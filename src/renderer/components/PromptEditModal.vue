@@ -11,8 +11,8 @@
                     </NFormItem>
 
                     <NAlert type="info" style="margin-top: 8px;">
-                        <NText depth="3" >
-                            提示：在内容中使用 {{ 变量名 }} 来定义可替换的变量，例如：{{ 用户名 }}、{{ 产品名称 }} 等。输入后会自动添加到下方的变量列表中。
+                        <NText depth="3">
+                            提示：在内容中使用 <span v-pre>{{变量名}}</span> 来定义可替换的变量，例如：<span v-pre>{{用户名}}</span>、<span v-pre>{{产品名称}}</span> 等。输入后会自动添加到下方的变量列表中。
                         </NText>
                     </NAlert>
                 </NCard>
@@ -333,7 +333,15 @@ const handleSave = async () => {
             content: formData.value.content,
             categoryId: formData.value.categoryId || undefined,
             tags: formData.value.tags || undefined,
-            variables: formData.value.variables.filter(v => v.name && v.label)
+            variables: formData.value.variables.filter(v => v.name && v.label).map(v => ({
+                name: v.name,
+                label: v.label,
+                type: v.type,
+                options: v.options || undefined,
+                defaultValue: v.defaultValue || undefined,
+                required: v.required,
+                placeholder: v.placeholder || undefined
+            }))
         }
 
         if (isEdit.value) {
@@ -348,7 +356,7 @@ const handleSave = async () => {
         }
 
         resetForm()
-        emit('saved')
+        emit('saved') // 通知父组件重新加载数据
     } catch (error) {
         message.error(isEdit.value ? '更新失败' : '创建失败')
         console.error(error)

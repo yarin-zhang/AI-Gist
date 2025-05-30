@@ -203,6 +203,7 @@ interface Emits {
   (e: 'update:show', value: boolean): void
   (e: 'use'): void
   (e: 'edit', prompt: any): void
+  (e: 'updated'): void // 添加数据更新事件
 }
 
 const props = defineProps<Props>()
@@ -269,7 +270,7 @@ const copyToClipboard = async (text) => {
 // 使用 Prompt
 const usePrompt = async () => {
   try {
-    // 保存使用记录
+    // 保存使用记录到本地存储
     const record = {
       date: formatDate(new Date()),
       content: filledContent.value,
@@ -284,7 +285,7 @@ const usePrompt = async () => {
     // 保存到本地存储
     localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
     
-    // 增加使用计数
+    // 通过 tRPC 增加使用计数
     await trpc.prompts.incrementUseCount.mutate(props.prompt.id)
     
     // 复制到剪贴板
@@ -292,6 +293,7 @@ const usePrompt = async () => {
     
     message.success('Prompt 已复制，使用计数已更新')
     emit('use')
+    emit('updated') // 通知父组件重新加载数据以更新使用计数
   } catch (error) {
     message.error('操作失败')
     console.error(error)
@@ -302,10 +304,11 @@ const usePrompt = async () => {
 const toggleFavorite = async () => {
   try {
     await trpc.prompts.toggleFavorite.mutate(props.prompt.id)
-    props.prompt.isFavorite = !props.prompt.isFavorite
     message.success('收藏状态已更新')
+    emit('updated') // 通知父组件重新加载数据
   } catch (error) {
     message.error('更新收藏状态失败')
+    console.error(error)
   }
 }
 

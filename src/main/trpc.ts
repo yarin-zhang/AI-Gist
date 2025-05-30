@@ -87,6 +87,7 @@ const updatePromptSchema = z.object({
     categoryId: z.number().optional(),
     tags: z.string().optional(),
     isFavorite: z.boolean().optional(),
+    variables: z.array(createPromptVariableSchema).optional(),
   }),
 });
 

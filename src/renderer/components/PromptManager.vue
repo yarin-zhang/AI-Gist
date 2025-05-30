@@ -142,6 +142,7 @@
       :prompt="selectedPrompt"
       @use="handlePromptUse"
       @edit="handleEditPrompt"
+      @updated="handlePromptUpdated"
     />
   </div>
 </template>
@@ -249,7 +250,7 @@ const selectPrompt = (prompt) => {
 const toggleFavorite = async (promptId) => {
   try {
     await trpc.prompts.toggleFavorite.mutate(promptId)
-    await loadPrompts()
+    await loadPrompts() // 重新加载数据而不是直接修改本地状态
     message.success('收藏状态已更新')
   } catch (error) {
     message.error('更新收藏状态失败')
@@ -326,6 +327,10 @@ const handlePromptSaved = () => {
 const handlePromptUse = () => {
   showDetailModal.value = false
   loadPrompts() // 刷新使用计数
+}
+
+const handlePromptUpdated = () => {
+  loadPrompts() // 重新加载数据以反映更新
 }
 
 // 组件挂载时加载数据

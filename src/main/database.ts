@@ -236,10 +236,27 @@ export class DatabaseService {
     categoryId?: number;
     tags?: string;
     isFavorite?: boolean;
+    variables?: Array<{
+      name: string;
+      label: string;
+      type: string;
+      options?: string;
+      defaultValue?: string;
+      required: boolean;
+      placeholder?: string;
+    }>;
   }) {
+    const { variables, ...promptData } = data;
+    
     return await this.db.prompt.update({
       where: { id },
-      data,
+      data: {
+        ...promptData,
+        variables: variables ? {
+          deleteMany: {},
+          create: variables
+        } : undefined
+      },
       include: {
         category: true,
         variables: true
