@@ -1,0 +1,39 @@
+{
+    "appId": "com.electron.app",
+    "directories": {
+        "output": "dist"
+    },
+
+    "nsis": {
+        "oneClick": false,
+        "perMachine": false,
+        "allowToChangeInstallationDirectory": true,
+        "shortcutName": "Electron App"
+    },
+    "win": {
+        "target": "nsis"
+    },
+    "linux":  {
+        "target": ["snap"]
+    },
+    "files": [
+        {
+            "from": "build/main",
+            "to": "main",
+            "filter": ["**/*"]
+        },
+        {
+            "from": "build/renderer",
+            "to": "renderer",
+            "filter": ["**/*"]
+        },
+        {
+            "from": "src/main/static",
+            "to": "static",
+            "filter": ["**/*"]
+        },
+	"!build",
+	"!dist",
+	"!scripts"
+    ]
+}

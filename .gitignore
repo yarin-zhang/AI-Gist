@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+
+.vscode
+.idea
+/src/generated/prisma
+
+.DS_Store
+
+*.db

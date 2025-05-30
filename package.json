@@ -1,0 +1,37 @@
+{
+  "name": "electron-vue-template",
+  "version": "0.1.0",
+  "description": "A minimal Electron + Vue application",
+  "main": "main/main.js",
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "build": "node scripts/build.js && electron-builder",
+    "build:win": "node scripts/build.js && electron-builder --win",
+    "build:mac": "node scripts/build.js && electron-builder --mac",
+    "build:linux": "node scripts/build.js && electron-builder --linux"
+  },
+  "repository": "https://github.com/deluze/electron-vue-template",
+  "author": {
+    "name": "Deluze",
+    "url": "https://github.com/Deluze"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.4.1",
+    "chalk": "^4.1.2",
+    "chokidar": "^3.5.3",
+    "electron": "^32.1.2",
+    "electron-builder": "^25.1.6",
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "@trpc/client": "^11.1.4",
+    "@trpc/server": "^11.1.4",
+    "@vicons/tabler": "^0.13.0",
+    "naive-ui": "^2.41.0",
+    "prisma": "^6.8.2",
+    "vue": "^3.3.8",
+    "zod": "^3.25.40"
+  }
+}
