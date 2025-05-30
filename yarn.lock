@@ -863,6 +863,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ai-gist@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "ai-gist@workspace:."
+  dependencies:
+    "@prisma/client": "npm:^6.8.2"
+    "@trpc/client": "npm:^11.1.4"
+    "@trpc/server": "npm:^11.1.4"
+    "@vicons/tabler": "npm:^0.13.0"
+    "@vitejs/plugin-vue": "npm:^4.4.1"
+    chalk: "npm:^4.1.2"
+    chokidar: "npm:^3.5.3"
+    electron: "npm:^32.1.2"
+    electron-builder: "npm:^25.1.6"
+    naive-ui: "npm:^2.41.0"
+    prisma: "npm:^6.8.2"
+    typescript: "npm:^5.2.2"
+    vite: "npm:^4.5.0"
+    vue: "npm:^3.3.8"
+    zod: "npm:^3.25.40"
+  languageName: unknown
+  linkType: soft
+
 "ajv-keywords@npm:^3.4.1":
   version: 3.5.2
   resolution: "ajv-keywords@npm:3.5.2"
@@ -1735,28 +1757,6 @@ __metadata:
   checksum: 10c0/cdb58049c24b38ba7879514224cfd2245fd364e125391ed6e12eeed2a96d95ede192a1ad961ff1287f344ca7b3b62e1096ce4a4c41be40fd402d0688fcf5c505
   languageName: node
   linkType: hard
-
-"electron-vue-template@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "electron-vue-template@workspace:."
-  dependencies:
-    "@prisma/client": "npm:^6.8.2"
-    "@trpc/client": "npm:^11.1.4"
-    "@trpc/server": "npm:^11.1.4"
-    "@vicons/tabler": "npm:^0.13.0"
-    "@vitejs/plugin-vue": "npm:^4.4.1"
-    chalk: "npm:^4.1.2"
-    chokidar: "npm:^3.5.3"
-    electron: "npm:^32.1.2"
-    electron-builder: "npm:^25.1.6"
-    naive-ui: "npm:^2.41.0"
-    prisma: "npm:^6.8.2"
-    typescript: "npm:^5.2.2"
-    vite: "npm:^4.5.0"
-    vue: "npm:^3.3.8"
-    zod: "npm:^3.25.40"
-  languageName: unknown
-  linkType: soft
 
 "electron@npm:^32.1.2":
   version: 32.3.3
