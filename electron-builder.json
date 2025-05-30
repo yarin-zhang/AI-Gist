@@ -32,8 +32,20 @@
             "to": "static",
             "filter": ["**/*"]
         },
+        "node_modules/.prisma",
+        "node_modules/@prisma/client",
+        {
+            "from": "prisma",
+            "to": "prisma",
+            "filter": ["**/*"]
+        },
+        "package.json",
 	"!build",
 	"!dist",
 	"!scripts"
+    ],
+    "asarUnpack": [
+        "node_modules/.prisma/**/*",
+        "node_modules/@prisma/client/**/*"
     ]
 }
