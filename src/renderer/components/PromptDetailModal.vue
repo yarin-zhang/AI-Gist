@@ -50,39 +50,10 @@
         </NFlex>
       </NCard>
 
-      <!-- 原始内容 -->
-      <NCard title="原始 Prompt" size="small">
-        <NInput
-          :value="prompt.content"
-          type="textarea"
-          readonly
-          :rows="8"
-          style="font-family: monospace;"
-        />
-        <NFlex justify="end" style="margin-top: 8px;">
-          <NButton size="small" @click="copyToClipboard(prompt.content)">
-            <template #icon>
-              <NIcon><Copy /></NIcon>
-            </template>
-            复制原始内容
-          </NButton>
-        </NFlex>
-      </NCard>
+
 
       <!-- 变量填充 -->
       <NCard v-if="prompt.variables && prompt.variables.length > 0" size="small">
-        <template #header>
-          <NFlex justify="space-between" align="center">
-            <NText>变量填充</NText>
-            <NButton size="small" @click="fillFromTemplate">
-              <template #icon>
-                <NIcon><Wand /></NIcon>
-              </template>
-              使用模板
-            </NButton>
-          </NFlex>
-        </template>
-
         <NFlex vertical size="medium">
           <NFormItem 
             v-for="variable in prompt.variables" 
@@ -112,35 +83,47 @@
 
           <NFlex justify="end">
             <NButton @click="clearVariables">清空</NButton>
-            <NButton type="primary" @click="generateFilledPrompt">
-              生成填充后的 Prompt
-            </NButton>
           </NFlex>
         </NFlex>
       </NCard>
 
-      <!-- 填充后的内容 -->
-      <NCard v-if="filledContent" title="填充后的 Prompt" size="small">
+      <!-- Prompt 内容 -->
+      <NCard size="small">
+        <template #header>
+          <NFlex justify="space-between" align="center">
+            <NText strong>Prompt 内容</NText>
+            <NFlex>
+              <NButton size="small" @click="copyToClipboard(filledContent)">
+                <template #icon>
+                  <NIcon><Copy /></NIcon>
+                </template>
+                复制内容
+              </NButton>
+              <NButton size="small" v-if="hasVariables" type="primary" @click="usePrompt">
+                <template #icon>
+                  <NIcon><Check /></NIcon>
+                </template>
+                使用此 Prompt
+              </NButton>
+            </NFlex>
+          </NFlex>
+        </template>
+        
         <NInput
           :value="filledContent"
           type="textarea"
           readonly
           :rows="8"
           style="font-family: monospace;"
+          :placeholder="!filledContent ? '内容为空' : ''"
         />
-        <NFlex justify="end" style="margin-top: 8px;">
-          <NButton @click="copyToClipboard(filledContent)">
-            <template #icon>
-              <NIcon><Copy /></NIcon>
-            </template>
-            复制填充内容
-          </NButton>
-          <NButton type="primary" @click="usePrompt">
-            <template #icon>
-              <NIcon><Check /></NIcon>
-            </template>
-            使用此 Prompt
-          </NButton>
+        
+        <!-- 如果有未填写的变量，显示提示 -->
+        <NFlex v-if="hasUnfilledVariables" align="center" style="margin-top: 8px; padding: 8px; background-color: #fff7e6; border-radius: 6px;">
+          <NIcon color="#fa8c16"><Wand /></NIcon>
+          <NText style="color: #fa8c16; font-size: 14px;">
+            检测到未填写的变量，请在上方填写以生成完整的 Prompt
+          </NText>
         </NFlex>
       </NCard>
 
@@ -214,18 +197,24 @@ const message = useMessage()
 
 // 响应式数据
 const variableValues = ref({})
-const filledContent = ref('')
 const useHistory = ref([])
 
 // 初始化变量值
 const initializeVariables = () => {
-  if (!props.prompt?.variables) return
+  if (!props.prompt?.variables) {
+    variableValues.value = {}
+    return
+  }
   
   const values = {}
   props.prompt.variables.forEach(variable => {
+    // 确保每个变量都有初始值，即使是空字符串
     values[variable.name] = variable.defaultValue || ''
   })
   variableValues.value = values
+  
+  console.log('初始化变量:', values) // 调试用
+  console.log('Prompt 内容:', props.prompt.content) // 调试用
 }
 
 // 获取选择框选项
@@ -237,25 +226,54 @@ const getSelectOptions = (optionsString) => {
   }))
 }
 
-// 生成填充后的 Prompt
-const generateFilledPrompt = () => {
-  if (!props.prompt) return
+// 生成填充后的 Prompt - 改为计算属性，自动生成
+const filledContent = computed(() => {
+  if (!props.prompt?.content) return ''
   
   let content = props.prompt.content
   
+  // 如果没有变量，直接返回原始内容
+  if (!props.prompt.variables || props.prompt.variables.length === 0) {
+    return content
+  }
+  
   // 替换变量
   Object.entries(variableValues.value).forEach(([key, value]) => {
-    const regex = new RegExp(`{{${key}}}`, 'g')
-    content = content.replace(regex, value || `{{${key}}}`)
+    const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g')
+    // 如果变量有值，就替换；如果没有值，保留原始的 {{key}} 格式
+    if (value !== undefined && value !== null && value.toString().trim() !== '') {
+      content = content.replace(regex, value.toString())
+    }
   })
   
-  filledContent.value = content
-}
+  console.log('计算填充内容:', { 
+    original: props.prompt.content, 
+    variables: variableValues.value, 
+    result: content 
+  }) // 调试用
+  
+  return content
+})
+
+// 是否有变量
+const hasVariables = computed(() => {
+  return props.prompt?.variables && props.prompt.variables.length > 0
+})
+
+// 是否有未填写的变量
+const hasUnfilledVariables = computed(() => {
+  if (!hasVariables.value) return false
+  
+  // 检查是否还有未替换的变量占位符
+  const content = filledContent.value
+  const hasPlaceholders = /\{\{[^}]+\}\}/.test(content)
+  
+  return hasPlaceholders
+})
 
 // 清空变量
 const clearVariables = () => {
   initializeVariables()
-  filledContent.value = ''
 }
 
 // 复制到剪贴板
@@ -313,16 +331,9 @@ const toggleFavorite = async () => {
   }
 }
 
-// 从模板填充
-const fillFromTemplate = () => {
-  // 这里可以实现一些常用的模板填充逻辑
-  message.info('模板功能开发中...')
-}
-
 // 加载历史记录
 const loadHistoryRecord = (record) => {
   variableValues.value = { ...record.variables }
-  filledContent.value = record.content
   message.success('已加载历史记录')
 }
 
@@ -351,9 +362,9 @@ const handleClose = () => {
 
 // 监听 prompt 变化
 watch(() => props.prompt, (newPrompt) => {
+  console.log('Prompt 变化:', newPrompt) // 调试用
   if (newPrompt) {
     initializeVariables()
-    filledContent.value = ''
     
     // 加载使用历史
     const history = localStorage.getItem(`prompt_history_${newPrompt.id}`)
@@ -369,11 +380,15 @@ watch(() => props.prompt, (newPrompt) => {
   }
 }, { immediate: true })
 
+// 监听变量值变化，用于调试
+watch(() => variableValues.value, (newValues) => {
+  console.log('变量值变化:', newValues)
+  console.log('填充后内容:', filledContent.value)
+}, { deep: true })
+
 // 监听显示状态
 watch(() => props.show, (show) => {
-  if (!show) {
-    filledContent.value = ''
-  }
+  // 移除了 filledContent.value = '' 因为现在是计算属性
 })
 </script>
 
