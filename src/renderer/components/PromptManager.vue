@@ -5,7 +5,7 @@
       <NFlex justify="space-between" align="center">
         <NText strong style="font-size: 24px;">AI Prompt 管理</NText>
         <NFlex>
-          <NButton type="primary" @click="showCreateModal = true">
+          <NButton type="primary" @click="() => { selectedPrompt = null; showCreateModal = true; }">
             <template #icon>
               <NIcon><Plus /></NIcon>
             </template>
@@ -290,7 +290,7 @@ const handlePromptAction = (action, prompt) => {
 }
 
 const handleEditPrompt = (prompt) => {
-  selectedPrompt.value = prompt
+  selectedPrompt.value = { ...prompt } // 创建副本避免直接修改
   showCreateModal.value = true
 }
 
@@ -320,6 +320,7 @@ const handlePromptSaved = () => {
   showCreateModal.value = false
   selectedPrompt.value = null
   loadPrompts()
+  // 移除这里的消息提示，让子组件处理
 }
 
 const handlePromptUse = () => {
