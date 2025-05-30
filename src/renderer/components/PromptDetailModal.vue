@@ -35,14 +35,15 @@
           <NText v-if="prompt.description">{{ prompt.description }}</NText>
 
           <div v-if="prompt.tags">
-            <NFlex size="small">
+            <NFlex size="small" style="margin: 8px 0;">
               <NTag 
-                v-for="tag in prompt.tags.split(',')" 
+                v-for="tag in getTagsArray(prompt.tags)" 
                 :key="tag"
                 size="small"
-                type="info"
+                :bordered="false"
+                :type="getTagType(tag)"
               >
-                {{ tag.trim() }}
+                {{ tag }}
               </NTag>
             </NFlex>
           </div>
@@ -328,6 +329,19 @@ const loadHistoryRecord = (record) => {
 // 格式化日期
 const formatDate = (date) => {
   return new Date(date).toLocaleString('zh-CN')
+}
+
+// 处理标签相关方法
+const getTagsArray = (tags) => {
+  if (!tags) return []
+  return typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(t => t) : tags
+}
+
+const getTagType = (tag) => {
+  // 根据标签内容返回不同的类型，让标签更有视觉层次
+  const types = ['default', 'success', 'warning', 'error', 'info']
+  const index = tag.length % types.length
+  return types[index]
 }
 
 // 关闭弹窗

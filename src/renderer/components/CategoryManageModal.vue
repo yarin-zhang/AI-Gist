@@ -4,15 +4,21 @@
       <!-- 创建新分类 -->
       <NCard title="创建分类" size="small">
         <NForm :model="newCategory" inline>
-          <NFormItem label="分类名称" style="flex: 1">
+          <NFormItem label="分类名称" style="flex: 4">
             <NInput 
               v-model:value="newCategory.name" 
               placeholder="请输入分类名称"
               @keyup.enter="handleCreate"
             />
           </NFormItem>
-          <NFormItem label="颜色">
-            <NColorPicker v-model:value="newCategory.color" :modes="['hex']" />
+          <NFormItem label="颜色" style="flex: 1">
+            <NColorPicker v-model:value="newCategory.color" :modes="['hex']" :swatches="[
+      '#FFFFFF',
+      '#18A058',
+      '#2080F0',
+      '#F0A020',
+      '#D03050',
+    ]"/>
           </NFormItem>
           <NFormItem>
             <NButton type="primary" @click="handleCreate" :loading="creating">

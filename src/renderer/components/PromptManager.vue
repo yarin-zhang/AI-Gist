@@ -103,6 +103,21 @@
               {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
             </NText>
             
+            <!-- 标签显示 -->
+            <div v-if="prompt.tags">
+              <NFlex size="small" style="margin: 8px 0;">
+                <NTag 
+                  v-for="tag in getTagsArray(prompt.tags)" 
+                  :key="tag"
+                  size="small"
+                  :bordered="false"
+                  :type="getTagType(tag)"
+                >
+                  {{ tag }}
+                </NTag>
+              </NFlex>
+            </div>
+            
             <NFlex justify="space-between" align="center" style="margin-top: 8px;">
               <NFlex size="small">
                 <NTag v-if="prompt.category" size="small" :color="{ color: prompt.category.color || '#18a058' }">
@@ -240,6 +255,19 @@ const handleCategoryFilter = () => {
 const toggleFavoritesFilter = () => {
   showFavoritesOnly.value = !showFavoritesOnly.value
   loadPrompts()
+}
+
+// 处理标签相关方法
+const getTagsArray = (tags) => {
+  if (!tags) return []
+  return typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(t => t) : tags
+}
+
+const getTagType = (tag) => {
+  // 根据标签内容返回不同的类型，让标签更有视觉层次
+  const types = ['default', 'success', 'warning', 'error', 'info']
+  const index = tag.length % types.length
+  return types[index]
 }
 
 const selectPrompt = (prompt) => {

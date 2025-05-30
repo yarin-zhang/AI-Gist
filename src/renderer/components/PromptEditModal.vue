@@ -105,8 +105,12 @@
                                     placeholder="选择分类" clearable />
                             </NFormItem>
 
-                            <NFormItem label="标签" style="flex: 1">
-                                <NInput v-model:value="formData.tags" placeholder="用逗号分隔，如：写作,创意" />
+                            <NFormItem label="标签" style="flex: 1" path="tags">
+                                <NDynamicTags 
+                                    v-model:value="formData.tags" 
+                                    placeholder="按回车添加标签"
+                                    :max="5"
+                                />
                             </NFormItem>
                         </NFlex>
                     </NFlex>
@@ -142,6 +146,7 @@ import {
     NAlert,
     NEmpty,
     NSwitch,
+    NDynamicTags,
     useMessage
 } from 'naive-ui'
 import { Plus, Trash } from '@vicons/tabler'
@@ -181,7 +186,7 @@ const formData = ref({
     description: '',
     content: '',
     categoryId: null,
-    tags: '',
+    tags: [] as string[],
     variables: [] as Variable[]
 })
 
@@ -208,6 +213,15 @@ const rules = {
         required: true,
         message: '请输入 Prompt 内容',
         trigger: 'blur'
+    },
+    tags: {
+        trigger: ['change'],
+        validator(rule: unknown, value: string[]) {
+            if (value.length > 5) {
+                return new Error('不得超过5个标签')
+            }
+            return true
+        }
     }
 }
 
@@ -218,7 +232,7 @@ const resetForm = () => {
         description: '',
         content: '',
         categoryId: null,
-        tags: '',
+        tags: [],
         variables: []
     }
 }
@@ -259,7 +273,7 @@ watch(() => props.prompt, (newPrompt) => {
             description: newPrompt.description || '',
             content: newPrompt.content || '',
             categoryId: newPrompt.categoryId || null,
-            tags: newPrompt.tags || '',
+            tags: newPrompt.tags ? (typeof newPrompt.tags === 'string' ? newPrompt.tags.split(',').map(t => t.trim()).filter(t => t) : newPrompt.tags) : [],
             variables: newPrompt.variables?.map(v => ({
                 name: v.name || '',
                 label: v.label || '',
@@ -332,7 +346,7 @@ const handleSave = async () => {
             description: formData.value.description || undefined,
             content: formData.value.content,
             categoryId: formData.value.categoryId || undefined,
-            tags: formData.value.tags || undefined,
+            tags: formData.value.tags.length > 0 ? formData.value.tags.join(',') : undefined,
             variables: formData.value.variables.filter(v => v.name && v.label).map(v => ({
                 name: v.name,
                 label: v.label,
