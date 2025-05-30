@@ -17,7 +17,6 @@ import {
     Star as PromptIcon
 } from '@vicons/tabler'
 
-import TrpcDemo from './TrpcDemo.vue'
 import PromptManager from './PromptManager.vue'
 
 const currentView = ref('prompts')
@@ -28,11 +27,6 @@ const menuOptions: MenuOption[] = [
         label: 'AI Prompt',
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
-    },
-    {
-        label: 'tRPC 演示',
-        key: 'trpc',
-        icon: () => h(NIcon, null, { default: () => h(TrpcIcon) })
     }
 ]
 

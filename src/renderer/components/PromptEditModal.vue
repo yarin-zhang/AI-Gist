@@ -356,6 +356,7 @@ const handleSave = async () => {
         }
 
         resetForm()
+        emit('update:show', false) // 关闭弹窗
         emit('saved') // 通知父组件重新加载数据
     } catch (error) {
         message.error(isEdit.value ? '更新失败' : '创建失败')
