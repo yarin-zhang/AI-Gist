@@ -114,6 +114,55 @@ ipcMain.handle('trpc', async (_, input: { path: string; input?: any; type: 'quer
         default:
           throw new Error(`Unknown procedure: ${input.path}`);
       }
+    } else if (routerName === 'categories') {
+      switch (procedureName) {
+        case 'create':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.createCategory(input.input.name, input.input.color);
+        case 'getAll':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.getAllCategories();
+        case 'update':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.updateCategory(input.input.id, input.input.data);
+        case 'delete':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.deleteCategory(input.input);
+        default:
+          throw new Error(`Unknown procedure: ${input.path}`);
+      }
+    } else if (routerName === 'prompts') {
+      switch (procedureName) {
+        case 'create':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.createPrompt(input.input);
+        case 'getAll':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.getAllPrompts(input.input);
+        case 'getById':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.getPromptById(input.input);
+        case 'update':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.updatePrompt(input.input.id, input.input.data);
+        case 'delete':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.deletePrompt(input.input);
+        case 'incrementUseCount':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.incrementPromptUseCount(input.input);
+        case 'fillVariables':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.fillPromptVariables(input.input.promptId, input.input.variables);
+        case 'getFavorites':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.getFavoritePrompts();
+        case 'toggleFavorite':
+          if (!dbService) throw new Error('Database not initialized');
+          return await dbService.togglePromptFavorite(input.input);
+        default:
+          throw new Error(`Unknown procedure: ${input.path}`);
+      }
     } else {
       throw new Error(`Unknown router: ${routerName}`);
     }

@@ -17,19 +17,13 @@ import {
     Star as PromptIcon
 } from '@vicons/tabler'
 
-import HelloWorld from './HelloWorld.vue'
 import TrpcDemo from './TrpcDemo.vue'
 import PromptManager from './PromptManager.vue'
 
-const currentView = ref('hello')
+const currentView = ref('prompts')
 
 // 菜单选项
 const menuOptions: MenuOption[] = [
-    {
-        label: '欢迎',
-        key: 'hello',
-        icon: () => h(NIcon, null, { default: () => h(HomeIcon) })
-    },
     {
         label: 'AI Prompt',
         key: 'prompts',
@@ -46,19 +40,18 @@ const handleMenuSelect = (key: string) => {
     currentView.value = key
 }
 
-const collapseRef = ref(false)
+const collapseRef = ref(true)
 
 window.electronAPI.sendMessage('Hello from App.vue!')
 </script>
 
 <template>
     <NLayout has-sider style="height: 100vh;">
-        <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event"
+        <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event" :default-collapsed="collapseRef"
             :width="260" show-trigger>
-            <NFlex vertical align="center" justify="center" style="padding: 20px; border-bottom: 1px solid #e0e0e6;"
-                v-if="!collapseRef">
+            <NFlex vertical align="center" justify="center" style="padding: 20px; border-bottom: 1px solid #e0e0e6;" v-if="!collapseRef">
                 <NText strong style="font-size: 16px; color: #333;">
-                    Electron Starter
+                    AI Gist
                 </NText>
             </NFlex>
             <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect" :collapsed-width="64"
@@ -66,7 +59,6 @@ window.electronAPI.sendMessage('Hello from App.vue!')
         </NLayoutSider>
 
         <NLayoutContent content-style="padding: 24px; overflow-y: auto; background-color: #f8f9fa;">
-            <HelloWorld v-if="currentView === 'hello'" msg="Electron Starter" />
             <PromptManager v-if="currentView === 'prompts'" />
             <TrpcDemo v-if="currentView === 'trpc'" />
         </NLayoutContent>
