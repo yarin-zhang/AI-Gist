@@ -13,11 +13,13 @@ import {
 import {
     Home as HomeIcon,
     Database as DatabaseIcon,
-    Server as TrpcIcon
+    Server as TrpcIcon,
+    Star as PromptIcon
 } from '@vicons/tabler'
 
 import HelloWorld from './HelloWorld.vue'
 import TrpcDemo from './TrpcDemo.vue'
+import PromptManager from './PromptManager.vue'
 
 const currentView = ref('hello')
 
@@ -27,6 +29,11 @@ const menuOptions: MenuOption[] = [
         label: '欢迎',
         key: 'hello',
         icon: () => h(NIcon, null, { default: () => h(HomeIcon) })
+    },
+    {
+        label: 'AI Prompt',
+        key: 'prompts',
+        icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
     },
     {
         label: 'tRPC 演示',
@@ -60,8 +67,8 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 
         <NLayoutContent content-style="padding: 24px; overflow-y: auto; background-color: #f8f9fa;">
             <HelloWorld v-if="currentView === 'hello'" msg="Electron Starter" />
+            <PromptManager v-if="currentView === 'prompts'" />
             <TrpcDemo v-if="currentView === 'trpc'" />
-            <DatabaseDemo v-if="currentView === 'database'" />
         </NLayoutContent>
     </NLayout>
 </template>

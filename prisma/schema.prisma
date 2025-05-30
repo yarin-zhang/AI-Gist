@@ -33,3 +33,43 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Prompt 管理相关模型
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  color     String?  // 分类颜色
+  prompts   Prompt[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Prompt {
+  id          Int              @id @default(autoincrement())
+  title       String
+  content     String           // Prompt 内容，可包含变量占位符
+  description String?          // Prompt 描述
+  category    Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId  Int?
+  variables   PromptVariable[] // 关联的变量
+  tags        String?          // 标签，用逗号分隔
+  isFavorite  Boolean          @default(false)
+  useCount    Int              @default(0) // 使用次数
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model PromptVariable {
+  id          Int      @id @default(autoincrement())
+  prompt      Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  promptId    Int
+  name        String   // 变量名，如 {{name}}
+  label       String   // 显示标签
+  type        String   @default("text") // 变量类型：text, textarea, select
+  options     String?  // 选项，JSON 格式存储
+  defaultValue String? // 默认值
+  required    Boolean  @default(true)
+  placeholder String?  // 占位符文本
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

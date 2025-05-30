@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, h } from 'vue'
 import {
-    NLayout,
-    NConfigProvider
+    NConfigProvider,
+    NMessageProvider
 } from 'naive-ui'
 import MainPage from './components/MainPage.vue'
 </script>
 
 <template>
     <NConfigProvider>
-        <MainPage />
+        <NMessageProvider>
+            <MainPage />
+        </NMessageProvider>
     </NConfigProvider>
 </template>
 

@@ -56,6 +56,75 @@ function createClient() {
           return window.electronAPI.trpc.mutate('posts.delete', id);
         }
       }
+    },
+    categories: {
+      create: {
+        mutate: async (input: any) => {
+          return window.electronAPI.trpc.mutate('categories.create', input);
+        }
+      },
+      getAll: {
+        query: async () => {
+          return window.electronAPI.trpc.query('categories.getAll');
+        }
+      },
+      update: {
+        mutate: async (input: any) => {
+          return window.electronAPI.trpc.mutate('categories.update', input);
+        }
+      },
+      delete: {
+        mutate: async (id: number) => {
+          return window.electronAPI.trpc.mutate('categories.delete', id);
+        }
+      }
+    },
+    prompts: {
+      create: {
+        mutate: async (input: any) => {
+          return window.electronAPI.trpc.mutate('prompts.create', input);
+        }
+      },
+      getAll: {
+        query: async (filters?: any) => {
+          return window.electronAPI.trpc.query('prompts.getAll', filters);
+        }
+      },
+      getById: {
+        query: async (id: number) => {
+          return window.electronAPI.trpc.query('prompts.getById', id);
+        }
+      },
+      update: {
+        mutate: async (input: any) => {
+          return window.electronAPI.trpc.mutate('prompts.update', input);
+        }
+      },
+      delete: {
+        mutate: async (id: number) => {
+          return window.electronAPI.trpc.mutate('prompts.delete', id);
+        }
+      },
+      incrementUseCount: {
+        mutate: async (id: number) => {
+          return window.electronAPI.trpc.mutate('prompts.incrementUseCount', id);
+        }
+      },
+      fillVariables: {
+        mutate: async (input: any) => {
+          return window.electronAPI.trpc.mutate('prompts.fillVariables', input);
+        }
+      },
+      getFavorites: {
+        query: async () => {
+          return window.electronAPI.trpc.query('prompts.getFavorites');
+        }
+      },
+      toggleFavorite: {
+        mutate: async (id: number) => {
+          return window.electronAPI.trpc.mutate('prompts.toggleFavorite', id);
+        }
+      }
     }
   };
 }
