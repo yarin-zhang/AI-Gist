@@ -3,7 +3,53 @@
     "directories": {
         "output": "dist"
     },
-
+    "files": [
+        {
+            "from": "build/main",
+            "to": "main",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
+            "from": "build/renderer",
+            "to": "renderer",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
+            "from": "src/main/static",
+            "to": "static",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
+            "from": "prisma",
+            "to": "prisma",
+            "filter": [
+                "**/*"
+            ]
+        },
+        "package.json",
+        "node_modules/@prisma/**",
+        "node_modules/.prisma/**"
+    ],
+    "asarUnpack": [
+        "**/node_modules/.prisma/**",
+        "**/node_modules/@prisma/client/**"
+    ],
+    "extraResources": [
+        {
+            "from": "node_modules/.prisma",
+            "to": "node_modules/.prisma"
+        },
+        {
+            "from": "node_modules/@prisma",
+            "to": "node_modules/@prisma"
+        }
+    ],
     "nsis": {
         "oneClick": false,
         "perMachine": false,
@@ -13,39 +59,9 @@
     "win": {
         "target": "nsis"
     },
-    "linux":  {
-        "target": ["snap"]
-    },
-    "files": [
-        {
-            "from": "build/main",
-            "to": "main",
-            "filter": ["**/*"]
-        },
-        {
-            "from": "build/renderer",
-            "to": "renderer",
-            "filter": ["**/*"]
-        },
-        {
-            "from": "src/main/static",
-            "to": "static",
-            "filter": ["**/*"]
-        },
-        "node_modules/.prisma",
-        "node_modules/@prisma/client",
-        {
-            "from": "prisma",
-            "to": "prisma",
-            "filter": ["**/*"]
-        },
-        "package.json",
-	"!build",
-	"!dist",
-	"!scripts"
-    ],
-    "asarUnpack": [
-        "node_modules/.prisma/**/*",
-        "node_modules/@prisma/client/**/*"
-    ]
+    "linux": {
+        "target": [
+            "snap"
+        ]
+    }
 }
