@@ -1,18 +1,163 @@
-import {app, BrowserWindow, ipcMain, session} from 'electron';
+import {app, BrowserWindow, ipcMain, session, Tray, Menu, dialog, nativeImage} from 'electron';
 import {join} from 'path';
 import { initDatabase, closeDatabase, DatabaseService } from './database';
 import { appRouter, setDatabaseService } from './trpc';
+import { existsSync } from 'fs';
 
 let dbService: DatabaseService | null = null;
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
+// 用户偏好设置
+interface UserPreferences {
+  dontShowCloseDialog: boolean;
+  closeAction: 'quit' | 'minimize'; // 'quit' 退出, 'minimize' 最小化到托盘
+}
+
+let userPrefs: UserPreferences = {
+  dontShowCloseDialog: false,
+  closeAction: 'quit'
+};
+
+function getAppIconPath(): string {
+  // 尝试多个可能的图标路径
+  const possiblePaths = [
+    join(__dirname, '..', 'assets', 'icon.png'),
+    join(__dirname, '..', 'assets', 'app.png'),
+    join(__dirname, '..', 'assets', 'tray.png'),
+    join(process.cwd(), 'assets', 'icon.png'),
+    join(process.cwd(), 'src', 'assets', 'icon.png')
+  ];
+
+  for (const iconPath of possiblePaths) {
+    if (existsSync(iconPath)) {
+      return iconPath;
+    }
+  }
+
+  // 如果没有找到图标文件，返回空字符串
+  console.warn('No icon file found, using default system icon');
+  return '';
+}
+
+function createTray() {
+  try {
+    const iconPath = getAppIconPath();
+    if (!iconPath) {
+      console.warn('Cannot create tray: no icon file found');
+      return;
+    }
+
+    // 创建托盘图标
+    const icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) {
+      console.warn('Cannot create tray: icon file is invalid or empty');
+      return;
+    }
+
+    tray = new Tray(icon);
+    
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '显示主窗口',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }
+      },
+      {
+        label: '退出',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        }
+      }
+    ]);
+    
+    tray.setToolTip('AI-Gist');
+    tray.setContextMenu(contextMenu);
+    
+    // 双击托盘图标显示窗口
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+
+    console.log('System tray created successfully');
+  } catch (error) {
+    console.error('Failed to create system tray:', error);
+  }
+}
 
 function createWindow () {
-  const mainWindow = new BrowserWindow({
+  const iconPath = getAppIconPath();
+  
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+    }
+  });
+
+  // 处理窗口关闭事件
+  mainWindow.on('close', async (event) => {
+    if (isQuitting) {
+      return;
+    }
+
+    event.preventDefault();
+
+    // 如果用户设置了不再提示，直接执行保存的操作
+    if (userPrefs.dontShowCloseDialog) {
+      if (userPrefs.closeAction === 'minimize') {
+        mainWindow?.hide();
+      } else {
+        isQuitting = true;
+        app.quit();
+      }
+      return;
+    }
+
+    // 显示关闭确认对话框
+    const result = await dialog.showMessageBox(mainWindow!, {
+      type: 'question',
+      buttons: ['退出', '最小化到托盘', '取消'],
+      defaultId: 0,
+      cancelId: 2,
+      title: '确认操作',
+      message: '您想要退出应用程序还是最小化到系统托盘？',
+      detail: '最小化到托盘后，应用程序将在后台继续运行。',
+      checkboxLabel: '不再显示此对话框',
+      checkboxChecked: false
+    });
+
+    if (result.response === 2) {
+      // 取消
+      return;
+    }
+
+    // 保存用户偏好
+    if (result.checkboxChecked) {
+      userPrefs.dontShowCloseDialog = true;
+      userPrefs.closeAction = result.response === 0 ? 'quit' : 'minimize';
+    }
+
+    if (result.response === 0) {
+      // 退出
+      isQuitting = true;
+      app.quit();
+    } else if (result.response === 1) {
+      // 最小化到托盘
+      mainWindow?.hide();
     }
   });
 
@@ -37,6 +182,9 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+  
+  // 创建系统托盘（在所有平台上都尝试创建，但主要用于 Windows 和 Linux）
+  createTray();
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -59,7 +207,14 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', async function () {
   // 关闭数据库连接
   await closeDatabase();
-  if (process.platform !== 'darwin') app.quit()
+  // 在 Windows 和 Linux 上，如果有托盘图标，不退出应用
+  if (process.platform !== 'darwin' && !tray) {
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 ipcMain.on('message', (event, message) => {
@@ -169,5 +324,28 @@ ipcMain.handle('trpc', async (_, input: { path: string; input?: any; type: 'quer
   } catch (error) {
     console.error('tRPC call failed:', error);
     throw error;
+  }
+});
+
+// 添加新的 IPC 处理器用于管理用户偏好
+ipcMain.handle('get-user-preferences', () => {
+  return userPrefs;
+});
+
+ipcMain.handle('set-user-preferences', (_, newPrefs: Partial<UserPreferences>) => {
+  userPrefs = { ...userPrefs, ...newPrefs };
+  return userPrefs;
+});
+
+ipcMain.handle('show-window', () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
+ipcMain.handle('hide-to-tray', () => {
+  if (mainWindow) {
+    mainWindow.hide();
   }
 });
