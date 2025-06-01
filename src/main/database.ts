@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { app } from 'electron';
 import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 let prisma: PrismaClient | null = null;
 
@@ -9,11 +10,25 @@ export function initDatabase(): PrismaClient {
     return prisma;
   }
 
-  // 在生产环境中，数据库文件应该存储在用户数据目录中
-  const isDev = process.env.NODE_ENV === 'development';
-  const databasePath = isDev 
-    ? join(process.cwd(), 'prisma', 'dev.db')
-    : join(app.getPath('userData'), 'app.db');
+  // 更准确的环境判断：检查是否在开发模式或者是否已打包
+  const isDev = !app.isPackaged;
+  
+  let databasePath: string;
+  
+  if (isDev) {
+    // 开发环境：使用项目根目录下的数据库
+    databasePath = join(process.cwd(), 'prisma', 'dev.db');
+  } else {
+    // 生产环境：使用用户数据目录
+    const userDataPath = app.getPath('userData');
+    // 确保目录存在
+    if (!existsSync(userDataPath)) {
+      mkdirSync(userDataPath, { recursive: true });
+    }
+    databasePath = join(userDataPath, 'app.db');
+  }
+
+  console.log('Database path:', databasePath);
 
   prisma = new PrismaClient({
     datasources: {
@@ -24,6 +39,128 @@ export function initDatabase(): PrismaClient {
   });
 
   return prisma;
+}
+
+// 在 database.ts 中添加
+export async function runDatabaseMigrations(): Promise<void> {
+  if (!prisma) {
+    throw new Error('Database not initialized');
+  }
+
+  try {
+    console.log('Running database migrations...');
+    
+    // 创建 User 表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "User" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "email" TEXT NOT NULL UNIQUE,
+        "name" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL
+      );
+    `;
+    
+    // 创建 Post 表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Post" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "title" TEXT NOT NULL,
+        "content" TEXT,
+        "published" BOOLEAN NOT NULL DEFAULT false,
+        "authorId" INTEGER NOT NULL,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL,
+        FOREIGN KEY ("authorId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+      );
+    `;
+    
+    // 创建 Category 表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Category" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "name" TEXT NOT NULL UNIQUE,
+        "color" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL
+      );
+    `;
+    
+    // 创建 Prompt 表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Prompt" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "title" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "description" TEXT,
+        "categoryId" INTEGER,
+        "tags" TEXT,
+        "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+        "useCount" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL,
+        FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+      );
+    `;
+    
+    // 创建 PromptVariable 表
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "PromptVariable" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "name" TEXT NOT NULL,
+        "label" TEXT NOT NULL,
+        "type" TEXT NOT NULL DEFAULT 'text',
+        "options" TEXT,
+        "defaultValue" TEXT,
+        "required" BOOLEAN NOT NULL DEFAULT false,
+        "placeholder" TEXT,
+        "promptId" INTEGER NOT NULL,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL,
+        FOREIGN KEY ("promptId") REFERENCES "Prompt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `;
+    
+    // 创建索引以提高性能
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_category" ON "Prompt"("categoryId");`;
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_favorite" ON "Prompt"("isFavorite");`;
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_use_count" ON "Prompt"("useCount");`;
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_variable_prompt" ON "PromptVariable"("promptId");`;
+    
+    console.log('Database migrations completed successfully');
+  } catch (error) {
+    console.error('Database migration failed:', error);
+    throw error;
+  }
+}
+
+// 添加数据库初始化函数
+export async function ensureDatabaseExists(): Promise<void> {
+  if (!prisma) {
+    throw new Error('Database not initialized');
+  }
+  
+  try {
+    console.log('Ensuring database exists and is properly structured...');
+    
+    // 尝试连接数据库
+    await prisma.$connect();
+    
+    // 运行数据库迁移
+    await runDatabaseMigrations();
+    
+    // 验证表是否存在
+    const tables = await prisma.$queryRaw`
+      SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';
+    `;
+    console.log('Database tables:', tables);
+    
+    console.log('Database initialization completed successfully');
+    
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    throw error;
+  }
 }
 
 export function getDatabase(): PrismaClient {

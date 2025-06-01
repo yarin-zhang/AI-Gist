@@ -1,6 +1,6 @@
 import {app, BrowserWindow, ipcMain, session, Tray, Menu, dialog, nativeImage} from 'electron';
 import {join} from 'path';
-import { initDatabase, closeDatabase, DatabaseService } from './database';
+import { initDatabase, closeDatabase, DatabaseService,ensureDatabaseExists } from './database';
 import { appRouter, setDatabaseService } from './trpc';
 import { existsSync } from 'fs';
 
@@ -171,14 +171,35 @@ function createWindow () {
 }
 
 app.whenReady().then(async () => {
-  // 初始化数据库
+  createWindow();
+  createTray();
+
   try {
-    initDatabase();
+    // 初始化数据库
+    console.log('Initializing database...');
+    const db = initDatabase();
+    await ensureDatabaseExists();
+    
     dbService = new DatabaseService();
     setDatabaseService(dbService);
+    
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Failed to initialize database:', error);
+    
+    // 显示错误对话框
+    if (mainWindow) {
+      dialog.showErrorBox(
+        '数据库初始化失败',
+        `应用程序无法初始化数据库。错误信息：\n${error instanceof Error ? error.message : String(error)}\n\n请尝试重新启动应用程序。如果问题持续存在，请联系技术支持。`
+      );
+    }
+    
+    // 延迟退出，让用户看到错误信息
+    setTimeout(() => {
+      app.quit();
+    }, 3000);
+    return;
   }
 
   createWindow();
