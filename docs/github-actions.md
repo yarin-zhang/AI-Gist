@@ -56,6 +56,22 @@ yarn version major
 
 工作流配置位于 `.github/workflows/build-release.yml`。
 
+## 常见问题
+
+**问题：** `'tsc' is not recognized as an internal or external command` 或 `/bin/sh: tsc: command not found`
+
+**解决方案：**
+- 这是 TypeScript 编译器未找到的问题
+- 工作流已经配置了自动安装 TypeScript
+- 如果仍有问题，可以检查 `package.json` 中是否包含 `typescript` 依赖
+
+**问题：** `Application entry file "main\main.js" does not exist`
+
+**解决方案：**
+- 这通常是由于 TypeScript 编译失败导致的
+- 确保所有 TypeScript 源文件语法正确
+- 检查 `src/main/tsconfig.json` 配置是否正确
+
 ## 注意事项
 
 - 确保您的仓库设置了适当的 GitHub Actions 权限
