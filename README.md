@@ -76,7 +76,7 @@ yarn build:linux    # 构建 Linux 安装包
 - [数据库模型管理](./docs/database-models.md)
 - [API 接口开发](./docs/api-development.md)
 
-## 使用静态资源
+### 使用静态资源
 
 如果你有一些文件需要在安装后复制到应用目录，请将它们放入 `src/main/static` 目录中。
 
@@ -94,6 +94,11 @@ import { readFileSync } from 'fs';
 const path = join(app.getAppPath(), 'static', 'myFile.txt');
 const buffer = readFileSync(path);
 ```
+
+## 自动构建与发布
+
+本项目使用 GitHub Actions 自动构建和发布应用程序。有关详细信息，请参阅 [GitHub Actions 自动构建与发布指南](docs/github-actions.md)。
+
 
 ## 应用截图
 
