@@ -4,6 +4,11 @@
     "directories": {
         "output": "dist"
     },
+    "publish": {
+        "provider": "github",
+        "owner": "yarin-zhang",
+        "repo": "AI-Gist"
+    },
     "files": [
         {
             "from": "build/main",
