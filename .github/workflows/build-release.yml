@@ -70,9 +70,11 @@ jobs:
         run: yarn prisma:generate
 
       - name: Build for macOS ${{ matrix.arch }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
           node scripts/build.js
-          CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --${{ matrix.arch }}
+          yarn electron-builder --mac --${{ matrix.arch }}
 
       - name: Upload macOS DMG
         uses: softprops/action-gh-release@v1
@@ -102,7 +104,7 @@ jobs:
 
       - name: Build for Windows
         run: |
-          yarn build:win
+          yarn build:ci:win
 
       - name: Upload Windows EXE
         uses: softprops/action-gh-release@v1
@@ -132,7 +134,7 @@ jobs:
 
       - name: Build for Linux
         run: |
-          yarn build:linux
+          yarn build:ci:linux
 
       - name: Upload Linux AppImage
         uses: softprops/action-gh-release@v1
