@@ -171,7 +171,6 @@ function createWindow () {
 }
 
 app.whenReady().then(async () => {
-  createWindow();
   createTray();
 
   try {
