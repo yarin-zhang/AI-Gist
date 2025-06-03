@@ -41,6 +41,7 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
@@ -76,6 +77,7 @@ jobs:
 
       - name: Build for macOS ${{ matrix.arch }}
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
           node scripts/build.js
@@ -84,6 +86,7 @@ jobs:
       - name: Upload macOS DMG
         uses: softprops/action-gh-release@v1
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
@@ -116,10 +119,13 @@ jobs:
         run: |
           node scripts/build.js
           yarn electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload Windows EXE
         uses: softprops/action-gh-release@v1
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
@@ -152,10 +158,13 @@ jobs:
         run: |
           node scripts/build.js
           yarn electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload Linux AppImage
         uses: softprops/action-gh-release@v1
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
