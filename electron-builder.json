@@ -7,28 +7,28 @@
     "files": [
         {
             "from": "build/main",
-            "to": "main",
+            "to": "./main",
             "filter": [
                 "**/*"
             ]
         },
         {
             "from": "build/renderer",
-            "to": "renderer",
+            "to": "./renderer",
             "filter": [
                 "**/*"
             ]
         },
         {
             "from": "src/main/static",
-            "to": "static",
+            "to": "./static",
             "filter": [
                 "**/*"
             ]
         },
         {
             "from": "prisma",
-            "to": "prisma",
+            "to": "./prisma",
             "filter": [
                 "**/*"
             ]
