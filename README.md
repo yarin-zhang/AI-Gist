@@ -6,7 +6,7 @@
 
 </div>
 
-![](docs/images/image01.png)
+![](docs/images/image01.png?v=2)
 
 ## ✨ 特点
 
@@ -97,6 +97,6 @@ const buffer = readFileSync(path);
 
 ## 应用截图
 
-![](docs/images/image02.png)
+![](docs/images/image02.png?v=2)
 
-![](docs/images/image03.png)
+![](docs/images/image03.png?v=2)
