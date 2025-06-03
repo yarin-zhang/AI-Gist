@@ -2,7 +2,7 @@
   "name": "ai-gist",
   "version": "0.1.0",
   "description": "AI Prompt Manager",
-  "main": "main/main.js",
+  "main": "./main/main.js",
   "scripts": {
     "dev": "node scripts/dev-server.js",
     "build": "yarn prisma:generate && electron-builder",
