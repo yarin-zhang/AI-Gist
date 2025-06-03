@@ -5,7 +5,7 @@ function compile(directory) {
   return new Promise((resolve, reject) => {
     console.log(Chalk.blueBright(`Compiling TypeScript in: ${directory}`));
     
-    const tscProcess = ChildProcess.exec('tsc', {
+    const tscProcess = ChildProcess.exec('npx tsc', {
       cwd: directory,
     });
 
