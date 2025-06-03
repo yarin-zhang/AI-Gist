@@ -15,6 +15,7 @@ function buildRenderer() {
 
 function buildMain() {
     const mainPath = Path.join(__dirname, '..', 'src', 'main');
+    console.log(Chalk.blueBright(`Building main process from: ${mainPath}`));
     return compileTs(mainPath);
 }
 
@@ -79,12 +80,27 @@ generatePrismaClient().then(() => {
     preparePrismaFiles();
     console.log(Chalk.blueBright('Transpiling renderer & main...'));
     
-    return Promise.allSettled([
+    // 使用 Promise.all 而不是 Promise.allSettled，这样任何失败都会导致整个构建失败
+    return Promise.all([
         buildRenderer(),
         buildMain(),
     ]);
-}).then(() => {
+}).then((results) => {
     console.log(Chalk.greenBright('Renderer & main successfully transpiled! (ready to be built with electron-builder)'));
+    
+    // 验证构建结果
+    const buildDir = Path.join(__dirname, '..', 'build');
+    const mainDir = Path.join(buildDir, 'main');
+    const rendererDir = Path.join(buildDir, 'renderer');
+    
+    if (!FileSystem.existsSync(mainDir)) {
+        throw new Error('Main build directory does not exist: ' + mainDir);
+    }
+    if (!FileSystem.existsSync(rendererDir)) {
+        throw new Error('Renderer build directory does not exist: ' + rendererDir);
+    }
+    
+    console.log(Chalk.greenBright('Build verification passed!'));
 }).catch((error) => {
     console.error(Chalk.redBright('Build failed:'), error);
     process.exit(1);

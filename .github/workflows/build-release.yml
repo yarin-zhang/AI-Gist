@@ -74,10 +74,6 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
           node scripts/build.js
-          # 检查构建目录结构
-          ls -la build/main/
-          ls -la build/renderer/
-          # 使用正确的路径构建
           yarn electron-builder --mac --${{ matrix.arch }}
 
       - name: Upload macOS DMG
@@ -109,10 +105,6 @@ jobs:
       - name: Build for Windows
         run: |
           node scripts/build.js
-          # 检查构建目录结构
-          dir build\main
-          dir build\renderer
-          # 使用正确的路径构建
           yarn electron-builder --win
 
       - name: Upload Windows EXE
@@ -144,10 +136,6 @@ jobs:
       - name: Build for Linux
         run: |
           node scripts/build.js
-          # 检查构建目录结构
-          ls -la build/main/
-          ls -la build/renderer/
-          # 使用正确的路径构建
           yarn electron-builder --linux
 
       - name: Upload Linux AppImage
