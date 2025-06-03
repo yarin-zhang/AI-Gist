@@ -95,6 +95,11 @@ const path = join(app.getAppPath(), 'static', 'myFile.txt');
 const buffer = readFileSync(path);
 ```
 
+## 自动构建与发布
+
+本项目使用 GitHub Actions 自动构建和发布应用程序。有关详细信息，请参阅 [GitHub Actions 自动构建与发布指南](docs/github-actions.md)。
+
+
 ## 应用截图
 
 ![](docs/images/image02.png?v=2)

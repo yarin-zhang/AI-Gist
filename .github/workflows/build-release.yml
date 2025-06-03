@@ -1,0 +1,147 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'v0.1.0'
+        required: true
+        default: ''
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: AI Gist ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+  build-mac:
+    needs: create-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build for macOS ${{ matrix.arch }}
+        run: |
+          node scripts/build.js
+          CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --${{ matrix.arch }}
+
+      - name: Upload macOS DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/AI Gist-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg
+          asset_name: AI-Gist-${{ needs.create-release.outputs.version }}-mac-${{ matrix.arch }}.dmg
+          asset_content_type: application/octet-stream
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build for Windows
+        run: |
+          node scripts/build.js
+          electron-builder --win
+
+      - name: Upload Windows EXE
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/AI Gist Setup ${{ needs.create-release.outputs.version }}.exe
+          asset_name: AI-Gist-Setup-${{ needs.create-release.outputs.version }}.exe
+          asset_content_type: application/octet-stream
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build for Linux
+        run: |
+          node scripts/build.js
+          electron-builder --linux
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/ai-gist_${{ needs.create-release.outputs.version }}_amd64.snap
+          asset_name: ai-gist-${{ needs.create-release.outputs.version }}-linux.snap
+          asset_content_type: application/octet-stream

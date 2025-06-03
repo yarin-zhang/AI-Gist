@@ -13,7 +13,9 @@
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:prod": "prisma migrate deploy"
+    "prisma:migrate:prod": "prisma migrate deploy",
+    "version": "git add -A",
+    "postversion": "git push && git push --tags"
   },
   "repository": "https://github.com/yarin-zhang/ai-gist",
   "author": {
