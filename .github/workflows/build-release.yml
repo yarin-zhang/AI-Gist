@@ -7,9 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'v0.1.0'
+        description: '版本号 (例如: v0.1.1)'
         required: true
         default: ''
+
+# 添加全局权限，解决 Resource not accessible by integration 错误
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  pull-requests: write
 
 jobs:
   create-release:
@@ -32,14 +39,13 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: AI Gist ${{ steps.get_version.outputs.version }}
+          name: AI Gist ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
+          generate_release_notes: true
 
   build-mac:
     needs: create-release
@@ -69,14 +75,11 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --${{ matrix.arch }}
 
       - name: Upload macOS DMG
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/AI Gist-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg
-          asset_name: AI-Gist-${{ needs.create-release.outputs.version }}-mac-${{ matrix.arch }}.dmg
-          asset_content_type: application/octet-stream
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            ./dist/AI Gist-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg#AI-Gist-${{ needs.create-release.outputs.version }}-mac-${{ matrix.arch }}.dmg
 
   build-windows:
     needs: create-release
@@ -103,14 +106,11 @@ jobs:
           electron-builder --win
 
       - name: Upload Windows EXE
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/AI Gist Setup ${{ needs.create-release.outputs.version }}.exe
-          asset_name: AI-Gist-Setup-${{ needs.create-release.outputs.version }}.exe
-          asset_content_type: application/octet-stream
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            ./dist/AI Gist Setup ${{ needs.create-release.outputs.version }}.exe#AI-Gist-Setup-${{ needs.create-release.outputs.version }}.exe
 
   build-linux:
     needs: create-release
@@ -137,11 +137,8 @@ jobs:
           electron-builder --linux
 
       - name: Upload Linux AppImage
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/ai-gist_${{ needs.create-release.outputs.version }}_amd64.snap
-          asset_name: ai-gist-${{ needs.create-release.outputs.version }}-linux.snap
-          asset_content_type: application/octet-stream
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            ./dist/ai-gist_${{ needs.create-release.outputs.version }}_amd64.snap#ai-gist-${{ needs.create-release.outputs.version }}-linux.snap
