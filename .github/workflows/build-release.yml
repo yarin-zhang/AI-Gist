@@ -119,17 +119,3 @@ jobs:
           node scripts/build.js
           yarn electron-builder --linux --publish always
 
-  publish-release:
-    needs: [create-release, build-mac, build-windows, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          draft: false
