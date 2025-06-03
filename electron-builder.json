@@ -75,13 +75,7 @@
     "dmg": {
         "contents": [
             {
-                "x": 130,
-                "y": 150,
-                "type": "file",
-                "path": "dist/mac/AI Gist.app"
-            },
-            {
-                "x": 400,
+                "x": 410,
                 "y": 150,
                 "type": "link",
                 "path": "/Applications"
@@ -96,7 +90,8 @@
         "window": {
             "width": 540,
             "height": 380
-        }
+        },
+        "title": "AI Gist ${version}"
     },
     "linux": {
         "target": [
