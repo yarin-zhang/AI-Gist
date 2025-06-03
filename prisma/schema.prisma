@@ -1,44 +1,39 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
-// 示例模型
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  posts     Post[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Post {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   title     String
   content   String?
-  published Boolean @default(false)
-  author    User    @relation(fields: [authorId], references: [id])
+  published Boolean  @default(false)
+  author    User     @relation(fields: [authorId], references: [id])
   authorId  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Prompt 管理相关模型
 model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
-  color     String?  // 分类颜色
+  color     String?
   prompts   Prompt[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -47,29 +42,35 @@ model Category {
 model Prompt {
   id          Int              @id @default(autoincrement())
   title       String
-  content     String           // Prompt 内容，可包含变量占位符
-  description String?          // Prompt 描述
-  category    Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  content     String
+  description String?
+  category    Category?        @relation(fields: [categoryId], references: [id])
   categoryId  Int?
-  variables   PromptVariable[] // 关联的变量
-  tags        String?          // 标签，用逗号分隔
+  tags        String?
   isFavorite  Boolean          @default(false)
-  useCount    Int              @default(0) // 使用次数
+  useCount    Int              @default(0)
+  variables   PromptVariable[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([categoryId], name: "idx_prompt_category")
+  @@index([isFavorite], name: "idx_prompt_favorite")
+  @@index([useCount], name: "idx_prompt_use_count")
 }
 
 model PromptVariable {
-  id          Int      @id @default(autoincrement())
-  prompt      Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  promptId    Int
-  name        String   // 变量名，如 {{name}}
-  label       String   // 显示标签
-  type        String   @default("text") // 变量类型：text, textarea, select
-  options     String?  // 选项，JSON 格式存储
-  defaultValue String? // 默认值
-  required    Boolean  @default(true)
-  placeholder String?  // 占位符文本
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  name         String
+  label        String
+  type         String   @default("text")
+  options      String?
+  defaultValue String?
+  required     Boolean  @default(false)
+  placeholder  String?
+  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  promptId     Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([promptId], name: "idx_prompt_variable_prompt")
 }

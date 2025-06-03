@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { app } from 'electron';
 import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
+import path from 'path';
 
 let prisma: PrismaClient | null = null;
 
@@ -41,7 +42,7 @@ export function initDatabase(): PrismaClient {
   return prisma;
 }
 
-// 在 database.ts 中添加
+// 替换原有的迁移函数
 export async function runDatabaseMigrations(): Promise<void> {
   if (!prisma) {
     throw new Error('Database not initialized');
@@ -50,88 +51,141 @@ export async function runDatabaseMigrations(): Promise<void> {
   try {
     console.log('Running database migrations...');
     
-    // 创建 User 表
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "User" (
-        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "email" TEXT NOT NULL UNIQUE,
-        "name" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL
-      );
-    `;
+    // 确定迁移文件的路径
+    const isDev = !app.isPackaged;
+    let migrationsDir: string;
     
-    // 创建 Post 表
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "Post" (
-        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "title" TEXT NOT NULL,
-        "content" TEXT,
-        "published" BOOLEAN NOT NULL DEFAULT false,
-        "authorId" INTEGER NOT NULL,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("authorId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-      );
-    `;
+    if (isDev) {
+      // 开发环境：使用项目根目录下的迁移文件
+      migrationsDir = join(process.cwd(), 'prisma', 'migrations');
+    } else {
+      // 生产环境：使用打包到应用中的迁移文件
+      migrationsDir = join(process.resourcesPath, 'prisma', 'migrations');
+    }
     
-    // 创建 Category 表
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "Category" (
-        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "name" TEXT NOT NULL UNIQUE,
-        "color" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL
-      );
-    `;
+    console.log('Migrations directory:', migrationsDir);
     
-    // 创建 Prompt 表
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "Prompt" (
-        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "title" TEXT NOT NULL,
-        "content" TEXT NOT NULL,
-        "description" TEXT,
-        "categoryId" INTEGER,
-        "tags" TEXT,
-        "isFavorite" BOOLEAN NOT NULL DEFAULT false,
-        "useCount" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-      );
-    `;
+    if (!existsSync(migrationsDir)) {
+      console.warn('Migrations directory not found. Skipping migrations.');
+      return;
+    }
     
-    // 创建 PromptVariable 表
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "PromptVariable" (
-        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "name" TEXT NOT NULL,
-        "label" TEXT NOT NULL,
-        "type" TEXT NOT NULL DEFAULT 'text',
-        "options" TEXT,
-        "defaultValue" TEXT,
-        "required" BOOLEAN NOT NULL DEFAULT false,
-        "placeholder" TEXT,
-        "promptId" INTEGER NOT NULL,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("promptId") REFERENCES "Prompt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-      );
-    `;
+    // 获取所有迁移文件夹，按命名顺序排序
+    const migrationDirs = getMigrationDirectories(migrationsDir);
     
-    // 创建索引以提高性能
-    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_category" ON "Prompt"("categoryId");`;
-    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_favorite" ON "Prompt"("isFavorite");`;
-    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_use_count" ON "Prompt"("useCount");`;
-    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "idx_prompt_variable_prompt" ON "PromptVariable"("promptId");`;
+    // 获取已应用的迁移列表
+    const appliedMigrations = await getAppliedMigrations();
+    
+    // 应用每个迁移
+    for (const migrationDir of migrationDirs) {
+      const migrationName = path.basename(migrationDir);
+      
+      // 如果迁移已经应用过，跳过
+      if (appliedMigrations.includes(migrationName)) {
+        console.log(`Migration ${migrationName} already applied, skipping`);
+        continue;
+      }
+      
+      // 读取并执行迁移SQL
+      const sqlPath = path.join(migrationDir, 'migration.sql');
+      if (existsSync(sqlPath)) {
+        const sql = readFileSync(sqlPath, 'utf8');
+        console.log(`Applying migration: ${migrationName}`);
+        
+        // 将SQL语句按分号分割并执行
+        const statements = sql
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        
+        for (const statement of statements) {
+          await prisma.$executeRawUnsafe(statement);
+        }
+        
+        // 记录已应用的迁移
+        await recordAppliedMigration(migrationName);
+      }
+    }
     
     console.log('Database migrations completed successfully');
   } catch (error) {
     console.error('Database migration failed:', error);
     throw error;
   }
+}
+
+// 获取迁移目录列表并排序
+function getMigrationDirectories(migrationsDir: string): string[] {
+  if (!existsSync(migrationsDir)) {
+    return [];
+  }
+  
+  // 读取目录
+  const entries = require('fs').readdirSync(migrationsDir, { withFileTypes: true });
+  
+  // 过滤出目录并按名称排序（Prisma的迁移文件夹格式为：20220101000000_migration_name）
+  return entries
+    .filter((entry: any) => entry.isDirectory())
+    .map((entry: any) => path.join(migrationsDir, entry.name))
+    .sort();
+}
+
+// 获取已应用的迁移列表
+async function getAppliedMigrations(): Promise<string[]> {
+  try {
+    // 确保_prisma_migrations表存在
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+        "id" TEXT PRIMARY KEY,
+        "checksum" TEXT NOT NULL,
+        "finished_at" DATETIME,
+        "migration_name" TEXT NOT NULL,
+        "logs" TEXT,
+        "rolled_back_at" DATETIME,
+        "started_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "applied_steps_count" INTEGER NOT NULL DEFAULT 0
+      );
+    `;
+    
+    // 查询已应用的迁移
+    const appliedMigrations = await prisma.$queryRaw<Array<{migration_name: string}>>`
+      SELECT migration_name FROM "_prisma_migrations" WHERE rolled_back_at IS NULL;
+    `;
+    
+    return appliedMigrations.map(m => m.migration_name);
+  } catch (error) {
+    console.error('Failed to get applied migrations:', error);
+    return [];
+  }
+}
+
+// 记录已应用的迁移
+async function recordAppliedMigration(migrationName: string): Promise<void> {
+  const id = generateUuid();
+  const checksum = generateMigrationChecksum(migrationName);
+  
+  await prisma.$executeRaw`
+    INSERT INTO "_prisma_migrations" (
+      "id", "checksum", "finished_at", "migration_name", "applied_steps_count"
+    ) VALUES (
+      ${id}, ${checksum}, CURRENT_TIMESTAMP, ${migrationName}, 1
+    );
+  `;
+}
+
+// 生成UUID
+function generateUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0,
+        v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// 生成迁移检查和
+function generateMigrationChecksum(migrationName: string): string {
+  // 简单实现，实际应用中可能需要更复杂的检查和算法
+  return Buffer.from(migrationName).toString('base64');
 }
 
 // 添加数据库初始化函数
