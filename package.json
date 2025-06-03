@@ -5,7 +5,7 @@
   "main": "main/main.js",
   "scripts": {
     "dev": "node scripts/dev-server.js",
-    "build": "npm run prisma:generate && electron-builder",
+    "build": "yarn prisma:generate && electron-builder",
     "build:win": "node scripts/build.js && electron-builder --win",
     "build:mac": "node scripts/build.js && electron-builder --mac",
     "build:linux": "node scripts/build.js && electron-builder --linux",

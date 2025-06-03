@@ -60,14 +60,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '20'
+          cache: 'yarn'
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npm run prisma:generate
+        run: yarn prisma:generate
 
       - name: Build for macOS ${{ matrix.arch }}
         run: |
@@ -91,19 +91,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '20'
+          cache: 'yarn'
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npm run prisma:generate
+        run: yarn prisma:generate
 
       - name: Build for Windows
         run: |
-          node scripts/build.js
-          electron-builder --win
+          yarn build:win
 
       - name: Upload Windows EXE
         uses: softprops/action-gh-release@v1
@@ -122,19 +121,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '20'
+          cache: 'yarn'
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npm run prisma:generate
+        run: yarn prisma:generate
 
       - name: Build for Linux
         run: |
-          node scripts/build.js
-          electron-builder --linux
+          yarn build:linux
 
       - name: Upload Linux AppImage
         uses: softprops/action-gh-release@v1
