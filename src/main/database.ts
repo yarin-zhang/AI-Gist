@@ -73,7 +73,10 @@ export async function runDatabaseMigrations(): Promise<void> {
     // 获取所有迁移文件夹，按命名顺序排序
     const migrationDirs = getMigrationDirectories(migrationsDir);
     
-    // 获取已应用的迁移列表
+    // 保持对 prisma 的引用以确保它在函数执行期间不会变为 null
+    const db = prisma;
+    
+    // 获取已应用的迁移列表 - 内部自己检查 prisma 是否为 null
     const appliedMigrations = await getAppliedMigrations();
     
     // 应用每个迁移
@@ -99,10 +102,10 @@ export async function runDatabaseMigrations(): Promise<void> {
           .filter(s => s.length > 0);
         
         for (const statement of statements) {
-          await prisma.$executeRawUnsafe(statement);
+          await db.$executeRawUnsafe(statement);
         }
         
-        // 记录已应用的迁移
+        // 记录已应用的迁移 - 内部自己检查 prisma 是否为 null
         await recordAppliedMigration(migrationName);
       }
     }
@@ -132,6 +135,11 @@ function getMigrationDirectories(migrationsDir: string): string[] {
 
 // 获取已应用的迁移列表
 async function getAppliedMigrations(): Promise<string[]> {
+  if (!prisma) {
+    console.warn('Prisma client is not initialized, cannot get applied migrations');
+    return [];
+  }
+
   try {
     // 确保_prisma_migrations表存在
     await prisma.$executeRaw`
@@ -161,6 +169,11 @@ async function getAppliedMigrations(): Promise<string[]> {
 
 // 记录已应用的迁移
 async function recordAppliedMigration(migrationName: string): Promise<void> {
+  if (!prisma) {
+    console.error('Prisma client is not initialized, cannot record migration');
+    return;
+  }
+
   const id = generateUuid();
   const checksum = generateMigrationChecksum(migrationName);
   
