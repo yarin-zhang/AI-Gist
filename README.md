@@ -6,9 +6,7 @@ AI Prompt 管理工具，能够利用 AI 快速生成高质量的 AI Prompt + �
 
 </div>
 
-
-
-
+![](docs/images/image01.png)
 
 ## 快速开始
 
@@ -87,3 +85,9 @@ import { readFileSync } from 'fs';
 const path = join(app.getAppPath(), 'static', 'myFile.txt');
 const buffer = readFileSync(path);
 ```
+
+## 应用截图
+
+![](docs/images/image02.png)
+
+![](docs/images/image03.png)
