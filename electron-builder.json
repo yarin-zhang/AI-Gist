@@ -74,7 +74,7 @@
     },
     "linux": {
         "target": [
-            "AppImage", "deb"
+            "AppImage"
         ],
         "artifactName": "ai-gist-${version}-linux.${ext}"
     }
