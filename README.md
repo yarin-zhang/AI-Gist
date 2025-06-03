@@ -2,19 +2,31 @@
 
 # AI Gist
 
-AI Prompt 管理工具，能够利用 AI 快速生成高质量的 AI Prompt + 维护 Prompt 列表 + Prompt 变量填充。
+本地 AI Prompt 管理工具，能够管理个人 AI Prompt + 维护 Prompt 标签分类 + Prompt 变量填充。
 
 </div>
 
 ![](docs/images/image01.png)
 
-## 快速开始
+## ✨ 特点
 
-点击页面上方绿色的 **Use this template** 按钮，创建一个属于你自己的仓库。
+- **Prompt 模板管理**：集中管理和组织所有 AI Prompt 模板
+- **变量填充**：支持在 Prompt 中定义变量，使用时可动态填充
+- **分类与标签**：通过分类和标签系统轻松查找和过滤 Prompt
+- **一键复制**：一键复制生成的 Prompt，直接粘贴到其他 AI 工具中使用
+- **历史记录**：保存使用过的 Prompt，方便重复使用和优化
+- **跨平台支持**：支持 Windows、macOS 和 Linux 系统
 
-**或者**
+## 🚀 使用说明
 
-直接克隆此仓库：`git clone https://git.yarinz.com/yarin-zhang/electron-vue-template.git`
+1. **创建 Prompt 模板**：点击"新建"按钮创建新的 Prompt 模板，设置标题、内容和变量
+2. **使用变量**：在 Prompt 内容中使用 `{{变量名}}` 格式定义变量
+3. **填充变量**：选择模板后，系统会提示填写变量值
+4. **生成 Prompt**：填写变量后自动生成最终 Prompt
+5. **复制使用**：点击复制按钮，将生成的 Prompt 粘贴到任何 AI 工具中
+6. **管理模板**：通过左侧导航栏管理分类和标签，组织你的 Prompt 库
+
+## 开发说明
 
 ### 安装依赖 ⏬
 
@@ -35,7 +47,7 @@ yarn prisma db push
 yarn dev
 ```
 
-## 其他常用命令
+### 其他常用命令
 
 ```bash
 # 开发相关
@@ -56,10 +68,7 @@ yarn build:linux    # 构建 Linux 安装包
 
 更多配置选项请参阅 [Electron Builder CLI 文档](https://www.electron.build/cli.html)。
 
-
-
-
-## 开发指南
+### 开发指南
 
 详细的开发指南请参阅 [docs](./docs) 目录：
 
