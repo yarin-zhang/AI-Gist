@@ -1,5 +1,6 @@
 {
-    "appId": "com.electron.app",
+    "appId": "com.yarinz.aigist",
+    "productName": "AI Gist",
     "directories": {
         "output": "dist"
     },
