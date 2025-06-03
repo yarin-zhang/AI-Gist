@@ -7,7 +7,8 @@
     "publish": {
         "provider": "github",
         "owner": "yarin-zhang",
-        "repo": "AI-Gist"
+        "repo": "AI-Gist",
+        "releaseType": "draft"
     },
     "files": [
         {

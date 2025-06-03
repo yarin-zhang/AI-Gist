@@ -35,14 +35,14 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create GitHub Release
+      - name: Create Draft GitHub Release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
           name: AI Gist ${{ steps.get_version.outputs.version }}
-          draft: false
+          draft: true
           prerelease: false
           generate_release_notes: true
 
@@ -118,3 +118,18 @@ jobs:
         run: |
           node scripts/build.js
           yarn electron-builder --linux --publish always
+
+  publish-release:
+    needs: [create-release, build-mac, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          draft: false
