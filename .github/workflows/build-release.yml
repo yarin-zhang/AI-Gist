@@ -11,7 +11,6 @@ on:
         required: true
         default: ''
 
-# 添加全局权限，解决 Resource not accessible by integration 错误
 permissions:
   contents: write
   packages: write
@@ -22,7 +21,6 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout code
@@ -37,11 +35,9 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Release
-        id: create_release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
@@ -57,8 +53,7 @@ jobs:
       matrix:
         arch: [x64, arm64]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -66,39 +61,23 @@ jobs:
           node-version: '20'
           cache: 'yarn'
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile
+      - run: npm install -g typescript
+      - run: yarn prisma:generate
 
-      - name: Install TypeScript globally
-        run: npm install -g typescript
-
-      - name: Generate Prisma client
-        run: yarn prisma:generate
-
-      - name: Build for macOS ${{ matrix.arch }}
+      - name: Build and Publish (macOS)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: |
           node scripts/build.js
-          yarn electron-builder --mac --${{ matrix.arch }}
-
-      - name: Upload macOS DMG
-        uses: softprops/action-gh-release@v1
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          files: |
-            ./dist/AI Gist-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg#AI-Gist-${{ needs.create-release.outputs.version }}-mac-${{ matrix.arch }}.dmg
+          yarn electron-builder --mac --${{ matrix.arch }} --publish always
 
   build-windows:
     needs: create-release
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -106,38 +85,22 @@ jobs:
           node-version: '20'
           cache: 'yarn'
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile
+      - run: npm install -g typescript
+      - run: yarn prisma:generate
 
-      - name: Install TypeScript globally
-        run: npm install -g typescript
-
-      - name: Generate Prisma client
-        run: yarn prisma:generate
-
-      - name: Build for Windows
+      - name: Build and Publish (Windows)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Upload Windows EXE
-        uses: softprops/action-gh-release@v1
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          files: |
-            ./dist/AI Gist Setup ${{ needs.create-release.outputs.version }}.exe#AI-Gist-Setup-${{ needs.create-release.outputs.version }}.exe
+          yarn electron-builder --win --publish always
 
   build-linux:
     needs: create-release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -145,28 +108,13 @@ jobs:
           node-version: '20'
           cache: 'yarn'
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile
+      - run: npm install -g typescript
+      - run: yarn prisma:generate
 
-      - name: Install TypeScript globally
-        run: npm install -g typescript
-
-      - name: Generate Prisma client
-        run: yarn prisma:generate
-
-      - name: Build for Linux
+      - name: Build and Publish (Linux)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --linux
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Upload Linux AppImage
-        uses: softprops/action-gh-release@v1
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          files: |
-            ./dist/ai-gist_${{ needs.create-release.outputs.version }}_amd64.snap#ai-gist-${{ needs.create-release.outputs.version }}-linux.snap
+          yarn electron-builder --linux --publish always
