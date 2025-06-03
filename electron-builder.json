@@ -55,18 +55,21 @@
         "oneClick": false,
         "perMachine": false,
         "allowToChangeInstallationDirectory": true,
-        "shortcutName": "Electron App"
+        "shortcutName": "AI Gist"
     },
     "win": {
-        "target": "nsis"
+        "target": "nsis",
+        "artifactName": "AI-Gist-Setup-${version}.${ext}"
     },
     "mac": {
         "target": "dmg",
-        "icon": "src/assets/macos.icns"
+        "icon": "src/assets/macos.icns",
+        "artifactName": "AI-Gist-${version}-mac-${arch}.${ext}"
     },
     "linux": {
         "target": [
             "snap"
-        ]
+        ],
+        "artifactName": "ai-gist-${version}-linux.${ext}"
     }
 }
