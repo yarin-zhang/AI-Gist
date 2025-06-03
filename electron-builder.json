@@ -72,6 +72,32 @@
         "icon": "src/assets/macos.icns",
         "artifactName": "AI-Gist-${version}-mac-${arch}.${ext}"
     },
+    "dmg": {
+        "contents": [
+            {
+                "x": 130,
+                "y": 150,
+                "type": "file",
+                "path": "dist/mac/YourAppName.app"
+            },
+            {
+                "x": 400,
+                "y": 150,
+                "type": "link",
+                "path": "/Applications"
+            },
+            {
+                "x": 130,
+                "y": 300,
+                "type": "file",
+                "path": "src/assets/install-guide.html"
+            }
+        ],
+        "window": {
+            "width": 540,
+            "height": 380
+        }
+    },
     "linux": {
         "target": [
             "AppImage"
