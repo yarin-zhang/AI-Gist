@@ -300,7 +300,7 @@ class DatabaseManager {
           : `${packageManager} prisma migrate dev`;
       } else {
         // 生产环境：使用 migrate deploy
-        command = "npx prisma migrate deploy";
+        command = `${packageManager} prisma migrate deploy`;
       }
 
       const result = await execAsync(command, {
