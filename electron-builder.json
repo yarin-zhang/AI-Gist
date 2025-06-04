@@ -36,8 +36,8 @@
             "from": "prisma",
             "to": "./prisma",
             "filter": [
-                "**/*",
-                "!dev.db*"
+                "schema.prisma",
+                "migrations/**/*"
             ]
         },
         "package.json"
@@ -45,7 +45,8 @@
     "asarUnpack": [
         "**/node_modules/.prisma/**",
         "**/node_modules/@prisma/client/**",
-        "**/prisma/**"
+        "**/node_modules/prisma/**",
+        "prisma/**"
     ],
     "extraResources": [
         {
@@ -55,6 +56,14 @@
         {
             "from": "node_modules/@prisma",
             "to": "node_modules/@prisma"
+        },
+        {
+            "from": "node_modules/prisma",
+            "to": "node_modules/prisma"
+        },
+        {
+            "from": "prisma/schema.prisma",
+            "to": "prisma/schema.prisma"
         }
     ],
     "nsis": {

@@ -29,7 +29,7 @@ model User {
 }
 ```
 
-**注意：** 本项目使用 SQLite 数据库，适合桌面应用程序。数据库文件位于 `prisma/dev.db`。
+**注意：** 本项目使用 SQLite 数据库，适合桌面应用程序。开发环境数据库文件位于项目根目录的 `dev.db`。
 
 ## 2. 修改数据库模型
 
@@ -132,6 +132,9 @@ yarn prisma migrate deploy
 如果需要完全重置数据库：
 
 ```bash
+# 删除现有数据库文件
+rm -f dev.db*
+
 # 重置数据库并应用所有迁移
 yarn prisma migrate reset
 
@@ -279,14 +282,34 @@ model User {
 yarn prisma generate
 ```
 
-**错误：迁移冲突**
+**错误：迁移冲突 / 表已存在**
 ```bash
-yarn prisma migrate reset
-yarn prisma migrate dev
+# 删除数据库文件重新开始
+find . -name "dev.db*" -delete
+yarn prisma db push
+yarn prisma generate
 ```
 
 **错误：数据库连接失败**
-检查 `DATABASE_URL` 环境变量或 `schema.prisma` 中的数据库配置。
+检查 `DATABASE_URL` 环境变量。开发环境应该指向项目根目录的 `dev.db` 文件。
+
+**错误：多个数据库文件**
+如果发现有多个 `dev.db` 文件，删除所有并重新初始化：
+```bash
+find . -name "dev.db*" -delete
+yarn prisma db push
+```
+
+**错误：P2010 - 表已存在**
+这通常是因为数据库迁移状态不一致：
+```bash
+# 方法1：重置数据库
+find . -name "dev.db*" -delete
+yarn prisma db push
+
+# 方法2：如果需要保留数据，标记迁移为已应用
+yarn prisma migrate resolve --applied 20250530015702_init
+```
 
 ### 8.2 查看数据库内容
 
