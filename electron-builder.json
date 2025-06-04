@@ -36,16 +36,15 @@
             "from": "prisma",
             "to": "./prisma",
             "filter": [
-                "**/*",
-                "!dev.db*"
+                "schema.prisma",
+                "migrations/**/*"
             ]
         },
         "package.json"
     ],
     "asarUnpack": [
         "**/node_modules/.prisma/**",
-        "**/node_modules/@prisma/client/**",
-        "**/prisma/**"
+        "**/node_modules/@prisma/client/**"
     ],
     "extraResources": [
         {
