@@ -1,5 +1,7 @@
 <div align="center">
 
+![Logo](docs/images/logo.png)
+
 # AI Gist
 
 本地 AI Prompt 管理工具，能够管理个人 AI Prompt + 维护 Prompt 标签分类 + Prompt 变量填充。
@@ -23,7 +25,7 @@
 
 | 平台 | 下载链接 | 说明 |
 |------|----------|------|
-| ![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Windows 安装程序 |
+| ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Windows 安装程序 |
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Apple Silicon)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Apple 芯片 |
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
@@ -92,30 +94,7 @@ yarn build:linux    # 构建 Linux 安装包
 - [tRPC 和 Prisma 使用指南](./docs/trpc-prisma-guide.md)
 - [数据库模型管理](./docs/database-models.md)
 - [API 接口开发](./docs/api-development.md)
-
-### 使用静态资源
-
-如果你有一些文件需要在安装后复制到应用目录，请将它们放入 `src/main/static` 目录中。
-
-该目录中的文件仅对主进程可访问，类似于 `src/renderer/assets` 目录中的资源只对渲染进程可访问。其使用方式与你在其他前端项目中的经验类似。
-
-### 主进程中引用静态资源
-
-```ts
-/* 假设文件 src/main/static/myFile.txt 存在 */
-
-import { app } from 'electron';
-import { join } from 'path';
-import { readFileSync } from 'fs';
-
-const path = join(app.getAppPath(), 'static', 'myFile.txt');
-const buffer = readFileSync(path);
-```
-
-## 自动构建与发布
-
-本项目使用 GitHub Actions 自动构建和发布应用程序。有关详细信息，请参阅 [GitHub Actions 自动构建与发布指南](docs/github-actions.md)。
-
+- [GitHub Actions 自动构建与发布](./docs/github-actions.md)
 
 ## 应用截图
 
