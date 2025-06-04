@@ -22,7 +22,7 @@ function buildRenderer() {
  */
 function buildMain() {
     const mainPath = Path.join(__dirname, '..', 'src', 'main');
-    console.log(Chalk.blueBright(`Building main process from: ${mainPath}`));
+    console.log(Chalk.blueBright(`正在构建主进程：${mainPath}`));
     return compileTs(mainPath);
 }
 
@@ -31,7 +31,7 @@ function buildMain() {
  */
 function generatePrismaClient() {
     return new Promise((resolve, reject) => {
-        console.log(Chalk.yellowBright('Generating Prisma client...'));
+        console.log(Chalk.yellowBright('正在生成 Prisma 客户端...'));
         
         const prismaProcess = ChildProcess.exec('yarn prisma generate', {
             cwd: Path.join(__dirname, '..'),
@@ -51,9 +51,9 @@ function generatePrismaClient() {
 
         prismaProcess.on('exit', exitCode => {
             if (exitCode && exitCode > 0) {
-                reject(new Error(`Prisma generate failed with exit code ${exitCode}`));
+                reject(new Error(`Prisma 客户端生成失败，退出码：${exitCode}`));
             } else {
-                console.log(Chalk.greenBright('Prisma client generated successfully!'));
+                console.log(Chalk.greenBright('Prisma 客户端生成成功！'));
                 resolve();
             }
         });
@@ -69,7 +69,7 @@ function copyResources() {
 
     if (FileSystem.existsSync(resourcesPath)) {
         FileSystem.cpSync(resourcesPath, buildResourcesPath, { recursive: true });
-        console.log(Chalk.greenBright('Resources copied to build directory'));
+        console.log(Chalk.greenBright('资源文件已复制到构建目录'));
     }
 
     // 复制 Prisma schema 和 migrations
@@ -78,7 +78,7 @@ function copyResources() {
     
     if (FileSystem.existsSync(prismaPath)) {
         FileSystem.cpSync(prismaPath, buildPrismaPath, { recursive: true });
-        console.log(Chalk.greenBright('Prisma files copied to build directory'));
+        console.log(Chalk.greenBright('Prisma 文件已复制到构建目录'));
     }
 }
 
@@ -88,12 +88,12 @@ FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
     force: true,
 });
 
-console.log(Chalk.blueBright('Building application...'));
+console.log(Chalk.blueBright('开始构建应用程序...'));
 
 // 简化的构建流程
 generatePrismaClient()
     .then(() => {
-        console.log(Chalk.blueBright('Building renderer & main...'));
+        console.log(Chalk.blueBright('正在构建渲染进程和主进程...'));
         
         // 并行构建渲染进程和主进程
         return Promise.all([
@@ -105,10 +105,10 @@ generatePrismaClient()
         // 复制必要的资源文件
         copyResources();
         
-        console.log(Chalk.greenBright('Build completed successfully!'));
-        console.log(Chalk.greenBright('Ready for electron-builder packaging.'));
+        console.log(Chalk.greenBright('构建成功完成！'));
+        console.log(Chalk.greenBright('可以使用 electron-builder 进行打包。'));
     })
     .catch((error) => {
-        console.error(Chalk.redBright('Build failed:'), error);
+        console.error(Chalk.redBright('构建失败：'), error);
         process.exit(1);
     });
