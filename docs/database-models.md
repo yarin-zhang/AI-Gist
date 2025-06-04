@@ -10,7 +10,7 @@ Prisma schema 文件位于 `prisma/schema.prisma`，包含：
 // 数据库配置
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 // 客户端生成器
@@ -28,6 +28,8 @@ model User {
   updatedAt DateTime @updatedAt
 }
 ```
+
+**注意：** 本项目使用 SQLite 数据库，适合桌面应用程序。数据库文件位于 `prisma/dev.db`。
 
 ## 2. 修改数据库模型
 
