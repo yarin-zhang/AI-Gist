@@ -2,7 +2,6 @@
 node_modules/
 
 # 包管理器缓存和状态文件
-.yarn/
 .pnp.*
 install-state.gz
 .pnpm-store/
