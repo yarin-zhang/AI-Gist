@@ -182,8 +182,11 @@ FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
 
 console.log(Chalk.blueBright('Building application...'));
 
-// 构建流程：首先生成 Prisma 客户端，然后构建应用
-generatePrismaClient().then(() => {
+// 构建流程：首先生成 Prisma 客户端和初始数据库，然后构建应用
+Promise.all([
+    generatePrismaClient(),
+    generateStarterDatabase()
+]).then(() => {
     // 准备 Prisma 相关文件
     preparePrismaFiles();
     console.log(Chalk.blueBright('Transpiling renderer & main...'));
