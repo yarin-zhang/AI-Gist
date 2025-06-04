@@ -23,7 +23,12 @@ function generatePrismaClient() {
     return new Promise((resolve, reject) => {
         console.log(Chalk.yellowBright('Generating Prisma client...'));
         const prismaProcess = ChildProcess.exec('npx prisma generate', {
-            cwd: Path.join(__dirname, '..')
+            cwd: Path.join(__dirname, '..'),
+            env: {
+                ...process.env,
+                // 确保在构建时使用正确的数据库 URL
+                DATABASE_URL: process.env.DATABASE_URL || 'file:./prisma/dev.db'
+            }
         });
 
         if (prismaProcess.stdout) {
@@ -65,6 +70,38 @@ function preparePrismaFiles() {
             Path.join(buildPrismaPath, 'schema.prisma')
         );
         console.log(Chalk.greenBright('Prisma schema copied to build directory'));
+    }
+    
+    // 复制生成的 Prisma 客户端
+    const generatedPath = Path.join(__dirname, '..', 'node_modules', '.prisma');
+    const buildGeneratedPath = Path.join(__dirname, '..', 'build', 'node_modules', '.prisma');
+    
+    if (FileSystem.existsSync(generatedPath)) {
+        // 确保目标目录存在
+        FileSystem.mkdirSync(Path.dirname(buildGeneratedPath), { recursive: true });
+        
+        // 递归复制目录
+        copyDirectory(generatedPath, buildGeneratedPath);
+        console.log(Chalk.greenBright('Generated Prisma client copied to build directory'));
+    }
+}
+
+function copyDirectory(src, dest) {
+    if (!FileSystem.existsSync(dest)) {
+        FileSystem.mkdirSync(dest, { recursive: true });
+    }
+    
+    const entries = FileSystem.readdirSync(src, { withFileTypes: true });
+    
+    for (const entry of entries) {
+        const srcPath = Path.join(src, entry.name);
+        const destPath = Path.join(dest, entry.name);
+        
+        if (entry.isDirectory()) {
+            copyDirectory(srcPath, destPath);
+        } else {
+            FileSystem.copyFileSync(srcPath, destPath);
+        }
     }
 }
 
