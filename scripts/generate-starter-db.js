@@ -37,48 +37,48 @@ async function generateStarterDatabase() {
 
     console.log('正在填充初始数据...');
     
-    // 创建示例用户
-    const adminUser = await prisma.user.create({
-      data: {
-        email: '管理员@example.com',
-        name: '系统管理员'
-      }
-    });
+    // // 创建示例用户
+    // const adminUser = await prisma.user.create({
+    //   data: {
+    //     email: '管理员@example.com',
+    //     name: '系统管理员'
+    //   }
+    // });
 
-    const demoUser = await prisma.user.create({
-      data: {
-        email: '演示用户@example.com',
-        name: '演示用户'
-      }
-    });
+    // const demoUser = await prisma.user.create({
+    //   data: {
+    //     email: '演示用户@example.com',
+    //     name: '演示用户'
+    //   }
+    // });
 
-    // 创建示例文章
-    await prisma.post.create({
-      data: {
-        title: '欢迎使用本应用',
-        content: '这是您的第一篇文章。您可以随时编辑或删除它。',
-        published: true,
-        authorId: adminUser.id
-      }
-    });
+    // // 创建示例文章
+    // await prisma.post.create({
+    //   data: {
+    //     title: '欢迎使用本应用',
+    //     content: '这是您的第一篇文章。您可以随时编辑或删除它。',
+    //     published: true,
+    //     authorId: adminUser.id
+    //   }
+    // });
 
-    await prisma.post.create({
-      data: {
-        title: '快速入门指南',
-        content: '这里是一些帮助您快速上手本应用的小贴士...',
-        published: true,
-        authorId: adminUser.id
-      }
-    });
+    // await prisma.post.create({
+    //   data: {
+    //     title: '快速入门指南',
+    //     content: '这里是一些帮助您快速上手本应用的小贴士...',
+    //     published: true,
+    //     authorId: adminUser.id
+    //   }
+    // });
 
-    await prisma.post.create({
-      data: {
-        title: '演示文章',
-        content: '这是由演示用户创建的一篇演示文章。',
-        published: false,
-        authorId: demoUser.id
-      }
-    });
+    // await prisma.post.create({
+    //   data: {
+    //     title: '演示文章',
+    //     content: '这是由演示用户创建的一篇演示文章。',
+    //     published: false,
+    //     authorId: demoUser.id
+    //   }
+    // });
 
     console.log('初始数据填充成功');
 
