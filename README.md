@@ -17,7 +17,24 @@
 - **历史记录**：保存使用过的 Prompt，方便重复使用和优化
 - **跨平台支持**：支持 Windows、macOS 和 Linux 系统
 
-## 🚀 使用说明
+## 🚀 下载
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/yarin-zhang/AI-Gist?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases/latest) [![GitHub all releases](https://img.shields.io/github/downloads/yarin-zhang/AI-Gist/total?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases)
+
+| 平台 | 下载链接 | 说明 |
+|------|----------|------|
+| ![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Windows 安装程序 |
+| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Apple Silicon)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Apple 芯片 |
+| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
+| ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
+
+### 安装说明
+
+- **Windows：** 下载 `.exe` 文件后双击运行安装
+- **macOS：** 下载 `.dmg` 文件后打开，将应用拖拽到应用程序文件夹，在终端执行 `xattr -cr /Applications/AI\ Gist.app` 以解除“已损坏”报错后启动。
+- **Linux：** 下载 `.AppImage` 文件后添加执行权限：`chmod +x ai-gist-linux.AppImage`
+
+## 📒 使用说明
 
 1. **创建 Prompt 模板**：点击"新建"按钮创建新的 Prompt 模板，设置标题、内容和变量
 2. **使用变量**：在 Prompt 内容中使用 `{{变量名}}` 格式定义变量
