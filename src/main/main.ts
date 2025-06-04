@@ -1,5 +1,5 @@
 import { app, BrowserWindow, session, dialog } from 'electron';
-import { initDatabase, closeDatabase, ensureDatabaseExists } from './database';
+import { initDatabase, closeDatabase } from './database';
 import { 
   windowManager, 
   trayManager, 
@@ -16,8 +16,7 @@ let isQuitting = false; // 标记应用是否正在退出
 async function initializeDatabase(): Promise<boolean> {
   try {
     console.log('正在初始化数据库...');
-    initDatabase();
-    await ensureDatabaseExists();
+    await initDatabase();
     
     console.log('数据库初始化成功');
     return true;

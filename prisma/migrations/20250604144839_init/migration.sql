@@ -1,4 +1,25 @@
 -- CreateTable
+CREATE TABLE "User" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "email" TEXT NOT NULL,
+    "name" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Post" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "title" TEXT NOT NULL,
+    "content" TEXT,
+    "published" BOOLEAN NOT NULL DEFAULT false,
+    "authorId" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Post_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Category" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
@@ -25,18 +46,33 @@ CREATE TABLE "Prompt" (
 -- CreateTable
 CREATE TABLE "PromptVariable" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "promptId" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "label" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'text',
     "options" TEXT,
     "defaultValue" TEXT,
-    "required" BOOLEAN NOT NULL DEFAULT true,
+    "required" BOOLEAN NOT NULL DEFAULT false,
     "placeholder" TEXT,
+    "promptId" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "PromptVariable_promptId_fkey" FOREIGN KEY ("promptId") REFERENCES "Prompt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
+
+-- CreateIndex
+CREATE INDEX "idx_prompt_category" ON "Prompt"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "idx_prompt_favorite" ON "Prompt"("isFavorite");
+
+-- CreateIndex
+CREATE INDEX "idx_prompt_use_count" ON "Prompt"("useCount");
+
+-- CreateIndex
+CREATE INDEX "idx_prompt_variable_prompt" ON "PromptVariable"("promptId");

@@ -1,380 +1,610 @@
 import { PrismaClient } from "@prisma/client";
 import { app, dialog } from "electron";
-import { join } from "path";
-import { existsSync, mkdirSync, copyFileSync, writeFileSync, promises as fs } from "fs";
+import { join, dirname } from "path";
+import { existsSync, mkdirSync, copyFileSync, promises as fs } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
-// 将 exec 函数转换为 Promise 形式，便于使用 async/await
 const execAsync = promisify(exec);
 
-// Prisma 客户端实例，全局单例
-let prisma: PrismaClient | null = null;
+/**
+ * 数据库环境类型
+ */
+export type DatabaseEnvironment = "development" | "production";
 
 /**
- * 简化的日志记录函数
- * @param message 日志消息内容
- * @param level 日志级别：info(信息)、warn(警告)、error(错误)
+ * 数据库状态类型
  */
-function log(message: string, level: 'info' | 'warn' | 'error' = 'info') {
-  // 获取当前时间戳
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-  console.log(logMessage);
-  
-  try {
-    // 将日志写入用户数据目录下的 app.log 文件
-    const logPath = join(app.getPath('userData'), 'app.log');
-    writeFileSync(logPath, logMessage + '\n', { flag: 'a' });
-  } catch (error) {
-    console.error('Failed to write to log file:', error);
-  }
+export type DatabaseStatus =
+  | "not_initialized"
+  | "initialized"
+  | "migrating"
+  | "ready"
+  | "error";
+
+/**
+ * 数据库配置接口
+ */
+interface DatabaseConfig {
+  environment: DatabaseEnvironment;
+  databasePath: string;
+  databaseUrl: string;
+  migrationsPath: string;
+  starterDbPath?: string;
+  backupEnabled: boolean;
+  autoMigrate: boolean;
 }
 
 /**
- * 获取数据库文件路径
- * 开发环境：项目根目录下的 prisma/dev.db
- * 生产环境：用户数据目录下的 app.db
+ * 数据库管理器类
+ * 负责 Prisma 数据库的完整生命周期管理
  */
-function getDatabasePath(): string {
-  const isDev = !app.isPackaged;
-  
-  if (isDev) {
-    // 开发环境：使用项目目录下的开发数据库
-    return join(process.cwd(), "prisma", "dev.db");
-  } else {
-    // 生产环境：使用用户数据目录
-    const userDataPath = app.getPath("userData");
-    if (!existsSync(userDataPath)) {
-      mkdirSync(userDataPath, { recursive: true });
+class DatabaseManager {
+  private prisma: PrismaClient | null = null;
+  private config: DatabaseConfig;
+  private status: DatabaseStatus = "not_initialized";
+  private isInitializing = false;
+
+  constructor() {
+    this.config = this.createConfig();
+  }
+  /**
+   * 创建数据库配置
+   */
+  private createConfig(): DatabaseConfig {
+    const environment: DatabaseEnvironment = app.isPackaged
+      ? "production"
+      : "development";
+    const databasePath = this.getDatabasePath(environment);
+    const databaseUrl = `file:${databasePath}`;
+
+    return {
+      environment,
+      databasePath,
+      databaseUrl,
+      migrationsPath: this.getMigrationsPath(environment),
+      starterDbPath: this.getStarterDbPath(),
+      backupEnabled: environment === "production",
+      autoMigrate: true,
+    };
+  }
+
+  /**
+   * 获取数据库文件路径
+   */
+  private getDatabasePath(env: DatabaseEnvironment): string {
+    if (env === "development") {
+      // 开发环境：使用项目根目录下的 dev.db
+      return join(process.cwd(), "prisma", "dev.db");
+    } else {
+      // 生产环境：使用用户数据目录下的 app.db
+      const userDataPath = app.getPath("userData");
+      this.ensureDirectoryExists(userDataPath);
+      return join(userDataPath, "app.db");
     }
-    return join(userDataPath, "app.db");
   }
-}
+  /**
+   * 获取迁移文件路径
+   */
+  private getMigrationsPath(environment?: DatabaseEnvironment): string {
+    const env = environment || this.config?.environment || "development";
+    
+    if (env === "production") {
+      // 生产环境：从资源目录或可执行文件目录查找
+      const possiblePaths = [
+        join(process.resourcesPath, "prisma", "migrations"),
+        join(__dirname, "..", "..", "prisma", "migrations"),
+        join(__dirname, "..", "prisma", "migrations"),
+      ];
 
-/**
- * 初始化生产环境数据库
- * 如果数据库不存在，尝试从模板数据库复制，否则创建空数据库
- * @param databasePath 数据库文件路径
- */
-function initProductionDatabase(databasePath: string): void {
-  // 如果数据库已存在，直接返回
-  if (existsSync(databasePath)) {
-    return;
-  }
+      for (const path of possiblePaths) {
+        if (existsSync(path)) {
+          return path;
+        }
+      }
 
-  // 定义可能的模板数据库路径，按优先级排序
-  const possiblePaths = [
-    join(process.resourcesPath, "prisma", "starter.db"),        // 打包后的资源目录
-    join(__dirname, "..", "..", "prisma", "starter.db"),       // 相对于当前文件的路径
-    join(__dirname, "..", "prisma", "starter.db"),             // 上级目录
-    join(process.cwd(), "resources", "prisma", "starter.db")   // 项目资源目录
-  ];
-
-  // 遍历可能的路径，找到模板数据库就复制
-  for (const starterPath of possiblePaths) {
-    if (existsSync(starterPath)) {
-      copyFileSync(starterPath, databasePath);
-      log(`从模板初始化数据库: ${starterPath}`);
-      return;
+      // 如果找不到，使用默认路径
+      return join(process.resourcesPath, "prisma", "migrations");
+    } else {
+      // 开发环境：使用项目目录
+      return join(process.cwd(), "prisma", "migrations");
     }
   }
 
-  log("未找到模板数据库文件，将创建空数据库", 'warn');
-}
+  /**
+   * 获取初始数据库模板路径
+   */
+  private getStarterDbPath(): string | undefined {
+    const possiblePaths = [
+      join(process.resourcesPath, "prisma", "starter.db"),
+      join(__dirname, "..", "..", "resources", "prisma", "starter.db"),
+      join(process.cwd(), "resources", "prisma", "starter.db"),
+    ];
 
-/**
- * 创建数据库备份
- * @returns 备份文件路径
- */
-async function backupDatabase(): Promise<string> {
-  // 生成带时间戳的备份文件名
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupPath = join(app.getPath('userData'), `database-backup-${timestamp}.db`);
-  const dbPath = process.env.DATABASE_URL?.replace('file:', '') || getDatabasePath();
-  
-  // 复制数据库文件到备份路径
-  await fs.copyFile(dbPath, backupPath);
-  log(`数据库备份完成: ${backupPath}`);
-  return backupPath;
-}
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        return path;
+      }
+    }
 
-/**
- * 从备份恢复数据库
- * @param backupPath 备份文件路径
- */
-async function restoreDatabase(backupPath: string): Promise<void> {
-  const dbPath = process.env.DATABASE_URL?.replace('file:', '') || getDatabasePath();
-  await fs.copyFile(backupPath, dbPath);
-  log(`数据库恢复完成`);
-}
-
-/**
- * 检查是否是首次安装（数据库文件不存在）
- * @returns 是否为首次安装
- */
-function isFirstInstall(): boolean {
-  const databasePath = getDatabasePath();
-  return !existsSync(databasePath);
-}
-
-/**
- * 检查是否存在迁移文件夹
- * @returns 是否存在迁移文件夹
- */
-function hasMigrationsFolder(): boolean {
-  const migrationsPath = join(process.cwd(), "prisma", "migrations");
-  return existsSync(migrationsPath);
-}
-
-/**
- * 检查是否有待应用的数据库迁移
- * @returns 是否有待应用的迁移
- */
-async function hasPendingMigrations(): Promise<boolean> {
-  const isDev = !app.isPackaged;
-  
-  // 生产环境下，如果是首次安装，不需要检查迁移
-  if (!isDev && isFirstInstall()) {
-    log("生产环境首次安装，跳过迁移检查");
-    return false;
+    return undefined;
   }
 
-  // 如果没有迁移文件夹，说明项目可能没有使用迁移功能
-  if (!hasMigrationsFolder()) {
-    log("未找到迁移文件夹，跳过迁移检查");
-    return false;
+  /**
+   * 确保目录存在
+   */
+  private ensureDirectoryExists(dirPath: string): void {
+    if (!existsSync(dirPath)) {
+      mkdirSync(dirPath, { recursive: true });
+    }
   }
 
-  try {
-    // 根据环境选择合适的命令：开发环境用 yarn，生产环境用 npx
-    const command = isDev ? "yarn prisma migrate status" : "npx prisma migrate status";
-    
-    const result = await execAsync(command, {
-      cwd: process.cwd(),
-      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-    });
-    
-    // 检查输出中是否包含待应用的迁移标识
-    return result.stdout.includes('pending') || 
-           result.stdout.includes('unapplied');
-  } catch (error) {
-    log(`检查迁移状态失败: ${error}`, 'warn');
-    
-    // 生产环境下如果命令失败，保守假设不需要迁移
-    if (!isDev) {
-      log("生产环境检查迁移失败，假设不需要迁移");
+  /**
+   * 记录日志
+   */
+  private log(
+    message: string,
+    level: "info" | "warn" | "error" = "info"
+  ): void {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] [DATABASE ${level.toUpperCase()}] ${message}`;
+    console.log(logMessage);
+  }
+
+  /**
+   * 检查是否为首次安装
+   */
+  private isFirstInstall(): boolean {
+    return !existsSync(this.config.databasePath);
+  }
+
+  /**
+   * 检查是否存在迁移文件
+   */
+  private hasMigrations(): boolean {
+    return existsSync(this.config.migrationsPath);
+  }
+
+  /**
+   * 创建数据库备份
+   */
+  private async createBackup(): Promise<string | null> {
+    if (!this.config.backupEnabled || this.isFirstInstall()) {
+      return null;
+    }
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const backupDir = join(app.getPath("userData"), "backups");
+      this.ensureDirectoryExists(backupDir);
+
+      const backupPath = join(backupDir, `database-backup-${timestamp}.db`);
+      await fs.copyFile(this.config.databasePath, backupPath);
+
+      this.log(`数据库备份完成: ${backupPath}`);
+      return backupPath;
+    } catch (error) {
+      this.log(`创建备份失败: ${error}`, "error");
+      return null;
+    }
+  }
+
+  /**
+   * 从备份恢复数据库
+   */
+  private async restoreFromBackup(backupPath: string): Promise<boolean> {
+    try {
+      await fs.copyFile(backupPath, this.config.databasePath);
+      this.log(`从备份恢复数据库: ${backupPath}`);
+      return true;
+    } catch (error) {
+      this.log(`恢复备份失败: ${error}`, "error");
       return false;
     }
-    
-    // 开发环境保守起见认为有迁移需要应用
-    return true;
-  }
-}
-
-/**
- * 应用数据库迁移
- * 执行所有待应用的迁移文件
- */
-async function applyMigrations(): Promise<void> {
-  const isDev = !app.isPackaged;
-  // 根据环境选择迁移命令
-  const command = isDev ? "yarn prisma migrate deploy" : "npx prisma migrate deploy";
-  
-  const result = await execAsync(command, {
-    cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-  });
-  
-  log(`数据库迁移成功`);
-  // 如果有警告信息，记录下来
-  if (result.stderr) {
-    log(`迁移警告: ${result.stderr}`, 'warn');
-  }
-}
-
-/**
- * 生产环境数据库推送处理
- * 包含备份、迁移和错误恢复逻辑
- */
-async function runProductionDbPush(): Promise<void> {
-  // 首次安装直接使用预构建的数据库，无需迁移
-  if (isFirstInstall()) {
-    log("生产环境首次安装，使用预构建数据库结构");
-    return;
   }
 
-  // 检查是否有待应用的迁移
-  if (!(await hasPendingMigrations())) {
-    log("无待应用的迁移，使用当前数据库结构");
-    return;
-  }
-
-  log("发现待应用的迁移，开始数据库更新流程");
-  
-  // 创建数据库备份
-  let backupPath: string;
-  try {
-    backupPath = await backupDatabase();
-  } catch (error) {
-    log("无法创建数据库备份，中止更新", 'error');
-    throw error;
-  }
-
-  // 尝试应用迁移
-  try {
-    await applyMigrations();
-  } catch (migrationError) {
-    log(`数据库迁移失败: ${migrationError}`, 'error');
-    
-    // 迁移失败时尝试恢复数据库
-    try {
-      await restoreDatabase(backupPath);
-      log("数据库已恢复到更新前状态");
-    } catch (restoreError) {
-      log(`数据库恢复失败: ${restoreError}`, 'error');
-    }
-    
-    // 显示错误对话框，给用户提供解决建议
-    dialog.showErrorBox(
-      '数据库更新错误',
-      '数据库更新失败，已恢复到之前的版本。\n\n建议：\n1. 检查是否有其他应用正在使用数据库\n2. 尝试重启应用\n3. 如果问题持续，请考虑回退到旧版本'
-    );
-    
-    throw migrationError;
-  }
-}
-
-/**
- * 开发环境数据库推送处理
- * 优先使用 migrate dev，失败时回退到 db push
- */
-async function runDevelopmentDbPush(): Promise<void> {
-  try {
-    // 如果有迁移文件夹，优先使用 migrate dev 命令
-    if (hasMigrationsFolder()) {
-      await execAsync("yarn prisma migrate dev --name init", {
-        cwd: process.cwd(),
-        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-      });
-      log("Prisma 数据库迁移完成");
+  /**
+   * 初始化生产环境数据库
+   */
+  private async initProductionDatabase(): Promise<void> {
+    if (!this.isFirstInstall()) {
       return;
     }
-  } catch (error) {
-    log(`Prisma 迁移失败，使用 db push: ${error}`, 'warn');
-  }
-  
-  // 回退到 db push 或没有迁移文件夹时直接使用 db push
-  const result = await execAsync("yarn prisma db push --accept-data-loss", {
-    cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-  });
-  
-  log(`Prisma 数据结构推送完成`);
-  // 记录推送过程中的警告信息
-  if (result.stderr) {
-    log(`数据推送警告: ${result.stderr}`, 'warn');
-  }
-}
 
-/**
- * 初始化数据库连接
- * 创建 Prisma 客户端实例并设置数据库 URL
- * @returns Prisma 客户端实例
- */
-export function initDatabase(): PrismaClient {
-  // 如果已经初始化过，直接返回现有实例（单例模式）
-  if (prisma) {
-    return prisma;
-  }
+    this.log("首次安装，初始化生产环境数据库");
 
-  const isDev = !app.isPackaged;
-  const databasePath = getDatabasePath();
-  
-  log(`初始化数据库 - 环境: ${isDev ? '开发' : '生产'}, 路径: ${databasePath}`);
+    // 确保数据库目录存在
+    this.ensureDirectoryExists(dirname(this.config.databasePath));
 
-  // 生产环境需要初始化数据库文件
-  if (!isDev) {
-    initProductionDatabase(databasePath);
-  }
-
-  // 设置数据库连接 URL 环境变量
-  process.env.DATABASE_URL = `file:${databasePath}`;
-
-  // 创建 Prisma 客户端实例
-  prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: `file:${databasePath}`,
-      },
-    },
-  });
-
-  return prisma;
-}
-
-/**
- * 确保数据库存在且结构正确
- * 连接数据库、应用迁移、验证表结构
- */
-export async function ensureDatabaseExists(): Promise<void> {
-  if (!prisma) {
-    throw new Error("数据库尚未初始化");
-  }
-
-  try {
-    log("确保数据库存在且结构正确...");
-    
-    // 尝试连接数据库
-    await prisma.$connect();
-    log("数据库连接成功");
-
-    const isDev = !app.isPackaged;
-    
-    // 根据环境执行不同的数据库推送策略
-    if (isDev) {
-      await runDevelopmentDbPush();
-    } else {
-      await runProductionDbPush();
+    // 如果有初始数据库模板，复制它
+    if (this.config.starterDbPath) {
+      try {
+        await fs.copyFile(this.config.starterDbPath, this.config.databasePath);
+        this.log(`从模板初始化数据库: ${this.config.starterDbPath}`);
+        return;
+      } catch (error) {
+        this.log(`复制初始数据库失败: ${error}`, "warn");
+      }
     }
 
-    // 验证数据库表结构（查询所有非系统表）
+    this.log("未找到初始数据库模板，将通过迁移创建数据库");
+  }
+  /**
+   * 检查迁移状态
+   */
+  private async checkMigrationStatus(): Promise<{
+    hasPending: boolean;
+    needsBaseline: boolean;
+  }> {
+    if (!this.hasMigrations()) {
+      return { hasPending: false, needsBaseline: false };
+    }
+
     try {
-      const tables = await prisma.$queryRaw`
-        SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';
-      `;
-      log(`数据库表: ${JSON.stringify(tables)}`);
+      // 检测包管理器
+      const hasYarnLock = existsSync(join(process.cwd(), "yarn.lock"));
+      const packageManager = hasYarnLock ? "yarn" : "npx";
+      
+      const command = `${packageManager} prisma migrate status`;
+
+      const result = await execAsync(command, {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          DATABASE_URL: this.config.databaseUrl,
+        },
+      });
+
+      const output = result.stdout + result.stderr;
+
+      return {
+        hasPending: output.includes("pending") || output.includes("unapplied"),
+        needsBaseline: output.includes("baseline") || output.includes("shadow"),
+      };
     } catch (error) {
-      log(`查询数据库表失败: ${error}`, 'warn');
+      this.log(`检查迁移状态失败: ${error}`, "warn");
+
+      // 如果是首次安装，认为需要迁移
+      if (this.isFirstInstall()) {
+        return { hasPending: true, needsBaseline: false };
+      }
+
+      return { hasPending: false, needsBaseline: false };
+    }
+  }
+
+  /**
+   * 应用数据库迁移
+   */
+  private async applyMigrations(): Promise<void> {
+    this.status = "migrating";
+
+    try {
+      const { hasPending, needsBaseline } = await this.checkMigrationStatus();
+
+      if (!hasPending) {
+        this.log("无待应用的迁移");
+        return;
+      }      this.log("开始应用数据库迁移");
+
+      // 检测包管理器
+      const hasYarnLock = existsSync(join(process.cwd(), "yarn.lock"));
+      const packageManager = hasYarnLock ? "yarn" : "npx";
+
+      let command: string;
+
+      if (this.config.environment === "development") {
+        // 开发环境：使用 migrate dev 或 migrate deploy
+        command = this.isFirstInstall()
+          ? `${packageManager} prisma migrate dev --name init`
+          : `${packageManager} prisma migrate dev`;
+      } else {
+        // 生产环境：使用 migrate deploy
+        command = "npx prisma migrate deploy";
+      }
+
+      const result = await execAsync(command, {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          DATABASE_URL: this.config.databaseUrl,
+        },
+      });
+
+      this.log("数据库迁移完成");
+
+      if (result.stderr) {
+        this.log(`迁移警告: ${result.stderr}`, "warn");
+      }
+    } catch (error) {
+      this.status = "error";
+      this.log(`数据库迁移失败: ${error}`, "error");
+      throw new Error(`数据库迁移失败: ${error}`);
+    }
+  }
+  /**
+   * 执行数据库推送（开发环境回退方案）
+   */
+  private async pushDatabase(): Promise<void> {
+    try {
+      this.log("执行数据库结构推送");
+
+      // 检测包管理器
+      const hasYarnLock = existsSync(join(process.cwd(), "yarn.lock"));
+      const packageManager = hasYarnLock ? "yarn" : "npx";
+      
+      const command = `${packageManager} prisma db push --accept-data-loss`;
+
+      const result = await execAsync(command, {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          DATABASE_URL: this.config.databaseUrl,
+        },
+      });
+
+      this.log("数据库结构推送完成");
+
+      if (result.stderr) {
+        this.log(`推送警告: ${result.stderr}`, "warn");
+      }
+    } catch (error) {
+      this.log(`数据库推送失败: ${error}`, "error");
+      throw new Error(`数据库推送失败: ${error}`);
+    }
+  }
+  /**
+   * 生成 Prisma 客户端
+   */
+  private async generatePrismaClient(): Promise<void> {
+    try {
+      this.log("生成 Prisma 客户端");
+
+      // 检测包管理器
+      const hasYarnLock = existsSync(join(process.cwd(), "yarn.lock"));
+      const packageManager = hasYarnLock ? "yarn" : "npx";
+      
+      const command = `${packageManager} prisma generate`;
+
+      await execAsync(command, {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          DATABASE_URL: this.config.databaseUrl,
+        },
+      });
+
+      this.log("Prisma 客户端生成完成");
+    } catch (error) {
+      this.log(`生成 Prisma 客户端失败: ${error}`, "warn");
+      // 客户端生成失败不应该阻止应用启动，因为可能已经存在预生成的客户端
+    }
+  }
+
+  /**
+   * 验证数据库连接和结构
+   */
+  private async validateDatabase(): Promise<void> {
+    if (!this.prisma) {
+      throw new Error("Prisma 客户端未初始化");
     }
 
-    log("数据库初始化完成");
-  } catch (error) {
-    log(`数据库初始化失败: ${error}`, 'error');
-    throw error;
+    try {
+      // 测试数据库连接
+      await this.prisma.$connect();
+      this.log("数据库连接验证成功");
+
+      // 查询数据库表结构
+      const tables = (await this.prisma.$queryRaw`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%';
+      `) as Array<{ name: string }>;
+
+      const tableNames = tables.map((table) => table.name);
+      this.log(`数据库表: [${tableNames.join(", ")}]`);
+
+      // 验证必要的表是否存在
+      const expectedTables = ["User", "Post", "Category", "Prompt"];
+      const missingTables = expectedTables.filter(
+        (table) =>
+          !tableNames.some((name) => name.toLowerCase() === table.toLowerCase())
+      );
+
+      if (missingTables.length > 0) {
+        this.log(`缺少数据库表: [${missingTables.join(", ")}]`, "warn");
+      }
+    } catch (error) {
+      this.log(`数据库验证失败: ${error}`, "error");
+      throw new Error(`数据库验证失败: ${error}`);
+    }
+  }
+
+  /**
+   * 初始化数据库
+   */
+  public async initialize(): Promise<PrismaClient> {
+    if (this.isInitializing) {
+      throw new Error("数据库正在初始化中");
+    }
+
+    if (this.prisma && this.status === "ready") {
+      return this.prisma;
+    }
+
+    this.isInitializing = true;
+    this.status = "not_initialized";
+
+    try {
+      this.log(`开始初始化数据库 - 环境: ${this.config.environment}`);
+      this.log(`数据库路径: ${this.config.databasePath}`);
+
+      // 1. 生产环境初始化数据库文件
+      if (this.config.environment === "production") {
+        await this.initProductionDatabase();
+      }
+
+      // 2. 设置环境变量
+      process.env.DATABASE_URL = this.config.databaseUrl;
+
+      // 3. 创建 Prisma 客户端
+      this.prisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: this.config.databaseUrl,
+          },
+        },
+      });
+
+      this.status = "initialized";
+
+      // 4. 如果启用自动迁移，应用数据库迁移
+      if (this.config.autoMigrate) {
+        // 创建备份（仅生产环境且非首次安装）
+        const backupPath = await this.createBackup();
+
+        try {
+          // 尝试应用迁移
+          await this.applyMigrations();
+        } catch (migrationError) {
+          this.log(`迁移失败，尝试数据库推送`, "warn");
+
+          // 如果迁移失败，尝试从备份恢复
+          if (backupPath) {
+            await this.restoreFromBackup(backupPath);
+          }
+
+          // 在开发环境，尝试使用 db push 作为回退
+          if (this.config.environment === "development") {
+            try {
+              await this.pushDatabase();
+            } catch (pushError) {
+              this.status = "error";
+              throw new Error(
+                `迁移和推送都失败: ${migrationError}, ${pushError}`
+              );
+            }
+          } else {
+            this.status = "error";
+
+            // 生产环境迁移失败，显示错误对话框
+            dialog.showErrorBox(
+              "数据库更新失败",
+              `数据库迁移失败，请尝试以下解决方案：\n\n1. 重启应用\n2. 检查是否有其他程序占用数据库\n3. 联系技术支持\n\n错误详情: ${migrationError}`
+            );
+
+            throw migrationError;
+          }
+        }
+      }
+
+      // 5. 生成 Prisma 客户端（如果需要）
+      await this.generatePrismaClient();
+
+      // 6. 验证数据库
+      await this.validateDatabase();
+
+      this.status = "ready";
+      this.log("数据库初始化完成");
+
+      return this.prisma;
+    } catch (error) {
+      this.status = "error";
+      this.log(`数据库初始化失败: ${error}`, "error");
+
+      // 清理资源
+      if (this.prisma) {
+        try {
+          await this.prisma.$disconnect();
+        } catch {}
+        this.prisma = null;
+      }
+
+      throw error;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  /**
+   * 获取数据库客户端实例
+   */
+  public getClient(): PrismaClient {
+    if (!this.prisma || this.status !== "ready") {
+      throw new Error("数据库未初始化或未就绪，请先调用 initialize()");
+    }
+    return this.prisma;
+  }
+
+  /**
+   * 获取数据库状态
+   */
+  public getStatus(): DatabaseStatus {
+    return this.status;
+  }
+
+  /**
+   * 获取数据库配置
+   */
+  public getConfig(): Readonly<DatabaseConfig> {
+    return { ...this.config };
+  }
+
+  /**
+   * 关闭数据库连接
+   */
+  public async close(): Promise<void> {
+    if (this.prisma) {
+      try {
+        await this.prisma.$disconnect();
+        this.log("数据库连接已关闭");
+      } catch (error) {
+        this.log(`关闭数据库连接时出错: ${error}`, "error");
+      } finally {
+        this.prisma = null;
+        this.status = "not_initialized";
+      }
+    }
+  }
+
+  /**
+   * 手动触发数据库迁移
+   */
+  public async migrate(): Promise<void> {
+    if (this.status !== "ready") {
+      throw new Error("数据库未就绪，无法执行迁移");
+    }
+
+    const backupPath = await this.createBackup();
+
+    try {
+      await this.applyMigrations();
+    } catch (error) {
+      if (backupPath) {
+        await this.restoreFromBackup(backupPath);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 手动创建备份
+   */
+  public async backup(): Promise<string | null> {
+    return await this.createBackup();
   }
 }
 
-/**
- * 获取数据库客户端实例
- * @returns Prisma 客户端实例
- * @throws 如果数据库未初始化则抛出错误
- */
-export function getDatabase(): PrismaClient {
-  if (!prisma) {
-    throw new Error("数据库尚未初始化，请先调用 initDatabase()");
-  }
-  return prisma;
-}
+// 全局数据库管理器实例
+const databaseManager = new DatabaseManager();
 
-/**
- * 关闭数据库连接
- * 断开 Prisma 客户端连接并清理实例
- */
-export async function closeDatabase(): Promise<void> {
-  if (prisma) {
-    await prisma.$disconnect();
-    prisma = null;
-  }
-}
+// 导出的公共 API
+export const initDatabase = () => databaseManager.initialize();
+export const getDatabase = () => databaseManager.getClient();
+export const closeDatabase = () => databaseManager.close();
+export const getDatabaseStatus = () => databaseManager.getStatus();
+export const getDatabaseConfig = () => databaseManager.getConfig();
+export const migrateDatabase = () => databaseManager.migrate();
+export const backupDatabase = () => databaseManager.backup();
 
+// 向后兼容的别名
+export const ensureDatabaseExists = initDatabase;
