@@ -96,7 +96,9 @@ class WindowManager {
       // 最小化到托盘
       this.mainWindow?.hide();
     }
-  }  /**
+  }
+
+  /**
    * 加载窗口内容
    */
   private loadContent() {
@@ -108,15 +110,7 @@ class WindowManager {
       this.mainWindow.loadURL(`http://localhost:${rendererPort}`);
     } else {
       // 生产环境：加载打包后的静态文件
-      // 使用相对于构建后 main.js 的路径
-      const indexPath = join(__dirname, '..', 'renderer', 'index.html');
-      
-      console.log('Production mode - loading renderer');
-      console.log('__dirname:', __dirname);
-      console.log('indexPath:', indexPath);
-      console.log('app.getAppPath():', app.getAppPath());
-      
-      this.mainWindow.loadFile(indexPath);
+      this.mainWindow.loadFile(join(app.getAppPath(), 'renderer', 'index.html'));
     }
   }
 

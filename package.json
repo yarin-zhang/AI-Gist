@@ -1,6 +1,6 @@
 {
   "name": "ai-gist",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "AI Prompt Manager",
   "main": "./main/main.js",
   "scripts": {
