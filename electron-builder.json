@@ -82,23 +82,29 @@
         "artifactName": "AI-Gist-${version}-mac-${arch}.${ext}"
     },
     "dmg": {
+        "background": "src/assets/dmg-background.png",
         "contents": [
             {
-                "x": 410,
-                "y": 150,
+                "x": 140,
+                "y": 180,
+                "type": "file"
+            },
+            {
+                "x": 400,
+                "y": 180,
                 "type": "link",
                 "path": "/Applications"
             },
             {
-                "x": 130,
-                "y": 300,
+                "x": 270,
+                "y": 320,
                 "type": "file",
-                "path": "src/assets/install-guide.html"
+                "path": "src/assets/安装说明.html"
             }
         ],
         "window": {
             "width": 540,
-            "height": 380
+            "height": 480
         },
         "title": "AI Gist ${version}"
     },
