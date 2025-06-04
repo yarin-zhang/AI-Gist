@@ -68,7 +68,9 @@
         {
             "from": "prisma/migrations",
             "to": "prisma/migrations",
-            "filter": ["**/*"]
+            "filter": [
+                "**/*"
+            ]
         },
         {
             "from": "resources/prisma/starter.db",
@@ -79,10 +81,13 @@
         "oneClick": false,
         "perMachine": false,
         "allowToChangeInstallationDirectory": true,
-        "shortcutName": "AI Gist"
+        "shortcutName": "AI Gist",
+        "installerIcon": "src/assets/windows.ico",
+        "uninstallerIcon": "src/assets/windows.ico"
     },
     "win": {
         "target": "nsis",
+        "icon": "src/assets/windows.ico",
         "artifactName": "AI-Gist-Setup-${version}.${ext}"
     },
     "mac": {
@@ -121,6 +126,7 @@
         "target": [
             "AppImage"
         ],
+        "icon": "src/assets/linux.png",
         "artifactName": "ai-gist-${version}-linux.${ext}"
     }
 }
