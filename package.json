@@ -17,6 +17,7 @@
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:prod": "prisma migrate deploy",
+    "prepare:starter-db": "node scripts/generate-starter-db.js",
     "version": "git add -A",
     "postversion": "git push && git push --tags"
   },
