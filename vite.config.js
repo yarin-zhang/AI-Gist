@@ -1,3 +1,4 @@
+// @ts-nocheck
 const Path = require('path');
 const vuePlugin = require('@vitejs/plugin-vue')
 

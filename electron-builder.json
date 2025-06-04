@@ -64,6 +64,15 @@
         {
             "from": "prisma/schema.prisma",
             "to": "prisma/schema.prisma"
+        },
+        {
+            "from": "prisma/migrations",
+            "to": "prisma/migrations",
+            "filter": ["**/*"]
+        },
+        {
+            "from": "resources/prisma/starter.db",
+            "to": "prisma/starter.db"
         }
     ],
     "nsis": {

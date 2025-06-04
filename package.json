@@ -1,6 +1,6 @@
 {
   "name": "ai-gist",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "AI Prompt Manager",
   "main": "./main/main.js",
   "scripts": {
@@ -17,6 +17,7 @@
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:prod": "prisma migrate deploy",
+    "prepare:starter-db": "node scripts/generate-starter-db.js",
     "version": "git add -A",
     "postversion": "git push && git push --tags"
   },

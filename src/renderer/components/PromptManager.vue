@@ -221,7 +221,7 @@ const loadPrompts = async () => {
   try {
     isLoading.value = true
     const filters = {
-      categoryId: selectedCategory.value,
+      categoryId: selectedCategory.value || undefined,
       search: searchText.value || undefined,
       isFavorite: showFavoritesOnly.value || undefined
     }
