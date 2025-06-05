@@ -177,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import {
     NModal,
     NForm,
@@ -228,6 +228,10 @@ const message = useMessage()
 const formRef = ref()
 const saving = ref(false)
 const showExtraInfo = ref(false)
+
+// 防抖相关
+const debounceTimer = ref<number | null>(null)
+const DEBOUNCE_DELAY = 500 // 500ms 防抖延迟
 
 // 表单数据
 const formData = ref({
@@ -288,6 +292,12 @@ const rules = {
 
 // 重置表单方法
 const resetForm = () => {
+    // 清理防抖定时器
+    if (debounceTimer.value) {
+        clearTimeout(debounceTimer.value)
+        debounceTimer.value = null
+    }
+    
     formData.value = {
         title: '',
         description: '',
@@ -306,32 +316,57 @@ const getCategoryName = (categoryId: any) => {
     return category?.name || '未知分类'
 }
 
-// 提取变量的方法
+// 提取变量的方法 - 优化版本：去重并只保留实际存在的变量
 const extractVariables = (content: string) => {
     const variableRegex = /\{\{([^}]+)\}\}/g
     const matches = content.match(variableRegex)
-
+    
+    // 提取当前内容中的所有变量名
+    const currentVariableNames = new Set<string>()
     if (matches) {
-        const newVariables = new Set()
         matches.forEach(match => {
             const variableName = match.replace(/[{}]/g, '').trim()
-            if (variableName && !formData.value.variables.some(v => v.name === variableName)) {
-                newVariables.add(variableName)
+            if (variableName) {
+                currentVariableNames.add(variableName)
             }
         })
-
-        newVariables.forEach(variableName => {
-            formData.value.variables.push({
-                name: variableName,
-                label: variableName,
-                type: 'text',
-                options: '',
-                defaultValue: '',
-                required: true,
-                placeholder: ''
-            })
-        })
     }
+    
+    // 保留现有变量的配置信息
+    const existingVariableConfigs = new Map()
+    formData.value.variables.forEach(variable => {
+        if (variable.name) {
+            existingVariableConfigs.set(variable.name, variable)
+        }
+    })
+    
+    // 重新构建变量列表：只包含当前内容中实际存在的变量
+    formData.value.variables = Array.from(currentVariableNames).map(variableName => {
+        // 如果已有配置，保留原配置；否则创建新配置
+        return existingVariableConfigs.get(variableName) || {
+            name: variableName,
+            label: variableName,
+            type: 'text',
+            options: '',
+            defaultValue: '',
+            required: true,
+            placeholder: ''
+        }
+    })
+}
+
+// 防抖的变量提取方法
+const debouncedExtractVariables = (content: string) => {
+    // 清除之前的定时器
+    if (debounceTimer.value) {
+        clearTimeout(debounceTimer.value)
+    }
+    
+    // 设置新的定时器
+    debounceTimer.value = setTimeout(() => {
+        extractVariables(content)
+        debounceTimer.value = null
+    }, DEBOUNCE_DELAY) as unknown as number
 }
 
 // 监听 prompt 变化，初始化表单
@@ -353,6 +388,13 @@ watch(() => props.prompt, (newPrompt) => {
                 placeholder: v.placeholder || ''
             })) || []
         }
+        
+        // 如果有内容但没有变量配置，立即提取变量
+        if (newPrompt.content && (!newPrompt.variables || newPrompt.variables.length === 0)) {
+            nextTick(() => {
+                extractVariables(newPrompt.content)
+            })
+        }
     }
 }, { immediate: true })
 
@@ -363,7 +405,11 @@ watch(() => props.show, (newShow, oldShow) => {
         showExtraInfo.value = false
     }
     if (oldShow && !newShow) {
-        // 弹窗从显示变为隐藏时，延迟重置表单
+        // 弹窗从显示变为隐藏时，清理定时器并延迟重置表单
+        if (debounceTimer.value) {
+            clearTimeout(debounceTimer.value)
+            debounceTimer.value = null
+        }
         setTimeout(() => {
             if (!props.show && !isEdit.value) {
                 // 只在新建模式下且弹窗确实关闭时重置表单
@@ -373,10 +419,17 @@ watch(() => props.show, (newShow, oldShow) => {
     }
 })
 
-// 监听内容变化，自动提取变量
+// 监听内容变化，自动提取变量（使用防抖）
 watch(() => formData.value.content, (newContent) => {
     if (newContent) {
-        extractVariables(newContent)
+        debouncedExtractVariables(newContent)
+    } else {
+        // 如果内容为空，立即清空变量列表
+        if (debounceTimer.value) {
+            clearTimeout(debounceTimer.value)
+            debounceTimer.value = null
+        }
+        formData.value.variables = []
     }
 })
 
