@@ -47,12 +47,12 @@
     "win": {
         "target": "nsis",
         "icon": "src/assets/windows.ico",
-        "artifactName": "AI-Gist-Setup-${version}.${ext}"
+        "artifactName": "AI-Gist-${version}-Windows-Setup.${ext}"
     },
     "mac": {
         "target": "dmg",
         "icon": "src/assets/macos.icns",
-        "artifactName": "AI-Gist-${version}-mac-${arch}.${ext}"
+        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}"
     },
     "dmg": {
         "background": "src/assets/dmg-background.png",
@@ -86,6 +86,6 @@
             "AppImage"
         ],
         "icon": "src/assets/linux.png",
-        "artifactName": "ai-gist-${version}-linux.${ext}"
+        "artifactName": "AI-Gist-${version}-linux.${ext}"
     }
 }
