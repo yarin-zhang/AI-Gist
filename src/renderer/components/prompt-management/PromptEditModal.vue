@@ -5,7 +5,7 @@
                 style="flex: 1; overflow: hidden;">
                 <div style="height: 100%; display: flex; gap: 20px;">
                     <!-- 左侧内容区 -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">                        <!-- 第一步：提示词内容 -->
+                    <div style="flex: 2; display: flex; flex-direction: column; overflow: hidden;">                        <!-- 第一步：提示词内容 -->
                         <div v-show="!showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
                             <NScrollbar style="max-height: 75vh;">
                                 <NFormItem label="提示词内容" path="content">
