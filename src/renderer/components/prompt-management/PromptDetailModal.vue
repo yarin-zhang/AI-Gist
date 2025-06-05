@@ -1,6 +1,7 @@
-<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card"
-        class="fullscreen-modal" :title="prompt?.title">
-        <div style="height: 100%; display: flex; flex-direction: column;" v-if="prompt">
+<template>
+    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" class="fullscreen-modal"
+        :title="prompt?.title">
+        <div style="display: flex; flex-direction: column;" v-if="prompt">
             <!-- 提示词信息头部 -->
             <NCard size="small" style="margin-bottom: 16px;">
                 <NFlex vertical size="medium">
@@ -166,7 +167,7 @@
 
                                     <NText style="font-size: 14px; line-height: 1.5;">
                                         {{ record.content.substring(0, 120) }}{{ record.content.length > 120 ? '...' :
-                                        '' }}
+                                            '' }}
                                     </NText>
 
                                     <!-- 显示变量数量 -->
@@ -198,8 +199,9 @@
                         <template #footer v-if="useHistory.length > pageSize">
                             <NFlex justify="center">
                                 <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
-                                    :item-count="useHistory.length" size="small" show-quick-jumper show-size-picker
-                                    :page-sizes="[1, 3, 5, 10, 20]" @update:page-size="handlePageSizeChange" />
+                                     size="small" show-quick-jumper show-size-picker
+                                    :page-sizes="[1, 3, 5, 10, 20]" 
+                                    :page-slot="7" @update:page-size="handlePageSizeChange" />
                             </NFlex>
                         </template>
                     </NCard>
@@ -633,5 +635,4 @@ watch(() => showHistoryPage.value, (show) => {
 })
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>
