@@ -8,6 +8,7 @@ class TrayManager {
   private tray: Tray | null = null;
   private mainWindow: BrowserWindow | null = null;
   private onQuitCallback?: () => void;
+  private showWindowCallback?: () => void;
 
   /**
    * 设置主窗口引用
@@ -21,6 +22,13 @@ class TrayManager {
    */
   setQuitCallback(callback: () => void) {
     this.onQuitCallback = callback;
+  }
+
+  /**
+   * 设置显示窗口回调函数
+   */
+  setShowWindowCallback(callback: () => void) {
+    this.showWindowCallback = callback;
   }
 
   /**
@@ -63,6 +71,11 @@ class TrayManager {
       
       // 双击托盘图标显示窗口
       this.tray.on('double-click', () => this.showMainWindow());
+      
+      // 在 macOS 下，单击托盘图标也显示窗口（macOS 用户习惯）
+      if (process.platform === 'darwin') {
+        this.tray.on('click', () => this.showMainWindow());
+      }
 
       console.log('系统托盘创建成功');
       return true;
@@ -76,9 +89,31 @@ class TrayManager {
    * 显示主窗口
    */
   private showMainWindow() {
-    if (this.mainWindow) {
-      this.mainWindow.show();
-      this.mainWindow.focus();
+    // 优先使用回调函数，确保使用 windowManager 的方法
+    if (this.showWindowCallback) {
+      this.showWindowCallback();
+    } else if (this.mainWindow) {
+      // 备用方案：直接操作窗口
+      if (process.platform === 'darwin') {
+        // 如果窗口被最小化，先恢复它
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        // 显示窗口
+        this.mainWindow.show();
+        // 确保应用获得焦点
+        this.mainWindow.focus();
+        // 在 macOS 下，确保应用出现在前台
+        const { app } = require('electron');
+        app.focus({ steal: true });
+      } else {
+        // 其他平台的处理
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        this.mainWindow.show();
+        this.mainWindow.focus();
+      }
     }
   }
 

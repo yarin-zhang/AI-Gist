@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import { ref, h } from 'vue'
+import { onMounted } from 'vue'
 import {
+    NLayout,
     NConfigProvider,
     NMessageProvider
 } from 'naive-ui'
+import { useTheme } from './composables/useTheme'
 import MainPage from './components/MainPage.vue'
+
+// 使用主题管理
+const { naiveTheme, initTheme } = useTheme()
+
+// 初始化主题
+onMounted(async () => {
+  await initTheme()
+})
 </script>
 
 <template>
-    <NConfigProvider>
+    <NConfigProvider :theme="naiveTheme">
         <NMessageProvider>
             <MainPage />
         </NMessageProvider>
     </NConfigProvider>
 </template>
-

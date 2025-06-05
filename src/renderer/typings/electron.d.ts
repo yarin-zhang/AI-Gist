@@ -4,16 +4,34 @@
 export default interface ElectronApi {
   sendMessage: (message: string) => void
   
-  // 用户偏好设置
   preferences: {
     get: () => Promise<any>
     set: (prefs: any) => Promise<any>
+    reset: () => Promise<any>
   }
   
-  // 窗口管理
   window: {
     show: () => Promise<void>
     hideToTray: () => Promise<void>
+  }
+  
+  theme: {
+    getCurrent: () => Promise<'light' | 'dark' | 'system'>
+    getInfo: () => Promise<{
+      currentTheme: 'light' | 'dark' | 'system'
+      isDarkTheme: boolean
+      isHighContrastTheme: boolean
+      themeSource: string
+      shouldUseDarkColors: boolean
+      shouldUseHighContrastColors: boolean
+      shouldUseInvertedColorScheme: boolean
+    }>
+    setSource: (source: 'system' | 'light' | 'dark') => Promise<'light' | 'dark' | 'system'>
+    isDark: () => Promise<boolean>
+    onThemeChanged: (callback: (data: {
+      theme: 'light' | 'dark' | 'system'
+      themeInfo: any
+    }) => void) => () => void
   }
 }
 

@@ -16,12 +16,14 @@ class WindowManager {
    */
   createMainWindow(): BrowserWindow {
     const iconPath = getAppIconPath();
+    const userPrefs = preferencesManager.getPreferences();
     
     // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
+      width: 1280,
+      height: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
+      show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
       webPreferences: {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成
@@ -34,6 +36,18 @@ class WindowManager {
 
     // 根据环境加载不同的页面
     this.loadContent();
+
+    // 如果设置了启动时最小化，窗口准备好后隐藏到托盘
+    if (userPrefs.startMinimized) {
+      this.mainWindow.once('ready-to-show', () => {
+        console.log('应用启动时最小化到托盘');
+        // 不显示窗口，直接保持隐藏状态
+      });
+    } else {
+      this.mainWindow.once('ready-to-show', () => {
+        this.mainWindow?.show();
+      });
+    }
 
     return this.mainWindow;
   }
@@ -54,10 +68,11 @@ class WindowManager {
 
     // 如果用户设置了不再提示，直接执行保存的操作
     if (userPrefs.dontShowCloseDialog) {
+      console.log(`执行用户保存的关闭行为: ${userPrefs.closeAction}`);
       if (userPrefs.closeAction === 'minimize') {
-        this.mainWindow?.hide(); // 隐藏到托盘
+        this.hideToTray(); // 隐藏到托盘
       } else {
-        this.quitApplication();
+        this.quitApplication(); // 直接退出
       }
       return;
     }
@@ -82,9 +97,12 @@ class WindowManager {
 
     // 保存用户偏好设置
     if (result.checkboxChecked) {
+      // 修复：正确保存用户选择
+      const closeAction = result.response === 0 ? 'quit' : 'minimize';
+      console.log(`用户选择记住关闭行为: ${closeAction}`);
       preferencesManager.updatePreferences({
         dontShowCloseDialog: true,
-        closeAction: result.response === 0 ? 'quit' : 'minimize'
+        closeAction: closeAction
       });
     }
 
@@ -94,7 +112,7 @@ class WindowManager {
       this.quitApplication();
     } else if (result.response === 1) {
       // 最小化到托盘
-      this.mainWindow?.hide();
+      this.hideToTray();
     }
   }
 
@@ -119,8 +137,26 @@ class WindowManager {
    */
   showMainWindow() {
     if (this.mainWindow) {
-      this.mainWindow.show();
-      this.mainWindow.focus();
+      // 在 macOS 下，确保窗口能够正确显示和获得焦点
+      if (process.platform === 'darwin') {
+        // 如果窗口被最小化，先恢复它
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        // 显示窗口
+        this.mainWindow.show();
+        // 确保应用获得焦点
+        this.mainWindow.focus();
+        // 在 macOS 下，确保应用出现在前台
+        app.focus({ steal: true });
+      } else {
+        // 其他平台的处理
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        this.mainWindow.show();
+        this.mainWindow.focus();
+      }
     }
   }
 
@@ -130,6 +166,21 @@ class WindowManager {
   hideMainWindow() {
     if (this.mainWindow) {
       this.mainWindow.hide();
+    }
+  }
+
+  /**
+   * 隐藏到托盘（专门用于隐藏到系统托盘的方法）
+   */
+  private hideToTray() {
+    if (this.mainWindow) {
+      this.mainWindow.hide();
+      
+      // 在 macOS 下显示通知提醒用户应用已最小化到托盘
+      if (process.platform === 'darwin') {
+        // 可以在这里添加系统通知，提醒用户应用已最小化到托盘
+        // 用户可以通过托盘图标或 Dock 图标重新打开
+      }
     }
   }
 
@@ -151,7 +202,16 @@ class WindowManager {
    * 退出应用程序
    */
   private quitApplication() {
+    console.log('开始退出应用程序...');
     this.isQuitting = true;
+    
+    // 确保窗口关闭
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.destroy();
+      this.mainWindow = null;
+    }
+    
+    // 触发应用退出
     app.quit();
   }
 

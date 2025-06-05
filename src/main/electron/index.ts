@@ -8,3 +8,4 @@ export * from './preferences-manager';
 export * from './tray-manager';
 export * from './window-manager';
 export * from './ipc-handlers';
+export * from './theme-manager';
