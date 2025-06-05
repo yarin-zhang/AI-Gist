@@ -9,7 +9,6 @@
               <NTag v-if="prompt.category" :color="{ color: prompt.category.color || '#18a058' }">
                 {{ prompt.category.name }}
               </NTag>
-              <NText depth="3">使用 {{ prompt.useCount }} 次</NText>
               <NText depth="3">{{ formatDate(prompt.updatedAt) }}</NText>
             </NFlex>
             <NFlex>
@@ -101,7 +100,7 @@
         </div>
 
         <!-- 右侧：结果预览区 -->
-        <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="flex: 2; display: flex; flex-direction: column; overflow: hidden;">
           <NScrollbar style="max-height: 100%;">
             <!-- Prompt 内容 -->
             <NCard size="small">
@@ -115,7 +114,7 @@
                       </template>
                       复制内容
                     </NButton>
-                    <NButton size="small" v-if="hasVariables" type="primary" @click="usePrompt">
+                    <NButton size="small" type="primary" @click="usePrompt">
                       <template #icon>
                         <NIcon><Check /></NIcon>
                       </template>
@@ -521,10 +520,10 @@ const usePrompt = async () => {
     // 增加使用计数
     await api.prompts.incrementUseCount.mutate(props.prompt.id)
     
-    // 复制到剪贴板
-    await copyToClipboard(filledContent.value)
+    // 直接复制到剪贴板，不显示单独的复制消息
+    await navigator.clipboard.writeText(filledContent.value)
     
-    message.success('Prompt 已复制，使用计数已更新')
+    message.success('Prompt 已复制到剪贴板，使用计数已更新')
     emit('use')
     emit('updated') // 通知父组件重新加载数据以更新使用计数
   } catch (error) {
