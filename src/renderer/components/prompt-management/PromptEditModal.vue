@@ -150,7 +150,7 @@ import {
     useMessage
 } from 'naive-ui'
 import { Plus, Trash } from '@vicons/tabler'
-import { api } from '../lib/api'
+import { api } from '@/lib/api'
 
 interface Variable {
     name: string

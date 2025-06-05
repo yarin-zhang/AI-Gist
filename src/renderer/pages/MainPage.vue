@@ -16,9 +16,8 @@ import {
     Settings as SettingsIcon
 } from '@vicons/tabler'
 
-import PromptManager from './PromptManager.vue'
 import SettingsPage from './SettingsPage.vue'
-
+import PromptManagementPage from './PromptManagementPage.vue'
 const currentView = ref('prompts')
 
 // 菜单选项
@@ -58,8 +57,8 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 :collapsed-icon-size="22" style="margin-top: 8px;" />
         </NLayoutSider>
 
-        <NLayoutContent content-style="padding: 24px; overflow-y: auto;">
-            <PromptManager v-if="currentView === 'prompts'" />
+        <NLayoutContent content-style="overflow-y: auto;">
+            <PromptManagementPage v-if="currentView === 'prompts'" />
             <SettingsPage v-else-if="currentView === 'settings'" />
         </NLayoutContent>
     </NLayout>

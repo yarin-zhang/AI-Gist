@@ -175,7 +175,7 @@ import {
   useMessage
 } from 'naive-ui'
 import { Heart, Edit, Copy, Wand, Check } from '@vicons/tabler'
-import { api } from '../lib/api'
+import { api } from '@/lib/api'
 
 interface Props {
   show: boolean
