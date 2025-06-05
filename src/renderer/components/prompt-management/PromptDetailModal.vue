@@ -1,6 +1,5 @@
-<template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card"
-        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%;" :title="prompt?.title">
+<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card"
+        style="width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;" :title="prompt?.title">
         <div style="height: 100%; display: flex; flex-direction: column;" v-if="prompt">
             <!-- 提示词信息头部 -->
             <NCard size="small" style="margin-bottom: 16px;">

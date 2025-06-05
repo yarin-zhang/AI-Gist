@@ -1,6 +1,5 @@
-<template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
-        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%" title="提示词编辑">
+<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
+        style="width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;" title="提示词编辑">
         <div style="height: 100%; display: flex; flex-direction: column;">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
                 style="flex: 1; overflow: hidden;">
