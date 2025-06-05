@@ -412,7 +412,6 @@ onMounted(async () => {
 <style scoped>
 .settings-page {
     padding: 24px;
-    height: 100vh;
     overflow-y: auto;
 }
 
