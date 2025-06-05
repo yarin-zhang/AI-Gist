@@ -1,5 +1,5 @@
 <template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" style="width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;" title="分类管理">
+    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" class="fullscreen-modal" title="分类管理">
         <NFlex vertical size="large">
             <!-- 创建新分类 -->
             <NCard title="创建分类" size="small">

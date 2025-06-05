@@ -44,21 +44,23 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 </script>
 
 <template>
-    <NLayout has-sider style="height: 100vh;">
-        <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event"
-            :default-collapsed="collapseRef" :width="260" show-trigger="bar">
-            <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
-                <NText strong style="font-size: 16px; ">
-                    AI Gist
-                </NText>
-            </NFlex>
-            <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect" :collapsed-width="64"
-                :collapsed-icon-size="22" style="margin-top: 8px;" />
-        </NLayoutSider>
+    <div style="height: 100vh;">
+        <NLayout has-sider style="height: 100%;">
+            <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event"
+                :default-collapsed="collapseRef" :width="260" show-trigger="bar">
+                <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
+                    <NText strong style="font-size: 16px; ">
+                        AI Gist
+                    </NText>
+                </NFlex>
+                <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
+                    :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
+            </NLayoutSider>
 
-        <NLayoutContent content-style="overflow-y: auto;">
-            <PromptManagementPage v-if="currentView === 'prompts'" />
-            <SettingsPage v-else-if="currentView === 'settings'" />
-        </NLayoutContent>
-    </NLayout>
+            <NLayoutContent content-style="overflow-y: auto;">
+                <PromptManagementPage v-if="currentView === 'prompts'" />
+                <SettingsPage v-else-if="currentView === 'settings'" />
+            </NLayoutContent>
+        </NLayout>
+    </div>
 </template>
