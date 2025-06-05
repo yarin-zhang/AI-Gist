@@ -20,8 +20,10 @@ class WindowManager {
     
     // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
-      width: 1280,
-      height: 800,
+      width: 1080,
+      height: 720,
+      minHeight: 600,
+      minWidth: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
       show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
       webPreferences: {
