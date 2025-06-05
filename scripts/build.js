@@ -39,6 +39,32 @@ function copyResources() {
     }
 }
 
+/**
+ * 复制图标资源到构建目录
+ */
+function copyAssets() {
+    const assetsPath = Path.join(__dirname, '..', 'src', 'assets');
+    const buildAssetsPath = Path.join(__dirname, '..', 'build', 'assets');
+
+    if (FileSystem.existsSync(assetsPath)) {
+        // 确保目标目录存在
+        if (!FileSystem.existsSync(buildAssetsPath)) {
+            FileSystem.mkdirSync(buildAssetsPath, { recursive: true });
+        }
+        
+        // 复制图标文件
+        const iconFiles = ['windows.ico', 'macos.icns', 'linux.png', 'icon.png', 'tray.png', 'tray@2x.png'];
+        iconFiles.forEach(file => {
+            const srcPath = Path.join(assetsPath, file);
+            const destPath = Path.join(buildAssetsPath, file);
+            if (FileSystem.existsSync(srcPath)) {
+                FileSystem.copyFileSync(srcPath, destPath);
+                console.log(Chalk.greenBright(`图标文件已复制: ${file}`));
+            }
+        });
+    }
+}
+
 // 清理构建目录
 FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
     recursive: true,
@@ -55,6 +81,9 @@ Promise.all([
     .then(() => {
         // 复制必要的资源文件
         copyResources();
+        
+        // 复制图标资源文件
+        copyAssets();
         
         console.log(Chalk.greenBright('构建成功完成！'));
         console.log(Chalk.greenBright('可以使用 electron-builder 进行打包。'));

@@ -9,8 +9,7 @@
         "owner": "yarin-zhang",
         "repo": "AI-Gist",
         "releaseType": "draft"
-    },
-    "files": [
+    },    "files": [
         {
             "from": "build/main",
             "to": "./main",
@@ -30,6 +29,15 @@
             "to": "./static",
             "filter": [
                 "**/*"
+            ]
+        },
+        {
+            "from": "src/assets",
+            "to": "./assets",
+            "filter": [
+                "*.png",
+                "*.ico",
+                "*.icns"
             ]
         },
         "package.json"
