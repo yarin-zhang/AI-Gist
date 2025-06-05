@@ -25,31 +25,6 @@
         </NFlex>
       </NFlex>
 
-      <!-- 统计卡片 -->
-      <NFlex>
-        <NCard class="stat-card">
-          <NFlex vertical align="center">
-            <NIcon size="24" color="#18a058"><FileText /></NIcon>
-            <NText strong style="font-size: 20px;">{{ totalPrompts }}</NText>
-            <NText depth="3">总 Prompts</NText>
-          </NFlex>
-        </NCard>
-        <NCard class="stat-card">
-          <NFlex vertical align="center">
-            <NIcon size="24" color="#f0a020"><Heart /></NIcon>
-            <NText strong style="font-size: 20px;">{{ favoritePrompts }}</NText>
-            <NText depth="3">收藏</NText>
-          </NFlex>
-        </NCard>
-        <NCard class="stat-card">
-          <NFlex vertical align="center">
-            <NIcon size="24" color="#2080f0"><Folder /></NIcon>
-            <NText strong style="font-size: 20px;">{{ totalCategories }}</NText>
-            <NText depth="3">分类</NText>
-          </NFlex>
-        </NCard>
-      </NFlex>
-
       <!-- Prompt 列表组件 -->
       <PromptList 
         @edit="handleEditPrompt"
