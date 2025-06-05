@@ -30,7 +30,6 @@ class TrayManager {
   setShowWindowCallback(callback: () => void) {
     this.showWindowCallback = callback;
   }
-
   /**
    * 创建系统托盘
    * 在系统托盘区域创建应用图标，提供右键菜单和双击事件
@@ -44,8 +43,17 @@ class TrayManager {
         return false;
       }
 
+      console.log(`正在使用图标文件: ${iconPath}`);
+
       // 创建托盘图标
-      const icon = nativeImage.createFromPath(iconPath);
+      let icon = nativeImage.createFromPath(iconPath);
+      
+      // 针对 Windows 平台的特殊处理
+      if (process.platform === 'win32' && !icon.isEmpty()) {
+        // Windows 托盘图标建议尺寸为 16x16
+        icon = icon.resize({ width: 16, height: 16 });
+      }
+      
       if (icon.isEmpty()) {
         console.warn('无法创建托盘：图标文件无效或为空');
         return false;
@@ -59,6 +67,7 @@ class TrayManager {
           label: '显示主窗口',
           click: () => this.showMainWindow()
         },
+        { type: 'separator' },
         {
           label: '退出',
           click: () => this.quitApplication()
@@ -66,14 +75,18 @@ class TrayManager {
       ]);
       
       // 设置托盘提示文本和右键菜单
-      this.tray.setToolTip('AI-Gist');
+      this.tray.setToolTip('AI-Gist - AI 提示词管理工具');
       this.tray.setContextMenu(contextMenu);
       
       // 双击托盘图标显示窗口
       this.tray.on('double-click', () => this.showMainWindow());
       
-      // 在 macOS 下，单击托盘图标也显示窗口（macOS 用户习惯）
+      // 根据平台设置点击行为
       if (process.platform === 'darwin') {
+        // 在 macOS 下，单击托盘图标也显示窗口（macOS 用户习惯）
+        this.tray.on('click', () => this.showMainWindow());
+      } else if (process.platform === 'win32') {
+        // 在 Windows 下，单击托盘图标显示窗口（Windows 用户习惯）
         this.tray.on('click', () => this.showMainWindow());
       }
 
@@ -81,6 +94,7 @@ class TrayManager {
       return true;
     } catch (error) {
       console.error('创建系统托盘失败:', error);
+      console.error('错误详情:', error);
       return false;
     }
   }

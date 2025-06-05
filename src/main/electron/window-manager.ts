@@ -17,13 +17,15 @@ class WindowManager {
   createMainWindow(): BrowserWindow {
     const iconPath = getAppIconPath();
     const userPrefs = preferencesManager.getPreferences();
-    
-    // 创建浏览器窗口
+      // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
-      width: 1280,
-      height: 800,
+      width: 1080,
+      height: 720,
+      minHeight: 600,
+      minWidth: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
       show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
+      autoHideMenuBar: true, // 隐藏菜单栏
       webPreferences: {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成
@@ -64,10 +66,8 @@ class WindowManager {
     // 阻止默认关闭行为
     event.preventDefault();
 
-    const userPrefs = preferencesManager.getPreferences();
-
-    // 如果用户设置了不再提示，直接执行保存的操作
-    if (userPrefs.dontShowCloseDialog) {
+    const userPrefs = preferencesManager.getPreferences();    // 如果用户设置了固定行为，直接执行保存的操作
+    if (userPrefs.closeBehaviorMode === 'fixed') {
       console.log(`执行用户保存的关闭行为: ${userPrefs.closeAction}`);
       if (userPrefs.closeAction === 'minimize') {
         this.hideToTray(); // 隐藏到托盘
@@ -96,12 +96,11 @@ class WindowManager {
     }
 
     // 保存用户偏好设置
-    if (result.checkboxChecked) {
-      // 修复：正确保存用户选择
+    if (result.checkboxChecked) {      // 修复：正确保存用户选择
       const closeAction = result.response === 0 ? 'quit' : 'minimize';
       console.log(`用户选择记住关闭行为: ${closeAction}`);
       preferencesManager.updatePreferences({
-        dontShowCloseDialog: true,
+        closeBehaviorMode: 'fixed',
         closeAction: closeAction
       });
     }

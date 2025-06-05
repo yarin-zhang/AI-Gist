@@ -1,18 +1,25 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, Menu } from 'electron';
 import { 
   windowManager, 
   trayManager, 
   ipcHandlers,
   themeManager,
-  preferencesManager 
+  preferencesManager,
+  singleInstanceManager
 } from './electron';
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
 
+// 防止多重启动 - 初始化单实例管理器
+singleInstanceManager.initialize();
+
 // 应用准备就绪时的初始化流程
 app.whenReady().then(async () => {
   console.log('应用启动中...');
+
+  // 移除应用菜单栏
+  Menu.setApplicationMenu(null);
 
   // 应用偏好设置（在创建窗口之前）
   preferencesManager.applyAllSettings();

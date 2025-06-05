@@ -1,6 +1,6 @@
 <template>
     <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
-        style="width: 1200px; height: 90%;" title="Prompt 编辑">
+        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%" title="Prompt 编辑">
         <div style="height: 100%; display: flex; flex-direction: column;">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
                 style="flex: 1; overflow: hidden;">
