@@ -69,7 +69,11 @@
                     v-model:value="variableValues[variable.name]"
                     type="textarea"
                     :placeholder="variable.placeholder || `请输入${variable.label}`"
-                    :rows="3"
+                    :rows="1"
+                    :autosize="{
+                        minRows: 1,
+                        maxRows: 5,
+                    }"
                   />
                   <NSelect
                     v-else-if="variable.type === 'select'"
@@ -192,14 +196,13 @@
                     {{ record.content.substring(0, 120) }}{{ record.content.length > 120 ? '...' : '' }}
                   </NText>
                   
-                  <!-- 显示变量数量 -->
-                  <NFlex v-if="record.variables && Object.keys(record.variables).length > 0" size="small" style="margin-top: 8px;">
-                    <NText depth="3" style="font-size: 12px;">变量:</NText>
+                  <!-- 显示变量数量 -->                  <NFlex v-if="record.variables && Object.keys(record.variables).length > 0" size="small" style="margin-top: 8px;">
+                    <NText depth="3" style="font-size: 12px;">包含变量：</NText>
                     <NTag 
                       v-for="key in Object.keys(record.variables).slice(0, 3)" 
                       :key="key"
                       size="small"
-                      type="info"
+                      type="primary"
                       :bordered="false"
                     >
                       {{ key }}
@@ -241,24 +244,25 @@
         <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
           <NCard size="small" title="历史记录预览" style="height: 100%; display: flex; flex-direction: column;">
             <NScrollbar style="flex: 1; max-height: 75vh;">
-              <div v-if="selectedHistory">
-                <!-- 变量信息 -->
+              <div v-if="selectedHistory">                <!-- 变量信息 -->
                 <div v-if="selectedHistory.variables && Object.keys(selectedHistory.variables).length > 0" style="margin-bottom: 16px;">
-                  <NText strong style="margin-bottom: 12px; display: block;">使用的变量：</NText>
+                  <NText strong style="margin-bottom: 12px; display: block;">包含变量：</NText>
                   <NFlex vertical size="small">
-                    <div 
+                    <NFlex 
                       v-for="(value, key) in selectedHistory.variables" 
                       :key="key"
-                      style="padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-color);"
+                      align="center"
+                      size="small"
+                      style="padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-color);"
                     >
-                      <NFlex vertical size="small">
-                        <NFlex align="center" size="small">
-                          <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
-                          <NText depth="3" style="font-size: 12px;">变量名</NText>
-                        </NFlex>
-                        <NText style="word-break: break-all; line-height: 1.5;">{{ value }}</NText>
-                      </NFlex>
-                    </div>
+                      <NTag size="small" type="primary" :bordered="false" style="flex-shrink: 0;">{{ key }}</NTag>
+                      <NInput
+                        :value="value"
+                        readonly
+                        size="small"
+                        style="flex: 1; font-family: monospace;"
+                      />
+                    </NFlex>
                   </NFlex>
                 </div>
 
@@ -269,18 +273,29 @@
                     :value="selectedHistory.content"
                     type="textarea"
                     readonly
-                    :rows="12"
                     style="font-family: monospace;"
                   />
-                </div>
-
-                <!-- 操作按钮 -->
-                <NFlex justify="end" style="margin-top: 16px;">
-                  <NButton @click="copyToClipboard(selectedHistory.content)">
+                </div>                <!-- 操作按钮 -->
+                <NFlex justify="space-between" style="margin-top: 16px;">
+                  <NPopconfirm
+                    @positive-click="deleteHistoryRecord"
+                    @negative-click="() => {}"
+                  >
+                    <template #trigger>
+                      <NButton type="error" secondary>
+                        <template #icon>
+                          <NIcon><Trash /></NIcon>
+                        </template>
+                        删除
+                      </NButton>
+                    </template>
+                    确定要删除这条历史记录吗？删除后将无法恢复。
+                  </NPopconfirm>
+                  <NButton type="primary" @click="copyToClipboard(selectedHistory.content)">
                     <template #icon>
                       <NIcon><Copy /></NIcon>
                     </template>
-                    复制此记录
+                    复制记录
                   </NButton>
                 </NFlex>
               </div>
@@ -339,9 +354,10 @@ import {
   NEmpty,
   NScrollbar,
   NPagination,
+  NPopconfirm,
   useMessage
 } from 'naive-ui'
-import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText } from '@vicons/tabler'
+import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
 
 interface Props {
@@ -539,6 +555,26 @@ const loadHistoryRecord = (record) => {
 // 选择历史记录
 const selectHistoryRecord = (index) => {
   selectedHistoryIndex.value = index
+}
+
+// 删除历史记录
+const deleteHistoryRecord = () => {
+  if (selectedHistoryIndex.value >= 0) {
+    useHistory.value.splice(selectedHistoryIndex.value, 1)
+    
+    // 更新本地存储
+    localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
+    
+    // 重置选择
+    selectedHistoryIndex.value = -1
+    
+    // 如果当前页面没有记录了，回到第一页
+    if (paginatedHistory.value.length === 0 && currentPage.value > 1) {
+      currentPage.value = 1
+    }
+    
+    message.success('历史记录已删除')
+  }
 }
 
 // 格式化日期
