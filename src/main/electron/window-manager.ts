@@ -17,8 +17,7 @@ class WindowManager {
   createMainWindow(): BrowserWindow {
     const iconPath = getAppIconPath();
     const userPrefs = preferencesManager.getPreferences();
-    
-    // 创建浏览器窗口
+      // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
       width: 1080,
       height: 720,
@@ -26,6 +25,7 @@ class WindowManager {
       minWidth: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
       show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
+      autoHideMenuBar: true, // 隐藏菜单栏
       webPreferences: {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成

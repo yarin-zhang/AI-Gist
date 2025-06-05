@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, Menu } from 'electron';
 import { 
   windowManager, 
   trayManager, 
@@ -17,6 +17,9 @@ singleInstanceManager.initialize();
 // 应用准备就绪时的初始化流程
 app.whenReady().then(async () => {
   console.log('应用启动中...');
+
+  // 移除应用菜单栏
+  Menu.setApplicationMenu(null);
 
   // 应用偏好设置（在创建窗口之前）
   preferencesManager.applyAllSettings();
