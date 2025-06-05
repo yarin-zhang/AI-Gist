@@ -3,7 +3,9 @@ import { onMounted } from 'vue'
 import {
     NLayout,
     NConfigProvider,
-    NMessageProvider
+    NMessageProvider,
+    zhCN,
+    dateZhCN
 } from 'naive-ui'
 import { useTheme } from './composables/useTheme'
 import MainPage from './pages/MainPage.vue'
@@ -13,12 +15,12 @@ const { naiveTheme, initTheme } = useTheme()
 
 // 初始化主题
 onMounted(async () => {
-  await initTheme()
+    await initTheme()
 })
 </script>
 
 <template>
-    <NConfigProvider :theme="naiveTheme">
+    <NConfigProvider :theme="naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
         <NMessageProvider>
             <MainPage />
         </NMessageProvider>

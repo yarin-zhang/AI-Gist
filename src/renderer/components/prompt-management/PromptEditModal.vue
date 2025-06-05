@@ -1,18 +1,16 @@
-<template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
-        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%" title="Prompt 编辑">
+<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
+        class="fullscreen-modal" title="提示词编辑">
         <div style="height: 100%; display: flex; flex-direction: column;">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
                 style="flex: 1; overflow: hidden;">
                 <div style="height: 100%; display: flex; gap: 20px;">
                     <!-- 左侧内容区 -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <!-- 第一步：Prompt 内容 -->
+                    <div style="flex: 2; display: flex; flex-direction: column; overflow: hidden;"> <!-- 第一步：提示词内容 -->
                         <div v-show="!showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
                             <NScrollbar style="max-height: 75vh;">
-                                <NFormItem label="Prompt 内容" path="content">
+                                <NFormItem label="提示词内容" path="content">
                                     <NInput v-model:value="formData.content" type="textarea"
-                                        placeholder="请输入 Prompt 内容，使用 {{变量名}} 来定义变量" :rows="12" show-count />
+                                        placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" :rows="12" show-count />
                                 </NFormItem>
 
                                 <NAlert type="info" style="margin-top: 8px;">
@@ -29,12 +27,12 @@
                                 <NCard title="基本信息" size="small">
                                     <NFlex vertical size="medium">
                                         <NFormItem label="标题" path="title">
-                                            <NInput v-model:value="formData.title" placeholder="请输入 Prompt 标题（可选）" />
+                                            <NInput v-model:value="formData.title" placeholder="请输入提示词标题（可选）" />
                                         </NFormItem>
 
                                         <NFormItem label="描述" path="description">
                                             <NInput v-model:value="formData.description" type="textarea"
-                                                placeholder="请输入 Prompt 描述（可选）" :rows="8" />
+                                                placeholder="请输入提示词描述（可选）" :rows="8" />
                                         </NFormItem>
 
                                     </NFlex>
@@ -106,29 +104,18 @@
                                                 </NFlex>
 
                                                 <NFormItem label="默认值">
-                                                    <NInput 
-                                                        v-if="variable.type === 'text'"
-                                                        v-model:value="variable.defaultValue" 
-                                                        placeholder="默认值（可选）"
-                                                        size="small" 
-                                                    />
-                                                    <NSelect
-                                                        v-else-if="variable.type === 'select'"
+                                                    <NInput v-if="variable.type === 'text'"
+                                                        v-model:value="variable.defaultValue" placeholder="默认值（可选）"
+                                                        size="small" />
+                                                    <NSelect v-else-if="variable.type === 'select'"
                                                         v-model:value="variable.defaultValue"
                                                         :options="getVariableDefaultOptions(variable.options)"
-                                                        placeholder="选择默认选项（可选）"
-                                                        size="small"
-                                                        clearable
-                                                    />
+                                                        placeholder="选择默认选项（可选）" size="small" clearable />
                                                 </NFormItem>
 
                                                 <NFormItem v-if="variable.type === 'select'" label="选项">
-                                                    <NDynamicInput 
-                                                        v-model:value="variable.options" 
-                                                        show-sort-button
-                                                        placeholder="请输入选项"
-                                                        :min="1"
-                                                    />
+                                                    <NDynamicInput v-model:value="variable.options" show-sort-button
+                                                        placeholder="请输入选项" :min="1" />
                                                 </NFormItem>
                                             </NFlex>
                                         </NCard>
@@ -279,8 +266,7 @@ const displayTitle = computed(() => {
     if (formData.value.content) {
         const firstLine = formData.value.content.split('\n')[0].trim()
         return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine
-    }
-    return '未命名 Prompt'
+    } return '未命名提示词'
 })
 
 const variableTypeOptions = [
@@ -292,7 +278,7 @@ const variableTypeOptions = [
 const rules = {
     content: {
         required: true,
-        message: '请输入 Prompt 内容',
+        message: '请输入提示词内容',
         trigger: 'blur, focus'
     },
     tags: {
@@ -313,7 +299,7 @@ const resetForm = () => {
         clearTimeout(debounceTimer.value)
         debounceTimer.value = null
     }
-    
+
     formData.value = {
         title: '',
         description: '',
@@ -336,7 +322,7 @@ const getCategoryName = (categoryId: any) => {
 const extractVariables = (content: string) => {
     const variableRegex = /\{\{([^}]+)\}\}/g
     const matches = content.match(variableRegex)
-    
+
     // 提取当前内容中的所有变量名
     const currentVariableNames = new Set<string>()
     if (matches) {
@@ -347,7 +333,7 @@ const extractVariables = (content: string) => {
             }
         })
     }
-    
+
     // 保留现有变量的配置信息
     const existingVariableConfigs = new Map()
     formData.value.variables.forEach(variable => {
@@ -355,7 +341,7 @@ const extractVariables = (content: string) => {
             existingVariableConfigs.set(variable.name, variable)
         }
     })
-    
+
     // 重新构建变量列表：只包含当前内容中实际存在的变量
     formData.value.variables = Array.from(currentVariableNames).map(variableName => {
         // 如果已有配置，保留原配置；否则创建新配置
@@ -377,7 +363,7 @@ const debouncedExtractVariables = (content: string) => {
     if (debounceTimer.value) {
         clearTimeout(debounceTimer.value)
     }
-    
+
     // 设置新的定时器
     debounceTimer.value = setTimeout(() => {
         extractVariables(content)
@@ -388,12 +374,12 @@ const debouncedExtractVariables = (content: string) => {
 // 自动生成标题的函数
 const generateAutoTitle = () => {
     if (!formData.value.content) return ''
-    
+
     const firstLine = formData.value.content.split('\n')[0].trim()
     if (firstLine.length > 30) {
         return firstLine.substring(0, 30) + '...'
     }
-    return firstLine || `Prompt ${new Date().toLocaleString()}`
+    return firstLine || `提示词 ${new Date().toLocaleString()}`
 }
 
 // 处理进入补充信息页面
@@ -424,7 +410,7 @@ watch(() => props.prompt, (newPrompt) => {
                 placeholder: v.placeholder || ''
             })) || []
         }
-        
+
         // 如果有内容但没有变量配置，立即提取变量
         if (newPrompt.content && (!newPrompt.variables || newPrompt.variables.length === 0)) {
             nextTick(() => {
@@ -495,12 +481,12 @@ const generateUniqueVariableName = () => {
     const existingNames = new Set(formData.value.variables.map(v => v.name))
     let counter = 1
     let variableName = `变量${counter}`
-    
+
     while (existingNames.has(variableName)) {
         counter++
         variableName = `变量${counter}`
     }
-    
+
     return variableName
 }
 
@@ -516,7 +502,7 @@ const getVariableDefaultOptions = (options) => {
 // 方法
 const addVariable = () => {
     const variableName = generateUniqueVariableName()
-    
+
     // 添加变量配置
     formData.value.variables.push({
         name: variableName,
@@ -527,10 +513,10 @@ const addVariable = () => {
         required: true,
         placeholder: ''
     })
-    
+
     // 在左侧内容中自动添加对应的占位符
     const placeholder = `{{${variableName}}}`
-    
+
     // 如果内容为空，直接添加占位符
     if (!formData.value.content.trim()) {
         formData.value.content = placeholder
@@ -567,7 +553,7 @@ const handleSave = async () => {
                 p.title === finalTitle &&
                 (!isEdit.value || p.id !== props.prompt?.id)
             )
-            
+
             // 如果标题重复，自动添加时间戳
             if (duplicatePrompt) {
                 const timestamp = new Date().toLocaleString('zh-CN', {
@@ -578,15 +564,15 @@ const handleSave = async () => {
                     minute: '2-digit',
                     second: '2-digit'
                 }).replace(/[/:]/g, '-').replace(/,?\s+/g, '_')
-                
+
                 finalTitle = `${finalTitle}_${timestamp}`
-                
+
                 // 再次检查新标题是否重复（极低概率）
                 const newCheck = existingPrompts.find(p =>
                     p.title === finalTitle &&
                     (!isEdit.value || p.id !== props.prompt?.id)
                 )
-                
+
                 // 如果还是重复，添加随机后缀
                 if (newCheck) {
                     const randomSuffix = Math.random().toString(36).substring(2, 8)
@@ -619,15 +605,15 @@ const handleSave = async () => {
                 id: props.prompt.id,
                 data
             })
-            message.success('Prompt 更新成功')
+            message.success('提示词更新成功')
         } else {
             await api.prompts.create.mutate(data)
-            message.success('Prompt 创建成功')
+            message.success('提示词创建成功')
         }
 
         // 立即发送 saved 事件，通知父组件刷新数据
         emit('saved')
-        
+
         // 短暂延迟后关闭弹窗，确保数据已经刷新
         setTimeout(() => {
             emit('update:show', false)
@@ -642,4 +628,5 @@ const handleSave = async () => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+</style>

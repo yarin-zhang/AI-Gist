@@ -118,6 +118,11 @@ function createApiClient() {
           return databaseService.incrementPromptUseCount(id);
         }
       },
+      decrementUseCount: {
+        mutate: async (id: number) => {
+          return databaseService.decrementPromptUseCount(id);
+        }
+      },
       fillVariables: {
         mutate: async (input: any) => {
           const { promptId, variables } = input;

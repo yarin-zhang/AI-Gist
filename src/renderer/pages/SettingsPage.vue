@@ -261,7 +261,7 @@ import {
 const message = useMessage();
 
 // 当前激活的设置项
-const activeSettingKey = ref("close-behavior");
+const activeSettingKey = ref("appearance");
 
 // 状态管理
 const saving = ref(false);

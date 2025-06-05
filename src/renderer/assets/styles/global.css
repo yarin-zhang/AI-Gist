@@ -25,11 +25,49 @@ body.dark {
 }
 
 /* 基础元素样式 */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 #app {
   width: 100vw;
   height: 100vh;
   background-color: var(--app-bg-color);
   color: var(--app-text-color);
+  overflow: hidden; /* 防止应用本身出现滚动条 */
+}
+
+/* 全屏Modal样式 - 统一处理 */
+.n-modal-container .n-modal.fullscreen-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card {
+  height: 100% !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card .n-card__content {
+  flex: 1 !important;
+  overflow: auto !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card .n-card__footer {
+  flex-shrink: 0 !important;
 }
 
 /* 滚动条样式 */
