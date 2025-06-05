@@ -13,7 +13,6 @@ import {
 import {
     Home as HomeIcon,
     Database as DatabaseIcon,
-    Server as TrpcIcon,
     Star as PromptIcon
 } from '@vicons/tabler'
 
@@ -54,7 +53,6 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 
         <NLayoutContent content-style="padding: 24px; overflow-y: auto; background-color: #f8f9fa;">
             <PromptManager v-if="currentView === 'prompts'" />
-            <TrpcDemo v-if="currentView === 'trpc'" />
         </NLayoutContent>
     </NLayout>
 </template>

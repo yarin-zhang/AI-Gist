@@ -53,13 +53,6 @@
 yarn install
 ```
 
-### 初始化数据库 🗄️
-
-```bash
-yarn prisma generate
-yarn prisma db push
-```
-
 ### 启动开发环境 ⚒️
 
 ```bash
@@ -73,12 +66,6 @@ yarn dev
 yarn dev            # 启动应用并开启热重载
 yarn build          # 打包应用，输出目录为 "dist"
 
-# 数据库相关
-yarn prisma studio  # 打开 Prisma 数据库管理界面
-yarn prisma generate # 生成 Prisma 客户端
-yarn prisma db push # 推送 schema 变更到数据库
-yarn prisma migrate # 创建和应用数据库迁移
-
 # 跨平台构建
 yarn build:win      # 构建 Windows 安装包
 yarn build:mac      # 构建 macOS 安装包
@@ -91,9 +78,7 @@ yarn build:linux    # 构建 Linux 安装包
 
 详细的开发指南请参阅 [docs](./docs) 目录：
 
-- [tRPC 和 Prisma 使用指南](./docs/trpc-prisma-guide.md)
-- [数据库模型管理](./docs/database-models.md)
-- [API 接口开发](./docs/api-development.md)
+- [IndexedDB 架构指南](./docs/indexeddb-architecture.md)
 - [GitHub Actions 自动构建与发布](./docs/github-actions.md)
 
 ## 应用截图

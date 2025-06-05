@@ -32,51 +32,10 @@
                 "**/*"
             ]
         },
-        {
-            "from": "prisma",
-            "to": "./prisma",
-            "filter": [
-                "schema.prisma",
-                "migrations/**/*"
-            ]
-        },
         "package.json"
     ],
-    "asarUnpack": [
-        "**/node_modules/.prisma/**",
-        "**/node_modules/@prisma/client/**",
-        "**/node_modules/prisma/**",
-        "prisma/**"
-    ],
-    "extraResources": [
-        {
-            "from": "node_modules/.prisma",
-            "to": "node_modules/.prisma"
-        },
-        {
-            "from": "node_modules/@prisma",
-            "to": "node_modules/@prisma"
-        },
-        {
-            "from": "node_modules/prisma",
-            "to": "node_modules/prisma"
-        },
-        {
-            "from": "prisma/schema.prisma",
-            "to": "prisma/schema.prisma"
-        },
-        {
-            "from": "prisma/migrations",
-            "to": "prisma/migrations",
-            "filter": [
-                "**/*"
-            ]
-        },
-        {
-            "from": "resources/prisma/starter.db",
-            "to": "prisma/starter.db"
-        }
-    ],
+    "asarUnpack": [],
+    "extraResources": [],
     "nsis": {
         "oneClick": false,
         "perMachine": false,

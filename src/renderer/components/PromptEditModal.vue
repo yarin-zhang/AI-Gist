@@ -150,7 +150,7 @@ import {
     useMessage
 } from 'naive-ui'
 import { Plus, Trash } from '@vicons/tabler'
-import { trpc } from '../lib/trpc'
+import { dbClient } from '../lib/database-client'
 
 interface Variable {
     name: string
@@ -327,7 +327,7 @@ const handleSave = async () => {
         // 检查标题是否重复（如果有填写标题的话）
         if (formData.value.title) {
             try {
-                const existingPrompts = await trpc.prompts.getAll.query({ search: formData.value.title })
+                const existingPrompts = await dbClient.prompts.getAll.query({ search: formData.value.title })
                 const duplicatePrompt = existingPrompts.find(p =>
                     p.title === formData.value.title &&
                     (!isEdit.value || p.id !== props.prompt?.id)
@@ -359,13 +359,13 @@ const handleSave = async () => {
         }
 
         if (isEdit.value) {
-            await trpc.prompts.update.mutate({
+            await dbClient.prompts.update.mutate({
                 id: props.prompt.id,
                 data
             })
             message.success('Prompt 更新成功')
         } else {
-            await trpc.prompts.create.mutate(data)
+            await dbClient.prompts.create.mutate(data)
             message.success('Prompt 创建成功')
         }
 

@@ -176,7 +176,7 @@ import {
   useMessage
 } from 'naive-ui'
 import { Heart, Edit, Copy, Wand, Check } from '@vicons/tabler'
-import { trpc } from '../lib/trpc'
+import { dbClient } from '../lib/database-client'
 
 interface Props {
   show: boolean
@@ -304,8 +304,8 @@ const usePrompt = async () => {
     // 保存到本地存储
     localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
     
-    // 通过 tRPC 增加使用计数
-    await trpc.prompts.incrementUseCount.mutate(props.prompt.id)
+    // 增加使用计数
+    await dbClient.prompts.incrementUseCount.mutate(props.prompt.id)
     
     // 复制到剪贴板
     await copyToClipboard(filledContent.value)
@@ -322,7 +322,7 @@ const usePrompt = async () => {
 // 切换收藏状态
 const toggleFavorite = async () => {
   try {
-    await trpc.prompts.toggleFavorite.mutate(props.prompt.id)
+    await dbClient.prompts.toggleFavorite.mutate(props.prompt.id)
     message.success('收藏状态已更新')
     emit('updated') // 通知父组件重新加载数据
   } catch (error) {

@@ -134,7 +134,7 @@ import {
   useMessage
 } from 'naive-ui'
 import { Edit, Trash } from '@vicons/tabler'
-import { trpc } from '../lib/trpc'
+import { dbClient } from '../lib/database-client'
 
 interface Props {
   show: boolean
@@ -170,7 +170,7 @@ const handleCreate = async () => {
 
   try {
     creating.value = true
-    await trpc.categories.create.mutate({
+    await dbClient.categories.create.mutate({
       name: newCategory.value.name,
       color: newCategory.value.color
     })
@@ -206,7 +206,7 @@ const handleSaveEdit = async () => {
 
   try {
     updating.value = true
-    await trpc.categories.update.mutate({
+    await dbClient.categories.update.mutate({
       id: editingCategory.value.id,
       data: {
         name: editingCategory.value.name,
@@ -240,7 +240,7 @@ const handleDelete = async (category) => {
   }
 
   try {
-    await trpc.categories.delete.mutate(category.id)
+    await dbClient.categories.delete.mutate(category.id)
     message.success('分类删除成功')
     emit('updated')
   } catch (error) {
