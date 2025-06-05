@@ -27,6 +27,7 @@
 
       <!-- Prompt 列表组件 -->
       <PromptList 
+        ref="promptListRef"
         @edit="handleEditPrompt"
         @view="handleViewPrompt"
         @refresh="loadStatistics"
@@ -79,6 +80,9 @@ import { api } from '@/lib/api'
 
 const message = useMessage()
 
+// 组件引用
+const promptListRef = ref()
+
 // 响应式数据
 const prompts = ref([])
 const categories = ref([])
@@ -105,6 +109,10 @@ const loadPrompts = async () => {
 const loadCategories = async () => {
   try {
     categories.value = await api.categories.getAll.query()
+    // 同时刷新 PromptList 的分类数据
+    if (promptListRef.value) {
+      promptListRef.value.loadCategories()
+    }
   } catch (error) {
     message.error('加载分类失败')
     console.error(error)
@@ -137,6 +145,12 @@ const handleEditFromDetail = (prompt) => {
 }
 
 const handlePromptSaved = () => {
+  // 刷新 PromptList 组件的数据
+  if (promptListRef.value) {
+    promptListRef.value.loadPrompts()
+    promptListRef.value.loadCategories()
+  }
+  // 同时刷新页面统计数据
   loadStatistics()
 }
 

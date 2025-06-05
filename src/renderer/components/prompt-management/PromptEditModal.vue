@@ -155,7 +155,7 @@
                         </template>
                         返回编辑
                     </NButton>
-                    <NButton v-if="!showExtraInfo" @click="showExtraInfo = true" :disabled="!formData.content.trim()"
+                    <NButton v-if="!showExtraInfo" @click="handleShowExtraInfo" :disabled="!formData.content.trim()"
                         ghost>
                         <template #icon>
                             <NIcon>
@@ -369,6 +369,26 @@ const debouncedExtractVariables = (content: string) => {
     }, DEBOUNCE_DELAY) as unknown as number
 }
 
+// 自动生成标题的函数
+const generateAutoTitle = () => {
+    if (!formData.value.content) return ''
+    
+    const firstLine = formData.value.content.split('\n')[0].trim()
+    if (firstLine.length > 30) {
+        return firstLine.substring(0, 30) + '...'
+    }
+    return firstLine || `Prompt ${new Date().toLocaleString()}`
+}
+
+// 处理进入补充信息页面
+const handleShowExtraInfo = () => {
+    // 如果标题为空，自动填充生成的标题
+    if (!formData.value.title.trim()) {
+        formData.value.title = generateAutoTitle()
+    }
+    showExtraInfo.value = true
+}
+
 // 监听 prompt 变化，初始化表单
 watch(() => props.prompt, (newPrompt) => {
     if (newPrompt) {
@@ -462,23 +482,41 @@ const handleSave = async () => {
         // 自动生成标题（如果没有填写）
         let finalTitle = formData.value.title
         if (!finalTitle) {
-            const firstLine = formData.value.content.split('\n')[0].trim()
-            finalTitle = firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine
-            if (!finalTitle) {
-                finalTitle = `Prompt ${new Date().toLocaleString()}`
-            }
+            finalTitle = generateAutoTitle()
         }
 
-        // 检查标题是否重复
+        // 检查标题是否重复，如果重复则自动添加时间戳
         try {
             const existingPrompts = await api.prompts.getAll.query({ search: finalTitle })
-            const duplicatePrompt = existingPrompts.find(p =>
+            let duplicatePrompt = existingPrompts.find(p =>
                 p.title === finalTitle &&
                 (!isEdit.value || p.id !== props.prompt?.id)
             )
+            
+            // 如果标题重复，自动添加时间戳
             if (duplicatePrompt) {
-                message.error('标题已存在，请使用不同的标题')
-                return
+                const timestamp = new Date().toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }).replace(/[/:]/g, '-').replace(/,?\s+/g, '_')
+                
+                finalTitle = `${finalTitle}_${timestamp}`
+                
+                // 再次检查新标题是否重复（极低概率）
+                const newCheck = existingPrompts.find(p =>
+                    p.title === finalTitle &&
+                    (!isEdit.value || p.id !== props.prompt?.id)
+                )
+                
+                // 如果还是重复，添加随机后缀
+                if (newCheck) {
+                    const randomSuffix = Math.random().toString(36).substring(2, 8)
+                    finalTitle = `${finalTitle}_${randomSuffix}`
+                }
             }
         } catch (error) {
             console.error('检查标题重复时出错:', error)
@@ -512,15 +550,12 @@ const handleSave = async () => {
             message.success('Prompt 创建成功')
         }
 
-        // 使用 nextTick 确保状态更新的顺序
-        await new Promise(resolve => setTimeout(resolve, 50))
-
-        // 先关闭弹窗，再通知父组件
-        emit('update:show', false)
-
-        // 延迟发送 saved 事件，确保弹窗已经关闭
+        // 立即发送 saved 事件，通知父组件刷新数据
+        emit('saved')
+        
+        // 短暂延迟后关闭弹窗，确保数据已经刷新
         setTimeout(() => {
-            emit('saved')
+            emit('update:show', false)
         }, 100)
 
     } catch (error) {
