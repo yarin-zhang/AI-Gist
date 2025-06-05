@@ -47,9 +47,6 @@ FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
 
 console.log(Chalk.blueBright('开始构建应用程序...'));
 
-// 简化的构建流程
-console.log(Chalk.blueBright('正在构建渲染进程和主进程...'));
-
 // 并行构建渲染进程和主进程
 Promise.all([
     buildRenderer(),

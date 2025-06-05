@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { initDatabase } from './lib/database'
+import { initDatabase } from './lib/db'
 
 // 初始化数据库，然后启动应用
 async function startApp() {

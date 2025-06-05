@@ -1,7 +1,7 @@
-import { databaseService } from './database';
+import { databaseService } from './db';
 
 // 创建一个数据库客户端，直接使用 IndexedDB
-function createClient() {
+function createApiClient() {
   return {
     users: {
       create: {
@@ -139,9 +139,9 @@ function createClient() {
 }
 
 // 创建数据库客户端，直接使用 IndexedDB
-export const dbClient = createClient();
+export const api = createApiClient();
 
 
 // 类型定义（为了兼容性保留）
 export type AppRouter = any;
-export type DatabaseClient = typeof dbClient;
+export type DatabaseClient = typeof api;

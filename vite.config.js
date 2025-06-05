@@ -19,6 +19,12 @@ const config = defineConfig({
         emptyOutDir: true,
     },
     plugins: [vuePlugin()],
+    resolve: {
+        alias: {
+            '@': Path.resolve(__dirname, 'src/renderer'),
+            '~': Path.resolve(__dirname, 'src/renderer'),
+        }
+    }
 });
 
 module.exports = config;

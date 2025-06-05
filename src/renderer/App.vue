@@ -6,7 +6,7 @@ import {
     NMessageProvider
 } from 'naive-ui'
 import { useTheme } from './composables/useTheme'
-import MainPage from './components/MainPage.vue'
+import MainPage from './pages/MainPage.vue'
 
 // 使用主题管理
 const { naiveTheme, initTheme } = useTheme()

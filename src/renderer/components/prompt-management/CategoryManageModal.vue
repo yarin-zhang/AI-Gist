@@ -134,7 +134,7 @@ import {
   useMessage
 } from 'naive-ui'
 import { Edit, Trash } from '@vicons/tabler'
-import { dbClient } from '../lib/database-client'
+import { api } from '@/lib/api'
 
 interface Props {
   show: boolean
@@ -170,7 +170,7 @@ const handleCreate = async () => {
 
   try {
     creating.value = true
-    await dbClient.categories.create.mutate({
+    await api.categories.create.mutate({
       name: newCategory.value.name,
       color: newCategory.value.color
     })
@@ -206,7 +206,7 @@ const handleSaveEdit = async () => {
 
   try {
     updating.value = true
-    await dbClient.categories.update.mutate({
+    await api.categories.update.mutate({
       id: editingCategory.value.id,
       data: {
         name: editingCategory.value.name,
@@ -240,7 +240,7 @@ const handleDelete = async (category) => {
   }
 
   try {
-    await dbClient.categories.delete.mutate(category.id)
+    await api.categories.delete.mutate(category.id)
     message.success('分类删除成功')
     emit('updated')
   } catch (error) {
@@ -263,14 +263,10 @@ watch(() => props.show, (show) => {
 </script>
 
 <style scoped>
-.category-item {
-  border: 1px solid #e0e0e6;
-}
 
 .color-indicator {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid #e0e0e6;
 }
 </style>
