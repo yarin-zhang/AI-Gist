@@ -119,9 +119,9 @@
         />
         
         <!-- 如果有未填写的变量，显示提示 -->
-        <NFlex v-if="hasUnfilledVariables" align="center" style="margin-top: 8px; padding: 8px; background-color: #fff7e6; border-radius: 6px;">
+        <NFlex v-if="hasUnfilledVariables" align="center" style="margin-top: 8px; padding: 8px; border-radius: 6px;">
           <NIcon color="#fa8c16"><Wand /></NIcon>
-          <NText style="color: #fa8c16; font-size: 14px;">
+          <NText style="font-size: 14px;">
             检测到未填写的变量，请在上方填写以生成完整的 Prompt
           </NText>
         </NFlex>
@@ -134,7 +134,6 @@
             v-for="(record, index) in useHistory" 
             :key="index"
             size="small"
-            style="background-color: #fafafa;"
           >
             <NFlex justify="space-between" align="center">
               <NText depth="3" style="font-size: 12px;">
