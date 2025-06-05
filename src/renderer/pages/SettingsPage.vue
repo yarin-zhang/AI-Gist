@@ -54,15 +54,14 @@
                             </template>
 
                             <NFlex vertical :size="16">
-                                <NAlert type="info" show-icon>
-                                    <template #header>设置说明</template>
+                                <NAlert :show-icon="false">
                                     {{ currentSectionDescription }}
                                 </NAlert>
                             </NFlex>
                         </NCard>
 
                         <!-- 关闭行为设置 -->
-                        <NCard v-show="activeSettingKey === 'close-behavior'" title="关闭行为详细设置">
+                        <NCard v-show="activeSettingKey === 'close-behavior'">
                             <NFlex vertical :size="16">
                                 <NFormItem label="关闭行为模式">
                                     <NRadioGroup v-model:value="settings.closeBehaviorMode"
@@ -73,7 +72,7 @@
                                                     <div>
                                                         <div>每次询问</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            点击关闭按钮时弹出对话框，让您选择退出应用还是最小化到托盘
+                                                            弹出对话框让您选择
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -83,7 +82,7 @@
                                                     <div>
                                                         <div>固定行为</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            点击关闭按钮时直接执行指定的关闭动作，不再弹出对话框
+                                                            直接执行指定动作
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -101,7 +100,7 @@
                                                     <div>
                                                         <div>退出应用</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            直接退出应用程序
+                                                            完全退出程序
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -111,7 +110,7 @@
                                                     <div>
                                                         <div>最小化到托盘</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            最小化到系统托盘，应用继续在后台运行
+                                                            后台继续运行
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -122,31 +121,27 @@
 
                                 <NAlert v-if="settings.closeBehaviorMode === 'ask'" type="info" show-icon>
                                     <template #header>当前设置</template>
-                                    点击关闭按钮时会弹出对话框，您可以选择退出应用或最小化到托盘。
+                                    关闭时弹出选择对话框
                                 </NAlert>
 
                                 <NAlert v-if="settings.closeBehaviorMode === 'fixed'" type="success" show-icon>
                                     <template #header>当前设置</template>
-                                    点击关闭按钮时将直接执行"{{
-                                        settings.closeAction === "quit"
-                                            ? "退出应用"
-                                    : "最小化到托盘"
-                                    }}"操作，不会弹出对话框。
+                                    关闭时直接{{ settings.closeAction === "quit" ? "退出应用" : "最小化到托盘" }}
                                 </NAlert>
                             </NFlex>
                         </NCard>
 
                         <!-- 启动行为设置 -->
-                        <NCard v-show="activeSettingKey === 'startup-behavior'" title="启动行为详细设置">
+                        <NCard v-show="activeSettingKey === 'startup-behavior'">
                             <NFlex vertical :size="16">
                                 <NFormItem label="启动模式">
                                     <NCheckbox v-model:checked="settings.startMinimized"
                                         @update:checked="updateSetting">
                                         <NFlex align="center" :size="8">
                                             <div>
-                                                <div>启动时最小化到系统托盘</div>
+                                                <div>启动时最小化到托盘</div>
                                                 <NText depth="3" style="font-size: 12px">
-                                                    启用后应用启动时不会显示主窗口，直接最小化到托盘运行
+                                                    启动时不显示主窗口
                                                 </NText>
                                             </div>
                                         </NFlex>
@@ -159,9 +154,9 @@
                                     <NCheckbox v-model:checked="settings.autoLaunch" @update:checked="updateSetting">
                                         <NFlex align="center" :size="8">
                                             <div>
-                                                <div>开机时自动启动应用</div>
+                                                <div>开机自动启动</div>
                                                 <NText depth="3" style="font-size: 12px">
-                                                    启用后应用会在系统启动时自动运行
+                                                    系统启动时自动运行
                                                 </NText>
                                             </div>
                                         </NFlex>
@@ -171,7 +166,7 @@
                         </NCard>
 
                         <!-- 外观设置 -->
-                        <NCard v-show="activeSettingKey === 'appearance'" title="外观详细设置">
+                        <NCard v-show="activeSettingKey === 'appearance'">
                             <NFlex vertical :size="16">
                                 <NFormItem label="主题模式">
                                     <NRadioGroup v-model:value="settings.themeSource" @update:value="updateSetting">
@@ -181,7 +176,7 @@
                                                     <div>
                                                         <div>跟随系统</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            自动跟随系统的主题设置
+                                                            自动切换主题
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -191,7 +186,7 @@
                                                     <div>
                                                         <div>浅色主题</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            始终使用浅色主题
+                                                            始终使用浅色
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -201,7 +196,7 @@
                                                     <div>
                                                         <div>深色主题</div>
                                                         <NText depth="3" style="font-size: 12px">
-                                                            始终使用深色主题
+                                                            始终使用深色
                                                         </NText>
                                                     </div>
                                                 </NFlex>
@@ -308,19 +303,17 @@ const currentSectionInfo = computed(() => {
         "close-behavior": {
             title: "关闭行为设置",
             icon: Power,
-            description:
-                '配置点击关闭按钮时的行为，可选择退出应用或最小化到托盘。启用"记住我的选择"后，设置将永久保存。',
+            description: "配置点击关闭按钮时的行为方式"
         },
         "startup-behavior": {
             title: "启动行为设置",
             icon: Rocket,
-            description:
-                "配置应用启动时的行为，包括是否最小化启动和开机自启动等选项。",
+            description: "配置应用启动和自启动选项"
         },
         appearance: {
             title: "外观设置",
             icon: Sun,
-            description: "配置应用的主题模式，可选择跟随系统、浅色或深色主题。",
+            description: "配置应用的主题模式"
         },
     };
     return sections[activeSettingKey.value] || sections["close-behavior"];
