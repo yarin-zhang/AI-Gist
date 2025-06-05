@@ -140,7 +140,7 @@
                         <!-- 标签区（第二步显示） -->
                         <div v-show="showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
                             <NScrollbar style="max-height: 75vh;">
-                                <NCard title="分类管理" size="small">
+                                <NCard title="分类与标签" size="small">
                                     <NFlex vertical size="medium">
                                         <NFormItem label="分类">
                                             <NSelect v-model:value="formData.categoryId" :options="categoryOptions"
