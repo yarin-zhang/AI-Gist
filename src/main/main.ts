@@ -4,11 +4,15 @@ import {
   trayManager, 
   ipcHandlers,
   themeManager,
-  preferencesManager 
+  preferencesManager,
+  singleInstanceManager
 } from './electron';
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
+
+// 防止多重启动 - 初始化单实例管理器
+singleInstanceManager.initialize();
 
 // 应用准备就绪时的初始化流程
 app.whenReady().then(async () => {
