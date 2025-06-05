@@ -562,22 +562,34 @@ const selectHistoryRecord = (index) => {
 }
 
 // 删除历史记录
-const deleteHistoryRecord = () => {
+const deleteHistoryRecord = async () => {
   if (selectedHistoryIndex.value >= 0) {
-    useHistory.value.splice(selectedHistoryIndex.value, 1)
-    
-    // 更新本地存储
-    localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
-    
-    // 重置选择
-    selectedHistoryIndex.value = -1
-    
-    // 如果当前页面没有记录了，回到第一页
-    if (paginatedHistory.value.length === 0 && currentPage.value > 1) {
-      currentPage.value = 1
+    try {
+      // 删除历史记录
+      useHistory.value.splice(selectedHistoryIndex.value, 1)
+      
+      // 更新本地存储
+      localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
+      
+      // 减少数据库中的使用计数
+      await api.prompts.decrementUseCount.mutate(props.prompt.id)
+      
+      // 重置选择
+      selectedHistoryIndex.value = -1
+      
+      // 如果当前页面没有记录了，回到第一页
+      if (paginatedHistory.value.length === 0 && currentPage.value > 1) {
+        currentPage.value = 1
+      }
+      
+      // 发出更新事件，通知父组件刷新数据
+      emit('updated')
+      
+      message.success('历史记录已删除')
+    } catch (error) {
+      console.error('删除历史记录失败:', error)
+      message.error('删除历史记录失败')
     }
-    
-    message.success('历史记录已删除')
   }
 }
 

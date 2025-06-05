@@ -520,6 +520,20 @@ class DatabaseService {
     });
   }
 
+  async decrementPromptUseCount(id: number): Promise<Prompt> {
+    const prompt = await this.getById<Prompt>('prompts', id);
+    if (!prompt) {
+      throw new Error('Prompt not found');
+    }
+    
+    // 确保useCount不会小于0
+    const newUseCount = Math.max(0, prompt.useCount - 1);
+    
+    return this.update<Prompt>('prompts', id, {
+      useCount: newUseCount,
+    });
+  }
+
   async getFavoritePrompts(): Promise<PromptWithRelations[]> {
     return this.getAllPrompts({ isFavorite: true });
   }
