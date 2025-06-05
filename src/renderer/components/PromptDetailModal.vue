@@ -392,7 +392,4 @@ watch(() => props.show, (show) => {
 </script>
 
 <style scoped>
-:deep(.n-input__textarea-el) {
-  font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
 </style>

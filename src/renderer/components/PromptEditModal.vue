@@ -284,11 +284,21 @@ watch(() => props.prompt, (newPrompt) => {
                 placeholder: v.placeholder || ''
             })) || []
         }
-    } else {
-        // 重置表单
-        resetForm()
     }
 }, { immediate: true })
+
+// 监听弹窗显示状态，关闭时重置表单
+watch(() => props.show, (newShow, oldShow) => {
+    if (oldShow && !newShow) {
+        // 弹窗从显示变为隐藏时，延迟重置表单
+        setTimeout(() => {
+            if (!props.show && !isEdit.value) {
+                // 只在新建模式下且弹窗确实关闭时重置表单
+                resetForm()
+            }
+        }, 100)
+    }
+})
 
 // 监听内容变化，自动提取变量
 watch(() => formData.value.content, (newContent) => {
@@ -315,7 +325,6 @@ const removeVariable = (index: number) => {
 }
 
 const handleCancel = () => {
-    resetForm()
     emit('update:show', false)
 }
 
@@ -369,9 +378,17 @@ const handleSave = async () => {
             message.success('Prompt 创建成功')
         }
 
-        resetForm()
-        emit('update:show', false) // 关闭弹窗
-        emit('saved') // 通知父组件重新加载数据
+        // 使用 nextTick 确保状态更新的顺序
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+        // 先关闭弹窗，再通知父组件
+        emit('update:show', false)
+        
+        // 延迟发送 saved 事件，确保弹窗已经关闭
+        setTimeout(() => {
+            emit('saved')
+        }, 100)
+        
     } catch (error) {
         message.error(isEdit.value ? '更新失败' : '创建失败')
         console.error(error)
@@ -381,8 +398,3 @@ const handleSave = async () => {
 }
 </script>
 
-<style scoped>
-.variable-card {
-    border: 1px solid #e0e0e6;
-}
-</style>

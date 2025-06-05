@@ -319,6 +319,9 @@ const handlePromptAction = (action, prompt) => {
 }
 
 const handleEditPrompt = (prompt) => {
+  // 先关闭详情弹窗
+  showDetailModal.value = false
+  // 然后设置编辑数据并打开编辑弹窗
   selectedPrompt.value = { ...prompt } // 创建副本避免直接修改
   showCreateModal.value = true
 }
@@ -346,10 +349,10 @@ const handleDeletePrompt = async (prompt) => {
 }
 
 const handlePromptSaved = () => {
-  showCreateModal.value = false
+  // 不要在这里设置 showCreateModal，让子组件自己控制
+  // showCreateModal.value = false
   selectedPrompt.value = null
   loadPrompts()
-  // 移除这里的消息提示，让子组件处理
 }
 
 const handlePromptUse = () => {
@@ -385,8 +388,4 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.prompt-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
 </style>

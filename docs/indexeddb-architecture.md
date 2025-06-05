@@ -3,9 +3,9 @@
 本项目使用 IndexedDB 作为客户端数据存储解决方案，完全在渲染进程中处理数据操作。
 
 ## 架构概览
-
+    
 ```
-Vue 3 前端  ←→  IndexedDB 数据impo```vue
+Vue 3 前端  ←→  IndexedDB 数据
 <script setup>
 import { api } from '../lib/database-client'
 
@@ -118,13 +118,13 @@ await databaseService.fillPromptVariables(promptId, variables)
 
 ```vue
 <script setup>
-import { trpc } from '../lib/trpc'
+import { api } from '../lib/api'
 
 // 获取数据
-const prompts = await trpc.prompts.getAll.query()
+const prompts = await api.prompts.getAll.query()
 
 // 创建数据
-await trpc.prompts.create.mutate({
+await api.prompts.create.mutate({
   title: '新提示词',
   content: '内容...',
   categoryId: 1

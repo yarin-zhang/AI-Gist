@@ -263,14 +263,10 @@ watch(() => props.show, (show) => {
 </script>
 
 <style scoped>
-.category-item {
-  border: 1px solid #e0e0e6;
-}
 
 .color-indicator {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid #e0e0e6;
 }
 </style>
