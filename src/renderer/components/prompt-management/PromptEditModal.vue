@@ -453,17 +453,46 @@ watch(() => formData.value.content, (newContent) => {
     }
 })
 
+// 生成唯一变量名的辅助方法
+const generateUniqueVariableName = () => {
+    const existingNames = new Set(formData.value.variables.map(v => v.name))
+    let counter = 1
+    let variableName = `变量${counter}`
+    
+    while (existingNames.has(variableName)) {
+        counter++
+        variableName = `变量${counter}`
+    }
+    
+    return variableName
+}
+
 // 方法
 const addVariable = () => {
+    const variableName = generateUniqueVariableName()
+    
+    // 添加变量配置
     formData.value.variables.push({
-        name: '',
-        label: '',
+        name: variableName,
+        label: variableName,
         type: 'text',
         options: '',
         defaultValue: '',
         required: true,
         placeholder: ''
     })
+    
+    // 在左侧内容中自动添加对应的占位符
+    const placeholder = `{{${variableName}}}`
+    
+    // 如果内容为空，直接添加占位符
+    if (!formData.value.content.trim()) {
+        formData.value.content = placeholder
+    } else {
+        // 如果内容不为空，在末尾添加占位符（换行后添加）
+        const content = formData.value.content.trim()
+        formData.value.content = content + '\n' + placeholder
+    }
 }
 
 const removeVariable = (index: number) => {
