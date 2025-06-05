@@ -3,7 +3,7 @@
     <NFlex vertical size="large">
       <!-- 页面标题 -->
       <NFlex justify="space-between" align="center">        <div>
-          <NText strong style="font-size: 28px;">AI 提示词管理中心</NText>
+          <NText strong style="font-size: 28px;">AI 提示词</NText>
           <NText depth="3" style="display: block; margin-top: 4px;">
             管理和组织你的 AI 提示词库
           </NText>
@@ -117,6 +117,10 @@ const loadCategories = async () => {
 
 const loadStatistics = async () => {
   await Promise.all([loadPrompts(), loadCategories()])
+  // 同时刷新 PromptList 组件的数据
+  if (promptListRef.value) {
+    promptListRef.value.loadPrompts()
+  }
 }
 
 const handleCreatePrompt = () => {

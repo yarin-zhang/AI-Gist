@@ -513,7 +513,13 @@ const usePrompt = async () => {
     
     // 增加使用计数
     await api.prompts.incrementUseCount.mutate(props.prompt.id)
-      // 直接复制到剪贴板，不显示单独的复制消息
+    
+    // 立即更新当前 prompt 对象的使用计数
+    if (props.prompt) {
+      props.prompt.useCount = (props.prompt.useCount || 0) + 1
+    }
+    
+    // 直接复制到剪贴板，不显示单独的复制消息
     await navigator.clipboard.writeText(filledContent.value)
     
     message.success('提示词已复制到剪贴板，使用计数已更新')
@@ -529,6 +535,12 @@ const usePrompt = async () => {
 const toggleFavorite = async () => {
   try {
     await api.prompts.toggleFavorite.mutate(props.prompt.id)
+    
+    // 立即更新当前 prompt 对象的收藏状态
+    if (props.prompt) {
+      props.prompt.isFavorite = !props.prompt.isFavorite
+    }
+    
     message.success('收藏状态已更新')
     emit('updated') // 通知父组件重新加载数据
   } catch (error) {

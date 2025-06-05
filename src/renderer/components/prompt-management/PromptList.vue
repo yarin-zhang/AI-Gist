@@ -220,11 +220,21 @@ const getTagType = (tag) => {
 
 const toggleFavorite = async (promptId) => {
   try {
+    // 先乐观更新UI
+    const prompt = prompts.value.find(p => p.id === promptId)
+    if (prompt) {
+      prompt.isFavorite = !prompt.isFavorite
+    }
+    
     await api.prompts.toggleFavorite.mutate(promptId)
-    await loadPrompts()
     message.success('收藏状态已更新')
     emit('refresh')
   } catch (error) {
+    // 如果API调用失败，回滚UI状态
+    const prompt = prompts.value.find(p => p.id === promptId)
+    if (prompt) {
+      prompt.isFavorite = !prompt.isFavorite
+    }
     message.error('更新收藏状态失败')
     console.error(error)
   }
