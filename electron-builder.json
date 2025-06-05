@@ -32,14 +32,6 @@
                 "**/*"
             ]
         },
-        {
-            "from": "prisma",
-            "to": "./prisma",
-            "filter": [
-                "schema.prisma",
-                "migrations/**/*"
-            ]
-        },
         "package.json"
     ],
     "asarUnpack": [],

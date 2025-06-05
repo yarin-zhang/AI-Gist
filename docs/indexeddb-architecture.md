@@ -5,7 +5,21 @@
 ## 架构概览
 
 ```
-Vue 3 前端  ←→  IndexedDB 数据库  (本地浏览器存储)
+Vue 3 前端  ←→  IndexedDB 数据impo```vue
+<script setup>
+import { dbClient } from '../lib/database-client'
+
+// 查询数据
+const prompts = await dbClient.prompts.getAll.query()
+
+// 创建数据
+await dbClient.prompts.create.mutate({ient } from '../lib/database-client'
+
+// 查询数据
+const prompts = await dbClient.prompts.getAll.query()
+
+// 创建数据
+await dbClient.prompts.create.mutate({览器存储)
    (渲染进程)         (客户端)
 ```
 
@@ -81,18 +95,6 @@ await databaseService.incrementPromptUseCount(id)
 await databaseService.fillPromptVariables(promptId, variables)
 ```
 
-### 兼容性客户端 (`src/renderer/lib/trpc.ts`)
-
-为了维护代码兼容性，保留了类似 tRPC 的客户端接口，但实际调用 IndexedDB：
-
-```typescript
-// 这些调用实际上都会重定向到 IndexedDB
-await trpc.prompts.getAll.query(filters)
-await trpc.prompts.create.mutate(promptData)
-await trpc.categories.getAll.query()
-await trpc.users.getAll.query()
-```
-
 ## 数据初始化
 
 应用启动时会自动初始化 IndexedDB：
@@ -104,21 +106,11 @@ await trpc.users.getAll.query()
 
 ## 优势
 
+- **简化架构**: 移除了主进程数据库依赖和 IPC 通信复杂性
 - **离线优先**: 无需服务器，完全本地存储
 - **性能优异**: 客户端数据库，无网络延迟
 - **类型安全**: TypeScript 接口确保数据一致性
 - **自动备份**: 数据存储在用户设备上
-- **简化架构**: 移除了服务器端复杂性
-
-## 数据迁移说明
-
-项目从 Prisma + SQLite + tRPC 架构迁移而来：
-
-- ✅ 所有数据模型保持不变
-- ✅ 所有 CRUD 操作功能完整
-- ✅ 保持了原有的 API 接口兼容性
-- ✅ 主进程不再需要数据库操作
-- ✅ 渲染进程独立处理所有数据逻辑
 
 ## 使用指南
 
@@ -139,7 +131,7 @@ await trpc.prompts.create.mutate({
 })
 
 // 更新数据
-await trpc.prompts.update.mutate({
+await dbClient.prompts.update.mutate({
   id: 1,
   data: { title: '更新的标题' }
 })
@@ -152,7 +144,7 @@ await trpc.prompts.update.mutate({
 
 ```typescript
 try {
-  await trpc.prompts.create.mutate(promptData)
+  await dbClient.prompts.create.mutate(promptData)
   message.success('创建成功')
 } catch (error) {
   message.error('创建失败: ' + error.message)

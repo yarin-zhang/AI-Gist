@@ -13,7 +13,6 @@ import {
 import {
     Home as HomeIcon,
     Database as DatabaseIcon,
-    Server as TrpcIcon,
     Star as PromptIcon
 } from '@vicons/tabler'
 

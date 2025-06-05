@@ -1,6 +1,6 @@
 import { databaseService } from './database';
 
-// 创建一个新的客户端，直接使用 IndexedDB
+// 创建一个数据库客户端，直接使用 IndexedDB
 function createClient() {
   return {
     users: {
@@ -138,8 +138,10 @@ function createClient() {
   };
 }
 
-// 创建 tRPC 客户端
-export const trpc = createClient();
+// 创建数据库客户端，直接使用 IndexedDB
+export const dbClient = createClient();
+
 
 // 类型定义（为了兼容性保留）
 export type AppRouter = any;
+export type DatabaseClient = typeof dbClient;
