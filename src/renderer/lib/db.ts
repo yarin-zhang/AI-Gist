@@ -1,6 +1,5 @@
 /**
  * IndexedDB 数据库服务
- * 替代原来的 Prisma + SQLite 方案
  */
 
 // 数据类型定义
