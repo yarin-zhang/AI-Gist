@@ -3,9 +3,8 @@
  */
 
 export interface UserPreferences {
-  dontShowCloseDialog: boolean; // 是否不再显示关闭确认对话框
+  closeBehaviorMode: 'ask' | 'fixed'; // 关闭行为模式：'ask' 每次询问, 'fixed' 固定行为
   closeAction: 'quit' | 'minimize'; // 关闭动作：'quit' 退出应用, 'minimize' 最小化到托盘
-  // 新增设置选项
   startMinimized: boolean; // 启动时是否最小化到托盘
   autoLaunch: boolean; // 是否开机自启动
   themeSource: 'system' | 'light' | 'dark'; // 主题设置

@@ -66,10 +66,8 @@ class WindowManager {
     // 阻止默认关闭行为
     event.preventDefault();
 
-    const userPrefs = preferencesManager.getPreferences();
-
-    // 如果用户设置了不再提示，直接执行保存的操作
-    if (userPrefs.dontShowCloseDialog) {
+    const userPrefs = preferencesManager.getPreferences();    // 如果用户设置了固定行为，直接执行保存的操作
+    if (userPrefs.closeBehaviorMode === 'fixed') {
       console.log(`执行用户保存的关闭行为: ${userPrefs.closeAction}`);
       if (userPrefs.closeAction === 'minimize') {
         this.hideToTray(); // 隐藏到托盘
@@ -98,12 +96,11 @@ class WindowManager {
     }
 
     // 保存用户偏好设置
-    if (result.checkboxChecked) {
-      // 修复：正确保存用户选择
+    if (result.checkboxChecked) {      // 修复：正确保存用户选择
       const closeAction = result.response === 0 ? 'quit' : 'minimize';
       console.log(`用户选择记住关闭行为: ${closeAction}`);
       preferencesManager.updatePreferences({
-        dontShowCloseDialog: true,
+        closeBehaviorMode: 'fixed',
         closeAction: closeAction
       });
     }

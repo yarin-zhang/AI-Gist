@@ -8,9 +8,8 @@ import { UserPreferences } from './types';
  */
 class PreferencesManager {
   private userPrefs: UserPreferences;
-  private configPath: string;
-  private readonly defaultPreferences: UserPreferences = {
-    dontShowCloseDialog: false,
+  private configPath: string;  private readonly defaultPreferences: UserPreferences = {
+    closeBehaviorMode: 'ask',
     closeAction: 'quit',
     startMinimized: false,
     autoLaunch: false,
@@ -42,7 +41,6 @@ class PreferencesManager {
     
     console.log('用户偏好设置已加载:', this.userPrefs);
   }
-
   /**
    * 从文件加载偏好设置
    */
@@ -53,8 +51,8 @@ class PreferencesManager {
         const loadedPrefs = JSON.parse(data);
         
         // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
-        const cleanedPrefs = {
-          dontShowCloseDialog: loadedPrefs.dontShowCloseDialog ?? this.defaultPreferences.dontShowCloseDialog,
+        const cleanedPrefs: UserPreferences = {
+          closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
           closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
           startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
           autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,

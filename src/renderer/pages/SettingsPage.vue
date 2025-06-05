@@ -334,13 +334,6 @@ const handleMenuSelect = (key: string) => {
 const loadSettings = async () => {
     try {
         const prefs = await window.electronAPI.preferences.get();
-
-        // 处理向后兼容性：将旧的 dontShowCloseDialog 转换为新的 closeBehaviorMode
-        if (prefs.hasOwnProperty("dontShowCloseDialog")) {
-            prefs.closeBehaviorMode = prefs.dontShowCloseDialog ? "fixed" : "ask";
-            delete prefs.dontShowCloseDialog;
-        }
-
         Object.assign(settings, prefs);
         console.log("设置加载成功:", prefs);
     } catch (error) {
