@@ -15,7 +15,7 @@ const { naiveTheme, initTheme } = useTheme()
 
 // 初始化主题
 onMounted(async () => {
-  await initTheme()
+    await initTheme()
 })
 </script>
 

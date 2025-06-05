@@ -47,8 +47,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
     <NLayout has-sider style="height: 100vh;">
         <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event"
             :default-collapsed="collapseRef" :width="260" show-trigger="bar">
-            <NFlex vertical align="center" justify="center" style="padding: 20px; "
-                v-if="!collapseRef">
+            <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
                 <NText strong style="font-size: 16px; ">
                     AI Gist
                 </NText>
