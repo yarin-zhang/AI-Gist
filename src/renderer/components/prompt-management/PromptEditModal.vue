@@ -106,13 +106,29 @@
                                                 </NFlex>
 
                                                 <NFormItem label="默认值">
-                                                    <NInput v-model:value="variable.defaultValue" placeholder="默认值（可选）"
-                                                        size="small" />
+                                                    <NInput 
+                                                        v-if="variable.type === 'text'"
+                                                        v-model:value="variable.defaultValue" 
+                                                        placeholder="默认值（可选）"
+                                                        size="small" 
+                                                    />
+                                                    <NSelect
+                                                        v-else-if="variable.type === 'select'"
+                                                        v-model:value="variable.defaultValue"
+                                                        :options="getVariableDefaultOptions(variable.options)"
+                                                        placeholder="选择默认选项（可选）"
+                                                        size="small"
+                                                        clearable
+                                                    />
                                                 </NFormItem>
 
                                                 <NFormItem v-if="variable.type === 'select'" label="选项">
-                                                    <NInput v-model:value="variable.options" placeholder="选项1,选项2,选项3"
-                                                        size="small" />
+                                                    <NDynamicInput 
+                                                        v-model:value="variable.options" 
+                                                        show-sort-button
+                                                        placeholder="请输入选项"
+                                                        :min="1"
+                                                    />
                                                 </NFormItem>
                                             </NFlex>
                                         </NCard>
@@ -195,6 +211,7 @@ import {
     NDynamicTags,
     NTag,
     NScrollbar,
+    NDynamicInput,
     useMessage
 } from 'naive-ui'
 import { Plus, Trash, InfoCircle, ArrowLeft } from '@vicons/tabler'
@@ -204,7 +221,7 @@ interface Variable {
     name: string
     label: string
     type: string
-    options?: string
+    options?: string[]
     defaultValue?: string
     required: boolean
     placeholder?: string
@@ -267,9 +284,8 @@ const displayTitle = computed(() => {
 })
 
 const variableTypeOptions = [
-    { label: '单行文本', value: 'text' },
-    { label: '多行文本', value: 'textarea' },
-    { label: '下拉选择', value: 'select' }
+    { label: '文本', value: 'text' },
+    { label: '选项', value: 'select' }
 ]
 
 // 表单验证规则
@@ -347,7 +363,7 @@ const extractVariables = (content: string) => {
             name: variableName,
             label: variableName,
             type: 'text',
-            options: '',
+            options: [],
             defaultValue: '',
             required: true,
             placeholder: ''
@@ -402,7 +418,7 @@ watch(() => props.prompt, (newPrompt) => {
                 name: v.name || '',
                 label: v.label || '',
                 type: v.type || 'text',
-                options: v.options || '',
+                options: Array.isArray(v.options) ? v.options : (typeof v.options === 'string' ? v.options.split(',').map(opt => opt.trim()).filter(opt => opt) : []),
                 defaultValue: v.defaultValue || '',
                 required: v.required !== false,
                 placeholder: v.placeholder || ''
@@ -453,6 +469,27 @@ watch(() => formData.value.content, (newContent) => {
     }
 })
 
+// 监听变量类型变化，清理不匹配的默认值
+watch(() => formData.value.variables, (newVariables) => {
+    newVariables.forEach(variable => {
+        // 当变量类型为选项时，检查默认值是否在选项中
+        if (variable.type === 'select' && variable.defaultValue) {
+            const validOptions = Array.isArray(variable.options) ? variable.options.filter(opt => opt && opt.trim()) : []
+            if (!validOptions.includes(variable.defaultValue)) {
+                variable.defaultValue = ''
+            }
+        }
+        // 当变量类型为文本且选项不为空时，清空选项
+        if (variable.type === 'text' && Array.isArray(variable.options) && variable.options.length > 0) {
+            variable.options = []
+        }
+        // 当变量类型切换到选项但没有选项时，提供默认选项
+        if (variable.type === 'select' && (!Array.isArray(variable.options) || variable.options.length === 0)) {
+            variable.options = ['选项1', '选项2', '选项3']
+        }
+    })
+}, { deep: true })
+
 // 生成唯一变量名的辅助方法
 const generateUniqueVariableName = () => {
     const existingNames = new Set(formData.value.variables.map(v => v.name))
@@ -467,6 +504,15 @@ const generateUniqueVariableName = () => {
     return variableName
 }
 
+// 获取变量默认值选项
+const getVariableDefaultOptions = (options) => {
+    if (!Array.isArray(options) || options.length === 0) return []
+    return options.filter(opt => opt && opt.trim()).map(option => ({
+        label: option,
+        value: option
+    }))
+}
+
 // 方法
 const addVariable = () => {
     const variableName = generateUniqueVariableName()
@@ -476,7 +522,7 @@ const addVariable = () => {
         name: variableName,
         label: variableName,
         type: 'text',
-        options: '',
+        options: [],
         defaultValue: '',
         required: true,
         placeholder: ''
@@ -561,7 +607,7 @@ const handleSave = async () => {
                 name: v.name,
                 label: v.label,
                 type: v.type,
-                options: v.options || undefined,
+                options: v.type === 'select' && Array.isArray(v.options) && v.options.length > 0 ? v.options.filter(opt => opt.trim()) : undefined,
                 defaultValue: v.defaultValue || undefined,
                 required: v.required,
                 placeholder: v.placeholder || undefined

@@ -64,11 +64,6 @@
             <NInput
               v-if="variable.type === 'text'"
               v-model:value="variableValues[variable.name]"
-              :placeholder="variable.placeholder || `请输入${variable.label}`"
-            />
-            <NInput
-              v-else-if="variable.type === 'textarea'"
-              v-model:value="variableValues[variable.name]"
               type="textarea"
               :placeholder="variable.placeholder || `请输入${variable.label}`"
               :rows="3"
@@ -217,11 +212,13 @@ const initializeVariables = () => {
 }
 
 // 获取选择框选项
-const getSelectOptions = (optionsString) => {
-  if (!optionsString) return []
-  return optionsString.split(',').map(option => ({
-    label: option.trim(),
-    value: option.trim()
+const getSelectOptions = (options) => {
+  if (!options) return []
+  // 如果是数组，直接使用；如果是字符串，按逗号分割
+  const optionsArray = Array.isArray(options) ? options : options.split(',').map(opt => opt.trim()).filter(opt => opt)
+  return optionsArray.map(option => ({
+    label: option,
+    value: option
   }))
 }
 
