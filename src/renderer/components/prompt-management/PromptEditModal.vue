@@ -1,18 +1,16 @@
-<template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
-        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%" title="Prompt 编辑">
+<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
+        style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%" title="提示词编辑">
         <div style="height: 100%; display: flex; flex-direction: column;">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
                 style="flex: 1; overflow: hidden;">
                 <div style="height: 100%; display: flex; gap: 20px;">
                     <!-- 左侧内容区 -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                        <!-- 第一步：Prompt 内容 -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">                        <!-- 第一步：提示词内容 -->
                         <div v-show="!showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
                             <NScrollbar style="max-height: 75vh;">
-                                <NFormItem label="Prompt 内容" path="content">
+                                <NFormItem label="提示词内容" path="content">
                                     <NInput v-model:value="formData.content" type="textarea"
-                                        placeholder="请输入 Prompt 内容，使用 {{变量名}} 来定义变量" :rows="12" show-count />
+                                        placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" :rows="12" show-count />
                                 </NFormItem>
 
                                 <NAlert type="info" style="margin-top: 8px;">
@@ -27,14 +25,13 @@
                         <div v-show="showExtraInfo" style="flex: 1;">
                             <NScrollbar style="max-height: 75vh;">
                                 <NCard title="基本信息" size="small">
-                                    <NFlex vertical size="medium">
-                                        <NFormItem label="标题" path="title">
-                                            <NInput v-model:value="formData.title" placeholder="请输入 Prompt 标题（可选）" />
+                                    <NFlex vertical size="medium">                                        <NFormItem label="标题" path="title">
+                                            <NInput v-model:value="formData.title" placeholder="请输入提示词标题（可选）" />
                                         </NFormItem>
 
                                         <NFormItem label="描述" path="description">
                                             <NInput v-model:value="formData.description" type="textarea"
-                                                placeholder="请输入 Prompt 描述（可选）" :rows="8" />
+                                                placeholder="请输入提示词描述（可选）" :rows="8" />
                                         </NFormItem>
 
                                     </NFlex>
@@ -279,8 +276,7 @@ const displayTitle = computed(() => {
     if (formData.value.content) {
         const firstLine = formData.value.content.split('\n')[0].trim()
         return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine
-    }
-    return '未命名 Prompt'
+    }    return '未命名提示词'
 })
 
 const variableTypeOptions = [
@@ -292,7 +288,7 @@ const variableTypeOptions = [
 const rules = {
     content: {
         required: true,
-        message: '请输入 Prompt 内容',
+        message: '请输入提示词内容',
         trigger: 'blur, focus'
     },
     tags: {
@@ -393,7 +389,7 @@ const generateAutoTitle = () => {
     if (firstLine.length > 30) {
         return firstLine.substring(0, 30) + '...'
     }
-    return firstLine || `Prompt ${new Date().toLocaleString()}`
+    return firstLine || `提示词 ${new Date().toLocaleString()}`
 }
 
 // 处理进入补充信息页面
@@ -617,12 +613,11 @@ const handleSave = async () => {
         if (isEdit.value) {
             await api.prompts.update.mutate({
                 id: props.prompt.id,
-                data
-            })
-            message.success('Prompt 更新成功')
+                data            })
+            message.success('提示词更新成功')
         } else {
             await api.prompts.create.mutate(data)
-            message.success('Prompt 创建成功')
+            message.success('提示词创建成功')
         }
 
         // 立即发送 saved 事件，通知父组件刷新数据

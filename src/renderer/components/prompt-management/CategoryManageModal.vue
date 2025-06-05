@@ -61,11 +61,10 @@
                     />
                   </NFlex>
                 </div>
-                <div v-else>
-                  <NFlex vertical size="small">
+                <div v-else>                  <NFlex vertical size="small">
                     <NText strong>{{ category.name }}</NText>
                     <NText depth="3" style="font-size: 12px;">
-                      {{ category._count?.prompts || 0 }} 个 Prompt
+                      {{ category._count?.prompts || 0 }} 个提示词
                     </NText>
                   </NFlex>
                 </div>
@@ -231,7 +230,7 @@ const handleCancelEdit = () => {
 
 const handleDelete = async (category) => {
   if (category._count?.prompts > 0) {
-    message.warning('该分类下还有 Prompt，无法删除')
+    message.warning('该分类下还有提示词，无法删除')
     return
   }
 

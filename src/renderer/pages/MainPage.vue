@@ -23,7 +23,7 @@ const currentView = ref('prompts')
 // 菜单选项
 const menuOptions: MenuOption[] = [
     {
-        label: 'AI Prompt',
+        label: 'AI 提示词',
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
     },

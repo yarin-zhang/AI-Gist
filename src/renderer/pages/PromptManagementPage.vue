@@ -2,19 +2,17 @@
   <div class="prompt-management-page">
     <NFlex vertical size="large">
       <!-- 页面标题 -->
-      <NFlex justify="space-between" align="center">
-        <div>
-          <NText strong style="font-size: 28px;">AI Prompt 管理中心</NText>
+      <NFlex justify="space-between" align="center">        <div>
+          <NText strong style="font-size: 28px;">AI 提示词管理中心</NText>
           <NText depth="3" style="display: block; margin-top: 4px;">
-            管理和组织你的 AI Prompt 库
+            管理和组织你的 AI 提示词库
           </NText>
         </div>
-        <NFlex>
-          <NButton type="primary" @click="handleCreatePrompt">
+        <NFlex>          <NButton type="primary" @click="handleCreatePrompt">
             <template #icon>
               <NIcon><Plus /></NIcon>
             </template>
-            新建 Prompt
+            新建提示词
           </NButton>
           <NButton @click="showCategoryManagement = true">
             <template #icon>
@@ -23,10 +21,8 @@
             分类管理
           </NButton>
         </NFlex>
-      </NFlex>
-
-      <!-- Prompt 列表组件 -->
-      <PromptList 
+      </NFlex>      <!-- 提示词列表组件 -->
+      <PromptList
         ref="promptListRef"
         @edit="handleEditPrompt"
         @view="handleViewPrompt"

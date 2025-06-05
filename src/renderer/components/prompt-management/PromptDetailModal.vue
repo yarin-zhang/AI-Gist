@@ -1,7 +1,6 @@
 <template>
-  <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%;" :title="prompt?.title">
-    <div style="height: 100%; display: flex; flex-direction: column;" v-if="prompt">
-      <!-- Prompt 信息头部 -->
+  <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" style="max-width:1800px; min-width: 800px; height: 90%; max-height: 100%;" :title="prompt?.title">    <div style="height: 100%; display: flex; flex-direction: column;" v-if="prompt">
+      <!-- 提示词信息头部 -->
       <NCard size="small" style="margin-bottom: 16px;">
         <NFlex vertical size="medium">
           <NFlex justify="space-between" align="center">
@@ -86,11 +85,9 @@
                   <NButton @click="clearVariables">清空</NButton>
                 </NFlex>
               </NFlex>
-            </NCard>
-
-            <!-- 无变量时的提示 -->
+            </NCard>            <!-- 无变量时的提示 -->
             <NCard v-else size="small" title="变量设置">
-              <NEmpty description="此 Prompt 没有可配置的变量" style="padding: 40px;">
+              <NEmpty description="此提示词没有可配置的变量" style="padding: 40px;">
                 <template #icon>
                   <NIcon><Wand /></NIcon>
                 </template>
@@ -101,24 +98,22 @@
 
         <!-- 右侧：结果预览区 -->
         <div style="flex: 2; display: flex; flex-direction: column; overflow: hidden;">
-          <NScrollbar style="max-height: 100%;">
-            <!-- Prompt 内容 -->
+          <NScrollbar style="max-height: 100%;">            <!-- 提示词内容 -->
             <NCard size="small">
               <template #header>
                 <NFlex justify="space-between" align="center">
-                  <NText strong>Prompt 内容</NText>
+                  <NText strong>提示词内容</NText>
                   <NFlex>
                     <NButton size="small" @click="copyToClipboard(filledContent)">
                       <template #icon>
                         <NIcon><Copy /></NIcon>
                       </template>
                       复制内容
-                    </NButton>
-                    <NButton size="small" type="primary" @click="usePrompt">
+                    </NButton>                    <NButton size="small" type="primary" @click="usePrompt">
                       <template #icon>
                         <NIcon><Check /></NIcon>
                       </template>
-                      使用此 Prompt
+                      使用此提示词
                     </NButton>
                   </NFlex>
                 </NFlex>
@@ -133,11 +128,10 @@
                 :placeholder="!filledContent ? '内容为空' : ''"
               />
               
-              <!-- 如果有未填写的变量，显示提示 -->
-              <NFlex v-if="hasUnfilledVariables" align="center" style="margin-top: 8px; padding: 8px; border-radius: 6px;">
+              <!-- 如果有未填写的变量，显示提示 -->              <NFlex v-if="hasUnfilledVariables" align="center" style="margin-top: 8px; padding: 8px; border-radius: 6px;">
                 <NIcon color="#fa8c16"><Wand /></NIcon>
                 <NText style="font-size: 14px;">
-                  检测到未填写的变量，请在左侧填写以生成完整的 Prompt
+                  检测到未填写的变量，请在左侧填写以生成完整的提示词
                 </NText>
               </NFlex>
             </NCard>
@@ -519,11 +513,10 @@ const usePrompt = async () => {
     
     // 增加使用计数
     await api.prompts.incrementUseCount.mutate(props.prompt.id)
-    
-    // 直接复制到剪贴板，不显示单独的复制消息
+      // 直接复制到剪贴板，不显示单独的复制消息
     await navigator.clipboard.writeText(filledContent.value)
     
-    message.success('Prompt 已复制到剪贴板，使用计数已更新')
+    message.success('提示词已复制到剪贴板，使用计数已更新')
     emit('use')
     emit('updated') // 通知父组件重新加载数据以更新使用计数
   } catch (error) {

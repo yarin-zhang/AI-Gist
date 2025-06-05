@@ -3,10 +3,9 @@
     <!-- 搜索和过滤器 -->
     <NCard>
       <NFlex vertical size="small">
-        <NFlex>
-          <NInput
+        <NFlex>          <NInput
             v-model:value="searchText"
-            placeholder="搜索 Prompt..."
+            placeholder="搜索提示词..."
             style="flex: 1"
             @input="handleSearch"
           >
@@ -33,15 +32,12 @@
           </NButton>
         </NFlex>
       </NFlex>
-    </NCard>
-
-    <!-- Prompt 列表 -->
+    </NCard>    <!-- 提示词列表 -->
     <div v-if="isLoading" style="text-align: center; padding: 40px;">
       <NSpin size="large" />
     </div>
-    
-    <div v-else-if="prompts.length === 0" style="text-align: center; padding: 40px;">
-      <NEmpty description="暂无 Prompt，快来创建第一个吧！" />
+      <div v-else-if="prompts.length === 0" style="text-align: center; padding: 40px;">
+      <NEmpty description="暂无提示词，快来创建第一个吧！" />
     </div>
 
     <div v-else class="prompt-grid">
@@ -180,7 +176,7 @@ const loadPrompts = async () => {
     }
     prompts.value = await api.prompts.getAll.query(filters)
   } catch (error) {
-    message.error('加载 Prompt 失败')
+    message.error('加载提示词失败')
     console.error(error)
   } finally {
     isLoading.value = false
@@ -269,7 +265,7 @@ const handlePromptAction = (action, prompt) => {
 const handleCopyPrompt = async (prompt) => {
   try {
     await navigator.clipboard.writeText(prompt.content)
-    message.success('Prompt 内容已复制到剪贴板')
+    message.success('提示词内容已复制到剪贴板')
   } catch (error) {
     message.error('复制失败')
   }
@@ -277,10 +273,9 @@ const handleCopyPrompt = async (prompt) => {
 
 const handleDeletePrompt = async (prompt) => {
   if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
-    try {
-      await api.prompts.delete.mutate(prompt.id)
+    try {      await api.prompts.delete.mutate(prompt.id)
       await loadPrompts()
-      message.success('Prompt 已删除')
+      message.success('提示词已删除')
       emit('refresh')
     } catch (error) {
       message.error('删除失败')
