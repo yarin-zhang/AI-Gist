@@ -188,7 +188,7 @@ import {
   Trash,
   Copy
 } from '@vicons/tabler'
-import { dbClient } from '../lib/database-client'
+import { api } from '../lib/api'
 import PromptEditModal from './PromptEditModal.vue'
 import CategoryManageModal from './CategoryManageModal.vue'
 import PromptDetailModal from './PromptDetailModal.vue'
@@ -225,7 +225,7 @@ const loadPrompts = async () => {
       search: searchText.value || undefined,
       isFavorite: showFavoritesOnly.value || undefined
     }
-    prompts.value = await dbClient.prompts.getAll.query(filters)
+    prompts.value = await api.prompts.getAll.query(filters)
   } catch (error) {
     message.error('加载 Prompt 失败')
     console.error(error)
@@ -236,7 +236,7 @@ const loadPrompts = async () => {
 
 const loadCategories = async () => {
   try {
-    categories.value = await dbClient.categories.getAll.query()
+    categories.value = await api.categories.getAll.query()
   } catch (error) {
     message.error('加载分类失败')
     console.error(error)
@@ -277,7 +277,7 @@ const selectPrompt = (prompt) => {
 
 const toggleFavorite = async (promptId) => {
   try {
-    await dbClient.prompts.toggleFavorite.mutate(promptId)
+    await api.prompts.toggleFavorite.mutate(promptId)
     await loadPrompts() // 重新加载数据而不是直接修改本地状态
     message.success('收藏状态已更新')
   } catch (error) {
@@ -335,7 +335,7 @@ const handleCopyPrompt = async (prompt) => {
 const handleDeletePrompt = async (prompt) => {
   if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
     try {
-      await dbClient.prompts.delete.mutate(prompt.id)
+      await api.prompts.delete.mutate(prompt.id)
       await loadPrompts()
       message.success('Prompt 已删除')
     } catch (error) {

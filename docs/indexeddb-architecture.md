@@ -7,19 +7,19 @@
 ```
 Vue 3 前端  ←→  IndexedDB 数据impo```vue
 <script setup>
-import { dbClient } from '../lib/database-client'
+import { api } from '../lib/database-client'
 
 // 查询数据
-const prompts = await dbClient.prompts.getAll.query()
+const prompts = await api.prompts.getAll.query()
 
 // 创建数据
-await dbClient.prompts.create.mutate({ient } from '../lib/database-client'
+await api.prompts.create.mutate({ient } from '../lib/database-client'
 
 // 查询数据
-const prompts = await dbClient.prompts.getAll.query()
+const prompts = await api.prompts.getAll.query()
 
 // 创建数据
-await dbClient.prompts.create.mutate({览器存储)
+await api.prompts.create.mutate({览器存储)
    (渲染进程)         (客户端)
 ```
 
@@ -131,7 +131,7 @@ await trpc.prompts.create.mutate({
 })
 
 // 更新数据
-await dbClient.prompts.update.mutate({
+await api.prompts.update.mutate({
   id: 1,
   data: { title: '更新的标题' }
 })
@@ -144,7 +144,7 @@ await dbClient.prompts.update.mutate({
 
 ```typescript
 try {
-  await dbClient.prompts.create.mutate(promptData)
+  await api.prompts.create.mutate(promptData)
   message.success('创建成功')
 } catch (error) {
   message.error('创建失败: ' + error.message)
