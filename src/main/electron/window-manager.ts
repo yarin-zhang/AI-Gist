@@ -55,7 +55,7 @@ class WindowManager {
     // 如果用户设置了不再提示，直接执行保存的操作
     if (userPrefs.dontShowCloseDialog) {
       if (userPrefs.closeAction === 'minimize') {
-        this.mainWindow?.hide(); // 隐藏到托盘
+        this.hideToTray(); // 隐藏到托盘
       } else {
         this.quitApplication();
       }
@@ -82,9 +82,11 @@ class WindowManager {
 
     // 保存用户偏好设置
     if (result.checkboxChecked) {
+      // 修复：正确保存用户选择
+      const closeAction = result.response === 0 ? 'quit' : 'minimize';
       preferencesManager.updatePreferences({
         dontShowCloseDialog: true,
-        closeAction: result.response === 0 ? 'quit' : 'minimize'
+        closeAction: closeAction
       });
     }
 
@@ -94,7 +96,7 @@ class WindowManager {
       this.quitApplication();
     } else if (result.response === 1) {
       // 最小化到托盘
-      this.mainWindow?.hide();
+      this.hideToTray();
     }
   }
 
@@ -119,8 +121,26 @@ class WindowManager {
    */
   showMainWindow() {
     if (this.mainWindow) {
-      this.mainWindow.show();
-      this.mainWindow.focus();
+      // 在 macOS 下，确保窗口能够正确显示和获得焦点
+      if (process.platform === 'darwin') {
+        // 如果窗口被最小化，先恢复它
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        // 显示窗口
+        this.mainWindow.show();
+        // 确保应用获得焦点
+        this.mainWindow.focus();
+        // 在 macOS 下，确保应用出现在前台
+        app.focus({ steal: true });
+      } else {
+        // 其他平台的处理
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        this.mainWindow.show();
+        this.mainWindow.focus();
+      }
     }
   }
 
@@ -130,6 +150,21 @@ class WindowManager {
   hideMainWindow() {
     if (this.mainWindow) {
       this.mainWindow.hide();
+    }
+  }
+
+  /**
+   * 隐藏到托盘（专门用于隐藏到系统托盘的方法）
+   */
+  private hideToTray() {
+    if (this.mainWindow) {
+      this.mainWindow.hide();
+      
+      // 在 macOS 下显示通知提醒用户应用已最小化到托盘
+      if (process.platform === 'darwin') {
+        // 可以在这里添加系统通知，提醒用户应用已最小化到托盘
+        // 用户可以通过托盘图标或 Dock 图标重新打开
+      }
     }
   }
 
