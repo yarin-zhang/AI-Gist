@@ -12,11 +12,12 @@ import {
 } from 'naive-ui'
 import {
     Home as HomeIcon,
-    Database as DatabaseIcon,
-    Star as PromptIcon
+    Star as PromptIcon,
+    Settings as SettingsIcon
 } from '@vicons/tabler'
 
 import PromptManager from './PromptManager.vue'
+import SettingsPage from './SettingsPage.vue'
 
 const currentView = ref('prompts')
 
@@ -26,6 +27,11 @@ const menuOptions: MenuOption[] = [
         label: 'AI Prompt',
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
+    },
+    {
+        label: '设置',
+        key: 'settings',
+        icon: () => h(NIcon, null, { default: () => h(SettingsIcon) })
     }
 ]
 
@@ -51,8 +57,9 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 :collapsed-icon-size="22" style="margin-top: 8px;" />
         </NLayoutSider>
 
-        <NLayoutContent content-style="padding: 24px; overflow-y: auto; background-color: #f8f9fa;">
+        <NLayoutContent content-style="padding: 24px; overflow-y: auto;">
             <PromptManager v-if="currentView === 'prompts'" />
+            <SettingsPage v-else-if="currentView === 'settings'" />
         </NLayoutContent>
     </NLayout>
 </template>

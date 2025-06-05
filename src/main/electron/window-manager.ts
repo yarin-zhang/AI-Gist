@@ -16,12 +16,14 @@ class WindowManager {
    */
   createMainWindow(): BrowserWindow {
     const iconPath = getAppIconPath();
+    const userPrefs = preferencesManager.getPreferences();
     
     // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
+      width: 1280,
+      height: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
+      show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
       webPreferences: {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成
@@ -34,6 +36,18 @@ class WindowManager {
 
     // 根据环境加载不同的页面
     this.loadContent();
+
+    // 如果设置了启动时最小化，窗口准备好后隐藏到托盘
+    if (userPrefs.startMinimized) {
+      this.mainWindow.once('ready-to-show', () => {
+        console.log('应用启动时最小化到托盘');
+        // 不显示窗口，直接保持隐藏状态
+      });
+    } else {
+      this.mainWindow.once('ready-to-show', () => {
+        this.mainWindow?.show();
+      });
+    }
 
     return this.mainWindow;
   }
@@ -54,10 +68,11 @@ class WindowManager {
 
     // 如果用户设置了不再提示，直接执行保存的操作
     if (userPrefs.dontShowCloseDialog) {
+      console.log(`执行用户保存的关闭行为: ${userPrefs.closeAction}`);
       if (userPrefs.closeAction === 'minimize') {
         this.hideToTray(); // 隐藏到托盘
       } else {
-        this.quitApplication();
+        this.quitApplication(); // 直接退出
       }
       return;
     }
@@ -84,6 +99,7 @@ class WindowManager {
     if (result.checkboxChecked) {
       // 修复：正确保存用户选择
       const closeAction = result.response === 0 ? 'quit' : 'minimize';
+      console.log(`用户选择记住关闭行为: ${closeAction}`);
       preferencesManager.updatePreferences({
         dontShowCloseDialog: true,
         closeAction: closeAction
@@ -186,7 +202,16 @@ class WindowManager {
    * 退出应用程序
    */
   private quitApplication() {
+    console.log('开始退出应用程序...');
     this.isQuitting = true;
+    
+    // 确保窗口关闭
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.destroy();
+      this.mainWindow = null;
+    }
+    
+    // 触发应用退出
     app.quit();
   }
 

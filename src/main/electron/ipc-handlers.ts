@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
-import { UserPreferences } from './types';
+import { themeManager } from './theme-manager';
+import { UserPreferences, SystemTheme } from './types';
 
 /**
  * IPC 处理器管理器
@@ -14,6 +15,7 @@ class IpcHandlers {
     this.setupMessageHandler();
     this.setupPreferencesHandlers();
     this.setupWindowHandlers();
+    this.setupThemeHandlers();
   }
 
   /**
@@ -38,6 +40,11 @@ class IpcHandlers {
     ipcMain.handle('set-user-preferences', (_, newPrefs: Partial<UserPreferences>): UserPreferences => {
       return preferencesManager.updatePreferences(newPrefs);
     });
+
+    // 重置用户偏好设置
+    ipcMain.handle('reset-user-preferences', (): UserPreferences => {
+      return preferencesManager.resetPreferences();
+    });
   }
 
   /**
@@ -56,14 +63,50 @@ class IpcHandlers {
   }
 
   /**
+   * 设置主题管理处理器
+   */
+  private setupThemeHandlers() {
+    // 获取当前主题
+    ipcMain.handle('theme:get-current', () => {
+      return themeManager.getCurrentTheme();
+    });
+
+    // 获取主题详细信息
+    ipcMain.handle('theme:get-info', () => {
+      return themeManager.getThemeInfo();
+    });
+
+    // 设置主题来源
+    ipcMain.handle('theme:set-source', (_, source: 'system' | 'light' | 'dark') => {
+      themeManager.setThemeSource(source);
+      // 同时保存到用户偏好设置中
+      preferencesManager.updatePreferences({ themeSource: source });
+      return themeManager.getCurrentTheme();
+    });
+
+    // 检查是否为暗色主题
+    ipcMain.handle('theme:is-dark', () => {
+      return themeManager.isDarkTheme();
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
     ipcMain.removeAllListeners('message');
+    // 清理偏好设置处理器
     ipcMain.removeHandler('get-user-preferences');
     ipcMain.removeHandler('set-user-preferences');
+    ipcMain.removeHandler('reset-user-preferences');
+    // 清理窗口处理器
     ipcMain.removeHandler('show-window');
     ipcMain.removeHandler('hide-to-tray');
+    // 清理主题处理器
+    ipcMain.removeHandler('theme:get-current');
+    ipcMain.removeHandler('theme:get-info');
+    ipcMain.removeHandler('theme:set-source');
+    ipcMain.removeHandler('theme:is-dark');
   }
 }
 

@@ -2,7 +2,9 @@ import { app, BrowserWindow, session } from 'electron';
 import { 
   windowManager, 
   trayManager, 
-  ipcHandlers 
+  ipcHandlers,
+  themeManager,
+  preferencesManager 
 } from './electron';
 
 // 全局变量定义
@@ -12,16 +14,27 @@ let isQuitting = false; // 标记应用是否正在退出
 app.whenReady().then(async () => {
   console.log('应用启动中...');
 
+  // 应用偏好设置（在创建窗口之前）
+  preferencesManager.applyAllSettings();
+
+  // 初始化主题管理器
+  themeManager.initialize();
+
   // 初始化 IPC 处理器
   ipcHandlers.initialize();
 
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
   
+  // 设置主题管理器的主窗口引用
+  themeManager.setMainWindow(mainWindow);
+  
   // 创建系统托盘并设置主窗口引用
   trayManager.setMainWindow(mainWindow);
   trayManager.setQuitCallback(() => {
+    console.log('从托盘触发退出...');
     isQuitting = true;
+    windowManager.setQuitting(true);
     app.quit();
   });
   // 设置显示窗口回调，使用 windowManager 的方法
@@ -51,24 +64,46 @@ app.whenReady().then(async () => {
       // 如果没有窗口，则创建新窗口
       const newWindow = windowManager.createMainWindow();
       trayManager.setMainWindow(newWindow);
+      themeManager.setMainWindow(newWindow);
     }
+  });
+
+  // 窗口加载完成后，通知当前主题
+  mainWindow.webContents.once('did-finish-load', () => {
+    console.log('主窗口加载完成，通知当前主题');
+    themeManager.notifyCurrentTheme();
   });
 });
 
 // 所有窗口关闭时的处理
-app.on('window-all-closed', async function () {
-  // 在 Windows 和 Linux 上，如果有托盘图标，不退出应用
-  if (process.platform !== 'darwin' && !trayManager.getTray()) {
-    app.quit();
+app.on('window-all-closed', function () {
+  console.log('所有窗口已关闭');
+  // 在 Windows 和 Linux 上，如果没有托盘图标，则退出应用
+  // 在 macOS 上，通常保持应用运行，除非用户明确选择退出
+  if (process.platform !== 'darwin') {
+    if (!trayManager.getTray() || isQuitting) {
+      console.log('退出应用程序');
+      app.quit();
+    }
   }
 });
 
 // 应用即将退出时的处理
 app.on('before-quit', () => {
+  console.log('应用即将退出，清理资源...');
   isQuitting = true;
   windowManager.setQuitting(true);
   
   // 清理资源
   ipcHandlers.cleanup();
   trayManager.destroy();
+  themeManager.cleanup();
+  
+  // 强制销毁所有窗口
+  const allWindows = BrowserWindow.getAllWindows();
+  allWindows.forEach(window => {
+    if (!window.isDestroyed()) {
+      window.destroy();
+    }
+  });
 });
