@@ -4,10 +4,16 @@
 export default interface ElectronApi {
   sendMessage: (message: string) => void
   
-  // tRPC 通信
-  trpc: {
-    query: (path: string, input?: any) => Promise<any>
-    mutate: (path: string, input?: any) => Promise<any>
+  // 用户偏好设置
+  preferences: {
+    get: () => Promise<any>
+    set: (prefs: any) => Promise<any>
+  }
+  
+  // 窗口管理
+  window: {
+    show: () => Promise<void>
+    hideToTray: () => Promise<void>
   }
 }
 

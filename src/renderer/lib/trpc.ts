@@ -1,128 +1,137 @@
-import type { AppRouter } from '../../main/trpc';
+import { databaseService } from './database';
 
-// 创建一个简化的 tRPC 客户端，手动实现路由调用
+// 创建一个新的客户端，直接使用 IndexedDB
 function createClient() {
   return {
     users: {
       create: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('users.create', input);
+          return databaseService.createUser(input);
         }
       },
       getAll: {
         query: async () => {
-          return window.electronAPI.trpc.query('users.getAll');
+          return databaseService.getAllUsers();
         }
       },
       getById: {
         query: async (id: number) => {
-          return window.electronAPI.trpc.query('users.getById', id);
+          return databaseService.getUserById(id);
         }
       },
       update: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('users.update', input);
+          const { id, data } = input;
+          return databaseService.updateUser(id, data);
         }
       },
       delete: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('users.delete', id);
+          await databaseService.deleteUser(id);
+          return { id };
         }
       }
     },
     posts: {
       create: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('posts.create', input);
+          return databaseService.createPost(input);
         }
       },
       getAll: {
         query: async () => {
-          return window.electronAPI.trpc.query('posts.getAll');
+          return databaseService.getAllPosts();
         }
       },
       getById: {
         query: async (id: number) => {
-          return window.electronAPI.trpc.query('posts.getById', id);
+          return databaseService.getPostById(id);
         }
       },
       update: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('posts.update', input);
+          const { id, data } = input;
+          return databaseService.updatePost(id, data);
         }
       },
       delete: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('posts.delete', id);
+          await databaseService.deletePost(id);
+          return { id };
         }
       }
     },
     categories: {
       create: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('categories.create', input);
+          return databaseService.createCategory(input);
         }
       },
       getAll: {
         query: async () => {
-          return window.electronAPI.trpc.query('categories.getAll');
+          return databaseService.getAllCategories();
         }
       },
       update: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('categories.update', input);
+          const { id, data } = input;
+          return databaseService.updateCategory(id, data);
         }
       },
       delete: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('categories.delete', id);
+          await databaseService.deleteCategory(id);
+          return { id };
         }
       }
     },
     prompts: {
       create: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('prompts.create', input);
+          return databaseService.createPrompt(input);
         }
       },
       getAll: {
         query: async (filters?: any) => {
-          return window.electronAPI.trpc.query('prompts.getAll', filters);
+          return databaseService.getAllPrompts(filters);
         }
       },
       getById: {
         query: async (id: number) => {
-          return window.electronAPI.trpc.query('prompts.getById', id);
+          return databaseService.getPromptById(id);
         }
       },
       update: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('prompts.update', input);
+          const { id, data } = input;
+          return databaseService.updatePrompt(id, data);
         }
       },
       delete: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('prompts.delete', id);
+          await databaseService.deletePrompt(id);
+          return { id };
         }
       },
       incrementUseCount: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('prompts.incrementUseCount', id);
+          return databaseService.incrementPromptUseCount(id);
         }
       },
       fillVariables: {
         mutate: async (input: any) => {
-          return window.electronAPI.trpc.mutate('prompts.fillVariables', input);
+          const { promptId, variables } = input;
+          return databaseService.fillPromptVariables(promptId, variables);
         }
       },
       getFavorites: {
         query: async () => {
-          return window.electronAPI.trpc.query('prompts.getFavorites');
+          return databaseService.getFavoritePrompts();
         }
       },
       toggleFavorite: {
         mutate: async (id: number) => {
-          return window.electronAPI.trpc.mutate('prompts.toggleFavorite', id);
+          return databaseService.togglePromptFavorite(id);
         }
       }
     }
@@ -132,5 +141,5 @@ function createClient() {
 // 创建 tRPC 客户端
 export const trpc = createClient();
 
-// 导出类型
-export type { AppRouter } from '../../main/trpc';
+// 类型定义（为了兼容性保留）
+export type AppRouter = any;

@@ -12,12 +12,6 @@
     "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
     "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
     "build:ci:linux": "node scripts/build.js && yarn electron-builder --linux",
-    "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio",
-    "prisma:push": "prisma db push",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:prod": "prisma migrate deploy",
-    "prepare:starter-db": "node scripts/generate-starter-db.js",
     "version": "git add -A",
     "postversion": "git push && git push --tags"
   },
@@ -36,12 +30,8 @@
     "vite": "^4.5.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.8.2",
-    "@trpc/client": "^11.1.4",
-    "@trpc/server": "^11.1.4",
     "@vicons/tabler": "^0.13.0",
     "naive-ui": "^2.41.0",
-    "prisma": "^6.8.2",
     "vue": "^3.3.8",
     "zod": "^3.25.40"
   }

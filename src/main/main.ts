@@ -1,5 +1,5 @@
 import { app, BrowserWindow, session, dialog } from 'electron';
-import { initDatabase, closeDatabase } from './database';
+// import { initDatabase, closeDatabase } from './database';
 import { 
   windowManager, 
   trayManager, 
@@ -15,8 +15,8 @@ let isQuitting = false; // 标记应用是否正在退出
  */
 async function initializeDatabase(): Promise<boolean> {
   try {
-    console.log('正在初始化数据库...');
-    await initDatabase();
+    console.log('数据库已迁移到 IndexedDB，主进程不再需要数据库初始化');
+    // await initDatabase();
     
     console.log('数据库初始化成功');
     return true;
@@ -82,8 +82,8 @@ app.whenReady().then(async () => {
 
 // 所有窗口关闭时的处理
 app.on('window-all-closed', async function () {
-  // 关闭数据库连接
-  await closeDatabase();
+  // 关闭数据库连接（数据已迁移到 IndexedDB）
+  // await closeDatabase();
   // 在 Windows 和 Linux 上，如果有托盘图标，不退出应用
   if (process.platform !== 'darwin' && !trayManager.getTray()) {
     app.quit();
