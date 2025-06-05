@@ -150,7 +150,7 @@
             <template #header>
               <NFlex justify="space-between" align="center">
                 <NText strong>使用历史记录</NText>
-                <NText depth="3" style="font-size: 12px;">{{ paginatedHistory.length }} / {{ useHistory.length }} 条记录</NText>
+                <NText depth="3" style="font-size: 12px;">{{ useHistory.length }} 条记录</NText>
               </NFlex>
             </template>
             
@@ -161,8 +161,6 @@
                   :key="(currentPage - 1) * pageSize + index"
                   size="small"
                   hoverable
-                  :bordered="selectedHistoryIndex === ((currentPage - 1) * pageSize + index)"
-                  :class="{ 'selected-history-card': selectedHistoryIndex === ((currentPage - 1) * pageSize + index) }"
                 >
                   <template #header>
                     <NFlex justify="space-between" align="center">
@@ -175,7 +173,6 @@
                           text 
                           type="info"
                           @click.stop="selectHistoryRecord((currentPage - 1) * pageSize + index)"
-                          :strong="selectedHistoryIndex === ((currentPage - 1) * pageSize + index)"
                         >
                           预览
                         </NButton>
@@ -232,7 +229,7 @@
                   size="small"
                   show-quick-jumper
                   show-size-picker
-                  :page-sizes="[5, 10, 20]"
+                  :page-sizes="[1, 3, 5, 10, 20]"
                   @update:page-size="handlePageSizeChange"
                 />
               </NFlex>
@@ -372,7 +369,7 @@ const selectedHistoryIndex = ref(-1)
 
 // 分页相关
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(3)
 
 // 分页计算属性
 const totalPages = computed(() => Math.ceil(useHistory.value.length / pageSize.value))
@@ -498,8 +495,8 @@ const usePrompt = async () => {
     }
     
     useHistory.value.unshift(record)
-    if (useHistory.value.length > 5) {
-      useHistory.value = useHistory.value.slice(0, 5)
+    if (useHistory.value.length > 50) {
+      useHistory.value = useHistory.value.slice(0, 50)
     }
     
     // 保存到本地存储
@@ -614,5 +611,4 @@ watch(() => showHistoryPage.value, (show) => {
 </script>
 
 <style scoped>
-
 </style>
