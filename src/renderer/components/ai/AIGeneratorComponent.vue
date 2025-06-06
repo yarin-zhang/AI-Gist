@@ -148,6 +148,7 @@
     <PromptEditModal 
       v-model:show="showSaveModal"
       :prompt="promptToSave"
+      :categories="categories"
       @saved="onPromptSaved"
     />
   </div>
@@ -196,6 +197,7 @@ const generatedResult = ref<any | null>(null)
 const generating = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
+const categories = ref<any[]>([]) // 添加分类列表数据
 
 // 表单数据
 const formData = reactive({
@@ -384,7 +386,7 @@ const saveAsPrompt = () => {
     title: `AI生成: ${generatedResult.value.topic}`,
     content: generatedResult.value.generatedPrompt,
     description: `由 AI 生成的提示词，主题：${generatedResult.value.topic}`,
-    tags: 'AI生成',
+    tags: ['AI生成'],
     isFavorite: false,
     useCount: 0
   }
@@ -396,6 +398,9 @@ const saveAsPrompt = () => {
 const onPromptSaved = () => {
   message.success('提示词已保存')
   showSaveModal.value = false
+  
+  // 清空当前选中的提示词，避免再次点击保存按钮
+  promptToSave.value = null
 }
 
 // 查看历史项
@@ -455,7 +460,22 @@ const serializeConfig = (config: AIConfig) => {
 onMounted(() => {
   loadConfigs()
   loadHistory()
+  loadCategories() // 加载分类数据
 })
+
+// 加载分类数据
+const loadCategories = async () => {
+  try {
+    console.log('开始加载分类数据')
+    const result = await api.categories.getAll.query()
+    console.log('成功获取到分类数据:', result)
+    categories.value = result
+  } catch (error) {
+    console.error('加载分类数据失败:', error)
+    message.error('加载分类数据失败: ' + (error as Error).message)
+    categories.value = [] // 确保至少是空数组而不是undefined
+  }
+}
 </script>
 
 <style scoped>
