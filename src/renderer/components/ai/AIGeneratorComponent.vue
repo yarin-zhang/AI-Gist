@@ -6,104 +6,74 @@
         :model="formData"
         :rules="formRules"
         label-placement="top"
-        require-mark-placement="right-hanging"
       >
-        <n-form-item label="选择 AI 配置" path="configId">
-          <n-select 
-            v-model:value="formData.configId" 
-            :options="configOptions"
-            placeholder="请选择一个 AI 配置"
-            @update:value="onConfigChange"
-          />
-        </n-form-item>
-        
-        <n-form-item v-if="selectedConfig" label="选择模型" path="model">
-          <n-select 
-            v-model:value="formData.model" 
-            :options="modelOptions"
-            placeholder="请选择模型"
-            clearable
-          />
-        </n-form-item>
-        
-        <n-form-item label="主题描述" path="topic">
+        <n-form-item label="要求" path="topic">
           <n-input 
             v-model:value="formData.topic" 
             type="textarea"
-            :rows="3"
-            placeholder="请描述你想要生成提示词的主题，例如：写作助手、代码审查、翻译工具等"
-          />
-        </n-form-item>
-        
-        <n-form-item label="自定义生成提示（可选）" path="customPrompt">
-          <n-input 
-            v-model:value="formData.customPrompt" 
-            type="textarea"
             :rows="4"
-            placeholder="可以自定义用于生成提示词的提示，留空则使用默认提示"
+            placeholder="描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等"
           />
         </n-form-item>
         
         <n-form-item>
-          <n-button 
-            type="primary" 
-            @click="generatePrompt" 
-            :loading="generating"
-            :disabled="!selectedConfig"
-            block
-          >
-            生成提示词
-          </n-button>
+          <n-space>
+            <n-button 
+              type="primary" 
+              @click="generatePrompt" 
+              :loading="generating"
+              :disabled="!defaultConfig"
+              size="large"
+            >
+              {{ generating ? '生成中...' : '确定' }}
+            </n-button>
+            
+            <n-dropdown 
+              :options="modelDropdownOptions" 
+              @select="onModelSelect"
+              trigger="click"
+              v-if="defaultConfig"
+            >
+              <n-button size="large" quaternary>
+                {{ currentModel || '默认模型' }}
+                <template #icon>
+                  <n-icon><ChevronDown /></n-icon>
+                </template>
+              </n-button>
+            </n-dropdown>
+            
+            <n-button 
+              @click="toggleHistory" 
+              quaternary
+              size="large"
+            >
+              <template #icon>
+                <n-icon><History /></n-icon>
+              </template>
+              历史记录
+            </n-button>
+          </n-space>
         </n-form-item>
       </n-form>
     </n-card>
 
-    <!-- 生成结果 -->
-    <n-card v-if="generatedResult" title="生成结果" class="result-card">
+    <!-- 历史记录（可切换显示） -->
+    <n-card v-if="showHistory" title="生成历史" class="history-card">
       <template #header-extra>
         <n-space>
-          <n-button size="small" @click="copyToClipboard">
+          <n-button size="small" @click="loadHistory">
             <template #icon>
-              <n-icon><Copy /></n-icon>
+              <n-icon><Refresh /></n-icon>
             </template>
-            复制
+            刷新
           </n-button>
-          <n-button size="small" @click="saveAsPrompt">
+          <n-button size="small" @click="toggleHistory">
             <template #icon>
-              <n-icon><Plus /></n-icon>
+              <n-icon><X /></n-icon>
             </template>
-            保存为提示词
+            关闭
           </n-button>
         </n-space>
-      </template>
-      
-      <div class="result-content">
-        <n-input 
-          :value="generatedResult.generatedPrompt" 
-          type="textarea" 
-          :rows="10"
-          readonly
-        />
-        
-        <div class="result-meta">
-          <n-space>
-            <n-tag>配置: {{ getConfigName(generatedResult.configId) }}</n-tag>
-            <n-tag>模型: {{ generatedResult.model }}</n-tag>
-            <n-tag>时间: {{ formatDate(generatedResult.createdAt) }}</n-tag>
-          </n-space>
-        </div>
-      </div>
-    </n-card>
-
-    <!-- 历史记录 -->
-    <n-card title="生成历史" class="history-card">
-      <template #header-extra>
-        <n-button size="small" @click="loadHistory">
-          <template #icon>
-            <n-icon><Refresh /></n-icon>
-          </template>
-          刷新
-        </n-button>
       </template>
       
       <n-list>
@@ -134,7 +104,6 @@
           
           <template #suffix>
             <n-space v-if="item.status === 'success'">
-              <n-button size="small" @click="viewHistoryItem(item)">查看</n-button>
               <n-button size="small" @click="copyHistoryItem(item)">复制</n-button>
             </n-space>
           </template>
@@ -163,25 +132,16 @@ import {
     NForm,
     NFormItem,
     NInput,
-    NSelect,
     NButton,
     NIcon,
     NTag,
     NSpace,
     NThing,
-    NModal,
-    NFormRules,
-    NDynamicTags,
-    NScrollbar,
     NDropdown,
-    NMessage,
-    NFlex,
-    NText,
-    NDatePicker,
     NEmpty,
     useMessage 
 } from 'naive-ui'
-import { Copy, Plus, Refresh, Check, AlertCircle } from '@vicons/tabler'
+import { ChevronDown, History, Refresh, Check, AlertCircle, X } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
@@ -192,29 +152,24 @@ const message = useMessage()
 // 数据状态
 const configs = ref<AIConfig[]>([])
 const history = ref<AIGenerationHistory[]>([])
-const selectedConfig = ref<AIConfig | null>(null)
-const generatedResult = ref<any | null>(null)
+const defaultConfig = ref<AIConfig | null>(null)
+const currentModel = ref<string>('')
 const generating = ref(false)
+const showHistory = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
-const categories = ref<any[]>([]) // 添加分类列表数据
+const categories = ref<any[]>([])
 
 // 表单数据
 const formData = reactive({
-  configId: '',
-  model: '',
-  topic: '',
-  customPrompt: ''
+  topic: ''
 })
 
 // 表单校验规则
 const formRules = {
-  configId: [
-    { required: true, message: '请选择 AI 配置', trigger: 'change' }
-  ],
   topic: [
-    { required: true, message: '请输入主题描述', trigger: 'blur' },
-    { min: 1, message: '主题描述至少 1 个字符', trigger: 'blur' }
+    { required: true, message: '请输入要求', trigger: 'blur' },
+    { min: 1, message: '要求至少 1 个字符', trigger: 'blur' }
   ]
 }
 
@@ -222,30 +177,32 @@ const formRules = {
 const formRef = ref()
 
 // 计算属性
-const configOptions = computed(() => {
-  return configs.value
-    .filter(config => config.enabled)
-    .map(config => ({
-      label: `${config.name} (${config.type})`,
-      value: config.configId // 使用 configId 而不是 id
-    }))
-})
-
-const modelOptions = computed(() => {
-  if (!selectedConfig.value) return []
+const modelDropdownOptions = computed(() => {
+  if (!defaultConfig.value) return []
   
-  const models = Array.isArray(selectedConfig.value.models) 
-    ? selectedConfig.value.models 
+  const models = Array.isArray(defaultConfig.value.models) 
+    ? defaultConfig.value.models 
     : []
-  const options = models.map(model => ({ label: model, value: model }))
   
-  // 添加默认模型和自定义模型
-  if (selectedConfig.value.defaultModel && !models.includes(selectedConfig.value.defaultModel)) {
-    options.unshift({ label: `${selectedConfig.value.defaultModel} (默认)`, value: selectedConfig.value.defaultModel })
+  const options = models.map(model => ({
+    label: model,
+    key: model
+  }))
+  
+  // 添加默认模型
+  if (defaultConfig.value.defaultModel) {
+    options.unshift({
+      label: `${defaultConfig.value.defaultModel} (默认)`,
+      key: defaultConfig.value.defaultModel
+    })
   }
   
-  if (selectedConfig.value.customModel && !models.includes(selectedConfig.value.customModel)) {
-    options.push({ label: `${selectedConfig.value.customModel} (自定义)`, value: selectedConfig.value.customModel })
+  // 添加自定义模型
+  if (defaultConfig.value.customModel && !models.includes(defaultConfig.value.customModel)) {
+    options.push({
+      label: `${defaultConfig.value.customModel} (自定义)`,
+      key: defaultConfig.value.customModel
+    })
   }
   
   return options
@@ -259,33 +216,17 @@ const loadConfigs = async () => {
     console.log('成功获取到启用的 AI 配置:', result)
     configs.value = result
     
-    // 如果没有配置或配置为空，显示提示信息
-    if (!result || result.length === 0) {
+    // 自动选择第一个启用的配置作为默认配置
+    if (result && result.length > 0) {
+      defaultConfig.value = result[0]
+      currentModel.value = defaultConfig.value.defaultModel || ''
+      console.log('自动选择默认配置:', defaultConfig.value.name)
+    } else {
       message.info('没有找到启用的 AI 配置，请先在 AI 配置页面添加并启用至少一个配置')
     }
   } catch (error) {
     console.error('加载 AI 配置失败:', error)
     message.error('加载 AI 配置失败: ' + (error as Error).message)
-    
-    // 尝试获取所有配置作为备选方案
-    try {
-      const allConfigs = await databaseService.getAllAIConfigs()
-      console.log('获取所有 AI 配置作为备选:', allConfigs)
-      if (allConfigs && allConfigs.length > 0) {
-        // 仅选择已启用的配置
-        const enabledConfigs = allConfigs.filter(c => c.enabled)
-        if (enabledConfigs.length > 0) {
-          configs.value = enabledConfigs
-          message.success('已成功加载备选配置')
-        } else {
-          message.warning('找到配置但均未启用，请在 AI 配置页面启用至少一个配置')
-        }
-      } else {
-        message.warning('未找到任何 AI 配置，请先在 AI 配置页面添加配置')
-      }
-    } catch (fallbackError) {
-      console.error('备选方案也失败:', fallbackError)
-    }
   }
 }
 
@@ -299,10 +240,17 @@ const loadHistory = async () => {
   }
 }
 
-// 配置变化处理
-const onConfigChange = (configId: string) => {
-  selectedConfig.value = configs.value.find(c => c.configId === configId) || null
-  formData.model = selectedConfig.value?.defaultModel || ''
+// 模型选择处理
+const onModelSelect = (modelKey: string) => {
+  currentModel.value = modelKey
+}
+
+// 切换历史记录显示
+const toggleHistory = () => {
+  showHistory.value = !showHistory.value
+  if (showHistory.value) {
+    loadHistory()
+  }
 }
 
 // 生成提示词
@@ -311,23 +259,21 @@ const generatePrompt = async () => {
     await formRef.value?.validate()
     generating.value = true
     
-    if (!selectedConfig.value) {
-      throw new Error('请先选择 AI 配置')
+    if (!defaultConfig.value) {
+      throw new Error('没有可用的 AI 配置')
     }
     
     const request = {
-      configId: formData.configId,
-      model: formData.model || undefined,
-      topic: formData.topic,
-      customPrompt: formData.customPrompt || undefined
+      configId: defaultConfig.value.configId,
+      model: currentModel.value || defaultConfig.value.defaultModel,
+      topic: formData.topic
     }
     
     // 序列化配置对象以确保可以通过 IPC 传递
-    const serializedConfig = serializeConfig(selectedConfig.value)
+    const serializedConfig = serializeConfig(defaultConfig.value)
     
     // 传递配置对象给主进程
     const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
-    generatedResult.value = result
     
     // 保存到历史记录
     await api.aiGenerationHistory.create.mutate({
@@ -336,12 +282,21 @@ const generatePrompt = async () => {
       topic: result.topic,
       generatedPrompt: result.generatedPrompt,
       model: result.model,
-      customPrompt: request.customPrompt,
       status: 'success'
     })
     
-    message.success('提示词生成成功')
-    loadHistory() // 刷新历史记录
+    // 直接保存为提示词
+    await saveGeneratedPrompt(result)
+    
+    message.success('提示词生成并保存成功')
+    
+    // 清空输入框
+    formData.topic = ''
+    
+    // 刷新历史记录（如果正在显示）
+    if (showHistory.value) {
+      loadHistory()
+    }
   } catch (error) {
     message.error('生成失败: ' + (error as Error).message)
     
@@ -349,15 +304,16 @@ const generatePrompt = async () => {
     try {
       await api.aiGenerationHistory.create.mutate({
         historyId: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        configId: formData.configId,
+        configId: defaultConfig.value?.configId || 'unknown',
         topic: formData.topic,
         generatedPrompt: '',
-        model: formData.model || 'unknown',
-        customPrompt: formData.customPrompt || undefined,
+        model: currentModel.value || 'unknown',
         status: 'error',
         errorMessage: (error as Error).message
       })
-      loadHistory()
+      if (showHistory.value) {
+        loadHistory()
+      }
     } catch (saveError) {
       console.error('保存错误记录失败:', saveError)
     }
@@ -366,53 +322,23 @@ const generatePrompt = async () => {
   }
 }
 
-// 复制到剪贴板
-const copyToClipboard = async () => {
-  if (!generatedResult.value) return
-  
+// 直接保存生成的提示词
+const saveGeneratedPrompt = async (result: any) => {
   try {
-    await navigator.clipboard.writeText(generatedResult.value.generatedPrompt)
-    message.success('已复制到剪贴板')
+    const promptData = {
+      title: `AI生成: ${result.topic}`,
+      content: result.generatedPrompt,
+      description: `由 AI 生成的提示词，主题：${result.topic}`,
+      tags: ['AI生成'],
+      categoryId: null, // 可以根据需要设置默认分类
+      isFavorite: false,
+      useCount: 0
+    }
+    
+    await api.prompts.create.mutate(promptData)
   } catch (error) {
-    message.error('复制失败')
-  }
-}
-
-// 保存为提示词
-const saveAsPrompt = () => {
-  if (!generatedResult.value) return
-  
-  promptToSave.value = {
-    title: `AI生成: ${generatedResult.value.topic}`,
-    content: generatedResult.value.generatedPrompt,
-    description: `由 AI 生成的提示词，主题：${generatedResult.value.topic}`,
-    tags: ['AI生成'],
-    isFavorite: false,
-    useCount: 0
-  }
-  
-  showSaveModal.value = true
-}
-
-// 提示词保存完成
-const onPromptSaved = () => {
-  message.success('提示词已保存')
-  showSaveModal.value = false
-  
-  // 清空当前选中的提示词，避免再次点击保存按钮
-  promptToSave.value = null
-}
-
-// 查看历史项
-const viewHistoryItem = (item: AIGenerationHistory) => {
-  generatedResult.value = {
-    id: item.historyId,
-    configId: item.configId,
-    topic: item.topic,
-    generatedPrompt: item.generatedPrompt,
-    model: item.model,
-    customPrompt: item.customPrompt,
-    createdAt: item.createdAt
+    console.error('保存提示词失败:', error)
+    throw new Error('保存提示词失败: ' + (error as Error).message)
   }
 }
 
@@ -447,7 +373,7 @@ const serializeConfig = (config: AIConfig) => {
     baseURL: config.baseURL,
     apiKey: config.apiKey,
     secretKey: config.secretKey,
-    models: [...(config.models || [])], // 创建新数组
+    models: [...(config.models || [])],
     defaultModel: config.defaultModel,
     customModel: config.customModel,
     enabled: config.enabled,
@@ -456,11 +382,17 @@ const serializeConfig = (config: AIConfig) => {
   }
 }
 
+// 提示词保存完成（保留此函数以防Modal组件需要）
+const onPromptSaved = () => {
+  message.success('提示词已保存')
+  showSaveModal.value = false
+  promptToSave.value = null
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadConfigs()
-  loadHistory()
-  loadCategories() // 加载分类数据
+  loadCategories()
 })
 
 // 加载分类数据
@@ -473,7 +405,7 @@ const loadCategories = async () => {
   } catch (error) {
     console.error('加载分类数据失败:', error)
     message.error('加载分类数据失败: ' + (error as Error).message)
-    categories.value = [] // 确保至少是空数组而不是undefined
+    categories.value = []
   }
 }
 </script>
@@ -481,24 +413,18 @@ const loadCategories = async () => {
 <style scoped>
 .ai-generator {
   padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
   display: grid;
   gap: 20px;
 }
 
-.generator-card,
-.result-card,
-.history-card {
+.generator-card {
   border: 1px solid var(--border-color);
 }
 
-.result-content {
-  display: grid;
-  gap: 12px;
-}
-
-.result-meta {
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
+.history-card {
+  border: 1px solid var(--border-color);
 }
 
 .history-content {
@@ -513,26 +439,8 @@ const loadCategories = async () => {
   font-size: 14px;
 }
 
-/* 响应式布局 */
-@media (min-width: 1200px) {
-  .ai-generator {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
-  }
-  
-  .generator-card {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  
-  .result-card {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  
-  .history-card {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
+/* 简化布局，去除复杂的响应式网格 */
+.ai-generator {
+  display: block;
 }
 </style>
