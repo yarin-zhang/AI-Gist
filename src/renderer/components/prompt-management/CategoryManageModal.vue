@@ -211,7 +211,7 @@ const categoryListHeight = computed(() => {
 // 响应式数据
 const newCategory = ref({
     name: '',
-    color: '#18A05880'
+    color: '#18A05833'
 })
 
 const editingCategory = ref(null)
@@ -234,7 +234,7 @@ const handleCreate = async () => {
 
         newCategory.value = {
             name: '',
-            color: '#18A05880'
+            color: '#18A05833'
         }
 
         message.success('分类创建成功')
@@ -251,7 +251,7 @@ const handleEdit = (category) => {
     editingCategory.value = {
         id: category.id,
         name: category.name,
-        color: category.color || '#18A05880'
+        color: category.color || '#18A05833'
     }
 }
 

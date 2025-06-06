@@ -76,9 +76,29 @@ export function useTagColors() {
             : tags
     }
 
+    /**
+     * 根据分类获取颜色配置
+     * @param category 分类对象
+     * @returns 颜色配置对象
+     */
+    const getCategoryTagColor = (category: any) => {
+        if (!category) return {}
+        
+        // 使用数据库中存储的分类颜色，如果没有则使用默认值
+        const baseColor = category.color || '#18a058'
+        
+        // 直接使用数据库中的颜色，保持与用户设置的一致性
+        return {
+            color: baseColor,
+            textColor: themeVars.value.textColorBase, // 使用主题的基础文字颜色
+            borderColor: baseColor
+        }
+    }
+
     return {
         getTagColor,
         getTagsArray,
+        getCategoryTagColor, // 新增分类颜色函数
         COLOR_SWATCHES,
         themeVars // 暴露主题变量，以便组件需要时使用
     }

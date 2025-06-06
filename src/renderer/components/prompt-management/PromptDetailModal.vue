@@ -370,17 +370,7 @@ const emit = defineEmits<Emits>()
 const message = useMessage()
 
 // 使用标签颜色 composable
-const { getTagColor, getTagsArray } = useTagColors()
-
-// 获取分类标签颜色配置
-const getCategoryTagColor = (category: any) => {
-    const baseColor = category.color || '#18a058'
-    return {
-        color: baseColor,
-        borderColor: baseColor,
-        textColor: '#ffffff'
-    }
-}
+const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
 // 使用窗口尺寸 composable
 const { modalWidth } = useWindowSize()
