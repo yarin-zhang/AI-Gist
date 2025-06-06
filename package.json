@@ -1,6 +1,6 @@
 {
   "name": "ai-gist",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
   "main": "./main/main.js",
   "scripts": {
@@ -30,7 +30,11 @@
     "vite": "^4.5.0"
   },
   "dependencies": {
+    "@langchain/core": "^0.3.57",
+    "@langchain/ollama": "^0.2.1",
+    "@langchain/openai": "^0.5.12",
     "@vicons/tabler": "^0.13.0",
+    "langchain": "^0.3.27",
     "naive-ui": "^2.41.0",
     "vue": "^3.3.8",
     "zod": "^3.25.40"

@@ -30,5 +30,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
       // 返回移除监听器的函数
       return () => ipcRenderer.removeListener('theme-changed', listener);
     }
+  },
+
+  // AI 服务管理
+  ai: {
+    getConfigs: () => ipcRenderer.invoke('ai:get-configs'),
+    getEnabledConfigs: () => ipcRenderer.invoke('ai:get-enabled-configs'),
+    addConfig: (config: any) => ipcRenderer.invoke('ai:add-config', config),
+    updateConfig: (id: string, config: any) => ipcRenderer.invoke('ai:update-config', id, config),
+    removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
+    testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
+    getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
+    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
+    generatePromptStream: (request: any, config: any, onProgress: (charCount: number) => void) => {
+      // 监听流式进度
+      const progressListener = (_: any, charCount: number) => onProgress(charCount);
+      ipcRenderer.on('ai:stream-progress', progressListener);
+      
+      // 调用流式生成
+      const promise = ipcRenderer.invoke('ai:generate-prompt-stream', request, config);
+      
+      // 清理监听器
+      promise.finally(() => {
+        ipcRenderer.removeListener('ai:stream-progress', progressListener);
+      });
+      
+      return promise;
+    },
+    intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
   }
 });

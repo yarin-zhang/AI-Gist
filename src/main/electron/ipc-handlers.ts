@@ -2,7 +2,8 @@ import { ipcMain } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
-import { UserPreferences, SystemTheme } from './types';
+import { aiServiceManager } from './ai-service-manager';
+import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from './types';
 
 /**
  * IPC 处理器管理器
@@ -16,6 +17,7 @@ class IpcHandlers {
     this.setupPreferencesHandlers();
     this.setupWindowHandlers();
     this.setupThemeHandlers();
+    this.setupAIHandlers();
   }
 
   /**
@@ -101,6 +103,126 @@ class IpcHandlers {
   }
 
   /**
+   * 设置 AI 服务处理器
+   */
+  private setupAIHandlers() {
+    // 获取所有 AI 配置 - 由前端数据库处理
+    ipcMain.handle('ai:get-configs', async () => {
+      // 这里应该从前端数据库读取，暂时返回空数组
+      return [];
+    });
+
+    // 获取启用的 AI 配置 - 由前端数据库处理
+    ipcMain.handle('ai:get-enabled-configs', async () => {
+      // 这里应该从前端数据库读取，暂时返回空数组
+      return [];
+    });
+
+    // 添加 AI 配置 - 返回配置数据，实际存储由前端处理
+    ipcMain.handle('ai:add-config', (_, config: any) => {
+      // 确保日期字段正确处理
+      const processedConfig = {
+        ...config,
+        createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
+        updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
+      };
+      return processedConfig;
+    });
+
+    // 更新 AI 配置 - 返回配置数据，实际存储由前端处理
+    ipcMain.handle('ai:update-config', (_, id: string, config: any) => {
+      // 确保日期字段正确处理
+      const processedConfig = {
+        ...config,
+        updatedAt: new Date()
+      };
+      return processedConfig;
+    });
+
+    // 删除 AI 配置 - 返回成功标志，实际删除由前端处理
+    ipcMain.handle('ai:remove-config', (_, id: string) => {
+      return true;
+    });
+
+    // 测试 AI 配置
+    ipcMain.handle('ai:test-config', async (_, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.testConfig(processedConfig);
+    });
+
+    // 获取可用模型列表
+    ipcMain.handle('ai:get-models', async (_, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.getAvailableModels(processedConfig);
+    });
+
+    // 生成 Prompt
+    ipcMain.handle('ai:generate-prompt', async (_, request: AIGenerationRequest, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      const requestWithConfig = {
+        ...request,
+        config: processedConfig
+      };
+      
+      return await aiServiceManager.generatePrompt(requestWithConfig);
+    });
+
+    // 智能测试 - 发送真实提示词并获取AI响应
+    ipcMain.handle('ai:intelligent-test', async (_, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.intelligentTest(processedConfig);
+    });
+
+    // 流式生成 Prompt
+    ipcMain.handle('ai:generate-prompt-stream', async (event, request: AIGenerationRequest, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.generatePromptWithStream(
+        request,
+        processedConfig,
+        (charCount: number) => {
+          // 发送进度更新到渲染进程
+          event.sender.send('ai:stream-progress', charCount);
+        }
+      );
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -119,6 +241,17 @@ class IpcHandlers {
     ipcMain.removeHandler('theme:get-info');
     ipcMain.removeHandler('theme:set-source');
     ipcMain.removeHandler('theme:is-dark');
+    // 清理 AI 处理器
+    ipcMain.removeHandler('ai:get-configs');
+    ipcMain.removeHandler('ai:get-enabled-configs');
+    ipcMain.removeHandler('ai:add-config');
+    ipcMain.removeHandler('ai:update-config');
+    ipcMain.removeHandler('ai:remove-config');
+    ipcMain.removeHandler('ai:test-config');
+    ipcMain.removeHandler('ai:get-models');
+    ipcMain.removeHandler('ai:generate-prompt');
+    ipcMain.removeHandler('ai:intelligent-test');
+    ipcMain.removeHandler('ai:generate-prompt-stream');
   }
 }
 

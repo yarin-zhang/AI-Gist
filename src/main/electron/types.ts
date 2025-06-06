@@ -24,3 +24,52 @@ export interface ThemeInfo {
   shouldUseHighContrastColors: boolean;
   shouldUseInvertedColorScheme: boolean;
 }
+
+/**
+ * AI 配置相关类型定义
+ */
+export interface AIConfig {
+  id?: number;
+  configId: string; // 唯一标识符
+  name: string;
+  type: 'openai' | 'ollama';
+  baseURL: string;
+  apiKey?: string;
+  secretKey?: string;
+  models: string[];
+  defaultModel?: string;
+  customModel?: string;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AIGenerationRequest {
+  configId: string;
+  model?: string;
+  topic: string;
+  customPrompt?: string;
+  systemPrompt?: string;
+}
+
+export interface AIGenerationResult {
+  id: string;
+  configId: string;
+  topic: string;
+  generatedPrompt: string;
+  model: string;
+  customPrompt?: string;
+  createdAt: Date;
+}
+
+export interface AIGenerationHistory {
+  id: string;
+  configId: string;
+  topic: string;
+  generatedPrompt: string;
+  model: string;
+  customPrompt?: string;
+  status: 'success' | 'error';
+  errorMessage?: string;
+  createdAt: Date;
+}

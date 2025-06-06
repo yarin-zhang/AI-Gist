@@ -13,11 +13,13 @@ import {
 import {
     Home as HomeIcon,
     Star as PromptIcon,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    Diamonds as AIIcon
 } from '@vicons/tabler'
 
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
+import AIConfigPage from './AIConfigPage.vue'
 const currentView = ref('prompts')
 
 // 菜单选项
@@ -26,6 +28,11 @@ const menuOptions: MenuOption[] = [
         label: 'AI 提示词',
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
+    },
+    {
+        label: 'AI 配置',
+        key: 'ai-config',
+        icon: () => h(NIcon, null, { default: () => h(AIIcon) })
     },
     {
         label: '设置',
@@ -59,6 +66,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 
             <NLayoutContent content-style="overflow-y: auto;">
                 <PromptManagementPage v-if="currentView === 'prompts'" />
+                <AIConfigPage v-else-if="currentView === 'ai-config'" />
                 <SettingsPage v-else-if="currentView === 'settings'" />
             </NLayoutContent>
         </NLayout>

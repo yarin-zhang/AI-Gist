@@ -56,6 +56,36 @@ export interface PromptVariable {
   updatedAt: Date;
 }
 
+// AI 相关数据类型
+export interface AIConfig {
+  id?: number;
+  configId: string; // 唯一标识符
+  name: string;
+  type: 'openai' | 'ollama';
+  baseURL: string;
+  apiKey?: string;
+  secretKey?: string;
+  models: string[]; // 修改为 string[]
+  defaultModel?: string;
+  customModel?: string;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AIGenerationHistory {
+  id?: number;
+  historyId: string; // 唯一标识符
+  configId: string;
+  topic: string;
+  generatedPrompt: string;
+  model: string;
+  customPrompt?: string;
+  status: 'success' | 'error';
+  errorMessage?: string;
+  createdAt: Date;
+}
+
 // 扩展的数据类型（包含关联数据）
 export interface PromptWithRelations extends Prompt {
   category?: Category;
@@ -72,7 +102,7 @@ export interface CategoryWithRelations extends Category {
 class DatabaseService {
   private db: IDBDatabase | null = null;
   private readonly dbName = 'AIGistDB';
-  private readonly dbVersion = 1;
+  private readonly dbVersion = 3; // 升级版本号以修复表名不一致问题
 
   /**
    * 初始化数据库
@@ -102,7 +132,7 @@ class DatabaseService {
         // 创建 posts 表
         if (!db.objectStoreNames.contains('posts')) {
           const postStore = db.createObjectStore('posts', { keyPath: 'id', autoIncrement: true });
-          postStore.createIndex('authorId', 'authorId');
+          postStore.createIndex('authorId', 'authorId', { unique: false });
         }
 
         // 创建 categories 表
@@ -114,17 +144,34 @@ class DatabaseService {
         // 创建 prompts 表
         if (!db.objectStoreNames.contains('prompts')) {
           const promptStore = db.createObjectStore('prompts', { keyPath: 'id', autoIncrement: true });
-          promptStore.createIndex('categoryId', 'categoryId');
-          promptStore.createIndex('isFavorite', 'isFavorite');
-          promptStore.createIndex('useCount', 'useCount');
-          promptStore.createIndex('title', 'title');
+          promptStore.createIndex('categoryId', 'categoryId', { unique: false });
+          promptStore.createIndex('isFavorite', 'isFavorite', { unique: false });
         }
 
-        // 创建 promptVariables 表
+        // 创建 promptVariables 表（修复表名不一致问题）
         if (!db.objectStoreNames.contains('promptVariables')) {
-          const variableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
-          variableStore.createIndex('promptId', 'promptId');
+          const promptVariableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
+          promptVariableStore.createIndex('promptId', 'promptId', { unique: false });
         }
+
+        // 创建 ai_configs 表
+        if (!db.objectStoreNames.contains('ai_configs')) {
+          const aiConfigStore = db.createObjectStore('ai_configs', { keyPath: 'id', autoIncrement: true });
+          aiConfigStore.createIndex('configId', 'configId', { unique: true });
+          aiConfigStore.createIndex('type', 'type', { unique: false });
+          aiConfigStore.createIndex('enabled', 'enabled', { unique: false });
+        }
+
+        // 创建 ai_generation_history 表
+        if (!db.objectStoreNames.contains('ai_generation_history')) {
+          const aiHistoryStore = db.createObjectStore('ai_generation_history', { keyPath: 'id', autoIncrement: true });
+          aiHistoryStore.createIndex('historyId', 'historyId', { unique: true });
+          aiHistoryStore.createIndex('configId', 'configId', { unique: false });
+          aiHistoryStore.createIndex('status', 'status', { unique: false });
+          aiHistoryStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        resolve();
       };
     });
   }
@@ -149,8 +196,12 @@ class DatabaseService {
       const store = transaction.objectStore(storeName);
       
       const now = new Date();
+      
+      // 深度克隆数据以确保可序列化
+      const cleanData = this.cleanDataForStorage(data);
+      
       const dataWithTimestamps = {
-        ...data,
+        ...cleanData,
         createdAt: now,
         updatedAt: now,
       };
@@ -162,9 +213,37 @@ class DatabaseService {
       };
 
       request.onerror = () => {
-        reject(new Error(`Failed to add to ${storeName}`));
+        console.error('IndexedDB add error:', request.error);
+        reject(new Error(`Failed to add to ${storeName}: ${request.error?.message || 'Unknown error'}`));
       };
     });
+  }
+
+  /**
+   * 清理数据以确保可序列化
+   */
+  private cleanDataForStorage(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => this.cleanDataForStorage(item));
+    }
+    
+    if (data instanceof Date) {
+      return data;
+    }
+    
+    if (typeof data === 'object') {
+      const cleanedObj: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        cleanedObj[key] = this.cleanDataForStorage(value);
+      }
+      return cleanedObj;
+    }
+    
+    return data;
   }
 
   /**
@@ -226,9 +305,12 @@ class DatabaseService {
           return;
         }
 
+        // 清理更新数据以确保可序列化
+        const cleanUpdates = this.cleanDataForStorage(updates);
+
         const updatedData = {
           ...existingData,
-          ...updates,
+          ...cleanUpdates,
           updatedAt: new Date(),
         };
 
@@ -239,7 +321,8 @@ class DatabaseService {
         };
 
         putRequest.onerror = () => {
-          reject(new Error(`Failed to update in ${storeName}`));
+          console.error('IndexedDB update error:', putRequest.error);
+          reject(new Error(`Failed to update in ${storeName}: ${putRequest.error?.message || 'Unknown error'}`));
         };
       };
 
@@ -275,18 +358,53 @@ class DatabaseService {
   private async getByIndex<T>(storeName: string, indexName: string, value: any): Promise<T[]> {
     const db = this.ensureDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([storeName], 'readonly');
-      const store = transaction.objectStore(storeName);
-      const index = store.index(indexName);
-      const request = index.getAll(value);
+      try {
+        const transaction = db.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        
+        // 确保索引存在
+        if (!store.indexNames.contains(indexName)) {
+          console.error(`Index ${indexName} does not exist in store ${storeName}`);
+          return resolve([]);
+        }
+        
+        const index = store.index(indexName);
+        
+        // 对布尔值特殊处理，避免直接传递可能导致的问题
+        let request;
+        if (typeof value === 'boolean') {
+          // 使用游标而不是直接查询
+          request = index.openCursor();
+          const results: T[] = [];
+          
+          request.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+              if (cursor.value[indexName] === value) {
+                results.push(cursor.value);
+              }
+              cursor.continue();
+            } else {
+              resolve(results);
+            }
+          };
+        } else {
+          // 对于非布尔值，使用标准的 getAll
+          request = index.getAll(value);
+          
+          request.onsuccess = () => {
+            resolve(request.result);
+          };
+        }
 
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-
-      request.onerror = () => {
-        reject(new Error(`Failed to get by index from ${storeName}`));
-      };
+        request.onerror = (event) => {
+          console.error(`Error in getByIndex for ${storeName}.${indexName}:`, event);
+          reject(new Error(`Failed to get by index from ${storeName}: ${request.error?.message || 'Unknown error'}`));
+        };
+      } catch (error) {
+        console.error(`Exception in getByIndex for ${storeName}.${indexName}:`, error);
+        reject(error);
+      }
     });
   }
 
@@ -399,6 +517,7 @@ class DatabaseService {
     isFavorite?: boolean;
     page?: number;
     limit?: number;
+    sortBy?: string; // 添加排序方式参数
   }): Promise<{ data: PromptWithRelations[]; total: number; hasMore: boolean }> {
     const prompts = await this.getAll<Prompt>('prompts');
     const categories = await this.getAll<Category>('categories');
@@ -446,16 +565,49 @@ class DatabaseService {
       }
     }
 
-    // 排序：收藏 > 使用次数 > 更新时间
-    filteredPrompts.sort((a, b) => {
-      if (a.isFavorite !== b.isFavorite) {
-        return b.isFavorite ? 1 : -1;
+    // 根据排序方式进行排序
+    if (filters?.sortBy) {
+      switch (filters.sortBy) {
+        case 'timeDesc': // 最新优先
+          filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          break;
+        case 'timeAsc': // 最早优先
+          filteredPrompts.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+          break;
+        case 'useCount': // 使用次数优先
+          filteredPrompts.sort((a, b) => b.useCount - a.useCount);
+          break;
+        case 'favorite': // 收藏优先
+          filteredPrompts.sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) {
+              return b.isFavorite ? 1 : -1;
+            }
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(); // 收藏相同时按更新时间
+          });
+          break;
+        default: // 默认：收藏 > 使用次数 > 更新时间
+          filteredPrompts.sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) {
+              return b.isFavorite ? 1 : -1;
+            }
+            if (a.useCount !== b.useCount) {
+              return b.useCount - a.useCount;
+            }
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          });
       }
-      if (a.useCount !== b.useCount) {
-        return b.useCount - a.useCount;
-      }
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
+    } else {
+      // 默认排序：收藏 > 使用次数 > 更新时间
+      filteredPrompts.sort((a, b) => {
+        if (a.isFavorite !== b.isFavorite) {
+          return b.isFavorite ? 1 : -1;
+        }
+        if (a.useCount !== b.useCount) {
+          return b.useCount - a.useCount;
+        }
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+    }
 
     // 计算总数
     const total = filteredPrompts.length;
@@ -632,6 +784,227 @@ class DatabaseService {
 
   async deletePromptVariable(id: number): Promise<void> {
     return this.delete('promptVariables', id);
+  }
+
+  // ===== AIConfig 相关方法 =====
+  async createAIConfig(data: Omit<AIConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<AIConfig> {
+    return this.add<AIConfig>('ai_configs', data);
+  }
+
+  async getAllAIConfigs(): Promise<AIConfig[]> {
+    return this.getAll<AIConfig>('ai_configs');
+  }
+
+  async getEnabledAIConfigs(): Promise<AIConfig[]> {
+    // 修改实现方式，先获取所有配置然后在内存中过滤
+    // 而不是直接使用索引查询，避免 IndexedDB 对布尔值索引的处理问题
+    const allConfigs = await this.getAllAIConfigs();
+    return allConfigs.filter(config => config.enabled === true);
+  }
+
+  async getAIConfigById(id: number): Promise<AIConfig | null> {
+    return this.getById<AIConfig>('ai_configs', id);
+  }
+
+  async getAIConfigByConfigId(configId: string): Promise<AIConfig | null> {
+    const configs = await this.getByIndex<AIConfig>('ai_configs', 'configId', configId);
+    return configs.length > 0 ? configs[0] : null;
+  }
+
+  async updateAIConfig(id: number, data: Partial<Omit<AIConfig, 'id' | 'createdAt' | 'updatedAt'>>): Promise<AIConfig> {
+    return this.update<AIConfig>('ai_configs', id, data);
+  }
+
+  async updateAIConfigByConfigId(configId: string, data: Partial<Omit<AIConfig, 'id' | 'configId' | 'createdAt' | 'updatedAt'>>): Promise<AIConfig | null> {
+    const config = await this.getAIConfigByConfigId(configId);
+    if (!config || !config.id) {
+      return null;
+    }
+    return this.updateAIConfig(config.id, data);
+  }
+
+  async deleteAIConfig(id: number): Promise<void> {
+    return this.delete('ai_configs', id);
+  }
+
+  async deleteAIConfigByConfigId(configId: string): Promise<boolean> {
+    const config = await this.getAIConfigByConfigId(configId);
+    if (!config || !config.id) {
+      return false;
+    }
+    await this.deleteAIConfig(config.id);
+    return true;
+  }
+
+  async getAIConfigsByType(type: 'openai' | 'ollama'): Promise<AIConfig[]> {
+    return this.getByIndex<AIConfig>('ai_configs', 'type', type);
+  }
+
+  async toggleAIConfigEnabled(id: number): Promise<AIConfig> {
+    const config = await this.getById<AIConfig>('ai_configs', id);
+    if (!config) {
+      throw new Error('AI Config not found');
+    }
+
+    return this.update<AIConfig>('ai_configs', id, {
+      enabled: !config.enabled,
+    });
+  }
+
+  // ===== AIGenerationHistory 相关方法 =====
+  async createAIGenerationHistory(data: Omit<AIGenerationHistory, 'id' | 'createdAt'>): Promise<AIGenerationHistory> {
+    const historyData = {
+      ...data,
+      createdAt: new Date(),
+    };
+    return this.add<AIGenerationHistory>('ai_generation_history', historyData);
+  }
+
+  async getAllAIGenerationHistory(): Promise<AIGenerationHistory[]> {
+    const histories = await this.getAll<AIGenerationHistory>('ai_generation_history');
+    // 按创建时间降序排列
+    return histories.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getAIGenerationHistoryById(id: number): Promise<AIGenerationHistory | null> {
+    return this.getById<AIGenerationHistory>('ai_generation_history', id);
+  }
+
+  async getAIGenerationHistoryByHistoryId(historyId: string): Promise<AIGenerationHistory | null> {
+    const histories = await this.getByIndex<AIGenerationHistory>('ai_generation_history', 'historyId', historyId);
+    return histories.length > 0 ? histories[0] : null;
+  }
+
+  async getAIGenerationHistoryByConfigId(configId: string): Promise<AIGenerationHistory[]> {
+    const histories = await this.getByIndex<AIGenerationHistory>('ai_generation_history', 'configId', configId);
+    // 按创建时间降序排列
+    return histories.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getAIGenerationHistoryByStatus(status: 'success' | 'error'): Promise<AIGenerationHistory[]> {
+    const histories = await this.getByIndex<AIGenerationHistory>('ai_generation_history', 'status', status);
+    // 按创建时间降序排列
+    return histories.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getAIGenerationHistoryPaginated(options?: {
+    configId?: string;
+    status?: 'success' | 'error';
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: AIGenerationHistory[]; total: number; hasMore: boolean }> {
+    let histories = await this.getAll<AIGenerationHistory>('ai_generation_history');
+
+    // 应用过滤器
+    if (options?.configId) {
+      histories = histories.filter(h => h.configId === options.configId);
+    }
+
+    if (options?.status) {
+      histories = histories.filter(h => h.status === options.status);
+    }
+
+    // 按创建时间降序排列
+    histories.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = histories.length;
+
+    // 应用分页
+    if (options?.page && options?.limit) {
+      const offset = (options.page - 1) * options.limit;
+      histories = histories.slice(offset, offset + options.limit);
+    }
+
+    const hasMore = options?.page && options?.limit ? 
+      (options.page * options.limit) < total : 
+      false;
+
+    return {
+      data: histories,
+      total,
+      hasMore
+    };
+  }
+
+  async deleteAIGenerationHistory(id: number): Promise<void> {
+    return this.delete('ai_generation_history', id);
+  }
+
+  async deleteAIGenerationHistoryByHistoryId(historyId: string): Promise<boolean> {
+    const history = await this.getAIGenerationHistoryByHistoryId(historyId);
+    if (!history || !history.id) {
+      return false;
+    }
+    await this.deleteAIGenerationHistory(history.id);
+    return true;
+  }
+
+  async deleteAIGenerationHistoryByConfigId(configId: string): Promise<number> {
+    const histories = await this.getAIGenerationHistoryByConfigId(configId);
+    let deletedCount = 0;
+
+    for (const history of histories) {
+      if (history.id) {
+        await this.deleteAIGenerationHistory(history.id);
+        deletedCount++;
+      }
+    }
+
+    return deletedCount;
+  }
+
+  async clearAIGenerationHistory(): Promise<number> {
+    const histories = await this.getAllAIGenerationHistory();
+    let deletedCount = 0;
+
+    for (const history of histories) {
+      if (history.id) {
+        await this.deleteAIGenerationHistory(history.id);
+        deletedCount++;
+      }
+    }
+
+    return deletedCount;
+  }
+
+  // 获取生成历史统计信息
+  async getAIGenerationHistoryStats(): Promise<{
+    total: number;
+    success: number;
+    error: number;
+    byConfig: Record<string, { total: number; success: number; error: number }>;
+  }> {
+    const histories = await this.getAllAIGenerationHistory();
+    
+    const stats = {
+      total: histories.length,
+      success: 0,
+      error: 0,
+      byConfig: {} as Record<string, { total: number; success: number; error: number }>
+    };
+
+    histories.forEach(history => {
+      // 统计总体状态
+      if (history.status === 'success') {
+        stats.success++;
+      } else if (history.status === 'error') {
+        stats.error++;
+      }
+
+      // 按配置ID统计
+      if (!stats.byConfig[history.configId]) {
+        stats.byConfig[history.configId] = { total: 0, success: 0, error: 0 };
+      }
+      
+      stats.byConfig[history.configId].total++;
+      if (history.status === 'success') {
+        stats.byConfig[history.configId].success++;
+      } else if (history.status === 'error') {
+        stats.byConfig[history.configId].error++;
+      }
+    });
+
+    return stats;
   }
 
   /**

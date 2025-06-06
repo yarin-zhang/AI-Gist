@@ -12,6 +12,7 @@
                             </NIcon>
                         </template>
                     </NInput>
+                    <NSelect v-model:value="sortType" :options="sortOptions" placeholder="排序方式" style="width: 160px; margin-right: 8px" />
                     <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
                             <NIcon>
@@ -163,6 +164,11 @@
                         </template>
 
                         <NFlex vertical size="small">
+                            <!-- 更新时间 -->
+                            <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
+                                {{ new Date(prompt.updatedAt).toLocaleDateString() }}
+                            </NText> -->
+                            <!-- 描述或内容预览 -->
                             <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
                             <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
                                 {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
@@ -222,7 +228,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h, watch } from 'vue'
 import {
     NCard,
     NFlex,
@@ -274,6 +280,15 @@ const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
 const selectedCategory = ref(null)
 const showFavoritesOnly = ref(false)
+
+// 排序相关状态
+const sortType = ref('timeDesc') // 默认按时间倒序排序
+const sortOptions = [
+    { label: '最新优先', value: 'timeDesc' },
+    { label: '最早优先', value: 'timeAsc' },
+    { label: '使用次数', value: 'useCount' },
+    { label: '收藏优先', value: 'favorite' }
+]
 
 // 分页相关状态
 const currentPage = ref(1)
@@ -362,7 +377,8 @@ const loadPrompts = async (reset = true) => {
             search: searchText.value || undefined,
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
-            limit: pageSize.value
+            limit: pageSize.value,
+            sortBy: sortType.value // 添加排序参数
         }
         
         const result = await api.prompts.getAll.query(filters)
@@ -410,6 +426,11 @@ const loadCategories = async () => {
 const handleSearch = () => {
     loadPrompts(true) // 重置加载
 }
+
+// 监听排序方式变化
+watch(sortType, () => {
+    loadPrompts(true) // 排序方式变化时重新加载数据
+})
 
 const handleCategoryFilter = () => {
     loadPrompts(true) // 重置加载

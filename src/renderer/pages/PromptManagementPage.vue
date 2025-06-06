@@ -26,8 +26,20 @@
                         </template>
                         分类管理
                     </NButton>
+                    <NButton @click="showAIGenerator = !showAIGenerator" :type="showAIGenerator ? 'primary' : 'default'">
+                        <template #icon>
+                            <NIcon>
+                                <Robot />
+                            </NIcon>
+                        </template>
+                        AI 生成器
+                    </NButton>
                 </NFlex>
             </NFlex>
+            
+            <!-- AI 生成器组件 -->
+            <AIGeneratorComponent v-if="showAIGenerator" @prompt-generated="handlePromptGenerated" />
+            
             <!-- 提示词列表组件 -->
             <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
                 @refresh="loadStatistics" />
@@ -53,15 +65,17 @@ import {
     NIcon,
     NCard,
     NScrollbar,
+    NEmpty,
     useMessage
 } from 'naive-ui'
-import { Plus, Folder, FileText, Heart } from '@vicons/tabler'
+import { Plus, Folder, FileText, Heart, Robot } from '@vicons/tabler'
 
 // 组件导入
 import PromptList from '@/components/prompt-management/PromptList.vue'
 import PromptEditModal from '@/components/prompt-management/PromptEditModal.vue'
 import PromptDetailModal from '@/components/prompt-management/PromptDetailModal.vue'
 import CategoryManageModal from '@/components/prompt-management/CategoryManageModal.vue'
+import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
 
 // API 导入
 import { api } from '@/lib/api'
@@ -78,6 +92,7 @@ const selectedPrompt = ref(null)
 const showEditModal = ref(false)
 const showDetailModal = ref(false)
 const showCategoryManagement = ref(false)
+const showAIGenerator = ref(false)
 
 // 统计数据
 const totalPrompts = computed(() => prompts.value.length)
@@ -142,6 +157,19 @@ const handlePromptSaved = () => {
     }
     // 同时刷新页面统计数据
     loadStatistics()
+}
+
+const handlePromptGenerated = (generatedPrompt: any) => {
+    // 当 AI 生成提示词后，自动创建新的提示词
+    selectedPrompt.value = {
+        title: generatedPrompt.title || `AI生成: ${generatedPrompt.topic}`,
+        content: generatedPrompt.content || generatedPrompt.generatedPrompt,
+        description: generatedPrompt.description || `由 AI 生成的提示词，主题：${generatedPrompt.topic}`,
+        tags: 'AI生成',
+        isFavorite: false,
+        useCount: 0
+    }
+    showEditModal.value = true
 }
 
 // 生命周期

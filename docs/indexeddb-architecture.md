@@ -118,7 +118,7 @@ await databaseService.fillPromptVariables(promptId, variables)
 
 ```vue
 <script setup>
-import { api } from '../lib/api'
+import { api } from '~/lib/api'
 
 // 获取数据
 const prompts = await api.prompts.getAll.query()

@@ -636,7 +636,9 @@ const handleSave = async () => {
 
         // 检查标题是否重复，如果重复则自动添加时间戳
         try {
-            const existingPrompts = await api.prompts.getAll.query({ search: finalTitle })
+            const response = await api.prompts.getAll.query({ search: finalTitle })
+            const existingPrompts = Array.isArray(response) ? response : (response?.data || [])
+            
             let duplicatePrompt = existingPrompts.find(p =>
                 p.title === finalTitle &&
                 (!isEdit.value || p.id !== props.prompt?.id)
@@ -669,6 +671,7 @@ const handleSave = async () => {
             }
         } catch (error) {
             console.error('检查标题重复时出错:', error)
+            // 继续执行，不因为标题检查失败而中断保存流程
         }
 
         const data = {
