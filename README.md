@@ -8,9 +8,9 @@
 
 </div>
 
-![](docs/images/image01.png?v=2)
+![](docs/images/imageMain.png?v=3)
 
-## ✨ 特点
+## 特点
 
 - **提示词模板管理**：集中管理和组织所有 AI 提示词模板
 - **变量填充**：支持在提示词中定义变量，使用时可动态填充
@@ -47,13 +47,13 @@
 
 ## 开发说明
 
-### 安装依赖 ⏬
+### 安装依赖
 
 ```bash
 yarn install
 ```
 
-### 启动开发环境 ⚒️
+### 启动开发环境
 
 ```bash
 yarn dev
@@ -72,8 +72,6 @@ yarn build:mac      # 构建 macOS 安装包
 yarn build:linux    # 构建 Linux 安装包
 ```
 
-更多配置选项请参阅 [Electron Builder CLI 文档](https://www.electron.build/cli.html)。
-
 ### 开发指南
 
 详细的开发指南请参阅 [docs](./docs) 目录：
@@ -83,6 +81,12 @@ yarn build:linux    # 构建 Linux 安装包
 
 ## 应用截图
 
-![](docs/images/image02.png?v=2)
+![](docs/images/image01.png?v=3)
 
-![](docs/images/image03.png?v=2)
+![](docs/images/image02.png?v=3)
+
+![](docs/images/image03.png?v=3)
+
+![](docs/images/image04.png?v=3)
+
+![](docs/images/image05.png?v=3)
