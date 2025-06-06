@@ -27,7 +27,8 @@
                         分类管理
                     </NButton>
                 </NFlex>
-            </NFlex> <!-- 提示词列表组件 -->
+            </NFlex>
+            <!-- 提示词列表组件 -->
             <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
                 @refresh="loadStatistics" />
         </NFlex>
@@ -51,6 +52,7 @@ import {
     NButton,
     NIcon,
     NCard,
+    NScrollbar,
     useMessage
 } from 'naive-ui'
 import { Plus, Folder, FileText, Heart } from '@vicons/tabler'
@@ -85,7 +87,8 @@ const totalCategories = computed(() => categories.value.length)
 // 方法
 const loadPrompts = async () => {
     try {
-        prompts.value = await api.prompts.getAll.query({})
+        const result = await api.prompts.getAllForTags.query()
+        prompts.value = result
     } catch (error) {
         message.error('加载 Prompts 失败')
         console.error(error)
@@ -96,7 +99,7 @@ const loadCategories = async () => {
     try {
         categories.value = await api.categories.getAll.query()
         // 同时刷新 PromptList 的分类数据
-        if (promptListRef.value) {
+        if (promptListRef.value?.loadCategories) {
             promptListRef.value.loadCategories()
         }
     } catch (error) {
@@ -107,10 +110,7 @@ const loadCategories = async () => {
 
 const loadStatistics = async () => {
     await Promise.all([loadPrompts(), loadCategories()])
-    // 同时刷新 PromptList 组件的数据
-    if (promptListRef.value) {
-        promptListRef.value.loadPrompts()
-    }
+    // 不需要在这里调用 PromptList 的方法，因为 PromptList 有自己的加载逻辑
 }
 
 const handleCreatePrompt = () => {
@@ -136,7 +136,7 @@ const handleEditFromDetail = (prompt) => {
 
 const handlePromptSaved = () => {
     // 刷新 PromptList 组件的数据
-    if (promptListRef.value) {
+    if (promptListRef.value?.loadPrompts && promptListRef.value?.loadCategories) {
         promptListRef.value.loadPrompts()
         promptListRef.value.loadCategories()
     }

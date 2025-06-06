@@ -96,6 +96,11 @@ function createApiClient() {
           return databaseService.getAllPrompts(filters);
         }
       },
+      getAllForTags: {
+        query: async () => {
+          return databaseService.getAllPromptsForTags();
+        }
+      },
       getById: {
         query: async (id: number) => {
           return databaseService.getPromptById(id);

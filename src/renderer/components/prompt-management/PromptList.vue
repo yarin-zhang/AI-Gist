@@ -117,86 +117,106 @@
                     </div>
                 </div>
             </NFlex>
-        </NCard> <!-- 提示词列表 -->
-        <div v-if="isLoading" style="text-align: center; padding: 40px;">
+        </NCard>        <!-- 提示词列表 -->
+        <div v-if="initialLoading" style="text-align: center; padding: 40px;">
             <NSpin size="large" />
         </div>
-        <div v-else-if="prompts.length === 0" style="text-align: center; padding: 40px;">
+        <div v-else-if="prompts.length === 0 && !hasNextPage" style="text-align: center; padding: 40px;">
             <NEmpty description="暂无提示词，快来创建第一个吧！" />
         </div>
 
-        <div v-else class="prompt-grid">
-            <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
-                @click="$emit('view', prompt)">
-                <template #header>
-                    <NText strong>{{ prompt.title }}</NText>
-                </template>
+        <div v-else>
+            <!-- 无限滚动容器 -->
+            <NInfiniteScroll 
+                :distance="10" 
+                @load="handleLoadMore"
+                :style="{ minHeight: '400px' }"
+            >
+                <div class="prompt-grid">
+                    <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
+                        @click="$emit('view', prompt)">
+                        <template #header>
+                            <NText strong>{{ prompt.title }}</NText>
+                        </template>
 
-                <template #header-extra>
-                    <NFlex size="small">
-                        <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
-                            :type="prompt.isFavorite ? 'error' : 'default'">
-                            <template #icon>
-                                <NIcon>
-                                    <Heart />
-                                </NIcon>
-                            </template>
-                        </NButton>
-                        <NDropdown :options="getPromptActions(prompt)"
-                            @select="(key) => handlePromptAction(key, prompt)">
-                            <NButton size="small" text @click.stop>
-                                <template #icon>
-                                    <NIcon>
-                                        <DotsVertical />
-                                    </NIcon>
-                                </template>
-                            </NButton>
-                        </NDropdown>
-                    </NFlex>
-                </template>
-
-                <NFlex vertical size="small">
-                    <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
-                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
-                        {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
-                    </NText>
-
-                </NFlex>
-
-                <template #footer>
-                    <NFlex justify="space-between" align="center">
-                        <!-- 标签区域 -->
-                        <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
-                            <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
-                                {{ prompt.variables.length }} 个变量
-                            </NTag>
-                            <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
-                                <template #icon>
-                                    <NIcon>
-                                        <Box />
-                                    </NIcon>
-                                </template>
-                                {{ prompt.category.name }}
-                            </NTag>
-                            <template v-if="prompt.tags">
-                                <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                    :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
+                        <template #header-extra>
+                            <NFlex size="small">
+                                <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
+                                    :type="prompt.isFavorite ? 'error' : 'default'">
                                     <template #icon>
                                         <NIcon>
-                                            <Tag />
+                                            <Heart />
                                         </NIcon>
                                     </template>
-                                    {{ tag }}
-                                </NTag>
-                            </template>
+                                </NButton>
+                                <NDropdown :options="getPromptActions(prompt)"
+                                    @select="(key) => handlePromptAction(key, prompt)">
+                                    <NButton size="small" text @click.stop>
+                                        <template #icon>
+                                            <NIcon>
+                                                <DotsVertical />
+                                            </NIcon>
+                                        </template>
+                                    </NButton>
+                                </NDropdown>
+                            </NFlex>
+                        </template>
+
+                        <NFlex vertical size="small">
+                            <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
+                            <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
+                                {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
+                            </NText>
+
                         </NFlex>
-                        <!-- 使用次数区域 -->
-                        <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
-                            使用 {{ prompt.useCount }} 次
-                        </NText>
-                    </NFlex>
+
+                        <template #footer>
+                            <NFlex justify="space-between" align="center">
+                                <!-- 标签区域 -->
+                                <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
+                                    <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
+                                        {{ prompt.variables.length }} 个变量
+                                    </NTag>
+                                    <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Box />
+                                            </NIcon>
+                                        </template>
+                                        {{ prompt.category.name }}
+                                    </NTag>
+                                    <template v-if="prompt.tags">
+                                        <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                                            :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
+                                            <template #icon>
+                                                <NIcon>
+                                                    <Tag />
+                                                </NIcon>
+                                            </template>
+                                            {{ tag }}
+                                        </NTag>
+                                    </template>
+                                </NFlex>
+                                <!-- 使用次数区域 -->
+                                <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
+                                    使用 {{ prompt.useCount }} 次
+                                </NText>
+                            </NFlex>
+                        </template>
+                    </NCard>
+                </div>
+
+                <!-- 加载更多状态 -->
+                <template #footer>
+                    <div v-if="loadingMore" style="text-align: center; padding: 20px;">
+                        <NSpin size="medium" />
+                        <NText depth="3" style="margin-left: 12px;">加载更多中...</NText>
+                    </div>
+                    <div v-else-if="!hasNextPage && prompts.length > 0" style="text-align: center; padding: 20px;">
+                        <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
+                    </div>
                 </template>
-            </NCard>
+            </NInfiniteScroll>
         </div>
     </div>
 </template>
@@ -215,6 +235,7 @@ import {
     NSpin,
     NEmpty,
     NDropdown,
+    NInfiniteScroll,
     useMessage
 } from 'naive-ui'
 import {
@@ -248,10 +269,17 @@ const { getTagColor, getTagsArray } = useTagColors()
 const prompts = ref([])
 const categories = ref([])
 const allPrompts = ref([]) // 保存所有提示词，用于计算热门标签
-const isLoading = ref(false)
+const initialLoading = ref(false) // 首次加载状态
+const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
 const selectedCategory = ref(null)
 const showFavoritesOnly = ref(false)
+
+// 分页相关状态
+const currentPage = ref(1)
+const pageSize = ref(12) // 每页加载12个
+const hasNextPage = ref(true)
+const totalCount = ref(0)
 
 // 高级筛选开关
 const showAdvancedFilter = ref(false)
@@ -323,26 +351,60 @@ const popularTags = computed(() => {
 })
 
 // 加载数据
-const loadPrompts = async () => {
+const loadPrompts = async (reset = true) => {
     try {
-        isLoading.value = true
+        if (reset) {
+            initialLoading.value = true
+            currentPage.value = 1
+            prompts.value = []
+        } else {
+            loadingMore.value = true
+        }
 
-        // 加载所有提示词用于计算热门标签
-        allPrompts.value = await api.prompts.getAll.query({})
+        // 加载所有提示词用于计算热门标签（仅在首次加载时）
+        if (reset) {
+            allPrompts.value = await api.prompts.getAllForTags.query()
+        }
 
-        // 根据过滤条件加载显示的提示词
+        // 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
             search: searchText.value || undefined,
-            isFavorite: showFavoritesOnly.value || undefined
+            isFavorite: showFavoritesOnly.value || undefined,
+            page: currentPage.value,
+            limit: pageSize.value
         }
-        prompts.value = await api.prompts.getAll.query(filters)
+        
+        const result = await api.prompts.getAll.query(filters)
+        
+        // 如果是重置加载，直接替换数据；否则追加数据
+        if (reset) {
+            prompts.value = result.data || []
+            totalCount.value = result.total || 0
+        } else {
+            prompts.value = [...prompts.value, ...(result.data || [])]
+        }
+        
+        // 更新分页状态
+        hasNextPage.value = result.hasMore || false
+        
     } catch (error) {
         message.error('加载提示词失败')
         console.error(error)
     } finally {
-        isLoading.value = false
+        initialLoading.value = false
+        loadingMore.value = false
     }
+}
+
+// 处理无限滚动加载更多
+const handleLoadMore = () => {
+    if (!hasNextPage.value || loadingMore.value) {
+        return Promise.resolve()
+    }
+    
+    currentPage.value++
+    return loadPrompts(false)
 }
 
 const loadCategories = async () => {
@@ -356,16 +418,16 @@ const loadCategories = async () => {
 
 // 事件处理
 const handleSearch = () => {
-    loadPrompts()
+    loadPrompts(true) // 重置加载
 }
 
 const handleCategoryFilter = () => {
-    loadPrompts()
+    loadPrompts(true) // 重置加载
 }
 
 const handleCategoryQuickFilter = (categoryId: string | null) => {
     selectedCategory.value = categoryId
-    loadPrompts()
+    loadPrompts(true) // 重置加载
 }
 
 const toggleCategoriesExpanded = () => {
@@ -378,7 +440,7 @@ const toggleTagsExpanded = () => {
 
 const toggleFavoritesFilter = () => {
     showFavoritesOnly.value = !showFavoritesOnly.value
-    loadPrompts()
+    loadPrompts(true) // 重置加载
 }
 
 const toggleAdvancedFilter = () => {
@@ -469,7 +531,7 @@ const handleDeletePrompt = async (prompt) => {
     if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
         try {
             await api.prompts.delete.mutate(prompt.id)
-            await loadPrompts()
+            await loadPrompts(true) // 重置加载
             message.success('提示词已删除')
             emit('refresh')
         } catch (error) {
@@ -487,7 +549,7 @@ defineExpose({
 
 // 组件挂载时加载数据
 onMounted(() => {
-    loadPrompts()
+    loadPrompts(true) // 初始加载
     loadCategories()
 })
 </script>
