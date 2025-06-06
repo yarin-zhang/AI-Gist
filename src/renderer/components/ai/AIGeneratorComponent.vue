@@ -155,12 +155,36 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useMessage } from 'naive-ui'
+import { 
+    NList,
+    NListItem,
+    NCard,
+    NForm,
+    NFormItem,
+    NInput,
+    NSelect,
+    NButton,
+    NIcon,
+    NTag,
+    NSpace,
+    NThing,
+    NModal,
+    NFormRules,
+    NDynamicTags,
+    NScrollbar,
+    NDropdown,
+    NMessage,
+    NFlex,
+    NText,
+    NDatePicker,
+    NEmpty,
+    useMessage 
+} from 'naive-ui'
 import { Copy, Plus, Refresh, Check, AlertCircle } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
-import type { AIConfig, AIGenerationRequest, AIGenerationResult } from '~/typings/electron'
-import type { AIGenerationHistory } from '~/lib/db'
+import type { AIConfig, AIGenerationHistory } from '~/lib/db'
+import { databaseService } from '~/lib/db'
 
 const message = useMessage()
 
@@ -168,7 +192,7 @@ const message = useMessage()
 const configs = ref<AIConfig[]>([])
 const history = ref<AIGenerationHistory[]>([])
 const selectedConfig = ref<AIConfig | null>(null)
-const generatedResult = ref<AIGenerationResult | null>(null)
+const generatedResult = ref<any | null>(null)
 const generating = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
@@ -201,14 +225,16 @@ const configOptions = computed(() => {
     .filter(config => config.enabled)
     .map(config => ({
       label: `${config.name} (${config.type})`,
-      value: config.id
+      value: config.configId // 使用 configId 而不是 id
     }))
 })
 
 const modelOptions = computed(() => {
   if (!selectedConfig.value) return []
   
-  const models = selectedConfig.value.models || []
+  const models = Array.isArray(selectedConfig.value.models) 
+    ? selectedConfig.value.models 
+    : []
   const options = models.map(model => ({ label: model, value: model }))
   
   // 添加默认模型和自定义模型
@@ -226,7 +252,7 @@ const modelOptions = computed(() => {
 // 加载 AI 配置
 const loadConfigs = async () => {
   try {
-    const result = await window.electronAPI.ai.getEnabledConfigs()
+    const result = await databaseService.getEnabledAIConfigs()
     configs.value = result
   } catch (error) {
     message.error('加载 AI 配置失败: ' + (error as Error).message)
@@ -245,7 +271,7 @@ const loadHistory = async () => {
 
 // 配置变化处理
 const onConfigChange = (configId: string) => {
-  selectedConfig.value = configs.value.find(c => c.id === configId) || null
+  selectedConfig.value = configs.value.find(c => c.configId === configId) || null
   formData.model = selectedConfig.value?.defaultModel || ''
 }
 
@@ -255,14 +281,19 @@ const generatePrompt = async () => {
     await formRef.value?.validate()
     generating.value = true
     
-    const request: AIGenerationRequest = {
+    if (!selectedConfig.value) {
+      throw new Error('请先选择 AI 配置')
+    }
+    
+    const request = {
       configId: formData.configId,
       model: formData.model || undefined,
       topic: formData.topic,
       customPrompt: formData.customPrompt || undefined
     }
     
-    const result = await window.electronAPI.ai.generatePrompt(request)
+    // 传递配置对象给主进程
+    const result = await window.electronAPI.ai.generatePrompt(request, selectedConfig.value)
     generatedResult.value = result
     
     // 保存到历史记录
@@ -361,7 +392,7 @@ const copyHistoryItem = async (item: AIGenerationHistory) => {
 
 // 获取配置名称
 const getConfigName = (configId: string) => {
-  const config = configs.value.find(c => c.id === configId)
+  const config = configs.value.find(c => c.configId === configId)
   return config ? config.name : '未知配置'
 }
 

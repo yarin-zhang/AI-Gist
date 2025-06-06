@@ -23,13 +23,13 @@
             <div class="config-actions">
               <n-switch 
                 v-model:value="config.enabled" 
-                @update:value="(value) => toggleConfig(config.id, value)"
+                @update:value="(value) => toggleConfig(config.id!, value)"
               />
               <n-button size="small" @click="editConfig(config)">编辑</n-button>
-              <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(config.id)">
+              <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(String(config.id!))">
                 测试连接
               </n-button>
-              <n-button size="small" type="error" @click="deleteConfig(config.id)">删除</n-button>
+              <n-button size="small" type="error" @click="deleteConfig(config.id!)">删除</n-button>
             </div>
           </div>
         </template>
@@ -130,7 +130,8 @@ import {
     useMessage 
 } from 'naive-ui'
 import { Plus } from '@vicons/tabler'
-import type { AIConfig } from '~/typings/electron'
+import type { AIConfig } from '~/lib/db'
+import { databaseService } from '~/lib/db'
 
 const message = useMessage()
 
@@ -139,7 +140,7 @@ const configs = ref<AIConfig[]>([])
 const showAddModal = ref(false)
 const editingConfig = ref<AIConfig | null>(null)
 const saving = ref(false)
-const testingConfigs = ref(new Set<string>())
+const testingConfigs = ref(new Set<number>())
 
 // 表单数据
 const formData = reactive({
@@ -190,7 +191,7 @@ const formRef = ref()
 // 加载配置列表
 const loadConfigs = async () => {
   try {
-    const result = await window.electronAPI.ai.getConfigs()
+    const result = await databaseService.getAllAIConfigs()
     configs.value = result
   } catch (error) {
     message.error('加载配置失败: ' + (error as Error).message)
@@ -203,25 +204,33 @@ const saveConfig = async () => {
     await formRef.value?.validate()
     saving.value = true
     
-    const configData: AIConfig = {
-      id: editingConfig.value?.id || `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: formData.name,
-      type: formData.type,
-      baseURL: formData.baseURL,
-      apiKey: formData.apiKey || undefined,
-      models: formData.models,
-      defaultModel: formData.defaultModel || undefined,
-      customModel: formData.customModel || undefined,
-      enabled: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-    
     if (editingConfig.value) {
-      await window.electronAPI.ai.updateConfig(editingConfig.value.id, configData)
+      // 更新配置
+      const updateData = {
+        name: formData.name,
+        type: formData.type,
+        baseURL: formData.baseURL,
+        apiKey: formData.apiKey || undefined,
+        models: [...formData.models], // 创建新数组确保可序列化
+        defaultModel: formData.defaultModel || undefined,
+        customModel: formData.customModel || undefined,
+      }
+      await databaseService.updateAIConfig(editingConfig.value.id!, updateData)
       message.success('配置更新成功')
     } else {
-      await window.electronAPI.ai.addConfig(configData)
+      // 添加新配置
+      const configData = {
+        configId: `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: formData.name,
+        type: formData.type,
+        baseURL: formData.baseURL,
+        apiKey: formData.apiKey || undefined,
+        models: [...formData.models], // 创建新数组确保可序列化
+        defaultModel: formData.defaultModel || undefined,
+        customModel: formData.customModel || undefined,
+        enabled: true,
+      }
+      await databaseService.createAIConfig(configData)
       message.success('配置添加成功')
     }
     
@@ -241,16 +250,16 @@ const editConfig = (config: AIConfig) => {
   formData.type = config.type
   formData.baseURL = config.baseURL
   formData.apiKey = config.apiKey || ''
-  formData.models = config.models || []
+  formData.models = Array.isArray(config.models) ? config.models : []
   formData.defaultModel = config.defaultModel || ''
   formData.customModel = config.customModel || ''
   showAddModal.value = true
 }
 
 // 删除配置
-const deleteConfig = async (id: string) => {
+const deleteConfig = async (id: number) => {
   try {
-    await window.electronAPI.ai.removeConfig(id)
+    await databaseService.deleteAIConfig(id)
     message.success('配置删除成功')
     loadConfigs()
   } catch (error) {
@@ -259,9 +268,9 @@ const deleteConfig = async (id: string) => {
 }
 
 // 切换配置状态
-const toggleConfig = async (id: string, enabled: boolean) => {
+const toggleConfig = async (id: number, enabled: boolean) => {
   try {
-    await window.electronAPI.ai.updateConfig(id, { enabled })
+    await databaseService.updateAIConfig(id, { enabled })
     message.success(enabled ? '配置已启用' : '配置已禁用')
   } catch (error) {
     message.error('更新失败: ' + (error as Error).message)
@@ -270,6 +279,8 @@ const toggleConfig = async (id: string, enabled: boolean) => {
 
 // 测试配置
 const testConfig = async (config: AIConfig) => {
+  if (!config.id) return
+  
   testingConfigs.value.add(config.id)
   try {
     const result = await window.electronAPI.ai.testConfig(config)

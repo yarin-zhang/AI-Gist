@@ -41,6 +41,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
-    generatePrompt: (request: any) => ipcRenderer.invoke('ai:generate-prompt', request),
+    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
   }
 });

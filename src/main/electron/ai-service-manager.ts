@@ -1,68 +1,34 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { Ollama } from '@langchain/ollama';
-import { AIConfig, AIGenerationRequest, AIGenerationResult, AIGenerationHistory } from './types';
+import { AIGenerationRequest, AIGenerationResult } from './types';
+
+// 定义配置接口，适配前端数据库的结构
+interface ProcessedAIConfig {
+  id?: number;
+  configId: string;
+  name: string;
+  type: 'openai' | 'ollama';
+  baseURL: string;
+  apiKey?: string;
+  secretKey?: string;
+  models: string[];
+  defaultModel?: string;
+  customModel?: string;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * AI 服务管理器
+ * 不再维护内存中的配置存储，而是直接处理传入的配置
  */
 class AIServiceManager {
-  private configs: Map<string, AIConfig> = new Map();
-
-  /**
-   * 添加 AI 配置
-   */
-  addConfig(config: AIConfig): void {
-    this.configs.set(config.id, config);
-  }
-
-  /**
-   * 更新 AI 配置
-   */
-  updateConfig(id: string, config: Partial<AIConfig>): AIConfig | null {
-    const existingConfig = this.configs.get(id);
-    if (!existingConfig) return null;
-
-    const updatedConfig = {
-      ...existingConfig,
-      ...config,
-      updatedAt: new Date()
-    };
-    this.configs.set(id, updatedConfig);
-    return updatedConfig;
-  }
-
-  /**
-   * 删除 AI 配置
-   */
-  removeConfig(id: string): boolean {
-    return this.configs.delete(id);
-  }
-
-  /**
-   * 获取所有配置
-   */
-  getAllConfigs(): AIConfig[] {
-    return Array.from(this.configs.values());
-  }
-
-  /**
-   * 获取启用的配置
-   */
-  getEnabledConfigs(): AIConfig[] {
-    return this.getAllConfigs().filter(config => config.enabled);
-  }
-
-  /**
-   * 根据 ID 获取配置
-   */
-  getConfig(id: string): AIConfig | null {
-    return this.configs.get(id) || null;
-  }
 
   /**
    * 测试配置连接
    */
-  async testConfig(config: AIConfig): Promise<{ success: boolean; error?: string; models?: string[] }> {
+  async testConfig(config: ProcessedAIConfig): Promise<{ success: boolean; error?: string; models?: string[] }> {
     try {
       if (config.type === 'openai') {
         const llm = new ChatOpenAI({
@@ -72,9 +38,8 @@ class AIServiceManager {
           }
         });
 
-        // 尝试获取模型列表（如果支持）
+        // 尝试发送一个简单的测试请求
         try {
-          // 简单测试：发送一个小的请求
           await llm.invoke('test');
           return { success: true };
         } catch (error: any) {
@@ -88,11 +53,6 @@ class AIServiceManager {
           return { success: true };
         }
       } else if (config.type === 'ollama') {
-        const llm = new Ollama({
-          baseUrl: config.baseURL,
-          model: config.defaultModel || 'llama2'
-        });
-
         try {
           // 尝试获取模型列表
           const response = await fetch(`${config.baseURL}/api/tags`);
@@ -120,7 +80,7 @@ class AIServiceManager {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: ProcessedAIConfig): Promise<string[]> {
     try {
       if (config.type === 'ollama') {
         const response = await fetch(`${config.baseURL}/api/tags`);
@@ -141,9 +101,11 @@ class AIServiceManager {
 
   /**
    * 生成 Prompt
+   * 现在需要传入配置，因为不再有内存中的配置存储
    */
-  async generatePrompt(request: AIGenerationRequest): Promise<AIGenerationResult> {
-    const config = this.getConfig(request.configId);
+  async generatePrompt(request: AIGenerationRequest & { config: ProcessedAIConfig }): Promise<AIGenerationResult> {
+    const { config } = request;
+    
     if (!config) {
       throw new Error('配置不存在');
     }
@@ -209,7 +171,7 @@ class AIServiceManager {
 
       const result: AIGenerationResult = {
         id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        configId: request.configId,
+        configId: config.configId, // 使用 configId 而不是 id
         topic: request.topic,
         generatedPrompt: generatedPrompt,
         model: model,

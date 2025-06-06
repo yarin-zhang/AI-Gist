@@ -65,7 +65,7 @@ export interface AIConfig {
   baseURL: string;
   apiKey?: string;
   secretKey?: string;
-  models: string;
+  models: string[]; // 修改为 string[]
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
@@ -196,8 +196,12 @@ class DatabaseService {
       const store = transaction.objectStore(storeName);
       
       const now = new Date();
+      
+      // 深度克隆数据以确保可序列化
+      const cleanData = this.cleanDataForStorage(data);
+      
       const dataWithTimestamps = {
-        ...data,
+        ...cleanData,
         createdAt: now,
         updatedAt: now,
       };
@@ -209,9 +213,37 @@ class DatabaseService {
       };
 
       request.onerror = () => {
-        reject(new Error(`Failed to add to ${storeName}`));
+        console.error('IndexedDB add error:', request.error);
+        reject(new Error(`Failed to add to ${storeName}: ${request.error?.message || 'Unknown error'}`));
       };
     });
+  }
+
+  /**
+   * 清理数据以确保可序列化
+   */
+  private cleanDataForStorage(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => this.cleanDataForStorage(item));
+    }
+    
+    if (data instanceof Date) {
+      return data;
+    }
+    
+    if (typeof data === 'object') {
+      const cleanedObj: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        cleanedObj[key] = this.cleanDataForStorage(value);
+      }
+      return cleanedObj;
+    }
+    
+    return data;
   }
 
   /**
@@ -273,9 +305,12 @@ class DatabaseService {
           return;
         }
 
+        // 清理更新数据以确保可序列化
+        const cleanUpdates = this.cleanDataForStorage(updates);
+
         const updatedData = {
           ...existingData,
-          ...updates,
+          ...cleanUpdates,
           updatedAt: new Date(),
         };
 
@@ -286,7 +321,8 @@ class DatabaseService {
         };
 
         putRequest.onerror = () => {
-          reject(new Error(`Failed to update in ${storeName}`));
+          console.error('IndexedDB update error:', putRequest.error);
+          reject(new Error(`Failed to update in ${storeName}: ${putRequest.error?.message || 'Unknown error'}`));
         };
       };
 

@@ -106,45 +106,70 @@ class IpcHandlers {
    * 设置 AI 服务处理器
    */
   private setupAIHandlers() {
-    // 获取所有 AI 配置
-    ipcMain.handle('ai:get-configs', () => {
-      return aiServiceManager.getAllConfigs();
+    // 获取所有 AI 配置 - 由前端数据库处理
+    ipcMain.handle('ai:get-configs', async () => {
+      // 这里应该从前端数据库读取，暂时返回空数组
+      return [];
     });
 
-    // 获取启用的 AI 配置
-    ipcMain.handle('ai:get-enabled-configs', () => {
-      return aiServiceManager.getEnabledConfigs();
+    // 获取启用的 AI 配置 - 由前端数据库处理
+    ipcMain.handle('ai:get-enabled-configs', async () => {
+      // 这里应该从前端数据库读取，暂时返回空数组
+      return [];
     });
 
-    // 添加 AI 配置
-    ipcMain.handle('ai:add-config', (_, config: AIConfig) => {
-      aiServiceManager.addConfig(config);
-      return config;
+    // 添加 AI 配置 - 返回配置数据，实际存储由前端处理
+    ipcMain.handle('ai:add-config', (_, config: any) => {
+      // 确保日期字段正确处理
+      const processedConfig = {
+        ...config,
+        createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
+        updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
+      };
+      return processedConfig;
     });
 
-    // 更新 AI 配置
-    ipcMain.handle('ai:update-config', (_, id: string, config: Partial<AIConfig>) => {
-      return aiServiceManager.updateConfig(id, config);
+    // 更新 AI 配置 - 返回配置数据，实际存储由前端处理
+    ipcMain.handle('ai:update-config', (_, id: string, config: any) => {
+      // 确保日期字段正确处理
+      const processedConfig = {
+        ...config,
+        updatedAt: new Date()
+      };
+      return processedConfig;
     });
 
-    // 删除 AI 配置
+    // 删除 AI 配置 - 返回成功标志，实际删除由前端处理
     ipcMain.handle('ai:remove-config', (_, id: string) => {
-      return aiServiceManager.removeConfig(id);
+      return true;
     });
 
     // 测试 AI 配置
-    ipcMain.handle('ai:test-config', async (_, config: AIConfig) => {
+    ipcMain.handle('ai:test-config', async (_, config: any) => {
       return await aiServiceManager.testConfig(config);
     });
 
     // 获取可用模型列表
-    ipcMain.handle('ai:get-models', async (_, config: AIConfig) => {
+    ipcMain.handle('ai:get-models', async (_, config: any) => {
       return await aiServiceManager.getAvailableModels(config);
     });
 
     // 生成 Prompt
-    ipcMain.handle('ai:generate-prompt', async (_, request: AIGenerationRequest) => {
-      return await aiServiceManager.generatePrompt(request);
+    ipcMain.handle('ai:generate-prompt', async (_, request: AIGenerationRequest, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      const requestWithConfig = {
+        ...request,
+        config: processedConfig
+      };
+      
+      return await aiServiceManager.generatePrompt(requestWithConfig);
     });
   }
 

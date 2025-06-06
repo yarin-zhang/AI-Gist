@@ -4,7 +4,8 @@
 
 // AI 相关类型定义
 export interface AIConfig {
-  id: string;
+  id?: number;
+  configId: string; // 唯一标识符
   name: string;
   type: 'openai' | 'ollama';
   baseURL: string;
@@ -79,7 +80,7 @@ export default interface ElectronApi {
     removeConfig: (id: string) => Promise<boolean>
     testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
     getModels: (config: AIConfig) => Promise<string[]>
-    generatePrompt: (request: AIGenerationRequest) => Promise<AIGenerationResult>
+    generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
   }
 }
 

@@ -29,7 +29,8 @@ export interface ThemeInfo {
  * AI 配置相关类型定义
  */
 export interface AIConfig {
-  id: string;
+  id?: number;
+  configId: string; // 唯一标识符
   name: string;
   type: 'openai' | 'ollama';
   baseURL: string;

@@ -65,6 +65,7 @@ import {
     NIcon,
     NCard,
     NScrollbar,
+    NEmpty,
     useMessage
 } from 'naive-ui'
 import { Plus, Folder, FileText, Heart, Robot } from '@vicons/tabler'
