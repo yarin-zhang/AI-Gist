@@ -416,11 +416,20 @@ class DatabaseService {
 
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        filteredPrompts = filteredPrompts.filter(p => 
-          p.title.toLowerCase().includes(searchLower) ||
-          (p.description && p.description.toLowerCase().includes(searchLower)) ||
-          p.content.toLowerCase().includes(searchLower)
-        );
+        filteredPrompts = filteredPrompts.filter(p => {
+          // 搜索标题、描述、内容
+          const matchesBasicFields = 
+            p.title.toLowerCase().includes(searchLower) ||
+            (p.description && p.description.toLowerCase().includes(searchLower)) ||
+            p.content.toLowerCase().includes(searchLower);
+          
+          // 搜索标签
+          const matchesTags = p.tags && 
+            p.tags.toLowerCase().split(',')
+              .some(tag => tag.trim().includes(searchLower));
+          
+          return matchesBasicFields || matchesTags;
+        });
       }
 
       if (filters.tags) {

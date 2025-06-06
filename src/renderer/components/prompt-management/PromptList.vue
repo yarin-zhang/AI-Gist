@@ -4,7 +4,7 @@
         <NCard>
             <NFlex vertical size="small">
                 <NFlex>
-                    <NInput v-model:value="searchText" placeholder="搜索提示词..." style="flex: 1" @input="handleSearch">
+                    <NInput v-model:value="searchText" placeholder="搜索提示词" style="flex: 1" @input="handleSearch" clearable>
                         <template #prefix>
                             <NIcon>
                                 <Search />
@@ -22,6 +22,38 @@
                         收藏
                     </NButton>
                 </NFlex>
+                <!-- 搜索提示信息 -->
+                <div v-if="searchText.trim()" style="padding: 8px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
+                    <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
+                        <Search />
+                    </NIcon>
+                    正在搜索: 包含 "{{ searchText.trim() }}" 的提示词
+                    <span v-if="!isLoading" style="margin-left: 8px; color: var(--n-color-primary);">
+                        (找到 {{ prompts.length }} 个结果)
+                    </span>
+                </div>
+                <!-- 热门标签快捷搜索 -->
+                <div v-if="!searchText.trim() && popularTags.length > 0" style="padding: 8px 0;">
+                    <NFlex size="small" wrap>
+                        <NTag 
+                            v-for="tag in popularTags.slice(0, 8)" 
+                            :key="tag.name" 
+                            size="small" 
+                            :bordered="false"
+                            clickable
+                            :color="getTagColor(tag.name)"
+                            @click="handleTagQuickSearch(tag.name)"
+                            style="cursor: pointer;"
+                        >
+                            <template #icon>
+                                <NIcon>
+                                    <Tag />
+                                </NIcon>
+                            </template>
+                            {{ tag.name }} ({{ tag.count }})
+                        </NTag>
+                    </NFlex>
+                </div>
             </NFlex>
         </NCard> <!-- 提示词列表 -->
         <div v-if="isLoading" style="text-align: center; padding: 40px;">
@@ -87,7 +119,7 @@
                             </NTag>
                             <template v-if="prompt.tags">
                                 <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                    :color="getTagColor(tag)">
+                                    :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
                                     <template #icon>
                                         <NIcon>
                                             <Tag />
@@ -152,6 +184,7 @@ const { getTagColor, getTagsArray } = useTagColors()
 // 响应式数据
 const prompts = ref([])
 const categories = ref([])
+const allPrompts = ref([]) // 保存所有提示词，用于计算热门标签
 const isLoading = ref(false)
 const searchText = ref('')
 const selectedCategory = ref(null)
@@ -166,10 +199,36 @@ const categoryOptions = computed(() => [
     }))
 ])
 
+// 计算热门标签
+const popularTags = computed(() => {
+    const tagCounts = new Map()
+    
+    allPrompts.value.forEach(prompt => {
+        if (prompt.tags) {
+            const tags = getTagsArray(prompt.tags)
+            tags.forEach(tag => {
+                const trimmedTag = tag.trim()
+                if (trimmedTag) {
+                    tagCounts.set(trimmedTag, (tagCounts.get(trimmedTag) || 0) + 1)
+                }
+            })
+        }
+    })
+    
+    return Array.from(tagCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+})
+
 // 加载数据
 const loadPrompts = async () => {
     try {
         isLoading.value = true
+        
+        // 加载所有提示词用于计算热门标签
+        allPrompts.value = await api.prompts.getAll.query({})
+        
+        // 根据过滤条件加载显示的提示词
         const filters = {
             categoryId: selectedCategory.value || undefined,
             search: searchText.value || undefined,
@@ -227,6 +286,18 @@ const toggleFavorite = async (promptId) => {
         message.error('更新收藏状态失败')
         console.error(error)
     }
+}
+
+// 检查标签是否匹配搜索关键词
+const isTagMatched = (tag: string) => {
+    if (!searchText.value.trim()) return false
+    return tag.toLowerCase().includes(searchText.value.toLowerCase())
+}
+
+// 快速标签搜索
+const handleTagQuickSearch = (tagName: string) => {
+    searchText.value = tagName
+    handleSearch()
 }
 
 const getPromptActions = (prompt) => [
@@ -319,5 +390,19 @@ onMounted(() => {
 .prompt-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 高亮匹配的标签 */
+.highlighted-tag {
+    animation: pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        box-shadow: 0 0 5px rgba(24, 160, 88, 0.5);
+    }
+    to {
+        box-shadow: 0 0 15px rgba(24, 160, 88, 0.8);
+    }
 }
 </style>
