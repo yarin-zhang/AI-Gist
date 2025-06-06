@@ -52,14 +52,14 @@ export function useWindowSize() {
     }
   })
 
-  // 计算模态框最大高度（窗口高度的 90%，最小 600px）
+  // 计算模态框最大高度（窗口高度的 100%，最小 600px）
   const modalMaxHeight = computed(() => {
-    return Math.max(contentSize.value.height * 0.9, 600)
+    return Math.max(contentSize.value.height * 1, 600)
   })
 
-  // 计算模态框宽度（窗口宽度的 85%，最小 800px，最大 1200px）
+  // 计算模态框宽度（窗口宽度的 100%，最小 800px）
   const modalWidth = computed(() => {
-    return Math.min(Math.max(contentSize.value.width * 0.85, 800), 1200)
+    return Math.max(contentSize.value.width * 1, 800)
   })
 
   return {

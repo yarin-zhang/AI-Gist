@@ -1,16 +1,11 @@
 <template>
-    <NModal 
-        :show="show" 
-        @update:show="$emit('update:show', $event)" 
-        :title="prompt?.title" 
-        :style="{ 
-            width: `${modalWidth}px`, 
-            height: `${modalHeight}px`
-        }"
-    >
+    <NModal :show="show" @update:show="$emit('update:show', $event)" :title="prompt?.title" :style="{
+        width: `${modalWidth}px`,
+        height: `${modalHeight}px`
+    }">
         <NLayout v-if="prompt" position="absolute">
             <!-- 顶部固定区域 -->
-            <NLayoutHeader :height="180" bordered>
+            <NLayoutHeader :height="headerHeight" bordered>
                 <NFlex vertical size="medium" style="padding: 16px;">
                     <NFlex justify="space-between" align="center">
                         <NFlex align="center">
@@ -61,83 +56,88 @@
                 <NLayout v-show="!showHistoryPage" has-sider>
                     <!-- 左侧：变量输入区 -->
                     <NLayoutSider :width="siderWidth" content-style="padding-right: 8px;">
-                        <NCard size="small">
-                            <template #header>
-                                <NFlex justify="space-between" align="center">
-                                    <NText strong>变量设置</NText>
-                                    <NButton v-if="prompt.variables && prompt.variables.length > 0" 
-                                        size="small" @click="clearVariables">清空</NButton>
-                                </NFlex>
-                            </template>
+                        <NFlex>
+                            <NCard size="small">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center">
+                                        <NText strong>变量设置</NText>
+                                        <NButton v-if="prompt.variables && prompt.variables.length > 0" size="small"
+                                            @click="clearVariables">清空</NButton>
+                                    </NFlex>
+                                </template>
 
-                            <NScrollbar :style="{ height: `${modalHeight - 300}px` }">
-                                <NFlex vertical size="medium" style="padding-right: 12px;" v-if="prompt.variables && prompt.variables.length > 0">
-                                    <NFormItem v-for="variable in prompt.variables" :key="variable.id"
-                                        :label="variable.label" :required="variable.required">
-                                        <NInput v-if="variable.type === 'text'"
-                                            v-model:value="variableValues[variable.name]" type="textarea"
-                                            :placeholder="variable.placeholder || `请输入${variable.label}`" :rows="1"
-                                            :autosize="{ minRows: 1, maxRows: 5 }" />
-                                        <NSelect v-else-if="variable.type === 'select'"
-                                            v-model:value="variableValues[variable.name]"
-                                            :options="getSelectOptions(variable.options)"
-                                            :placeholder="variable.placeholder || `请选择${variable.label}`" />
-                                    </NFormItem>
-                                </NFlex>
-                                <NEmpty v-else description="此提示词没有可配置的变量">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Wand />
-                                        </NIcon>
-                                    </template>
-                                </NEmpty>
-                            </NScrollbar>
-                        </NCard>
+                                <NScrollbar :style="{ height: `${contentHeight}px` }">
+                                    <NFlex vertical size="medium" style="padding-right: 12px;"
+                                        v-if="prompt.variables && prompt.variables.length > 0">
+                                        <NFormItem v-for="variable in prompt.variables" :key="variable.id"
+                                            :label="variable.label" :required="variable.required">
+                                            <NInput v-if="variable.type === 'text'"
+                                                v-model:value="variableValues[variable.name]" type="textarea"
+                                                :placeholder="variable.placeholder || `请输入${variable.label}`" :rows="1"
+                                                :autosize="{ minRows: 1, maxRows: 5 }" />
+                                            <NSelect v-else-if="variable.type === 'select'"
+                                                v-model:value="variableValues[variable.name]"
+                                                :options="getSelectOptions(variable.options)"
+                                                :placeholder="variable.placeholder || `请选择${variable.label}`" />
+                                        </NFormItem>
+                                    </NFlex>
+                                    <NEmpty v-else description="此提示词没有可配置的变量">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Wand />
+                                            </NIcon>
+                                        </template>
+                                    </NEmpty>
+                                </NScrollbar>
+                            </NCard>
+                        </NFlex>
                     </NLayoutSider>
 
                     <!-- 右侧：结果预览区 -->
                     <NLayoutContent content-style="padding-left: 8px;">
-                        <NCard size="small">
-                            <template #header>
-                                <NFlex justify="space-between" align="center">
-                                    <NText strong>提示词内容</NText>
-                                    <NFlex>
-                                        <NButton size="small" @click="copyToClipboard(filledContent)">
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Copy />
-                                                </NIcon>
-                                            </template>
-                                            复制内容
-                                        </NButton>
-                                        <NButton size="small" type="primary" @click="usePrompt">
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Check />
-                                                </NIcon>
-                                            </template>
-                                            使用此提示词
-                                        </NButton>
+                        <NFlex>
+                            <NCard size="small">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center">
+                                        <NText strong>提示词内容</NText>
+                                        <NFlex>
+                                            <NButton size="small" @click="copyToClipboard(filledContent)">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Copy />
+                                                    </NIcon>
+                                                </template>
+                                                复制内容
+                                            </NButton>
+                                            <NButton size="small" type="primary" @click="usePrompt">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Check />
+                                                    </NIcon>
+                                                </template>
+                                                使用此提示词
+                                            </NButton>
+                                        </NFlex>
                                     </NFlex>
-                                </NFlex>
-                            </template>
+                                </template>
 
-                            <NScrollbar :style="{ height: `${modalHeight - 300}px` }">
-                                <NFlex vertical size="medium" style="padding-right: 12px;">
-                                    <NInput :value="filledContent" type="textarea" readonly
-                                        :style="{ height: `${modalHeight - 350}px`, fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                        :placeholder="!filledContent ? '内容为空' : ''" />
+                                <NScrollbar :style="{ height: `${contentHeight}px` }">
+                                    <NFlex vertical size="medium" style="padding-right: 12px;">
+                                        <NInput :value="filledContent" type="textarea" readonly
+                                            :style="{ height: `${contentHeight - 50}px`, fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
+                                            :placeholder="!filledContent ? '内容为空' : ''" />
 
-                                    <!-- 如果有未填写的变量，显示提示 -->
-                                    <NFlex v-if="hasUnfilledVariables" align="center">
-                                        <NIcon color="#fa8c16">
-                                            <Wand />
-                                        </NIcon>
-                                        <NText>检测到未填写的变量，请在左侧填写以生成完整的提示词</NText>
+                                        <!-- 如果有未填写的变量，显示提示 -->
+                                        <NFlex v-if="hasUnfilledVariables" align="center">
+                                            <NIcon color="#fa8c16">
+                                                <Wand />
+                                            </NIcon>
+                                            <NText>检测到未填写的变量，请在左侧填写以生成完整的提示词</NText>
+                                        </NFlex>
                                     </NFlex>
-                                </NFlex>
-                            </NScrollbar>
-                        </NCard>
+                                </NScrollbar>
+                            </NCard>
+                        </NFlex>
                     </NLayoutContent>
                 </NLayout>
 
@@ -153,17 +153,18 @@
                                 </NFlex>
                             </template>
 
-                            <template #footer v-if="useHistory.length > pageSize">
+                            <template #footer >
                                 <NFlex justify="center">
-                                    <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
-                                         size="small" show-quick-jumper show-size-picker
-                                        :page-sizes="[1, 3, 5, 10, 20]" 
-                                        :page-slot="7" @update:page-size="handlePageSizeChange" />
+                                    <NPagination v-model:page="currentPage" :page-count="totalPages"
+                                        :page-size="pageSize" size="small" show-quick-jumper show-size-picker
+                                        :page-sizes="[1, 3, 5, 10, 20]" :page-slot="7"
+                                        @update:page-size="handlePageSizeChange" />
                                 </NFlex>
                             </template>
 
-                            <NScrollbar :style="{ height: `${modalHeight - 360}px` }">
-                                <NFlex vertical size="medium" style="padding-right: 12px;" v-if="paginatedHistory.length > 0">
+                            <NScrollbar :style="{ height: `${contentHeight - 60}px` }">
+                                <NFlex vertical size="medium" style="padding-right: 12px;"
+                                    v-if="paginatedHistory.length > 0">
                                     <NCard v-for="(record, index) in paginatedHistory"
                                         :key="(currentPage - 1) * pageSize + index" size="small" hoverable>
                                         <template #header>
@@ -183,12 +184,15 @@
                                         </template>
 
                                         <NFlex vertical size="small">
-                                            <NText>{{ record.content.substring(0, 120) }}{{ record.content.length > 120 ? '...' : '' }}</NText>
-                                            
-                                            <NFlex v-if="record.variables && Object.keys(record.variables).length > 0" size="small">
+                                            <NText>{{ record.content.substring(0, 120) }}{{ record.content.length > 120
+                                                ? '...' : ''
+                                            }}</NText>
+
+                                            <NFlex v-if="record.variables && Object.keys(record.variables).length > 0"
+                                                size="small">
                                                 <NText depth="3">包含变量：</NText>
-                                                <NTag v-for="key in Object.keys(record.variables).slice(0, 3)" :key="key"
-                                                    size="small" type="primary" :bordered="false">
+                                                <NTag v-for="key in Object.keys(record.variables).slice(0, 3)"
+                                                    :key="key" size="small" type="primary" :bordered="false">
                                                     {{ key }}
                                                 </NTag>
                                                 <NText v-if="Object.keys(record.variables).length > 3" depth="3">
@@ -217,13 +221,15 @@
                                 <NText strong>历史记录预览</NText>
                             </template>
 
-                            <NScrollbar :style="{ height: `${modalHeight - 300}px` }">
+                            <NScrollbar :style="{ height: `${contentHeight}px` }">
                                 <NFlex vertical size="medium" style="padding-right: 12px;" v-if="selectedHistory">
                                     <!-- 变量信息 -->
-                                    <div v-if="selectedHistory.variables && Object.keys(selectedHistory.variables).length > 0">
+                                    <div
+                                        v-if="selectedHistory.variables && Object.keys(selectedHistory.variables).length > 0">
                                         <NText strong>包含变量：</NText>
                                         <NFlex vertical size="small">
-                                            <NFlex v-for="(value, key) in selectedHistory.variables" :key="key" align="center" size="small">
+                                            <NFlex v-for="(value, key) in selectedHistory.variables" :key="key"
+                                                align="center" size="small">
                                                 <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
                                                 <NInput :value="value" readonly size="small" />
                                             </NFlex>
@@ -276,9 +282,9 @@
             </NLayoutContent>
 
             <!-- 底部固定区域 -->
-            <NLayoutFooter :height="60" bordered>
-                <NFlex justify="space-between" align="center" style="padding: 0 16px; height: 100%;">
-                    <div>
+            <NLayoutFooter :height="footerHeight" bordered>
+                <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
+                    <NFlex>
                         <!-- 历史记录按钮（主页面左下角） -->
                         <NButton v-show="!showHistoryPage" @click="showHistoryPage = true"
                             :disabled="useHistory.length === 0">
@@ -299,9 +305,11 @@
                             </template>
                             返回
                         </NButton>
-                    </div>
+                    </NFlex>
 
-                    <NButton @click="handleClose">关闭</NButton>
+                    <NFlex>
+                        <NButton @click="handleClose">关闭</NButton>
+                    </NFlex>
                 </NFlex>
             </NLayoutFooter>
         </NLayout>
@@ -358,15 +366,24 @@ const message = useMessage()
 const { getTagColor, getTagsArray } = useTagColors()
 
 // 使用窗口尺寸 composable
-const { modalMaxHeight, modalWidth } = useWindowSize()
+const { modalMaxHeight, modalWidth, contentSize } = useWindowSize()
 
-// 响应式布局计算
+// 布局高度常量
+const headerHeight = 180
+const footerHeight = 60
+
+// 响应式布局计算 - 使用 composable 中的响应式值
 const modalHeight = computed(() => {
-  return Math.min(modalMaxHeight.value, Math.max(600, modalMaxHeight.value * 0.9))
+    return modalMaxHeight.value
+})
+
+// 中间内容区域高度
+const contentHeight = computed(() => {
+    return modalHeight.value - headerHeight - footerHeight
 })
 
 const siderWidth = computed(() => {
-  return modalWidth.value > 1000 ? '40%' : '45%'
+    return modalWidth.value > 1000 ? '40%' : '45%'
 })
 
 // 响应式数据
