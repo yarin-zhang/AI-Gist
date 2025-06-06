@@ -30,7 +30,11 @@
     "vite": "^4.5.0"
   },
   "dependencies": {
+    "@langchain/core": "^0.3.57",
+    "@langchain/ollama": "^0.2.1",
+    "@langchain/openai": "^0.5.12",
     "@vicons/tabler": "^0.13.0",
+    "langchain": "^0.3.27",
     "naive-ui": "^2.41.0",
     "vue": "^3.3.8",
     "zod": "^3.25.40"

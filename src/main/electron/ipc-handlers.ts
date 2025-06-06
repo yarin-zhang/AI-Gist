@@ -2,7 +2,8 @@ import { ipcMain } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
-import { UserPreferences, SystemTheme } from './types';
+import { aiServiceManager } from './ai-service-manager';
+import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from './types';
 
 /**
  * IPC 处理器管理器
@@ -16,6 +17,7 @@ class IpcHandlers {
     this.setupPreferencesHandlers();
     this.setupWindowHandlers();
     this.setupThemeHandlers();
+    this.setupAIHandlers();
   }
 
   /**
@@ -101,6 +103,52 @@ class IpcHandlers {
   }
 
   /**
+   * 设置 AI 服务处理器
+   */
+  private setupAIHandlers() {
+    // 获取所有 AI 配置
+    ipcMain.handle('ai:get-configs', () => {
+      return aiServiceManager.getAllConfigs();
+    });
+
+    // 获取启用的 AI 配置
+    ipcMain.handle('ai:get-enabled-configs', () => {
+      return aiServiceManager.getEnabledConfigs();
+    });
+
+    // 添加 AI 配置
+    ipcMain.handle('ai:add-config', (_, config: AIConfig) => {
+      aiServiceManager.addConfig(config);
+      return config;
+    });
+
+    // 更新 AI 配置
+    ipcMain.handle('ai:update-config', (_, id: string, config: Partial<AIConfig>) => {
+      return aiServiceManager.updateConfig(id, config);
+    });
+
+    // 删除 AI 配置
+    ipcMain.handle('ai:remove-config', (_, id: string) => {
+      return aiServiceManager.removeConfig(id);
+    });
+
+    // 测试 AI 配置
+    ipcMain.handle('ai:test-config', async (_, config: AIConfig) => {
+      return await aiServiceManager.testConfig(config);
+    });
+
+    // 获取可用模型列表
+    ipcMain.handle('ai:get-models', async (_, config: AIConfig) => {
+      return await aiServiceManager.getAvailableModels(config);
+    });
+
+    // 生成 Prompt
+    ipcMain.handle('ai:generate-prompt', async (_, request: AIGenerationRequest) => {
+      return await aiServiceManager.generatePrompt(request);
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -119,6 +167,15 @@ class IpcHandlers {
     ipcMain.removeHandler('theme:get-info');
     ipcMain.removeHandler('theme:set-source');
     ipcMain.removeHandler('theme:is-dark');
+    // 清理 AI 处理器
+    ipcMain.removeHandler('ai:get-configs');
+    ipcMain.removeHandler('ai:get-enabled-configs');
+    ipcMain.removeHandler('ai:add-config');
+    ipcMain.removeHandler('ai:update-config');
+    ipcMain.removeHandler('ai:remove-config');
+    ipcMain.removeHandler('ai:test-config');
+    ipcMain.removeHandler('ai:get-models');
+    ipcMain.removeHandler('ai:generate-prompt');
   }
 }
 

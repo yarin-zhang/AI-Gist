@@ -144,6 +144,133 @@ function createApiClient() {
           return databaseService.togglePromptFavorite(id);
         }
       }
+    },
+    aiConfigs: {
+      create: {
+        mutate: async (input: any) => {
+          return databaseService.createAIConfig(input);
+        }
+      },
+      getAll: {
+        query: async () => {
+          return databaseService.getAllAIConfigs();
+        }
+      },
+      getEnabled: {
+        query: async () => {
+          return databaseService.getEnabledAIConfigs();
+        }
+      },
+      getById: {
+        query: async (id: number) => {
+          return databaseService.getAIConfigById(id);
+        }
+      },
+      getByConfigId: {
+        query: async (configId: string) => {
+          return databaseService.getAIConfigByConfigId(configId);
+        }
+      },
+      getByType: {
+        query: async (type: 'openai' | 'ollama') => {
+          return databaseService.getAIConfigsByType(type);
+        }
+      },
+      update: {
+        mutate: async (input: any) => {
+          const { id, data } = input;
+          return databaseService.updateAIConfig(id, data);
+        }
+      },
+      updateByConfigId: {
+        mutate: async (input: any) => {
+          const { configId, data } = input;
+          return databaseService.updateAIConfigByConfigId(configId, data);
+        }
+      },
+      delete: {
+        mutate: async (id: number) => {
+          await databaseService.deleteAIConfig(id);
+          return { id };
+        }
+      },
+      deleteByConfigId: {
+        mutate: async (configId: string) => {
+          const deleted = await databaseService.deleteAIConfigByConfigId(configId);
+          return { configId, deleted };
+        }
+      },
+      toggleEnabled: {
+        mutate: async (id: number) => {
+          return databaseService.toggleAIConfigEnabled(id);
+        }
+      }
+    },
+    aiGenerationHistory: {
+      create: {
+        mutate: async (input: any) => {
+          return databaseService.createAIGenerationHistory(input);
+        }
+      },
+      getAll: {
+        query: async () => {
+          return databaseService.getAllAIGenerationHistory();
+        }
+      },
+      getById: {
+        query: async (id: number) => {
+          return databaseService.getAIGenerationHistoryById(id);
+        }
+      },
+      getByHistoryId: {
+        query: async (historyId: string) => {
+          return databaseService.getAIGenerationHistoryByHistoryId(historyId);
+        }
+      },
+      getByConfigId: {
+        query: async (configId: string) => {
+          return databaseService.getAIGenerationHistoryByConfigId(configId);
+        }
+      },
+      getByStatus: {
+        query: async (status: 'success' | 'error') => {
+          return databaseService.getAIGenerationHistoryByStatus(status);
+        }
+      },
+      getPaginated: {
+        query: async (options?: any) => {
+          return databaseService.getAIGenerationHistoryPaginated(options);
+        }
+      },
+      delete: {
+        mutate: async (id: number) => {
+          await databaseService.deleteAIGenerationHistory(id);
+          return { id };
+        }
+      },
+      deleteByHistoryId: {
+        mutate: async (historyId: string) => {
+          const deleted = await databaseService.deleteAIGenerationHistoryByHistoryId(historyId);
+          return { historyId, deleted };
+        }
+      },
+      deleteByConfigId: {
+        mutate: async (configId: string) => {
+          const deletedCount = await databaseService.deleteAIGenerationHistoryByConfigId(configId);
+          return { configId, deletedCount };
+        }
+      },
+      clear: {
+        mutate: async () => {
+          const deletedCount = await databaseService.clearAIGenerationHistory();
+          return { deletedCount };
+        }
+      },
+      getStats: {
+        query: async () => {
+          return databaseService.getAIGenerationHistoryStats();
+        }
+      }
     }
   };
 }
