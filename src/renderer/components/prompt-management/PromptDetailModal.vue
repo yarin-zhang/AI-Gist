@@ -186,7 +186,7 @@
                                         <NFlex vertical size="small">
                                             <NText>{{ record.content.substring(0, 120) }}{{ record.content.length > 120
                                                 ? '...' : ''
-                                                }}</NText>
+                                            }}</NText>
 
                                             <NFlex v-if="record.variables && Object.keys(record.variables).length > 0"
                                                 size="small">
@@ -282,7 +282,7 @@
             </NLayoutContent>
 
             <!-- 底部固定区域 -->
-            <NLayoutFooter :height="footerHeight" bordered content-style="padding: 24px;">
+            <NLayoutFooter :height="footerHeight" bordered content-style="padding: 24px;" position="absolute">
                 <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
                     <NFlex>
                         <!-- 历史记录按钮（主页面左下角） -->
