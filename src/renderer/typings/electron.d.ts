@@ -2,7 +2,7 @@
  * Should match main/preload.ts for typescript support in renderer
  */
 
-// AI 相关类型定义
+// AI 相    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }>类型定义
 export interface AIConfig {
   id?: number;
   configId: string; // 唯一标识符

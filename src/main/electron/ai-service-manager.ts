@@ -103,20 +103,20 @@ class AIServiceManager {
   /**
    * 智能测试 - 发送真实提示词并获取AI响应
    */
-  async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string }> {
+  async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
     try {
       if (!config.enabled) {
         return { success: false, error: '配置已禁用' };
       }
 
-      const model = config.defaultModel || config.customModel || (config.models && config.models[0]);
+      const model = config.defaultModel || config.customModel;
       if (!model) {
-        return { success: false, error: '未配置可用模型' };
+        return { success: false, error: '未设置默认模型' };
       }
 
-      // 使用简单的测试提示词
-      const testPrompt = '请简单介绍一下人工智能，不超过50字。';
-      
+      // 简单的测试提示词
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+
       let llm: any;
       
       if (config.type === 'openai') {
@@ -136,29 +136,21 @@ class AIServiceManager {
         return { success: false, error: '不支持的配置类型' };
       }
 
-      // 发送测试请求
       const response = await llm.invoke(testPrompt);
       const responseText = typeof response === 'string' ? response : response.content;
 
       return {
         success: true,
-        response: responseText
+        response: responseText,
+        inputPrompt: testPrompt
       };
     } catch (error: any) {
       console.error('智能测试失败:', error);
-      
-      // 处理常见错误类型
-      if (error.message?.includes('API key') || error.message?.includes('authentication')) {
-        return { success: false, error: 'API Key 无效或已过期' };
-      }
-      if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
-        return { success: false, error: '网络连接失败，请检查服务器地址' };
-      }
-      if (error.message?.includes('model') || error.message?.includes('not found')) {
-        return { success: false, error: '指定的模型不存在或不可用' };
-      }
-      
-      return { success: false, error: error.message || '未知错误' };
+      return { 
+        success: false, 
+        error: error.message || '未知错误',
+        inputPrompt: '请用一句话简单介绍一下你自己。'
+      };
     }
   }
 

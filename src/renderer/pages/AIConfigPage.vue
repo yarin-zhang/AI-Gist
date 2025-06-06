@@ -115,7 +115,14 @@
         </n-form-item>
         
         <n-form-item label="默认模型" path="defaultModel">
-          <n-input v-model:value="formData.defaultModel" placeholder="输入默认模型名称" />
+          <n-select 
+            v-model:value="formData.defaultModel" 
+            :options="modelOptions"
+            placeholder="选择默认模型"
+            filterable
+            tag
+            clearable
+          />
         </n-form-item>
         
         <n-form-item label="自定义模型" path="customModel">
@@ -138,14 +145,30 @@
       <div v-if="intelligentTestResult">
         <n-alert v-if="intelligentTestResult.success" type="success" title="测试成功">
           <div style="margin-top: 12px;">
-            <strong>AI 回复:</strong>
-            <div style="background: var(--code-color); padding: 12px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap;">
-              {{ intelligentTestResult.response }}
+            <div style="margin-bottom: 16px;">
+              <strong>输入 Prompt:</strong>
+              <div style="background: var(--code-color); padding: 12px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap; font-family: monospace;">
+                {{ intelligentTestResult.inputPrompt }}
+              </div>
+            </div>
+            <div>
+              <strong>AI 回复:</strong>
+              <div style="background: var(--code-color); padding: 12px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap;">
+                {{ intelligentTestResult.response }}
+              </div>
             </div>
           </div>
         </n-alert>
         <n-alert v-else type="error" title="测试失败">
-          {{ intelligentTestResult.error }}
+          <div v-if="intelligentTestResult.inputPrompt" style="margin-bottom: 12px;">
+            <strong>尝试发送的 Prompt:</strong>
+            <div style="background: var(--code-color); padding: 12px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap; font-family: monospace;">
+              {{ intelligentTestResult.inputPrompt }}
+            </div>
+          </div>
+          <div>
+            <strong>错误信息:</strong> {{ intelligentTestResult.error }}
+          </div>
         </n-alert>
       </div>
       
@@ -157,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { 
     NButton,
     NCard,
@@ -196,7 +219,7 @@ const intelligentTestingConfigs = ref(new Set<number>())
 const testingFormConnection = ref(false)
 const formTestResult = ref<{ success: boolean; models?: string[]; error?: string } | null>(null)
 const showIntelligentTestResult = ref(false)
-const intelligentTestResult = ref<{ success: boolean; response?: string; error?: string } | null>(null)
+const intelligentTestResult = ref<{ success: boolean; response?: string; error?: string; inputPrompt?: string } | null>(null)
 
 // 表单数据
 const formData = reactive({
@@ -243,6 +266,14 @@ const typeOptions = [
 
 // 表单引用
 const formRef = ref()
+
+// 计算属性：模型选项
+const modelOptions = computed(() => {
+  return formData.models.map(model => ({
+    label: model,
+    value: model
+  }))
+})
 
 // 加载配置列表
 const loadConfigs = async () => {
