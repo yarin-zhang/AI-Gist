@@ -1,53 +1,45 @@
 <template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" :style="{
-        width: `${modalWidth}px`,
-        height: `${modalHeight}px`
-    }">
-        <NLayout v-if="prompt" position="absolute">
-            <!-- 固定在右上角的关闭按钮 -->
-            <NButton  @click="handleClose" size="small" circle :style="{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-            }">
-                <template #icon>
-                    <NIcon size="18">
-                        <X />
-                    </NIcon>
-                </template>
-            </NButton>
-
-            <!-- 顶部固定区域 -->
-            <NLayoutHeader :height="headerHeight" bordered content-style="padding: 24px;">
-                <NFlex vertical size="medium" style="padding: 16px;">
-                    <NFlex justify="flex-start" align="center">
-                        <NFlex align="center">
-                            <NText strong size="large">{{ prompt?.title }}</NText>
-                            <NTag v-if="prompt.category" :color="{ color: prompt.category.color || '#18a058' }">
-                                {{ prompt.category.name }}
-                            </NTag>
-                            <NText depth="3">{{ formatDate(prompt.updatedAt) }}</NText>
-                        </NFlex>
-                    </NFlex>
-
-                    <NText v-if="prompt.description">{{ prompt.description }}</NText>
-
-                    <NFlex v-if="prompt.tags" size="small">
-                        <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                            :color="getTagColor(tag)">
-                            <template #icon>
-                                <NIcon>
-                                    <Tag />
-                                </NIcon>
-                            </template>
-                            {{ tag }}
+    <CommonModal 
+        v-if="prompt"
+        ref="modalRef"
+        :show="show" 
+        @update:show="$emit('update:show', $event)"
+        @close="handleClose"
+        :header-height="headerHeight"
+        :footer-height="footerHeight"
+        :content-padding="contentPadding"
+    >
+        <!-- 顶部固定区域 -->
+        <template #header>
+            <NFlex vertical size="medium" style="padding: 16px;">
+                <NFlex justify="flex-start" align="center">
+                    <NFlex align="center">
+                        <NText strong size="large">{{ prompt?.title }}</NText>
+                        <NTag v-if="prompt.category" :color="{ color: prompt.category.color || '#18a058' }">
+                            {{ prompt.category.name }}
                         </NTag>
+                        <NText depth="3">{{ formatDate(prompt.updatedAt) }}</NText>
                     </NFlex>
                 </NFlex>
-            </NLayoutHeader>
 
-            <!-- 中间可操作区域 -->
-            <NLayoutContent :height="contentHeight" content-style="padding: 24px;">
+                <NText v-if="prompt.description">{{ prompt.description }}</NText>
+
+                <NFlex v-if="prompt.tags" size="small">
+                    <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                        :color="getTagColor(tag)">
+                        <template #icon>
+                            <NIcon>
+                                <Tag />
+                            </NIcon>
+                        </template>
+                        {{ tag }}
+                    </NTag>
+                </NFlex>
+            </NFlex>
+        </template>
+
+        <!-- 中间可操作区域 -->
+        <template #content>
                 <!-- 详情页面 -->
                 <NLayout v-show="!showHistoryPage" has-sider>
                     <!-- 左侧：变量输入区 -->
@@ -274,65 +266,62 @@
                             </NScrollbar>
                         </NCard>
                     </NLayoutContent>
-                </NLayout>
-            </NLayoutContent>
+                </NLayout>        </template>
 
-            <!-- 底部固定区域 -->
-            <NLayoutFooter :height="footerHeight" bordered content-style="padding: 24px;" position="absolute">
-                <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
-                    <NFlex>
-                        <!-- 历史记录按钮（主页面左下角） -->
-                        <NButton v-show="!showHistoryPage" @click="showHistoryPage = true"
-                            :disabled="useHistory.length === 0">
-                            <template #icon>
-                                <NIcon>
-                                    <History />
-                                </NIcon>
-                            </template>
-                            查看历史记录 ({{ useHistory.length }})
-                        </NButton>
+        <!-- 底部固定区域 -->
+        <template #footer>
+            <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
+                <NFlex>
+                    <!-- 历史记录按钮（主页面左下角） -->
+                    <NButton v-show="!showHistoryPage" @click="showHistoryPage = true"
+                        :disabled="useHistory.length === 0">
+                        <template #icon>
+                            <NIcon>
+                                <History />
+                            </NIcon>
+                        </template>
+                        查看历史记录 ({{ useHistory.length }})
+                    </NButton>
 
-                        <!-- 返回按钮（历史记录页面左下角） -->
-                        <NButton v-show="showHistoryPage" @click="showHistoryPage = false">
-                            <template #icon>
-                                <NIcon>
-                                    <ArrowLeft />
-                                </NIcon>
-                            </template>
-                            返回
-                        </NButton>
-                    </NFlex>
-
-                    <NFlex>
-                        <!-- 收藏和编辑按钮移到右下角 -->
-                        <NButton type="primary" ghost @click="toggleFavorite"
-                            :color="prompt.isFavorite ? '#f5222d' : '#18a058'">
-                            <template #icon>
-                                <NIcon>
-                                    <Heart />
-                                </NIcon>
-                            </template>
-                            {{ prompt.isFavorite ? '取消收藏' : '收藏' }}
-                        </NButton>
-                        <NButton type="primary" @click="$emit('edit', prompt)">
-                            <template #icon>
-                                <NIcon>
-                                    <Edit />
-                                </NIcon>
-                            </template>
-                            编辑
-                        </NButton>
-                    </NFlex>
+                    <!-- 返回按钮（历史记录页面左下角） -->
+                    <NButton v-show="showHistoryPage" @click="showHistoryPage = false">
+                        <template #icon>
+                            <NIcon>
+                                <ArrowLeft />
+                            </NIcon>
+                        </template>
+                        返回
+                    </NButton>
                 </NFlex>
-            </NLayoutFooter>
-        </NLayout>
-    </NModal>
+
+                <NFlex>
+                    <!-- 收藏和编辑按钮移到右下角 -->
+                    <NButton type="primary" secondary @click="toggleFavorite"
+                        :type="prompt.isFavorite ? 'error' : 'default'">
+                        <template #icon>
+                            <NIcon>
+                                <Heart />
+                            </NIcon>
+                        </template>
+                        {{ prompt.isFavorite ? '取消收藏' : '收藏' }}
+                    </NButton>
+                    <NButton type="primary" @click="$emit('edit', prompt)">
+                        <template #icon>
+                            <NIcon>
+                                <Edit />
+                            </NIcon>
+                        </template>
+                        编辑
+                    </NButton>
+                </NFlex>
+            </NFlex>
+        </template>
+    </CommonModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import {
-    NModal,
     NCard,
     NFlex,
     NText,
@@ -347,16 +336,14 @@ import {
     NPagination,
     NPopconfirm,
     NLayout,
-    NLayoutHeader,
-    NLayoutContent,
-    NLayoutFooter,
     NLayoutSider,
     useMessage
 } from 'naive-ui'
-import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag, X } from '@vicons/tabler'
+import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useWindowSize } from '@/composables/useWindowSize'
+import CommonModal from '@/components/common/CommonModal.vue'
 
 interface Props {
     show: boolean
@@ -379,25 +366,24 @@ const message = useMessage()
 const { getTagColor, getTagsArray } = useTagColors()
 
 // 使用窗口尺寸 composable
-const { modalMaxHeight, modalWidth, contentSize } = useWindowSize()
+const { modalWidth } = useWindowSize()
 
 // 布局高度常量
 const headerHeight = 180
 const footerHeight = 60
 const contentPadding = 24
 
-// 响应式布局计算 - 使用 composable 中的响应式值
-const modalHeight = computed(() => {
-    return modalMaxHeight.value
-})
-
-// 中间内容区域高度
-const contentHeight = computed(() => {
-    return modalHeight.value - headerHeight - footerHeight - contentPadding * 2
-})
-
+// 边栏宽度计算
 const siderWidth = computed(() => {
     return modalWidth.value > 1000 ? '40%' : '45%'
+})
+
+// 模板引用
+const modalRef = ref<InstanceType<typeof CommonModal> | null>(null)
+
+// 获取内容高度
+const contentHeight = computed(() => {
+    return modalRef.value?.contentHeight || 400
 })
 
 // 响应式数据
