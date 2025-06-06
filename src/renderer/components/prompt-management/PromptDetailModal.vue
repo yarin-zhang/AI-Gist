@@ -5,7 +5,7 @@
     }">
         <NLayout v-if="prompt" position="absolute">
             <!-- 顶部固定区域 -->
-            <NLayoutHeader :height="headerHeight" bordered>
+            <NLayoutHeader :height="headerHeight" bordered content-style="padding: 24px;">
                 <NFlex vertical size="medium" style="padding: 16px;">
                     <NFlex justify="space-between" align="center">
                         <NFlex align="center">
@@ -51,7 +51,7 @@
             </NLayoutHeader>
 
             <!-- 中间可操作区域 -->
-            <NLayoutContent>
+            <NLayoutContent :height="contentHeight" content-style="padding: 24px;">
                 <!-- 详情页面 -->
                 <NLayout v-show="!showHistoryPage" has-sider>
                     <!-- 左侧：变量输入区 -->
@@ -147,14 +147,14 @@
                     <NLayoutSider :width="siderWidth" content-style="padding-right: 8px;">
                         <NCard size="small">
                             <template #header>
-                                <NFlex justify="space-between" align="center">
+                                <NFlex justify="space-between" align="center" :style="{ height: `30px` }">
                                     <NText strong>使用历史记录</NText>
                                     <NText depth="3">{{ useHistory.length }} 条记录</NText>
                                 </NFlex>
                             </template>
 
-                            <template #footer >
-                                <NFlex justify="center">
+                            <template #action>
+                                <NFlex justify="center" :style="{ height: `30px` }">
                                     <NPagination v-model:page="currentPage" :page-count="totalPages"
                                         :page-size="pageSize" size="small" show-quick-jumper show-size-picker
                                         :page-sizes="[1, 3, 5, 10, 20]" :page-slot="7"
@@ -186,7 +186,7 @@
                                         <NFlex vertical size="small">
                                             <NText>{{ record.content.substring(0, 120) }}{{ record.content.length > 120
                                                 ? '...' : ''
-                                            }}</NText>
+                                                }}</NText>
 
                                             <NFlex v-if="record.variables && Object.keys(record.variables).length > 0"
                                                 size="small">
@@ -282,7 +282,7 @@
             </NLayoutContent>
 
             <!-- 底部固定区域 -->
-            <NLayoutFooter :height="footerHeight" bordered>
+            <NLayoutFooter :height="footerHeight" bordered content-style="padding: 24px;">
                 <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
                     <NFlex>
                         <!-- 历史记录按钮（主页面左下角） -->
@@ -371,6 +371,7 @@ const { modalMaxHeight, modalWidth, contentSize } = useWindowSize()
 // 布局高度常量
 const headerHeight = 180
 const footerHeight = 60
+const contentPadding = 24
 
 // 响应式布局计算 - 使用 composable 中的响应式值
 const modalHeight = computed(() => {
@@ -379,7 +380,7 @@ const modalHeight = computed(() => {
 
 // 中间内容区域高度
 const contentHeight = computed(() => {
-    return modalHeight.value - headerHeight - footerHeight
+    return modalHeight.value - headerHeight - footerHeight - contentPadding * 2
 })
 
 const siderWidth = computed(() => {
