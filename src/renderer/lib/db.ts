@@ -102,7 +102,7 @@ export interface CategoryWithRelations extends Category {
 class DatabaseService {
   private db: IDBDatabase | null = null;
   private readonly dbName = 'AIGistDB';
-  private readonly dbVersion = 2; // 升级版本号以支持新表
+  private readonly dbVersion = 3; // 升级版本号以修复表名不一致问题
 
   /**
    * 初始化数据库
@@ -148,9 +148,9 @@ class DatabaseService {
           promptStore.createIndex('isFavorite', 'isFavorite', { unique: false });
         }
 
-        // 创建 prompt_variables 表
-        if (!db.objectStoreNames.contains('prompt_variables')) {
-          const promptVariableStore = db.createObjectStore('prompt_variables', { keyPath: 'id', autoIncrement: true });
+        // 创建 promptVariables 表（修复表名不一致问题）
+        if (!db.objectStoreNames.contains('promptVariables')) {
+          const promptVariableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
           promptVariableStore.createIndex('promptId', 'promptId', { unique: false });
         }
 
@@ -358,18 +358,53 @@ class DatabaseService {
   private async getByIndex<T>(storeName: string, indexName: string, value: any): Promise<T[]> {
     const db = this.ensureDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([storeName], 'readonly');
-      const store = transaction.objectStore(storeName);
-      const index = store.index(indexName);
-      const request = index.getAll(value);
+      try {
+        const transaction = db.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        
+        // 确保索引存在
+        if (!store.indexNames.contains(indexName)) {
+          console.error(`Index ${indexName} does not exist in store ${storeName}`);
+          return resolve([]);
+        }
+        
+        const index = store.index(indexName);
+        
+        // 对布尔值特殊处理，避免直接传递可能导致的问题
+        let request;
+        if (typeof value === 'boolean') {
+          // 使用游标而不是直接查询
+          request = index.openCursor();
+          const results: T[] = [];
+          
+          request.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+              if (cursor.value[indexName] === value) {
+                results.push(cursor.value);
+              }
+              cursor.continue();
+            } else {
+              resolve(results);
+            }
+          };
+        } else {
+          // 对于非布尔值，使用标准的 getAll
+          request = index.getAll(value);
+          
+          request.onsuccess = () => {
+            resolve(request.result);
+          };
+        }
 
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-
-      request.onerror = () => {
-        reject(new Error(`Failed to get by index from ${storeName}`));
-      };
+        request.onerror = (event) => {
+          console.error(`Error in getByIndex for ${storeName}.${indexName}:`, event);
+          reject(new Error(`Failed to get by index from ${storeName}: ${request.error?.message || 'Unknown error'}`));
+        };
+      } catch (error) {
+        console.error(`Exception in getByIndex for ${storeName}.${indexName}:`, error);
+        reject(error);
+      }
     });
   }
 
@@ -727,7 +762,10 @@ class DatabaseService {
   }
 
   async getEnabledAIConfigs(): Promise<AIConfig[]> {
-    return this.getByIndex<AIConfig>('ai_configs', 'enabled', true);
+    // 修改实现方式，先获取所有配置然后在内存中过滤
+    // 而不是直接使用索引查询，避免 IndexedDB 对布尔值索引的处理问题
+    const allConfigs = await this.getAllAIConfigs();
+    return allConfigs.filter(config => config.enabled === true);
   }
 
   async getAIConfigById(id: number): Promise<AIConfig | null> {

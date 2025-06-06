@@ -212,7 +212,7 @@ const formRules = {
   ],
   topic: [
     { required: true, message: '请输入主题描述', trigger: 'blur' },
-    { min: 5, message: '主题描述至少 5 个字符', trigger: 'blur' }
+    { min: 1, message: '主题描述至少 1 个字符', trigger: 'blur' }
   ]
 }
 
@@ -252,10 +252,38 @@ const modelOptions = computed(() => {
 // 加载 AI 配置
 const loadConfigs = async () => {
   try {
+    console.log('开始加载 AI 配置')
     const result = await databaseService.getEnabledAIConfigs()
+    console.log('成功获取到启用的 AI 配置:', result)
     configs.value = result
+    
+    // 如果没有配置或配置为空，显示提示信息
+    if (!result || result.length === 0) {
+      message.info('没有找到启用的 AI 配置，请先在 AI 配置页面添加并启用至少一个配置')
+    }
   } catch (error) {
+    console.error('加载 AI 配置失败:', error)
     message.error('加载 AI 配置失败: ' + (error as Error).message)
+    
+    // 尝试获取所有配置作为备选方案
+    try {
+      const allConfigs = await databaseService.getAllAIConfigs()
+      console.log('获取所有 AI 配置作为备选:', allConfigs)
+      if (allConfigs && allConfigs.length > 0) {
+        // 仅选择已启用的配置
+        const enabledConfigs = allConfigs.filter(c => c.enabled)
+        if (enabledConfigs.length > 0) {
+          configs.value = enabledConfigs
+          message.success('已成功加载备选配置')
+        } else {
+          message.warning('找到配置但均未启用，请在 AI 配置页面启用至少一个配置')
+        }
+      } else {
+        message.warning('未找到任何 AI 配置，请先在 AI 配置页面添加配置')
+      }
+    } catch (fallbackError) {
+      console.error('备选方案也失败:', fallbackError)
+    }
   }
 }
 
