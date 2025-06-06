@@ -35,28 +35,29 @@
             <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
                 @click="$emit('view', prompt)">
                 <template #header>
-                    <NFlex justify="space-between" align="center">
-                        <NText strong>{{ prompt.title }}</NText>
-                        <NFlex size="small">
-                            <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
-                                :type="prompt.isFavorite ? 'error' : 'default'">
+                    <NText strong>{{ prompt.title }}</NText>
+                </template>
+
+                <template #header-extra>
+                    <NFlex size="small">
+                        <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
+                            :type="prompt.isFavorite ? 'error' : 'default'">
+                            <template #icon>
+                                <NIcon>
+                                    <Heart />
+                                </NIcon>
+                            </template>
+                        </NButton>
+                        <NDropdown :options="getPromptActions(prompt)"
+                            @select="(key) => handlePromptAction(key, prompt)">
+                            <NButton size="small" text @click.stop>
                                 <template #icon>
                                     <NIcon>
-                                        <Heart />
+                                        <DotsVertical />
                                     </NIcon>
                                 </template>
                             </NButton>
-                            <NDropdown :options="getPromptActions(prompt)"
-                                @select="(key) => handlePromptAction(key, prompt)">
-                                <NButton size="small" text @click.stop>
-                                    <template #icon>
-                                        <NIcon>
-                                            <DotsVertical />
-                                        </NIcon>
-                                    </template>
-                                </NButton>
-                            </NDropdown>
-                        </NFlex>
+                        </NDropdown>
                     </NFlex>
                 </template>
 
@@ -66,31 +67,41 @@
                         {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                     </NText>
 
-                    <!-- 标签显示 -->
-                    <div v-if="prompt.tags">
-                        <NFlex size="small" style="margin: 8px 0;">
-                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                :type="getTagType(tag)">
-                                {{ tag }}
-                            </NTag>
-                        </NFlex>
-                    </div>
+                </NFlex>
 
-                    <NFlex justify="space-between" align="center" style="margin-top: 8px;">
-                        <NFlex size="small">
-                            <NTag v-if="prompt.category" size="small"
-                                :color="{ color: prompt.category.color || '#18a058' }">
-                                {{ prompt.category.name }}
-                            </NTag>
+                <template #footer>
+                    <NFlex justify="space-between" align="center">
+                        <!-- 分类和标签放在同一行 -->
+                        <NFlex size="small" align="center" style="margin-top: 8px;" wrap>
                             <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
                                 {{ prompt.variables.length }} 个变量
                             </NTag>
+                            <NTag v-if="prompt.category" size="small"
+                                :color="{ color: prompt.category.color || '#18a058' }">
+                                <template #icon>
+                                    <NIcon>
+                                        <Box />
+                                    </NIcon>
+                                </template>
+                                {{ prompt.category.name }}
+                            </NTag>
+                            <template v-if="prompt.tags">
+                                <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                                    :color="getTagColor(tag)">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Tag />
+                                        </NIcon>
+                                    </template>
+                                    {{ tag }}
+                                </NTag>
+                            </template>
                         </NFlex>
                         <NText depth="3" style="font-size: 12px;">
                             使用 {{ prompt.useCount }} 次
                         </NText>
                     </NFlex>
-                </NFlex>
+                </template>
             </NCard>
         </div>
     </div>
@@ -118,9 +129,12 @@ import {
     DotsVertical,
     Edit,
     Trash,
-    Copy
+    Copy,
+    Tag,
+    Box
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
+import { useTagColors } from '@/composables/useTagColors'
 
 interface Emits {
     (e: 'edit', prompt: any): void
@@ -130,6 +144,9 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
+
+// 使用标签颜色 composable
+const { getTagColor, getTagsArray } = useTagColors()
 
 // 响应式数据
 const prompts = ref([])
@@ -187,18 +204,6 @@ const handleCategoryFilter = () => {
 const toggleFavoritesFilter = () => {
     showFavoritesOnly.value = !showFavoritesOnly.value
     loadPrompts()
-}
-
-// 处理标签相关方法
-const getTagsArray = (tags) => {
-    if (!tags) return []
-    return typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(t => t) : tags
-}
-
-const getTagType = (tag) => {
-    const types = ['default', 'success', 'warning', 'error', 'info']
-    const index = tag.length % types.length
-    return types[index]
 }
 
 const toggleFavorite = async (promptId) => {

@@ -120,26 +120,7 @@ import {
 } from 'naive-ui'
 import { Edit, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
-
-// 统一的颜色色卡配置（按色相排序）
-const COLOR_SWATCHES = [
-    '#EF444480',  // 红色
-    '#F9731680',  // 橙红色
-    '#F59E0B80',  // 橙色
-    '#EAB30880',  // 黄橙色
-    '#FDE04780',  // 黄色
-    '#A3E63580',  // 黄绿色
-    '#22C55E80',  // 绿色
-    '#10B98180',  // 翠绿色
-    '#06B6D480',  // 青色
-    '#0EA5E980',  // 天蓝色
-    '#3B82F680',  // 蓝色
-    '#6366F180',  // 靛蓝色
-    '#8B5CF680',  // 紫色
-    '#A855F780',  // 紫罗兰色
-    '#EC489980',  // 粉色
-    '#94A3B880',  // 灰色
-]
+import { useTagColors } from '@/composables/useTagColors'
 
 interface Props {
     show: boolean
@@ -155,6 +136,9 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const message = useMessage()
+
+// 使用统一的颜色配置
+const { COLOR_SWATCHES } = useTagColors()
 
 // 响应式数据
 const newCategory = ref({

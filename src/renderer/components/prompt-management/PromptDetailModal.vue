@@ -37,7 +37,12 @@
                     <div v-if="prompt.tags">
                         <NFlex size="small" style="margin: 8px 0;">
                             <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                :type="getTagType(tag)">
+                                :color="getTagColor(tag)">
+                                <template #icon>
+                                    <NIcon>
+                                        <Tag />
+                                    </NIcon>
+                                </template>
                                 {{ tag }}
                             </NTag>
                         </NFlex>
@@ -323,8 +328,9 @@ import {
     NPopconfirm,
     useMessage
 } from 'naive-ui'
-import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash } from '@vicons/tabler'
+import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag } from '@vicons/tabler'
 import { api } from '@/lib/api'
+import { useTagColors } from '@/composables/useTagColors'
 
 interface Props {
     show: boolean
@@ -342,6 +348,9 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const message = useMessage()
+
+// 使用标签颜色 composable
+const { getTagColor, getTagsArray } = useTagColors()
 
 // 响应式数据
 const variableValues = ref({})
@@ -569,19 +578,6 @@ const deleteHistoryRecord = async () => {
 // 格式化日期
 const formatDate = (date) => {
     return new Date(date).toLocaleString('zh-CN')
-}
-
-// 处理标签相关方法
-const getTagsArray = (tags) => {
-    if (!tags) return []
-    return typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(t => t) : tags
-}
-
-const getTagType = (tag) => {
-    // 根据标签内容返回不同的类型，让标签更有视觉层次
-    const types = ['default', 'success', 'warning', 'error', 'info']
-    const index = tag.length % types.length
-    return types[index]
 }
 
 // 关闭弹窗
