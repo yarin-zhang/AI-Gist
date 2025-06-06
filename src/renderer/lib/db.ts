@@ -517,6 +517,7 @@ class DatabaseService {
     isFavorite?: boolean;
     page?: number;
     limit?: number;
+    sortBy?: string; // 添加排序方式参数
   }): Promise<{ data: PromptWithRelations[]; total: number; hasMore: boolean }> {
     const prompts = await this.getAll<Prompt>('prompts');
     const categories = await this.getAll<Category>('categories');
@@ -564,16 +565,49 @@ class DatabaseService {
       }
     }
 
-    // 排序：收藏 > 使用次数 > 更新时间
-    filteredPrompts.sort((a, b) => {
-      if (a.isFavorite !== b.isFavorite) {
-        return b.isFavorite ? 1 : -1;
+    // 根据排序方式进行排序
+    if (filters?.sortBy) {
+      switch (filters.sortBy) {
+        case 'timeDesc': // 最新优先
+          filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          break;
+        case 'timeAsc': // 最早优先
+          filteredPrompts.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+          break;
+        case 'useCount': // 使用次数优先
+          filteredPrompts.sort((a, b) => b.useCount - a.useCount);
+          break;
+        case 'favorite': // 收藏优先
+          filteredPrompts.sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) {
+              return b.isFavorite ? 1 : -1;
+            }
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(); // 收藏相同时按更新时间
+          });
+          break;
+        default: // 默认：收藏 > 使用次数 > 更新时间
+          filteredPrompts.sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) {
+              return b.isFavorite ? 1 : -1;
+            }
+            if (a.useCount !== b.useCount) {
+              return b.useCount - a.useCount;
+            }
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          });
       }
-      if (a.useCount !== b.useCount) {
-        return b.useCount - a.useCount;
-      }
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
+    } else {
+      // 默认排序：收藏 > 使用次数 > 更新时间
+      filteredPrompts.sort((a, b) => {
+        if (a.isFavorite !== b.isFavorite) {
+          return b.isFavorite ? 1 : -1;
+        }
+        if (a.useCount !== b.useCount) {
+          return b.useCount - a.useCount;
+        }
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+    }
 
     // 计算总数
     const total = filteredPrompts.length;
