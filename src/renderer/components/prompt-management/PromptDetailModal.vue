@@ -1,36 +1,32 @@
 <template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" :title="prompt?.title" :style="{
+    <NModal :show="show" @update:show="$emit('update:show', $event)" :style="{
         width: `${modalWidth}px`,
         height: `${modalHeight}px`
     }">
         <NLayout v-if="prompt" position="absolute">
+            <!-- 固定在右上角的关闭按钮 -->
+            <NButton  @click="handleClose" size="small" circle :style="{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+            }">
+                <template #icon>
+                    <NIcon size="18">
+                        <X />
+                    </NIcon>
+                </template>
+            </NButton>
+
             <!-- 顶部固定区域 -->
             <NLayoutHeader :height="headerHeight" bordered content-style="padding: 24px;">
                 <NFlex vertical size="medium" style="padding: 16px;">
-                    <NFlex justify="space-between" align="center">
+                    <NFlex justify="flex-start" align="center">
                         <NFlex align="center">
+                            <NText strong size="large">{{ prompt?.title }}</NText>
                             <NTag v-if="prompt.category" :color="{ color: prompt.category.color || '#18a058' }">
                                 {{ prompt.category.name }}
                             </NTag>
                             <NText depth="3">{{ formatDate(prompt.updatedAt) }}</NText>
-                        </NFlex>
-                        <NFlex>
-                            <NButton text @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
-                                <template #icon>
-                                    <NIcon>
-                                        <Heart />
-                                    </NIcon>
-                                </template>
-                                {{ prompt.isFavorite ? '取消收藏' : '收藏' }}
-                            </NButton>
-                            <NButton text @click="$emit('edit', prompt)">
-                                <template #icon>
-                                    <NIcon>
-                                        <Edit />
-                                    </NIcon>
-                                </template>
-                                编辑
-                            </NButton>
                         </NFlex>
                     </NFlex>
 
@@ -186,7 +182,7 @@
                                         <NFlex vertical size="small">
                                             <NText>{{ record.content.substring(0, 120) }}{{ record.content.length > 120
                                                 ? '...' : ''
-                                            }}</NText>
+                                                }}</NText>
 
                                             <NFlex v-if="record.variables && Object.keys(record.variables).length > 0"
                                                 size="small">
@@ -308,7 +304,24 @@
                     </NFlex>
 
                     <NFlex>
-                        <NButton @click="handleClose">关闭</NButton>
+                        <!-- 收藏和编辑按钮移到右下角 -->
+                        <NButton type="primary" ghost @click="toggleFavorite"
+                            :color="prompt.isFavorite ? '#f5222d' : '#18a058'">
+                            <template #icon>
+                                <NIcon>
+                                    <Heart />
+                                </NIcon>
+                            </template>
+                            {{ prompt.isFavorite ? '取消收藏' : '收藏' }}
+                        </NButton>
+                        <NButton type="primary" @click="$emit('edit', prompt)">
+                            <template #icon>
+                                <NIcon>
+                                    <Edit />
+                                </NIcon>
+                            </template>
+                            编辑
+                        </NButton>
                     </NFlex>
                 </NFlex>
             </NLayoutFooter>
@@ -340,7 +353,7 @@ import {
     NLayoutSider,
     useMessage
 } from 'naive-ui'
-import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag } from '@vicons/tabler'
+import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag, X } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useWindowSize } from '@/composables/useWindowSize'
