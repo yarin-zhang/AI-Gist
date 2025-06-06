@@ -1,26 +1,27 @@
 <template>
-    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" class="fullscreen-modal" title="分类管理">
+    <NModal :show="show" @update:show="$emit('update:show', $event)" preset="card" class="fullscreen-modal"
+        title="分类管理">
         <NFlex vertical size="large">
             <!-- 创建新分类 -->
             <NCard title="创建分类" size="small">
-                <NForm :model="newCategory" inline>
-                    <NFormItem label="分类名称" style="flex: 4">
-                        <NInput v-model:value="newCategory.name" placeholder="请输入分类名称" @keyup.enter="handleCreate" />
-                    </NFormItem>
-                    <NFormItem label="颜色" style="flex: 1">
-                        <NColorPicker v-model:value="newCategory.color" :modes="['hex']" :swatches="[
-                            '#FFFFFF',
-                            '#18A058',
-                            '#2080F0',
-                            '#F0A020',
-                            '#D03050',
-                        ]" />
-                    </NFormItem>
-                    <NFormItem>
-                        <NButton type="primary" @click="handleCreate" :loading="creating">
-                            创建
-                        </NButton>
-                    </NFormItem>
+                <NForm :model="newCategory" >
+                    <NFlex justify="space-between">
+                        <NFlex>
+                            <NFormItem label="分类名称">
+                                <NInput v-model:value="newCategory.name" placeholder="请输入分类名称"
+                                    style="width: 300px; flex-shrink: 0;" @keyup.enter="handleCreate" />
+                            </NFormItem>
+                            <NFormItem label="颜色">
+                                <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
+                                    :swatches="COLOR_SWATCHES" style="width: 120px;" />
+                            </NFormItem>
+                        </NFlex>
+                        <NFormItem>
+                            <NButton type="primary" @click="handleCreate" :loading="creating">
+                                创建
+                            </NButton>
+                        </NFormItem>
+                    </NFlex>
                 </NForm>
             </NCard>
 
@@ -34,14 +35,16 @@
                     <NCard v-for="category in categories" :key="category.id" size="small" class="category-item">
                         <NFlex justify="space-between" align="center">
                             <NFlex align="center">
-                                <div class="color-indicator" :style="{ backgroundColor: category.color || '#18a058' }">
+                                <div class="color-indicator"
+                                    :style="{ backgroundColor: category.color || '#18A05880' }">
                                 </div>
-                                <div v-if="editingCategory?.id === category.id">
-                                    <NFlex>
+                                <div v-if="editingCategory?.id === category.id" style="min-width: 300px;">
+                                    <NFlex :vertical="false" align="center" size="medium" :wrap="false">
                                         <NInput v-model:value="editingCategory.name" size="small"
-                                            style="width: 150px" />
+                                            style="width: 180px; flex-shrink: 0;" />
                                         <NColorPicker v-model:value="editingCategory.color" :modes="['hex']"
-                                            size="small" />
+                                            :swatches="COLOR_SWATCHES" size="small"
+                                            style="width: 120px; flex-shrink: 0;" />
                                     </NFlex>
                                 </div>
                                 <div v-else>
@@ -118,6 +121,26 @@ import {
 import { Edit, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
 
+// 统一的颜色色卡配置（按色相排序）
+const COLOR_SWATCHES = [
+    '#EF444480',  // 红色
+    '#F9731680',  // 橙红色
+    '#F59E0B80',  // 橙色
+    '#EAB30880',  // 黄橙色
+    '#FDE04780',  // 黄色
+    '#A3E63580',  // 黄绿色
+    '#22C55E80',  // 绿色
+    '#10B98180',  // 翠绿色
+    '#06B6D480',  // 青色
+    '#0EA5E980',  // 天蓝色
+    '#3B82F680',  // 蓝色
+    '#6366F180',  // 靛蓝色
+    '#8B5CF680',  // 紫色
+    '#A855F780',  // 紫罗兰色
+    '#EC489980',  // 粉色
+    '#94A3B880',  // 灰色
+]
+
 interface Props {
     show: boolean
     categories: any[]
@@ -136,7 +159,7 @@ const message = useMessage()
 // 响应式数据
 const newCategory = ref({
     name: '',
-    color: '#18a058'
+    color: '#18A05880'
 })
 
 const editingCategory = ref(null)
@@ -159,7 +182,7 @@ const handleCreate = async () => {
 
         newCategory.value = {
             name: '',
-            color: '#18a058'
+            color: '#18A05880'
         }
 
         message.success('分类创建成功')
@@ -176,7 +199,7 @@ const handleEdit = (category) => {
     editingCategory.value = {
         id: category.id,
         name: category.name,
-        color: category.color || '#18a058'
+        color: category.color || '#18A05880'
     }
 }
 
