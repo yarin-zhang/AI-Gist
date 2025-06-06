@@ -31,7 +31,7 @@
       <NLayoutHeader 
         :height="headerHeight" 
         bordered 
-        content-style="padding: 24px;"
+        content-style="padding: 24px; padding-right: 56px;"
         :style="{
             zIndex: 10,
         }"
