@@ -1,3 +1,4 @@
+// @ts-nocheck
 const Path = require('path');
 const vuePlugin = require('@vitejs/plugin-vue')
 
@@ -9,11 +10,6 @@ const { defineConfig } = require('vite');
 const config = defineConfig({
     root: Path.join(__dirname, 'src', 'renderer'),
     publicDir: 'public',
-    main: {
-        // 调整 envPrefix 以解决 Electron + Prisma 构建问题
-        // 参考：https://github.com/prisma/prisma/discussions/21027
-        envPrefix: 'M_VITE_'
-    },
     server: {
         port: 8080,
     },
@@ -21,11 +17,14 @@ const config = defineConfig({
     build: {
         outDir: Path.join(__dirname, 'build', 'renderer'),
         emptyOutDir: true,
-        rollupOptions: {
-            external: ['@prisma/client', '.prisma/client/default'],
-        },
     },
     plugins: [vuePlugin()],
+    resolve: {
+        alias: {
+            '@': Path.resolve(__dirname, 'src/renderer'),
+            '~': Path.resolve(__dirname, 'src/renderer'),
+        }
+    }
 });
 
 module.exports = config;

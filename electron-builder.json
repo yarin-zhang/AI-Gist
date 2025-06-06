@@ -4,69 +4,96 @@
     "directories": {
         "output": "dist"
     },
-    "files": [
+    "publish": {
+        "provider": "github",
+        "owner": "yarin-zhang",
+        "repo": "AI-Gist",
+        "releaseType": "draft"
+    },    "files": [
         {
             "from": "build/main",
-            "to": "main",
+            "to": "./main",
             "filter": [
                 "**/*"
             ]
         },
         {
             "from": "build/renderer",
-            "to": "renderer",
+            "to": "./renderer",
             "filter": [
                 "**/*"
             ]
         },
         {
             "from": "src/main/static",
-            "to": "static",
+            "to": "./static",
             "filter": [
                 "**/*"
             ]
         },
         {
-            "from": "prisma",
-            "to": "prisma",
+            "from": "src/assets",
+            "to": "./assets",
             "filter": [
-                "**/*"
+                "*.png",
+                "*.ico",
+                "*.icns"
             ]
         },
-        "package.json",
-        "node_modules/@prisma/**",
-        "node_modules/.prisma/**"
+        "package.json"
     ],
-    "asarUnpack": [
-        "**/node_modules/.prisma/**",
-        "**/node_modules/@prisma/client/**"
-    ],
-    "extraResources": [
-        {
-            "from": "node_modules/.prisma",
-            "to": "node_modules/.prisma"
-        },
-        {
-            "from": "node_modules/@prisma",
-            "to": "node_modules/@prisma"
-        }
-    ],
+    "asarUnpack": [],
+    "extraResources": [],
     "nsis": {
         "oneClick": false,
         "perMachine": false,
         "allowToChangeInstallationDirectory": true,
-        "shortcutName": "Electron App"
+        "shortcutName": "AI Gist",
+        "installerIcon": "src/assets/windows.ico",
+        "uninstallerIcon": "src/assets/windows.ico"
     },
     "win": {
-        "target": "nsis"
+        "target": "nsis",
+        "icon": "src/assets/windows.ico",
+        "artifactName": "AI-Gist-${version}-Windows-Setup.${ext}"
     },
     "mac": {
         "target": "dmg",
-        "icon": "src/assets/macos.icns"
+        "icon": "src/assets/macos.icns",
+        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}"
+    },
+    "dmg": {
+        "background": "src/assets/dmg-background.png",
+        "contents": [
+            {
+                "x": 140,
+                "y": 180,
+                "type": "file"
+            },
+            {
+                "x": 400,
+                "y": 180,
+                "type": "link",
+                "path": "/Applications"
+            },
+            {
+                "x": 270,
+                "y": 320,
+                "type": "file",
+                "path": "src/assets/安装说明.html"
+            }
+        ],
+        "window": {
+            "width": 540,
+            "height": 480
+        },
+        "title": "AI Gist ${version}"
     },
     "linux": {
         "target": [
-            "snap"
-        ]
+            "AppImage"
+        ],
+        "icon": "src/assets/linux.png",
+        "artifactName": "AI-Gist-${version}-linux.${ext}"
     }
 }

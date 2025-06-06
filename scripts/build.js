@@ -1,3 +1,4 @@
+// @ts-nocheck
 const Path = require('path');
 const Chalk = require('chalk');
 const FileSystem = require('fs');
@@ -5,6 +6,9 @@ const Vite = require('vite');
 const ChildProcess = require('child_process');
 const compileTs = require('./private/tsc');
 
+/**
+ * 构建渲染进程
+ */
 function buildRenderer() {
     return Vite.build({
         configFile: Path.join(__dirname, '..', 'vite.config.js'),
@@ -13,79 +17,78 @@ function buildRenderer() {
     });
 }
 
+/**
+ * 构建主进程
+ */
 function buildMain() {
     const mainPath = Path.join(__dirname, '..', 'src', 'main');
+    console.log(Chalk.blueBright(`正在构建主进程：${mainPath}`));
     return compileTs(mainPath);
 }
 
-function generatePrismaClient() {
-    return new Promise((resolve, reject) => {
-        console.log(Chalk.yellowBright('Generating Prisma client...'));
-        const prismaProcess = ChildProcess.exec('npx prisma generate', {
-            cwd: Path.join(__dirname, '..')
-        });
+/**
+ * 复制资源文件到构建目录
+ */
+function copyResources() {
+    const resourcesPath = Path.join(__dirname, '..', 'resources');
+    const buildResourcesPath = Path.join(__dirname, '..', 'build', 'resources');
 
-        if (prismaProcess.stdout) {
-            prismaProcess.stdout.on('data', data => 
-                process.stdout.write(Chalk.yellowBright(`[prisma] `) + Chalk.white(data.toString()))
-            );
+    if (FileSystem.existsSync(resourcesPath)) {
+        FileSystem.cpSync(resourcesPath, buildResourcesPath, { recursive: true });
+        console.log(Chalk.greenBright('资源文件已复制到构建目录'));
+    }
+}
+
+/**
+ * 复制图标资源到构建目录
+ */
+function copyAssets() {
+    const assetsPath = Path.join(__dirname, '..', 'src', 'assets');
+    const buildAssetsPath = Path.join(__dirname, '..', 'build', 'assets');
+
+    if (FileSystem.existsSync(assetsPath)) {
+        // 确保目标目录存在
+        if (!FileSystem.existsSync(buildAssetsPath)) {
+            FileSystem.mkdirSync(buildAssetsPath, { recursive: true });
         }
-
-        if (prismaProcess.stderr) {
-            prismaProcess.stderr.on('data', data => 
-                process.stderr.write(Chalk.yellowBright(`[prisma] `) + Chalk.white(data.toString()))
-            );
-        }
-
-        prismaProcess.on('exit', exitCode => {
-            if (exitCode && exitCode > 0) {
-                reject(new Error(`Prisma generate failed with exit code ${exitCode}`));
-            } else {
-                console.log(Chalk.greenBright('Prisma client generated successfully!'));
-                resolve(undefined);
+        
+        // 复制图标文件
+        const iconFiles = ['windows.ico', 'macos.icns', 'linux.png', 'icon.png', 'tray.png', 'tray@2x.png'];
+        iconFiles.forEach(file => {
+            const srcPath = Path.join(assetsPath, file);
+            const destPath = Path.join(buildAssetsPath, file);
+            if (FileSystem.existsSync(srcPath)) {
+                FileSystem.copyFileSync(srcPath, destPath);
+                console.log(Chalk.greenBright(`图标文件已复制: ${file}`));
             }
         });
-    });
-}
-
-function preparePrismaFiles() {
-    const srcPrismaPath = Path.join(__dirname, '..', 'prisma');
-    const buildPrismaPath = Path.join(__dirname, '..', 'build', 'prisma');
-    
-    // 确保构建目录存在
-    if (!FileSystem.existsSync(buildPrismaPath)) {
-        FileSystem.mkdirSync(buildPrismaPath, { recursive: true });
-    }
-    
-    // 复制 schema.prisma 文件
-    if (FileSystem.existsSync(Path.join(srcPrismaPath, 'schema.prisma'))) {
-        FileSystem.copyFileSync(
-            Path.join(srcPrismaPath, 'schema.prisma'),
-            Path.join(buildPrismaPath, 'schema.prisma')
-        );
-        console.log(Chalk.greenBright('Prisma schema copied to build directory'));
     }
 }
 
+// 清理构建目录
 FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
     recursive: true,
     force: true,
-})
-
-console.log(Chalk.blueBright('Building application...'));
-
-// 首先生成 Prisma 客户端，然后构建应用
-generatePrismaClient().then(() => {
-    preparePrismaFiles();
-    console.log(Chalk.blueBright('Transpiling renderer & main...'));
-    
-    return Promise.allSettled([
-        buildRenderer(),
-        buildMain(),
-    ]);
-}).then(() => {
-    console.log(Chalk.greenBright('Renderer & main successfully transpiled! (ready to be built with electron-builder)'));
-}).catch((error) => {
-    console.error(Chalk.redBright('Build failed:'), error);
-    process.exit(1);
 });
+
+console.log(Chalk.blueBright('开始构建应用程序...'));
+
+// 并行构建渲染进程和主进程
+Promise.all([
+    buildRenderer(),
+    buildMain(),
+])
+    .then(() => {
+        // 复制必要的资源文件
+        copyResources();
+        
+        // 复制图标资源文件
+        copyAssets();
+        
+        console.log(Chalk.greenBright('构建成功完成！'));
+        console.log(Chalk.greenBright('可以使用 electron-builder 进行打包。'));
+    })
+    .catch((error) => {
+        console.error(Chalk.redBright('构建失败：'), error);
+        process.exit(1);
+    });

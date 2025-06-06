@@ -4,10 +4,36 @@
 export default interface ElectronApi {
   sendMessage: (message: string) => void
   
-  // tRPC 通信
-  trpc: {
-    query: (path: string, input?: any) => Promise<any>
-    mutate: (path: string, input?: any) => Promise<any>
+  preferences: {
+    get: () => Promise<any>
+    set: (prefs: any) => Promise<any>
+    reset: () => Promise<any>
+  }
+  
+  window: {
+    show: () => Promise<void>
+    hideToTray: () => Promise<void>
+    getSize: () => Promise<{ width: number; height: number } | null>
+    getContentSize: () => Promise<{ width: number; height: number } | null>
+  }
+  
+  theme: {
+    getCurrent: () => Promise<'light' | 'dark' | 'system'>
+    getInfo: () => Promise<{
+      currentTheme: 'light' | 'dark' | 'system'
+      isDarkTheme: boolean
+      isHighContrastTheme: boolean
+      themeSource: string
+      shouldUseDarkColors: boolean
+      shouldUseHighContrastColors: boolean
+      shouldUseInvertedColorScheme: boolean
+    }>
+    setSource: (source: 'system' | 'light' | 'dark') => Promise<'light' | 'dark' | 'system'>
+    isDark: () => Promise<boolean>
+    onThemeChanged: (callback: (data: {
+      theme: 'light' | 'dark' | 'system'
+      themeInfo: any
+    }) => void) => () => void
   }
 }
 

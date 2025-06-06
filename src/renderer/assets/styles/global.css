@@ -3,4 +3,97 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 主题样式变量 */
+body.light {
+  --app-bg-color: #ffffff;
+  --app-text-color: #333333;
+  --app-border-color: #e0e0e6;
+  --app-surface-color: #f8f9fa;
+}
+
+body.dark {
+  --app-bg-color: #101014;
+  --app-text-color: #ffffffd1;
+  --app-border-color: #262626;
+  --app-surface-color: #18181c;
+}
+
+/* 基础元素样式 */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--app-bg-color);
+  color: var(--app-text-color);
+  overflow: hidden; /* 防止应用本身出现滚动条 */
+}
+
+/* 全屏Modal样式 - 统一处理 */
+.n-modal-container .n-modal.fullscreen-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card {
+  height: 100% !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card .n-card__content {
+  flex: 1 !important;
+  overflow: auto !important;
+}
+
+.n-modal-container .n-modal.fullscreen-modal .n-card .n-card__footer {
+  flex-shrink: 0 !important;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
+}
+
+/* 深色主题下的滚动条 */
+body.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+body.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
