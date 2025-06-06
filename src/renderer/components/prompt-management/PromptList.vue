@@ -2,17 +2,24 @@
     <div class="prompt-list">
         <!-- 搜索和过滤器 -->
         <NCard>
-            <NFlex vertical size="small">
+            <NFlex vertical :size="getCardSpacing()">
                 <NFlex>
-                    <NInput v-model:value="searchText" placeholder="搜索提示词" style="flex: 1" @input="handleSearch" clearable>
+                    <NInput v-model:value="searchText" placeholder="搜索提示词" style="flex: 1" @input="handleSearch"
+                        clearable>
                         <template #prefix>
                             <NIcon>
                                 <Search />
                             </NIcon>
                         </template>
                     </NInput>
-                    <NSelect v-model:value="selectedCategory" placeholder="选择分类" style="width: 200px"
-                        :options="categoryOptions" clearable @update:value="handleCategoryFilter" />
+                    <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
+                        <template #icon>
+                            <NIcon>
+                                <Tag />
+                            </NIcon>
+                        </template>
+                        高级筛选
+                    </NButton>
                     <NButton :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
                         <template #icon>
                             <NIcon>
@@ -23,36 +30,91 @@
                     </NButton>
                 </NFlex>
                 <!-- 搜索提示信息 -->
-                <div v-if="searchText.trim()" style="padding: 8px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
+                <div v-if="searchText.trim() || selectedCategory || showFavoritesOnly"
+                    style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
                     <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
                         <Search />
                     </NIcon>
-                    正在搜索: 包含 "{{ searchText.trim() }}" 的提示词
+                    <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
+                    <span v-if="selectedCategory"> 分类: {{ getCategoryName(selectedCategory) }}</span>
+                    <span v-if="showFavoritesOnly">仅显示收藏</span>
                     <span v-if="!isLoading" style="margin-left: 8px; color: var(--n-color-primary);">
                         (找到 {{ prompts.length }} 个结果)
                     </span>
                 </div>
-                <!-- 热门标签快捷搜索 -->
-                <div v-if="!searchText.trim() && popularTags.length > 0" style="padding: 8px 0;">
-                    <NFlex size="small" wrap>
-                        <NTag 
-                            v-for="tag in popularTags.slice(0, 8)" 
-                            :key="tag.name" 
-                            size="small" 
-                            :bordered="false"
-                            clickable
-                            :color="getTagColor(tag.name)"
-                            @click="handleTagQuickSearch(tag.name)"
-                            style="cursor: pointer;"
-                        >
-                            <template #icon>
-                                <NIcon>
-                                    <Tag />
-                                </NIcon>
-                            </template>
-                            {{ tag.name }} ({{ tag.count }})
-                        </NTag>
-                    </NFlex>
+
+                <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
+                <div v-if="showAdvancedFilter">
+                    <!-- 分类快捷筛选 -->
+                    <div v-if="categories.length > 0" :style="{ padding: categoriesExpanded ? '4px 0' : '2px 0' }">
+                        <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">分类筛选</NText>
+                            <NButton text size="small" @click="toggleCategoriesExpanded">
+                                <template #icon>
+                                    <NIcon>
+                                        <ChevronDown v-if="!categoriesExpanded" />
+                                        <ChevronUp v-else />
+                                    </NIcon>
+                                </template>
+                                {{ categoriesExpanded ? '收起' : '展开' }}
+                            </NButton>
+                        </NFlex>
+                        <div v-show="categoriesExpanded">
+                            <NFlex size="small" wrap>
+                                <NTag size="small" :bordered="false" :checked="!selectedCategory" checkable
+                                    @click="handleCategoryQuickFilter(null)" style="cursor: pointer;">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Box />
+                                        </NIcon>
+                                    </template>
+                                    全部分类 ({{ allPrompts.length }})
+                                </NTag>
+                                <NTag v-for="category in categories" :key="category.id" size="small" :bordered="false"
+                                    :checked="selectedCategory === category.id" checkable
+                                    :color="getCategoryTagColor(category)"
+                                    @click="handleCategoryQuickFilter(category.id)" style="cursor: pointer;">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Box />
+                                        </NIcon>
+                                    </template>
+                                    {{ category.name }} ({{ getCategoryPromptCount(category.id) }})
+                                </NTag>
+                            </NFlex>
+                        </div>
+                    </div>
+
+                    <!-- 热门标签快捷搜索 -->
+                    <div v-if="popularTags.length > 0" :style="{ padding: tagsExpanded ? '4px 0' : '2px 0' }">
+                        <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">热门标签</NText>
+                            <NButton text size="small" @click="toggleTagsExpanded">
+                                <template #icon>
+                                    <NIcon>
+                                        <ChevronDown v-if="!tagsExpanded" />
+                                        <ChevronUp v-else />
+                                    </NIcon>
+                                </template>
+                                {{ tagsExpanded ? '收起' : '展开' }}
+                            </NButton>
+                        </NFlex>
+                        <div v-show="tagsExpanded">
+                            <NFlex size="small" wrap>
+                                <NTag v-for="tag in (tagsExpanded ? popularTags : popularTags.slice(0, 6))"
+                                    :key="tag.name" size="small" :bordered="false" clickable
+                                    :color="getTagColor(tag.name)" @click="handleTagQuickSearch(tag.name)"
+                                    style="cursor: pointer;" :class="{ 'highlighted-tag': isTagMatched(tag.name) }">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Tag />
+                                        </NIcon>
+                                    </template>
+                                    {{ tag.name }} ({{ tag.count }})
+                                </NTag>
+                            </NFlex>
+                        </div>
+                    </div>
                 </div>
             </NFlex>
         </NCard> <!-- 提示词列表 -->
@@ -108,8 +170,7 @@
                             <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
                                 {{ prompt.variables.length }} 个变量
                             </NTag>
-                            <NTag v-if="prompt.category" size="small"
-                                :color="{ color: prompt.category.color || '#18a058' }">
+                            <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
                                 <template #icon>
                                     <NIcon>
                                         <Box />
@@ -164,7 +225,9 @@ import {
     Trash,
     Copy,
     Tag,
-    Box
+    Box,
+    ChevronDown,
+    ChevronUp
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
@@ -190,6 +253,13 @@ const searchText = ref('')
 const selectedCategory = ref(null)
 const showFavoritesOnly = ref(false)
 
+// 高级筛选开关
+const showAdvancedFilter = ref(false)
+
+// 折叠展开状态
+const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
+const tagsExpanded = ref(true) // 高级筛选开启时默认展开
+
 // 计算属性
 const categoryOptions = computed(() => [
     { label: '全部分类', value: null },
@@ -199,10 +269,42 @@ const categoryOptions = computed(() => [
     }))
 ])
 
+// 获取分类名称
+const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return '全部分类'
+    const category = categories.value.find(cat => cat.id === categoryId)
+    return category?.name || '未知分类'
+}
+
+// 获取分类下的提示词数量
+const getCategoryPromptCount = (categoryId: string | null) => {
+    if (!categoryId) return allPrompts.value.length
+    return allPrompts.value.filter(prompt => prompt.categoryId === categoryId).length
+}
+
+// 获取分类标签颜色配置
+const getCategoryTagColor = (category: any) => {
+    const baseColor = category.color || '#18a058'
+    return {
+        color: baseColor,
+        borderColor: baseColor,
+        textColor: '#ffffff'
+    }
+}
+
+// 计算卡片间距 - 根据展开状态动态调整
+const getCardSpacing = () => {
+    // 如果显示高级筛选且有任何区域展开，使用正常间距，否则使用紧凑间距
+    if (showAdvancedFilter.value && (categoriesExpanded.value || tagsExpanded.value)) {
+        return 'small'
+    }
+    return 4 // 使用数字表示更小的间距
+}
+
 // 计算热门标签
 const popularTags = computed(() => {
     const tagCounts = new Map()
-    
+
     allPrompts.value.forEach(prompt => {
         if (prompt.tags) {
             const tags = getTagsArray(prompt.tags)
@@ -214,7 +316,7 @@ const popularTags = computed(() => {
             })
         }
     })
-    
+
     return Array.from(tagCounts.entries())
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
@@ -224,10 +326,10 @@ const popularTags = computed(() => {
 const loadPrompts = async () => {
     try {
         isLoading.value = true
-        
+
         // 加载所有提示词用于计算热门标签
         allPrompts.value = await api.prompts.getAll.query({})
-        
+
         // 根据过滤条件加载显示的提示词
         const filters = {
             categoryId: selectedCategory.value || undefined,
@@ -261,9 +363,31 @@ const handleCategoryFilter = () => {
     loadPrompts()
 }
 
+const handleCategoryQuickFilter = (categoryId: string | null) => {
+    selectedCategory.value = categoryId
+    loadPrompts()
+}
+
+const toggleCategoriesExpanded = () => {
+    categoriesExpanded.value = !categoriesExpanded.value
+}
+
+const toggleTagsExpanded = () => {
+    tagsExpanded.value = !tagsExpanded.value
+}
+
 const toggleFavoritesFilter = () => {
     showFavoritesOnly.value = !showFavoritesOnly.value
     loadPrompts()
+}
+
+const toggleAdvancedFilter = () => {
+    showAdvancedFilter.value = !showAdvancedFilter.value
+    // 当开启高级筛选时，默认展开分类和标签区域
+    if (showAdvancedFilter.value) {
+        categoriesExpanded.value = true
+        tagsExpanded.value = true
+    }
 }
 
 const toggleFavorite = async (promptId) => {
@@ -394,15 +518,8 @@ onMounted(() => {
 
 /* 高亮匹配的标签 */
 .highlighted-tag {
-    animation: pulse 1s ease-in-out infinite alternate;
-}
-
-@keyframes pulse {
-    from {
-        box-shadow: 0 0 5px rgba(24, 160, 88, 0.5);
-    }
-    to {
-        box-shadow: 0 0 15px rgba(24, 160, 88, 0.8);
-    }
+    border: 1px solid var(--n-color-primary) !important;
+    transform: scale(1.02);
+    transition: all 0.3s ease;
 }
 </style>
