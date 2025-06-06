@@ -42,5 +42,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
     generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
+    intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
   }
 });

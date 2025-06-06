@@ -26,8 +26,11 @@
                 @update:value="(value) => toggleConfig(config.id!, value)"
               />
               <n-button size="small" @click="editConfig(config)">编辑</n-button>
-              <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(String(config.id!))">
+              <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(config.id!)">
                 测试连接
+              </n-button>
+              <n-button size="small" @click="intelligentTest(config)" :loading="intelligentTestingConfigs.has(config.id!)" type="info">
+                智能测试
               </n-button>
               <n-button size="small" type="error" @click="deleteConfig(config.id!)">删除</n-button>
             </div>
@@ -81,6 +84,32 @@
           />
         </n-form-item>
         
+        <!-- 表单内测试连接 -->
+        <n-form-item>
+          <n-button 
+            @click="testFormConnection" 
+            :loading="testingFormConnection"
+            :disabled="!formData.baseURL || (formData.type === 'openai' && !formData.apiKey)"
+            type="info"
+            block
+          >
+            测试连接并获取模型列表
+          </n-button>
+        </n-form-item>
+        
+        <!-- 测试结果显示 -->
+        <n-alert 
+          v-if="formTestResult" 
+          :type="formTestResult.success ? 'success' : 'error'"
+          :title="formTestResult.success ? '连接成功' : '连接失败'"
+          style="margin-bottom: 16px;"
+        >
+          {{ formTestResult.success 
+            ? `发现 ${formTestResult.models?.length || 0} 个可用模型` 
+            : formTestResult.error 
+          }}
+        </n-alert>
+        
         <n-form-item label="模型列表" path="models">
           <n-dynamic-tags v-model:value="formData.models" />
         </n-form-item>
@@ -101,6 +130,27 @@
             {{ editingConfig ? '更新' : '添加' }}
           </n-button>
         </n-space>
+      </template>
+    </n-modal>
+
+    <!-- 智能测试结果弹窗 -->
+    <n-modal v-model:show="showIntelligentTestResult" preset="dialog" title="智能测试结果">
+      <div v-if="intelligentTestResult">
+        <n-alert v-if="intelligentTestResult.success" type="success" title="测试成功">
+          <div style="margin-top: 12px;">
+            <strong>AI 回复:</strong>
+            <div style="background: var(--code-color); padding: 12px; border-radius: 6px; margin-top: 8px; white-space: pre-wrap;">
+              {{ intelligentTestResult.response }}
+            </div>
+          </div>
+        </n-alert>
+        <n-alert v-else type="error" title="测试失败">
+          {{ intelligentTestResult.error }}
+        </n-alert>
+      </div>
+      
+      <template #action>
+        <n-button @click="showIntelligentTestResult = false">关闭</n-button>
       </template>
     </n-modal>
   </div>
@@ -127,6 +177,7 @@ import {
     NText,
     NFormRules,
     NMessage,
+    NAlert,
     useMessage 
 } from 'naive-ui'
 import { Plus } from '@vicons/tabler'
@@ -141,6 +192,11 @@ const showAddModal = ref(false)
 const editingConfig = ref<AIConfig | null>(null)
 const saving = ref(false)
 const testingConfigs = ref(new Set<number>())
+const intelligentTestingConfigs = ref(new Set<number>())
+const testingFormConnection = ref(false)
+const formTestResult = ref<{ success: boolean; models?: string[]; error?: string } | null>(null)
+const showIntelligentTestResult = ref(false)
+const intelligentTestResult = ref<{ success: boolean; response?: string; error?: string } | null>(null)
 
 // 表单数据
 const formData = reactive({
@@ -302,10 +358,85 @@ const testConfig = async (config: AIConfig) => {
   }
 }
 
+// 表单内测试连接并获取模型
+const testFormConnection = async () => {
+  testingFormConnection.value = true
+  formTestResult.value = null
+  
+  try {
+    // 构建临时配置对象进行测试
+    const tempConfig = {
+      configId: 'temp_test',
+      name: formData.name || 'Test',
+      type: formData.type,
+      baseURL: formData.baseURL,
+      apiKey: formData.apiKey,
+      models: [],
+      enabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    
+    const result = await window.electronAPI.ai.testConfig(tempConfig)
+    formTestResult.value = result
+    
+    if (result.success) {
+      message.success('连接测试成功')
+      
+      // 自动填充模型列表
+      if (result.models && result.models.length > 0) {
+        formData.models = [...result.models]
+        
+        // 如果还没有设置默认模型，自动设置第一个
+        if (!formData.defaultModel && result.models.length > 0) {
+          formData.defaultModel = result.models[0]
+        }
+        
+        message.info(`已自动填充 ${result.models.length} 个可用模型`)
+      }
+    } else {
+      message.error(`连接测试失败: ${result.error}`)
+    }
+  } catch (error) {
+    message.error('测试失败: ' + (error as Error).message)
+    formTestResult.value = { success: false, error: (error as Error).message }
+  } finally {
+    testingFormConnection.value = false
+  }
+}
+
+// 智能测试 - 发送真实提示词
+const intelligentTest = async (config: AIConfig) => {
+  if (!config.id) return
+  
+  intelligentTestingConfigs.value.add(config.id)
+  try {
+    // 序列化配置对象以确保可以通过 IPC 传递
+    const serializedConfig = serializeConfig(config)
+    
+    const result = await window.electronAPI.ai.intelligentTest(serializedConfig)
+    intelligentTestResult.value = result
+    showIntelligentTestResult.value = true
+    
+    if (result.success) {
+      message.success('智能测试完成，AI已成功响应')
+    } else {
+      message.error(`智能测试失败: ${result.error}`)
+    }
+  } catch (error) {
+    message.error('智能测试失败: ' + (error as Error).message)
+    intelligentTestResult.value = { success: false, error: (error as Error).message }
+    showIntelligentTestResult.value = true
+  } finally {
+    intelligentTestingConfigs.value.delete(config.id)
+  }
+}
+
 // 关闭弹窗
 const closeModal = () => {
   showAddModal.value = false
   editingConfig.value = null
+  formTestResult.value = null
   resetForm()
 }
 
@@ -318,6 +449,7 @@ const resetForm = () => {
   formData.models = []
   formData.defaultModel = ''
   formData.customModel = ''
+  formTestResult.value = null
 }
 
 // 类型变化处理

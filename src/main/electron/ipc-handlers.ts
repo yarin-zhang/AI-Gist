@@ -187,6 +187,19 @@ class IpcHandlers {
       
       return await aiServiceManager.generatePrompt(requestWithConfig);
     });
+
+    // 智能测试 - 发送真实提示词并获取AI响应
+    ipcMain.handle('ai:intelligent-test', async (_, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.intelligentTest(processedConfig);
+    });
   }
 
   /**
@@ -217,6 +230,7 @@ class IpcHandlers {
     ipcMain.removeHandler('ai:test-config');
     ipcMain.removeHandler('ai:get-models');
     ipcMain.removeHandler('ai:generate-prompt');
+    ipcMain.removeHandler('ai:intelligent-test');
   }
 }
 

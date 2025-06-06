@@ -41,7 +41,8 @@ class AIServiceManager {
         // 尝试发送一个简单的测试请求
         try {
           await llm.invoke('test');
-          return { success: true };
+          // OpenAI 类型连接成功，返回配置中的模型列表
+          return { success: true, models: config.models || [] };
         } catch (error: any) {
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
@@ -50,7 +51,7 @@ class AIServiceManager {
             return { success: false, error: '无法连接到服务器，请检查 baseURL' };
           }
           // 其他错误可能是正常的（比如模型不存在等），但连接是成功的
-          return { success: true };
+          return { success: true, models: config.models || [] };
         }
       } else if (config.type === 'ollama') {
         try {
@@ -96,6 +97,68 @@ class AIServiceManager {
     } catch (error) {
       console.error('获取模型列表失败:', error);
       return [];
+    }
+  }
+
+  /**
+   * 智能测试 - 发送真实提示词并获取AI响应
+   */
+  async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string }> {
+    try {
+      if (!config.enabled) {
+        return { success: false, error: '配置已禁用' };
+      }
+
+      const model = config.defaultModel || config.customModel || (config.models && config.models[0]);
+      if (!model) {
+        return { success: false, error: '未配置可用模型' };
+      }
+
+      // 使用简单的测试提示词
+      const testPrompt = '请简单介绍一下人工智能，不超过50字。';
+      
+      let llm: any;
+      
+      if (config.type === 'openai') {
+        llm = new ChatOpenAI({
+          openAIApiKey: config.apiKey,
+          modelName: model,
+          configuration: {
+            baseURL: config.baseURL || undefined
+          }
+        });
+      } else if (config.type === 'ollama') {
+        llm = new Ollama({
+          baseUrl: config.baseURL,
+          model: model
+        });
+      } else {
+        return { success: false, error: '不支持的配置类型' };
+      }
+
+      // 发送测试请求
+      const response = await llm.invoke(testPrompt);
+      const responseText = typeof response === 'string' ? response : response.content;
+
+      return {
+        success: true,
+        response: responseText
+      };
+    } catch (error: any) {
+      console.error('智能测试失败:', error);
+      
+      // 处理常见错误类型
+      if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+        return { success: false, error: 'API Key 无效或已过期' };
+      }
+      if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+        return { success: false, error: '网络连接失败，请检查服务器地址' };
+      }
+      if (error.message?.includes('model') || error.message?.includes('not found')) {
+        return { success: false, error: '指定的模型不存在或不可用' };
+      }
+      
+      return { success: false, error: error.message || '未知错误' };
     }
   }
 

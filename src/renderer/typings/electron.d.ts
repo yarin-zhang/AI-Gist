@@ -81,6 +81,7 @@ export default interface ElectronApi {
     testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
+    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
   }
 }
 
