@@ -17,7 +17,7 @@
           position: 'absolute',
           top: '16px',
           right: '16px',
-          zIndex: 1
+          zIndex: 10
         }"
       >
         <template #icon>
@@ -32,6 +32,9 @@
         :height="headerHeight" 
         bordered 
         content-style="padding: 24px;"
+        :style="{
+            zIndex: 10,
+        }"
       >
         <slot name="header" />
       </NLayoutHeader>
@@ -50,6 +53,9 @@
         bordered 
         content-style="padding: 24px;" 
         position="absolute"
+        :style="{
+            zIndex: 10,
+        }"
       >
         <slot name="footer" />
       </NLayoutFooter>
@@ -70,6 +76,7 @@ import {
 } from 'naive-ui'
 import { X } from '@vicons/tabler'
 import { useWindowSize } from '@/composables/useWindowSize'
+import { z } from 'zod'
 
 interface Props {
   show: boolean
