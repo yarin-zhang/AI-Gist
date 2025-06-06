@@ -71,8 +71,8 @@
 
                 <template #footer>
                     <NFlex justify="space-between" align="center">
-                        <!-- 分类和标签放在同一行 -->
-                        <NFlex size="small" align="center" style="margin-top: 8px;" wrap>
+                        <!-- 标签区域 -->
+                        <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
                             <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
                                 {{ prompt.variables.length }} 个变量
                             </NTag>
@@ -97,7 +97,8 @@
                                 </NTag>
                             </template>
                         </NFlex>
-                        <NText depth="3" style="font-size: 12px;">
+                        <!-- 使用次数区域 -->
+                        <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
                             使用 {{ prompt.useCount }} 次
                         </NText>
                     </NFlex>
