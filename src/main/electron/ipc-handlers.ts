@@ -200,6 +200,26 @@ class IpcHandlers {
       
       return await aiServiceManager.intelligentTest(processedConfig);
     });
+
+    // 流式生成 Prompt
+    ipcMain.handle('ai:generate-prompt-stream', async (event, request: AIGenerationRequest, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.generatePromptWithStream(
+        request,
+        processedConfig,
+        (charCount: number) => {
+          // 发送进度更新到渲染进程
+          event.sender.send('ai:stream-progress', charCount);
+        }
+      );
+    });
   }
 
   /**
@@ -231,6 +251,7 @@ class IpcHandlers {
     ipcMain.removeHandler('ai:get-models');
     ipcMain.removeHandler('ai:generate-prompt');
     ipcMain.removeHandler('ai:intelligent-test');
+    ipcMain.removeHandler('ai:generate-prompt-stream');
   }
 }
 

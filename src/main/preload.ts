@@ -42,6 +42,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
     generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
+    generatePromptStream: (request: any, config: any, onProgress: (charCount: number) => void) => {
+      // 监听流式进度
+      const progressListener = (_: any, charCount: number) => onProgress(charCount);
+      ipcRenderer.on('ai:stream-progress', progressListener);
+      
+      // 调用流式生成
+      const promise = ipcRenderer.invoke('ai:generate-prompt-stream', request, config);
+      
+      // 清理监听器
+      promise.finally(() => {
+        ipcRenderer.removeListener('ai:stream-progress', progressListener);
+      });
+      
+      return promise;
+    },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
   }
 });

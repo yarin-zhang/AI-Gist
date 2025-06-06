@@ -164,6 +164,11 @@
                         </template>
 
                         <NFlex vertical size="small">
+                            <!-- 更新时间 -->
+                            <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
+                                {{ new Date(prompt.updatedAt).toLocaleDateString() }}
+                            </NText> -->
+                            <!-- 描述或内容预览 -->
                             <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
                             <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
                                 {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}

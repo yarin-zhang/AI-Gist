@@ -17,41 +17,50 @@
         </n-form-item>
         
         <n-form-item>
-          <n-space>
-            <n-button 
-              type="primary" 
-              @click="generatePrompt" 
-              :loading="generating"
-              :disabled="!defaultConfig"
-              size="large"
-            >
-              {{ generating ? '生成中...' : '确定' }}
-            </n-button>
-            
-            <n-dropdown 
-              :options="modelDropdownOptions" 
-              @select="onModelSelect"
-              trigger="click"
-              v-if="defaultConfig"
-            >
-              <n-button size="large" quaternary>
-                {{ currentModel || '默认模型' }}
-                <template #icon>
-                  <n-icon><ChevronDown /></n-icon>
-                </template>
+          <n-space justify="space-between" style="width: 100%;">
+            <n-space>
+              <n-button 
+                type="primary" 
+                @click="generatePrompt" 
+                :loading="generating"
+                :disabled="!defaultConfig"
+                size="large"
+              >
+                {{ generating ? '生成中...' : '确定' }}
               </n-button>
-            </n-dropdown>
+              
+              <n-dropdown 
+                :options="modelDropdownOptions" 
+                @select="onModelSelect"
+                trigger="click"
+                v-if="defaultConfig"
+              >
+                <n-button size="large" quaternary>
+                  {{ currentModel || '默认模型' }}
+                  <template #icon>
+                    <n-icon><ChevronDown /></n-icon>
+                  </template>
+                </n-button>
+              </n-dropdown>
+            </n-space>
             
-            <n-button 
-              @click="toggleHistory" 
-              quaternary
-              size="large"
-            >
-              <template #icon>
-                <n-icon><History /></n-icon>
-              </template>
-              历史记录
-            </n-button>
+            <n-space>
+              <!-- 生成进度提示 -->
+              <n-text v-if="generating && streamStats.charCount > 0" type="info">
+                已生成 {{ streamStats.charCount }} 字符
+              </n-text>
+              
+              <n-button 
+                @click="toggleHistory" 
+                quaternary
+                size="large"
+              >
+                <template #icon>
+                  <n-icon><History /></n-icon>
+                </template>
+                历史记录
+              </n-button>
+            </n-space>
           </n-space>
         </n-form-item>
       </n-form>
@@ -139,6 +148,7 @@ import {
     NThing,
     NDropdown,
     NEmpty,
+    NText,
     useMessage 
 } from 'naive-ui'
 import { ChevronDown, History, Refresh, Check, AlertCircle, X } from '@vicons/tabler'
@@ -159,6 +169,12 @@ const showHistory = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
 const categories = ref<any[]>([])
+
+// 流式传输状态
+const streamStats = reactive({
+  charCount: 0,
+  isStreaming: false
+})
 
 // 表单数据
 const formData = reactive({
@@ -259,6 +275,10 @@ const generatePrompt = async () => {
     await formRef.value?.validate()
     generating.value = true
     
+    // 重置流式传输状态
+    streamStats.charCount = 0
+    streamStats.isStreaming = true
+    
     if (!defaultConfig.value) {
       throw new Error('没有可用的 AI 配置')
     }
@@ -272,8 +292,23 @@ const generatePrompt = async () => {
     // 序列化配置对象以确保可以通过 IPC 传递
     const serializedConfig = serializeConfig(defaultConfig.value)
     
-    // 传递配置对象给主进程
-    const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
+    // 检查是否支持流式传输
+    let result
+    if (window.electronAPI.ai.generatePromptStream) {
+      // 使用流式传输
+      result = await window.electronAPI.ai.generatePromptStream(
+        request, 
+        serializedConfig,
+        (charCount: number) => {
+          streamStats.charCount = charCount;
+        }
+      );
+    } else {
+      // 使用普通生成
+      result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
+      // 模拟字数增长
+      await simulateStreamProgress(result.generatedPrompt)
+    }
     
     // 保存到历史记录
     await api.aiGenerationHistory.create.mutate({
@@ -319,7 +354,25 @@ const generatePrompt = async () => {
     }
   } finally {
     generating.value = false
+    streamStats.isStreaming = false
+    streamStats.charCount = 0
   }
+}
+
+// 模拟流式进度（在不支持真正流式传输时使用）
+const simulateStreamProgress = async (finalContent: string) => {
+  const totalChars = finalContent.length
+  const steps = 20 // 分20步显示
+  const stepSize = Math.ceil(totalChars / steps)
+  
+  for (let i = 0; i < steps; i++) {
+    if (!generating.value) break // 如果已取消，停止模拟
+    
+    streamStats.charCount = Math.min((i + 1) * stepSize, totalChars)
+    await new Promise(resolve => setTimeout(resolve, 100)) // 每100ms更新一次
+  }
+  
+  streamStats.charCount = totalChars
 }
 
 // 直接保存生成的提示词
@@ -413,18 +466,21 @@ const loadCategories = async () => {
 <style scoped>
 .ai-generator {
   padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
-  display: grid;
-  gap: 20px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  display: block;
 }
 
 .generator-card {
   border: 1px solid var(--border-color);
+  width: 100%;
 }
 
 .history-card {
   border: 1px solid var(--border-color);
+  width: 100%;
+  margin-top: 20px;
 }
 
 .history-content {
@@ -439,8 +495,17 @@ const loadCategories = async () => {
   font-size: 14px;
 }
 
-/* 简化布局，去除复杂的响应式网格 */
-.ai-generator {
-  display: block;
+/* 确保表单元素也全宽 */
+.n-form {
+  width: 100%;
+}
+
+.n-form-item {
+  width: 100%;
+}
+
+/* 确保按钮组合也能正确布局 */
+.n-space {
+  width: 100%;
 }
 </style>

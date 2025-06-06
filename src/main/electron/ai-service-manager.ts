@@ -240,6 +240,115 @@ class AIServiceManager {
       throw new Error(`生成失败: ${error.message}`);
     }
   }
+
+  /**
+   * 流式生成 Prompt（支持实时返回字符数统计）
+   */
+  async generatePromptWithStream(
+    request: AIGenerationRequest,
+    config: ProcessedAIConfig, 
+    onProgress: (charCount: number) => void
+  ): Promise<AIGenerationResult> {
+    const model = request.model || config.defaultModel || config.customModel;
+    
+    if (!model) {
+      throw new Error('未指定模型');
+    }
+
+    if (!config.enabled) {
+      throw new Error('配置已禁用');
+    }
+
+    // 系统提示词
+    const systemPrompt = `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
+
+要求：
+1. 提示词应该清晰、具体、可操作
+2. 包含必要的上下文和约束条件
+3. 使用适当的格式和结构
+4. 考虑不同的使用场景
+5. 提供具体的输出格式要求
+
+请直接返回优化后的提示词内容，不需要额外的解释。`;
+
+    // 构建用户提示词
+    const userPrompt = request.customPrompt || 
+      `请为以下主题生成一个专业的 AI 提示词：
+
+主题：${request.topic}
+
+请生成一个完整、可直接使用的提示词。`;
+
+    try {
+      let llm: any;
+      
+      if (config.type === 'openai') {
+        llm = new ChatOpenAI({
+          openAIApiKey: config.apiKey,
+          modelName: model,
+          configuration: {
+            baseURL: config.baseURL || undefined
+          },
+          streaming: true // 启用流式传输
+        });
+      } else if (config.type === 'ollama') {
+        llm = new Ollama({
+          baseUrl: config.baseURL,
+          model: model
+        });
+      } else {
+        throw new Error('不支持的配置类型');
+      }
+
+      // 构建消息
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+
+      let accumulatedContent = '';
+      
+      // 尝试使用流式传输
+      try {
+        const stream = await llm.stream(messages);
+        
+        for await (const chunk of stream) {
+          const content = typeof chunk === 'string' ? chunk : chunk.content;
+          if (content) {
+            accumulatedContent += content;
+            onProgress(accumulatedContent.length);
+          }
+        }
+      } catch (streamError) {
+        // 如果流式传输失败，回退到普通调用
+        console.warn('流式传输失败，回退到普通调用:', streamError);
+        const response = await llm.invoke(messages);
+        accumulatedContent = typeof response === 'string' ? response : response.content;
+        
+        // 模拟流式进度
+        const totalChars = accumulatedContent.length;
+        for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+          onProgress(Math.min(i, totalChars));
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+
+      const result: AIGenerationResult = {
+        id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        configId: config.configId,
+        topic: request.topic,
+        generatedPrompt: accumulatedContent,
+        model: model,
+        customPrompt: request.customPrompt,
+        createdAt: new Date()
+      };
+
+      return result;
+    } catch (error: any) {
+      console.error('流式生成 Prompt 失败:', error);
+      throw new Error(`生成失败: ${error.message}`);
+    }
+  }
 }
 
 // 单例模式
