@@ -13,6 +13,8 @@ export default interface ElectronApi {
   window: {
     show: () => Promise<void>
     hideToTray: () => Promise<void>
+    getSize: () => Promise<{ width: number; height: number } | null>
+    getContentSize: () => Promise<{ width: number; height: number } | null>
   }
   
   theme: {
