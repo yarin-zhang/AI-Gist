@@ -1,29 +1,56 @@
-<template>    <NModal :show="show" @update:show="$emit('update:show', $event)" :mask-closable="false" preset="card"
-        class="fullscreen-modal" title="提示词编辑">
-        <div style="height: 100%; display: flex; flex-direction: column;">
-            <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
-                style="flex: 1; overflow: hidden;">
-                <div style="height: 100%; display: flex; gap: 20px;">
-                    <!-- 左侧内容区 -->
-                    <div style="flex: 2; display: flex; flex-direction: column; overflow: hidden;"> <!-- 第一步：提示词内容 -->
-                        <div v-show="!showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
-                            <NScrollbar style="max-height: 75vh;">
-                                <NFormItem label="提示词内容" path="content">
-                                    <NInput v-model:value="formData.content" type="textarea"
-                                        placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" :rows="12" show-count />
-                                </NFormItem>
+<template>
+    <CommonModal 
+        ref="modalRef"
+        :show="show" 
+        @update:show="$emit('update:show', $event)"
+        @close="handleCancel"
+        :header-height="headerHeight"
+        :footer-height="footerHeight"
+        :content-padding="contentPadding"
+    >
+        <!-- 顶部固定区域 -->
+        <template #header>
+            <NFlex vertical size="medium" style="padding: 16px;">
+                <NFlex justify="space-between" align="center">
+                    <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                        {{ isEdit ? '编辑提示词' : '创建提示词' }}
+                    </NText>
+                </NFlex>
+                <NText depth="3">
+                    {{ !showExtraInfo ? '编写提示词内容并配置变量参数' : '完善提示词的基本信息和分类标签' }}
+                </NText>
+            </NFlex>
+        </template>
 
-                                <NAlert type="info" style="margin-top: 8px;">
-                                    <NText depth="3">
-                                        使用 <code v-pre>{{变量名}}</code> 来定义可替换的变量，右侧会自动识别并显示变量配置
-                                    </NText>
-                                </NAlert>
+        <!-- 中间可操作区域 -->
+        <template #content>
+            <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top">
+                <NGrid :cols="gridCols" :x-gap="16">
+                    <!-- 左侧：内容编辑区 -->
+                    <NGridItem :span="leftSpan">
+                        <!-- 第一步：提示词内容 -->
+                        <div v-show="!showExtraInfo">
+                            <NScrollbar :style="{ height: `${contentAreaHeight}px` }">
+                                <NFlex vertical size="medium">
+                                    <NFormItem label="提示词内容" path="content">
+                                        <NInput v-model:value="formData.content" type="textarea"
+                                            placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" 
+                                            :rows="Math.floor(contentAreaHeight / 35)" 
+                                            show-count />
+                                    </NFormItem>
+
+                                    <NAlert type="info">
+                                        <NText depth="3">
+                                            使用 <code v-pre>{{变量名}}</code> 来定义可替换的变量，右侧会自动识别并显示变量配置
+                                        </NText>
+                                    </NAlert>
+                                </NFlex>
                             </NScrollbar>
                         </div>
 
                         <!-- 第二步：额外信息 -->
-                        <div v-show="showExtraInfo" style="flex: 1;">
-                            <NScrollbar style="max-height: 75vh;">
+                        <div v-show="showExtraInfo">
+                            <NScrollbar :style="{ height: `${contentAreaHeight}px` }">
                                 <NCard title="基本信息" size="small">
                                     <NFlex vertical size="medium">
                                         <NFormItem label="标题" path="title">
@@ -34,33 +61,32 @@
                                             <NInput v-model:value="formData.description" type="textarea"
                                                 placeholder="请输入提示词描述（可选）" :rows="8" />
                                         </NFormItem>
-
                                     </NFlex>
                                 </NCard>
                             </NScrollbar>
                         </div>
-                    </div>
+                    </NGridItem>
 
-                    <!-- 右侧配置/预览区 -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                    <!-- 右侧：配置区 -->
+                    <NGridItem :span="rightSpan">
                         <!-- 变量识别和配置区（第一步显示） -->
-                        <div v-show="!showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
-                            <NScrollbar style="max-height: 75vh;">
-                                <NCard size="small" style="flex: 1; display: flex; flex-direction: column;">
-                                    <template #header>
-                                        <NFlex justify="space-between" align="center">
-                                            <NText>检测到的变量</NText>
-                                            <NButton size="small" @click="addVariable">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Plus />
-                                                    </NIcon>
-                                                </template>
-                                                手动添加
-                                            </NButton>
-                                        </NFlex>
-                                    </template>
+                        <div v-show="!showExtraInfo">
+                            <NCard size="small">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center">
+                                        <NText>检测到的变量</NText>
+                                        <NButton size="small" @click="addVariable">
+                                            <template #icon>
+                                                <NIcon>
+                                                    <Plus />
+                                                </NIcon>
+                                            </template>
+                                            手动添加
+                                        </NButton>
+                                    </NFlex>
+                                </template>
 
+                                <NScrollbar :style="{ height: `${contentAreaHeight}px` }">
                                     <div v-if="formData.variables.length === 0" style="padding: 20px 0;">
                                         <NEmpty description="在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量" size="small" />
                                     </div>
@@ -120,13 +146,13 @@
                                             </NFlex>
                                         </NCard>
                                     </NFlex>
-                                </NCard>
-                            </NScrollbar>
+                                </NScrollbar>
+                            </NCard>
                         </div>
 
                         <!-- 标签区（第二步显示） -->
-                        <div v-show="showExtraInfo" style="flex: 1; display: flex; flex-direction: column;">
-                            <NScrollbar style="max-height: 75vh;">
+                        <div v-show="showExtraInfo">
+                            <NScrollbar :style="{ height: `${contentAreaHeight}px` }">
                                 <NCard title="分类与标签" size="small">
                                     <NFlex vertical size="medium">
                                         <NFormItem label="分类">
@@ -137,18 +163,18 @@
                                             <NDynamicTags v-model:value="formData.tags" placeholder="按回车添加标签"
                                                 :max="5" />
                                         </NFormItem>
-
                                     </NFlex>
                                 </NCard>
                             </NScrollbar>
                         </div>
-                    </div>
-                </div>
+                    </NGridItem>
+                </NGrid>
             </NForm>
-        </div>
+        </template>
 
+        <!-- 底部固定区域 -->
         <template #footer>
-            <NFlex justify="space-between">
+            <NFlex justify="space-between" style="padding: 16px; height: 100%;">
                 <div>
                     <NButton v-if="showExtraInfo" @click="showExtraInfo = false" ghost>
                         <template #icon>
@@ -176,13 +202,12 @@
                 </NFlex>
             </NFlex>
         </template>
-    </NModal>
+    </CommonModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import {
-    NModal,
     NForm,
     NFormItem,
     NInput,
@@ -199,10 +224,14 @@ import {
     NTag,
     NScrollbar,
     NDynamicInput,
+    NGrid,
+    NGridItem,
     useMessage
 } from 'naive-ui'
 import { Plus, Trash, InfoCircle, ArrowLeft } from '@vicons/tabler'
 import { api } from '@/lib/api'
+import { useWindowSize } from '@/composables/useWindowSize'
+import CommonModal from '@/components/common/CommonModal.vue'
 
 interface Variable {
     name: string
@@ -232,6 +261,38 @@ const message = useMessage()
 const formRef = ref()
 const saving = ref(false)
 const showExtraInfo = ref(false)
+
+// 使用窗口尺寸 composable
+const { modalWidth } = useWindowSize()
+
+// 布局高度常量
+const headerHeight = 140
+const footerHeight = 80
+const contentPadding = 24
+
+// 模板引用
+const modalRef = ref<InstanceType<typeof CommonModal> | null>(null)
+
+// 网格布局计算
+const gridCols = computed(() => {
+    return modalWidth.value > 1000 ? 12 : 12
+})
+
+// 左侧网格大小（内容编辑）
+const leftSpan = computed(() => {
+    return modalWidth.value > 1000 ? 7 : 12
+})
+
+// 右侧网格大小（变量配置）
+const rightSpan = computed(() => {
+    return modalWidth.value > 1000 ? 5 : 12
+})
+
+// 获取内容区域高度
+const contentAreaHeight = computed(() => {
+    const modalHeight = modalRef.value?.contentHeight || 500
+    return modalHeight - 48 // 减去一些内边距
+})
 
 // 防抖相关
 const debounceTimer = ref<number | null>(null)

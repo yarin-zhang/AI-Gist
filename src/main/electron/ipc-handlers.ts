@@ -60,6 +60,16 @@ class IpcHandlers {
     ipcMain.handle('hide-to-tray', () => {
       windowManager.hideMainWindow();
     });
+
+    // 获取窗口尺寸
+    ipcMain.handle('get-window-size', () => {
+      return windowManager.getWindowSize();
+    });
+
+    // 获取窗口内容尺寸
+    ipcMain.handle('get-content-size', () => {
+      return windowManager.getContentSize();
+    });
   }
 
   /**
@@ -102,6 +112,8 @@ class IpcHandlers {
     // 清理窗口处理器
     ipcMain.removeHandler('show-window');
     ipcMain.removeHandler('hide-to-tray');
+    ipcMain.removeHandler('get-window-size');
+    ipcMain.removeHandler('get-content-size');
     // 清理主题处理器
     ipcMain.removeHandler('theme:get-current');
     ipcMain.removeHandler('theme:get-info');

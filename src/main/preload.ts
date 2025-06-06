@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   window: {
     show: () => ipcRenderer.invoke('show-window'),
     hideToTray: () => ipcRenderer.invoke('hide-to-tray'),
+    getSize: () => ipcRenderer.invoke('get-window-size'),
+    getContentSize: () => ipcRenderer.invoke('get-content-size'),
   },
 
   // 主题管理

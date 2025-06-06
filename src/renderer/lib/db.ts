@@ -397,7 +397,9 @@ class DatabaseService {
     search?: string;
     tags?: string;
     isFavorite?: boolean;
-  }): Promise<PromptWithRelations[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: PromptWithRelations[]; total: number; hasMore: boolean }> {
     const prompts = await this.getAll<Prompt>('prompts');
     const categories = await this.getAll<Category>('categories');
     const variables = await this.getAll<PromptVariable>('promptVariables');
@@ -416,11 +418,20 @@ class DatabaseService {
 
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        filteredPrompts = filteredPrompts.filter(p => 
-          p.title.toLowerCase().includes(searchLower) ||
-          (p.description && p.description.toLowerCase().includes(searchLower)) ||
-          p.content.toLowerCase().includes(searchLower)
-        );
+        filteredPrompts = filteredPrompts.filter(p => {
+          // 搜索标题、描述、内容
+          const matchesBasicFields = 
+            p.title.toLowerCase().includes(searchLower) ||
+            (p.description && p.description.toLowerCase().includes(searchLower)) ||
+            p.content.toLowerCase().includes(searchLower);
+          
+          // 搜索标签
+          const matchesTags = p.tags && 
+            p.tags.toLowerCase().split(',')
+              .some(tag => tag.trim().includes(searchLower));
+          
+          return matchesBasicFields || matchesTags;
+        });
       }
 
       if (filters.tags) {
@@ -446,8 +457,42 @@ class DatabaseService {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
 
+    // 计算总数
+    const total = filteredPrompts.length;
+
+    // 应用分页
+    let paginatedPrompts = filteredPrompts;
+    if (filters?.page && filters?.limit) {
+      const offset = (filters.page - 1) * filters.limit;
+      paginatedPrompts = filteredPrompts.slice(offset, offset + filters.limit);
+    }
+
     // 组装关联数据
-    return filteredPrompts.map(prompt => ({
+    const result = paginatedPrompts.map(prompt => ({
+      ...prompt,
+      category: categories.find(c => c.id === prompt.categoryId),
+      variables: variables.filter(v => v.promptId === prompt.id),
+    }));
+
+    // 计算是否还有更多数据
+    const hasMore = filters?.page && filters?.limit ? 
+      (filters.page * filters.limit) < total : 
+      false;
+
+    return {
+      data: result,
+      total,
+      hasMore
+    };
+  }
+
+  async getAllPromptsForTags(): Promise<PromptWithRelations[]> {
+    const prompts = await this.getAll<Prompt>('prompts');
+    const categories = await this.getAll<Category>('categories');
+    const variables = await this.getAll<PromptVariable>('promptVariables');
+
+    // 组装关联数据
+    return prompts.map(prompt => ({
       ...prompt,
       category: categories.find(c => c.id === prompt.categoryId),
       variables: variables.filter(v => v.promptId === prompt.id),

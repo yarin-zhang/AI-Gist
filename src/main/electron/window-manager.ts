@@ -209,6 +209,30 @@ class WindowManager {
   }
 
   /**
+   * 获取窗口尺寸信息
+   */
+  getWindowSize(): { width: number; height: number } | null {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      return null;
+    }
+    
+    const [width, height] = this.mainWindow.getSize();
+    return { width, height };
+  }
+
+  /**
+   * 获取窗口内容区域尺寸
+   */
+  getContentSize(): { width: number; height: number } | null {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      return null;
+    }
+    
+    const [width, height] = this.mainWindow.getContentSize();
+    return { width, height };
+  }
+
+  /**
    * 设置退出状态
    */
   setQuitting(isQuitting: boolean) {
