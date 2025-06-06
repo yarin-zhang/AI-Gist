@@ -263,7 +263,7 @@ const emit = defineEmits<Emits>()
 const message = useMessage()
 
 // 使用标签颜色 composable
-const { getTagColor, getTagsArray } = useTagColors()
+const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
 // 响应式数据
 const prompts = ref([])
@@ -308,16 +308,6 @@ const getCategoryName = (categoryId: string | null) => {
 const getCategoryPromptCount = (categoryId: string | null) => {
     if (!categoryId) return allPrompts.value.length
     return allPrompts.value.filter(prompt => prompt.categoryId === categoryId).length
-}
-
-// 获取分类标签颜色配置
-const getCategoryTagColor = (category: any) => {
-    const baseColor = category.color || '#18a058'
-    return {
-        color: baseColor,
-        borderColor: baseColor,
-        textColor: '#ffffff'
-    }
 }
 
 // 计算卡片间距 - 根据展开状态动态调整

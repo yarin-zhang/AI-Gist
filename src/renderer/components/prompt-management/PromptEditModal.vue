@@ -206,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import {
     NForm,
     NFormItem,
@@ -361,6 +361,7 @@ const resetForm = () => {
         debounceTimer.value = null
     }
 
+    // 重置表单数据到初始状态
     formData.value = {
         title: '',
         description: '',
@@ -370,6 +371,11 @@ const resetForm = () => {
         variables: []
     }
     showExtraInfo.value = false
+    
+    // 清理表单验证状态
+    nextTick(() => {
+        formRef.value?.restoreValidation()
+    })
 }
 
 // 获取分类名称
@@ -455,6 +461,7 @@ const handleShowExtraInfo = () => {
 // 监听 prompt 变化，初始化表单
 watch(() => props.prompt, (newPrompt) => {
     if (newPrompt) {
+        // 有 prompt 数据，初始化为编辑模式
         formData.value = {
             title: newPrompt.title || '',
             description: newPrompt.description || '',
@@ -478,27 +485,41 @@ watch(() => props.prompt, (newPrompt) => {
                 extractVariables(newPrompt.content)
             })
         }
+    } else {
+        // 没有 prompt 数据，重置为新建模式
+        resetForm()
     }
 }, { immediate: true })
 
 // 监听弹窗显示状态，关闭时重置表单
 watch(() => props.show, (newShow, oldShow) => {
     if (newShow && !oldShow) {
-        // 弹窗从隐藏变为显示时，重置到第一步
+        // 弹窗从隐藏变为显示时
         showExtraInfo.value = false
+        
+        // 确保在显示时根据当前prompt状态正确初始化表单
+        if (!props.prompt) {
+            // 如果没有prompt，确保表单是重置状态
+            resetForm()
+        }
     }
     if (oldShow && !newShow) {
-        // 弹窗从显示变为隐藏时，清理定时器并延迟重置表单
+        // 弹窗从显示变为隐藏时，清理定时器
         if (debounceTimer.value) {
             clearTimeout(debounceTimer.value)
             debounceTimer.value = null
         }
+        
+        // 延迟重置表单，确保弹窗完全关闭后再重置
         setTimeout(() => {
-            if (!props.show && !isEdit.value) {
-                // 只在新建模式下且弹窗确实关闭时重置表单
-                resetForm()
+            if (!props.show) {
+                // 无论是编辑还是新建模式，关闭时都重置表单
+                // 这样确保下次打开时不会有残留数据
+                if (!props.prompt) {
+                    resetForm()
+                }
             }
-        }, 100)
+        }, 200)
     }
 })
 
@@ -593,6 +614,12 @@ const removeVariable = (index: number) => {
 }
 
 const handleCancel = () => {
+    // 取消时清理防抖定时器
+    if (debounceTimer.value) {
+        clearTimeout(debounceTimer.value)
+        debounceTimer.value = null
+    }
+    
     emit('update:show', false)
 }
 
@@ -678,6 +705,12 @@ const handleSave = async () => {
         // 短暂延迟后关闭弹窗，确保数据已经刷新
         setTimeout(() => {
             emit('update:show', false)
+            // 额外的安全措施：如果是新建模式，确保表单被重置
+            if (!isEdit.value) {
+                nextTick(() => {
+                    resetForm()
+                })
+            }
         }, 100)
 
     } catch (error) {
@@ -687,6 +720,15 @@ const handleSave = async () => {
         saving.value = false
     }
 }
+
+// 组件卸载时的清理
+onBeforeUnmount(() => {
+    // 清理防抖定时器
+    if (debounceTimer.value) {
+        clearTimeout(debounceTimer.value)
+        debounceTimer.value = null
+    }
+})
 </script>
 
 <style scoped>
