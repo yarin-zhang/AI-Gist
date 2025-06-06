@@ -12,28 +12,39 @@
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical size="medium" style="padding: 16px;">
-                <NFlex justify="flex-start" align="center">
+                <NFlex justify="start" align="center">
                     <NFlex align="center">
                         <NText strong size="large">{{ prompt?.title }}</NText>
-                        <NTag v-if="prompt.category" :color="{ color: prompt.category.color || '#18a058' }">
-                            {{ prompt.category.name }}
-                        </NTag>
                         <NText depth="3">{{ formatDate(prompt.updatedAt) }}</NText>
                     </NFlex>
                 </NFlex>
 
                 <NText v-if="prompt.description">{{ prompt.description }}</NText>
 
-                <NFlex v-if="prompt.tags" size="small">
-                    <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                        :color="getTagColor(tag)">
+                <!-- 标签区域 - 与 PromptList 保持一致的结构 -->
+                <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
+                    <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
+                        {{ prompt.variables.length }} 个变量
+                    </NTag>
+                    <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
                         <template #icon>
                             <NIcon>
-                                <Tag />
+                                <Box />
                             </NIcon>
                         </template>
-                        {{ tag }}
+                        {{ prompt.category.name }}
                     </NTag>
+                    <template v-if="prompt.tags">
+                        <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                            :color="getTagColor(tag)">
+                            <template #icon>
+                                <NIcon>
+                                    <Tag />
+                                </NIcon>
+                            </template>
+                            {{ tag }}
+                        </NTag>
+                    </template>
                 </NFlex>
             </NFlex>
         </template>
@@ -335,7 +346,7 @@ import {
     NGridItem,
     useMessage
 } from 'naive-ui'
-import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag } from '@vicons/tabler'
+import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag, Box } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useWindowSize } from '@/composables/useWindowSize'
@@ -360,6 +371,16 @@ const message = useMessage()
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray } = useTagColors()
+
+// 获取分类标签颜色配置
+const getCategoryTagColor = (category: any) => {
+    const baseColor = category.color || '#18a058'
+    return {
+        color: baseColor,
+        borderColor: baseColor,
+        textColor: '#ffffff'
+    }
+}
 
 // 使用窗口尺寸 composable
 const { modalWidth } = useWindowSize()

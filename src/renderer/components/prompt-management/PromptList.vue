@@ -157,7 +157,7 @@
 
                 <NFlex vertical size="small">
                     <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
-                    <NText depth="3" style="font-size: 12px;">
+                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
                         {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                     </NText>
 
