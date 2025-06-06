@@ -1,55 +1,93 @@
 <template>
   <div class="ai-config-page">
-    <div class="page-header">
-      <h2>AI 配置管理</h2>
-      <n-button type="primary" @click="showAddModal = true">
-        <template #icon>
-          <n-icon><Plus /></n-icon>
-        </template>
-        添加配置
-      </n-button>
-    </div>
-
-    <div class="config-list">
-      <n-card v-for="config in configs" :key="config.id" class="config-card">
-        <template #header>
-          <div class="config-header">
-            <div class="config-info">
-              <h3>{{ config.name }}</h3>
-              <n-tag :type="config.type === 'openai' ? 'success' : 'info'">
-                {{ config.type === 'openai' ? 'OpenAI 兼容' : 'Ollama' }}
-              </n-tag>
-            </div>
-            <div class="config-actions">
-              <n-switch 
-                v-model:value="config.enabled" 
-                @update:value="(value) => toggleConfig(config.id!, value)"
-              />
-              <n-button size="small" @click="editConfig(config)">编辑</n-button>
-              <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(config.id!)">
-                测试连接
-              </n-button>
-              <n-button size="small" @click="intelligentTest(config)" :loading="intelligentTestingConfigs.has(config.id!)" type="info">
-                智能测试
-              </n-button>
-              <n-button size="small" type="error" @click="deleteConfig(config.id!)">删除</n-button>
-            </div>
-          </div>
-        </template>
-        
-        <div class="config-details">
-          <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
-          <p v-if="config.defaultModel"><strong>默认模型:</strong> {{ config.defaultModel }}</p>
-          <p v-if="config.customModel"><strong>自定义模型:</strong> {{ config.customModel }}</p>
-          <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
+    <NFlex vertical size="large">
+      <!-- 页面标题 -->
+      <NFlex justify="space-between" align="center">
+        <div>
+          <NText strong style="font-size: 28px;">AI 配置管理</NText>
+          <NText depth="3" style="display: block; margin-top: 4px;">
+            管理和测试你的 AI 服务连接配置
+          </NText>
         </div>
-      </n-card>
-    </div>
+        <NFlex>
+          <NButton type="primary" @click="showAddModal = true">
+            <template #icon>
+              <NIcon>
+                <Plus />
+              </NIcon>
+            </template>
+            添加配置
+          </NButton>
+        </NFlex>
+      </NFlex>
+
+      <!-- 配置卡片列表 -->
+      <div class="config-list">
+        <n-card v-for="config in configs" :key="config.id" class="config-card">
+          <template #header>
+            <div class="config-header">
+              <div class="config-info">
+                <NIcon size="24">
+                  <Server v-if="config.type === 'openai'" />
+                  <Robot v-else />
+                </NIcon>
+                <h3>{{ config.name }}</h3>
+                <n-tag :type="config.type === 'openai' ? 'success' : 'info'">
+                  {{ config.type === 'openai' ? 'OpenAI 兼容' : 'Ollama' }}
+                </n-tag>
+                <n-tag :type="config.enabled ? 'success' : 'warning'">
+                  {{ config.enabled ? '已启用' : '已禁用' }}
+                </n-tag>
+              </div>
+              <div class="config-actions">
+                <n-switch 
+                  v-model:value="config.enabled" 
+                  @update:value="(value) => toggleConfig(config.id!, value)"
+                />
+                <n-button size="small" @click="editConfig(config)">
+                  <template #icon>
+                    <NIcon><Settings /></NIcon>
+                  </template>
+                  编辑
+                </n-button>
+                <n-button size="small" @click="testConfig(config)" :loading="testingConfigs.has(config.id!)">
+                  测试连接
+                </n-button>
+                <n-button size="small" @click="intelligentTest(config)" :loading="intelligentTestingConfigs.has(config.id!)" type="info">
+                  <template #icon>
+                    <NIcon><Robot /></NIcon>
+                  </template>
+                  智能测试
+                </n-button>
+                <n-button size="small" type="error" @click="deleteConfig(config.id!)">
+                  <template #icon>
+                    <NIcon><DatabaseOff /></NIcon>
+                  </template>
+                  删除
+                </n-button>
+              </div>
+            </div>
+          </template>
+          
+          <div class="config-details">
+            <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
+            <p v-if="config.defaultModel"><strong>默认模型:</strong> {{ config.defaultModel }}</p>
+            <p v-if="config.customModel"><strong>自定义模型:</strong> {{ config.customModel }}</p>
+            <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
+          </div>
+        </n-card>
+      </div>
+    </NFlex>
 
     <!-- 添加/编辑配置弹窗 -->
-    <n-modal v-model:show="showAddModal" preset="dialog" title="AI 配置">
+    <n-modal v-model:show="showAddModal" preset="dialog" style="width: 600px">
       <template #header>
-        <div>{{ editingConfig ? '编辑配置' : '添加配置' }}</div>
+        <NFlex align="center" style="gap: 8px">
+          <NIcon size="24">
+            <Settings />
+          </NIcon>
+          <NText strong>{{ editingConfig ? '编辑配置' : '添加配置' }}</NText>
+        </NFlex>
       </template>
       
       <n-form
@@ -93,6 +131,9 @@
             type="info"
             block
           >
+            <template #icon>
+              <NIcon><Server /></NIcon>
+            </template>
             测试连接并获取模型列表
           </n-button>
         </n-form-item>
@@ -141,7 +182,16 @@
     </n-modal>
 
     <!-- 智能测试结果弹窗 -->
-    <n-modal v-model:show="showIntelligentTestResult" preset="dialog" title="智能测试结果">
+    <n-modal v-model:show="showIntelligentTestResult" preset="dialog" style="width: 600px">
+      <template #header>
+        <NFlex align="center" style="gap: 8px">
+          <NIcon size="24">
+            <Robot />
+          </NIcon>
+          <NText strong>智能测试结果</NText>
+        </NFlex>
+      </template>
+
       <div v-if="intelligentTestResult">
         <n-alert v-if="intelligentTestResult.success" type="success" title="测试成功">
           <div style="margin-top: 12px;">
@@ -203,7 +253,7 @@ import {
     NAlert,
     useMessage 
 } from 'naive-ui'
-import { Plus } from '@vicons/tabler'
+import { Plus, Robot, DatabaseOff, Server, Settings } from '@vicons/tabler'
 import type { AIConfig } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 
@@ -525,27 +575,23 @@ onMounted(() => {
 
 <style scoped>
 .ai-config-page {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-header h2 {
-  margin: 0;
+  padding: 24px;
+  overflow-y: auto;
 }
 
 .config-list {
   display: grid;
   gap: 16px;
+  margin-top: 16px;
 }
 
 .config-card {
   border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.config-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .config-header {
@@ -573,6 +619,8 @@ onMounted(() => {
 
 .config-details {
   margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color-1);
 }
 
 .config-details p {
