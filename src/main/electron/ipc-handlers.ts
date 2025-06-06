@@ -146,12 +146,28 @@ class IpcHandlers {
 
     // 测试 AI 配置
     ipcMain.handle('ai:test-config', async (_, config: any) => {
-      return await aiServiceManager.testConfig(config);
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.testConfig(processedConfig);
     });
 
     // 获取可用模型列表
     ipcMain.handle('ai:get-models', async (_, config: any) => {
-      return await aiServiceManager.getAvailableModels(config);
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      return await aiServiceManager.getAvailableModels(processedConfig);
     });
 
     // 生成 Prompt

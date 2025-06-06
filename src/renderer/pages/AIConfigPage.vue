@@ -283,7 +283,10 @@ const testConfig = async (config: AIConfig) => {
   
   testingConfigs.value.add(config.id)
   try {
-    const result = await window.electronAPI.ai.testConfig(config)
+    // 序列化配置对象以确保可以通过 IPC 传递
+    const serializedConfig = serializeConfig(config)
+    
+    const result = await window.electronAPI.ai.testConfig(serializedConfig)
     if (result.success) {
       message.success('连接测试成功')
       if (result.models && result.models.length > 0) {
@@ -330,6 +333,25 @@ const onTypeChange = (type: 'openai' | 'ollama') => {
 // 格式化日期
 const formatDate = (date: Date | string) => {
   return new Date(date).toLocaleString('zh-CN')
+}
+
+// 序列化配置对象以确保可以通过 IPC 传递
+const serializeConfig = (config: AIConfig) => {
+  return {
+    id: config.id,
+    configId: config.configId,
+    name: config.name,
+    type: config.type,
+    baseURL: config.baseURL,
+    apiKey: config.apiKey,
+    secretKey: config.secretKey,
+    models: [...(config.models || [])], // 创建新数组
+    defaultModel: config.defaultModel,
+    customModel: config.customModel,
+    enabled: config.enabled,
+    createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
+    updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
+  }
 }
 
 // 组件挂载时加载数据

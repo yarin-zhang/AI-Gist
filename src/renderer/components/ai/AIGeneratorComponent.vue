@@ -292,8 +292,11 @@ const generatePrompt = async () => {
       customPrompt: formData.customPrompt || undefined
     }
     
+    // 序列化配置对象以确保可以通过 IPC 传递
+    const serializedConfig = serializeConfig(selectedConfig.value)
+    
     // 传递配置对象给主进程
-    const result = await window.electronAPI.ai.generatePrompt(request, selectedConfig.value)
+    const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
     generatedResult.value = result
     
     // 保存到历史记录
@@ -399,6 +402,25 @@ const getConfigName = (configId: string) => {
 // 格式化日期
 const formatDate = (date: Date | string) => {
   return new Date(date).toLocaleString('zh-CN')
+}
+
+// 序列化配置对象以确保可以通过 IPC 传递
+const serializeConfig = (config: AIConfig) => {
+  return {
+    id: config.id,
+    configId: config.configId,
+    name: config.name,
+    type: config.type,
+    baseURL: config.baseURL,
+    apiKey: config.apiKey,
+    secretKey: config.secretKey,
+    models: [...(config.models || [])], // 创建新数组
+    defaultModel: config.defaultModel,
+    customModel: config.customModel,
+    enabled: config.enabled,
+    createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
+    updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
+  }
 }
 
 // 组件挂载时加载数据
