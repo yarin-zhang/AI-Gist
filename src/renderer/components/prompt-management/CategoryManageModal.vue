@@ -173,7 +173,7 @@ const { modalWidth } = useWindowSize()
 // 布局高度常量
 const headerHeight = 120
 const footerHeight = 1
-const contentPadding = 24
+const contentPadding = 16
 
 // 网格布局计算
 const gridCols = computed(() => {

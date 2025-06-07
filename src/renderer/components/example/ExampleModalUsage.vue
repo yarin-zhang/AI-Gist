@@ -5,9 +5,9 @@
     
     <CommonModal 
       v-model:show="showModal"
-      :min-header-height="80"
-      :min-footer-height="70"
-      :content-padding="16"
+      :min-header-height="minHeaderHeight"
+      :min-footer-height="minFooterHeight"
+      :content-padding="contentPadding"
     >
       <template #header>
         <div>
@@ -59,6 +59,10 @@ const showModal = ref(false)
 // 使用窗口尺寸功能
 const { modalMaxHeight } = useWindowSize()
 
+const minHeaderHeight = 60
+const minFooterHeight = 70
+const contentPadding = 16
+
 // 使用模态框布局功能（也可以在这里单独使用）
 const {
   headerHeight,
@@ -66,9 +70,9 @@ const {
   contentHeight,
   updateActualHeights
 } = useModalLayout({
-  minHeaderHeight: 80,
-  minFooterHeight: 70,
-  contentPadding: 16
+  minHeaderHeight: minHeaderHeight,
+  minFooterHeight: minFooterHeight,
+  contentPadding: contentPadding
 }, modalMaxHeight)
 
 // 手动更新布局的示例

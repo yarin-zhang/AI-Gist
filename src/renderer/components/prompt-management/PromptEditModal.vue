@@ -274,7 +274,7 @@ const { modalWidth } = useWindowSize();
 // 布局高度常量
 const headerHeight = 140;
 const footerHeight = 80;
-const contentPadding = 24;
+const contentPadding = 16;
 
 // 模板引用
 const modalRef = ref<InstanceType<typeof CommonModal> | null>(null);

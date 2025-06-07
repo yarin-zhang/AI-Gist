@@ -20,7 +20,8 @@
             </NButton>
             <NLayout position="absolute">
                 <!-- 顶部固定区域 -->
-                <NLayoutHeader ref="headerRef" bordered position="absolute" :style="{ zIndex: 5, padding: `${props.contentPadding}px` }">
+                <NLayoutHeader ref="headerRef" bordered position="absolute"
+                    :style="{ zIndex: 5, padding: `${props.contentPadding}px`, minHeight: `${props.minHeaderHeight}px` }">
                     <slot name="header" />
                 </NLayoutHeader> <!-- 中间可滚动区域 -->
                 <NLayout position="absolute" :style="{
@@ -34,7 +35,7 @@
 
                 <!-- 底部固定区域（仅在有内容时显示） -->
                 <NLayoutFooter v-if="hasFooter" ref="footerRef" bordered position="absolute"
-                     :style="`padding: ${props.contentPadding}px;`">
+                    :style="`padding: ${props.contentPadding}px;`">
                     <slot name="footer" />
                 </NLayoutFooter>
             </NLayout>

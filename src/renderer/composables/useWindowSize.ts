@@ -99,7 +99,7 @@ export function useModalLayout(
   const {
     minHeaderHeight = 60,
     minFooterHeight = 60,
-    contentPadding = 24
+    contentPadding = 16
   } = options
 
   // 实际高度状态
