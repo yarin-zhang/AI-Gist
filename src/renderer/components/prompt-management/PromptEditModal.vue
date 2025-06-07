@@ -1,9 +1,8 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel"
-        :header-height="headerHeight" :footer-height="footerHeight" :content-padding="contentPadding">
+    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NFlex vertical size="medium" style="padding: 16px">
+            <NFlex vertical size="medium">
                 <NFlex justify="space-between" align="center">
                     <NText :style="{ fontSize: '20px', fontWeight: 600 }">
                         {{ isEdit ? "编辑提示词" : "创建提示词" }}
@@ -69,9 +68,10 @@
 
                     <!-- 右侧：配置区 -->
                     <template #2>
-                        <div style="height: 100%; padding-left: 8px"> <!-- 变量识别和配置区（第一步显示） -->                            <div v-show="!showExtraInfo" style="height: 100%; display: flex; flex-direction: column;">
-                                <NCard size="small" style="height: 100%;" 
-                                       :content-style="{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
+                        <div style="height: 100%; padding-left: 8px"> <!-- 变量识别和配置区（第一步显示） -->
+                            <div v-show="!showExtraInfo" style="height: 100%; display: flex; flex-direction: column;">
+                                <NCard size="small" style="height: 100%;"
+                                    :content-style="{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
                                     <!-- 头部区域 -->
                                     <template #header>
                                         <NFlex justify="space-between" align="center">
@@ -86,12 +86,13 @@
                                             </NButton>
                                         </NFlex>
                                     </template>
-                                    
+
                                     <!-- 可滚动内容区域 -->
                                     <div style="flex: 1; min-height: 0;">
                                         <NScrollbar style="height: 100%;">
-                                            <div style="padding: 16px; padding-bottom: 32px;">
-                                                <div v-if="formData.variables.length === 0" style="padding: 20px 0; text-align: center;">
+                                            <div style="padding-bottom: 32px;">
+                                                <div v-if="formData.variables.length === 0"
+                                                    style="padding: 20px 0; text-align: center;">
                                                     <NEmpty description="在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量" size="small" />
                                                 </div>
                                                 <NFlex v-else vertical size="medium">
@@ -101,7 +102,7 @@
                                                             <NFlex justify="space-between" align="center">
                                                                 <NText>{{
                                                                     variable.name || "变量" + (index + 1)
-                                                                    }}</NText>
+                                                                }}</NText>
                                                                 <NButton size="small" text type="error"
                                                                     @click="removeVariable(index)">
                                                                     <template #icon>
@@ -116,8 +117,8 @@
                                                         <NFlex vertical size="small">
                                                             <NFlex>
                                                                 <NFormItem label="变量名" style="flex: 1">
-                                                                    <NInput v-model:value="variable.name" placeholder="变量名"
-                                                                        size="small" />
+                                                                    <NInput v-model:value="variable.name"
+                                                                        placeholder="变量名" size="small" />
                                                                 </NFormItem>
                                                                 <NFormItem label="显示名" style="flex: 1">
                                                                     <NInput v-model:value="variable.label"
@@ -142,7 +143,8 @@
                                                                     placeholder="默认值（可选）" size="small" />
                                                                 <NSelect v-else-if="variable.type === 'select'"
                                                                     v-model:value="variable.defaultValue" :options="getVariableDefaultOptions(variable.options)
-                                                                        " placeholder="选择默认选项（可选）" size="small" clearable />
+                                                                        " placeholder="选择默认选项（可选）" size="small"
+                                                                    clearable />
                                                             </NFormItem>
 
                                                             <NFormItem v-if="variable.type === 'select'" label="选项">
@@ -181,7 +183,7 @@
 
         <!-- 底部固定区域 -->
         <template #footer>
-            <NFlex justify="space-between" style="padding: 16px; height: 100%">
+            <NFlex justify="space-between" style="height: 100%">
                 <div>
                     <NButton v-if="showExtraInfo" @click="showExtraInfo = false" ghost>
                         <template #icon>

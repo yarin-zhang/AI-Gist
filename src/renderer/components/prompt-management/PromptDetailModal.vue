@@ -5,13 +5,10 @@
         :show="show" 
         @update:show="$emit('update:show', $event)"
         @close="handleClose"
-        :header-height="headerHeight"
-        :footer-height="footerHeight"
-        :content-padding="contentPadding"
     >
         <!-- 顶部固定区域 -->
         <template #header>
-            <NFlex vertical size="medium" style="padding: 16px;">
+            <NFlex vertical size="medium" >
                 <NFlex justify="start" align="center">
                     <NFlex align="center">
                         <NText strong size="large">{{ prompt?.title }}</NText>
@@ -277,7 +274,7 @@
 
         <!-- 底部固定区域 -->
         <template #footer>
-            <NFlex justify="space-between" align="center" style="padding: 16px; height: 100%;">
+            <NFlex justify="space-between" align="center" style="height: 100%;">
                 <NFlex>
                     <!-- 历史记录按钮（主页面左下角） -->
                     <NButton v-show="!showHistoryPage" @click="showHistoryPage = true"

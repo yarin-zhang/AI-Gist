@@ -1,6 +1,5 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose"
-        :content-padding="contentPadding">
+    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical size="medium" style="padding: 16px;">

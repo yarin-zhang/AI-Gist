@@ -105,7 +105,7 @@
         <CommonModal ref="modalRef" :show="showAddModal" @update:show="showAddModal = $event" @close="closeModal">
             <!-- 顶部固定区域 -->
             <template #header>
-                <NFlex align="center" justify="space-between" style="padding: 16px">
+                <NFlex align="center" justify="space-between" >
                     <NFlex align="center" style="gap: 12px">
                         <NIcon size="24">
                             <Settings />
@@ -218,7 +218,7 @@
             </template>
             <!-- 底部固定区域 -->
             <template #footer>
-                <NFlex justify="end" style="padding: 16px">
+                <NFlex justify="end" >
                     <n-button @click="closeModal">取消</n-button>
                     <n-button type="primary" @click="saveConfig" :loading="saving">
                         {{ editingConfig ? "更新配置" : "添加配置" }}

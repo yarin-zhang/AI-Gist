@@ -6,7 +6,6 @@
         <NFlex vertical :size="8">
           <NText depth="3">开发模式: {{ isDevelopment ? '是' : '否' }}</NText>
           <NText depth="3">当前环境: {{ currentMode }}</NText>
-          <NText depth="3">Node 环境: {{ nodeEnv }}</NText>
           <NText depth="3">Vite 版本信息可在控制台查看</NText>
         </NFlex>
       </NCard>
@@ -56,7 +55,7 @@ import {
   NCode,
   useMessage
 } from 'naive-ui'
-import ExampleModalUsage from '@/components/common/ExampleModalUsage.vue'
+import ExampleModalUsage from '@/components/example/ExampleModalUsage.vue'
 
 const message = useMessage()
 const testResult = ref('')
