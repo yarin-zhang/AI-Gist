@@ -554,12 +554,6 @@ const handleDeletePrompt = async (prompt) => {
     }
 }
 
-// 暴露方法给父组件
-defineExpose({
-    loadPrompts,
-    loadCategories
-})
-
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()

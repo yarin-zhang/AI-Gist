@@ -23,7 +23,9 @@
                 <NLayoutHeader ref="headerRef" bordered position="absolute"
                     :style="{ zIndex: 5, padding: `${props.contentPadding}px`, minHeight: `${props.minHeaderHeight}px` }">
                     <slot name="header" />
-                </NLayoutHeader> <!-- 中间可滚动区域 -->
+                </NLayoutHeader>
+                
+                <!-- 中间可滚动区域 -->
                 <NLayout position="absolute" :style="{
                     top: `${Math.max(headerHeight, props.minHeaderHeight)}px`,
                     bottom: hasFooter ? `${Math.max(footerHeight, props.minFooterHeight)}px` : '0px'
@@ -44,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { computed, ref, onMounted, useSlots, toRef } from "vue";
 import {
     NModal,
     NButton,
@@ -55,8 +57,7 @@ import {
     NLayoutFooter,
 } from "naive-ui";
 import { X } from "@vicons/tabler";
-import { useWindowSize, useModalLayout } from "@/composables/useWindowSize";
-import { useSlots } from "vue";
+import { useModalLayout } from "@/composables/useWindowSize";
 
 interface Props {
     show: boolean;
@@ -79,65 +80,36 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 const slots = useSlots();
 
-// 使用窗口尺寸 composable
-const { modalMaxHeight, modalWidth } = useWindowSize();
-
-// 使用模态框布局 composable
-const {
-    headerHeight,
-    footerHeight,
-    contentHeight,
-    updateActualHeights,
-    resetHeights
-} = useModalLayout({
-    minHeaderHeight: props.minHeaderHeight,
-    minFooterHeight: props.minFooterHeight,
-    contentPadding: props.contentPadding
-}, modalMaxHeight);
-
 // 组件引用
 const headerRef = ref<InstanceType<typeof NLayoutHeader>>();
 const footerRef = ref<InstanceType<typeof NLayoutFooter>>();
-
-// 响应式布局计算
-const modalHeight = computed(() => {
-    return modalMaxHeight.value;
-});
 
 // 是否有底部内容
 const hasFooter = computed(() => {
     return !!slots.footer;
 });
 
-// 监听显示状态变化，更新高度
-watch(() => props.show, (newShow) => {
-    if (newShow) {
-        // 延迟一点确保DOM完全渲染
-        setTimeout(() => {
-            updateActualHeights(headerRef, footerRef, hasFooter.value);
-        }, 100);
-    } else {
-        // 关闭时重置高度
-        resetHeights();
-    }
+// 使用增强的模态框布局 composable
+const {
+    headerHeight,
+    footerHeight,
+    contentHeight,
+    modalHeight,
+    modalWidth,
+    updateActualHeights,
+    resetHeights,
+    setupLayoutWatchers
+} = useModalLayout({
+    minHeaderHeight: props.minHeaderHeight,
+    minFooterHeight: props.minFooterHeight,
+    contentPadding: props.contentPadding,
+    show: toRef(props, 'show'),
+    hasFooter: toRef(hasFooter)
 });
 
-// 监听插槽内容变化，重新计算高度
-watch(() => [slots.header, slots.footer], () => {
-    if (props.show) {
-        setTimeout(() => {
-            updateActualHeights(headerRef, footerRef, hasFooter.value);
-        }, 100);
-    }
-}, { deep: true });
-
-// 组件挂载后初始化
+// 组件挂载后设置布局监听器
 onMounted(() => {
-    if (props.show) {
-        setTimeout(() => {
-            updateActualHeights(headerRef, footerRef, hasFooter.value);
-        }, 100);
-    }
+    setupLayoutWatchers(headerRef, footerRef);
 });
 
 // 关闭弹窗
@@ -145,18 +117,6 @@ const handleClose = () => {
     emit("update:show", false);
     emit("close");
 };
-
-
-// 暴露计算属性供父组件使用
-defineExpose({
-    modalHeight,
-    contentHeight,
-    modalWidth,
-    updateActualHeights: () => updateActualHeights(headerRef, footerRef, hasFooter.value),
-    resetHeights,
-    headerHeight,
-    footerHeight
-});
 </script>
 
 <style scoped>

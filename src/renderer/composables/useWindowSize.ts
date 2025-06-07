@@ -10,6 +10,8 @@ interface ModalLayoutOptions {
   minHeaderHeight?: number
   minFooterHeight?: number
   contentPadding?: number
+  show?: Ref<boolean>
+  hasFooter?: Ref<boolean>
 }
 
 // 模态框布局返回值接口
@@ -17,8 +19,11 @@ interface ModalLayoutReturn {
   headerHeight: Ref<number>
   footerHeight: Ref<number>
   contentHeight: Readonly<Ref<number>>
+  modalHeight: Readonly<Ref<number>>
+  modalWidth: Readonly<Ref<number>>
   updateActualHeights: (headerRef?: any, footerRef?: any, hasFooter?: boolean) => Promise<void>
   resetHeights: () => void
+  setupLayoutWatchers: (headerRef: Ref<any>, footerRef: Ref<any>) => void
 }
 
 export function useWindowSize() {
@@ -90,26 +95,34 @@ export function useWindowSize() {
 /**
  * 用于模态框布局计算的 composable
  * @param options 布局配置选项
- * @param modalMaxHeight 模态框最大高度
  */
 export function useModalLayout(
-  options: ModalLayoutOptions = {},
-  modalMaxHeight: Ref<number>
+  options: ModalLayoutOptions = {}
 ): ModalLayoutReturn {
   const {
     minHeaderHeight = 60,
     minFooterHeight = 60,
-    contentPadding = 16
+    contentPadding = 16,
+    show,
+    hasFooter
   } = options
+
+  // 获取窗口尺寸
+  const { modalMaxHeight, modalWidth } = useWindowSize()
 
   // 实际高度状态
   const headerHeight = ref(minHeaderHeight)
   const footerHeight = ref(minFooterHeight)
 
+  // 模态框总高度
+  const modalHeight = computed(() => {
+    return modalMaxHeight.value
+  })
+
   // 中间内容区域高度（动态计算）
   const contentHeight = computed(() => {
     const topValue = Math.max(headerHeight.value, minHeaderHeight)
-    const bottomValue = Math.max(footerHeight.value, minFooterHeight)
+    const bottomValue = hasFooter?.value ? Math.max(footerHeight.value, minFooterHeight) : 0
     return modalMaxHeight.value - topValue - bottomValue
   })
 
@@ -117,7 +130,7 @@ export function useModalLayout(
   const updateActualHeights = async (
     headerRef?: any,
     footerRef?: any,
-    hasFooter: boolean = false
+    hasFooterValue: boolean = false
   ) => {
     await nextTick()
 
@@ -131,7 +144,7 @@ export function useModalLayout(
     }
 
     // 更新 footer 高度
-    if (footerRef?.value?.$el && hasFooter) {
+    if (footerRef?.value?.$el && hasFooterValue) {
       const footerEl = footerRef.value.$el as HTMLElement
       const actualFooterHeight = footerEl.getBoundingClientRect().height
       if (actualFooterHeight > 0) {
@@ -146,11 +159,50 @@ export function useModalLayout(
     footerHeight.value = minFooterHeight
   }
 
+  // 设置布局监听器的函数
+  const setupLayoutWatchers = (headerRef: Ref<any>, footerRef: Ref<any>) => {
+    // 监听显示状态变化，更新高度
+    if (show) {
+      watch(show, (newShow) => {
+        if (newShow) {
+          // 延迟一点确保DOM完全渲染
+          setTimeout(() => {
+            updateActualHeights(headerRef, footerRef, hasFooter?.value || false)
+          }, 100)
+        } else {
+          // 关闭时重置高度
+          resetHeights()
+        }
+      })
+    }
+
+    // 监听是否有footer变化
+    if (hasFooter) {
+      watch(hasFooter, () => {
+        if (show?.value) {
+          setTimeout(() => {
+            updateActualHeights(headerRef, footerRef, hasFooter.value)
+          }, 100)
+        }
+      })
+    }
+
+    // 初始化时如果已经显示，则更新高度
+    if (show?.value) {
+      setTimeout(() => {
+        updateActualHeights(headerRef, footerRef, hasFooter?.value || false)
+      }, 100)
+    }
+  }
+
   return {
     headerHeight,
     footerHeight,
     contentHeight: readonly(contentHeight),
+    modalHeight: readonly(modalHeight),
+    modalWidth: readonly(modalWidth),
     updateActualHeights,
-    resetHeights
+    resetHeights,
+    setupLayoutWatchers
   }
 }
