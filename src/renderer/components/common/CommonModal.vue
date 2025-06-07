@@ -1,5 +1,5 @@
 <template>
-    <NModal :show="show" >
+    <NModal :show="show">
         <div :style="{
             width: `${modalWidth}px`,
             height: `${modalHeight}px`,
@@ -18,25 +18,23 @@
                     </NIcon>
                 </template>
             </NButton>
-
             <NLayout position="absolute">
                 <!-- 顶部固定区域 -->
-                <NLayoutHeader ref="headerRef" bordered position="absolute" :style="{ zIndex: 5 }"
-                    :content-style="`padding: ${contentPadding}px; padding-right: 56px;`">
+                <NLayoutHeader ref="headerRef" bordered position="absolute" :style="{ zIndex: 5, padding: `${props.contentPadding}px` }">
                     <slot name="header" />
                 </NLayoutHeader> <!-- 中间可滚动区域 -->
                 <NLayout position="absolute" :style="{
-                    top: `${Math.max(headerHeight, minHeaderHeight)}px`,
-                    bottom: hasFooter ? `${Math.max(footerHeight, minFooterHeight)}px` : '0px'
+                    top: `${Math.max(headerHeight, props.minHeaderHeight)}px`,
+                    bottom: hasFooter ? `${Math.max(footerHeight, props.minFooterHeight)}px` : '0px'
                 }">
-                    <NLayoutContent :content-style="`padding: ${contentPadding}px;`">
+                    <NLayoutContent :style="`padding: ${props.contentPadding}px;`">
                         <slot name="content" />
                     </NLayoutContent>
                 </NLayout>
 
                 <!-- 底部固定区域（仅在有内容时显示） -->
                 <NLayoutFooter v-if="hasFooter" ref="footerRef" bordered position="absolute"
-                    :content-style="`padding: ${contentPadding}px;`">
+                     :style="`padding: ${props.contentPadding}px;`">
                     <slot name="footer" />
                 </NLayoutFooter>
             </NLayout>
@@ -56,7 +54,7 @@ import {
     NLayoutFooter,
 } from "naive-ui";
 import { X } from "@vicons/tabler";
-import { useWindowSize } from "@/composables/useWindowSize";
+import { useWindowSize, useModalLayout } from "@/composables/useWindowSize";
 import { useSlots } from "vue";
 
 interface Props {
@@ -74,12 +72,8 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
     minHeaderHeight: 60, // 最小头部高度
     minFooterHeight: 60, // 最小底部高度
-    contentPadding: 24, // 内容边距
+    contentPadding: 16, // 内容边距
 });
-
-const minHeaderHeight = ref(props.minHeaderHeight);
-const minFooterHeight = ref(props.minFooterHeight); 
-const contentPadding = ref(props.contentPadding);
 
 const emit = defineEmits<Emits>();
 const slots = useSlots();
@@ -87,13 +81,22 @@ const slots = useSlots();
 // 使用窗口尺寸 composable
 const { modalMaxHeight, modalWidth } = useWindowSize();
 
+// 使用模态框布局 composable
+const {
+    headerHeight,
+    footerHeight,
+    contentHeight,
+    updateActualHeights,
+    resetHeights
+} = useModalLayout({
+    minHeaderHeight: props.minHeaderHeight,
+    minFooterHeight: props.minFooterHeight,
+    contentPadding: props.contentPadding
+}, modalMaxHeight);
+
 // 组件引用
 const headerRef = ref<InstanceType<typeof NLayoutHeader>>();
 const footerRef = ref<InstanceType<typeof NLayoutFooter>>();
-
-// 实际高度状态
-const headerHeight = ref(props.minHeaderHeight);
-const footerHeight = ref(props.minFooterHeight);
 
 // 响应式布局计算
 const modalHeight = computed(() => {
@@ -105,41 +108,16 @@ const hasFooter = computed(() => {
     return !!slots.footer;
 });
 
-// 中间内容区域高度（动态计算）
-const contentHeight = computed(() => {
-    const topValue = Math.max(headerHeight.value, props.minHeaderHeight);
-    const bottomValue = hasFooter.value ? Math.max(footerHeight.value, props.minFooterHeight) : 0;
-    return modalHeight.value - topValue - bottomValue;
-});
-
-// 更新实际高度的函数
-const updateActualHeights = async () => {
-    await nextTick();
-
-    if (headerRef.value?.$el) {
-        const headerEl = headerRef.value.$el as HTMLElement;
-        const actualHeaderHeight = headerEl.getBoundingClientRect().height;
-        if (actualHeaderHeight > 0) {
-            headerHeight.value = Math.max(actualHeaderHeight, props.minHeaderHeight);
-        }
-    }
-
-    if (footerRef.value?.$el && hasFooter.value) {
-        const footerEl = footerRef.value.$el as HTMLElement;
-        const actualFooterHeight = footerEl.getBoundingClientRect().height;
-        if (actualFooterHeight > 0) {
-            footerHeight.value = Math.max(actualFooterHeight, props.minFooterHeight);
-        }
-    }
-};
-
 // 监听显示状态变化，更新高度
 watch(() => props.show, (newShow) => {
     if (newShow) {
         // 延迟一点确保DOM完全渲染
         setTimeout(() => {
-            updateActualHeights();
+            updateActualHeights(headerRef, footerRef, hasFooter.value);
         }, 100);
+    } else {
+        // 关闭时重置高度
+        resetHeights();
     }
 });
 
@@ -147,7 +125,7 @@ watch(() => props.show, (newShow) => {
 watch(() => [slots.header, slots.footer], () => {
     if (props.show) {
         setTimeout(() => {
-            updateActualHeights();
+            updateActualHeights(headerRef, footerRef, hasFooter.value);
         }, 100);
     }
 }, { deep: true });
@@ -156,7 +134,7 @@ watch(() => [slots.header, slots.footer], () => {
 onMounted(() => {
     if (props.show) {
         setTimeout(() => {
-            updateActualHeights();
+            updateActualHeights(headerRef, footerRef, hasFooter.value);
         }, 100);
     }
 });
@@ -173,7 +151,10 @@ defineExpose({
     modalHeight,
     contentHeight,
     modalWidth,
-    updateActualHeights,
+    updateActualHeights: () => updateActualHeights(headerRef, footerRef, hasFooter.value),
+    resetHeights,
+    headerHeight,
+    footerHeight
 });
 </script>
 
