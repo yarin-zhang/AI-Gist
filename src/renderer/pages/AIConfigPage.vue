@@ -242,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch, defineExpose } from 'vue'
 import { 
     NButton,
     NCard,
@@ -285,6 +285,7 @@ const testingFormConnection = ref(false)
 const formTestResult = ref<{ success: boolean; models?: string[]; error?: string } | null>(null)
 const showIntelligentTestResult = ref(false)
 const intelligentTestResult = ref<{ success: boolean; response?: string; error?: string; inputPrompt?: string } | null>(null)
+const autoShowAddModal = ref(false)
 
 // 表单数据
 const formData = reactive({
@@ -588,6 +589,23 @@ onMounted(async () => {
   // 等待数据库就绪后再加载数据
   await waitForDatabase()
   loadConfigs()
+})
+
+// 监听自动显示添加配置弹窗
+watch(autoShowAddModal, (show) => {
+  if (show) {
+    showAddModal.value = true
+    autoShowAddModal.value = false // 重置状态
+  }
+})
+
+// 导出方法供父组件调用
+const openAddConfigModal = () => {
+  autoShowAddModal.value = true
+}
+
+defineExpose({
+  openAddConfigModal
 })
 </script>
 

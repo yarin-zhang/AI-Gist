@@ -36,9 +36,12 @@
                     </NButton>
                 </NFlex>
             </NFlex>
-            
-            <!-- AI 生成器组件 -->
-            <AIGeneratorComponent v-if="showAIGenerator" @prompt-generated="handlePromptGenerated" />
+              <!-- AI 生成器组件 -->
+            <AIGeneratorComponent 
+                v-if="showAIGenerator" 
+                @prompt-generated="handlePromptGenerated"
+                @navigate-to-ai-config="handleNavigateToAIConfig" 
+            />
             
             <!-- 提示词列表组件 -->
             <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
@@ -80,6 +83,11 @@ import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
 // API 导入
 import { api } from '@/lib/api'
 import { useDatabase } from '@/composables/useDatabase'
+
+// 定义事件
+const emit = defineEmits<{
+  'navigate-to-ai-config': []
+}>()
 
 const message = useMessage()
 const { safeDbOperation, waitForDatabase } = useDatabase()
@@ -172,6 +180,11 @@ const handlePromptGenerated = (generatedPrompt: any) => {
         useCount: 0
     }
     showEditModal.value = true
+}
+
+const handleNavigateToAIConfig = () => {
+    // 向上传递导航事件到 MainPage
+    emit('navigate-to-ai-config')
 }
 
 // 生命周期
