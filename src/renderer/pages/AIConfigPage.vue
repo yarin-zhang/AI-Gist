@@ -89,109 +89,159 @@
           </div>
         </n-card>
       </div>
-    </NFlex>
-
-    <!-- 添加/编辑配置弹窗 -->
-    <n-modal v-model:show="showAddModal" preset="dialog" style="width: 600px">
+    </NFlex>    <!-- 添加/编辑配置弹窗 -->    <CommonModal 
+      ref="modalRef" 
+      :show="showAddModal" 
+      @update:show="showAddModal = $event" 
+      @close="closeModal"
+      :header-height="headerHeight" 
+      :footer-height="footerHeight" 
+      :content-padding="contentPadding"
+    >
+      <!-- 顶部固定区域 -->
       <template #header>
-        <NFlex align="center" style="gap: 8px">
-          <NIcon size="24">
-            <Settings />
-          </NIcon>
-          <NText strong>{{ editingConfig ? '编辑配置' : '添加配置' }}</NText>
+        <NFlex vertical size="medium" style="padding: 16px;">
+          <NFlex align="center" style="gap: 8px">
+            <NIcon size="24">
+              <Settings />
+            </NIcon>
+            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+              {{ editingConfig ? '编辑配置' : '添加配置' }}
+            </NText>
+          </NFlex>
+          <NText depth="3">
+            {{ editingConfig ? '修改现有的 AI 配置信息' : '添加新的 AI 服务配置，支持 OpenAI 兼容接口和 Ollama' }}
+          </NText>
+        </NFlex>
+      </template>      <!-- 中间可操作区域 -->
+      <template #content>
+        <NScrollbar :style="{ height: `${contentHeight}px` }">
+          <n-form
+            ref="formRef"
+            :model="formData"
+            :rules="formRules"
+            label-placement="top"
+            require-mark-placement="right-hanging"
+          >
+            <NGrid :cols="gridCols" :x-gap="16">
+              <!-- 左侧：基本配置和连接配置 -->
+              <NGridItem :span="leftSpan">
+                <NFlex vertical size="medium">
+                  <!-- 基本信息 -->
+                  <NCard title="基本信息" size="small">
+                    <NFlex vertical size="medium">
+                      <n-form-item label="类型" path="type">
+                        <n-select 
+                          v-model:value="formData.type" 
+                          :options="typeOptions"
+                          @update:value="onTypeChange"
+                        />
+                      </n-form-item>
+                      <n-form-item label="配置名称" path="name">
+                        <n-input v-model:value="formData.name" placeholder="输入配置名称" />
+                      </n-form-item>
+                      
+                    </NFlex>
+                  </NCard>
+
+                  <!-- 连接配置 -->
+                  <NCard title="连接配置" size="small">
+                    <NFlex vertical size="medium">
+                      <n-form-item label="Base URL" path="baseURL">
+                        <n-input v-model:value="formData.baseURL" placeholder="例如: https://api.openai.com/v1" />
+                      </n-form-item>
+                      
+                      <n-form-item v-if="formData.type === 'openai'" label="API Key" path="apiKey">
+                        <n-input 
+                          v-model:value="formData.apiKey" 
+                          type="password" 
+                          show-password-on="click"
+                          placeholder="输入 API Key"
+                        />
+                      </n-form-item>
+                    </NFlex>
+                  </NCard>
+                </NFlex>
+              </NGridItem>
+
+              <!-- 右侧：模型配置和测试 -->
+              <NGridItem :span="rightSpan">
+                <NScrollbar :style="{ height: `${contentAreaHeight}px` }">
+                  <NFlex vertical size="medium">
+                    <!-- 连接测试 -->
+                    <NCard title="连接测试" size="small">
+                      <NFlex vertical size="medium">
+                        <n-button 
+                          @click="testFormConnection" 
+                          :loading="testingFormConnection"
+                          :disabled="!formData.baseURL || (formData.type === 'openai' && !formData.apiKey)"
+                          type="info"
+                          block
+                        >
+                          <template #icon>
+                            <NIcon><Server /></NIcon>
+                          </template>
+                          测试连接并获取模型列表
+                        </n-button>
+                        
+                        <!-- 测试结果显示 -->
+                        <n-alert 
+                          v-if="formTestResult" 
+                          :type="formTestResult.success ? 'success' : 'error'"
+                          :title="formTestResult.success ? '连接成功' : '连接失败'"
+                        >
+                          {{ formTestResult.success 
+                            ? `发现 ${formTestResult.models?.length || 0} 个可用模型` 
+                            : formTestResult.error 
+                          }}
+                        </n-alert>
+                      </NFlex>
+                    </NCard>
+
+                    <!-- 模型配置 -->
+                    <NCard title="模型配置" size="small">
+                      <NFlex vertical size="medium">
+                        <n-form-item label="模型列表" path="models">
+                          <n-dynamic-tags v-model:value="formData.models" />
+                        </n-form-item>
+                        
+                        <n-form-item label="默认模型" path="defaultModel">
+                          <n-select 
+                            v-model:value="formData.defaultModel" 
+                            :options="modelOptions"
+                            placeholder="选择默认模型"
+                            filterable
+                            tag
+                            clearable
+                          />
+                        </n-form-item>
+                        
+                        <n-form-item label="自定义模型" path="customModel">
+                          <n-input v-model:value="formData.customModel" placeholder="输入自定义模型名称（可选）" />
+                        </n-form-item>
+                      </NFlex>
+                    </NCard>
+                  </NFlex>
+                </NScrollbar>
+              </NGridItem>
+            </NGrid>
+          </n-form>
+        </NScrollbar>
+      </template>      <!-- 底部固定区域 -->
+      <template #footer>
+        <NFlex justify="space-between" style="padding: 16px; height: 100%;">
+          <div>
+            <!-- 左侧可以放置一些辅助信息或操作 -->
+          </div>
+          <NFlex>
+            <n-button @click="closeModal">取消</n-button>
+            <n-button type="primary" @click="saveConfig" :loading="saving">
+              {{ editingConfig ? '更新配置' : '添加配置' }}
+            </n-button>
+          </NFlex>
         </NFlex>
       </template>
-      
-      <n-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-placement="top"
-        require-mark-placement="right-hanging"
-      >
-        <n-form-item label="配置名称" path="name">
-          <n-input v-model:value="formData.name" placeholder="输入配置名称" />
-        </n-form-item>
-        
-        <n-form-item label="类型" path="type">
-          <n-select 
-            v-model:value="formData.type" 
-            :options="typeOptions"
-            @update:value="onTypeChange"
-          />
-        </n-form-item>
-        
-        <n-form-item label="Base URL" path="baseURL">
-          <n-input v-model:value="formData.baseURL" placeholder="例如: https://api.openai.com/v1" />
-        </n-form-item>
-        
-        <n-form-item v-if="formData.type === 'openai'" label="API Key" path="apiKey">
-          <n-input 
-            v-model:value="formData.apiKey" 
-            type="password" 
-            show-password-on="click"
-            placeholder="输入 API Key"
-          />
-        </n-form-item>
-        
-        <!-- 表单内测试连接 -->
-        <n-form-item>
-          <n-button 
-            @click="testFormConnection" 
-            :loading="testingFormConnection"
-            :disabled="!formData.baseURL || (formData.type === 'openai' && !formData.apiKey)"
-            type="info"
-            block
-          >
-            <template #icon>
-              <NIcon><Server /></NIcon>
-            </template>
-            测试连接并获取模型列表
-          </n-button>
-        </n-form-item>
-        
-        <!-- 测试结果显示 -->
-        <n-alert 
-          v-if="formTestResult" 
-          :type="formTestResult.success ? 'success' : 'error'"
-          :title="formTestResult.success ? '连接成功' : '连接失败'"
-          style="margin-bottom: 16px;"
-        >
-          {{ formTestResult.success 
-            ? `发现 ${formTestResult.models?.length || 0} 个可用模型` 
-            : formTestResult.error 
-          }}
-        </n-alert>
-        
-        <n-form-item label="模型列表" path="models">
-          <n-dynamic-tags v-model:value="formData.models" />
-        </n-form-item>
-        
-        <n-form-item label="默认模型" path="defaultModel">
-          <n-select 
-            v-model:value="formData.defaultModel" 
-            :options="modelOptions"
-            placeholder="选择默认模型"
-            filterable
-            tag
-            clearable
-          />
-        </n-form-item>
-        
-        <n-form-item label="自定义模型" path="customModel">
-          <n-input v-model:value="formData.customModel" placeholder="输入自定义模型名称（可选）" />
-        </n-form-item>
-      </n-form>
-      
-      <template #action>
-        <n-space>
-          <n-button @click="closeModal">取消</n-button>
-          <n-button type="primary" @click="saveConfig" :loading="saving">
-            {{ editingConfig ? '更新' : '添加' }}
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
+    </CommonModal>
 
     <!-- 智能测试结果弹窗 -->
     <n-modal v-model:show="showIntelligentTestResult" preset="dialog" style="width: 600px">
@@ -264,15 +314,25 @@ import {
     NMessage,
     NAlert,
     NEmpty,
+    NGrid,
+    NGridItem,
     useMessage 
 } from 'naive-ui'
 import { Plus, Robot, DatabaseOff, Server, Settings } from '@vicons/tabler'
 import type { AIConfig } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 import { useDatabase } from '~/composables/useDatabase'
+import { useWindowSize } from '~/composables/useWindowSize'
+import CommonModal from '~/components/common/CommonModal.vue'
 
 const message = useMessage()
 const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase()
+const { modalWidth } = useWindowSize()
+
+// 布局高度常量
+const headerHeight = 120
+const footerHeight = 80
+const contentPadding = 24
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
@@ -289,8 +349,8 @@ const autoShowAddModal = ref(false)
 
 // 表单数据
 const formData = reactive({
-  name: '',
   type: 'openai' as 'openai' | 'ollama',
+  name: '',
   baseURL: '',
   apiKey: '',
   models: [] as string[],
@@ -300,11 +360,11 @@ const formData = reactive({
 
 // 表单校验规则
 const formRules = {
-  name: [
-    { required: true, message: '请输入配置名称', trigger: 'blur' }
-  ],
   type: [
     { required: true, message: '请选择类型', trigger: 'change' }
+  ],
+  name: [
+    { required: true, message: '请输入配置名称', trigger: 'blur' }
   ],
   baseURL: [
     { required: true, message: '请输入 Base URL', trigger: 'blur' }
@@ -332,6 +392,33 @@ const typeOptions = [
 
 // 表单引用
 const formRef = ref()
+const modalRef = ref<InstanceType<typeof CommonModal> | null>(null)
+
+// 网格布局计算
+const gridCols = computed(() => {
+  return modalWidth.value > 1000 ? 12 : 12
+})
+
+// 左侧网格大小（基本配置）
+const leftSpan = computed(() => {
+  return modalWidth.value > 1000 ? 7 : 12
+})
+
+// 右侧网格大小（模型配置）
+const rightSpan = computed(() => {
+  return modalWidth.value > 1000 ? 5 : 12
+})
+
+// 获取内容高度
+const contentHeight = computed(() => {
+  return modalRef.value?.contentHeight || 400
+})
+
+// 计算内容区域高度
+const contentAreaHeight = computed(() => {
+  const modalHeight = modalRef.value?.contentHeight || 500
+  return modalHeight - 48 // 减去一些内边距
+})
 
 // 计算属性：模型选项
 const modelOptions = computed(() => {
@@ -361,8 +448,8 @@ const saveConfig = async () => {
     if (editingConfig.value) {
       // 更新配置
       const updateData = {
-        name: formData.name,
         type: formData.type,
+        name: formData.name,
         baseURL: formData.baseURL,
         apiKey: formData.apiKey || undefined,
         models: [...formData.models], // 创建新数组确保可序列化
@@ -375,8 +462,8 @@ const saveConfig = async () => {
       // 添加新配置
       const configData = {
         configId: `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: formData.name,
         type: formData.type,
+        name: formData.name,
         baseURL: formData.baseURL,
         apiKey: formData.apiKey || undefined,
         models: [...formData.models], // 创建新数组确保可序列化
@@ -540,9 +627,9 @@ const closeModal = () => {
 
 // 重置表单
 const resetForm = () => {
-  formData.name = ''
+  formData.name = 'OpenAI 兼容' // 默认为 OpenAI 兼容
   formData.type = 'openai'
-  formData.baseURL = ''
+  formData.baseURL = 'https://api.openai.com/v1' // 默认填充 baseURL
   formData.apiKey = ''
   formData.models = []
   formData.defaultModel = ''
@@ -557,6 +644,18 @@ const onTypeChange = (type: 'openai' | 'ollama') => {
     formData.apiKey = ''
   } else {
     formData.baseURL = 'https://api.openai.com/v1'
+  }
+  
+  // 自动填充配置名称（仅在新建模式下，且名称为空或为之前的自动名称时）
+  if (!editingConfig.value) {
+    const currentName = formData.name.trim()
+    const isAutoGeneratedName = currentName === '' || 
+                               currentName === 'Ollama' || 
+                               currentName === 'OpenAI 兼容'
+    
+    if (isAutoGeneratedName) {
+      formData.name = type === 'ollama' ? 'Ollama' : 'OpenAI 兼容'
+    }
   }
 }
 
