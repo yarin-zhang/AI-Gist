@@ -1,26 +1,20 @@
 <template>
   <div 
-    v-if="!isDatabaseReady && !isHidden" 
-    class="database-status-banner"
-    :class="{ 'error': databaseError }"
+    v-if="databaseError && !isHidden" 
+    class="database-status-banner error"
   >
     <div class="content">
       <div class="icon">
-        <div v-if="!databaseError" class="loading-spinner"></div>
-        <div v-else class="error-icon">⚠️</div>
+        <div class="error-icon">⚠️</div>
       </div>
       <div class="text">
-        <div v-if="!databaseError" class="message">
-          正在初始化数据库...
-        </div>
-        <div v-else class="error-message">
-          <div>数据库初始化失败</div>
+        <div class="error-message">
+          <div>数据库连接异常</div>
           <div class="error-detail">{{ databaseError }}</div>
         </div>
       </div>
       <div class="actions">
         <button 
-          v-if="databaseError" 
           @click="retry" 
           class="retry-btn"
           :disabled="isRetrying"
@@ -71,16 +65,12 @@ const retry = async () => {
   top: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
   color: white;
   padding: 12px 20px;
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-}
-
-.database-status-banner.error {
-  background: linear-gradient(135deg, #e74c3c, #c0392b);
 }
 
 .content {
@@ -93,6 +83,15 @@ const retry = async () => {
 
 .icon {
   flex-shrink: 0;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .loading-spinner {
