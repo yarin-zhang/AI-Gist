@@ -256,8 +256,10 @@ import {
 import { Plus, Robot, DatabaseOff, Server, Settings } from '@vicons/tabler'
 import type { AIConfig } from '~/lib/db'
 import { databaseService } from '~/lib/db'
+import { useDatabase } from '~/composables/useDatabase'
 
 const message = useMessage()
+const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase()
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
@@ -327,11 +329,12 @@ const modelOptions = computed(() => {
 
 // 加载配置列表
 const loadConfigs = async () => {
-  try {
-    const result = await databaseService.getAllAIConfigs()
+  const result = await safeDbOperation(
+    () => databaseService.getAllAIConfigs(),
+    []
+  )
+  if (result) {
     configs.value = result
-  } catch (error) {
-    message.error('加载配置失败: ' + (error as Error).message)
   }
 }
 
@@ -568,7 +571,9 @@ const serializeConfig = (config: AIConfig) => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  // 等待数据库就绪后再加载数据
+  await waitForDatabase()
   loadConfigs()
 })
 </script>

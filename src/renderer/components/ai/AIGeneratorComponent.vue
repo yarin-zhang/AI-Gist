@@ -156,8 +156,10 @@ import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
+import { useDatabase } from '~/composables/useDatabase'
 
 const message = useMessage()
+const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
@@ -226,7 +228,7 @@ const modelDropdownOptions = computed(() => {
 
 // 加载 AI 配置
 const loadConfigs = async () => {
-  try {
+  await safeDbOperation(async () => {
     console.log('开始加载 AI 配置')
     const result = await databaseService.getEnabledAIConfigs()
     console.log('成功获取到启用的 AI 配置:', result)
@@ -240,10 +242,7 @@ const loadConfigs = async () => {
     } else {
       message.info('没有找到启用的 AI 配置，请先在 AI 配置页面添加并启用至少一个配置')
     }
-  } catch (error) {
-    console.error('加载 AI 配置失败:', error)
-    message.error('加载 AI 配置失败: ' + (error as Error).message)
-  }
+  })
 }
 
 // 加载历史记录
@@ -443,7 +442,8 @@ const onPromptSaved = () => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  await waitForDatabase()
   loadConfigs()
   loadCategories()
 })

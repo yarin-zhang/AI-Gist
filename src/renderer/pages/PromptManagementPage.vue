@@ -79,8 +79,10 @@ import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
 
 // API 导入
 import { api } from '@/lib/api'
+import { useDatabase } from '@/composables/useDatabase'
 
 const message = useMessage()
+const { safeDbOperation, waitForDatabase } = useDatabase()
 
 // 组件引用
 const promptListRef = ref()
@@ -101,25 +103,25 @@ const totalCategories = computed(() => categories.value.length)
 
 // 方法
 const loadPrompts = async () => {
-    try {
-        const result = await api.prompts.getAllForTags.query()
+    const result = await safeDbOperation(
+        () => api.prompts.getAllForTags.query(),
+        []
+    )
+    if (result) {
         prompts.value = result
-    } catch (error) {
-        message.error('加载 Prompts 失败')
-        console.error(error)
     }
 }
 
 const loadCategories = async () => {
-    try {
-        categories.value = await api.categories.getAll.query()
+    const result = await safeDbOperation(
+        () => api.categories.getAll.query(),
+        []
+    )
+    if (result) {
+        categories.value = result
         // 同时刷新 PromptList 的分类数据
         if (promptListRef.value?.loadCategories) {
-            promptListRef.value.loadCategories()
-        }
-    } catch (error) {
-        message.error('加载分类失败')
-        console.error(error)
+            promptListRef.value.loadCategories()        }
     }
 }
 
@@ -173,7 +175,9 @@ const handlePromptGenerated = (generatedPrompt: any) => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+    // 等待数据库就绪后再加载数据
+    await waitForDatabase()
     loadStatistics()
 })
 </script>

@@ -7,8 +7,9 @@ import {
     zhCN,
     dateZhCN
 } from 'naive-ui'
-import { useTheme } from './composables/useTheme'
-import MainPage from './pages/MainPage.vue'
+import { useTheme } from '~/composables/useTheme'
+import MainPage from '~/pages/MainPage.vue'
+import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 
 // 使用主题管理
 const { naiveTheme, initTheme } = useTheme()
@@ -22,6 +23,8 @@ onMounted(async () => {
 <template>
     <NConfigProvider :theme="naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
         <NMessageProvider>
+            <!-- 数据库状态横幅 -->
+            <DatabaseStatusBanner />
             <MainPage />
         </NMessageProvider>
     </NConfigProvider>
