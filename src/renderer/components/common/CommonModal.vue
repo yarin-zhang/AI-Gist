@@ -25,21 +25,10 @@
                     </NIcon>
                 </template>
             </NButton>
-            
-            <!-- 如果有 Footer，使用嵌套 NSplit 布局 -->
-            <NSplit 
-                v-if="hasFooter"
-                direction="vertical" 
-                :style="{ height: '100%', width: '100%' }"
-                :default-size="`${modalHeight - footerDefaultHeight}px`"
-                :min="`${modalHeight - footerMaxHeight}px`"
-                :max="`${modalHeight - minFooterHeight}px`"
-                :disabled="!footerResizable"
-                :resize-trigger-size="3"
-                :pane1-style="{ overflow: 'hidden' }"
-                :pane2-style="{ overflow: 'hidden' }"
-            >                <!-- 上部分：Header + Content -->
-                <template #1>
+              <!-- 如果有 Footer，使用 flexbox 布局确保底部固定高度 -->
+            <div v-if="hasFooter" :style="{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }">
+                <!-- 上部分：Header + Content，占据剩余空间 -->
+                <div :style="{ flex: 1, minHeight: 0, overflow: 'hidden' }">
                     <NSplit
                         direction="vertical"
                         :style="{ height: '100%' }"
@@ -80,9 +69,8 @@
                             </div>
                         </template>
                     </NSplit>
-                </template>
-                  <!-- Footer -->
-                <template #2>
+                </div>                <!-- Footer：固定高度 -->
+                <div :style="{ height: `${footerDefaultHeight}px`, flexShrink: 0 }">
                     <NFlex 
                         class="modal-footer" 
                         vertical 
@@ -96,8 +84,8 @@
                     >
                         <slot name="footer" />
                     </NFlex>
-                </template>
-            </NSplit>
+                </div>
+            </div>
             
             <!-- 如果没有 Footer，只使用 Header + Content -->
             <NSplit 
@@ -160,14 +148,11 @@ import { useWindowSize } from "@/composables/useWindowSize";
 interface Props {
     show: boolean;
     minHeaderHeight?: number;
-    minFooterHeight?: number;
     contentPadding?: number;
     headerResizable?: boolean;
-    footerResizable?: boolean;
     headerDefaultHeight?: number; // 头部默认高度（像素）
     footerDefaultHeight?: number; // 底部默认高度（像素）
     headerMaxHeight?: number; // 头部最大高度（像素）
-    footerMaxHeight?: number; // 底部最大高度（像素）
 }
 
 interface Emits {
@@ -177,14 +162,11 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
     minHeaderHeight: 60, // 最小头部高度
-    minFooterHeight: 60, // 最小底部高度
     contentPadding: 16, // 内容边距
     headerResizable: false, // 头部是否可调整大小
-    footerResizable: false, // 底部是否可调整大小
     headerDefaultHeight: 80, // 头部默认高度（像素）
     footerDefaultHeight: 80, // 底部默认高度（像素）
     headerMaxHeight: 300, // 头部最大高度（像素）
-    footerMaxHeight: 200, // 底部最大高度（像素）
 });
 
 const emit = defineEmits<Emits>();
@@ -205,7 +187,6 @@ const hasFooter = computed(() => {
 const headerDefaultHeight = computed(() => props.headerDefaultHeight);
 const headerMaxHeight = computed(() => `${props.headerMaxHeight}px`);
 const footerDefaultHeight = computed(() => props.footerDefaultHeight);
-const footerMaxHeight = computed(() => `${props.footerMaxHeight}px`);
 
 // 关闭弹窗
 const handleClose = () => {
