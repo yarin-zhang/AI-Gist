@@ -125,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRef } from 'vue'
 import {
     NCard,
     NFlex,
@@ -145,7 +145,7 @@ import {
 import { Edit, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
-import { useWindowSize } from '@/composables/useWindowSize'
+import { useModalLayout } from '@/composables/useWindowSize'
 import CommonModal from '@/components/common/CommonModal.vue'
 
 interface Props {
@@ -166,13 +166,17 @@ const message = useMessage()
 // 使用统一的颜色配置
 const { COLOR_SWATCHES } = useTagColors()
 
-// 使用窗口尺寸 composable
-const { modalWidth } = useWindowSize()
-
-// 布局高度常量
-const headerHeight = 120
-const footerHeight = 1
-const contentPadding = 16
+// 使用模态框布局 composable
+const {
+    modalWidth,
+    contentHeight
+} = useModalLayout({
+    minHeaderHeight: 120,
+    minFooterHeight: 1,
+    contentPadding: 16,
+    show: toRef(props, 'show'),
+    hasFooter: computed(() => false) // 这个组件没有footer
+})
 
 // 网格布局计算
 const gridCols = computed(() => {
@@ -187,14 +191,6 @@ const leftSpan = computed(() => {
 // 右侧网格大小（分类列表）
 const rightSpan = computed(() => {
     return modalWidth.value > 1000 ? 7 : 12
-})
-
-// 模板引用
-const modalRef = ref<InstanceType<typeof CommonModal> | null>(null)
-
-// 获取内容高度
-const contentHeight = computed(() => {
-    return modalRef.value?.contentHeight || 400
 })
 
 // 计算分类列表的最大高度

@@ -215,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount, toRef } from "vue";
 import {
     NForm,
     NFormItem,
@@ -238,7 +238,7 @@ import {
 } from "naive-ui";
 import { Plus, Trash, InfoCircle, ArrowLeft } from "@vicons/tabler";
 import { api } from "@/lib/api";
-import { useWindowSize } from "@/composables/useWindowSize";
+import { useModalLayout } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
 
 interface Variable {
@@ -270,21 +270,24 @@ const formRef = ref();
 const saving = ref(false);
 const showExtraInfo = ref(false);
 
-// 使用窗口尺寸 composable
-const { modalWidth } = useWindowSize();
+// 是否有底部内容
+const hasFooter = computed(() => true); // 这个组件有footer
 
-// 布局高度常量
-const headerHeight = 140;
-const footerHeight = 80;
-const contentPadding = 16;
-
-// 模板引用
-const modalRef = ref<InstanceType<typeof CommonModal> | null>(null);
+// 使用模态框布局 composable
+const {
+    modalWidth,
+    contentHeight
+} = useModalLayout({
+    minHeaderHeight: 140,
+    minFooterHeight: 80,
+    contentPadding: 16,
+    show: toRef(props, 'show'),
+    hasFooter
+});
 
 // 获取内容区域高度
 const contentAreaHeight = computed(() => {
-    const modalHeight = modalRef.value?.contentHeight || 500;
-    return modalHeight - 48; // 减去一些内边距
+    return contentHeight.value - 48; // 减去一些内边距
 });
 
 // 防抖相关

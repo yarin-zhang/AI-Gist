@@ -324,7 +324,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, toRef } from 'vue'
 import {
     NCard,
     NFlex,
@@ -346,7 +346,7 @@ import {
 import { Heart, Edit, Copy, Wand, Check, History, ArrowLeft, FileText, Trash, Tag, Box } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
-import { useWindowSize } from '@/composables/useWindowSize'
+import { useModalLayout } from '@/composables/useWindowSize'
 import CommonModal from '@/components/common/CommonModal.vue'
 
 interface Props {
@@ -369,13 +369,20 @@ const message = useMessage()
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
-// 使用窗口尺寸 composable
-const { modalWidth } = useWindowSize()
+// 是否有底部内容
+const hasFooter = computed(() => true) // 这个组件有footer
 
-// 布局高度常量
-const headerHeight = 180
-const footerHeight = 60
-const contentPadding = 16
+// 使用模态框布局 composable
+const {
+    modalWidth,
+    contentHeight
+} = useModalLayout({
+    minHeaderHeight: 180,
+    minFooterHeight: 60,
+    contentPadding: 16,
+    show: toRef(props, 'show'),
+    hasFooter
+})
 
 // 网格列数计算
 const gridCols = computed(() => {
@@ -390,14 +397,6 @@ const leftSpan = computed(() => {
 // 右侧网格大小
 const rightSpan = computed(() => {
     return modalWidth.value > 1000 ? 7 : 7
-})
-
-// 模板引用
-const modalRef = ref<InstanceType<typeof CommonModal> | null>(null)
-
-// 获取内容高度
-const contentHeight = computed(() => {
-    return modalRef.value?.contentHeight || 400
 })
 
 // 响应式数据
