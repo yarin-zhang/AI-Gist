@@ -189,6 +189,7 @@ const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
 interface Emits {
     (e: 'navigate-to-ai-config'): void
     (e: 'prompt-generated', prompt: any): void
+    (e: 'prompt-saved'): void
 }
 
 const emit = defineEmits<Emits>()
@@ -359,11 +360,13 @@ const generatePrompt = async () => {
       model: result.model,
       status: 'success'
     })
-    
-    // 直接保存为提示词
+      // 直接保存为提示词
     await saveGeneratedPrompt(result)
     
     message.success('提示词生成并保存成功')
+    
+    // 通知父组件刷新提示词列表
+    emit('prompt-saved')
     
     // 清空输入框
     formData.topic = ''
