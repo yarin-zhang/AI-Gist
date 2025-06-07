@@ -35,11 +35,11 @@
                         AI 生成器
                     </NButton>
                 </NFlex>
-            </NFlex>
-              <!-- AI 生成器组件 -->
+            </NFlex>              <!-- AI 生成器组件 -->
             <AIGeneratorComponent 
                 v-if="showAIGenerator" 
                 @prompt-generated="handlePromptGenerated"
+                @prompt-saved="handleListRefresh"
                 @navigate-to-ai-config="handleNavigateToAIConfig" 
             />
               <!-- 提示词列表组件 -->
