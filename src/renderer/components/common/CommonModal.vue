@@ -1,5 +1,5 @@
 <template>
-    <NModal :show="show" @update:show="handleUpdateShow">
+    <NModal :show="show" >
         <div :style="{
             width: `${modalWidth}px`,
             height: `${modalHeight}px`,

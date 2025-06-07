@@ -25,19 +25,17 @@
                     :min="0.3" :max="0.8" :disabled="modalWidth <= 800">
                     <!-- 左侧：内容编辑区 -->
                     <template #1>
-                        <div style="height: 100%; padding-right: 8px"> <!-- 第一步：提示词内容 -->                            <div v-show="!showExtraInfo" style="height: 100%;">
-                                <NCard title="提示词内容" size="small" style="height: 100%; display: flex; flex-direction: column;">
-                                    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;">
-                                        <NFormItem path="content" style="flex: 1; display: flex; flex-direction: column;">
-                                            <NInput 
-                                                v-model:value="formData.content" 
-                                                type="textarea"
-                                                placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量"
-                                                show-count
-                                                :rows="8"
-                                                style="flex: 1;"
-                                                :autosize="false"
-                                            />
+                        <div style="height: 100%; padding-right: 8px"> <!-- 第一步：提示词内容 -->
+                            <div v-show="!showExtraInfo" style="height: 100%;">
+                                <NCard title="提示词内容" size="small"
+                                    style="height: 100%; display: flex; flex-direction: column;">
+                                    <div
+                                        style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px;">
+                                        <NFormItem path="content"
+                                            style="flex: 1; display: flex; flex-direction: column;">
+                                            <NInput v-model:value="formData.content" type="textarea"
+                                                placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" show-count :rows="8"
+                                                style="flex: 1;" :autosize="false" />
                                         </NFormItem>
 
                                         <NAlert type="info">
@@ -49,7 +47,7 @@
                                         </NAlert>
                                     </div>
                                 </NCard>
-                            </div>                            <!-- 第二步：额外信息 -->
+                            </div> <!-- 第二步：额外信息 -->
                             <div v-show="showExtraInfo" style="height: 100%">
                                 <NScrollbar style="height: 100%" content-style="overflow: hidden;">
                                     <NCard title="基本信息" size="small">
@@ -71,9 +69,10 @@
 
                     <!-- 右侧：配置区 -->
                     <template #2>
-                        <div style="height: 100%; padding-left: 8px">                            <!-- 变量识别和配置区（第一步显示） -->
-                            <div v-show="!showExtraInfo" style="height: 100%; display: flex; flex-direction: column;">
-                                <NCard size="small" style="height: 100%; display: flex; flex-direction: column;">
+                        <div style="height: 100%; padding-left: 8px"> <!-- 变量识别和配置区（第一步显示） -->                            <div v-show="!showExtraInfo" style="height: 100%; display: flex; flex-direction: column;">
+                                <NCard size="small" style="height: 100%;" 
+                                       :content-style="{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
+                                    <!-- 头部区域 -->
                                     <template #header>
                                         <NFlex justify="space-between" align="center">
                                             <NText>检测到的变量</NText>
@@ -88,71 +87,76 @@
                                         </NFlex>
                                     </template>
                                     
+                                    <!-- 可滚动内容区域 -->
                                     <div style="flex: 1; min-height: 0;">
-                                        <NScrollbar style="max-height: 100%;" content-style="overflow: hidden;">
-                                            <div v-if="formData.variables.length === 0" style="padding: 20px 0">
-                                                <NEmpty description="在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量" size="small" />
+                                        <NScrollbar style="height: 100%;">
+                                            <div style="padding: 16px; padding-bottom: 32px;">
+                                                <div v-if="formData.variables.length === 0" style="padding: 20px 0; text-align: center;">
+                                                    <NEmpty description="在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量" size="small" />
+                                                </div>
+                                                <NFlex v-else vertical size="medium">
+                                                    <NCard v-for="(variable, index) in formData.variables" :key="index"
+                                                        size="small" class="variable-card">
+                                                        <template #header>
+                                                            <NFlex justify="space-between" align="center">
+                                                                <NText>{{
+                                                                    variable.name || "变量" + (index + 1)
+                                                                    }}</NText>
+                                                                <NButton size="small" text type="error"
+                                                                    @click="removeVariable(index)">
+                                                                    <template #icon>
+                                                                        <NIcon>
+                                                                            <Trash />
+                                                                        </NIcon>
+                                                                    </template>
+                                                                </NButton>
+                                                            </NFlex>
+                                                        </template>
+
+                                                        <NFlex vertical size="small">
+                                                            <NFlex>
+                                                                <NFormItem label="变量名" style="flex: 1">
+                                                                    <NInput v-model:value="variable.name" placeholder="变量名"
+                                                                        size="small" />
+                                                                </NFormItem>
+                                                                <NFormItem label="显示名" style="flex: 1">
+                                                                    <NInput v-model:value="variable.label"
+                                                                        placeholder="显示名称" size="small" />
+                                                                </NFormItem>
+                                                            </NFlex>
+
+                                                            <NFlex>
+                                                                <NFormItem label="类型" style="flex: 1">
+                                                                    <NSelect v-model:value="variable.type"
+                                                                        :options="variableTypeOptions" size="small" />
+                                                                </NFormItem>
+                                                                <NFormItem label="必填" style="width: 80px">
+                                                                    <NSwitch v-model:value="variable.required"
+                                                                        size="small" />
+                                                                </NFormItem>
+                                                            </NFlex>
+
+                                                            <NFormItem label="默认值">
+                                                                <NInput v-if="variable.type === 'text'"
+                                                                    v-model:value="variable.defaultValue"
+                                                                    placeholder="默认值（可选）" size="small" />
+                                                                <NSelect v-else-if="variable.type === 'select'"
+                                                                    v-model:value="variable.defaultValue" :options="getVariableDefaultOptions(variable.options)
+                                                                        " placeholder="选择默认选项（可选）" size="small" clearable />
+                                                            </NFormItem>
+
+                                                            <NFormItem v-if="variable.type === 'select'" label="选项">
+                                                                <NDynamicInput v-model:value="variable.options"
+                                                                    show-sort-button placeholder="请输入选项" :min="1" />
+                                                            </NFormItem>
+                                                        </NFlex>
+                                                    </NCard>
+                                                </NFlex>
                                             </div>
-                                            <NFlex v-else vertical size="medium" style="padding: 8px 0">
-                                                <NCard v-for="(variable, index) in formData.variables" :key="index"
-                                                    size="small" class="variable-card">
-                                                <template #header>
-                                                    <NFlex justify="space-between" align="center">
-                                                        <NText>{{
-                                                            variable.name || "变量" + (index + 1)
-                                                        }}</NText>
-                                                        <NButton size="small" text type="error"
-                                                            @click="removeVariable(index)">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Trash />
-                                                                </NIcon>
-                                                            </template>
-                                                        </NButton>
-                                                    </NFlex>
-                                                </template>
-
-                                                <NFlex vertical size="small">
-                                                    <NFlex>
-                                                        <NFormItem label="变量名" style="flex: 1">
-                                                            <NInput v-model:value="variable.name" placeholder="变量名"
-                                                                size="small" />
-                                                        </NFormItem>
-                                                        <NFormItem label="显示名" style="flex: 1">
-                                                            <NInput v-model:value="variable.label" placeholder="显示名称"
-                                                                size="small" />
-                                                        </NFormItem>
-                                                    </NFlex>
-
-                                                    <NFlex>
-                                                        <NFormItem label="类型" style="flex: 1">
-                                                            <NSelect v-model:value="variable.type"
-                                                                :options="variableTypeOptions" size="small" />
-                                                        </NFormItem>
-                                                        <NFormItem label="必填" style="width: 80px">
-                                                            <NSwitch v-model:value="variable.required" size="small" />
-                                                        </NFormItem>
-                                                    </NFlex>
-
-                                                    <NFormItem label="默认值">
-                                                        <NInput v-if="variable.type === 'text'"
-                                                            v-model:value="variable.defaultValue" placeholder="默认值（可选）"
-                                                            size="small" />
-                                                        <NSelect v-else-if="variable.type === 'select'"
-                                                            v-model:value="variable.defaultValue" :options="getVariableDefaultOptions(variable.options)
-                                                                " placeholder="选择默认选项（可选）" size="small" clearable />
-                                                    </NFormItem>
-
-                                                    <NFormItem v-if="variable.type === 'select'" label="选项">
-                                                        <NDynamicInput v-model:value="variable.options" show-sort-button
-                                                            placeholder="请输入选项" :min="1" />
-                                                    </NFormItem>                                                </NFlex>
-                                            </NCard>
-                                        </NFlex>
-                                    </NScrollbar>
+                                        </NScrollbar>
                                     </div>
                                 </NCard>
-                            </div>                            <!-- 标签区（第二步显示） -->
+                            </div><!-- 标签区（第二步显示） -->
                             <div v-show="showExtraInfo" style="height: 100%">
                                 <NScrollbar style="height: 100%" content-style="overflow: hidden;">
                                     <NCard title="分类与标签" size="small">
