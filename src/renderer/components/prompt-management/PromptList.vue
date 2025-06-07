@@ -258,6 +258,7 @@ import {
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
+import { useDatabase } from '@/composables/useDatabase'
 
 interface Emits {
     (e: 'edit', prompt: any): void
@@ -267,6 +268,7 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
+const { waitForDatabase } = useDatabase()
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
@@ -552,16 +554,17 @@ const handleDeletePrompt = async (prompt) => {
     }
 }
 
-// 暴露方法给父组件
-defineExpose({
-    loadPrompts,
-    loadCategories
-})
-
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+    await waitForDatabase()
     loadPrompts(true) // 初始加载
     loadCategories()
+})
+
+// 暴露方法给父组件
+defineExpose({
+    loadPrompts: () => loadPrompts(true),
+    loadCategories
 })
 </script>
 

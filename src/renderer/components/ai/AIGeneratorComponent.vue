@@ -1,6 +1,32 @@
 <template>
   <div class="ai-generator">
-    <n-card title="AI 提示词生成器" class="generator-card">
+    <!-- 没有AI 配置时显示的空状态 -->
+    <n-empty v-if="!defaultConfig && !loading" 
+             description="暂无可用的 AI 配置" 
+             size="large"
+             style="margin: 40px 0;">
+      <template #icon>
+        <n-icon size="48" :color="'var(--text-color-3)'">
+          <Robot />
+        </n-icon>
+      </template>
+      <template #extra>
+        <n-space vertical align="center">
+          <n-text depth="3" style="margin-bottom: 16px;">
+            请先添加并启用至少一个 AI 配置才能使用生成功能
+          </n-text>
+          <n-button type="primary" @click="navigateToAIConfig">
+            <template #icon>
+              <n-icon><Plus /></n-icon>
+            </template>
+            添加 AI 配置
+          </n-button>
+        </n-space>
+      </template>
+    </n-empty>
+
+    <!-- 有AI 配置时显示的生成工具 -->
+    <n-card v-if="defaultConfig" title="AI 提示词生成器" class="generator-card">
       <n-form
         ref="formRef"
         :model="formData"
@@ -17,7 +43,7 @@
         </n-form-item>
         
         <n-form-item>
-          <n-space justify="space-between" style="width: 100%;">
+          <n-space justify="space-between" >
             <n-space>
               <n-button 
                 type="primary" 
@@ -64,10 +90,8 @@
           </n-space>
         </n-form-item>
       </n-form>
-    </n-card>
-
-    <!-- 历史记录（可切换显示） -->
-    <n-card v-if="showHistory" title="生成历史" class="history-card">
+    </n-card>    <!-- 历史记录（可切换显示） -->
+    <n-card v-if="showHistory && defaultConfig" title="生成历史" class="history-card">
       <template #header-extra>
         <n-space>
           <n-button size="small" @click="loadHistory">
@@ -151,13 +175,23 @@ import {
     NText,
     useMessage 
 } from 'naive-ui'
-import { ChevronDown, History, Refresh, Check, AlertCircle, X } from '@vicons/tabler'
+import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
+import { useDatabase } from '~/composables/useDatabase'
 
 const message = useMessage()
+const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
+
+// 事件定义
+interface Emits {
+    (e: 'navigate-to-ai-config'): void
+    (e: 'prompt-generated', prompt: any): void
+}
+
+const emit = defineEmits<Emits>()
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
@@ -165,6 +199,7 @@ const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
 const generating = ref(false)
+const loading = ref(true)
 const showHistory = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
@@ -226,7 +261,8 @@ const modelDropdownOptions = computed(() => {
 
 // 加载 AI 配置
 const loadConfigs = async () => {
-  try {
+  loading.value = true
+  await safeDbOperation(async () => {
     console.log('开始加载 AI 配置')
     const result = await databaseService.getEnabledAIConfigs()
     console.log('成功获取到启用的 AI 配置:', result)
@@ -238,12 +274,16 @@ const loadConfigs = async () => {
       currentModel.value = defaultConfig.value.defaultModel || ''
       console.log('自动选择默认配置:', defaultConfig.value.name)
     } else {
-      message.info('没有找到启用的 AI 配置，请先在 AI 配置页面添加并启用至少一个配置')
+      defaultConfig.value = null
+      console.log('没有找到启用的 AI 配置')
     }
-  } catch (error) {
-    console.error('加载 AI 配置失败:', error)
-    message.error('加载 AI 配置失败: ' + (error as Error).message)
-  }
+  })
+  loading.value = false
+}
+
+// 导航到AI 配置页面
+const navigateToAIConfig = () => {
+  emit('navigate-to-ai-config')
 }
 
 // 加载历史记录
@@ -443,7 +483,8 @@ const onPromptSaved = () => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  await waitForDatabase()
   loadConfigs()
   loadCategories()
 })
@@ -466,7 +507,6 @@ const loadCategories = async () => {
 <style scoped>
 .ai-generator {
   padding: 20px;
-  width: 100%;
   max-width: none;
   margin: 0;
   display: block;

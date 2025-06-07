@@ -163,9 +163,7 @@
                                     </NCheckbox>
                                 </NFormItem>
                             </NFlex>
-                        </NCard>
-
-                        <!-- 外观设置 -->
+                        </NCard>                        <!-- 外观设置 -->
                         <NCard v-show="activeSettingKey === 'appearance'">
                             <NFlex vertical :size="16">
                                 <NFormItem label="主题模式">
@@ -205,6 +203,9 @@
                                     </NRadioGroup>
                                 </NFormItem>
                             </NFlex>
+                        </NCard>                        <!-- 实验室 (仅开发环境) -->
+                        <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
+                            <LaboratoryPanel />
                         </NCard>
 
                         <!-- 操作状态提示 -->
@@ -255,10 +256,16 @@ import {
     DeviceDesktop,
     Sun,
     Moon,
+    Flask,
 } from "@vicons/tabler";
+import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 
 // 消息提示
 const message = useMessage();
+
+// 检测是否为开发环境
+const isDevelopment = import.meta.env.DEV;
+const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
 const activeSettingKey = ref("appearance");
@@ -279,23 +286,36 @@ const settings = reactive({
 });
 
 // 菜单选项
-const menuOptions = [
-    {
-        label: "外观设置",
-        key: "appearance",
-        icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
-    },
-    {
-        label: "启动行为设置",
-        key: "startup-behavior",
-        icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
-    },
-    {
-        label: "关闭行为设置",
-        key: "close-behavior",
-        icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
-    },
-];
+const menuOptions = computed(() => {
+    const baseOptions = [
+        {
+            label: "外观设置",
+            key: "appearance",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
+        },
+        {
+            label: "启动行为设置",
+            key: "startup-behavior",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
+        },
+        {
+            label: "关闭行为设置",
+            key: "close-behavior",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
+        },
+    ];
+
+    // 仅在开发环境中添加实验室菜单
+    if (isDevelopment) {
+        baseOptions.push({
+            label: "实验室",
+            key: "laboratory",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Flask) }),
+        });
+    }
+
+    return baseOptions;
+});
 
 // 当前设置节的信息
 const currentSectionInfo = computed(() => {
@@ -315,8 +335,13 @@ const currentSectionInfo = computed(() => {
             icon: Sun,
             description: "配置应用的主题模式"
         },
+        laboratory: {
+            title: "实验室",
+            icon: Flask,
+            description: "开发中的实验性功能和组件测试"
+        },
     };
-    return sections[activeSettingKey.value] || sections["close-behavior"];
+    return sections[activeSettingKey.value] || sections["appearance"];
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);

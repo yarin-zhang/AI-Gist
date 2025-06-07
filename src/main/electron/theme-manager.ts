@@ -81,6 +81,10 @@ class ThemeManager {
   setThemeSource(source: 'system' | 'light' | 'dark') {
     nativeTheme.themeSource = source;
     console.log('主题来源已设置为:', source);
+    
+    // 立即更新窗口背景色
+    const currentTheme = this.getCurrentTheme();
+    this.updateWindowBackgroundColor(currentTheme);
   }
 
   /**
@@ -114,7 +118,6 @@ class ThemeManager {
   removeThemeChangeListener(callback: ThemeChangeCallback) {
     this.themeChangeCallbacks.delete(callback);
   }
-
   /**
    * 设置系统主题监听器
    * 监听系统主题变化并通知所有注册的回调函数
@@ -124,6 +127,9 @@ class ThemeManager {
     nativeTheme.on('updated', () => {
       const currentTheme = this.getCurrentTheme();
       console.log('系统主题已更新:', currentTheme);
+      
+      // 更新窗口背景色
+      this.updateWindowBackgroundColor(currentTheme);
       
       // 通知所有注册的回调函数
       this.themeChangeCallbacks.forEach(callback => {
@@ -139,6 +145,18 @@ class ThemeManager {
         this.notifyRendererThemeChange(currentTheme);
       }
     });
+  }
+
+  /**
+   * 更新窗口背景色
+   * @param theme 当前主题
+   */
+  private updateWindowBackgroundColor(theme: SystemTheme) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      const backgroundColor = theme === 'dark' ? '#101014' : '#ffffff';
+      this.mainWindow.setBackgroundColor(backgroundColor);
+      console.log(`窗口背景色已更新为: ${backgroundColor}`);
+    }
   }
 
   /**

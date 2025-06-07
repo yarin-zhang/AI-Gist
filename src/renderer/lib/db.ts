@@ -103,20 +103,36 @@ class DatabaseService {
   private db: IDBDatabase | null = null;
   private readonly dbName = 'AIGistDB';
   private readonly dbVersion = 3; // 升级版本号以修复表名不一致问题
-
+  private initializationPromise: Promise<void> | null = null;
+  private isInitialized: boolean = false;
   /**
    * 初始化数据库
    */
   async initialize(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // 如果已经有初始化 Promise，直接返回
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // 如果已经初始化完成，直接返回
+    if (this.isInitialized && this.db) {
+      return Promise.resolve();
+    }
+
+    // 创建初始化 Promise
+    this.initializationPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.dbVersion);
 
       request.onerror = () => {
+        console.error('Failed to open database:', request.error);
+        this.initializationPromise = null; // 重置，允许重试
         reject(new Error('Failed to open database'));
       };
 
       request.onsuccess = (event) => {
         this.db = (event.target as IDBOpenDBRequest).result;
+        this.isInitialized = true;
+        console.log('Database initialized successfully');
         resolve();
       };
 
@@ -171,26 +187,45 @@ class DatabaseService {
           aiHistoryStore.createIndex('createdAt', 'createdAt', { unique: false });
         }
 
-        resolve();
+        console.log('Database schema updated');
       };
     });
+
+    return this.initializationPromise;
+  }
+  /**
+   * 等待数据库初始化完成
+   */
+  async waitForInitialization(): Promise<void> {
+    if (this.isInitialized && this.db) {
+      return Promise.resolve();
+    }
+    
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+    
+    // 如果没有初始化过，启动初始化
+    return this.initialize();
   }
 
   /**
    * 确保数据库已初始化
    */
-  private ensureDB(): IDBDatabase {
+  private async ensureDB(): Promise<IDBDatabase> {
+    await this.waitForInitialization();
+    
     if (!this.db) {
-      throw new Error('Database not initialized');
+      throw new Error('Database failed to initialize');
     }
+    
     return this.db;
   }
-
   /**
    * 通用的添加方法
    */
   private async add<T>(storeName: string, data: Omit<T, 'id'>): Promise<T> {
-    const db = this.ensureDB();
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
@@ -245,12 +280,11 @@ class DatabaseService {
     
     return data;
   }
-
   /**
    * 通用的查询所有方法
    */
   private async getAll<T>(storeName: string): Promise<T[]> {
-    const db = this.ensureDB();
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readonly');
       const store = transaction.objectStore(storeName);
@@ -268,9 +302,8 @@ class DatabaseService {
 
   /**
    * 通用的根据ID查询方法
-   */
-  private async getById<T>(storeName: string, id: number): Promise<T | null> {
-    const db = this.ensureDB();
+   */  private async getById<T>(storeName: string, id: number): Promise<T | null> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readonly');
       const store = transaction.objectStore(storeName);
@@ -288,9 +321,8 @@ class DatabaseService {
 
   /**
    * 通用的更新方法
-   */
-  private async update<T>(storeName: string, id: number, updates: Partial<T>): Promise<T> {
-    const db = this.ensureDB();
+   */  private async update<T>(storeName: string, id: number, updates: Partial<T>): Promise<T> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
@@ -334,9 +366,8 @@ class DatabaseService {
 
   /**
    * 通用的删除方法
-   */
-  private async delete(storeName: string, id: number): Promise<void> {
-    const db = this.ensureDB();
+   */  private async delete(storeName: string, id: number): Promise<void> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
@@ -355,8 +386,7 @@ class DatabaseService {
   /**
    * 根据索引查询数据
    */
-  private async getByIndex<T>(storeName: string, indexName: string, value: any): Promise<T[]> {
-    const db = this.ensureDB();
+  private async getByIndex<T>(storeName: string, indexName: string, value: any): Promise<T[]> {    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       try {
         const transaction = db.transaction([storeName], 'readonly');

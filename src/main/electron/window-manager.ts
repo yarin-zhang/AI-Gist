@@ -13,19 +13,27 @@ class WindowManager {
   /**
    * 创建主窗口
    * 初始化应用的主窗口，设置窗口属性和事件处理
-   */
-  createMainWindow(): BrowserWindow {
+   */  createMainWindow(): BrowserWindow {
     const iconPath = getAppIconPath();
     const userPrefs = preferencesManager.getPreferences();
-      // 创建浏览器窗口
+    
+    // 根据用户主题偏好确定窗口背景色
+    const backgroundColor = userPrefs.themeSource === 'dark' 
+      ? '#101014' 
+      : userPrefs.themeSource === 'light' 
+        ? '#ffffff' 
+        : '#ffffff'; // 默认使用浅色，系统主题会在渲染进程中处理
+    
+    // 创建浏览器窗口
     this.mainWindow = new BrowserWindow({
       width: 1080,
       height: 720,
-      minHeight: 600,
+      minHeight: 660,
       minWidth: 800,
       icon: iconPath || undefined, // 为窗口设置图标，这样会在任务栏显示
       show: !userPrefs.startMinimized, // 如果设置了启动时最小化，则不显示窗口
       autoHideMenuBar: true, // 隐藏菜单栏
+      backgroundColor: backgroundColor, // 设置窗口背景色，防止拖拽时显示白色
       webPreferences: {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成

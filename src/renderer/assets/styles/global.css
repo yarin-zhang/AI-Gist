@@ -1,34 +1,50 @@
+/* 根元素样式 - 确保在拖拽时不显示白色背景 */
+html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  /* 默认使用系统主题偏好 */
+  background-color: #ffffff;
+}
+
+/* 根据系统主题偏好设置默认背景 */
+@media (prefers-color-scheme: dark) {
+  html {
+    background-color: #101014;
+  }
+}
+
 body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  height: 100%;
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
+  /* 默认背景色，会被主题类覆盖 */
+  background-color: #ffffff;
 }
 
-/* 主题样式变量 */
+/* 主题样式变量和背景色 */
+html.light,
 body.light {
   --app-bg-color: #ffffff;
   --app-text-color: #333333;
   --app-border-color: #e0e0e6;
   --app-surface-color: #f8f9fa;
+  background-color: var(--app-bg-color);
 }
 
+html.dark,
 body.dark {
   --app-bg-color: #101014;
   --app-text-color: #ffffffd1;
   --app-border-color: #262626;
   --app-surface-color: #18181c;
-}
-
-/* 基础元素样式 */
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
+  background-color: var(--app-bg-color);
 }
 
 #app {
@@ -37,6 +53,26 @@ html, body {
   background-color: var(--app-bg-color);
   color: var(--app-text-color);
   overflow: hidden; /* 防止应用本身出现滚动条 */
+}
+
+
+/* 防止任何透明背景暴露白色底色 */
+html, body, #app {
+  background-color: var(--app-bg-color, #ffffff);
+}
+
+/* 为窗口拖拽区域设置背景色 */
+html.light {
+  background-color: #ffffff !important;
+}
+
+html.dark {
+  background-color: #101014 !important;
+}
+
+/* Electron webContents 的根容器样式 */
+webview {
+  background-color: var(--app-bg-color);
 }
 
 /* 全屏Modal样式 - 统一处理 */
