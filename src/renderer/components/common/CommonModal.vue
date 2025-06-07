@@ -21,22 +21,83 @@
                         <X />
                     </NIcon>
                 </template>
-            </NButton>
-            
-            <!-- 使用 NSplit 进行布局分割 -->
+            </NButton>            <!-- 如果有 Footer，使用嵌套 NSplit 布局 -->
             <NSplit 
+                v-if="hasFooter"
                 direction="vertical" 
                 :style="{ height: '100%', width: '100%' }"
-                :default-size="headerDefaultSize"
-                :min="headerMinSize"
-                :max="headerMaxSize"
+                :default-size="`${modalHeight - footerDefaultHeight}px`"
+                :min="`${modalHeight - footerMaxHeight}px`"
+                :max="`${modalHeight - minFooterHeight}px`"
+                :disabled="!footerResizable"
+            >
+                <!-- 上部分：Header + Content -->
+                <template #1>
+                    <NSplit
+                        direction="vertical"
+                        :style="{ height: '100%' }"
+                        :default-size="`${headerDefaultHeight}px`"
+                        :min="`${minHeaderHeight}px`"
+                        :max="`${headerMaxHeight}px`"
+                        :disabled="!headerResizable"
+                    >
+                        <!-- Header -->
+                        <template #1>
+                            <div class="modal-header" :style="{ 
+                                padding: `${contentPadding}px`,
+                                height: '100%',
+                                borderBottom: '1px solid var(--app-border-color)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                backgroundColor: 'var(--app-surface-color)'
+                            }">
+                                <slot name="header" />
+                            </div>
+                        </template>
+                        
+                        <!-- Content -->
+                        <template #2>
+                            <div class="modal-content" :style="{ 
+                                padding: `${contentPadding}px`,
+                                height: '100%',
+                                overflow: 'auto',
+                                backgroundColor: 'var(--app-bg-color)'
+                            }">
+                                <slot name="content" />
+                            </div>
+                        </template>
+                    </NSplit>
+                </template>
+                
+                <!-- Footer -->
+                <template #2>
+                    <div class="modal-footer" :style="{ 
+                        padding: `${contentPadding}px`,
+                        height: '100%',
+                        borderTop: '1px solid var(--app-border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        backgroundColor: 'var(--app-surface-color)'
+                    }">
+                        <slot name="footer" />
+                    </div>
+                </template>
+            </NSplit>
+            
+            <!-- 如果没有 Footer，只使用 Header + Content -->
+            <NSplit 
+                v-else
+                direction="vertical" 
+                :style="{ height: '100%', width: '100%' }"
+                :default-size="`${headerDefaultHeight}px`"
+                :min="`${minHeaderHeight}px`"
+                :max="`${headerMaxHeight}px`"
                 :disabled="!headerResizable"
             >
-                <!-- 顶部区域 -->
+                <!-- Header -->
                 <template #1>
                     <div class="modal-header" :style="{ 
                         padding: `${contentPadding}px`,
-                        minHeight: `${minHeaderHeight}px`,
                         height: '100%',
                         borderBottom: '1px solid var(--app-border-color)',
                         display: 'flex',
@@ -47,46 +108,9 @@
                     </div>
                 </template>
                 
-                <!-- 剩余区域：内容 + 底部（如果有） -->
+                <!-- Content -->
                 <template #2>
-                    <NSplit v-if="hasFooter"
-                        direction="vertical" 
-                        :style="{ height: '100%' }"
-                        :default-size="contentDefaultSize"
-                        :min="contentMinSize"
-                        :max="contentMaxSize"
-                        :disabled="!footerResizable"
-                    >
-                        <!-- 中间内容区域 -->
-                        <template #1>
-                            <div class="modal-content" :style="{ 
-                                padding: `${contentPadding}px`,
-                                height: '100%',
-                                overflow: 'auto',
-                                backgroundColor: 'var(--app-bg-color)'
-                            }">
-                                <slot name="content" />
-                            </div>
-                        </template>
-                        
-                        <!-- 底部区域 -->
-                        <template #2>
-                            <div class="modal-footer" :style="{ 
-                                padding: `${contentPadding}px`,
-                                minHeight: `${minFooterHeight}px`,
-                                height: '100%',
-                                borderTop: '1px solid var(--app-border-color)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                backgroundColor: 'var(--app-surface-color)'
-                            }">
-                                <slot name="footer" />
-                            </div>
-                        </template>
-                    </NSplit>
-                    
-                    <!-- 只有内容区域，没有底部 -->
-                    <div v-else class="modal-content" :style="{ 
+                    <div class="modal-content" :style="{ 
                         padding: `${contentPadding}px`,
                         height: '100%',
                         overflow: 'auto',
@@ -118,8 +142,10 @@ interface Props {
     contentPadding?: number;
     headerResizable?: boolean;
     footerResizable?: boolean;
-    headerDefaultSize?: number;
-    footerDefaultSize?: number;
+    headerDefaultHeight?: number; // 头部默认高度（像素）
+    footerDefaultHeight?: number; // 底部默认高度（像素）
+    headerMaxHeight?: number; // 头部最大高度（像素）
+    footerMaxHeight?: number; // 底部最大高度（像素）
 }
 
 interface Emits {
@@ -133,8 +159,10 @@ const props = withDefaults(defineProps<Props>(), {
     contentPadding: 16, // 内容边距
     headerResizable: false, // 头部是否可调整大小
     footerResizable: false, // 底部是否可调整大小
-    headerDefaultSize: 0.15, // 头部默认占比（15%）
-    footerDefaultSize: 0.8, // 内容区域默认占比（80%，底部占20%）
+    headerDefaultHeight: 80, // 头部默认高度（像素）
+    footerDefaultHeight: 80, // 底部默认高度（像素）
+    headerMaxHeight: 300, // 头部最大高度（像素）
+    footerMaxHeight: 200, // 底部最大高度（像素）
 });
 
 const emit = defineEmits<Emits>();
@@ -151,37 +179,11 @@ const hasFooter = computed(() => {
     return !!slots.footer;
 });
 
-// NSplit 相关配置
-const headerMinSize = computed(() => {
-    // 头部最小尺寸：最小高度 / 总高度
-    return props.minHeaderHeight / modalHeight.value;
-});
-
-const headerMaxSize = computed(() => {
-    // 头部最大尺寸：如果有底部，最大不超过 70%，否则不超过 80%
-    return hasFooter.value ? 0.7 : 0.8;
-});
-
-const headerDefaultSize = computed(() => {
-    // 如果指定的默认尺寸太小，使用最小尺寸
-    return Math.max(props.headerDefaultSize, headerMinSize.value);
-});
-
-const contentMinSize = computed(() => {
-    // 内容区域最小尺寸：如果有底部，至少 30%，否则至少 20%
-    return hasFooter.value ? 0.3 : 0.2;
-});
-
-const contentMaxSize = computed(() => {
-    // 内容区域最大尺寸：最大占用空间 - 底部最小空间
-    const footerMinRatio = props.minFooterHeight / modalHeight.value;
-    return 1 - footerMinRatio;
-});
-
-const contentDefaultSize = computed(() => {
-    // 内容区域默认尺寸
-    return Math.min(Math.max(props.footerDefaultSize, contentMinSize.value), contentMaxSize.value);
-});
+// 直接使用像素值，让 NSplit 自己处理布局
+const headerDefaultHeight = computed(() => props.headerDefaultHeight);
+const headerMaxHeight = computed(() => `${props.headerMaxHeight}px`);
+const footerDefaultHeight = computed(() => props.footerDefaultHeight);
+const footerMaxHeight = computed(() => `${props.footerMaxHeight}px`);
 
 // 关闭弹窗
 const handleClose = () => {
@@ -235,31 +237,4 @@ const handleClose = () => {
     border: 1px solid var(--app-border-color);
 }
 
-/* 确保滚动条适配主题 */
-.modal-content::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-.modal-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.modal-content::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.3);
-    border-radius: 3px;
-}
-
-.modal-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(128, 128, 128, 0.5);
-}
-
-/* 深色主题下的滚动条 */
-html.dark .modal-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-html.dark .modal-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
 </style>
