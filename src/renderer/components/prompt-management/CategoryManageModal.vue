@@ -1,6 +1,6 @@
 <template>
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose"
-        :header-height="headerHeight" :footer-height="footerHeight" :content-padding="contentPadding">
+        :content-padding="contentPadding">
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical size="medium" style="padding: 16px;">
@@ -9,7 +9,7 @@
             </NFlex>
         </template> <!-- 中间可操作区域 -->
         <template #content>
-            <NScrollbar :style="{ height: `${contentHeight}px` }">
+            <NScrollbar >
                 <NGrid :cols="gridCols" :x-gap="16">
                     <!-- 左侧：创建新分类 -->
                     <NGridItem :span="leftSpan">
