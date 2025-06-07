@@ -21,7 +21,7 @@
             <NLayout position="absolute">
                 <!-- 顶部固定区域 -->
                 <NLayoutHeader ref="headerRef" bordered position="absolute"
-                    :style="{ zIndex: 5, padding: `${props.contentPadding}px`, minHeight: `${props.minHeaderHeight}px` }">
+                    :style="{ zIndex: 5, padding: `${props.contentPadding}px`, height: `${headerHeight}px`, minHeight: `${props.minHeaderHeight}px` }">
                     <slot name="header" />
                 </NLayoutHeader>
                 
@@ -37,7 +37,7 @@
 
                 <!-- 底部固定区域（仅在有内容时显示） -->
                 <NLayoutFooter v-if="hasFooter" ref="footerRef" bordered position="absolute"
-                    :style="`padding: ${props.contentPadding}px;`">
+                    :style="`padding: ${props.contentPadding}px; height: ${footerHeight}px; min-height: ${props.minFooterHeight}px; z-index: 5;`">
                     <slot name="footer" />
                 </NLayoutFooter>
             </NLayout>
