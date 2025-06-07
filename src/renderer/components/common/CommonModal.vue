@@ -77,6 +77,10 @@ const props = withDefaults(defineProps<Props>(), {
     contentPadding: 24, // 内容边距
 });
 
+const minHeaderHeight = ref(props.minHeaderHeight);
+const minFooterHeight = ref(props.minFooterHeight); 
+const contentPadding = ref(props.contentPadding);
+
 const emit = defineEmits<Emits>();
 const slots = useSlots();
 
