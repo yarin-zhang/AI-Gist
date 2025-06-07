@@ -19,10 +19,22 @@
             添加配置
           </NButton>
         </NFlex>
-      </NFlex>
-
-      <!-- 配置卡片列表 -->
+      </NFlex>      <!-- 配置卡片列表 -->
       <div class="config-list">
+        <div v-if="configs.length === 0" style="text-align: center; padding: 40px;">
+          <NEmpty description="暂无AI配置，快来添加第一个吧！">
+            <template #extra>
+              <NButton type="primary" @click="showAddModal = true">
+                <template #icon>
+                  <NIcon>
+                    <Plus />
+                  </NIcon>
+                </template>
+                添加配置
+              </NButton>
+            </template>
+          </NEmpty>
+        </div>
         <n-card v-for="config in configs" :key="config.id" class="config-card">
           <template #header>
             <div class="config-header">
@@ -251,6 +263,7 @@ import {
     NFormRules,
     NMessage,
     NAlert,
+    NEmpty,
     useMessage 
 } from 'naive-ui'
 import { Plus, Robot, DatabaseOff, Server, Settings } from '@vicons/tabler'
