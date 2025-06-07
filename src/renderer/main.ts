@@ -2,6 +2,22 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { initDatabase } from './lib/db'
 
+// 预设初始主题类，避免闪烁
+function setInitialTheme() {
+  const html = document.documentElement
+  const body = document.body
+  
+  // 检查系统主题偏好
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const themeClass = prefersDark ? 'dark' : 'light'
+  
+  // 立即应用主题类
+  html.classList.add(themeClass)
+  body.classList.add(themeClass)
+  
+  console.log(`预设主题: ${themeClass}`)
+}
+
 // 移除初始加载屏幕
 function removeInitialLoading() {
   const loadingElement = document.getElementById('initial-loading')
@@ -18,6 +34,9 @@ function removeInitialLoading() {
 // 初始化数据库，然后启动应用
 async function startApp() {
   try {
+    // 立即设置初始主题
+    setInitialTheme()
+    
     await initDatabase();
     console.log('IndexedDB initialized successfully');
     

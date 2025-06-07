@@ -111,13 +111,19 @@ export function useTheme() {
       updateBodyTheme()
     })
   }
-
   /**
    * 更新页面根元素的主题类名
    */
   const updateBodyTheme = () => {
+    const html = document.documentElement
     const body = document.body
+    
+    // 移除之前的主题类
+    html.classList.remove('light', 'dark')
     body.classList.remove('light', 'dark')
+    
+    // 添加新的主题类
+    html.classList.add(themeClass.value)
     body.classList.add(themeClass.value)
     
     // 设置CSS自定义属性

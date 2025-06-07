@@ -17,10 +17,22 @@
   color: #333333;
 }
 
-/* 暗色主题 */
+/* 根据html元素的主题类设置样式 */
+html.dark #initial-loading,
+body.dark #initial-loading {
+  background: #101014;
+  color: #e5e5e5;
+}
+
+html.dark #initial-loading .spinner,
+body.dark #initial-loading .spinner {
+  border-top-color: #ffffff !important;
+}
+
+/* 默认暗色主题媒体查询（作为后备） */
 @media (prefers-color-scheme: dark) {
   #initial-loading {
-    background: #1a1a1a;
+    background: #101014;
     color: #e5e5e5;
   }
   
