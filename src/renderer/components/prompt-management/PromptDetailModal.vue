@@ -42,7 +42,8 @@
             </NFlex>
 
             <!-- 详情页面 -->
-            <NSplit v-show="!showHistoryPage" direction="horizontal" :style="{ height: `${contentHeight - 60}px` }">
+            <NSplit v-show="!showHistoryPage" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
+                :style="{ height: `${contentHeight - 60}px` }">
                 <!-- 左侧：提示词内容 -->
                 <template #1>
                     <NCard size="small" :style="{ height: '100%' }">
@@ -125,7 +126,8 @@
             </NSplit>
 
             <!-- 历史记录页面 -->
-            <NSplit v-show="showHistoryPage" direction="horizontal" :style="{ height: `${contentHeight - 60}px` }">
+            <NSplit v-show="showHistoryPage" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
+                :style="{ height: `${contentHeight - 60}px` }">
                 <!-- 左侧：历史记录预览 -->
                 <template #1>
                     <NCard size="small" :style="{ height: '100%' }">
