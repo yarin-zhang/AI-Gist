@@ -124,31 +124,26 @@
                         </div>
                     </NFlex>
                 </NFlex>
-            </template>
-            <template #content>
+            </template>            <template #content="{ contentHeight }">
                 <!-- 中间可操作区域 -->
-                <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
-                    require-mark-placement="right-hanging">
-                    <NGrid :cols="gridCols" :x-gap="24">
-                        <!-- 左侧：基本配置和连接配置 -->
-                        <NGridItem :span="leftSpan">
-                            <NFlex vertical size="medium">
-                                <!-- 基本信息 -->
-                                <NCard title="基本信息" size="small">
-                                    <NFlex vertical>
-                                        <n-form-item label="类型" path="type">
+                <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
+                    :max="0.8" :disabled="modalWidth <= 800">
+                    <!-- 左侧：基本配置 -->
+                    <template #1>
+                        <NCard title="基本配置" size="small" :style="{ height: '100%' }">
+                            <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
+                                <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
+                                    require-mark-placement="right-hanging" style="padding-right: 12px;">
+                                    <NFlex vertical size="large">
+                                        <n-form-item label="服务类型" path="type">
                                             <n-select v-model:value="formData.type" :options="typeOptions"
                                                 @update:value="onTypeChange" />
                                         </n-form-item>
+
                                         <n-form-item label="配置名称" path="name">
                                             <n-input v-model:value="formData.name" placeholder="输入配置名称" />
                                         </n-form-item>
-                                    </NFlex>
-                                </NCard>
 
-                                <!-- 连接配置 -->
-                                <NCard title="连接配置" size="small">
-                                    <NFlex vertical>
                                         <n-form-item label="Base URL" path="baseURL">
                                             <n-input v-model:value="formData.baseURL"
                                                 placeholder="例如: https://api.openai.com/v1" />
@@ -158,63 +153,89 @@
                                             <n-input v-model:value="formData.apiKey" type="password"
                                                 show-password-on="click" placeholder="输入 API Key" />
                                         </n-form-item>
-                                    </NFlex>
-                                </NCard>
-                            </NFlex>
-                        </NGridItem>
-                        <!-- 右侧：模型配置和测试 -->
-                        <NGridItem :span="rightSpan">
-                            <NFlex vertical size="medium">
-                                <!-- 连接测试 -->
-                                <NCard title="连接测试" size="small">
-                                    <NFlex vertical>
-                                        <n-button @click="testFormConnection" :loading="testingFormConnection"
-                                            :disabled="!formData.baseURL ||
-                                                (formData.type === 'openai' && !formData.apiKey)
-                                                " type="info" block>
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Server />
-                                                </NIcon>
-                                            </template>
-                                            测试连接并获取模型列表
-                                        </n-button>
 
-                                        <!-- 测试结果显示 -->
-                                        <n-alert v-if="formTestResult"
-                                            :type="formTestResult.success ? 'success' : 'error'"
-                                            :title="formTestResult.success ? '连接成功' : '连接失败'">
-                                            {{
-                                                formTestResult.success
-                                                    ? `发现 ${formTestResult.models?.length || 0
-                                                    } 个可用模型`
-                                                    : formTestResult.error
-                                            }}
-                                        </n-alert>
-                                    </NFlex>
-                                </NCard>
+                                        <!-- 连接测试区域 -->
+                                        <n-form-item label="连接测试">
+                                            <NFlex vertical size="medium" style="width: 100%;">
+                                                <n-button @click="testFormConnection" :loading="testingFormConnection"
+                                                    :disabled="!formData.baseURL ||
+                                                        (formData.type === 'openai' && !formData.apiKey)
+                                                        " type="info" block>
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Server />
+                                                        </NIcon>
+                                                    </template>
+                                                    测试连接并获取模型列表
+                                                </n-button>
 
-                                <!-- 模型配置 -->
-                                <NCard title="模型配置" size="small">
-                                    <NFlex vertical>
-                                        <n-form-item label="模型列表" path="models">
-                                            <n-dynamic-tags v-model:value="formData.models" />
-                                        </n-form-item>
-
-                                        <n-form-item label="默认模型" path="defaultModel">
-                                            <n-select v-model:value="formData.defaultModel" :options="modelOptions"
-                                                placeholder="选择默认模型" filterable tag clearable />
-                                        </n-form-item>
-
-                                        <n-form-item label="自定义模型" path="customModel">
-                                            <n-input v-model:value="formData.customModel" placeholder="输入自定义模型名称（可选）" />
+                                                <!-- 测试结果显示 -->
+                                                <n-alert v-if="formTestResult"
+                                                    :type="formTestResult.success ? 'success' : 'error'"
+                                                    :title="formTestResult.success ? '连接成功' : '连接失败'">
+                                                    {{
+                                                        formTestResult.success
+                                                            ? `发现 ${formTestResult.models?.length || 0
+                                                            } 个可用模型`
+                                                            : formTestResult.error
+                                                    }}
+                                                </n-alert>
+                                            </NFlex>
                                         </n-form-item>
                                     </NFlex>
-                                </NCard>
-                            </NFlex>
-                        </NGridItem>
-                    </NGrid>
-                </n-form>
+                                </n-form>
+                            </NScrollbar>
+                        </NCard>
+                    </template>
+
+                    <!-- 右侧：模型配置 -->
+                    <template #2>
+                        <NCard title="模型配置" size="small" :style="{ height: '100%' }">
+                            <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
+                                <NFlex vertical size="large" style="padding-right: 12px;">
+                                    <n-form-item label="模型列表" path="models">
+                                        <n-dynamic-tags v-model:value="formData.models" />
+                                        <template #feedback>
+                                            <NText depth="3" style="font-size: 12px;">
+                                                点击左侧"测试连接"按钮可自动获取可用模型列表
+                                            </NText>
+                                        </template>
+                                    </n-form-item>
+
+                                    <n-form-item label="默认模型" path="defaultModel">
+                                        <n-select v-model:value="formData.defaultModel" :options="modelOptions"
+                                            placeholder="选择默认模型" filterable tag clearable />
+                                    </n-form-item>
+
+                                    <n-form-item label="自定义模型" path="customModel">
+                                        <n-input v-model:value="formData.customModel" placeholder="输入自定义模型名称（可选）" />
+                                        <template #feedback>
+                                            <NText depth="3" style="font-size: 12px;">
+                                                如果默认模型列表中没有您需要的模型，可以在此手动输入
+                                            </NText>
+                                        </template>
+                                    </n-form-item>
+
+                                    <!-- 模型信息显示 -->
+                                    <div v-if="formData.models.length > 0">
+                                        <NText strong style="margin-bottom: 8px; display: block;">可用模型</NText>
+                                        <NFlex wrap style="gap: 8px;">
+                                            <NTag v-for="model in formData.models" :key="model" size="small"
+                                                :type="model === formData.defaultModel ? 'primary' : 'default'">
+                                                {{ model }}
+                                                <template v-if="model === formData.defaultModel" #icon>
+                                                    <NIcon size="12">
+                                                        <Settings />
+                                                    </NIcon>
+                                                </template>
+                                            </NTag>
+                                        </NFlex>
+                                    </div>
+                                </NFlex>
+                            </NScrollbar>
+                        </NCard>
+                    </template>
+                </NSplit>
             </template>
             <!-- 底部固定区域 -->
             <template #footer>
@@ -318,34 +339,21 @@ import {
     NMessage,
     NAlert,
     NEmpty,
-    NGrid,
-    NGridItem,
+    NSplit,
     useMessage,
 } from "naive-ui";
 import { Plus, Robot, DatabaseOff, Server, Settings } from "@vicons/tabler";
 import type { AIConfig } from "~/lib/db";
 import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
-import { useModalLayout } from "~/composables/useWindowSize";
+import { useWindowSize } from "~/composables/useWindowSize";
 import CommonModal from "~/components/common/CommonModal.vue";
 
 const message = useMessage();
 const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase();
 
-// 是否有底部内容
-const hasFooter = computed(() => true); // 这个组件有footer
-
-// 使用模态框布局 composable
-const {
-    modalWidth,
-    contentHeight
-} = useModalLayout({
-    minHeaderHeight: 80,
-    minFooterHeight: 80,
-    contentPadding: 16,
-    show: computed(() => showAddModal.value || !!editingConfig.value),
-    hasFooter
-});
+// 获取窗口尺寸用于响应式布局
+const { modalWidth } = useWindowSize();
 
 // 数据状态
 const configs = ref<AIConfig[]>([]);
@@ -409,21 +417,6 @@ const typeOptions = [
 // 表单引用
 const formRef = ref();
 const modalRef = ref<InstanceType<typeof CommonModal> | null>(null);
-
-// 网格布局计算
-const gridCols = computed(() => {
-    return modalWidth.value > 1000 ? 12 : 12;
-});
-
-// 左侧网格大小（基本配置）
-const leftSpan = computed(() => {
-    return modalWidth.value > 1000 ? 7 : 12;
-});
-
-// 右侧网格大小（模型配置）
-const rightSpan = computed(() => {
-    return modalWidth.value > 1000 ? 5 : 12;
-});
 
 // 计算属性：模型选项
 const modelOptions = computed(() => {
