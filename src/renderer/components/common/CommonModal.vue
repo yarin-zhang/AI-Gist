@@ -12,16 +12,21 @@
             <!-- 固定在右上角的关闭按钮 -->
             <NButton @click="handleClose" size="small" circle :style="{
                 position: 'absolute',
-                top: '16px',
-                right: '16px',
+                top: '26px',
+                right: '26px',
                 zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
             }">
                 <template #icon>
-                    <NIcon size="18">
+                    <NIcon size="16">
                         <X />
                     </NIcon>
                 </template>
-            </NButton>            <!-- 如果有 Footer，使用嵌套 NSplit 布局 -->
+            </NButton>
+            
+            <!-- 如果有 Footer，使用嵌套 NSplit 布局 -->
             <NSplit 
                 v-if="hasFooter"
                 direction="vertical" 
@@ -30,8 +35,10 @@
                 :min="`${modalHeight - footerMaxHeight}px`"
                 :max="`${modalHeight - minFooterHeight}px`"
                 :disabled="!footerResizable"
-            >
-                <!-- 上部分：Header + Content -->
+                :resize-trigger-size="3"
+                :pane1-style="{ overflow: 'hidden' }"
+                :pane2-style="{ overflow: 'hidden' }"
+            >                <!-- 上部分：Header + Content -->
                 <template #1>
                     <NSplit
                         direction="vertical"
@@ -40,19 +47,25 @@
                         :min="`${minHeaderHeight}px`"
                         :max="`${headerMaxHeight}px`"
                         :disabled="!headerResizable"
+                        :resize-trigger-size="3"
+                        :pane1-style="{ overflow: 'hidden' }"
+                        :pane2-style="{ overflow: 'hidden' }"
                     >
                         <!-- Header -->
                         <template #1>
-                            <div class="modal-header" :style="{ 
-                                padding: `${contentPadding}px`,
-                                height: '100%',
-                                borderBottom: '1px solid var(--app-border-color)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                backgroundColor: 'var(--app-surface-color)'
-                            }">
+                            <NFlex 
+                                class="modal-header" 
+                                vertical 
+                                justify="center" 
+                                :style="{ 
+                                    padding: `0 ${contentPadding}px`,
+                                    height: '100%',
+                                    borderBottom: '1px solid var(--app-border-color)',
+                                    backgroundColor: 'var(--app-surface-color)'
+                                }"
+                            >
                                 <slot name="header" />
-                            </div>
+                            </NFlex>
                         </template>
                         
                         <!-- Content -->
@@ -68,19 +81,21 @@
                         </template>
                     </NSplit>
                 </template>
-                
-                <!-- Footer -->
+                  <!-- Footer -->
                 <template #2>
-                    <div class="modal-footer" :style="{ 
-                        padding: `${contentPadding}px`,
-                        height: '100%',
-                        borderTop: '1px solid var(--app-border-color)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        backgroundColor: 'var(--app-surface-color)'
-                    }">
+                    <NFlex 
+                        class="modal-footer" 
+                        vertical 
+                        justify="center" 
+                        :style="{ 
+                            padding: `0 ${contentPadding}px`,
+                            height: '100%',
+                            borderTop: '1px solid var(--app-border-color)',
+                            backgroundColor: 'var(--app-surface-color)'
+                        }"
+                    >
                         <slot name="footer" />
-                    </div>
+                    </NFlex>
                 </template>
             </NSplit>
             
@@ -93,19 +108,25 @@
                 :min="`${minHeaderHeight}px`"
                 :max="`${headerMaxHeight}px`"
                 :disabled="!headerResizable"
+                :resize-trigger-size="3"
+                :pane1-style="{ overflow: 'hidden' }"
+                :pane2-style="{ overflow: 'hidden' }"
             >
                 <!-- Header -->
                 <template #1>
-                    <div class="modal-header" :style="{ 
-                        padding: `${contentPadding}px`,
-                        height: '100%',
-                        borderBottom: '1px solid var(--app-border-color)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        backgroundColor: 'var(--app-surface-color)'
-                    }">
+                    <NFlex 
+                        class="modal-header" 
+                        vertical 
+                        justify="center" 
+                        :style="{ 
+                            padding: `0 ${contentPadding}px`,
+                            height: '100%',
+                            borderBottom: '1px solid var(--app-border-color)',
+                            backgroundColor: 'var(--app-surface-color)'
+                        }"
+                    >
                         <slot name="header" />
-                    </div>
+                    </NFlex>
                 </template>
                 
                 <!-- Content -->
@@ -131,6 +152,7 @@ import {
     NButton,
     NIcon,
     NSplit,
+    NFlex,
 } from "naive-ui";
 import { X } from "@vicons/tabler";
 import { useWindowSize } from "@/composables/useWindowSize";
