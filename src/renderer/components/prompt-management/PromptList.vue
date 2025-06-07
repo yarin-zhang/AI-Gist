@@ -560,6 +560,12 @@ onMounted(async () => {
     loadPrompts(true) // 初始加载
     loadCategories()
 })
+
+// 暴露方法给父组件
+defineExpose({
+    loadPrompts: () => loadPrompts(true),
+    loadCategories
+})
 </script>
 
 <style scoped>

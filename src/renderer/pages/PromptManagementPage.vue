@@ -42,10 +42,9 @@
                 @prompt-generated="handlePromptGenerated"
                 @navigate-to-ai-config="handleNavigateToAIConfig" 
             />
-            
-            <!-- 提示词列表组件 -->
-            <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
-                @refresh="loadStatistics" />
+              <!-- 提示词列表组件 -->
+<PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
+                @refresh="handleListRefresh" />
         </NFlex>
 
         <!-- 模态框 -->
@@ -185,6 +184,15 @@ const handlePromptGenerated = (generatedPrompt: any) => {
 const handleNavigateToAIConfig = () => {
     // 向上传递导航事件到 MainPage
     emit('navigate-to-ai-config')
+}
+
+const handleListRefresh = () => {
+    // 刷新 PromptList 组件的数据
+    if (promptListRef.value?.loadPrompts) {
+        promptListRef.value.loadPrompts()
+    }
+    // 同时刷新页面统计数据
+    loadStatistics()
 }
 
 // 生命周期

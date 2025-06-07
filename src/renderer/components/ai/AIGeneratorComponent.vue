@@ -43,7 +43,7 @@
         </n-form-item>
         
         <n-form-item>
-          <n-space justify="space-between" style="width: 100%;">
+          <n-space justify="space-between" >
             <n-space>
               <n-button 
                 type="primary" 
@@ -507,7 +507,6 @@ const loadCategories = async () => {
 <style scoped>
 .ai-generator {
   padding: 20px;
-  width: 100%;
   max-width: none;
   margin: 0;
   display: block;
