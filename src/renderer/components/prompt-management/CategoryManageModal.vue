@@ -1,12 +1,9 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
-        <!-- 顶部固定区域 -->
+    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">        <!-- 顶部固定区域 -->
         <template #header>
-            <NFlex vertical size="medium" style="padding: 16px;">
-                <NText :style="{ fontSize: '20px', fontWeight: 600 }">分类管理</NText>
-                <NText depth="3">管理您的提示词分类，创建、编辑或删除分类</NText>
-            </NFlex>
-        </template> <!-- 中间可操作区域 -->
+            <NText :style="{ fontSize: '20px', fontWeight: 600 }">分类管理</NText>
+            <NText depth="3">管理您的提示词分类，创建、编辑或删除分类</NText>
+        </template><!-- 中间可操作区域 -->
         <template #content>
             <NScrollbar >
                 <NGrid :cols="gridCols" :x-gap="16">
@@ -115,11 +112,18 @@
                     </NGridItem>
                 </NGrid>
             </NScrollbar>
-        </template>
-
-        <!-- 底部固定区域 -->
+        </template>        <!-- 底部固定区域 -->
         <template #footer>
-
+            <NFlex justify="space-between" align="center">
+                <div>
+                    <!-- 左侧区域 - 可以放置统计信息等 -->
+                    <NText depth="3">共 {{ categories.length }} 个分类</NText>
+                </div>
+                <div>
+                    <!-- 右侧区域 - 放置操作按钮 -->
+                    <NButton @click="handleClose">关闭</NButton>
+                </div>
+            </NFlex>
         </template>
     </CommonModal>
 </template>
@@ -175,7 +179,7 @@ const {
     minFooterHeight: 1,
     contentPadding: 16,
     show: toRef(props, 'show'),
-    hasFooter: computed(() => false) // 这个组件没有footer
+    hasFooter: computed(() => true) // 这个组件有footer
 })
 
 // 网格布局计算

@@ -1,21 +1,16 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">
-        <!-- 顶部固定区域 -->
+    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">        <!-- 顶部固定区域 -->
         <template #header>
-            <NFlex vertical size="medium">
-                <NFlex justify="space-between" align="center">
-                    <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                        {{ isEdit ? "编辑提示词" : "创建提示词" }}
-                    </NText>
-                </NFlex>
-                <NText depth="3">
-                    {{
-                        !showExtraInfo
-                            ? "编写提示词内容并配置变量参数"
-                            : "完善提示词的基本信息和分类标签"
-                    }}
-                </NText>
-            </NFlex>
+            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                {{ isEdit ? "编辑提示词" : "创建提示词" }}
+            </NText>
+            <NText depth="3">
+                {{
+                    !showExtraInfo
+                        ? "编写提示词内容并配置变量参数"
+                        : "完善提示词的基本信息和分类标签"
+                }}
+            </NText>
         </template>
         <!-- 中间可操作区域 -->
         <template #content>
@@ -102,7 +97,7 @@
                                                             <NFlex justify="space-between" align="center">
                                                                 <NText>{{
                                                                     variable.name || "变量" + (index + 1)
-                                                                }}</NText>
+                                                                    }}</NText>
                                                                 <NButton size="small" text type="error"
                                                                     @click="removeVariable(index)">
                                                                     <template #icon>
@@ -181,10 +176,10 @@
             </NForm>
         </template>
 
-        <!-- 底部固定区域 -->
-        <template #footer>
-            <NFlex justify="space-between" style="height: 100%">
+        <!-- 底部固定区域 -->        <template #footer>
+            <NFlex justify="space-between" align="center">
                 <div>
+                    <!-- 左侧区域 -->
                     <NButton v-if="showExtraInfo" @click="showExtraInfo = false" ghost>
                         <template #icon>
                             <NIcon>
@@ -203,12 +198,15 @@
                         补充信息
                     </NButton>
                 </div>
-                <NFlex>
-                    <NButton @click="handleCancel">取消</NButton>
-                    <NButton type="primary" @click="handleSave" :loading="saving" :disabled="!formData.content.trim()">
-                        {{ isEdit ? "更新" : "创建" }}
-                    </NButton>
-                </NFlex>
+                <div>
+                    <!-- 右侧区域 -->
+                    <NFlex size="small">
+                        <NButton @click="handleCancel">取消</NButton>
+                        <NButton type="primary" @click="handleSave" :loading="saving" :disabled="!formData.content.trim()">
+                            {{ isEdit ? "更新" : "创建" }}
+                        </NButton>
+                    </NFlex>
+                </div>
             </NFlex>
         </template>
     </CommonModal>

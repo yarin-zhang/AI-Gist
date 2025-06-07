@@ -6,16 +6,12 @@
         <CommonModal v-model:show="showModal" :min-header-height="minHeaderHeight" :min-footer-height="minFooterHeight"
             :content-padding="contentPadding" :header-resizable="false" :footer-resizable="false">
             <template #header>
-                <NFlex vertical size="medium">
-                    <NFlex justify="space-between" align="center">
-                        <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                            示例标题
-                        </NText>
-                    </NFlex>
-                    <NText depth="3">
-                        这是一个演示如何使用新的 NSplit 模态框布局的示例
-                    </NText>
-                </NFlex>
+                <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                    示例标题
+                </NText>
+                <NText depth="3">
+                    这是一个演示如何使用新的 NSplit 模态框布局的示例
+                </NText>
             </template>
 
             <template #content>
@@ -45,17 +41,23 @@
             </template>
 
             <template #footer>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Footer 内容 - 使用 NSplit 自动布局</span>
+                <NFlex justify="space-between" align="center">
                     <div>
-                        <NButton @click="testAction" style="margin-right: 8px;">
-                            测试操作
-                        </NButton>
-                        <NButton @click="showModal = false" type="primary">
-                            关闭
-                        </NButton>
+                        <!-- 左侧区域 -->
+                        <NText depth="3">Footer 内容 - 使用 NSplit 自动布局</NText>
                     </div>
-                </div>
+                    <div>
+                        <!-- 右侧区域 -->
+                        <NFlex size="small">
+                            <NButton @click="testAction">
+                                测试操作
+                            </NButton>
+                            <NButton @click="showModal = false" type="primary">
+                                关闭
+                            </NButton>
+                        </NFlex>
+                    </div>
+                </NFlex>
             </template>
         </CommonModal>
     </div>
