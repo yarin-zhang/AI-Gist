@@ -11,11 +11,10 @@
                         : "完善提示词的基本信息和分类标签"
                 }}
             </NText>
-        </template>
-        <!-- 中间可操作区域 -->
-        <template #content>
+        </template>        <!-- 中间可操作区域 -->
+        <template #content="{ contentHeight }">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top">
-                <NSplit direction="horizontal" :style="{ height: `${contentAreaHeight}px` }" :default-size="0.6"
+                <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6"
                     :min="0.3" :max="0.8" :disabled="modalWidth <= 800">
                     <!-- 左侧：内容编辑区 -->
                     <template #1>
@@ -213,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, toRef } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
 import {
     NForm,
     NFormItem,
@@ -236,7 +235,7 @@ import {
 } from "naive-ui";
 import { Plus, Trash, InfoCircle, ArrowLeft } from "@vicons/tabler";
 import { api } from "@/lib/api";
-import { useModalLayout } from "@/composables/useWindowSize";
+import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
 
 interface Variable {
@@ -268,25 +267,8 @@ const formRef = ref();
 const saving = ref(false);
 const showExtraInfo = ref(false);
 
-// 是否有底部内容
-const hasFooter = computed(() => true); // 这个组件有footer
-
-// 使用模态框布局 composable
-const {
-    modalWidth,
-    contentHeight
-} = useModalLayout({
-    minHeaderHeight: 140,
-    minFooterHeight: 80,
-    contentPadding: 16,
-    show: toRef(props, 'show'),
-    hasFooter
-});
-
-// 获取内容区域高度
-const contentAreaHeight = computed(() => {
-    return contentHeight.value - 48; // 减去一些内边距
-});
+// 获取窗口尺寸用于响应式布局
+const { modalWidth } = useWindowSize();
 
 // 防抖相关
 const debounceTimer = ref<number | null>(null);

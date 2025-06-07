@@ -56,16 +56,19 @@
                                 <slot name="header" />
                             </NFlex>
                         </template>
-                        
-                        <!-- Content -->
+                          <!-- Content -->
                         <template #2>
                             <div class="modal-content" :style="{ 
                                 padding: `${contentPadding}px`,
                                 height: '100%',
-                                overflow: 'auto',
-                                backgroundColor: 'var(--app-bg-color)'
+                                overflow: 'hidden',
+                                backgroundColor: 'var(--app-bg-color)',
+                                display: 'flex',
+                                flexDirection: 'column'
                             }">
-                                <slot name="content" />
+                                <div :style="{ flex: 1, height: '100%', overflow: 'hidden' }">
+                                    <slot name="content" :contentHeight="contentHeight" />
+                                </div>
                             </div>
                         </template>
                     </NSplit>
@@ -116,16 +119,19 @@
                         <slot name="header" />
                     </NFlex>
                 </template>
-                
-                <!-- Content -->
+                  <!-- Content -->
                 <template #2>
                     <div class="modal-content" :style="{ 
                         padding: `${contentPadding}px`,
                         height: '100%',
-                        overflow: 'auto',
-                        backgroundColor: 'var(--app-bg-color)'
+                        overflow: 'hidden',
+                        backgroundColor: 'var(--app-bg-color)',
+                        display: 'flex',
+                        flexDirection: 'column'
                     }">
-                        <slot name="content" />
+                        <div :style="{ flex: 1, height: '100%', overflow: 'hidden' }">
+                            <slot name="content" :contentHeight="contentHeight" />
+                        </div>
                     </div>
                 </template>
             </NSplit>
@@ -181,6 +187,24 @@ const modalHeight = modalMaxHeight;
 // 是否有底部内容
 const hasFooter = computed(() => {
     return !!slots.footer;
+});
+
+// 计算内容区域的实际可用高度
+const contentHeight = computed(() => {
+    let availableHeight = modalHeight.value;
+    
+    // 减去 Header 的高度
+    availableHeight -= props.headerDefaultHeight;
+    
+    // 如果有 Footer，减去 Footer 的高度
+    if (hasFooter.value) {
+        availableHeight -= props.footerDefaultHeight;
+    }
+    
+    // 减去内容区域的内边距 (上下各一份)
+    availableHeight -= props.contentPadding * 2;
+    
+    return Math.max(0, availableHeight);
 });
 
 // 直接使用像素值，让 NSplit 自己处理布局
