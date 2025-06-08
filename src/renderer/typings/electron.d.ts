@@ -71,7 +71,6 @@ export default interface ElectronApi {
       themeInfo: any
     }) => void) => () => void
   }
-
   ai: {
     getConfigs: () => Promise<AIConfig[]>
     getEnabledConfigs: () => Promise<AIConfig[]>
@@ -81,6 +80,7 @@ export default interface ElectronApi {
     testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
+    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => void) => Promise<AIGenerationResult>
     intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
   }
 }

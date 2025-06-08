@@ -41,10 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
-    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
-    generatePromptStream: (request: any, config: any, onProgress: (charCount: number) => void) => {
-      // 监听流式进度
-      const progressListener = (_: any, charCount: number) => onProgress(charCount);
+    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => void) => {
+      // 监听流式进度，接收字符数和部分内容
+      const progressListener = (_: any, charCount: number, partialContent?: string) => {
+        onProgress(charCount, partialContent);
+      };
       ipcRenderer.on('ai:stream-progress', progressListener);
       
       // 调用流式生成

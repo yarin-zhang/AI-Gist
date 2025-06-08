@@ -58,24 +58,13 @@
                   :rows="4"
                   placeholder="生成的提示词将在这里显示..."
                   readonly
+                  show-count
                   :style="{ 
                     height: '100%',
                     backgroundColor: 'var(--code-color)',
                     opacity: generatedResult ? 1 : 0.7
                   }"
                 />
-                <!-- 实时进度指示器 -->
-                <div 
-                  v-if="generating && streamStats.charCount > 0"
-                  style="position: absolute; top: 8px; right: 12px; z-index: 10;"
-                >
-                  <n-tag size="small" type="info" round>
-                    <template #icon>
-                      <n-icon><History /></n-icon>
-                    </template>
-                    {{ streamStats.charCount }} 字符
-                  </n-tag>
-                </div>
               </div>
             </template>
           </n-split>
@@ -108,15 +97,6 @@
               </n-dropdown>
             </n-space>
               <n-space align="center">
-              <!-- 生成进度提示 -->
-              <div v-if="generating && streamStats.charCount > 0" class="progress-indicator">
-                <n-text type="info" strong>
-                  <n-icon size="16" style="margin-right: 4px;">
-                    <History />
-                  </n-icon>
-                  已生成 {{ streamStats.charCount }} 字符
-                </n-text>
-              </div>
               
               <n-button 
                 @click="toggleHistory" 
@@ -451,31 +431,45 @@ const generatePrompt = async () => {
           } else {
             // 没有内容时的处理
             streamStats.noContentUpdateCount++;
-            
-            // 如果字符数增加了但没有内容，可能是后端只发送了字符数
+              // 如果字符数增加了但没有内容，可能是后端只发送了字符数
             if (charCount > prevCharCount) {
-              const placeholderText = `正在生成中... (已生成 ${charCount} 字符)`;
-              
-              // 如果连续多次没有内容更新，可能需要显示警告
+              // 如果连续多次没有内容更新，改变提示文本
               if (streamStats.noContentUpdateCount > 10) {
                 console.warn('⚠️ 检测到可能的流式传输问题：字符数在增加但没有内容传递');
-                // 可以考虑降级到轮询模式或其他处理方式
-              }
-              
-              // 只有当前没有真实内容时才显示占位符
-              if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...')) {
-                generatedResult.value = placeholderText;
-                console.log('📝 显示占位符:', placeholderText);
+                console.warn('📋 这通常意味着后端流式传输实现只传递了字符数，没有传递部分内容');
+                
+                // 改变占位符文本，让用户知道正在等待最终结果
+                const warningText = `生成中，请稍候... (已生成 ${charCount} 字符，等待内容传输)`;
+                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...') || generatedResult.value.startsWith('生成中，请稍候...')) {
+                  generatedResult.value = warningText;
+                  console.log('⚠️ 显示等待提示:', warningText);
+                }
+              } else {
+                // 正常的占位符
+                const placeholderText = `正在生成中... (已生成 ${charCount} 字符)`;
+                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...')) {
+                  generatedResult.value = placeholderText;
+                  console.log('📝 显示占位符:', placeholderText);
+                }
               }
             }
           }
         }
       );
-      
-      console.log('流式传输完成，最终结果:', {
+        console.log('流式传输完成，最终结果:', {
         success: !!result,
         contentLength: result?.generatedPrompt?.length || 0
       });
+      
+      // 如果流式传输过程中没有获得内容，但最终结果有内容，则立即显示
+      if (result && result.generatedPrompt && 
+          (!generatedResult.value || generatedResult.value.startsWith('正在生成中...'))) {
+        console.log('🔧 流式传输未提供内容，使用最终结果');
+        generatedResult.value = result.generatedPrompt;
+        
+        // 模拟一个快速的显示过程，让用户看到内容"出现"
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
       
     } else {
       console.log('使用普通生成模式')
@@ -508,14 +502,15 @@ const generatePrompt = async () => {
     emit('prompt-saved')
       // 清空输入框，但保持结果显示
     formData.topic = ''
-    
-    // 刷新历史记录（如果正在显示）
+      // 刷新历史记录（如果正在显示）
     if (showHistory.value) {
       loadHistory()
     }
     
     // 保持分隔状态，让用户继续查看结果
-    // 用户可以通过手动调整分隔条来改变布局  } catch (error) {
+    // 用户可以通过手动调整分隔条来改变布局
+    
+  } catch (error) {
     console.error('生成失败:', error)
     message.error('生成失败: ' + (error as Error).message)
     
