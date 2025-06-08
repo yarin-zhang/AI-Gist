@@ -1,7 +1,6 @@
 <template>
-  <div class="ai-generator">
-    <!-- 没有AI 配置时显示的空状态 -->
-    <n-empty v-if="!defaultConfig && !loading" 
+  <div class="ai-generator">    <!-- 没有AI 配置时显示的空状态 -->
+    <n-empty v-if="configs.length === 0 && !loading" 
              description="暂无可用的 AI 配置" 
              size="large"
              style="margin: 40px 0;">
@@ -26,7 +25,7 @@
     </n-empty>
 
     <!-- 有AI 配置时显示的生成工具 -->
-    <n-card v-if="defaultConfig" title="AI 提示词生成器" class="generator-card">
+    <n-card v-if="configs.length > 0" title="AI 提示词生成器" class="generator-card">
       <n-form
         ref="formRef"
         :model="formData"
@@ -44,25 +43,23 @@
         
         <n-form-item>
           <n-space justify="space-between" >
-            <n-space>
-              <n-button 
+            <n-space>              <n-button 
                 type="primary" 
                 @click="generatePrompt" 
                 :loading="generating"
-                :disabled="!defaultConfig"
+                :disabled="configs.length === 0"
                 size="large"
               >
                 {{ generating ? '生成中...' : '确定' }}
               </n-button>
-              
-              <n-dropdown 
+                <n-dropdown 
                 :options="modelDropdownOptions" 
                 @select="onModelSelect"
                 trigger="click"
-                v-if="defaultConfig"
+                v-if="configs.length > 0"
               >
                 <n-button size="large" quaternary>
-                  {{ currentModel || '默认模型' }}
+                  {{ getDisplayModelName() }}
                   <template #icon>
                     <n-icon><ChevronDown /></n-icon>
                   </template>
@@ -91,7 +88,7 @@
         </n-form-item>
       </n-form>
     </n-card>    <!-- 历史记录（可切换显示） -->
-    <n-card v-if="showHistory && defaultConfig" title="生成历史" class="history-card">
+    <n-card v-if="showHistory && configs.length > 0" title="生成历史" class="history-card">
       <template #header-extra>
         <n-space>
           <n-button size="small" @click="loadHistory">
@@ -199,6 +196,7 @@ const configs = ref<AIConfig[]>([])
 const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
+const currentConfigId = ref<string>('')
 const generating = ref(false)
 const loading = ref(true)
 const showHistory = ref(false)
@@ -230,32 +228,46 @@ const formRef = ref()
 
 // 计算属性
 const modelDropdownOptions = computed(() => {
-  if (!defaultConfig.value) return []
+  if (!configs.value || configs.value.length === 0) return []
   
-  const models = Array.isArray(defaultConfig.value.models) 
-    ? defaultConfig.value.models 
-    : []
+  const options: Array<{ label: string; key: string; configId: string; configName: string }> = []
   
-  const options = models.map(model => ({
-    label: model,
-    key: model
-  }))
-  
-  // 添加默认模型
-  if (defaultConfig.value.defaultModel) {
-    options.unshift({
-      label: `${defaultConfig.value.defaultModel} (默认)`,
-      key: defaultConfig.value.defaultModel
+  // 遍历所有启用的配置
+  configs.value.forEach(config => {
+    const models = Array.isArray(config.models) ? config.models : []
+    
+    // 添加默认模型
+    if (config.defaultModel) {
+      options.push({
+        label: `${config.defaultModel} (${config.name} - 默认)`,
+        key: `${config.configId}:${config.defaultModel}`,
+        configId: config.configId,
+        configName: config.name
+      })
+    }
+    
+    // 添加其他模型
+    models.forEach(model => {
+      if (model !== config.defaultModel) { // 避免重复添加默认模型
+        options.push({
+          label: `${model} (${config.name})`,
+          key: `${config.configId}:${model}`,
+          configId: config.configId,
+          configName: config.name
+        })
+      }
     })
-  }
-  
-  // 添加自定义模型
-  if (defaultConfig.value.customModel && !models.includes(defaultConfig.value.customModel)) {
-    options.push({
-      label: `${defaultConfig.value.customModel} (自定义)`,
-      key: defaultConfig.value.customModel
-    })
-  }
+    
+    // 添加自定义模型
+    if (config.customModel && !models.includes(config.customModel) && config.customModel !== config.defaultModel) {
+      options.push({
+        label: `${config.customModel} (${config.name} - 自定义)`,
+        key: `${config.configId}:${config.customModel}`,
+        configId: config.configId,
+        configName: config.name
+      })
+    }
+  })
   
   return options
 })
@@ -272,10 +284,17 @@ const loadConfigs = async () => {
     // 自动选择第一个启用的配置作为默认配置
     if (result && result.length > 0) {
       defaultConfig.value = result[0]
-      currentModel.value = defaultConfig.value.defaultModel || ''
+      // 设置默认选中的模型和配置
+      const defaultModel = defaultConfig.value.defaultModel || ''
+      if (defaultModel) {
+        currentModel.value = defaultModel
+        currentConfigId.value = defaultConfig.value.configId
+      }
       console.log('自动选择默认配置:', defaultConfig.value.name)
     } else {
       defaultConfig.value = null
+      currentModel.value = ''
+      currentConfigId.value = ''
       console.log('没有找到启用的 AI 配置')
     }
   })
@@ -299,7 +318,16 @@ const loadHistory = async () => {
 
 // 模型选择处理
 const onModelSelect = (modelKey: string) => {
-  currentModel.value = modelKey
+  // 解析选择的模型key，格式为 "configId:model"
+  const [configId, model] = modelKey.split(':')
+  currentModel.value = model
+  currentConfigId.value = configId
+  
+  // 更新当前使用的配置
+  const selectedConfig = configs.value.find(c => c.configId === configId)
+  if (selectedConfig) {
+    console.log('切换到配置:', selectedConfig.name, '模型:', model)
+  }
 }
 
 // 切换历史记录显示
@@ -320,18 +348,23 @@ const generatePrompt = async () => {
     streamStats.charCount = 0
     streamStats.isStreaming = true
     
-    if (!defaultConfig.value) {
+    // 获取当前选中的配置
+    const selectedConfig = currentConfigId.value 
+      ? configs.value.find(c => c.configId === currentConfigId.value)
+      : defaultConfig.value
+    
+    if (!selectedConfig) {
       throw new Error('没有可用的 AI 配置')
     }
     
     const request = {
-      configId: defaultConfig.value.configId,
-      model: currentModel.value || defaultConfig.value.defaultModel,
+      configId: selectedConfig.configId,
+      model: currentModel.value || selectedConfig.defaultModel,
       topic: formData.topic
     }
     
     // 序列化配置对象以确保可以通过 IPC 传递
-    const serializedConfig = serializeConfig(defaultConfig.value)
+    const serializedConfig = serializeConfig(selectedConfig)
     
     // 检查是否支持流式传输
     let result
@@ -382,7 +415,7 @@ const generatePrompt = async () => {
     try {
       await api.aiGenerationHistory.create.mutate({
         historyId: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        configId: defaultConfig.value?.configId || 'unknown',
+        configId: currentConfigId.value || defaultConfig.value?.configId || 'unknown',
         topic: formData.topic,
         generatedPrompt: '',
         model: currentModel.value || 'unknown',
@@ -446,6 +479,20 @@ const copyHistoryItem = async (item: AIGenerationHistory) => {
   } catch (error) {
     message.error('复制失败')
   }
+}
+
+// 获取显示的模型名称
+const getDisplayModelName = () => {
+  if (!currentModel.value) {
+    return '选择模型'
+  }
+  
+  const selectedConfig = configs.value.find(c => c.configId === currentConfigId.value)
+  if (selectedConfig) {
+    return `${currentModel.value} (${selectedConfig.name})`
+  }
+  
+  return currentModel.value || '选择模型'
 }
 
 // 获取配置名称
