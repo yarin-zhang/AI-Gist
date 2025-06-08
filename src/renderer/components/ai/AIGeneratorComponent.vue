@@ -394,10 +394,10 @@ const manualSavePrompt = async () => {
 
     try {
         const promptData = {
-            title: `手动保存: ${formData.topic || '未命名'}`,
+            title: `AI生成: ${formData.topic || '提示词生成'}`,
             content: generatedResult.value,
             description: ``,
-            tags: ['手动保存'],
+            tags: ['AI生成', '手动保存'],
             categoryId: null,
             isFavorite: false,
             useCount: 0
@@ -634,7 +634,7 @@ const saveGeneratedPrompt = async (result: any) => {
             title: `AI生成: ${result.topic}`,
             content: result.generatedPrompt,
             description: ``,
-            tags: ['AI生成'],
+            tags: ['AI生成', '自动保存'],
             categoryId: null, // 可以根据需要设置默认分类
             isFavorite: false,
             useCount: 0
