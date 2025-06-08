@@ -275,10 +275,9 @@ class AIServiceManager {
             const models = data.models?.map((model: any) => model.name) || [];
             console.log(`Ollama 解析出的模型列表:`, models);
             return models.length > 0 ? models : [];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 Ollama 模型列表失败:', error);
-          if (error.message?.includes('请求超时')) {
+          if (error instanceof Error && error.message?.includes('请求超时')) {
             console.warn('Ollama 请求超时');
           }
         }
@@ -308,14 +307,13 @@ class AIServiceManager {
           } else {
             console.warn(`LM Studio API 响应异常: ${response.status} ${response.statusText}`);
             return ['请检查 LM Studio 服务状态'];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 LM Studio 模型列表失败:', error);
-          if (error.message?.includes('请求超时')) {
+          if (error instanceof Error && error.message?.includes('请求超时')) {
             return ['连接超时，请检查 LM Studio 状态'];
           }
           return ['无法连接到 LM Studio'];
-        }      } else if (config.type === 'openai') {
+        }} else if (config.type === 'openai') {
         // OpenAI 官方 API 获取模型列表
         try {
           const url = `${config.baseURL}/models`;
@@ -342,10 +340,9 @@ class AIServiceManager {
               'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 
               'gpt-3.5-turbo-16k', 'text-davinci-003', 'text-davinci-002'
             ];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 OpenAI 模型列表失败，使用默认列表:', error);
-          if (error.message?.includes('请求超时')) {
+          if (error instanceof Error && error.message?.includes('请求超时')) {
             console.warn('OpenAI 请求超时');
           }
         }
@@ -375,10 +372,9 @@ class AIServiceManager {
             const models = data.data?.map((model: any) => model.id) || [];
             console.log(`DeepSeek 解析出的模型列表:`, models);
             return models.length > 0 ? models : ['deepseek-chat', 'deepseek-coder'];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 DeepSeek 模型列表失败，使用默认列表:', error);
-          if (error.message?.includes('请求超时')) {
+          if (error instanceof Error && error.message?.includes('请求超时')) {
             console.warn('DeepSeek 请求超时');
           }
         }
@@ -739,11 +735,9 @@ class AIServiceManager {
         llm = new ChatOpenAI(azureConfig);
       } else {
         return { success: false, error: '不支持的配置类型' };
-      }
-
-      if (llm) {
+      }      if (llm) {
         const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
-        const responseText = typeof response === 'string' ? response : response.content;
+        const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
 
         return {
           success: true,
@@ -898,10 +892,8 @@ class AIServiceManager {
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];
-
-      const response = await this.withTimeout(llm.invoke(messages), 60000); // 60秒超时
-      const generatedPrompt = typeof response === 'string' ? response : response.content;
+      ];      const response = await this.withTimeout(llm.invoke(messages), 60000); // 60秒超时
+      const generatedPrompt = typeof response === 'string' ? response : (response as any)?.content || '';
 
       const result: AIGenerationResult = {
         id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1054,15 +1046,16 @@ class AIServiceManager {
           },
           streaming: true
         });
-      } else {
-        throw new Error('不支持的配置类型');
+      } else {        throw new Error('不支持的配置类型');
       }
 
       // 构建消息
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];      let accumulatedContent = '';
+      ];
+      
+      let accumulatedContent = '';
       
       // 尝试使用流式传输，添加超时
       try {
@@ -1079,15 +1072,16 @@ class AIServiceManager {
         })();
         
         await this.withTimeout(streamPromise, 60000); // 60秒超时
+        
       } catch (streamError) {
         // 如果流式传输失败，回退到普通调用
         console.warn('流式传输失败，回退到普通调用:', streamError);
-        if (streamError.message?.includes('请求超时')) {
+        if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
           throw new Error('生成超时，请检查网络连接或服务状态');
         }
         
         const response = await this.withTimeout(llm.invoke(messages), 60000);
-        accumulatedContent = typeof response === 'string' ? response : response.content;
+        accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
         // 模拟流式进度
         const totalChars = accumulatedContent.length;
         for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
