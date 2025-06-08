@@ -26,14 +26,41 @@ interface ProcessedAIConfig {
  * AI 服务管理器
  * 不再维护内存中的配置存储，而是直接处理传入的配置
  */
-class AIServiceManager {  /**
+class AIServiceManager {
+  
+  /**
+   * 创建带超时的 fetch 请求
+   */
+  private createTimeoutFetch(timeoutMs: number = 15000) {
+    return (url: string, options: any = {}) => {
+      return Promise.race([
+        fetch(url, options),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('请求超时')), timeoutMs)
+        )
+      ]);
+    };
+  }
+
+  /**
+   * 创建带超时的 LangChain 调用
+   */
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('请求超时')), timeoutMs)
+      )
+    ]);
+  }
+
+  /**
    * 测试配置连接
    */
   async testConfig(config: ProcessedAIConfig): Promise<{ success: boolean; error?: string; models?: string[] }> {
     console.log(`测试配置连接 - 供应商: ${config.type}, baseURL: ${config.baseURL}, 配置ID: ${config.configId}`);
     
-    try {
-      if (config.type === 'openai' || config.type === 'deepseek' || config.type === 'mistral') {
+    try {      if (config.type === 'openai' || config.type === 'deepseek' || config.type === 'mistral') {
         console.log(`测试 ${config.type} 连接，使用 baseURL: ${config.baseURL}`);
         
         const llm = new ChatOpenAI({
@@ -43,15 +70,18 @@ class AIServiceManager {  /**
           }
         });
 
-        // 尝试发送一个简单的测试请求
+        // 尝试发送一个简单的测试请求，添加超时
         try {
-          await llm.invoke('test');
+          await this.withTimeout(llm.invoke('test'), 15000);
           // 连接成功，获取模型列表
           const models = await this.getAvailableModels(config);
           console.log(`${config.type} 连接测试成功，获取到模型:`, models);
           return { success: true, models };
         } catch (error: any) {
           console.error(`${config.type} 连接测试失败:`, error);
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查网络或服务器状态' };
+          }
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
           }
@@ -63,8 +93,9 @@ class AIServiceManager {  /**
           return { success: true, models };
         }      } else if (config.type === 'ollama') {
         try {
-          // 尝试获取模型列表来测试连接
-          const response = await fetch(`${config.baseURL}/api/tags`);
+          // 尝试获取模型列表来测试连接，添加超时
+          const timeoutFetch = this.createTimeoutFetch(15000);
+          const response = await timeoutFetch(`${config.baseURL}/api/tags`);
           if (response.ok) {
             const models = await this.getAvailableModels(config);
             return { success: true, models };
@@ -72,32 +103,46 @@ class AIServiceManager {  /**
             return { success: false, error: '无法连接到 Ollama 服务，请确保服务已启动' };
           }
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查 Ollama 服务是否正常运行' };
+          }
           if (error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch')) {
             return { success: false, error: '无法连接到 Ollama 服务，请确保服务已启动并检查 baseURL' };
           }
           return { success: false, error: error.message };
-        }
-      } else if (config.type === 'lmstudio') {
+        }      } else if (config.type === 'lmstudio') {
         try {
           // LM Studio 使用 OpenAI 兼容的端点测试连接
-          const response = await fetch(`${config.baseURL}/models`);
+          const timeoutFetch = this.createTimeoutFetch(15000);
+          // 如果 baseURL 已经包含 /v1，直接使用；否则添加 /v1
+          const baseUrl = config.baseURL || 'http://localhost:1234';
+          const testUrl = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
+          console.log(`LM Studio 连接测试URL: ${testUrl}`);
+          
+          const response = await timeoutFetch(testUrl);
           if (response.ok) {
             const models = await this.getAvailableModels(config);
+            console.log('LM Studio 连接测试成功，获取到模型:', models);
             return { success: true, models };
           } else {
-            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动' };
+            console.log(`LM Studio models 端点响应状态: ${response.status}`);
+            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动并加载了模型' };
           }
         } catch (error: any) {
+          console.error('LM Studio 连接测试失败:', error);
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查 LM Studio 服务是否正常运行' };
+          }
           if (error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch')) {
-            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动并检查 baseURL' };
+            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动并检查 baseURL（默认: http://localhost:1234）' };
           }
           return { success: false, error: error.message };
-        }
-      } else if (config.type === 'anthropic') {
+        }      } else if (config.type === 'anthropic') {
         try {
-          // 使用原生API测试Anthropic连接
+          // 使用原生API测试Anthropic连接，添加超时
           const apiUrl = config.baseURL || 'https://api.anthropic.com';
-          const response = await fetch(`${apiUrl}/v1/messages`, {
+          const timeoutFetch = this.createTimeoutFetch(15000);
+          const response = await timeoutFetch(`${apiUrl}/v1/messages`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -120,12 +165,15 @@ class AIServiceManager {  /**
             return { success: false, error: `连接失败: ${response.statusText}` };
           }
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查网络连接' };
+          }
           return { success: false, error: error.message };
-        }
-      } else if (config.type === 'google') {
+        }      } else if (config.type === 'google') {
         try {
-          // 使用原生API测试Google AI连接
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${config.apiKey}`, {
+          // 使用原生API测试Google AI连接，添加超时
+          const timeoutFetch = this.createTimeoutFetch(15000);
+          const response = await timeoutFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${config.apiKey}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -144,32 +192,39 @@ class AIServiceManager {  /**
             return { success: false, error: `连接失败: ${response.statusText}` };
           }
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查网络连接' };
+          }
           return { success: false, error: error.message };
-        }
-      } else if (config.type === 'cohere') {
+        }      } else if (config.type === 'cohere') {
         try {
           const cohere = new CohereClient({
             token: config.apiKey,
           });
           
-          // 测试生成
-          await cohere.generate({
-            model: 'command',
-            prompt: 'test',
-            maxTokens: 5
-          });
+          // 测试生成，添加超时
+          await this.withTimeout(
+            cohere.generate({
+              model: 'command',
+              prompt: 'test',
+              maxTokens: 5
+            }),
+            15000
+          );
           
           const models = await this.getAvailableModels(config);
           return { success: true, models };
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查网络连接' };
+          }
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
           }
           return { success: false, error: error.message };
-        }
-      } else if (config.type === 'azure') {
+        }      } else if (config.type === 'azure') {
         try {
-          // Azure OpenAI使用不同的配置方式
+          // Azure OpenAI使用不同的配置方式，添加超时
           const azureConfig: any = {
             openAIApiKey: config.apiKey,
             modelName: 'gpt-35-turbo',
@@ -183,10 +238,13 @@ class AIServiceManager {  /**
           }
           
           const llm = new ChatOpenAI(azureConfig);
-          await llm.invoke('test');
+          await this.withTimeout(llm.invoke('test'), 15000);
           const models = await this.getAvailableModels(config);
           return { success: true, models };
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { success: false, error: '连接超时，请检查 Azure 服务状态' };
+          }
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
           }
@@ -204,14 +262,14 @@ class AIServiceManager {  /**
   async getAvailableModels(config: ProcessedAIConfig): Promise<string[]> {
     console.log(`获取模型列表 - 供应商: ${config.type}, baseURL: ${config.baseURL}`);
     
-    try {
-      if (config.type === 'ollama') {
+    try {      if (config.type === 'ollama') {
         // Ollama 通过 /api/tags 端点获取模型列表
         try {
           const url = `${config.baseURL}/api/tags`;
           console.log(`Ollama 请求URL: ${url}`);
           
-          const response = await fetch(url);
+          const timeoutFetch = this.createTimeoutFetch(10000);
+          const response = await timeoutFetch(url);
           console.log(`Ollama 响应状态: ${response.status}`);
           
           if (response.ok) {
@@ -221,17 +279,22 @@ class AIServiceManager {  /**
             const models = data.models?.map((model: any) => model.name) || [];
             console.log(`Ollama 解析出的模型列表:`, models);
             return models.length > 0 ? models : [];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 Ollama 模型列表失败:', error);
+          if (error instanceof Error && error.message?.includes('请求超时')) {
+            console.warn('Ollama 请求超时');
+          }
         }
         return [];      } else if (config.type === 'lmstudio') {
-        // LM Studio 使用 OpenAI 兼容的 /v1/models 端点
+        // LM Studio 使用 OpenAI 兼容的 /models 端点
         try {
-          const url = `${config.baseURL}/models`;
+          // 如果 baseURL 已经包含 /v1，直接使用；否则添加 /v1
+          const baseUrl = config.baseURL || 'http://localhost:1234';
+          const url = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
           console.log(`LM Studio 请求URL: ${url}`);
           
-          const response = await fetch(url);
+          const timeoutFetch = this.createTimeoutFetch(10000);
+          const response = await timeoutFetch(url);
           console.log(`LM Studio 响应状态: ${response.status}`);
           
           if (response.ok) {
@@ -240,19 +303,30 @@ class AIServiceManager {  /**
             
             const models = data.data?.map((model: any) => model.id) || [];
             console.log(`LM Studio 解析出的模型列表:`, models);
-            return models.length > 0 ? models : [];
-          }
-        } catch (error) {
+            
+            if (models.length > 0) {
+              return models;
+            } else {
+              console.warn('LM Studio 返回空模型列表，可能未加载模型');
+              return ['请在 LM Studio 中加载模型'];
+            }
+          } else {
+            console.warn(`LM Studio API 响应异常: ${response.status} ${response.statusText}`);
+            return ['请检查 LM Studio 服务状态'];
+          }} catch (error) {
           console.error('获取 LM Studio 模型列表失败:', error);
-        }
-        return [];
-      } else if (config.type === 'openai') {
+          if (error instanceof Error && error.message?.includes('请求超时')) {
+            return ['连接超时，请检查 LM Studio 状态'];
+          }
+          return ['无法连接到 LM Studio'];
+        }} else if (config.type === 'openai') {
         // OpenAI 官方 API 获取模型列表
         try {
           const url = `${config.baseURL}/models`;
           console.log(`OpenAI 请求URL: ${url}`);
           
-          const response = await fetch(url, {
+          const timeoutFetch = this.createTimeoutFetch(10000);
+          const response = await timeoutFetch(url, {
             headers: {
               'Authorization': `Bearer ${config.apiKey}`,
               'Content-Type': 'application/json'
@@ -272,9 +346,11 @@ class AIServiceManager {  /**
               'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 
               'gpt-3.5-turbo-16k', 'text-davinci-003', 'text-davinci-002'
             ];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 OpenAI 模型列表失败，使用默认列表:', error);
+          if (error instanceof Error && error.message?.includes('请求超时')) {
+            console.warn('OpenAI 请求超时');
+          }
         }
         // 返回常见的 OpenAI 模型作为后备
         return [
@@ -286,7 +362,8 @@ class AIServiceManager {  /**
           const url = `${config.baseURL}/models`;
           console.log(`DeepSeek 请求URL: ${url}`);
           
-          const response = await fetch(url, {
+          const timeoutFetch = this.createTimeoutFetch(10000);
+          const response = await timeoutFetch(url, {
             headers: {
               'Authorization': `Bearer ${config.apiKey}`,
               'Content-Type': 'application/json'
@@ -301,9 +378,11 @@ class AIServiceManager {  /**
             const models = data.data?.map((model: any) => model.id) || [];
             console.log(`DeepSeek 解析出的模型列表:`, models);
             return models.length > 0 ? models : ['deepseek-chat', 'deepseek-coder'];
-          }
-        } catch (error) {
+          }        } catch (error) {
           console.error('获取 DeepSeek 模型列表失败，使用默认列表:', error);
+          if (error instanceof Error && error.message?.includes('请求超时')) {
+            console.warn('DeepSeek 请求超时');
+          }
         }
         // 返回常见的 DeepSeek 模型作为后备
         return ['deepseek-chat', 'deepseek-coder'];} else if (config.type === 'anthropic') {
@@ -484,7 +563,7 @@ class AIServiceManager {  /**
       console.error('获取模型列表失败:', error);
       return config.models || [];
     }
-  }/**
+  }  /**
    * 智能测试 - 发送真实提示词并获取AI响应
    */
   async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
@@ -511,15 +590,27 @@ class AIServiceManager {  /**
             baseURL: config.baseURL || undefined
           }
         });
-      } else if (config.type === 'ollama' || config.type === 'lmstudio') {
+      } else if (config.type === 'ollama') {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
+        });      } else if (config.type === 'lmstudio') {
+        // LM Studio 使用 ChatOpenAI 而不是 Ollama，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        
+        llm = new ChatOpenAI({
+          openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
+          modelName: model,
+          configuration: {
+            baseURL: finalBaseUrl
+          }
         });
       } else if (config.type === 'anthropic') {
-        // 使用原生API调用
+        // 使用原生API调用，添加超时
         try {
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
+          const timeoutFetch = this.createTimeoutFetch(20000);
+          const response = await timeoutFetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -548,6 +639,13 @@ class AIServiceManager {  /**
             };
           }
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { 
+              success: false, 
+              error: '连接超时，请检查网络连接',
+              inputPrompt: testPrompt
+            };
+          }
           return { 
             success: false, 
             error: error.message || '未知错误',
@@ -555,9 +653,10 @@ class AIServiceManager {  /**
           };
         }
       } else if (config.type === 'google') {
-        // 使用原生API调用
+        // 使用原生API调用，添加超时
         try {
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`, {
+          const timeoutFetch = this.createTimeoutFetch(20000);
+          const response = await timeoutFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -582,6 +681,13 @@ class AIServiceManager {  /**
             };
           }
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { 
+              success: false, 
+              error: '连接超时，请检查网络连接',
+              inputPrompt: testPrompt
+            };
+          }
           return { 
             success: false, 
             error: error.message || '未知错误',
@@ -594,11 +700,14 @@ class AIServiceManager {  /**
         });
         
         try {
-          const response = await cohere.generate({
-            model: model,
-            prompt: testPrompt,
-            maxTokens: 100
-          });
+          const response = await this.withTimeout(
+            cohere.generate({
+              model: model,
+              prompt: testPrompt,
+              maxTokens: 100
+            }),
+            20000
+          );
           
           return {
             success: true,
@@ -606,6 +715,13 @@ class AIServiceManager {  /**
             inputPrompt: testPrompt
           };
         } catch (error: any) {
+          if (error.message?.includes('请求超时')) {
+            return { 
+              success: false, 
+              error: '连接超时，请检查网络连接',
+              inputPrompt: testPrompt
+            };
+          }
           return { 
             success: false, 
             error: error.message || '未知错误',
@@ -627,11 +743,9 @@ class AIServiceManager {  /**
         llm = new ChatOpenAI(azureConfig);
       } else {
         return { success: false, error: '不支持的配置类型' };
-      }
-
-      if (llm) {
-        const response = await llm.invoke(testPrompt);
-        const responseText = typeof response === 'string' ? response : response.content;
+      }      if (llm) {
+        const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
+        const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
 
         return {
           success: true,
@@ -643,6 +757,13 @@ class AIServiceManager {  /**
       return { success: false, error: '未知错误' };
     } catch (error: any) {
       console.error('智能测试失败:', error);
+      if (error.message?.includes('请求超时')) {
+        return { 
+          success: false, 
+          error: '连接超时，请检查服务状态或网络连接',
+          inputPrompt: '请用一句话简单介绍一下你自己。'
+        };
+      }
       return { 
         success: false, 
         error: error.message || '未知错误',
@@ -701,15 +822,27 @@ class AIServiceManager {  /**
             baseURL: config.baseURL || undefined
           }
         });
-      } else if (config.type === 'ollama' || config.type === 'lmstudio') {
+      } else if (config.type === 'ollama') {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });      } else if (config.type === 'anthropic') {
+        });      } else if (config.type === 'lmstudio') {
+        // LM Studio 使用 ChatOpenAI，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        llm = new ChatOpenAI({
+          openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
+          modelName: model,
+          configuration: {
+            baseURL: finalBaseUrl
+          }
+        });
+      } else if (config.type === 'anthropic') {
         llm = new ChatAnthropic({
           anthropicApiKey: config.apiKey,
           modelName: model
-        });} else if (config.type === 'google') {
+        });
+      } else if (config.type === 'google') {
         llm = new ChatGoogleGenerativeAI({
           apiKey: config.apiKey,
           model: model
@@ -719,20 +852,23 @@ class AIServiceManager {  /**
           token: config.apiKey,
         });
         
-        // Cohere 使用不同的API格式
+        // Cohere 使用不同的API格式，添加超时
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await cohere.generate({
-          model: model,
-          prompt: prompt,
-          maxTokens: 2000,
-          temperature: 0.7
-        });
+        const response = await this.withTimeout(
+          cohere.generate({
+            model: model,
+            prompt: prompt,
+            maxTokens: 2000,
+            temperature: 0.7
+          }),
+          60000 // 生成较长的内容，使用更长的超时
+        );
         
         const generatedPrompt = response.generations[0]?.text || '';
         
         const result: AIGenerationResult = {
           id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          configId: config.configId, // 使用 configId 而不是 id
+          configId: config.configId,
           topic: request.topic,
           generatedPrompt: generatedPrompt,
           model: model,
@@ -740,7 +876,8 @@ class AIServiceManager {  /**
           createdAt: new Date()
         };
 
-        return result;      } else if (config.type === 'azure') {
+        return result;
+      } else if (config.type === 'azure') {
         llm = new ChatOpenAI({
           openAIApiKey: config.apiKey,
           modelName: model,
@@ -764,10 +901,8 @@ class AIServiceManager {  /**
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];
-
-      const response = await llm.invoke(messages);
-      const generatedPrompt = typeof response === 'string' ? response : response.content;
+      ];      const response = await this.withTimeout(llm.invoke(messages), 60000); // 60秒超时
+      const generatedPrompt = typeof response === 'string' ? response : (response as any)?.content || '';
 
       const result: AIGenerationResult = {
         id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -782,6 +917,9 @@ class AIServiceManager {  /**
       return result;
     } catch (error: any) {
       console.error('生成 Prompt 失败:', error);
+      if (error.message?.includes('请求超时')) {
+        throw new Error('生成超时，请检查网络连接或服务状态');
+      }
       throw new Error(`生成失败: ${error.message}`);
     }
   }
@@ -833,34 +971,51 @@ class AIServiceManager {  /**
           },
           streaming: true // 启用流式传输
         });
-      } else if (config.type === 'ollama' || config.type === 'lmstudio') {
+      } else if (config.type === 'ollama') {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });      } else if (config.type === 'anthropic') {
+        });      } else if (config.type === 'lmstudio') {
+        // LM Studio 使用 ChatOpenAI，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        
+        llm = new ChatOpenAI({
+          openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
+          modelName: model,
+          configuration: {
+            baseURL: finalBaseUrl
+          },
+          streaming: true
+        });
+      } else if (config.type === 'anthropic') {
         llm = new ChatAnthropic({
           anthropicApiKey: config.apiKey,
           modelName: model,
           streaming: true
-        });} else if (config.type === 'google') {
+        });
+      } else if (config.type === 'google') {
         llm = new ChatGoogleGenerativeAI({
           apiKey: config.apiKey,
           model: model,
           streaming: true
         });
       } else if (config.type === 'cohere') {
-        // Cohere 目前不支持LangChain流式，使用常规调用
+        // Cohere 目前不支持LangChain流式，使用常规调用，添加超时
         const cohere = new CohereClient({
           token: config.apiKey,
         });
         
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await cohere.generate({
-          model: model,
-          prompt: prompt,
-          maxTokens: 2000,
-          temperature: 0.7
-        });
+        const response = await this.withTimeout(
+          cohere.generate({
+            model: model,
+            prompt: prompt,
+            maxTokens: 2000,
+            temperature: 0.7
+          }),
+          60000
+        );
         
         const accumulatedContent = response.generations[0]?.text || '';
         
@@ -883,7 +1038,8 @@ class AIServiceManager {  /**
           createdAt: new Date()
         };
 
-        return result;      } else if (config.type === 'azure') {
+        return result;
+      } else if (config.type === 'azure') {
         llm = new ChatOpenAI({
           openAIApiKey: config.apiKey,
           modelName: model,
@@ -901,8 +1057,7 @@ class AIServiceManager {  /**
           },
           streaming: true
         });
-      } else {
-        throw new Error('不支持的配置类型');
+      } else {        throw new Error('不支持的配置类型');
       }
 
       // 构建消息
@@ -910,26 +1065,35 @@ class AIServiceManager {  /**
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ];
-
+      
       let accumulatedContent = '';
       
-      // 尝试使用流式传输
+      // 尝试使用流式传输，添加超时
       try {
-        const stream = await llm.stream(messages);
+        const streamPromise = (async () => {
+          const stream = await llm.stream(messages);
           for await (const chunk of stream) {
-          const content = typeof chunk === 'string' ? chunk : chunk.content;
-          if (content) {
-            accumulatedContent += content;
-            // 传递字符数和当前累积的内容
-            onProgress(accumulatedContent.length, accumulatedContent);
+            const content = typeof chunk === 'string' ? chunk : chunk.content;
+            if (content) {
+              accumulatedContent += content;
+              // 传递字符数和当前累积的内容
+              onProgress(accumulatedContent.length, accumulatedContent);
+            }
           }
-        }
+        })();
+        
+        await this.withTimeout(streamPromise, 60000); // 60秒超时
+        
       } catch (streamError) {
         // 如果流式传输失败，回退到普通调用
         console.warn('流式传输失败，回退到普通调用:', streamError);
-        const response = await llm.invoke(messages);
-        accumulatedContent = typeof response === 'string' ? response : response.content;
-          // 模拟流式进度
+        if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
+          throw new Error('生成超时，请检查网络连接或服务状态');
+        }
+        
+        const response = await this.withTimeout(llm.invoke(messages), 60000);
+        accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
+        // 模拟流式进度
         const totalChars = accumulatedContent.length;
         for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
           const currentCharCount = Math.min(i, totalChars);
@@ -952,6 +1116,9 @@ class AIServiceManager {  /**
       return result;
     } catch (error: any) {
       console.error('流式生成 Prompt 失败:', error);
+      if (error.message?.includes('请求超时')) {
+        throw new Error('生成超时，请检查网络连接或服务状态');
+      }
       throw new Error(`生成失败: ${error.message}`);
     }
   }
