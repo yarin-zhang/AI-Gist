@@ -457,7 +457,7 @@ const saveGeneratedPrompt = async (result: any) => {
     const promptData = {
       title: `AI生成: ${result.topic}`,
       content: result.generatedPrompt,
-      description: `由 AI 生成的提示词，主题：${result.topic}`,
+      description: ``,
       tags: ['AI生成'],
       categoryId: null, // 可以根据需要设置默认分类
       isFavorite: false,
