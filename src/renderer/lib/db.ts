@@ -61,7 +61,7 @@ export interface AIConfig {
   id?: number;
   configId: string; // 唯一标识符
   name: string;
-  type: 'openai' | 'ollama';
+  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
   baseURL: string;
   apiKey?: string;
   secretKey?: string;
