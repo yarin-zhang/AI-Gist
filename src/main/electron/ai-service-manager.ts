@@ -114,14 +114,18 @@ class AIServiceManager {
         try {
           // LM Studio 使用 OpenAI 兼容的端点测试连接
           const timeoutFetch = this.createTimeoutFetch(15000);
-          // 首先尝试 /v1/models 端点
-          const response = await timeoutFetch(`${config.baseURL}/v1/models`);
+          // 如果 baseURL 已经包含 /v1，直接使用；否则添加 /v1
+          const baseUrl = config.baseURL || 'http://localhost:1234';
+          const testUrl = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
+          console.log(`LM Studio 连接测试URL: ${testUrl}`);
+          
+          const response = await timeoutFetch(testUrl);
           if (response.ok) {
             const models = await this.getAvailableModels(config);
             console.log('LM Studio 连接测试成功，获取到模型:', models);
             return { success: true, models };
           } else {
-            console.log(`LM Studio /v1/models 端点响应状态: ${response.status}`);
+            console.log(`LM Studio models 端点响应状态: ${response.status}`);
             return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动并加载了模型' };
           }
         } catch (error: any) {
@@ -281,10 +285,12 @@ class AIServiceManager {
             console.warn('Ollama 请求超时');
           }
         }
-        return [];} else if (config.type === 'lmstudio') {
-        // LM Studio 使用 OpenAI 兼容的 /v1/models 端点
+        return [];      } else if (config.type === 'lmstudio') {
+        // LM Studio 使用 OpenAI 兼容的 /models 端点
         try {
-          const url = `${config.baseURL}/v1/models`;
+          // 如果 baseURL 已经包含 /v1，直接使用；否则添加 /v1
+          const baseUrl = config.baseURL || 'http://localhost:1234';
+          const url = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
           console.log(`LM Studio 请求URL: ${url}`);
           
           const timeoutFetch = this.createTimeoutFetch(10000);
@@ -307,7 +313,7 @@ class AIServiceManager {
           } else {
             console.warn(`LM Studio API 响应异常: ${response.status} ${response.statusText}`);
             return ['请检查 LM Studio 服务状态'];
-          }        } catch (error) {
+          }} catch (error) {
           console.error('获取 LM Studio 模型列表失败:', error);
           if (error instanceof Error && error.message?.includes('请求超时')) {
             return ['连接超时，请检查 LM Studio 状态'];
@@ -588,14 +594,16 @@ class AIServiceManager {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });
-      } else if (config.type === 'lmstudio') {
+        });      } else if (config.type === 'lmstudio') {
         // LM Studio 使用 ChatOpenAI 而不是 Ollama，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        
         llm = new ChatOpenAI({
           openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
           modelName: model,
           configuration: {
-            baseURL: config.baseURL ? `${config.baseURL}/v1` : 'http://localhost:1234/v1'
+            baseURL: finalBaseUrl
           }
         });
       } else if (config.type === 'anthropic') {
@@ -818,14 +826,15 @@ class AIServiceManager {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });
-      } else if (config.type === 'lmstudio') {
+        });      } else if (config.type === 'lmstudio') {
         // LM Studio 使用 ChatOpenAI，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         llm = new ChatOpenAI({
           openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
           modelName: model,
           configuration: {
-            baseURL: config.baseURL ? `${config.baseURL}/v1` : 'http://localhost:1234/v1'
+            baseURL: finalBaseUrl
           }
         });
       } else if (config.type === 'anthropic') {
@@ -966,14 +975,16 @@ class AIServiceManager {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });
-      } else if (config.type === 'lmstudio') {
+        });      } else if (config.type === 'lmstudio') {
         // LM Studio 使用 ChatOpenAI，因为它是 OpenAI 兼容的
+        const baseUrl = config.baseURL || 'http://localhost:1234';
+        const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        
         llm = new ChatOpenAI({
           openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
           modelName: model,
           configuration: {
-            baseURL: config.baseURL ? `${config.baseURL}/v1` : 'http://localhost:1234/v1'
+            baseURL: finalBaseUrl
           },
           streaming: true
         });
