@@ -412,6 +412,13 @@ const formRules = {
 const typeOptions = [
     { label: "OpenAI 兼容", value: "openai" },
     { label: "Ollama", value: "ollama" },
+    { label: "Anthropic Claude", value: "anthropic" },
+    { label: "Google AI", value: "google" },
+    { label: "Azure OpenAI", value: "azure" },
+    { label: "LM Studio", value: "lmstudio" },
+    { label: "DeepSeek", value: "deepseek" },
+    { label: "Cohere", value: "cohere" },
+    { label: "Mistral AI", value: "mistral" },
 ];
 
 // 表单引用

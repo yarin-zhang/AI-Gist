@@ -30,10 +30,15 @@
     "vite": "^4.5.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.53.0",
+    "@google/generative-ai": "^0.24.1",
+    "@langchain/anthropic": "^0.3.21",
     "@langchain/core": "^0.3.57",
+    "@langchain/google-genai": "^0.2.10",
     "@langchain/ollama": "^0.2.1",
     "@langchain/openai": "^0.5.12",
     "@vicons/tabler": "^0.13.0",
+    "cohere-ai": "^7.17.1",
     "langchain": "^0.3.27",
     "naive-ui": "^2.41.0",
     "vue": "^3.3.8",
