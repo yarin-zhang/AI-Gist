@@ -38,15 +38,14 @@
                 </div>
                 <n-card v-for="config in configs" :key="config.id" class="config-card">
                     <template #header>
-                        <div class="config-header">
-                            <div class="config-info">
+                        <div class="config-header">                            <div class="config-info">
                                 <NIcon size="24">
-                                    <Server v-if="config.type === 'openai'" />
+                                    <Server v-if="['openai', 'azure', 'deepseek', 'mistral'].includes(config.type)" />
                                     <Robot v-else />
                                 </NIcon>
                                 <h3>{{ config.name }}</h3>
-                                <n-tag :type="config.type === 'openai' ? 'success' : 'info'">
-                                    {{ config.type === "openai" ? "OpenAI 兼容" : "Ollama" }}
+                                <n-tag :type="getConfigTagType(config.type)">
+                                    {{ getConfigTypeLabel(config.type) }}
                                 </n-tag>
                                 <n-tag :type="config.enabled ? 'success' : 'warning'">
                                     {{ config.enabled ? "已启用" : "已禁用" }}
@@ -142,25 +141,20 @@
 
                                         <n-form-item label="配置名称" path="name">
                                             <n-input v-model:value="formData.name" placeholder="输入配置名称" />
-                                        </n-form-item>
-
-                                        <n-form-item label="Base URL" path="baseURL">
+                                        </n-form-item>                                        <n-form-item :label="getBaseURLInfo.label" path="baseURL" v-if="needsBaseURL || formData.type === 'anthropic' || formData.type === 'google' || formData.type === 'cohere'">
                                             <n-input v-model:value="formData.baseURL"
-                                                placeholder="例如: https://api.openai.com/v1" />
+                                                :placeholder="getBaseURLInfo.placeholder" />
                                         </n-form-item>
 
-                                        <n-form-item v-if="formData.type === 'openai'" label="API Key" path="apiKey">
+                                        <n-form-item :label="getApiKeyLabel" path="apiKey" v-if="needsApiKey">
                                             <n-input v-model:value="formData.apiKey" type="password"
-                                                show-password-on="click" placeholder="输入 API Key" />
+                                                show-password-on="click" :placeholder="`输入 ${getApiKeyLabel.replace('：', '')}`" />
                                         </n-form-item>
 
                                         <!-- 连接测试区域 -->
                                         <n-form-item label="连接测试">
-                                            <NFlex vertical size="medium" style="width: 100%;">
-                                                <n-button @click="testFormConnection" :loading="testingFormConnection"
-                                                    :disabled="!formData.baseURL ||
-                                                        (formData.type === 'openai' && !formData.apiKey)
-                                                        " type="info" block>
+                                            <NFlex vertical size="medium" style="width: 100%;">                                                <n-button @click="testFormConnection" :loading="testingFormConnection"
+                                                    :disabled="!canTestConnection" type="info" block>
                                                     <template #icon>
                                                         <NIcon>
                                                             <Server />
@@ -379,7 +373,7 @@ const autoShowAddModal = ref(false);
 
 // 表单数据
 const formData = reactive({
-    type: "openai" as "openai" | "ollama",
+    type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "cohere" | "mistral",
     name: "",
     baseURL: "",
     apiKey: "",
@@ -389,24 +383,107 @@ const formData = reactive({
 });
 
 // 表单校验规则
-const formRules = {
+const formRules = computed(() => ({
     type: [{ required: true, message: "请选择类型", trigger: "change" }],
     name: [{ required: true, message: "请输入配置名称", trigger: "blur" }],
-    baseURL: [{ required: true, message: "请输入 Base URL", trigger: "blur" }],
+    baseURL: [
+        {
+            required: needsBaseURL.value,
+            message: "请输入 Base URL",
+            trigger: "blur"
+        }
+    ],
     apiKey: [
         {
-            required: true,
-            message: "请输入 API Key",
-            trigger: "blur",
-            validator: (rule: any, value: string) => {
-                if (formData.type === "openai" && !value) {
-                    return new Error("OpenAI 类型需要 API Key");
-                }
-                return true;
-            },
-        },
+            required: needsApiKey.value,
+            message: getApiKeyLabel.value.replace('：', ''),
+            trigger: "blur"
+        }
     ],
-};
+}));
+
+// 计算属性：是否需要Base URL
+const needsBaseURL = computed(() => {
+    return !['anthropic', 'google', 'cohere'].includes(formData.type);
+});
+
+// 计算属性：是否需要API Key
+const needsApiKey = computed(() => {
+    return !['ollama', 'lmstudio'].includes(formData.type);
+});
+
+// 计算属性：API Key标签
+const getApiKeyLabel = computed(() => {
+    switch (formData.type) {
+        case 'anthropic':
+            return 'Anthropic API Key：';
+        case 'google':
+            return 'Google AI API Key：';
+        case 'azure':
+            return 'Azure OpenAI API Key：';
+        case 'deepseek':
+            return 'DeepSeek API Key：';
+        case 'cohere':
+            return 'Cohere API Key：';
+        case 'mistral':
+            return 'Mistral API Key：';
+        case 'openai':
+        default:
+            return 'API Key：';
+    }
+});
+
+// 计算属性：Base URL标签和placeholder
+const getBaseURLInfo = computed(() => {
+    switch (formData.type) {
+        case 'ollama':
+            return {
+                label: 'Ollama 服务地址：',
+                placeholder: '例如: http://localhost:11434'
+            };
+        case 'lmstudio':
+            return {
+                label: 'LM Studio 服务地址：',
+                placeholder: '例如: http://localhost:1234/v1'
+            };
+        case 'azure':
+            return {
+                label: 'Azure OpenAI 端点：',
+                placeholder: '例如: https://your-resource.openai.azure.com'
+            };
+        case 'deepseek':
+            return {
+                label: 'DeepSeek API 地址：',
+                placeholder: '例如: https://api.deepseek.com/v1'
+            };
+        case 'mistral':
+            return {
+                label: 'Mistral API 地址：',
+                placeholder: '例如: https://api.mistral.ai/v1'
+            };
+        case 'anthropic':
+            return {
+                label: '自定义端点（可选）：',
+                placeholder: '留空使用官方端点'
+            };
+        case 'google':
+            return {
+                label: '自定义端点（可选）：',
+                placeholder: '留空使用官方端点'
+            };
+        case 'cohere':
+            return {
+                label: '自定义端点（可选）：',
+                placeholder: '留空使用官方端点'
+            };
+        case 'openai':
+        default:
+            return {
+                label: 'Base URL：',
+                placeholder: '例如: https://api.openai.com/v1'
+            };
+    }
+});
 
 // 类型选项
 const typeOptions = [
@@ -431,6 +508,21 @@ const modelOptions = computed(() => {
         label: model,
         value: model,
     }));
+});
+
+// 计算属性：是否可以测试连接
+const canTestConnection = computed(() => {
+    // 如果需要API Key但没有提供，则不能测试
+    if (needsApiKey.value && !formData.apiKey.trim()) {
+        return false;
+    }
+    
+    // 如果需要Base URL但没有提供，则不能测试
+    if (needsBaseURL.value && !formData.baseURL.trim()) {
+        return false;
+    }
+    
+    return true;
 });
 
 // 加载配置列表
@@ -639,9 +731,9 @@ const closeModal = () => {
 
 // 重置表单
 const resetForm = () => {
-    formData.name = "OpenAI 兼容"; // 默认为 OpenAI 兼容
     formData.type = "openai";
-    formData.baseURL = "https://api.openai.com/v1"; // 默认填充 baseURL
+    formData.name = "OpenAI 兼容";
+    formData.baseURL = "https://api.openai.com/v1";
     formData.apiKey = "";
     formData.models = [];
     formData.defaultModel = "";
@@ -650,26 +742,107 @@ const resetForm = () => {
 };
 
 // 类型变化处理
-const onTypeChange = (type: "openai" | "ollama") => {
-    if (type === "ollama") {
-        formData.baseURL = "http://localhost:11434";
-        formData.apiKey = "";
-    } else {
-        formData.baseURL = "https://api.openai.com/v1";
+const onTypeChange = (type: typeof formData.type) => {
+    // 设置默认的Base URL和API Key
+    switch (type) {
+        case 'openai':
+            formData.baseURL = "https://api.openai.com/v1";
+            formData.apiKey = "";
+            break;
+        case 'ollama':
+            formData.baseURL = "http://localhost:11434";
+            formData.apiKey = "";
+            break;
+        case 'anthropic':
+            formData.baseURL = "";
+            formData.apiKey = "";
+            break;
+        case 'google':
+            formData.baseURL = "";
+            formData.apiKey = "";
+            break;
+        case 'azure':
+            formData.baseURL = "";
+            formData.apiKey = "";
+            break;
+        case 'lmstudio':
+            formData.baseURL = "http://localhost:1234/v1";
+            formData.apiKey = "";
+            break;
+        case 'deepseek':
+            formData.baseURL = "https://api.deepseek.com/v1";
+            formData.apiKey = "";
+            break;
+        case 'cohere':
+            formData.baseURL = "";
+            formData.apiKey = "";
+            break;
+        case 'mistral':
+            formData.baseURL = "https://api.mistral.ai/v1";
+            formData.apiKey = "";
+            break;
     }
 
     // 自动填充配置名称（仅在新建模式下，且名称为空或为之前的自动名称时）
     if (!editingConfig.value) {
         const currentName = formData.name.trim();
-        const isAutoGeneratedName =
-            currentName === "" ||
-            currentName === "Ollama" ||
-            currentName === "OpenAI 兼容";
+        const autoGeneratedNames = [
+            "", "OpenAI 兼容", "Ollama", "Anthropic Claude", "Google AI", 
+            "Azure OpenAI", "LM Studio", "DeepSeek", "Cohere", "Mistral AI"
+        ];
 
-        if (isAutoGeneratedName) {
-            formData.name = type === "ollama" ? "Ollama" : "OpenAI 兼容";
+        if (autoGeneratedNames.includes(currentName)) {
+            const nameMap: Record<typeof type, string> = {
+                'openai': 'OpenAI 兼容',
+                'ollama': 'Ollama',
+                'anthropic': 'Anthropic Claude',
+                'google': 'Google AI',
+                'azure': 'Azure OpenAI',
+                'lmstudio': 'LM Studio',
+                'deepseek': 'DeepSeek',
+                'cohere': 'Cohere',
+                'mistral': 'Mistral AI'
+            };
+            formData.name = nameMap[type];
         }
     }
+
+    // 清空之前的测试结果和模型列表
+    formTestResult.value = null;
+    formData.models = [];
+    formData.defaultModel = "";
+};
+
+// 获取配置类型标签
+const getConfigTypeLabel = (type: string) => {
+    const typeLabels: Record<string, string> = {
+        'openai': 'OpenAI 兼容',
+        'ollama': 'Ollama',
+        'anthropic': 'Anthropic Claude',
+        'google': 'Google AI',
+        'azure': 'Azure OpenAI',
+        'lmstudio': 'LM Studio',
+        'deepseek': 'DeepSeek',
+        'cohere': 'Cohere',
+        'mistral': 'Mistral AI'
+    };
+    return typeLabels[type] || type;
+};
+
+// 获取配置标签颜色类型
+const getConfigTagType = (type: string) => {
+    const tagTypes: Record<string, string> = {
+        'openai': 'success',
+        'ollama': 'info',
+        'anthropic': 'warning',
+        'google': 'primary',
+        'azure': 'success',
+        'lmstudio': 'info',
+        'deepseek': 'error',
+        'cohere': 'default',
+        'mistral': 'warning'
+    };
+    return tagTypes[type] || 'default';
 };
 
 // 格式化日期
