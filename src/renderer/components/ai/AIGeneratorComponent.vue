@@ -32,18 +32,46 @@
         :rules="formRules"
         label-placement="top"
       >
-        <n-form-item label="要求" path="topic">
-          <n-input 
-            v-model:value="formData.topic" 
-            type="textarea"
-            :rows="4"
-            placeholder="描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等"
-          />
+      <n-form-item label="要求" path="topic">
+          <n-split
+            v-model:size="splitSize"
+            direction="horizontal"
+            :min="0.3"
+            :max="1"
+            :default-size="1"
+            :disabled="!generating && !generatedResult"
+            :style="{ height: '120px', width: '100%' }"
+          >
+            <template #1>
+              <n-input 
+                v-model:value="formData.topic" 
+                type="textarea"
+                :rows="4"
+                placeholder="描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等"
+                :style="{ height: '100%' }"
+              />
+            </template>
+            <template #2>
+              <n-input
+                v-model:value="generatedResult"
+                type="textarea"
+                :rows="4"
+                placeholder="生成的提示词将在这里显示..."
+                readonly
+                :style="{ 
+                  height: '100%',
+                  backgroundColor: 'var(--code-color)',
+                  opacity: generatedResult ? 1 : 0.7
+                }"
+              />
+            </template>
+          </n-split>
         </n-form-item>
         
         <n-form-item>
           <n-space justify="space-between" >
-            <n-space>              <n-button 
+            <n-space>
+                <n-button 
                 type="primary" 
                 @click="generatePrompt" 
                 :loading="generating"
@@ -66,12 +94,16 @@
                 </n-button>
               </n-dropdown>
             </n-space>
-            
-            <n-space>
+              <n-space align="center">
               <!-- 生成进度提示 -->
-              <n-text v-if="generating && streamStats.charCount > 0" type="info">
-                已生成 {{ streamStats.charCount }} 字符
-              </n-text>
+              <div v-if="generating && streamStats.charCount > 0" class="progress-indicator">
+                <n-text type="info" strong>
+                  <n-icon size="16" style="margin-right: 4px;">
+                    <History />
+                  </n-icon>
+                  已生成 {{ streamStats.charCount }} 字符
+                </n-text>
+              </div>
               
               <n-button 
                 @click="toggleHistory" 
@@ -170,6 +202,7 @@ import {
     NDropdown,
     NEmpty,
     NText,
+    NSplit,
     useMessage 
 } from 'naive-ui'
 import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus } from '@vicons/tabler'
@@ -203,6 +236,8 @@ const showHistory = ref(false)
 const showSaveModal = ref(false)
 const promptToSave = ref<any>(null)
 const categories = ref<any[]>([])
+const splitSize = ref<number>(1) // 分隔大小，1表示全宽显示要求输入框
+const generatedResult = ref<string>('') // 存储生成的结果
 
 // 流式传输状态
 const streamStats = reactive({
@@ -343,10 +378,13 @@ const generatePrompt = async () => {
   try {
     await formRef.value?.validate()
     generating.value = true
-    
-    // 重置流式传输状态
+      // 重置流式传输状态
     streamStats.charCount = 0
     streamStats.isStreaming = true
+    generatedResult.value = '' // 清空之前的结果
+    
+    // 立即开始分隔动画，让用户看到右侧面板
+    animateSplit(1, 0.5)
     
     // 获取当前选中的配置
     const selectedConfig = currentConfigId.value 
@@ -365,24 +403,34 @@ const generatePrompt = async () => {
     
     // 序列化配置对象以确保可以通过 IPC 传递
     const serializedConfig = serializeConfig(selectedConfig)
-    
-    // 检查是否支持流式传输
+      // 检查是否支持流式传输
     let result
     if (window.electronAPI.ai.generatePromptStream) {
+      console.log('使用流式传输模式')
       // 使用流式传输
       result = await window.electronAPI.ai.generatePromptStream(
         request, 
         serializedConfig,
-        (charCount: number) => {
+        (charCount: number, partialContent?: string) => {
+          console.log('流式传输回调:', { charCount, hasContent: !!partialContent });
           streamStats.charCount = charCount;
+          if (partialContent !== undefined) {
+            generatedResult.value = partialContent; // 实时更新结果显示
+          }
         }
       );
     } else {
+      console.log('使用普通生成模式')
       // 使用普通生成
       result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
-      // 模拟字数增长
+      // 模拟字数增长和内容显示
       await simulateStreamProgress(result.generatedPrompt)
     }
+      // 确保最终结果正确显示
+    generatedResult.value = result.generatedPrompt
+    
+    // 让用户看到完整结果几秒钟
+    await new Promise(resolve => setTimeout(resolve, 2000))
     
     // 保存到历史记录
     await api.aiGenerationHistory.create.mutate({
@@ -400,16 +448,22 @@ const generatePrompt = async () => {
     
     // 通知父组件刷新提示词列表
     emit('prompt-saved')
-    
-    // 清空输入框
+      // 清空输入框，但保持结果显示
     formData.topic = ''
     
     // 刷新历史记录（如果正在显示）
     if (showHistory.value) {
       loadHistory()
     }
-  } catch (error) {
+    
+    // 保持分隔状态，让用户继续查看结果
+    // 用户可以通过手动调整分隔条来改变布局} catch (error) {
+    console.error('生成失败:', error)
     message.error('生成失败: ' + (error as Error).message)
+    
+    // 失败时恢复分隔为1
+    await animateSplit(splitSize.value, 1)
+    generatedResult.value = ''
     
     // 保存错误记录
     try {
@@ -438,17 +492,26 @@ const generatePrompt = async () => {
 // 模拟流式进度（在不支持真正流式传输时使用）
 const simulateStreamProgress = async (finalContent: string) => {
   const totalChars = finalContent.length
-  const steps = 20 // 分20步显示
+  const steps = Math.min(50, totalChars) // 最多50步，或者按字符数
   const stepSize = Math.ceil(totalChars / steps)
   
   for (let i = 0; i < steps; i++) {
     if (!generating.value) break // 如果已取消，停止模拟
     
-    streamStats.charCount = Math.min((i + 1) * stepSize, totalChars)
-    await new Promise(resolve => setTimeout(resolve, 100)) // 每100ms更新一次
+    const currentCharCount = Math.min((i + 1) * stepSize, totalChars)
+    streamStats.charCount = currentCharCount
+    
+    // 模拟渐进显示内容
+    generatedResult.value = finalContent.substring(0, currentCharCount)
+    
+    // 动态调整延迟 - 开始快一些，后面慢一些
+    const delay = i < steps / 2 ? 50 : 150
+    await new Promise(resolve => setTimeout(resolve, delay))
   }
   
+  // 确保显示完整内容
   streamStats.charCount = totalChars
+  generatedResult.value = finalContent
 }
 
 // 直接保存生成的提示词
@@ -479,6 +542,21 @@ const copyHistoryItem = async (item: AIGenerationHistory) => {
   } catch (error) {
     message.error('复制失败')
   }
+}
+
+// 分隔动画函数
+const animateSplit = async (from: number, to: number) => {
+  const duration = 600 // 动画持续时间
+  const steps = 20
+  const stepDuration = duration / steps
+  const stepSize = (to - from) / steps
+  
+  for (let i = 0; i <= steps; i++) {
+    splitSize.value = Number((from + stepSize * i).toFixed(3)) // 保持3位小数精度
+    await new Promise(resolve => setTimeout(resolve, stepDuration))
+  }
+  
+  splitSize.value = to
 }
 
 // 获取显示的模型名称
@@ -553,49 +631,3 @@ const loadCategories = async () => {
   }
 }
 </script>
-
-<style scoped>
-.ai-generator {
-  padding: 20px;
-  max-width: none;
-  margin: 0;
-  display: block;
-}
-
-.generator-card {
-  border: 1px solid var(--border-color);
-  width: 100%;
-}
-
-.history-card {
-  border: 1px solid var(--border-color);
-  width: 100%;
-  margin-top: 20px;
-}
-
-.history-content {
-  margin-top: 8px;
-  color: var(--text-color-2);
-  font-size: 14px;
-}
-
-.error-message {
-  margin-top: 8px;
-  color: var(--error-color);
-  font-size: 14px;
-}
-
-/* 确保表单元素也全宽 */
-.n-form {
-  width: 100%;
-}
-
-.n-form-item {
-  width: 100%;
-}
-
-/* 确保按钮组合也能正确布局 */
-.n-space {
-  width: 100%;
-}
-</style>
