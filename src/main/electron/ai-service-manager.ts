@@ -240,14 +240,13 @@ class AIServiceManager {
       throw new Error(`生成失败: ${error.message}`);
     }
   }
-
   /**
-   * 流式生成 Prompt（支持实时返回字符数统计）
+   * 流式生成 Prompt（支持实时返回字符数统计和部分内容）
    */
   async generatePromptWithStream(
     request: AIGenerationRequest,
     config: ProcessedAIConfig, 
-    onProgress: (charCount: number) => void
+    onProgress: (charCount: number, partialContent?: string) => void
   ): Promise<AIGenerationResult> {
     const model = request.model || config.defaultModel || config.customModel;
     
@@ -311,12 +310,12 @@ class AIServiceManager {
       // 尝试使用流式传输
       try {
         const stream = await llm.stream(messages);
-        
-        for await (const chunk of stream) {
+          for await (const chunk of stream) {
           const content = typeof chunk === 'string' ? chunk : chunk.content;
           if (content) {
             accumulatedContent += content;
-            onProgress(accumulatedContent.length);
+            // 传递字符数和当前累积的内容
+            onProgress(accumulatedContent.length, accumulatedContent);
           }
         }
       } catch (streamError) {
@@ -324,11 +323,12 @@ class AIServiceManager {
         console.warn('流式传输失败，回退到普通调用:', streamError);
         const response = await llm.invoke(messages);
         accumulatedContent = typeof response === 'string' ? response : response.content;
-        
-        // 模拟流式进度
+          // 模拟流式进度
         const totalChars = accumulatedContent.length;
         for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
-          onProgress(Math.min(i, totalChars));
+          const currentCharCount = Math.min(i, totalChars);
+          const partialContent = accumulatedContent.substring(0, currentCharCount);
+          onProgress(currentCharCount, partialContent);
           await new Promise(resolve => setTimeout(resolve, 50));
         }
       }

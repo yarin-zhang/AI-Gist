@@ -210,13 +210,12 @@ class IpcHandlers {
         createdAt: new Date(config.createdAt),
         updatedAt: new Date(config.updatedAt)
       };
-      
-      return await aiServiceManager.generatePromptWithStream(
+        return await aiServiceManager.generatePromptWithStream(
         request,
         processedConfig,
-        (charCount: number) => {
-          // 发送进度更新到渲染进程
-          event.sender.send('ai:stream-progress', charCount);
+        (charCount: number, partialContent?: string) => {
+          // 发送进度更新到渲染进程，包括字符数和部分内容
+          event.sender.send('ai:stream-progress', charCount, partialContent);
         }
       );
     });
