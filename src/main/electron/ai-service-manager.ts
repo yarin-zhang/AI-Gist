@@ -30,8 +30,12 @@ class AIServiceManager {  /**
    * 测试配置连接
    */
   async testConfig(config: ProcessedAIConfig): Promise<{ success: boolean; error?: string; models?: string[] }> {
+    console.log(`测试配置连接 - 供应商: ${config.type}, baseURL: ${config.baseURL}, 配置ID: ${config.configId}`);
+    
     try {
       if (config.type === 'openai' || config.type === 'deepseek' || config.type === 'mistral') {
+        console.log(`测试 ${config.type} 连接，使用 baseURL: ${config.baseURL}`);
+        
         const llm = new ChatOpenAI({
           openAIApiKey: config.apiKey,
           configuration: {
@@ -42,9 +46,12 @@ class AIServiceManager {  /**
         // 尝试发送一个简单的测试请求
         try {
           await llm.invoke('test');
-          // OpenAI 类型连接成功，返回配置中的模型列表
-          return { success: true, models: config.models || [] };
+          // 连接成功，获取模型列表
+          const models = await this.getAvailableModels(config);
+          console.log(`${config.type} 连接测试成功，获取到模型:`, models);
+          return { success: true, models };
         } catch (error: any) {
+          console.error(`${config.type} 连接测试失败:`, error);
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
           }
@@ -52,29 +59,45 @@ class AIServiceManager {  /**
             return { success: false, error: '无法连接到服务器，请检查 baseURL' };
           }
           // 其他错误可能是正常的（比如模型不存在等），但连接是成功的
-          return { success: true, models: config.models || [] };
-        }
-      } else if (config.type === 'ollama' || config.type === 'lmstudio') {
+          const models = await this.getAvailableModels(config);
+          return { success: true, models };
+        }      } else if (config.type === 'ollama') {
         try {
-          // 尝试获取模型列表
+          // 尝试获取模型列表来测试连接
           const response = await fetch(`${config.baseURL}/api/tags`);
           if (response.ok) {
-            const data = await response.json();
-            const models = data.models?.map((model: any) => model.name) || [];
+            const models = await this.getAvailableModels(config);
             return { success: true, models };
           } else {
-            return { success: false, error: `无法连接到服务器: ${response.statusText}` };
+            return { success: false, error: '无法连接到 Ollama 服务，请确保服务已启动' };
           }
         } catch (error: any) {
           if (error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch')) {
-            return { success: false, error: '无法连接到服务器，请确保服务已启动' };
+            return { success: false, error: '无法连接到 Ollama 服务，请确保服务已启动并检查 baseURL' };
+          }
+          return { success: false, error: error.message };
+        }
+      } else if (config.type === 'lmstudio') {
+        try {
+          // LM Studio 使用 OpenAI 兼容的端点测试连接
+          const response = await fetch(`${config.baseURL}/models`);
+          if (response.ok) {
+            const models = await this.getAvailableModels(config);
+            return { success: true, models };
+          } else {
+            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动' };
+          }
+        } catch (error: any) {
+          if (error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch')) {
+            return { success: false, error: '无法连接到 LM Studio 服务，请确保服务已启动并检查 baseURL' };
           }
           return { success: false, error: error.message };
         }
       } else if (config.type === 'anthropic') {
         try {
           // 使用原生API测试Anthropic连接
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
+          const apiUrl = config.baseURL || 'https://api.anthropic.com';
+          const response = await fetch(`${apiUrl}/v1/messages`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -82,14 +105,15 @@ class AIServiceManager {  /**
               'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-              model: config.models?.[0] || 'claude-3-sonnet-20240229',
+              model: 'claude-3-haiku-20240307',
               max_tokens: 5,
               messages: [{ role: 'user', content: 'test' }]
             })
           });
           
           if (response.ok || response.status === 400) { // 400可能是因为消息太短，但API key有效
-            return { success: true, models: config.models || ['claude-3-sonnet-20240229', 'claude-3-haiku-20240307'] };
+            const models = await this.getAvailableModels(config);
+            return { success: true, models };
           } else if (response.status === 401) {
             return { success: false, error: 'API Key 无效或已过期' };
           } else {
@@ -112,7 +136,8 @@ class AIServiceManager {  /**
           });
           
           if (response.ok || response.status === 400) {
-            return { success: true, models: config.models || ['gemini-pro', 'gemini-pro-vision'] };
+            const models = await this.getAvailableModels(config);
+            return { success: true, models };
           } else if (response.status === 401 || response.status === 403) {
             return { success: false, error: 'API Key 无效或已过期' };
           } else {
@@ -129,12 +154,13 @@ class AIServiceManager {  /**
           
           // 测试生成
           await cohere.generate({
-            model: config.models?.[0] || 'command',
+            model: 'command',
             prompt: 'test',
             maxTokens: 5
           });
           
-          return { success: true, models: config.models || ['command', 'command-light'] };
+          const models = await this.getAvailableModels(config);
+          return { success: true, models };
         } catch (error: any) {
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
@@ -146,19 +172,20 @@ class AIServiceManager {  /**
           // Azure OpenAI使用不同的配置方式
           const azureConfig: any = {
             openAIApiKey: config.apiKey,
-            modelName: config.models?.[0] || 'gpt-35-turbo',
+            modelName: 'gpt-35-turbo',
           };
 
           // 如果baseURL包含Azure格式，解析相关信息
           if (config.baseURL && config.baseURL.includes('openai.azure.com')) {
-            const urlParts = config.baseURL.split('.');
-            azureConfig.azureOpenAIBasePath = config.baseURL;
-            azureConfig.azureOpenAIApiVersion = '2023-12-01-preview';
+            azureConfig.configuration = {
+              baseURL: config.baseURL
+            };
           }
           
           const llm = new ChatOpenAI(azureConfig);
           await llm.invoke('test');
-          return { success: true, models: config.models || [] };
+          const models = await this.getAvailableModels(config);
+          return { success: true, models };
         } catch (error: any) {
           if (error.message?.includes('API key') || error.message?.includes('authentication')) {
             return { success: false, error: 'API Key 无效或已过期' };
@@ -175,31 +202,289 @@ class AIServiceManager {  /**
    * 获取可用模型列表
    */
   async getAvailableModels(config: ProcessedAIConfig): Promise<string[]> {
+    console.log(`获取模型列表 - 供应商: ${config.type}, baseURL: ${config.baseURL}`);
+    
     try {
-      if (config.type === 'ollama' || config.type === 'lmstudio') {
-        const response = await fetch(`${config.baseURL}/api/tags`);
-        if (response.ok) {
-          const data = await response.json();
-          return data.models?.map((model: any) => model.name) || [];
+      if (config.type === 'ollama') {
+        // Ollama 通过 /api/tags 端点获取模型列表
+        try {
+          const url = `${config.baseURL}/api/tags`;
+          console.log(`Ollama 请求URL: ${url}`);
+          
+          const response = await fetch(url);
+          console.log(`Ollama 响应状态: ${response.status}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Ollama 响应数据:', data);
+            
+            const models = data.models?.map((model: any) => model.name) || [];
+            console.log(`Ollama 解析出的模型列表:`, models);
+            return models.length > 0 ? models : [];
+          }
+        } catch (error) {
+          console.error('获取 Ollama 模型列表失败:', error);
         }
-      } else if (config.type === 'openai' || config.type === 'deepseek' || config.type === 'mistral') {
-        // OpenAI 兼容的 API 通常有固定的模型列表，或者通过配置指定
-        return config.models || [];
-      } else if (config.type === 'anthropic') {
-        return config.models || ['claude-3-sonnet-20240229', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'];
+        return [];      } else if (config.type === 'lmstudio') {
+        // LM Studio 使用 OpenAI 兼容的 /v1/models 端点
+        try {
+          const url = `${config.baseURL}/models`;
+          console.log(`LM Studio 请求URL: ${url}`);
+          
+          const response = await fetch(url);
+          console.log(`LM Studio 响应状态: ${response.status}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('LM Studio 响应数据:', data);
+            
+            const models = data.data?.map((model: any) => model.id) || [];
+            console.log(`LM Studio 解析出的模型列表:`, models);
+            return models.length > 0 ? models : [];
+          }
+        } catch (error) {
+          console.error('获取 LM Studio 模型列表失败:', error);
+        }
+        return [];
+      } else if (config.type === 'openai') {
+        // OpenAI 官方 API 获取模型列表
+        try {
+          const url = `${config.baseURL}/models`;
+          console.log(`OpenAI 请求URL: ${url}`);
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log(`OpenAI 响应状态: ${response.status}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('OpenAI 响应数据:', data);
+            
+            const models = data.data?.map((model: any) => model.id) || [];
+            console.log(`OpenAI 解析出的模型列表:`, models);
+            
+            // 如果获取到了模型列表，返回；否则返回常见模型
+            return models.length > 0 ? models : [
+              'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 
+              'gpt-3.5-turbo-16k', 'text-davinci-003', 'text-davinci-002'
+            ];
+          }
+        } catch (error) {
+          console.error('获取 OpenAI 模型列表失败，使用默认列表:', error);
+        }
+        // 返回常见的 OpenAI 模型作为后备
+        return [
+          'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 
+          'gpt-3.5-turbo-16k', 'text-davinci-003', 'text-davinci-002'
+        ];      } else if (config.type === 'deepseek') {
+        // DeepSeek 通过 API 获取模型列表
+        try {
+          const url = `${config.baseURL}/models`;
+          console.log(`DeepSeek 请求URL: ${url}`);
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log(`DeepSeek 响应状态: ${response.status}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('DeepSeek 响应数据:', data);
+            
+            const models = data.data?.map((model: any) => model.id) || [];
+            console.log(`DeepSeek 解析出的模型列表:`, models);
+            return models.length > 0 ? models : ['deepseek-chat', 'deepseek-coder'];
+          }
+        } catch (error) {
+          console.error('获取 DeepSeek 模型列表失败，使用默认列表:', error);
+        }
+        // 返回常见的 DeepSeek 模型作为后备
+        return ['deepseek-chat', 'deepseek-coder'];} else if (config.type === 'anthropic') {
+        // Anthropic 模型列表（官方文档中的可用模型）
+        // 尝试通过API验证可用性，但API不直接提供模型列表
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': config.apiKey || '',
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-3-haiku-20240307',
+              max_tokens: 1,
+              messages: [{ role: 'user', content: 'test' }]
+            })
+          });
+          
+          // 如果API key有效，返回已知可用模型
+          if (response.ok || response.status === 400) {
+            return [
+              'claude-3-5-sonnet-20241022',
+              'claude-3-5-haiku-20241022', 
+              'claude-3-opus-20240229',
+              'claude-3-sonnet-20240229',
+              'claude-3-haiku-20240307'
+            ];
+          }
+        } catch (error) {
+          console.error('Anthropic API 连接测试失败:', error);
+        }
+        
+        // 返回基础模型列表作为后备
+        return [
+          'claude-3-5-sonnet-20241022',
+          'claude-3-5-haiku-20241022', 
+          'claude-3-opus-20240229',
+          'claude-3-sonnet-20240229',
+          'claude-3-haiku-20240307'
+        ];
       } else if (config.type === 'google') {
-        return config.models || ['gemini-pro', 'gemini-pro-vision'];
+        // Google AI 尝试获取模型列表
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
+          if (response.ok) {
+            const data = await response.json();
+            const models = data.models?.map((model: any) => model.name?.replace('models/', '')) || [];
+            if (models.length > 0) {
+              return models.filter((model: string) => model.includes('gemini'));
+            }
+          }
+        } catch (error) {
+          console.error('获取 Google AI 模型列表失败:', error);
+        }
+        
+        // 返回常见的 Google AI 模型作为后备
+        return [
+          'gemini-1.5-pro-latest',
+          'gemini-1.5-flash-latest',
+          'gemini-pro',
+          'gemini-pro-vision',
+          'gemini-1.0-pro',
+          'gemini-1.0-pro-001'
+        ];
       } else if (config.type === 'cohere') {
-        return config.models || ['command', 'command-light', 'command-nightly'];
-      } else if (config.type === 'azure') {
-        return config.models || [];
+        // Cohere 模型列表（通过API获取或返回已知模型）
+        try {
+          const cohere = new CohereClient({
+            token: config.apiKey,
+          });
+          
+          // Cohere SDK可能不直接提供模型列表API，返回已知模型
+          return [
+            'command-r-plus',
+            'command-r',
+            'command',
+            'command-nightly',
+            'command-light',
+            'command-light-nightly'
+          ];
+        } catch (error) {
+          console.error('Cohere 连接测试失败:', error);
+        }
+        
+        // 返回基础模型列表
+        return [
+          'command-r-plus',
+          'command-r',
+          'command',
+          'command-nightly',
+          'command-light',
+          'command-light-nightly'
+        ];      } else if (config.type === 'mistral') {
+        // Mistral AI 通过 API 获取模型列表
+        try {
+          const url = `${config.baseURL}/models`;
+          console.log(`Mistral 请求URL: ${url}`);
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log(`Mistral 响应状态: ${response.status}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Mistral 响应数据:', data);
+            
+            const models = data.data?.map((model: any) => model.id) || [];
+            console.log(`Mistral 解析出的模型列表:`, models);
+            
+            return models.length > 0 ? models : [
+              'mistral-large-latest',
+              'mistral-medium-latest', 
+              'mistral-small-latest',
+              'codestral-latest',
+              'open-mistral-7b',
+              'open-mixtral-8x7b',
+              'open-mixtral-8x22b'
+            ];
+          }
+        } catch (error) {
+          console.error('获取 Mistral 模型列表失败，使用默认列表:', error);
+        }
+        // 返回常见的 Mistral 模型作为后备
+        return [
+          'mistral-large-latest',
+          'mistral-medium-latest', 
+          'mistral-small-latest',
+          'codestral-latest',
+          'open-mistral-7b',
+          'open-mixtral-8x7b',
+          'open-mixtral-8x22b'
+        ];} else if (config.type === 'azure') {
+        // Azure OpenAI 的模型通常是用户部署的，尝试通过API获取
+        try {
+          if (config.baseURL) {
+            // 构建Azure的模型列表API端点
+            const modelsUrl = config.baseURL.includes('/deployments/') 
+              ? config.baseURL.replace(/\/deployments\/.*$/, '/deployments')
+              : `${config.baseURL}/deployments`;
+              
+            const response = await fetch(`${modelsUrl}?api-version=2023-12-01-preview`, {
+              headers: {
+                'api-key': config.apiKey || '',
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              const deployments = data.data || [];
+              const models = deployments.map((deployment: any) => deployment.id || deployment.model);
+              if (models.length > 0) {
+                return models;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('获取 Azure OpenAI 部署列表失败:', error);
+        }
+        
+        // 如果有配置中的模型，返回配置的模型
+        if (config.models && config.models.length > 0) {
+          return config.models;
+        }
+        
+        // 返回常见的 Azure OpenAI 部署名称
+        return ['gpt-4', 'gpt-35-turbo', 'gpt-4-32k', 'text-davinci-003'];
       }
-      return [];
+      
+      return config.models || [];
     } catch (error) {
       console.error('获取模型列表失败:', error);
-      return [];
+      return config.models || [];
     }
-  }  /**
+  }/**
    * 智能测试 - 发送真实提示词并获取AI响应
    */
   async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {

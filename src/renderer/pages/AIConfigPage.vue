@@ -661,7 +661,11 @@ const testFormConnection = async () => {
             updatedAt: new Date().toISOString(),
         };
 
+        console.log('测试配置:', tempConfig);
+
         const result = await window.electronAPI.ai.testConfig(tempConfig);
+        console.log('测试结果:', result);
+        
         formTestResult.value = result;
 
         if (result.success) {
@@ -669,19 +673,26 @@ const testFormConnection = async () => {
 
             // 自动填充模型列表
             if (result.models && result.models.length > 0) {
+                console.log('获取到模型列表:', result.models);
                 formData.models = [...result.models];
 
                 // 如果还没有设置默认模型，自动设置第一个
                 if (!formData.defaultModel && result.models.length > 0) {
                     formData.defaultModel = result.models[0];
+                    console.log('自动设置默认模型:', formData.defaultModel);
                 }
 
                 message.info(`已自动填充 ${result.models.length} 个可用模型`);
+            } else {
+                console.log('未获取到模型列表');
+                message.warning('连接成功，但未获取到模型列表');
             }
         } else {
+            console.error('连接测试失败:', result.error);
             message.error(`连接测试失败: ${result.error}`);
         }
     } catch (error) {
+        console.error('测试连接时出错:', error);
         message.error("测试失败: " + (error as Error).message);
         formTestResult.value = { success: false, error: (error as Error).message };
     } finally {
