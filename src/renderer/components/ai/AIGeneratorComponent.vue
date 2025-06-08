@@ -50,20 +50,33 @@
                 placeholder="描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等"
                 :style="{ height: '100%' }"
               />
-            </template>
-            <template #2>
-              <n-input
-                v-model:value="generatedResult"
-                type="textarea"
-                :rows="4"
-                placeholder="生成的提示词将在这里显示..."
-                readonly
-                :style="{ 
-                  height: '100%',
-                  backgroundColor: 'var(--code-color)',
-                  opacity: generatedResult ? 1 : 0.7
-                }"
-              />
+            </template>            <template #2>
+              <div style="height: 100%; position: relative;">
+                <n-input
+                  v-model:value="generatedResult"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="生成的提示词将在这里显示..."
+                  readonly
+                  :style="{ 
+                    height: '100%',
+                    backgroundColor: 'var(--code-color)',
+                    opacity: generatedResult ? 1 : 0.7
+                  }"
+                />
+                <!-- 实时进度指示器 -->
+                <div 
+                  v-if="generating && streamStats.charCount > 0"
+                  style="position: absolute; top: 8px; right: 12px; z-index: 10;"
+                >
+                  <n-tag size="small" type="info" round>
+                    <template #icon>
+                      <n-icon><History /></n-icon>
+                    </template>
+                    {{ streamStats.charCount }} 字符
+                  </n-tag>
+                </div>
+              </div>
             </template>
           </n-split>
         </n-form-item>
@@ -242,7 +255,9 @@ const generatedResult = ref<string>('') // 存储生成的结果
 // 流式传输状态
 const streamStats = reactive({
   charCount: 0,
-  isStreaming: false
+  isStreaming: false,
+  lastCharCount: 0,  // 记录上次的字符数
+  noContentUpdateCount: 0  // 记录没有内容更新的次数
 })
 
 // 表单数据
@@ -402,23 +417,66 @@ const generatePrompt = async () => {
     }
     
     // 序列化配置对象以确保可以通过 IPC 传递
-    const serializedConfig = serializeConfig(selectedConfig)
-      // 检查是否支持流式传输
+    const serializedConfig = serializeConfig(selectedConfig)    // 检查是否支持流式传输
     let result
     if (window.electronAPI.ai.generatePromptStream) {
-      console.log('使用流式传输模式')
-      // 使用流式传输
+      console.log('使用流式传输模式')      // 使用流式传输
       result = await window.electronAPI.ai.generatePromptStream(
         request, 
         serializedConfig,
         (charCount: number, partialContent?: string) => {
-          console.log('流式传输回调:', { charCount, hasContent: !!partialContent });
+          console.log('流式传输回调:', { 
+            charCount, 
+            hasContent: !!partialContent,
+            contentLength: partialContent?.length || 0,
+            contentPreview: partialContent?.substring(0, 50) || 'null',
+            contentType: typeof partialContent,
+            isEmptyString: partialContent === '',
+            isNull: partialContent === null,
+            isUndefined: partialContent === undefined
+          });
+          
+          // 更新字符统计
+          const prevCharCount = streamStats.charCount;
           streamStats.charCount = charCount;
-          if (partialContent !== undefined) {
-            generatedResult.value = partialContent; // 实时更新结果显示
+          
+          // 检测是否有真实内容
+          const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+          
+          if (hasRealContent) {
+            // 有真实内容时直接显示
+            generatedResult.value = partialContent;
+            streamStats.noContentUpdateCount = 0; // 重置计数器
+            console.log('✅ 内容已更新，当前长度:', partialContent.length);
+          } else {
+            // 没有内容时的处理
+            streamStats.noContentUpdateCount++;
+            
+            // 如果字符数增加了但没有内容，可能是后端只发送了字符数
+            if (charCount > prevCharCount) {
+              const placeholderText = `正在生成中... (已生成 ${charCount} 字符)`;
+              
+              // 如果连续多次没有内容更新，可能需要显示警告
+              if (streamStats.noContentUpdateCount > 10) {
+                console.warn('⚠️ 检测到可能的流式传输问题：字符数在增加但没有内容传递');
+                // 可以考虑降级到轮询模式或其他处理方式
+              }
+              
+              // 只有当前没有真实内容时才显示占位符
+              if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...')) {
+                generatedResult.value = placeholderText;
+                console.log('📝 显示占位符:', placeholderText);
+              }
+            }
           }
         }
       );
+      
+      console.log('流式传输完成，最终结果:', {
+        success: !!result,
+        contentLength: result?.generatedPrompt?.length || 0
+      });
+      
     } else {
       console.log('使用普通生成模式')
       // 使用普通生成
@@ -457,11 +515,11 @@ const generatePrompt = async () => {
     }
     
     // 保持分隔状态，让用户继续查看结果
-    // 用户可以通过手动调整分隔条来改变布局} catch (error) {
+    // 用户可以通过手动调整分隔条来改变布局  } catch (error) {
     console.error('生成失败:', error)
     message.error('生成失败: ' + (error as Error).message)
     
-    // 失败时恢复分隔为1
+    // 失败时恢复分隔为1，清空结果
     await animateSplit(splitSize.value, 1)
     generatedResult.value = ''
     
@@ -481,11 +539,12 @@ const generatePrompt = async () => {
       }
     } catch (saveError) {
       console.error('保存错误记录失败:', saveError)
-    }
-  } finally {
+    }  } finally {
     generating.value = false
     streamStats.isStreaming = false
     streamStats.charCount = 0
+    streamStats.lastCharCount = 0
+    streamStats.noContentUpdateCount = 0
   }
 }
 
@@ -495,14 +554,26 @@ const simulateStreamProgress = async (finalContent: string) => {
   const steps = Math.min(50, totalChars) // 最多50步，或者按字符数
   const stepSize = Math.ceil(totalChars / steps)
   
+  console.log('开始模拟流式进度:', { totalChars, steps, stepSize })
+  
   for (let i = 0; i < steps; i++) {
-    if (!generating.value) break // 如果已取消，停止模拟
+    if (!generating.value) {
+      console.log('生成已取消，停止模拟')
+      break // 如果已取消，停止模拟
+    }
     
     const currentCharCount = Math.min((i + 1) * stepSize, totalChars)
     streamStats.charCount = currentCharCount
     
     // 模拟渐进显示内容
-    generatedResult.value = finalContent.substring(0, currentCharCount)
+    const partialContent = finalContent.substring(0, currentCharCount)
+    generatedResult.value = partialContent
+    
+    console.log(`模拟进度 ${i + 1}/${steps}:`, {
+      currentCharCount,
+      contentLength: partialContent.length,
+      preview: partialContent.substring(0, 30) + '...'
+    })
     
     // 动态调整延迟 - 开始快一些，后面慢一些
     const delay = i < steps / 2 ? 50 : 150
@@ -512,6 +583,7 @@ const simulateStreamProgress = async (finalContent: string) => {
   // 确保显示完整内容
   streamStats.charCount = totalChars
   generatedResult.value = finalContent
+  console.log('模拟流式进度完成，最终内容长度:', finalContent.length)
 }
 
 // 直接保存生成的提示词
