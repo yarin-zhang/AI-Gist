@@ -574,8 +574,8 @@ class DatabaseService {
             (p.description && p.description.toLowerCase().includes(searchLower)) ||
             p.content.toLowerCase().includes(searchLower);
           
-          // 搜索标签
-          const matchesTags = p.tags && 
+          // 搜索标签 - 添加类型检查
+          const matchesTags = p.tags && typeof p.tags === 'string' && 
             p.tags.toLowerCase().split(',')
               .some(tag => tag.trim().includes(searchLower));
           
@@ -586,7 +586,7 @@ class DatabaseService {
       if (filters.tags) {
         const tagsLower = filters.tags.toLowerCase();
         filteredPrompts = filteredPrompts.filter(p => 
-          p.tags && p.tags.toLowerCase().includes(tagsLower)
+          p.tags && typeof p.tags === 'string' && p.tags.toLowerCase().includes(tagsLower)
         );
       }
 
