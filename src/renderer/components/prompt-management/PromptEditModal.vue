@@ -259,7 +259,7 @@
 
         <template #content="{ contentHeight }">
             <div v-if="previewHistory" :style="{ height: `${contentHeight}px`, overflow: 'hidden' }">
-                <NTabs type="line" :style="{ height: '100%' }">
+                <NTabs type="segment" :style="{ height: '100%' }">
                     <!-- 内容与变量 Tab -->
                     <NTabPane name="content" tab="内容与变量">
                         <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3" :max="0.8">
