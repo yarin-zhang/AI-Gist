@@ -698,8 +698,7 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        try {
+          try {
           const response = await this.withTimeout(
             cohere.generate({
               model: model,
@@ -707,11 +706,11 @@ class AIServiceManager {
               maxTokens: 100
             }),
             20000
-          );
+          ) as any; // 临时类型断言来解决 Cohere 类型问题
           
           return {
             success: true,
-            response: response.generations[0]?.text || '测试成功',
+            response: response.generations?.[0]?.text || '测试成功',
             inputPrompt: testPrompt
           };
         } catch (error: any) {
@@ -851,8 +850,7 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        // Cohere 使用不同的API格式，添加超时
+          // Cohere 使用不同的API格式，添加超时
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
         const response = await this.withTimeout(
           cohere.generate({
@@ -862,9 +860,9 @@ class AIServiceManager {
             temperature: 0.7
           }),
           60000 // 生成较长的内容，使用更长的超时
-        );
+        ) as any; // 临时类型断言来解决 Cohere 类型问题
         
-        const generatedPrompt = response.generations[0]?.text || '';
+        const generatedPrompt = response.generations?.[0]?.text || '';
         
         const result: AIGenerationResult = {
           id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1005,8 +1003,7 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
+          const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
         const response = await this.withTimeout(
           cohere.generate({
             model: model,
@@ -1015,9 +1012,9 @@ class AIServiceManager {
             temperature: 0.7
           }),
           60000
-        );
+        ) as any; // 临时类型断言来解决 Cohere 类型问题
         
-        const accumulatedContent = response.generations[0]?.text || '';
+        const accumulatedContent = response.generations?.[0]?.text || '';
         
         // 模拟流式进度
         const totalChars = accumulatedContent.length;
