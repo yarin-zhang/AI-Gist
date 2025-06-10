@@ -260,109 +260,164 @@
         <template #content="{ contentHeight }">
             <div v-if="previewHistory" :style="{ height: `${contentHeight}px`, overflow: 'hidden' }">
                 <NTabs type="line" :style="{ height: '100%' }">
-                    <!-- 基本信息 Tab -->
-                    <NTabPane name="basic" tab="基本信息">
-                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
-                            <NFlex vertical size="medium" style="padding: 16px;">
-                                <NCard title="标题" size="small">
-                                    <NText>{{ previewHistory.title }}</NText>
+                    <!-- 内容与变量 Tab -->
+                    <NTabPane name="content" tab="内容与变量">
+                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3" :max="0.8">
+                            <!-- 左侧：提示词内容 -->
+                            <template #1>
+                                <NCard title="提示词内容" size="small" :style="{ height: '100%' }">
+                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                        <div style="padding-right: 12px;">
+                                            <NInput
+                                                :value="previewHistory.content"
+                                                type="textarea"
+                                                readonly
+                                                :style="{ 
+                                                    height: `${contentHeight - 180}px`, 
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' 
+                                                }"
+                                                :autosize="false"
+                                            />
+                                        </div>
+                                    </NScrollbar>
                                 </NCard>
+                            </template>
 
-                                <NCard title="描述" size="small" v-if="previewHistory.description">
-                                    <NText>{{ previewHistory.description }}</NText>
+                            <!-- 右侧：变量配置 -->
+                            <template #2>
+                                <NCard title="变量配置" size="small" :style="{ height: '100%' }">
+                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                        <div style="padding-right: 12px;">
+                                            <NFlex vertical size="medium" v-if="getPreviewVariables(previewHistory.variables).length > 0">
+                                                <NCard 
+                                                    v-for="(variable, index) in getPreviewVariables(previewHistory.variables)" 
+                                                    :key="index" 
+                                                    size="small"
+                                                >
+                                                    <template #header>
+                                                        <NText strong>{{ variable.name }}</NText>
+                                                    </template>
+                                                    <NFlex vertical size="small">
+                                                        <NFlex>
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">显示名</NText>
+                                                            </div>
+                                                            <NText style="font-size: 12px;">{{ variable.label }}</NText>
+                                                        </NFlex>
+                                                        <NFlex>
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">类型</NText>
+                                                            </div>
+                                                            <NTag size="small" :type="variable.type === 'text' ? 'default' : 'info'">
+                                                                {{ variable.type === 'text' ? '文本' : '选项' }}
+                                                            </NTag>
+                                                        </NFlex>
+                                                        <NFlex>
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">必填</NText>
+                                                            </div>
+                                                            <NTag size="small" :type="variable.required ? 'error' : 'success'">
+                                                                {{ variable.required ? '是' : '否' }}
+                                                            </NTag>
+                                                        </NFlex>
+                                                        <NFlex v-if="variable.defaultValue">
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">默认值</NText>
+                                                            </div>
+                                                            <NText style="font-size: 12px;">{{ variable.defaultValue }}</NText>
+                                                        </NFlex>
+                                                        <NFlex v-if="variable.placeholder">
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">占位符</NText>
+                                                            </div>
+                                                            <NText depth="3" style="font-size: 12px;">{{ variable.placeholder }}</NText>
+                                                        </NFlex>
+                                                        <NFlex v-if="variable.type === 'select' && variable.options && variable.options.length > 0">
+                                                            <div style="width: 60px;">
+                                                                <NText depth="3" style="font-size: 12px;">选项</NText>
+                                                            </div>
+                                                            <NFlex size="small" wrap>
+                                                                <NTag v-for="option in variable.options" :key="option" size="small">
+                                                                    {{ option }}
+                                                                </NTag>
+                                                            </NFlex>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </NCard>
+                                            </NFlex>
+                                            <NEmpty v-else description="该版本没有配置变量" size="small">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Plus />
+                                                    </NIcon>
+                                                </template>
+                                            </NEmpty>
+                                        </div>
+                                    </NScrollbar>
                                 </NCard>
-
-                                <NCard title="分类" size="small" v-if="previewHistory.categoryId">
-                                    <NText>{{ getCategoryName(previewHistory.categoryId) }}</NText>
-                                </NCard>
-
-                                <NCard title="标签" size="small" v-if="previewHistory.tags">
-                                    <NFlex size="small">
-                                        <NTag 
-                                            v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
-                                            :key="tag"
-                                            size="small"
-                                        >
-                                            {{ tag }}
-                                        </NTag>
-                                    </NFlex>
-                                </NCard>
-
-                                <NCard title="变更说明" size="small" v-if="previewHistory.changeDescription">
-                                    <NText>{{ previewHistory.changeDescription }}</NText>
-                                </NCard>
-                            </NFlex>
-                        </NScrollbar>
+                            </template>
+                        </NSplit>
                     </NTabPane>
 
-                    <!-- 内容 Tab -->
-                    <NTabPane name="content" tab="提示词内容">
-                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
-                            <NCard title="内容" size="small" style="margin: 16px;">
-                                <NInput
-                                    :value="previewHistory.content"
-                                    type="textarea"
-                                    readonly
-                                    :rows="20"
-                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                />
-                            </NCard>
-                        </NScrollbar>
-                    </NTabPane>
+                    <!-- 补充信息 Tab -->
+                    <NTabPane name="info" tab="补充信息">
+                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3" :max="0.8">
+                            <!-- 左侧：基本信息 -->
+                            <template #1>
+                                <NCard title="基本信息" size="small" :style="{ height: '100%' }">
+                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                        <NFlex vertical size="medium" style="padding-right: 12px;">
+                                            <div>
+                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">标题</NText>
+                                                <NInput :value="previewHistory.title" readonly />
+                                            </div>
 
-                    <!-- 变量配置 Tab -->
-                    <NTabPane name="variables" tab="变量配置" v-if="previewHistory.variables">
-                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
-                            <NFlex vertical size="medium" style="padding: 16px;">
-                                <div v-if="getPreviewVariables(previewHistory.variables).length > 0">
-                                    <NCard 
-                                        v-for="(variable, index) in getPreviewVariables(previewHistory.variables)" 
-                                        :key="index" 
-                                        size="small"
-                                        style="margin-bottom: 12px;"
-                                    >
-                                        <template #header>
-                                            <NText strong>{{ variable.name }}</NText>
-                                        </template>
-                                        <NFlex vertical size="small">
-                                            <NFlex>
-                                                <NText depth="3" style="width: 80px;">显示名:</NText>
-                                                <NText>{{ variable.label }}</NText>
-                                            </NFlex>
-                                            <NFlex>
-                                                <NText depth="3" style="width: 80px;">类型:</NText>
-                                                <NTag size="small" :type="variable.type === 'text' ? 'default' : 'info'">
-                                                    {{ variable.type === 'text' ? '文本' : '选项' }}
-                                                </NTag>
-                                            </NFlex>
-                                            <NFlex>
-                                                <NText depth="3" style="width: 80px;">必填:</NText>
-                                                <NTag size="small" :type="variable.required ? 'error' : 'success'">
-                                                    {{ variable.required ? '是' : '否' }}
-                                                </NTag>
-                                            </NFlex>
-                                            <NFlex v-if="variable.defaultValue">
-                                                <NText depth="3" style="width: 80px;">默认值:</NText>
-                                                <NText>{{ variable.defaultValue }}</NText>
-                                            </NFlex>
-                                            <NFlex v-if="variable.placeholder">
-                                                <NText depth="3" style="width: 80px;">占位符:</NText>
-                                                <NText depth="3">{{ variable.placeholder }}</NText>
-                                            </NFlex>
-                                            <NFlex v-if="variable.type === 'select' && variable.options && variable.options.length > 0">
-                                                <NText depth="3" style="width: 80px;">选项:</NText>
-                                                <NFlex size="small">
-                                                    <NTag v-for="option in variable.options" :key="option" size="small">
-                                                        {{ option }}
+                                            <div v-if="previewHistory.description">
+                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">描述</NText>
+                                                <NInput 
+                                                    :value="previewHistory.description" 
+                                                    type="textarea" 
+                                                    readonly 
+                                                    :rows="8" 
+                                                />
+                                            </div>
+                                        </NFlex>
+                                    </NScrollbar>
+                                </NCard>
+                            </template>
+
+                            <!-- 右侧：分类与标签 -->
+                            <template #2>
+                                <NCard title="分类与标签" size="small" :style="{ height: '100%' }">
+                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                        <NFlex vertical size="medium" style="padding-right: 12px;">
+                                            <div v-if="previewHistory.categoryId">
+                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">分类</NText>
+                                                <NInput :value="getCategoryName(previewHistory.categoryId)" readonly />
+                                            </div>
+
+                                            <div v-if="previewHistory.tags">
+                                                <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">标签</NText>
+                                                <NFlex size="small" wrap>
+                                                    <NTag 
+                                                        v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
+                                                        :key="tag"
+                                                        size="small"
+                                                    >
+                                                        {{ tag }}
                                                     </NTag>
                                                 </NFlex>
-                                            </NFlex>
+                                            </div>
+
+                                            <div v-if="previewHistory.changeDescription">
+                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">变更说明</NText>
+                                                <NInput :value="previewHistory.changeDescription" readonly />
+                                            </div>
                                         </NFlex>
-                                    </NCard>
-                                </div>
-                                <NEmpty v-else description="该版本没有配置变量" size="small" />
-                            </NFlex>
-                        </NScrollbar>
+                                    </NScrollbar>
+                                </NCard>
+                            </template>
+                        </NSplit>
                     </NTabPane>
                 </NTabs>
             </div>
