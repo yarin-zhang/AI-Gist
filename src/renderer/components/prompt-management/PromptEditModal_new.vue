@@ -422,25 +422,10 @@ const loadHistory = async () => {
 
     try {
         loadingHistory.value = true;
-        
-        // 先检查表是否存在
-        const tableExists = await api.promptHistories.checkExists.query();
-        if (!tableExists) {
-            console.warn("PromptHistories 表不存在，可能是数据库版本问题");
-            historyList.value = [];
-            return;
-        }
-        
         historyList.value = await api.promptHistories.getByPromptId.query(props.prompt.id);
     } catch (error) {
         console.error("加载历史记录失败:", error);
-        historyList.value = [];
-        // 如果是数据库表不存在的错误，不显示用户错误信息
-        if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
-            console.warn("PromptHistories 表不存在，可能是数据库版本问题");
-        } else {
-            message.error("加载历史记录失败");
-        }
+        message.error("加载历史记录失败");
     } finally {
         loadingHistory.value = false;
     }
@@ -466,13 +451,7 @@ const createHistoryRecord = async (currentPrompt: any) => {
         await api.promptHistories.create.mutate(historyData);
     } catch (error) {
         console.error("创建历史记录失败:", error);
-        // 如果是数据库表不存在的错误，静默失败
-        if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
-            console.warn("PromptHistories 表不存在，跳过历史记录创建");
-        } else {
-            // 其他错误也不影响主流程，只是记录失败
-            console.warn("创建历史记录失败，但不影响主流程");
-        }
+        // 不影响主流程，只是记录失败
     }
 };
 

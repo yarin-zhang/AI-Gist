@@ -145,6 +145,44 @@ function createApiClient() {
         }
       }
     },
+    promptHistories: {
+      checkExists: {
+        query: async () => {
+          return databaseService.checkObjectStoreExists('promptHistories');
+        }
+      },
+      create: {
+        mutate: async (input: any) => {
+          return databaseService.createPromptHistory(input);
+        }
+      },
+      getByPromptId: {
+        query: async (promptId: number) => {
+          return databaseService.getPromptHistoryByPromptId(promptId);
+        }
+      },
+      getById: {
+        query: async (id: number) => {
+          return databaseService.getPromptHistoryById(id);
+        }
+      },
+      delete: {
+        mutate: async (id: number) => {
+          await databaseService.deletePromptHistory(id);
+          return { id };
+        }
+      },
+      deleteByPromptId: {
+        mutate: async (promptId: number) => {
+          return databaseService.deletePromptHistoriesByPromptId(promptId);
+        }
+      },
+      getLatestVersion: {
+        query: async (promptId: number) => {
+          return databaseService.getLatestPromptHistoryVersion(promptId);
+        }
+      }
+    },
     aiConfigs: {
       create: {
         mutate: async (input: any) => {

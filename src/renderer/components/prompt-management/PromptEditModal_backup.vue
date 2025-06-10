@@ -26,7 +26,7 @@
                                                 <NInput v-model:value="formData.content" type="textarea"
                                                     placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" show-count
                                                     :style="{ height: `${contentHeight - 250}px`, fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                                    :autosize="false" />
+                                                    :autosize="false" @input="debouncedVariableExtraction" />
                                             </NFormItem>
                                         </NFlex>
                                         <NAlert type="info" :show-icon="false" style="margin: 0;">
@@ -222,15 +222,88 @@
                 </NTabs>
             </NForm>
         </template>
+                                                    <NInput v-model:value="variable.label" placeholder="显示名称"
+                                                        size="small" />
+                                                </NFormItem>
+                                            </NFlex>
 
-        <!-- 底部固定区域 -->
-        <template #footer>
+                                            <NFlex>
+                                                <NFormItem label="类型" style="flex: 1">
+                                                    <NSelect v-model:value="variable.type"
+                                                        :options="variableTypeOptions" size="small" />
+                                                </NFormItem>
+                                                <NFormItem label="必填" style="width: 80px">
+                                                    <NSwitch v-model:value="variable.required" size="small" />
+                                                </NFormItem>
+                                            </NFlex>
+
+                                            <NFormItem label="默认值">
+                                                <NInput v-if="variable.type === 'text'"
+                                                    v-model:value="variable.defaultValue" placeholder="默认值（可选）"
+                                                    size="small" />
+                                                <NSelect v-else-if="variable.type === 'select'"
+                                                    v-model:value="variable.defaultValue"
+                                                    :options="getVariableDefaultOptions(variable.options)"
+                                                    placeholder="选择默认选项（可选）" size="small" clearable />
+                                            </NFormItem>
+
+                                            <NFormItem v-if="variable.type === 'select'" label="选项">
+                                                <NDynamicInput v-model:value="variable.options" show-sort-button
+                                                    placeholder="请输入选项" :min="1" />
+                                            </NFormItem>
+                                        </NFlex>
+                                    </NCard>
+                                </NFlex>
+                                <NEmpty v-else description="在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量" size="small">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Plus />
+                                        </NIcon>
+                                    </template>
+                                </NEmpty>
+                            </NScrollbar>
+                        </NCard>
+
+                        <!-- 标签区（第二步显示） -->
+                        <NCard v-show="showExtraInfo" title="分类与标签" size="small" :style="{ height: '100%' }">
+                            <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
+                                <NFlex vertical size="medium" style="padding-right: 12px;">
+                                    <NFormItem label="分类">
+                                        <NSelect v-model:value="formData.categoryId" :options="categoryOptions"
+                                            placeholder="选择分类" clearable />
+                                    </NFormItem>
+                                    <NFormItem label="标签" path="tags">
+                                        <NDynamicTags v-model:value="formData.tags" placeholder="按回车添加标签" :max="5" />
+                                    </NFormItem>
+                                </NFlex>
+                            </NScrollbar>
+                        </NCard>
+                    </template>
+                </NSplit>
+            </NForm>
+        </template>
+
+        <!-- 底部固定区域 --> <template #footer>
             <NFlex justify="space-between" align="center">
                 <div>
-                    <!-- 显示当前活动的tab信息 -->
-                    <NText depth="3" v-if="activeTab === 'history' && isEdit">
-                        版本历史记录，可以预览和回滚到之前的版本
-                    </NText>
+                    <!-- 左侧区域 -->
+                    <NButton v-if="showExtraInfo" @click="showExtraInfo = false" ghost>
+                        <template #icon>
+                            <NIcon>
+                                <ArrowLeft />
+                            </NIcon>
+                        </template>
+                        返回编辑
+                    </NButton>
+                    <NButton v-if="!showExtraInfo" @click="handleShowExtraInfo" :disabled="!formData.content.trim()"
+                        ghost>
+                        <template #icon>
+                            <NIcon>
+                                <InfoCircle />
+                            </NIcon>
+                        </template>
+                        补充信息
+                    </NButton>
                 </div>
                 <div>
                     <!-- 右侧区域 -->
@@ -248,7 +321,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
 import {
     NForm,
     NFormItem,
@@ -267,15 +340,12 @@ import {
     NScrollbar,
     NDynamicInput,
     NSplit,
-    NTabs,
-    NTabPane,
     useMessage,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History } from "@vicons/tabler";
+import { Plus, Trash, InfoCircle, ArrowLeft } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
-import type { PromptHistory } from "@/lib/db";
 
 interface Variable {
     name: string;
@@ -304,9 +374,7 @@ const emit = defineEmits<Emits>();
 const message = useMessage();
 const formRef = ref();
 const saving = ref(false);
-const activeTab = ref("edit");
-const historyList = ref<PromptHistory[]>([]);
-const loadingHistory = ref(false);
+const showExtraInfo = ref(false);
 
 // 获取窗口尺寸用于响应式布局
 const { modalWidth } = useWindowSize();
@@ -366,25 +434,11 @@ const rules = {
         trigger: ["change"],
         validator(rule: unknown, value: string[]) {
             if (value.length > 5) {
-                return new Error("最多只能添加5个标签");
+                return new Error("不得超过5个标签");
             }
             return true;
         },
     },
-};
-
-// 获取Tab描述文本
-const getTabDescription = () => {
-    switch (activeTab.value) {
-        case "edit":
-            return "编写提示词内容并配置变量参数";
-        case "info":
-            return "完善提示词的基本信息和分类标签";
-        case "history":
-            return "查看提示词的版本历史，支持预览和回滚";
-        default:
-            return "编写提示词内容并配置变量参数";
-    }
 };
 
 // 重置表单方法
@@ -404,127 +458,12 @@ const resetForm = () => {
         tags: [],
         variables: [],
     };
-    activeTab.value = "edit";
-    historyList.value = [];
+    showExtraInfo.value = false;
 
     // 清理表单验证状态
     nextTick(() => {
         formRef.value?.restoreValidation();
     });
-};
-
-// 加载历史记录
-const loadHistory = async () => {
-    if (!isEdit.value || !props.prompt?.id) {
-        historyList.value = [];
-        return;
-    }
-
-    try {
-        loadingHistory.value = true;
-        
-        // 先检查表是否存在
-        const tableExists = await api.promptHistories.checkExists.query();
-        if (!tableExists) {
-            console.warn("PromptHistories 表不存在，可能是数据库版本问题");
-            historyList.value = [];
-            return;
-        }
-        
-        historyList.value = await api.promptHistories.getByPromptId.query(props.prompt.id);
-    } catch (error) {
-        console.error("加载历史记录失败:", error);
-        historyList.value = [];
-        // 如果是数据库表不存在的错误，不显示用户错误信息
-        if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
-            console.warn("PromptHistories 表不存在，可能是数据库版本问题");
-        } else {
-            message.error("加载历史记录失败");
-        }
-    } finally {
-        loadingHistory.value = false;
-    }
-};
-
-// 创建历史记录
-const createHistoryRecord = async (currentPrompt: any) => {
-    try {
-        const latestVersion = await api.promptHistories.getLatestVersion.query(currentPrompt.id);
-        
-        const historyData = {
-            promptId: currentPrompt.id,
-            version: latestVersion + 1,
-            title: currentPrompt.title,
-            content: currentPrompt.content,
-            description: currentPrompt.description,
-            categoryId: currentPrompt.categoryId,
-            tags: currentPrompt.tags,
-            variables: JSON.stringify(currentPrompt.variables || []),
-            changeDescription: "编辑更新"
-        };
-
-        await api.promptHistories.create.mutate(historyData);
-    } catch (error) {
-        console.error("创建历史记录失败:", error);
-        // 如果是数据库表不存在的错误，静默失败
-        if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
-            console.warn("PromptHistories 表不存在，跳过历史记录创建");
-        } else {
-            // 其他错误也不影响主流程，只是记录失败
-            console.warn("创建历史记录失败，但不影响主流程");
-        }
-    }
-};
-
-// 格式化日期
-const formatDate = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleString("zh-CN", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-};
-
-// 获取内容预览
-const getContentPreview = (content: string) => {
-    return content.length > 100 ? content.substring(0, 100) + "..." : content;
-};
-
-// 预览历史版本
-const previewHistory = (history: PromptHistory) => {
-    message.info(`版本 ${history.version} - ${history.title}`);
-    // 这里可以实现一个模态框来显示完整的历史内容
-};
-
-// 回滚到历史版本
-const rollbackToHistory = (history: PromptHistory) => {
-    try {
-        formData.value = {
-            title: history.title,
-            description: history.description || "",
-            content: history.content,
-            categoryId: history.categoryId || null,
-            tags: history.tags
-                ? typeof history.tags === "string"
-                    ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
-                    : history.tags
-                : [],
-            variables: history.variables
-                ? JSON.parse(history.variables)
-                : [],
-        };
-        
-        // 切换到编辑Tab
-        activeTab.value = "edit";
-        
-        message.success(`已回滚到版本 ${history.version}`);
-    } catch (error) {
-        console.error("回滚失败:", error);
-        message.error("回滚失败");
-    }
 };
 
 // 获取分类名称
@@ -602,6 +541,15 @@ const generateAutoTitle = () => {
     return firstLine || `提示词 ${new Date().toLocaleString()}`;
 };
 
+// 处理进入补充信息页面
+const handleShowExtraInfo = () => {
+    // 如果标题为空，自动填充生成的标题
+    if (!formData.value.title.trim()) {
+        formData.value.title = generateAutoTitle();
+    }
+    showExtraInfo.value = true;
+};
+
 // 监听 prompt 变化，初始化表单
 watch(
     () => props.prompt,
@@ -649,9 +597,6 @@ watch(
                     extractVariables(newPrompt.content);
                 });
             }
-            
-            // 加载历史记录
-            loadHistory();
         } else {
             // 没有 prompt 数据，重置为新建模式
             resetForm();
@@ -660,13 +605,13 @@ watch(
     { immediate: true }
 );
 
-// 监听弹窗显示状态
+// 监听弹窗显示状态，关闭时重置表单
 watch(
     () => props.show,
     (newShow, oldShow) => {
         if (newShow && !oldShow) {
             // 弹窗从隐藏变为显示时
-            activeTab.value = "edit";
+            showExtraInfo.value = false;
 
             // 确保在显示时根据当前prompt状态正确初始化表单
             if (!props.prompt) {
@@ -684,7 +629,11 @@ watch(
             // 延迟重置表单，确保弹窗完全关闭后再重置
             setTimeout(() => {
                 if (!props.show) {
-                    resetForm();
+                    // 无论是编辑还是新建模式，关闭时都重置表单
+                    // 这样确保下次打开时不会有残留数据
+                    if (!props.prompt) {
+                        resetForm();
+                    }
                 }
             }, 200);
         }
@@ -715,14 +664,17 @@ watch(
         newVariables.forEach((variable) => {
             // 当变量类型为选项时，检查默认值是否在选项中
             if (variable.type === "select" && variable.defaultValue) {
-                if (!variable.options || !variable.options.includes(variable.defaultValue)) {
+                const validOptions = Array.isArray(variable.options)
+                    ? variable.options.filter((opt) => opt && opt.trim())
+                    : [];
+                if (!validOptions.includes(variable.defaultValue)) {
                     variable.defaultValue = "";
                 }
             }
             // 当变量类型为文本且选项不为空时，清空选项
             if (
                 variable.type === "text" &&
-                variable.options &&
+                Array.isArray(variable.options) &&
                 variable.options.length > 0
             ) {
                 variable.options = [];
@@ -732,7 +684,7 @@ watch(
                 variable.type === "select" &&
                 (!Array.isArray(variable.options) || variable.options.length === 0)
             ) {
-                variable.options = ["选项1", "选项2"];
+                variable.options = ["选项1", "选项2", "选项3"];
             }
         });
     },
@@ -891,17 +843,11 @@ const handleSave = async () => {
         };
 
         if (isEdit.value) {
-            // 编辑模式：先创建历史记录，再更新
-            await createHistoryRecord(props.prompt);
-            
             await api.prompts.update.mutate({
                 id: props.prompt.id,
                 data,
             });
             message.success("提示词更新成功");
-            
-            // 重新加载历史记录
-            loadHistory();
         } else {
             await api.prompts.create.mutate(data);
             message.success("提示词创建成功");

@@ -56,6 +56,20 @@ export interface PromptVariable {
   updatedAt: Date;
 }
 
+export interface PromptHistory {
+  id?: number;
+  promptId: number;
+  version: number;
+  title: string;
+  content: string;
+  description?: string;
+  categoryId?: number;
+  tags?: string;
+  variables?: string; // JSON 字符串存储变量配置
+  changeDescription?: string; // 变更描述
+  createdAt: Date;
+}
+
 // AI 相关数据类型
 export interface AIConfig {
   id?: number;
@@ -102,7 +116,7 @@ export interface CategoryWithRelations extends Category {
 class DatabaseService {
   private db: IDBDatabase | null = null;
   private readonly dbName = 'AIGistDB';
-  private readonly dbVersion = 3; // 升级版本号以修复表名不一致问题
+  private readonly dbVersion = 4; // 升级版本号以添加 promptHistories 表
   private initializationPromise: Promise<void> | null = null;
   private isInitialized: boolean = false;
   /**
@@ -168,6 +182,13 @@ class DatabaseService {
         if (!db.objectStoreNames.contains('promptVariables')) {
           const promptVariableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
           promptVariableStore.createIndex('promptId', 'promptId', { unique: false });
+        }
+
+        // 创建 promptHistories 表
+        if (!db.objectStoreNames.contains('promptHistories')) {
+          const promptHistoryStore = db.createObjectStore('promptHistories', { keyPath: 'id', autoIncrement: true });
+          promptHistoryStore.createIndex('promptId', 'promptId', { unique: false });
+          promptHistoryStore.createIndex('version', 'version', { unique: false });
         }
 
         // 创建 ai_configs 表
@@ -1035,6 +1056,111 @@ class DatabaseService {
     });
 
     return stats;
+  }
+
+  // PromptHistory 相关操作
+  async createPromptHistory(history: Omit<PromptHistory, 'id'>): Promise<PromptHistory> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const transaction = this.db.transaction(['promptHistories'], 'readwrite');
+    const store = transaction.objectStore('promptHistories');
+    
+    const historyWithTimestamp = {
+      ...history,
+      createdAt: new Date()
+    };
+    
+    const request = store.add(historyWithTimestamp);
+    
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        resolve({ ...historyWithTimestamp, id: request.result as number });
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getPromptHistoryByPromptId(promptId: number): Promise<PromptHistory[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const transaction = this.db.transaction(['promptHistories'], 'readonly');
+    const store = transaction.objectStore('promptHistories');
+    const index = store.index('promptId');
+    const request = index.getAll(promptId);
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        const histories = request.result.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        resolve(histories);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getPromptHistoryById(id: number): Promise<PromptHistory | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const transaction = this.db.transaction(['promptHistories'], 'readonly');
+    const store = transaction.objectStore('promptHistories');
+    const request = store.get(id);
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        resolve(request.result || null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deletePromptHistory(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const transaction = this.db.transaction(['promptHistories'], 'readwrite');
+    const store = transaction.objectStore('promptHistories');
+    const request = store.delete(id);
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deletePromptHistoriesByPromptId(promptId: number): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const histories = await this.getPromptHistoryByPromptId(promptId);
+    let deletedCount = 0;
+
+    for (const history of histories) {
+      if (history.id) {
+        await this.deletePromptHistory(history.id);
+        deletedCount++;
+      }
+    }
+
+    return deletedCount;
+  }
+
+  async getLatestPromptHistoryVersion(promptId: number): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const histories = await this.getPromptHistoryByPromptId(promptId);
+    return histories.length > 0 ? Math.max(...histories.map(h => h.version)) : 0;
+  }
+
+  /**
+   * 检查指定的对象存储是否存在
+   */
+  async checkObjectStoreExists(storeName: string): Promise<boolean> {
+    await this.waitForInitialization();
+    
+    if (!this.db) {
+      return false;
+    }
+    
+    return this.db.objectStoreNames.contains(storeName);
   }
 
   /**
