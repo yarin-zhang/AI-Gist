@@ -179,7 +179,7 @@
                                                     </NTag>
                                                 </NFlex>
                                                 <NFlex size="small">
-                                                    <NButton size="small" @click="previewHistory(history)">
+                                                    <NButton size="small" @click="openPreviewHistory(history)">
                                                         <template #icon>
                                                             <NIcon>
                                                                 <Eye />
@@ -239,6 +239,147 @@
                         <NButton type="primary" @click="handleSave" :loading="saving"
                             :disabled="!formData.content.trim()">
                             {{ isEdit ? "更新" : "创建" }}
+                        </NButton>
+                    </NFlex>
+                </div>
+            </NFlex>
+        </template>
+    </CommonModal>
+
+    <!-- 历史版本预览模态框 -->
+    <CommonModal :show="showPreviewModal" @update:show="closePreviewModal" @close="closePreviewModal">
+        <template #header>
+            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
+                历史版本预览 - 版本 {{ previewHistory?.version }}
+            </NText>
+            <NText depth="3">
+                {{ formatDate(previewHistory?.createdAt || new Date()) }}
+            </NText>
+        </template>
+
+        <template #content="{ contentHeight }">
+            <div v-if="previewHistory" :style="{ height: `${contentHeight}px`, overflow: 'hidden' }">
+                <NTabs type="line" :style="{ height: '100%' }">
+                    <!-- 基本信息 Tab -->
+                    <NTabPane name="basic" tab="基本信息">
+                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
+                            <NFlex vertical size="medium" style="padding: 16px;">
+                                <NCard title="标题" size="small">
+                                    <NText>{{ previewHistory.title }}</NText>
+                                </NCard>
+
+                                <NCard title="描述" size="small" v-if="previewHistory.description">
+                                    <NText>{{ previewHistory.description }}</NText>
+                                </NCard>
+
+                                <NCard title="分类" size="small" v-if="previewHistory.categoryId">
+                                    <NText>{{ getCategoryName(previewHistory.categoryId) }}</NText>
+                                </NCard>
+
+                                <NCard title="标签" size="small" v-if="previewHistory.tags">
+                                    <NFlex size="small">
+                                        <NTag 
+                                            v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
+                                            :key="tag"
+                                            size="small"
+                                        >
+                                            {{ tag }}
+                                        </NTag>
+                                    </NFlex>
+                                </NCard>
+
+                                <NCard title="变更说明" size="small" v-if="previewHistory.changeDescription">
+                                    <NText>{{ previewHistory.changeDescription }}</NText>
+                                </NCard>
+                            </NFlex>
+                        </NScrollbar>
+                    </NTabPane>
+
+                    <!-- 内容 Tab -->
+                    <NTabPane name="content" tab="提示词内容">
+                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
+                            <NCard title="内容" size="small" style="margin: 16px;">
+                                <NInput
+                                    :value="previewHistory.content"
+                                    type="textarea"
+                                    readonly
+                                    :rows="20"
+                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
+                                />
+                            </NCard>
+                        </NScrollbar>
+                    </NTabPane>
+
+                    <!-- 变量配置 Tab -->
+                    <NTabPane name="variables" tab="变量配置" v-if="previewHistory.variables">
+                        <NScrollbar :style="{ height: `${contentHeight - 50}px` }">
+                            <NFlex vertical size="medium" style="padding: 16px;">
+                                <div v-if="getPreviewVariables(previewHistory.variables).length > 0">
+                                    <NCard 
+                                        v-for="(variable, index) in getPreviewVariables(previewHistory.variables)" 
+                                        :key="index" 
+                                        size="small"
+                                        style="margin-bottom: 12px;"
+                                    >
+                                        <template #header>
+                                            <NText strong>{{ variable.name }}</NText>
+                                        </template>
+                                        <NFlex vertical size="small">
+                                            <NFlex>
+                                                <NText depth="3" style="width: 80px;">显示名:</NText>
+                                                <NText>{{ variable.label }}</NText>
+                                            </NFlex>
+                                            <NFlex>
+                                                <NText depth="3" style="width: 80px;">类型:</NText>
+                                                <NTag size="small" :type="variable.type === 'text' ? 'default' : 'info'">
+                                                    {{ variable.type === 'text' ? '文本' : '选项' }}
+                                                </NTag>
+                                            </NFlex>
+                                            <NFlex>
+                                                <NText depth="3" style="width: 80px;">必填:</NText>
+                                                <NTag size="small" :type="variable.required ? 'error' : 'success'">
+                                                    {{ variable.required ? '是' : '否' }}
+                                                </NTag>
+                                            </NFlex>
+                                            <NFlex v-if="variable.defaultValue">
+                                                <NText depth="3" style="width: 80px;">默认值:</NText>
+                                                <NText>{{ variable.defaultValue }}</NText>
+                                            </NFlex>
+                                            <NFlex v-if="variable.placeholder">
+                                                <NText depth="3" style="width: 80px;">占位符:</NText>
+                                                <NText depth="3">{{ variable.placeholder }}</NText>
+                                            </NFlex>
+                                            <NFlex v-if="variable.type === 'select' && variable.options && variable.options.length > 0">
+                                                <NText depth="3" style="width: 80px;">选项:</NText>
+                                                <NFlex size="small">
+                                                    <NTag v-for="option in variable.options" :key="option" size="small">
+                                                        {{ option }}
+                                                    </NTag>
+                                                </NFlex>
+                                            </NFlex>
+                                        </NFlex>
+                                    </NCard>
+                                </div>
+                                <NEmpty v-else description="该版本没有配置变量" size="small" />
+                            </NFlex>
+                        </NScrollbar>
+                    </NTabPane>
+                </NTabs>
+            </div>
+        </template>
+
+        <template #footer>
+            <NFlex justify="space-between" align="center">
+                <div>
+                    <NText depth="3">
+                        可以查看历史版本的详细信息，确认后可以回滚到此版本
+                    </NText>
+                </div>
+                <div>
+                    <NFlex size="small">
+                        <NButton @click="closePreviewModal">关闭</NButton>
+                        <NButton type="primary" @click="rollbackToHistory(previewHistory!); closePreviewModal();">
+                            回滚到此版本
                         </NButton>
                     </NFlex>
                 </div>
@@ -307,6 +448,8 @@ const saving = ref(false);
 const activeTab = ref("edit");
 const historyList = ref<PromptHistory[]>([]);
 const loadingHistory = ref(false);
+const showPreviewModal = ref(false);
+const previewHistory = ref<PromptHistory | null>(null);
 
 // 获取窗口尺寸用于响应式布局
 const { modalWidth } = useWindowSize();
@@ -493,10 +636,29 @@ const getContentPreview = (content: string) => {
     return content.length > 100 ? content.substring(0, 100) + "..." : content;
 };
 
+// 解析预览变量
+const getPreviewVariables = (variables: string | any[]) => {
+    try {
+        if (typeof variables === 'string') {
+            return JSON.parse(variables) || [];
+        }
+        return Array.isArray(variables) ? variables : [];
+    } catch (error) {
+        console.error("解析变量配置失败:", error);
+        return [];
+    }
+};
+
 // 预览历史版本
-const previewHistory = (history: PromptHistory) => {
-    message.info(`版本 ${history.version} - ${history.title}`);
-    // 这里可以实现一个模态框来显示完整的历史内容
+const openPreviewHistory = (history: PromptHistory) => {
+    previewHistory.value = history;
+    showPreviewModal.value = true;
+};
+
+// 关闭预览模态框
+const closePreviewModal = () => {
+    showPreviewModal.value = false;
+    previewHistory.value = null;
 };
 
 // 回滚到历史版本
