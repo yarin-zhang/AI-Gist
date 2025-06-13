@@ -83,6 +83,7 @@ export interface AIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
 }

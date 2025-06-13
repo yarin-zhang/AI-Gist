@@ -2,12 +2,12 @@
  * Should match main/preload.ts for typescript support in renderer
  */
 
-// AI 相    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }>类型定义
+// AI 相关类型定义
 export interface AIConfig {
   id?: number;
   configId: string; // 唯一标识符
   name: string;
-  type: 'openai' | 'ollama';
+  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
   baseURL: string;
   apiKey?: string;
   secretKey?: string;
@@ -15,6 +15,7 @@ export interface AIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
 }

@@ -753,6 +753,7 @@ const serializeConfig = (config: AIConfig) => {
         defaultModel: config.defaultModel,
         customModel: config.customModel,
         enabled: config.enabled,
+        systemPrompt: config.systemPrompt, // 添加自定义系统提示词
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
     }

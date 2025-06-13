@@ -18,6 +18,7 @@ interface ProcessedAIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
 }
@@ -842,7 +843,7 @@ class AIServiceManager {
     }
 
     // 构建系统提示词
-    const systemPrompt = request.systemPrompt || 
+    const systemPrompt = request.systemPrompt || config.systemPrompt || 
       `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
 
 要求：
@@ -997,7 +998,7 @@ class AIServiceManager {
     }
 
     // 系统提示词
-    const systemPrompt = `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
+    const systemPrompt = config.systemPrompt || `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
 
 要求：
 1. 提示词应该清晰、具体、可操作

@@ -54,6 +54,14 @@
                             <div class="config-actions">
                                 <n-switch v-model:value="config.enabled"
                                     @update:value="(value) => toggleConfig(config.id!, value)" />
+                                <n-button size="small" @click="editSystemPrompt(config)" type="info">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Edit />
+                                        </NIcon>
+                                    </template>
+                                    编辑提示词
+                                </n-button>
                                 <n-button size="small" @click="editConfig(config)">
                                     <template #icon>
                                         <NIcon>
@@ -94,6 +102,12 @@
                         </p>
                         <p v-if="config.customModel">
                             <strong>自定义模型:</strong> {{ config.customModel }}
+                        </p>
+                        <p>
+                            <strong>系统提示词:</strong> 
+                            <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
+                                {{ config.systemPrompt ? '已自定义' : '使用默认' }}
+                            </NTag>
                         </p>
                         <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
                     </div>
@@ -307,6 +321,67 @@
                 <n-button @click="showIntelligentTestResult = false">关闭</n-button>
             </template>
         </n-modal>
+
+        <!-- 系统提示词编辑弹窗 -->
+        <CommonModal ref="systemPromptModalRef" :show="showSystemPromptModal" @update:show="showSystemPromptModal = $event" @close="closeSystemPromptModal">
+            <!-- 顶部固定区域 -->
+            <template #header>
+                <NFlex align="center" justify="space-between">
+                    <NFlex align="center" style="gap: 12px">
+                        <NIcon size="24">
+                            <Edit />
+                        </NIcon>
+                        <div>
+                            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                                编辑生成提示词
+                            </NText>
+                            <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
+                                自定义 AI 生成提示词时使用的系统提示词
+                            </NText>
+                        </div>
+                    </NFlex>
+                </NFlex>
+            </template>
+
+            <!-- 中间可操作区域 -->
+            <template #content="{ contentHeight }">
+                <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
+                    <NAlert type="info" :show-icon="false">
+                        <NText depth="3" style="font-size: 12px;">
+                            💡 此提示词用于指导 AI 如何生成新的提示词。留空将使用默认的系统提示词。
+                        </NText>
+                    </NAlert>
+
+                    <NInput
+                        v-model:value="systemPromptContent"
+                        type="textarea"
+                        placeholder="请输入自定义的系统提示词..."
+                        :rows="15"
+                        :style="{ 
+                            height: `${contentHeight - 120}px`, 
+                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace'
+                        }"
+                        :autosize="false"
+                        show-count
+                    />
+                </NFlex>
+            </template>
+
+            <!-- 底部固定区域 -->
+            <template #footer>
+                <NFlex justify="space-between">
+                    <NButton @click="resetSystemPromptToDefault" type="warning">
+                        重置为默认
+                    </NButton>
+                    <NFlex>
+                        <NButton @click="closeSystemPromptModal">取消</NButton>
+                        <NButton type="primary" @click="saveSystemPrompt">
+                            保存
+                        </NButton>
+                    </NFlex>
+                </NFlex>
+            </template>
+        </CommonModal>
     </div>
 </template>
 
@@ -336,7 +411,7 @@ import {
     NSplit,
     useMessage,
 } from "naive-ui";
-import { Plus, Robot, DatabaseOff, Server, Settings } from "@vicons/tabler";
+import { Plus, Robot, DatabaseOff, Server, Settings, Edit } from "@vicons/tabler";
 import type { AIConfig } from "~/lib/db";
 import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
@@ -371,6 +446,11 @@ const intelligentTestResult = ref<{
 } | null>(null);
 const autoShowAddModal = ref(false);
 
+// 系统提示词编辑相关状态
+const showSystemPromptModal = ref(false);
+const editingSystemPromptConfig = ref<AIConfig | null>(null);
+const systemPromptContent = ref("");
+
 // 表单数据
 const formData = reactive({
     type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "cohere" | "mistral",
@@ -380,6 +460,7 @@ const formData = reactive({
     models: [] as string[],
     defaultModel: "",
     customModel: "",
+    systemPrompt: "",
 });
 
 // 表单校验规则
@@ -552,6 +633,7 @@ const saveConfig = async () => {
                 models: [...formData.models], // 创建新数组确保可序列化
                 defaultModel: formData.defaultModel || undefined,
                 customModel: formData.customModel || undefined,
+                systemPrompt: formData.systemPrompt || undefined,
             };
             await databaseService.updateAIConfig(editingConfig.value.id!, updateData);
             message.success("配置更新成功");
@@ -568,6 +650,7 @@ const saveConfig = async () => {
                 models: [...formData.models], // 创建新数组确保可序列化
                 defaultModel: formData.defaultModel || undefined,
                 customModel: formData.customModel || undefined,
+                systemPrompt: formData.systemPrompt || undefined,
                 enabled: true,
             };
             await databaseService.createAIConfig(configData);
@@ -593,6 +676,7 @@ const editConfig = (config: AIConfig) => {
     formData.models = Array.isArray(config.models) ? config.models : [];
     formData.defaultModel = config.defaultModel || "";
     formData.customModel = config.customModel || "";
+    formData.systemPrompt = config.systemPrompt || "";
     showAddModal.value = true;
 };
 
@@ -732,6 +816,55 @@ const intelligentTest = async (config: AIConfig) => {
     }
 };
 
+// 编辑系统提示词
+const editSystemPrompt = (config: AIConfig) => {
+    editingSystemPromptConfig.value = config;
+    systemPromptContent.value = config.systemPrompt || getDefaultSystemPrompt();
+    showSystemPromptModal.value = true;
+};
+
+// 保存系统提示词
+const saveSystemPrompt = async () => {
+    if (!editingSystemPromptConfig.value?.id) return;
+
+    try {
+        await databaseService.updateAIConfig(editingSystemPromptConfig.value.id, {
+            systemPrompt: systemPromptContent.value.trim() || undefined,
+        });
+        message.success("系统提示词更新成功");
+        closeSystemPromptModal();
+        loadConfigs();
+    } catch (error) {
+        message.error("更新失败: " + (error as Error).message);
+    }
+};
+
+// 关闭系统提示词编辑弹窗
+const closeSystemPromptModal = () => {
+    showSystemPromptModal.value = false;
+    editingSystemPromptConfig.value = null;
+    systemPromptContent.value = "";
+};
+
+// 获取默认系统提示词
+const getDefaultSystemPrompt = () => {
+    return `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
+
+要求：
+1. 提示词应该清晰、具体、可操作
+2. 包含必要的上下文和约束条件
+3. 使用适当的格式和结构
+4. 考虑不同的使用场景
+5. 提供具体的输出格式要求
+
+请直接返回优化后的提示词内容，不需要额外的解释。`;
+};
+
+// 重置系统提示词为默认值
+const resetSystemPromptToDefault = () => {
+    systemPromptContent.value = getDefaultSystemPrompt();
+};
+
 // 关闭弹窗
 const closeModal = () => {
     showAddModal.value = false;
@@ -749,6 +882,7 @@ const resetForm = () => {
     formData.models = [];
     formData.defaultModel = "";
     formData.customModel = "";
+    formData.systemPrompt = "";
     formTestResult.value = null;
 };
 
@@ -875,6 +1009,7 @@ const serializeConfig = (config: AIConfig) => {
         defaultModel: config.defaultModel,
         customModel: config.customModel,
         enabled: config.enabled,
+        systemPrompt: config.systemPrompt,
         createdAt:
             config.createdAt instanceof Date
                 ? config.createdAt.toISOString()
