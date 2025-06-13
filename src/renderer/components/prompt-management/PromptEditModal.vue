@@ -164,8 +164,8 @@
                         </NSplit>
                     </NTabPane>
 
-                    <!-- 历史记录 Tab -->
-                    <NTabPane name="history" tab="历史记录" :disabled="!isEdit">
+                    <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
+                    <NTabPane v-if="isEdit" name="history" tab="历史记录">
                         <NCard title="版本历史" size="small" :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
                                 <NFlex vertical size="medium" style="padding-right: 12px;" v-if="historyList.length > 0">
@@ -579,7 +579,7 @@ const getTabDescription = () => {
         case "info":
             return "完善提示词的基本信息和分类标签";
         case "history":
-            return "查看提示词的版本历史，支持预览和回滚";
+            return isEdit.value ? "查看提示词的版本历史，支持预览和回滚" : "编写提示词内容并配置变量参数";
         default:
             return "编写提示词内容并配置变量参数";
     }
@@ -872,6 +872,10 @@ watch(
         } else {
             // 没有 prompt 数据，重置为新建模式
             resetForm();
+            // 在新建模式下，确保当前tab不是历史记录
+            if (activeTab.value === 'history') {
+                activeTab.value = 'edit';
+            }
         }
     },
     { immediate: true }
