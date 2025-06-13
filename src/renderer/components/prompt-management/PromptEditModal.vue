@@ -889,11 +889,13 @@ watch(
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
 
-            // 确保在显示时根据当前prompt状态正确初始化表单
-            if (!props.prompt) {
-                // 如果没有prompt，确保表单是重置状态
-                resetForm();
-            }
+            // 使用 nextTick 确保 props.prompt 已经正确传递
+            nextTick(() => {
+                // 只有在确实没有 prompt 且不是编辑模式时才重置表单
+                if (!props.prompt && !isEdit.value) {
+                    resetForm();
+                }
+            });
         }
         if (oldShow && !newShow) {
             // 弹窗从显示变为隐藏时，清理定时器
