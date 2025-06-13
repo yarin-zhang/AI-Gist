@@ -211,289 +211,114 @@ export class DataManagementService {
             });
 
             return result.canceled ? null : result.filePath;
-        });
-
-        // 获取数据统计
+        });        // 获取数据统计
         ipcMain.handle('data:get-stats', async () => {
             try {
-                // 这里应该从数据库中获取统计信息
-                return {
-                    categories: 10,
-                    prompts: 50,
-                    history: 100,
-                    totalSize: 1024 * 1024, // 1MB
-                    lastBackupTime: new Date().toISOString(),
-                };
+                // 通过 executeJavaScript 调用渲染进程暴露的方法
+                const mainWindow = BrowserWindow.getAllWindows()[0];
+                if (!mainWindow) {
+                    throw new Error('没有找到主窗口，无法访问数据库');
+                }
+
+                // 调用渲染进程中暴露的统计方法
+                const result = await mainWindow.webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            if (!window.databaseAPI || !window.databaseAPI.getStats) {
+                                throw new Error('数据库API未初始化');
+                            }
+                            return await window.databaseAPI.getStats();
+                        } catch (error) {
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+                
+                if (!result.success) {
+                    throw new Error(`获取数据统计失败: ${result.error}`);
+                }
+                
+                return result.stats;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`获取数据统计失败: ${errorMessage}`);
             }
         });
-    }
-
-    private async exportAllData() {
+    }    private async exportAllData() {
         try {
-            // 通过渲染进程获取真实数据
+            console.log('正在从渲染进程获取数据库数据...');
+            
+            // 通过 executeJavaScript 调用渲染进程暴露的方法
             const mainWindow = BrowserWindow.getAllWindows()[0];
             if (!mainWindow) {
                 throw new Error('没有找到主窗口，无法访问数据库');
             }
 
-            console.log('正在从渲染进程获取数据库数据...');
-            
-            // 发送请求到渲染进程获取数据
-            const webContents = mainWindow.webContents;
-            
-            try {
-                // 执行渲染进程中的代码来获取数据
-                const result = await webContents.executeJavaScript(`
-                    (async () => {
-                        try {
-                            // 确保数据库服务已初始化
-                            const { databaseServiceManager } = window.databaseAPI || {};
-                            if (!databaseServiceManager) {
-                                throw new Error('数据库服务未初始化');
-                            }
-                            
-                            await databaseServiceManager.waitForInitialization();
-                            
-                            // 获取所有数据
-                            const [
-                                users,
-                                posts,
-                                categories, 
-                                prompts,
-                                aiConfigs,
-                                aiHistory,
-                                settings,
-                                stats
-                            ] = await Promise.all([
-                                databaseServiceManager.user.getAllUsers(),
-                                databaseServiceManager.post.getAllPosts(),
-                                databaseServiceManager.category.getBasicCategories(),
-                                databaseServiceManager.prompt.getAllPromptsForTags(),
-                                databaseServiceManager.aiConfig.getAllAIConfigs(),
-                                databaseServiceManager.aiGenerationHistory.getAllAIGenerationHistory(),
-                                databaseServiceManager.appSettings.getAllSettings(),
-                                databaseServiceManager.getDatabaseStats()
-                            ]);
-                            
-                            const totalRecords = (users?.length || 0) + (posts?.length || 0) + (categories?.length || 0) + (prompts?.length || 0) + (aiConfigs?.length || 0) + (aiHistory?.length || 0) + (settings?.length || 0);
-                            
-                            // 验证数据是否有效
-                            if (totalRecords === 0) {
-                                console.warn('数据库为空或查询返回空结果');
-                            }
-                            
-                            return {
-                                success: true,
-                                data: {
-                                    users: users || [],
-                                    posts: posts || [],
-                                    categories: categories || [],
-                                    prompts: prompts || [],
-                                    aiConfigs: aiConfigs || [],
-                                    aiHistory: aiHistory || [],
-                                    settings: settings || [],
-                                    stats: stats || {},
-                                    exportTime: new Date().toISOString(),
-                                    version: '1.0.0',
-                                    totalRecords
-                                }
-                            };
-                        } catch (error) {
-                            console.error('获取数据库数据失败:', error);
-                            return {
-                                success: false,
-                                error: error.message || '未知错误'
-                            };
+            // 调用渲染进程中暴露的导出方法
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.exportAllData) {
+                            throw new Error('数据库API未初始化');
                         }
-                    })()
-                `);
-                
-                if (!result.success) {
-                    throw new Error(`数据库操作失败: ${result.error}`);
-                }
-                
-                console.log(`成功获取数据库数据，总记录数: ${result.data.totalRecords}`);
-                return result.data;
-                
-            } catch (error) {
-                console.error('执行渲染进程脚本失败:', error);
-                throw new Error(`无法从数据库获取数据: ${error instanceof Error ? error.message : '未知错误'}`);
+                        return await window.databaseAPI.exportAllData();
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+            
+            if (!result.success) {
+                throw new Error(`数据库操作失败: ${result.error}`);
             }
+            
+            console.log(`成功获取数据库数据，总记录数: ${result.data.totalRecords}`);
+            return result.data;
             
         } catch (error) {
             console.error('导出数据失败:', error);
             throw new Error(`数据导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
-    }
-
-    private async restoreAllData(data: any) {
+    }    private async restoreAllData(data: any) {
         try {
-            // 通过渲染进程恢复数据到数据库
+            console.log('正在恢复数据到数据库...');
+            
+            // 通过 executeJavaScript 调用渲染进程暴露的方法
             const mainWindow = BrowserWindow.getAllWindows()[0];
             if (!mainWindow) {
                 throw new Error('没有找到主窗口，无法访问数据库');
             }
 
-            console.log('正在恢复数据到数据库...');
-            
-            // 发送恢复数据的请求到渲染进程
-            const webContents = mainWindow.webContents;
-            
-            try {
-                // 执行渲染进程中的代码来恢复数据
-                const result = await webContents.executeJavaScript(`
-                    (async () => {
-                        try {
-                            // 确保数据库服务已初始化
-                            const { databaseServiceManager } = window.databaseAPI || {};
-                            if (!databaseServiceManager) {
-                                throw new Error('数据库服务未初始化');
-                            }
-                            
-                            await databaseServiceManager.waitForInitialization();
-                            
-                            const backupData = ${JSON.stringify(data)};
-                            
-                            // 清空现有数据（可选，根据需求决定）
-                            console.log('正在清空现有数据...');
-                            
-                            // 恢复各类数据
-                            const restorePromises = [];
-                            
-                            // 恢复用户数据
-                            if (backupData.users && backupData.users.length > 0) {
-                                console.log('恢复用户数据:', backupData.users.length, '条');
-                                for (const user of backupData.users) {
-                                    restorePromises.push(
-                                        databaseServiceManager.user.addUser(user).catch(err => {
-                                            console.warn('恢复用户数据失败:', user.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复分类数据
-                            if (backupData.categories && backupData.categories.length > 0) {
-                                console.log('恢复分类数据:', backupData.categories.length, '条');
-                                for (const category of backupData.categories) {
-                                    restorePromises.push(
-                                        databaseServiceManager.category.addCategory(category).catch(err => {
-                                            console.warn('恢复分类数据失败:', category.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复提示词数据
-                            if (backupData.prompts && backupData.prompts.length > 0) {
-                                console.log('恢复提示词数据:', backupData.prompts.length, '条');
-                                for (const prompt of backupData.prompts) {
-                                    restorePromises.push(
-                                        databaseServiceManager.prompt.addPrompt(prompt).catch(err => {
-                                            console.warn('恢复提示词数据失败:', prompt.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复文章数据
-                            if (backupData.posts && backupData.posts.length > 0) {
-                                console.log('恢复文章数据:', backupData.posts.length, '条');
-                                for (const post of backupData.posts) {
-                                    restorePromises.push(
-                                        databaseServiceManager.post.addPost(post).catch(err => {
-                                            console.warn('恢复文章数据失败:', post.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复AI配置数据
-                            if (backupData.aiConfigs && backupData.aiConfigs.length > 0) {
-                                console.log('恢复AI配置数据:', backupData.aiConfigs.length, '条');
-                                for (const config of backupData.aiConfigs) {
-                                    restorePromises.push(
-                                        databaseServiceManager.aiConfig.addAIConfig(config).catch(err => {
-                                            console.warn('恢复AI配置数据失败:', config.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复AI历史数据
-                            if (backupData.aiHistory && backupData.aiHistory.length > 0) {
-                                console.log('恢复AI历史数据:', backupData.aiHistory.length, '条');
-                                for (const history of backupData.aiHistory) {
-                                    restorePromises.push(
-                                        databaseServiceManager.aiGenerationHistory.addAIGenerationHistory(history).catch(err => {
-                                            console.warn('恢复AI历史数据失败:', history.id, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 恢复设置数据
-                            if (backupData.settings && backupData.settings.length > 0) {
-                                console.log('恢复设置数据:', backupData.settings.length, '条');
-                                for (const setting of backupData.settings) {
-                                    restorePromises.push(
-                                        databaseServiceManager.appSettings.setSetting(setting.key, setting.value).catch(err => {
-                                            console.warn('恢复设置数据失败:', setting.key, err.message);
-                                        })
-                                    );
-                                }
-                            }
-                            
-                            // 等待所有恢复操作完成
-                            await Promise.all(restorePromises);
-                            
-                            const totalRestored = (backupData.users?.length || 0) + 
-                                                (backupData.categories?.length || 0) + 
-                                                (backupData.prompts?.length || 0) + 
-                                                (backupData.posts?.length || 0) + 
-                                                (backupData.aiConfigs?.length || 0) + 
-                                                (backupData.aiHistory?.length || 0) + 
-                                                (backupData.settings?.length || 0);
-                            
-                            console.log('数据恢复完成，总计恢复记录数:', totalRestored);
-                            
-                            return {
-                                success: true,
-                                totalRestored: totalRestored,
-                                details: {
-                                    users: backupData.users?.length || 0,
-                                    categories: backupData.categories?.length || 0,
-                                    prompts: backupData.prompts?.length || 0,
-                                    posts: backupData.posts?.length || 0,
-                                    aiConfigs: backupData.aiConfigs?.length || 0,
-                                    aiHistory: backupData.aiHistory?.length || 0,
-                                    settings: backupData.settings?.length || 0
-                                }
-                            };
-                        } catch (error) {
-                            console.error('恢复数据失败:', error);
-                            return {
-                                success: false,
-                                error: error.message || '未知错误'
-                            };
+            // 调用渲染进程中暴露的恢复方法
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.restoreAllData) {
+                            throw new Error('数据库API未初始化');
                         }
-                    })()
-                `);
-                
-                if (!result.success) {
-                    throw new Error(`数据恢复失败: ${result.error}`);
-                }
-                
-                console.log(`数据恢复成功，总计恢复记录数: ${result.totalRestored}`);
-                console.log('恢复详情:', result.details);
-                
-            } catch (error) {
-                console.error('执行恢复脚本失败:', error);
-                throw new Error(`无法恢复数据到数据库: ${error instanceof Error ? error.message : '未知错误'}`);
+                        const data = ${JSON.stringify(data)};
+                        return await window.databaseAPI.restoreAllData(data);
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+            
+            if (!result.success) {
+                throw new Error(`数据恢复失败: ${result.error}`);
             }
+            
+            console.log(`数据恢复成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log('恢复详情:', result.details);
             
         } catch (error) {
             console.error('恢复数据失败:', error);
@@ -624,9 +449,7 @@ export class DataManagementService {
      */
     async generateExportData() {
         return await this.exportAllData();
-    }
-
-    /**
+    }    /**
      * 直接导入数据对象 - 供 WebDAV 同步使用
      */
     async importDataObject(data: any): Promise<{
@@ -641,18 +464,61 @@ export class DataManagementService {
         errors: string[];
     }> {
         try {
-            // 这里应该将数据导入到数据库
+            console.log('开始导入数据对象...');
+            
+            // 通过 executeJavaScript 调用渲染进程暴露的方法
+            const mainWindow = BrowserWindow.getAllWindows()[0];
+            if (!mainWindow) {
+                throw new Error('没有找到主窗口，无法访问数据库');
+            }
+
+            // 调用渲染进程中暴露的导入方法
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.importDataObject) {
+                            throw new Error('数据库API未初始化');
+                        }
+                        const data = ${JSON.stringify(data)};
+                        return await window.databaseAPI.importDataObject(data);
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+            
+            if (!result.success) {
+                console.error('导入数据对象失败:', result.error);
+                return {
+                    success: false,
+                    message: `导入失败: ${result.error}`,
+                    imported: {
+                        categories: 0,
+                        prompts: 0,
+                        settings: 0,
+                        history: 0,
+                    },
+                    errors: [result.error],
+                };
+            }
+            
+            console.log('数据对象导入成功:', result.details);
+            
             return {
                 success: true,
                 message: '导入成功',
                 imported: {
-                    categories: data.categories?.length || 0,
-                    prompts: data.prompts?.length || 0,
-                    settings: Object.keys(data.settings || {}).length,
-                    history: data.history?.length || 0,
+                    categories: result.details?.categories || 0,
+                    prompts: result.details?.prompts || 0,
+                    settings: result.details?.settings || 0,
+                    history: result.details?.aiHistory || 0,
                 },
                 errors: [],
             };
+            
         } catch (error) {
             console.error('导入数据对象失败:', error);
             return {
