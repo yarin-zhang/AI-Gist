@@ -71,5 +71,8 @@ export interface AIGenerationHistory {
   customPrompt?: string;
   status: 'success' | 'error';
   errorMessage?: string;
+  debugResult?: string;
+  debugStatus?: 'success' | 'error' | 'pending';
+  debugErrorMessage?: string;
   createdAt: Date;
 }

@@ -275,6 +275,47 @@ class IpcHandlers {
       
       return { success: true, message: '已停止所有生成请求' };
     });
+
+    // 调试提示词 - 使用提示词获取AI响应
+    ipcMain.handle('ai:debug-prompt', async (_, prompt: string, config: any) => {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      // 创建调试请求
+      const debugRequest = {
+        configId: config.configId,
+        topic: prompt,
+        customPrompt: prompt,
+        model: config.defaultModel || config.customModel,
+        config: processedConfig
+      };
+      
+      try {
+        console.log('IPC调试提示词 - 配置:', processedConfig);
+        console.log('IPC调试提示词 - 请求:', debugRequest);
+        
+        const result = await aiServiceManager.generatePrompt(debugRequest);
+        return {
+          success: true,
+          result: result.generatedPrompt,
+          model: result.model,
+          error: null
+        };
+      } catch (error: any) {
+        console.error('IPC调试提示词失败:', error);
+        return {
+          success: false,
+          result: null,
+          model: null,
+          error: error.message || '调试失败'
+        };
+      }
+    });
   }
 
   /**

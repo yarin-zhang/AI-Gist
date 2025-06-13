@@ -203,6 +203,12 @@ export interface AIGenerationHistory {
   status: 'success' | 'error';
   /** 错误信息（如果生成失败） */
   errorMessage?: string;
+  /** 调试结果（AI对提示词的响应结果） */
+  debugResult?: string;
+  /** 调试状态 */
+  debugStatus?: 'success' | 'error' | 'pending';
+  /** 调试错误信息 */
+  debugErrorMessage?: string;
   /** 记录创建时间 */
   createdAt: Date;
 }
