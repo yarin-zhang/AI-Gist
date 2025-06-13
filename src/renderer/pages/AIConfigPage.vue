@@ -41,7 +41,8 @@
                     </NButton>
                 </NFlex>
             </NAlert>
-            <NAlert v-else-if="configs.filter(c => c.enabled).length > 1" type="warning" :show-icon="false" style="margin-top: 16px">
+            <NAlert v-else-if="configs.filter(c => c.enabled).length > 1" type="warning" :show-icon="false"
+                style="margin-top: 16px">
                 <NFlex align="center" style="gap: 8px">
                     <NIcon size="18">
                         <Settings />
@@ -92,38 +93,49 @@
                                 </n-tag>
                             </div>
                             <div class="config-switch">
-                                <n-switch v-model:value="config.enabled"
-                                    @update:value="(value) => toggleConfig(config.id!, value)" />
+                                <n-space>
+                                    <n-button size="small" @click="setPreferred(config)"
+                                        :type="config.isPreferred ? 'primary' : 'default'" :disabled="!config.enabled">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Settings />
+                                            </NIcon>
+                                        </template>
+                                        {{ config.isPreferred ? '已设为首选' : '设为首选' }}
+                                    </n-button>
+                                    <n-switch v-model:value="config.enabled"
+                                        @update:value="(value) => toggleConfig(config.id!, value)" />
+                                </n-space>
                             </div>
                         </div>
                     </template>
 
                     <div class="config-details">
-                        <n-flex >
-                        <n-flex vertical >
-                        <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
-                        <p>
-                            <strong>系统提示词:</strong> 
-                            <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
-                                {{ config.systemPrompt ? '已自定义' : '使用默认' }}
-                            </NTag>
-                        </p>
-                        <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
-                        </n-flex>
-                        <n-flex vertical >
-                        <p v-if="config.defaultModel">
-                            <strong>默认模型:</strong> {{ config.defaultModel }}
-                        </p>
-                        <p v-if="config.customModel">
-                            <strong>自定义模型:</strong> {{ config.customModel }}
-                        </p>
-                        <p>
-                            <strong>首选状态:</strong>
-                            <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
-                                {{ config.isPreferred ? '全局首选' : '普通配置' }}
-                            </NTag>
-                        </p>
-                        </n-flex>
+                        <n-flex justify="space-between" >
+                            <n-flex vertical>
+                                <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
+                                <p v-if="config.defaultModel">
+                                    <strong>默认模型:</strong> {{ config.defaultModel }}
+                                </p>
+                                <p v-if="config.customModel">
+                                    <strong>自定义模型:</strong> {{ config.customModel }}
+                                </p>
+                            </n-flex>
+                            <n-flex vertical>
+                                <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
+                                <!-- <p>
+                                    <strong>系统提示词:</strong>
+                                    <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
+                                        {{ config.systemPrompt ? '已自定义' : '使用默认' }}
+                                    </NTag>
+                                </p> -->
+                                <!-- <p>
+                                    <strong>首选状态:</strong>
+                                    <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
+                                        {{ config.isPreferred ? '全局首选' : '普通配置' }}
+                                    </NTag>
+                                </p> -->
+                            </n-flex>
                         </n-flex>
                     </div>
 
@@ -131,17 +143,7 @@
                         <NFlex justify="space-between" align="center">
                             <!-- 左侧：常用操作 -->
                             <NFlex align="center" size="small">
-                                <n-button size="small" @click="setPreferred(config)" 
-                                    :type="config.isPreferred ? 'primary' : 'default'"
-                                    :disabled="!config.enabled">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Settings />
-                                        </NIcon>
-                                    </template>
-                                    {{ config.isPreferred ? '已设为首选' : '设为首选' }}
-                                </n-button>
-                                <n-button size="small" @click="editConfig(config)">
+                                <n-button size="small" @click="editConfig(config)" type="info">
                                     <template #icon>
                                         <NIcon>
                                             <Settings />
@@ -149,15 +151,7 @@
                                     </template>
                                     编辑
                                 </n-button>
-                                <n-button size="small" @click="testConfig(config)"
-                                    :loading="testingConfigs.has(config.id!)">
-                                    测试连接
-                                </n-button>
-                            </NFlex>
-
-                            <!-- 右侧：不常用操作 -->
-                            <NFlex align="center" size="small">
-                                <n-button size="small" @click="editSystemPrompt(config)" type="info">
+                                <n-button size="small" @click="editSystemPrompt(config)">
                                     <template #icon>
                                         <NIcon>
                                             <Edit />
@@ -165,14 +159,27 @@
                                     </template>
                                     编辑提示词
                                 </n-button>
+                            </NFlex>
+
+                            <!-- 右侧：不常用操作 -->
+                            <NFlex align="center" size="small">
+                                <n-button size="small" @click="testConfig(config)"
+                                    :loading="testingConfigs.has(config.id!)" type="info">
+                                    <template #icon>
+                                        <NIcon>
+                                            <AccessPoint />
+                                        </NIcon>
+                                    </template>
+                                    连接测试
+                                </n-button>
                                 <n-button size="small" @click="intelligentTest(config)"
-                                    :loading="intelligentTestingConfigs.has(config.id!)" type="info">
+                                    :loading="intelligentTestingConfigs.has(config.id!)">
                                     <template #icon>
                                         <NIcon>
                                             <Robot />
                                         </NIcon>
                                     </template>
-                                    智能测试
+                                    请求测试
                                 </n-button>
                                 <n-button size="small" type="error" @click="deleteConfig(config.id!)">
                                     <template #icon>
@@ -192,7 +199,7 @@
         <CommonModal ref="modalRef" :show="showAddModal" @update:show="showAddModal = $event" @close="closeModal">
             <!-- 顶部固定区域 -->
             <template #header>
-                <NFlex align="center" justify="space-between" >
+                <NFlex align="center" justify="space-between">
                     <NFlex align="center" style="gap: 12px">
                         <NIcon size="24">
                             <Settings />
@@ -211,7 +218,7 @@
                         </div>
                     </NFlex>
                 </NFlex>
-            </template>            <template #content="{ contentHeight }">
+            </template> <template #content="{ contentHeight }">
                 <!-- 中间可操作区域 -->
                 <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
                     :max="0.8" :disabled="modalWidth <= 800">
@@ -229,19 +236,22 @@
 
                                         <n-form-item label="配置名称" path="name">
                                             <n-input v-model:value="formData.name" placeholder="输入配置名称" />
-                                        </n-form-item>                                        <n-form-item :label="getBaseURLInfo.label" path="baseURL" v-if="needsBaseURL || formData.type === 'anthropic' || formData.type === 'google' || formData.type === 'cohere'">
+                                        </n-form-item> <n-form-item :label="getBaseURLInfo.label" path="baseURL"
+                                            v-if="needsBaseURL || formData.type === 'anthropic' || formData.type === 'google' || formData.type === 'cohere'">
                                             <n-input v-model:value="formData.baseURL"
                                                 :placeholder="getBaseURLInfo.placeholder" />
                                         </n-form-item>
 
                                         <n-form-item :label="getApiKeyLabel" path="apiKey" v-if="needsApiKey">
                                             <n-input v-model:value="formData.apiKey" type="password"
-                                                show-password-on="click" :placeholder="`输入 ${getApiKeyLabel.replace('：', '')}`" />
+                                                show-password-on="click"
+                                                :placeholder="`输入 ${getApiKeyLabel.replace('：', '')}`" />
                                         </n-form-item>
 
                                         <!-- 连接测试区域 -->
                                         <n-form-item label="连接测试">
-                                            <NFlex vertical size="medium" style="width: 100%;">                                                <n-button @click="testFormConnection" :loading="testingFormConnection"
+                                            <NFlex vertical size="medium" style="width: 100%;"> <n-button
+                                                    @click="testFormConnection" :loading="testingFormConnection"
                                                     :disabled="!canTestConnection" type="info" block>
                                                     <template #icon>
                                                         <NIcon>
@@ -321,7 +331,7 @@
             </template>
             <!-- 底部固定区域 -->
             <template #footer>
-                <NFlex justify="end" >
+                <NFlex justify="end">
                     <n-button @click="closeModal">取消</n-button>
                     <n-button type="primary" @click="saveConfig" :loading="saving">
                         {{ editingConfig ? "更新配置" : "添加配置" }}
@@ -397,7 +407,8 @@
         </n-modal>
 
         <!-- 系统提示词编辑弹窗 -->
-        <CommonModal ref="systemPromptModalRef" :show="showSystemPromptModal" @update:show="showSystemPromptModal = $event" @close="closeSystemPromptModal">
+        <CommonModal ref="systemPromptModalRef" :show="showSystemPromptModal"
+            @update:show="showSystemPromptModal = $event" @close="closeSystemPromptModal">
             <!-- 顶部固定区域 -->
             <template #header>
                 <NFlex align="center" justify="space-between">
@@ -426,18 +437,11 @@
                         </NText>
                     </NAlert>
 
-                    <NInput
-                        v-model:value="systemPromptContent"
-                        type="textarea"
-                        placeholder="请输入自定义的系统提示词..."
-                        :rows="15"
-                        :style="{ 
-                            height: `${contentHeight - 120}px`, 
+                    <NInput v-model:value="systemPromptContent" type="textarea" placeholder="请输入自定义的系统提示词..." :rows="15"
+                        :style="{
+                            height: `${contentHeight - 120}px`,
                             fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace'
-                        }"
-                        :autosize="false"
-                        show-count
-                    />
+                        }" :autosize="false" show-count />
                 </NFlex>
             </template>
 
@@ -485,7 +489,7 @@ import {
     NSplit,
     useMessage,
 } from "naive-ui";
-import { Plus, Robot, DatabaseOff, Server, Settings, Edit } from "@vicons/tabler";
+import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint } from "@vicons/tabler";
 import type { AIConfig } from "~/lib/db";
 import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
@@ -672,12 +676,12 @@ const canTestConnection = computed(() => {
     if (needsApiKey.value && !formData.apiKey.trim()) {
         return false;
     }
-    
+
     // 如果需要Base URL但没有提供，则不能测试
     if (needsBaseURL.value && !formData.baseURL.trim()) {
         return false;
     }
-    
+
     return true;
 });
 
@@ -689,7 +693,7 @@ const loadConfigs = async () => {
     );
     if (result) {
         configs.value = result;
-        
+
         // 同时加载首选配置
         const preferred = await safeDbOperation(
             () => databaseService.getPreferredAIConfig(),
@@ -779,7 +783,7 @@ const deleteConfig = async (id: number) => {
 const toggleConfig = async (id: number, enabled: boolean) => {
     try {
         await databaseService.updateAIConfig(id, { enabled });
-        
+
         // 如果禁用的是首选配置，需要清除首选项状态
         if (!enabled) {
             const config = configs.value.find(c => c.id === id);
@@ -787,7 +791,7 @@ const toggleConfig = async (id: number, enabled: boolean) => {
                 await databaseService.updateAIConfig(id, { isPreferred: false });
             }
         }
-        
+
         message.success(enabled ? "配置已启用" : "配置已禁用");
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
@@ -798,7 +802,7 @@ const toggleConfig = async (id: number, enabled: boolean) => {
 // 设置首选配置
 const setPreferred = async (config: AIConfig) => {
     if (!config.id) return;
-    
+
     try {
         if (config.isPreferred) {
             // 如果已经是首选，则取消首选
@@ -809,7 +813,7 @@ const setPreferred = async (config: AIConfig) => {
             await databaseService.setPreferredAIConfig(config.id);
             message.success(`已将 "${config.name}" 设置为全局首选配置`);
         }
-        
+
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
         message.error("设置失败: " + (error as Error).message);
@@ -875,7 +879,7 @@ const testFormConnection = async () => {
 
         const result = await window.electronAPI.ai.testConfig(tempConfig);
         console.log('测试结果:', result);
-        
+
         formTestResult.value = result;
 
         if (result.success) {
@@ -1058,7 +1062,7 @@ const onTypeChange = (type: typeof formData.type) => {
     if (!editingConfig.value) {
         const currentName = formData.name.trim();
         const autoGeneratedNames = [
-            "", "OpenAI 兼容", "Ollama", "Anthropic Claude", "Google AI", 
+            "", "OpenAI 兼容", "Ollama", "Anthropic Claude", "Google AI",
             "Azure OpenAI", "LM Studio", "DeepSeek", "Cohere", "Mistral AI"
         ];
 
@@ -1181,7 +1185,6 @@ defineExpose({
 .config-list {
     display: grid;
     gap: 16px;
-    margin-top: 16px;
 }
 
 .config-card {
@@ -1216,8 +1219,6 @@ defineExpose({
 }
 
 .config-details {
-    margin-top: 12px;
-    padding-top: 12px;
     border-top: 1px solid var(--border-color-1);
 }
 
