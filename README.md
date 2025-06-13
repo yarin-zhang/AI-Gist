@@ -8,7 +8,7 @@
 
 </div>
 
-![](docs/images/imageMain.png?v=3)
+![](docs/images/imageMain.png?v=4)
 
 ## 特点
 
@@ -81,12 +81,20 @@ yarn build:linux    # 构建 Linux 安装包
 
 ## 应用截图
 
-![](docs/images/image01.png?v=3)
+![](docs/images/image01.png?v=4)
 
-![](docs/images/image02.png?v=3)
+![](docs/images/image02.png?v=4)
 
-![](docs/images/image03.png?v=3)
+![](docs/images/image03.png?v=4)
 
-![](docs/images/image04.png?v=3)
+![](docs/images/image04.png?v=4)
 
-![](docs/images/image05.png?v=3)
+![](docs/images/image05.png?v=4)
+
+![](docs/images/image06.png?v=4)
+
+![](docs/images/image07.png?v=4)
+
+![](docs/images/image08.png?v=4)
+
+![](docs/images/image09.png?v=4)
