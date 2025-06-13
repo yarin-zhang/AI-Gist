@@ -91,9 +91,46 @@
                                     全局首选
                                 </n-tag>
                             </div>
-                            <div class="config-actions">
+                            <div class="config-switch">
                                 <n-switch v-model:value="config.enabled"
                                     @update:value="(value) => toggleConfig(config.id!, value)" />
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="config-details">
+                        <n-flex >
+                        <n-flex vertical >
+                        <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
+                        <p>
+                            <strong>系统提示词:</strong> 
+                            <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
+                                {{ config.systemPrompt ? '已自定义' : '使用默认' }}
+                            </NTag>
+                        </p>
+                        <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
+                        </n-flex>
+                        <n-flex vertical >
+                        <p v-if="config.defaultModel">
+                            <strong>默认模型:</strong> {{ config.defaultModel }}
+                        </p>
+                        <p v-if="config.customModel">
+                            <strong>自定义模型:</strong> {{ config.customModel }}
+                        </p>
+                        <p>
+                            <strong>首选状态:</strong>
+                            <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
+                                {{ config.isPreferred ? '全局首选' : '普通配置' }}
+                            </NTag>
+                        </p>
+                        </n-flex>
+                        </n-flex>
+                    </div>
+
+                    <template #action>
+                        <NFlex justify="space-between" align="center">
+                            <!-- 左侧：常用操作 -->
+                            <NFlex align="center" size="small">
                                 <n-button size="small" @click="setPreferred(config)" 
                                     :type="config.isPreferred ? 'primary' : 'default'"
                                     :disabled="!config.enabled">
@@ -103,14 +140,6 @@
                                         </NIcon>
                                     </template>
                                     {{ config.isPreferred ? '已设为首选' : '设为首选' }}
-                                </n-button>
-                                <n-button size="small" @click="editSystemPrompt(config)" type="info">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Edit />
-                                        </NIcon>
-                                    </template>
-                                    编辑提示词
                                 </n-button>
                                 <n-button size="small" @click="editConfig(config)">
                                     <template #icon>
@@ -123,6 +152,18 @@
                                 <n-button size="small" @click="testConfig(config)"
                                     :loading="testingConfigs.has(config.id!)">
                                     测试连接
+                                </n-button>
+                            </NFlex>
+
+                            <!-- 右侧：不常用操作 -->
+                            <NFlex align="center" size="small">
+                                <n-button size="small" @click="editSystemPrompt(config)" type="info">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Edit />
+                                        </NIcon>
+                                    </template>
+                                    编辑提示词
                                 </n-button>
                                 <n-button size="small" @click="intelligentTest(config)"
                                     :loading="intelligentTestingConfigs.has(config.id!)" type="info">
@@ -141,32 +182,9 @@
                                     </template>
                                     删除
                                 </n-button>
-                            </div>
-                        </div>
+                            </NFlex>
+                        </NFlex>
                     </template>
-
-                    <div class="config-details">
-                        <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
-                        <p v-if="config.defaultModel">
-                            <strong>默认模型:</strong> {{ config.defaultModel }}
-                        </p>
-                        <p v-if="config.customModel">
-                            <strong>自定义模型:</strong> {{ config.customModel }}
-                        </p>
-                        <p>
-                            <strong>系统提示词:</strong> 
-                            <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
-                                {{ config.systemPrompt ? '已自定义' : '使用默认' }}
-                            </NTag>
-                        </p>
-                        <p>
-                            <strong>首选状态:</strong>
-                            <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
-                                {{ config.isPreferred ? '全局首选' : '普通配置' }}
-                            </NTag>
-                        </p>
-                        <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
-                    </div>
                 </n-card>
             </div>
         </NFlex>
@@ -1192,10 +1210,9 @@ defineExpose({
     font-size: 16px;
 }
 
-.config-actions {
+.config-switch {
     display: flex;
     align-items: center;
-    gap: 8px;
 }
 
 .config-details {
