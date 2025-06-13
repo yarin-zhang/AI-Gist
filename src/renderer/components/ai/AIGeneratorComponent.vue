@@ -372,12 +372,12 @@ const loadConfigs = async () => {
     loading.value = true
     await safeDbOperation(async () => {
         console.log('开始加载 AI 配置')
-        const result = await databaseService.getEnabledAIConfigs()
+        const result = await databaseService.aiConfig.getEnabledAIConfigs()
         console.log('成功获取到启用的 AI 配置:', result)
         configs.value = result
 
         // 加载首选配置
-        const preferred = await databaseService.getPreferredAIConfig()
+        const preferred = await databaseService.aiConfig.getPreferredAIConfig()
         preferredConfig.value = preferred
         console.log('首选配置:', preferred?.name || '无')
 

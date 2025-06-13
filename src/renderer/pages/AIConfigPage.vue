@@ -702,7 +702,7 @@ const canTestConnection = computed(() => {
 // 加载配置列表
 const loadConfigs = async () => {
     const result = await safeDbOperation(
-        () => databaseService.getAllAIConfigs(),
+        () => databaseService.aiConfig.getAllAIConfigs(),
         []
     );
     if (result) {
@@ -710,7 +710,7 @@ const loadConfigs = async () => {
 
         // 同时加载首选配置
         const preferred = await safeDbOperation(
-            () => databaseService.getPreferredAIConfig(),
+            () => databaseService.aiConfig.getPreferredAIConfig(),
             null
         );
         preferredConfig.value = preferred;
@@ -737,7 +737,7 @@ const saveConfig = async () => {
                 // 保持原有的首选项状态，除非配置被禁用
                 isPreferred: editingConfig.value.isPreferred,
             };
-            await databaseService.updateAIConfig(editingConfig.value.id!, updateData);
+            await databaseService.aiConfig.updateAIConfig(editingConfig.value.id!, updateData);
             message.success("配置更新成功");
         } else {
             // 添加新配置
@@ -755,7 +755,7 @@ const saveConfig = async () => {
                 systemPrompt: formData.systemPrompt || undefined,
                 enabled: true,
             };
-            await databaseService.createAIConfig(configData);
+            await databaseService.aiConfig.createAIConfig(configData);
             message.success("配置添加成功");
         }
 
@@ -785,7 +785,7 @@ const editConfig = (config: AIConfig) => {
 // 删除配置
 const deleteConfig = async (id: number) => {
     try {
-        await databaseService.deleteAIConfig(id);
+        await databaseService.aiConfig.deleteAIConfig(id);
         message.success("配置删除成功");
         loadConfigs();
     } catch (error) {
@@ -796,13 +796,13 @@ const deleteConfig = async (id: number) => {
 // 切换配置状态
 const toggleConfig = async (id: number, enabled: boolean) => {
     try {
-        await databaseService.updateAIConfig(id, { enabled });
+        await databaseService.aiConfig.updateAIConfig(id, { enabled });
 
         // 如果禁用的是首选配置，需要清除首选项状态
         if (!enabled) {
             const config = configs.value.find(c => c.id === id);
             if (config?.isPreferred) {
-                await databaseService.updateAIConfig(id, { isPreferred: false });
+                await databaseService.aiConfig.updateAIConfig(id, { isPreferred: false });
             }
         }
 
@@ -820,11 +820,11 @@ const setPreferred = async (config: AIConfig) => {
     try {
         if (config.isPreferred) {
             // 如果已经是首选，则取消首选
-            await databaseService.clearPreferredAIConfig();
+            await databaseService.aiConfig.clearPreferredAIConfig();
             message.success("已取消首选设置");
         } else {
             // 设置为首选
-            await databaseService.setPreferredAIConfig(config.id);
+            await databaseService.aiConfig.setPreferredAIConfig(config.id);
             message.success(`已将 "${config.name}" 设置为全局首选配置`);
         }
 
@@ -837,7 +837,7 @@ const setPreferred = async (config: AIConfig) => {
 // 清除首选配置
 const clearPreferred = async () => {
     try {
-        await databaseService.clearPreferredAIConfig();
+        await databaseService.aiConfig.clearPreferredAIConfig();
         message.success("已清除全局首选配置");
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
@@ -972,7 +972,7 @@ const saveSystemPrompt = async () => {
     if (!editingSystemPromptConfig.value?.id) return;
 
     try {
-        await databaseService.updateAIConfig(editingSystemPromptConfig.value.id, {
+        await databaseService.aiConfig.updateAIConfig(editingSystemPromptConfig.value.id, {
             systemPrompt: systemPromptContent.value.trim() || undefined,
         });
         message.success("系统提示词更新成功");
