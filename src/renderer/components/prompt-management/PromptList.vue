@@ -169,8 +169,19 @@
                                 {{ new Date(prompt.updatedAt).toLocaleDateString() }}
                             </NText> -->
                             <!-- 描述或内容预览 -->
-                            <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
-                            <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
+                            <NText 
+                                depth="3" 
+                                v-if="prompt.description" 
+                                class="description-text"
+                            >
+                                {{ prompt.description }}
+                            </NText>
+                            <NText 
+                                depth="3" 
+                                v-if="!prompt.description" 
+                                style="font-size: 12px;" 
+                                class="content-preview-text"
+                            >
                                 {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                             </NText>
 
@@ -596,5 +607,18 @@ defineExpose({
     border: 1px solid var(--n-color-primary) !important;
     transform: scale(1.02);
     transition: all 0.3s ease;
+}
+
+/* 描述文本和内容预览的多行截断样式 */
+.description-text,
+.content-preview-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    max-height: calc(1.4em * 3); /* 限制最大高度为3行 */
+    word-break: break-word;
 }
 </style>
