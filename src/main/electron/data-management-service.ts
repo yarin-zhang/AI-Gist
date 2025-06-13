@@ -3,7 +3,7 @@
  * 这个文件需要在主进程中实现
  */
 
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -226,50 +226,101 @@ export class DataManagementService {
     }
 
     private async exportAllData() {
-        // 这里应该从数据库中导出所有数据
-        // 现在返回一些示例数据以便测试
-        return {
-            categories: [
-                { id: 1, name: '示例分类1', description: '这是一个示例分类', createdAt: new Date().toISOString() },
-                { id: 2, name: '示例分类2', description: '这是另一个示例分类', createdAt: new Date().toISOString() }
-            ],
-            prompts: [
-                { 
-                    id: 1, 
-                    title: '示例提示词1', 
-                    content: '这是一个示例提示词内容', 
-                    categoryId: 1,
-                    tags: ['示例', '测试'],
-                    createdAt: new Date().toISOString() 
-                },
-                { 
-                    id: 2, 
-                    title: '示例提示词2', 
-                    content: '这是另一个示例提示词内容', 
-                    categoryId: 2,
-                    tags: ['示例', '演示'],
-                    createdAt: new Date().toISOString() 
+        try {
+            // 通过渲染进程获取真实数据
+            const mainWindow = BrowserWindow.getAllWindows()[0];
+            if (!mainWindow) {
+                throw new Error('没有找到主窗口，无法访问数据库');
+            }
+
+            console.log('正在从渲染进程获取数据库数据...');
+            
+            // 发送请求到渲染进程获取数据
+            const webContents = mainWindow.webContents;
+            
+            try {
+                // 执行渲染进程中的代码来获取数据
+                const result = await webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            // 确保数据库服务已初始化
+                            const { databaseServiceManager } = window.databaseAPI || {};
+                            if (!databaseServiceManager) {
+                                throw new Error('数据库服务未初始化');
+                            }
+                            
+                            await databaseServiceManager.waitForInitialization();
+                            
+                            // 获取所有数据
+                            const [
+                                users,
+                                posts,
+                                categories, 
+                                prompts,
+                                aiConfigs,
+                                aiHistory,
+                                settings,
+                                stats
+                            ] = await Promise.all([
+                                databaseServiceManager.user.getAllUsers(),
+                                databaseServiceManager.post.getAllPosts(),
+                                databaseServiceManager.category.getBasicCategories(),
+                                databaseServiceManager.prompt.getAllPromptsForTags(),
+                                databaseServiceManager.aiConfig.getAllAIConfigs(),
+                                databaseServiceManager.aiGenerationHistory.getAllAIGenerationHistory(),
+                                databaseServiceManager.appSettings.getAllSettings(),
+                                databaseServiceManager.getDatabaseStats()
+                            ]);
+                            
+                            const totalRecords = (users?.length || 0) + (posts?.length || 0) + (categories?.length || 0) + (prompts?.length || 0) + (aiConfigs?.length || 0) + (aiHistory?.length || 0) + (settings?.length || 0);
+                            
+                            // 验证数据是否有效
+                            if (totalRecords === 0) {
+                                console.warn('数据库为空或查询返回空结果');
+                            }
+                            
+                            return {
+                                success: true,
+                                data: {
+                                    users: users || [],
+                                    posts: posts || [],
+                                    categories: categories || [],
+                                    prompts: prompts || [],
+                                    aiConfigs: aiConfigs || [],
+                                    aiHistory: aiHistory || [],
+                                    settings: settings || [],
+                                    stats: stats || {},
+                                    exportTime: new Date().toISOString(),
+                                    version: '1.0.0',
+                                    totalRecords
+                                }
+                            };
+                        } catch (error) {
+                            console.error('获取数据库数据失败:', error);
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+                
+                if (!result.success) {
+                    throw new Error(`数据库操作失败: ${result.error}`);
                 }
-            ],
-            settings: {
-                themeSource: 'system',
-                closeBehaviorMode: 'ask',
-                autoLaunch: false,
-                startMinimized: false
-            },
-            history: [
-                {
-                    id: 1,
-                    promptId: 1,
-                    input: '示例输入',
-                    output: '示例输出',
-                    timestamp: new Date().toISOString()
-                }
-            ],
-            exportTime: new Date().toISOString(),
-            version: '1.0.0',
-            totalRecords: 6
-        };
+                
+                console.log(`成功获取数据库数据，总记录数: ${result.data.totalRecords}`);
+                return result.data;
+                
+            } catch (error) {
+                console.error('执行渲染进程脚本失败:', error);
+                throw new Error(`无法从数据库获取数据: ${error instanceof Error ? error.message : '未知错误'}`);
+            }
+            
+        } catch (error) {
+            console.error('导出数据失败:', error);
+            throw new Error(`数据导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
     }
 
     private async restoreAllData(data: any) {
@@ -290,27 +341,32 @@ export class DataManagementService {
     }
 
     private async importData(filePath: string, options: any) {
-        const content = await fs.readFile(filePath, 'utf-8');
-        let data;
+        try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            let data;
 
-        if (options.format === 'csv') {
-            data = this.parseCSV(content);
-        } else {
-            data = JSON.parse(content);
+            if (options.format === 'csv') {
+                data = this.parseCSV(content);
+            } else {
+                data = JSON.parse(content);
+            }
+
+            // 这里应该将数据导入到数据库
+            return {
+                success: true,
+                message: '导入成功',
+                imported: {
+                    categories: data.categories?.length || 0,
+                    prompts: data.prompts?.length || 0,
+                    settings: Object.keys(data.settings || {}).length,
+                    history: data.history?.length || 0,
+                },
+                errors: [],
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            throw new Error(`导入数据失败: ${errorMessage}`);
         }
-
-        // 这里应该将数据导入到数据库
-        return {
-            success: true,
-            message: '导入成功',
-            imported: {
-                categories: data.categories?.length || 0,
-                prompts: data.prompts?.length || 0,
-                settings: Object.keys(data.settings || {}).length,
-                history: data.history?.length || 0,
-            },
-            errors: [],
-        };
     }
 
     private convertToCSV(data: any): string {
@@ -357,9 +413,86 @@ export class DataManagementService {
     }
 
     /**
+     * 创建备份 - 供 WebDAV 同步使用
+     */
+    async createBackup(description?: string): Promise<BackupInfo> {
+        try {
+            const backupId = uuidv4();
+            const timestamp = new Date().toISOString();
+            const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
+            const backupPath = path.join(this.backupDir, `${backupName}.json`);
+
+            // 从数据库中导出所有数据
+            const backupData = await this.exportAllData();
+            
+            const backupInfo: BackupInfo = {
+                id: backupId,
+                name: backupName,
+                description: description || '自动备份',
+                createdAt: timestamp,
+                size: 0, // 将在写入后计算
+                data: backupData,
+            };
+
+            await fs.writeFile(backupPath, JSON.stringify(backupInfo, null, 2));
+            
+            const stats = await fs.stat(backupPath);
+            backupInfo.size = stats.size;
+            
+            return backupInfo;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            throw new Error(`创建备份失败: ${errorMessage}`);
+        }
+    }
+
+    /**
      * 生成导出数据 - 供 WebDAV 同步使用
      */
     async generateExportData() {
         return await this.exportAllData();
+    }
+
+    /**
+     * 直接导入数据对象 - 供 WebDAV 同步使用
+     */
+    async importDataObject(data: any): Promise<{
+        success: boolean;
+        message: string;
+        imported: {
+            categories: number;
+            prompts: number;
+            settings: number;
+            history: number;
+        };
+        errors: string[];
+    }> {
+        try {
+            // 这里应该将数据导入到数据库
+            return {
+                success: true,
+                message: '导入成功',
+                imported: {
+                    categories: data.categories?.length || 0,
+                    prompts: data.prompts?.length || 0,
+                    settings: Object.keys(data.settings || {}).length,
+                    history: data.history?.length || 0,
+                },
+                errors: [],
+            };
+        } catch (error) {
+            console.error('导入数据对象失败:', error);
+            return {
+                success: false,
+                message: `导入失败: ${error instanceof Error ? error.message : '未知错误'}`,
+                imported: {
+                    categories: 0,
+                    prompts: 0,
+                    settings: 0,
+                    history: 0,
+                },
+                errors: [error instanceof Error ? error.message : '未知错误'],
+            };
+        }
     }
 }

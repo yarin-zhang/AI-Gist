@@ -766,7 +766,32 @@ const syncNow = async () => {
         if (result.success) {
             settings.dataSync.lastSyncTime = result.timestamp;
             await updateSetting();
-            message.success(`数据同步成功 - 上传: ${result.filesUploaded} 文件, 下载: ${result.filesDownloaded} 文件`);
+            
+            let successMessage = `数据同步成功 - 上传: ${result.filesUploaded} 文件, 下载: ${result.filesDownloaded} 文件`;
+            
+            // 显示冲突信息（如果有）
+            if (result.conflictsDetected > 0) {
+                successMessage += ` | 检测到 ${result.conflictsDetected} 个冲突`;
+                if (result.conflictsResolved > 0) {
+                    successMessage += `, 已解决 ${result.conflictsResolved} 个`;
+                }
+                
+                // 显示冲突详情
+                if (result.conflictDetails && result.conflictDetails.length > 0) {
+                    console.log('同步冲突详情:', result.conflictDetails);
+                    result.conflictDetails.forEach(detail => {
+                        const conflictType = detail.type === 'data_conflict' ? '数据冲突' :
+                                           detail.type === 'timestamp_conflict' ? '时间戳冲突' : '版本冲突';
+                        const resolution = detail.resolution === 'merged' ? '已合并' :
+                                         detail.resolution === 'local_wins' ? '保留本地' :
+                                         detail.resolution === 'remote_wins' ? '保留远程' : '已备份';
+                        
+                        message.warning(`${conflictType}: ${detail.description} (处理: ${resolution})`);
+                    });
+                }
+            }
+            
+            message.success(successMessage);
         } else {
             message.error(result.message || "数据同步失败");
         }

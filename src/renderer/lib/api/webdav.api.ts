@@ -24,6 +24,17 @@ export interface SyncResult {
     timestamp: string;
     filesUploaded: number;
     filesDownloaded: number;
+    conflictsDetected: number;
+    conflictsResolved: number;
+    conflictDetails?: ConflictDetail[];
+}
+
+export interface ConflictDetail {
+    type: 'data_conflict' | 'timestamp_conflict' | 'version_conflict';
+    description: string;
+    resolution: 'local_wins' | 'remote_wins' | 'merged' | 'backup_created';
+    localData?: any;
+    remoteData?: any;
 }
 
 /**
