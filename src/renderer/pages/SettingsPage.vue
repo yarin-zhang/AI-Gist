@@ -713,10 +713,8 @@ const updateSetting = async () => {
                 webdav: settings.webdav,
                 dataSync: settings.dataSync,
             })
-        );
-
-        // 如果 WebDAV 配置包含密码，需要先加密
-        if (settingsData.webdav && settingsData.webdav.password) {
+        );        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
+        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
             try {
                 console.log('正在加密 WebDAV 密码...');
                 const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
@@ -743,6 +741,90 @@ const updateSetting = async () => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settings.themeSource) {
             await window.electronAPI.theme.setSource(settings.themeSource);
+        }
+
+        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
+        if (settingsData.webdav) {
+            try {
+                await window.electronAPI.webdav.setConfig(settingsData.webdav);
+                console.log("WebDAV 配置同步成功");
+            } catch (error) {
+                console.error("WebDAV 配置同步失败:", error);
+            }
+        }
+
+        setTimeout(() => {
+            saving.value = false;
+        }, 500);
+    } catch (error) {
+        console.error("保存设置失败:", error);
+        message.error("保存设置失败");
+        saving.value = false;
+    }
+};
+
+// 更新设置（智能版本，避免重复加密）
+const updateSettingsSmart = async (fieldsToUpdate = null) => {
+    if (saving.value) return;
+
+    saving.value = true;
+    try {
+        // 只更新指定字段，如果没有指定则更新所有字段
+        let settingsData;
+        if (fieldsToUpdate) {
+            settingsData = {};
+            for (const field of fieldsToUpdate) {
+                if (field === 'webdav') {
+                    settingsData.webdav = JSON.parse(JSON.stringify(settings.webdav));
+                } else if (field === 'dataSync') {
+                    settingsData.dataSync = JSON.parse(JSON.stringify(settings.dataSync));
+                } else {
+                    settingsData[field] = settings[field];
+                }
+            }
+        } else {
+            // 创建纯对象副本，避免传递 Vue 响应式对象
+            settingsData = JSON.parse(
+                JSON.stringify({
+                    closeBehaviorMode: settings.closeBehaviorMode,
+                    closeAction: settings.closeAction,
+                    startMinimized: settings.startMinimized,
+                    autoLaunch: settings.autoLaunch,
+                    themeSource: settings.themeSource,
+                    webdav: settings.webdav,
+                    dataSync: settings.dataSync,
+                })
+            );
+        }
+
+        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
+        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
+            try {
+                console.log('正在加密 WebDAV 密码...');
+                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
+                if (encryptResult.success && encryptResult.encryptedPassword) {
+                    settingsData.webdav.password = encryptResult.encryptedPassword;
+                    console.log('WebDAV 密码加密成功');
+                } else {
+                    console.error('WebDAV 密码加密失败:', encryptResult.error);
+                    message.error('密码加密失败，请重试');
+                    saving.value = false;
+                    return;
+                }
+            } catch (error) {
+                console.error('WebDAV 密码加密出错:', error);
+                message.error('密码加密出错，请重试');
+                saving.value = false;
+                return;
+            }
+        }
+
+        const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
+        console.log("设置更新成功:", updatedPrefs);
+
+        // 如果更改了主题设置，也要更新主题管理器
+        if (settingsData.themeSource) {
+            await window.electronAPI.theme.setSource(settingsData.themeSource);
         }
 
         // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
@@ -802,33 +884,26 @@ const syncNow = async () => {
 
     loading.sync = true;
     try {
-        const result = await WebDAVAPI.syncNow();
-        
-        if (result.success) {
+        const result = await WebDAVAPI.syncNow();        if (result.success) {
             settings.dataSync.lastSyncTime = result.timestamp;
-            await updateSetting();
             
-            let successMessage = `数据同步成功 - 上传: ${result.filesUploaded} 文件, 下载: ${result.filesDownloaded} 文件`;
+            // 只更新 dataSync 配置，避免重复加密 WebDAV 密码
+            await updateSettingsSmart(['dataSync']);
             
-            // 显示冲突信息（如果有）
+            // 优先显示后端返回的消息，如果没有则显示默认消息
+            let successMessage = result.message || "数据同步成功";
+            
+            // 如果有冲突信息，简洁地显示
             if (result.conflictsDetected > 0) {
-                successMessage += ` | 检测到 ${result.conflictsDetected} 个冲突`;
                 if (result.conflictsResolved > 0) {
-                    successMessage += `, 已解决 ${result.conflictsResolved} 个`;
+                    successMessage += ` (检测到 ${result.conflictsDetected} 个冲突，已解决 ${result.conflictsResolved} 个)`;
+                } else {
+                    successMessage += ` (检测到 ${result.conflictsDetected} 个冲突)`;
                 }
                 
-                // 显示冲突详情
+                // 在控制台显示详细的冲突信息，前端只显示简洁消息
                 if (result.conflictDetails && result.conflictDetails.length > 0) {
                     console.log('同步冲突详情:', result.conflictDetails);
-                    result.conflictDetails.forEach(detail => {
-                        const conflictType = detail.type === 'data_conflict' ? '数据冲突' :
-                                           detail.type === 'timestamp_conflict' ? '时间戳冲突' : '版本冲突';
-                        const resolution = detail.resolution === 'merged' ? '已合并' :
-                                         detail.resolution === 'local_wins' ? '保留本地' :
-                                         detail.resolution === 'remote_wins' ? '保留远程' : '已备份';
-                        
-                        message.warning(`${conflictType}: ${detail.description} (处理: ${resolution})`);
-                    });
                 }
             }
             
@@ -892,11 +967,12 @@ const exportData = async (format: 'json' | 'csv') => {
                 includeSettings: true,
                 includeHistory: true,
             }, exportPath);
-            
-            if (result.success) {
-                message.success(`数据已导出为 ${format.toUpperCase()} 格式到: ${result.filePath}`);
+              if (result.success) {
+                // 优先显示后端返回的消息，如果没有则显示默认成功消息
+                const successMessage = result.message || `数据已导出为 ${format.toUpperCase()} 格式`;
+                message.success(successMessage);
             } else {
-                message.error('导出失败');
+                message.error(result.message || '导出失败');
             }
         }
     } catch (error) {
@@ -918,11 +994,10 @@ const importData = async (format: 'json' | 'csv') => {
                 overwrite: false,
                 mergeStrategy: 'merge',
             });
-            
-            if (result.success) {
-                const imported = result.imported;
-                const totalImported = imported.categories + imported.prompts + imported.settings + imported.history;
-                message.success(`${format.toUpperCase()} 数据导入成功 - 共导入 ${totalImported} 项数据`);
+              if (result.success) {
+                // 优先显示后端返回的消息，如果没有则显示默认成功消息
+                const successMessage = result.message || `${format.toUpperCase()} 数据导入成功`;
+                message.success(successMessage);
                 
                 if (result.errors.length > 0) {
                     console.warn("导入过程中的警告:", result.errors);

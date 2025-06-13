@@ -83,7 +83,9 @@ export class WebDAVService {
     private syncTimer: NodeJS.Timeout | null = null;
 
     constructor(private preferencesManager: any, private dataManagementService?: any) {
+        console.log('WebDAV 服务初始化中...');
         this.setupIpcHandlers();
+        console.log('WebDAV IPC 处理程序已设置');
     }
 
     /**
@@ -176,6 +178,8 @@ export class WebDAVService {
     }
 
     private setupIpcHandlers() {
+        console.log('正在设置 WebDAV IPC 处理程序...');
+        
         // 测试 WebDAV 连接
         ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig): Promise<WebDAVTestResult> => {
             try {
@@ -317,12 +321,14 @@ export class WebDAVService {
 
         // 设置 WebDAV 配置
         ipcMain.handle('webdav:set-config', async (event, config) => {
-            // 加密密码后保存
+            // 加密密码后保存（但不重复加密已加密的密码）
             const configToSave = { ...config };
-            if (configToSave.password) {
-                console.log('正在加密密码...');
+            if (configToSave.password && !this.isPasswordEncrypted(configToSave.password)) {
+                console.log('正在加密明文密码...');
                 configToSave.password = this.encryptPassword(configToSave.password);
                 console.log('密码已加密存储');
+            } else if (configToSave.password && this.isPasswordEncrypted(configToSave.password)) {
+                console.log('密码已经是加密状态，跳过加密');
             }
             
             this.config = config; // 保留明文密码在内存中用于当前会话
@@ -364,6 +370,7 @@ export class WebDAVService {
 
         // 加密密码（供前端调用）
         ipcMain.handle('webdav:encrypt-password', async (event, password: string) => {
+            console.log('WebDAV 密码加密 IPC 处理程序被调用');
             try {
                 return {
                     success: true,
@@ -380,6 +387,7 @@ export class WebDAVService {
 
         // 解密密码（供前端调用）
         ipcMain.handle('webdav:decrypt-password', async (event, encryptedPassword: EncryptedPassword) => {
+            console.log('WebDAV 密码解密 IPC 处理程序被调用');
             try {
                 return {
                     success: true,
@@ -393,6 +401,8 @@ export class WebDAVService {
                 };
             }
         });
+        
+        console.log('WebDAV IPC 处理程序设置完成，包括加密/解密处理程序');
     }
 
     private async performSync(): Promise<SyncResult> {
@@ -430,6 +440,7 @@ export class WebDAVService {
             console.log('- 同步时间:', localMetadata.lastSyncTime);
             console.log('- 同步次数:', localMetadata.syncCount);
             console.log('- 设备ID:', localMetadata.deviceId);
+            console.log('- 应用版本:', localMetadata.appVersion);
             console.log('- 分类数量:', localData.categories?.length || 0);
             console.log('- 提示词数量:', localData.prompts?.length || 0);
             
@@ -456,6 +467,7 @@ export class WebDAVService {
                         console.log('- 同步时间:', remoteMetadata.lastSyncTime);
                         console.log('- 同步次数:', remoteMetadata.syncCount);
                         console.log('- 设备ID:', remoteMetadata.deviceId);
+                        console.log('- 应用版本:', remoteMetadata.appVersion);
                         console.log('- 分类数量:', remoteData.categories?.length || 0);
                         console.log('- 提示词数量:', remoteData.prompts?.length || 0);
                     }

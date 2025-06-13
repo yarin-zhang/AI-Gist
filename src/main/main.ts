@@ -27,14 +27,15 @@ app.whenReady().then(async () => {
 
   // 应用偏好设置（在创建窗口之前）
   preferencesManager.applyAllSettings();
-
   // 初始化主题管理器
   themeManager.initialize();
-  // 初始化 IPC 处理器
-  ipcHandlers.initialize();
-  // 初始化新的服务
+  
+  // 初始化新的服务（在 IPC 处理器之前）
   dataManagementService = new DataManagementService(app.getPath('userData'));
   webdavService = new WebDAVService(preferencesManager, dataManagementService);
+  
+  // 初始化 IPC 处理器（放在服务初始化之后）
+  ipcHandlers.initialize();
 
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
