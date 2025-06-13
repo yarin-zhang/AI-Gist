@@ -21,6 +21,7 @@
     "url": "https://github.com/yarin-zhang"
   },
   "devDependencies": {
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-vue": "^4.4.1",
     "chalk": "^4.1.2",
     "chokidar": "^3.5.3",
@@ -41,7 +42,9 @@
     "cohere-ai": "^7.17.1",
     "langchain": "^0.3.27",
     "naive-ui": "^2.41.0",
+    "uuid": "^11.1.0",
     "vue": "^3.3.8",
+    "webdav": "^5.8.0",
     "zod": "^3.25.40"
   },
   "packageManager": "yarn@4.9.2"

@@ -203,7 +203,241 @@
                                     </NRadioGroup>
                                 </NFormItem>
                             </NFlex>
-                        </NCard>                        <!-- 实验室 (仅开发环境) -->
+                        </NCard>
+
+                        <!-- WebDAV 同步设置 -->
+                        <NCard v-show="activeSettingKey === 'webdav-sync'">
+                            <NFlex vertical :size="20">
+                                <!-- 启用 WebDAV 同步 -->
+                                <NFormItem label="启用 WebDAV 同步">
+                                    <NCheckbox v-model:checked="settings.webdav.enabled"
+                                        @update:checked="updateSetting">
+                                        <NFlex align="center" :size="8">
+                                            <div>
+                                                <div>启用 WebDAV 数据同步</div>
+                                                <NText depth="3" style="font-size: 12px">
+                                                    将数据同步到 WebDAV 服务器
+                                                </NText>
+                                            </div>
+                                        </NFlex>
+                                    </NCheckbox>
+                                </NFormItem>
+
+                                <!-- WebDAV 服务器配置 -->
+                                <div v-if="settings.webdav.enabled">
+                                    <NDivider>服务器配置</NDivider>
+                                    
+                                    <NFlex vertical :size="16">
+                                        <NFormItem label="服务器地址">
+                                            <NInput v-model:value="settings.webdav.serverUrl"
+                                                @blur="updateSetting"
+                                                placeholder="https://example.com/webdav"
+                                                type="url">
+                                                <template #prefix>
+                                                    <NIcon>
+                                                        <Cloud />
+                                                    </NIcon>
+                                                </template>
+                                            </NInput>
+                                        </NFormItem>
+
+                                        <NFlex :size="16">
+                                            <NFormItem label="用户名" style="flex: 1">
+                                                <NInput v-model:value="settings.webdav.username"
+                                                    @blur="updateSetting"
+                                                    placeholder="用户名" />
+                                            </NFormItem>
+                                            <NFormItem label="密码" style="flex: 1">
+                                                <NInput v-model:value="settings.webdav.password"
+                                                    @blur="updateSetting"
+                                                    type="password"
+                                                    placeholder="密码"
+                                                    show-password-on="click" />
+                                            </NFormItem>
+                                        </NFlex>
+
+                                        <NFlex :size="12">
+                                            <NButton type="primary" @click="testWebDAVConnection"
+                                                :loading="loading.webdavTest">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <CloudStorm />
+                                                    </NIcon>
+                                                </template>
+                                                测试连接
+                                            </NButton>
+                                        </NFlex>
+                                    </NFlex>
+                                </div>
+
+                                <!-- 自动同步设置 -->
+                                <div v-if="settings.webdav.enabled">
+                                    <NDivider>同步设置</NDivider>
+                                    
+                                    <NFlex vertical :size="16">
+                                        <NFormItem label="自动同步">
+                                            <NCheckbox v-model:checked="settings.webdav.autoSync"
+                                                @update:checked="updateSetting">
+                                                <NFlex align="center" :size="8">
+                                                    <div>
+                                                        <div>启用自动同步</div>
+                                                        <NText depth="3" style="font-size: 12px">
+                                                            定时自动同步数据
+                                                        </NText>
+                                                    </div>
+                                                </NFlex>
+                                            </NCheckbox>
+                                        </NFormItem>
+
+                                        <NFormItem v-if="settings.webdav.autoSync" label="同步间隔">
+                                            <NInputNumber v-model:value="settings.webdav.syncInterval"
+                                                @update:value="updateSetting"
+                                                :min="5"
+                                                :max="1440"
+                                                :step="5">
+                                                <template #suffix>分钟</template>
+                                            </NInputNumber>
+                                        </NFormItem>
+
+                                        <NFlex :size="12">
+                                            <NButton @click="syncNow" :loading="loading.sync">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <BrandSoundcloud />
+                                                    </NIcon>
+                                                </template>
+                                                立即同步
+                                            </NButton>
+                                        </NFlex>
+
+                                        <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
+                                            <template #header>上次同步时间</template>
+                                            {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
+                                        </NAlert>
+                                    </NFlex>
+                                </div>
+                            </NFlex>
+                        </NCard>
+
+                        <!-- 数据管理设置 -->
+                        <NCard v-show="activeSettingKey === 'data-management'">
+                            <NFlex vertical :size="20">
+                                <!-- 数据备份 -->
+                                <div>
+                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
+                                        数据备份
+                                    </NText>
+                                    <NFlex vertical :size="16">
+                                        <NFormItem label="自动备份">
+                                            <NCheckbox v-model:checked="settings.dataSync.autoBackup"
+                                                @update:checked="updateSetting">
+                                                <NFlex align="center" :size="8">
+                                                    <div>
+                                                        <div>启用自动备份</div>
+                                                        <NText depth="3" style="font-size: 12px">
+                                                            定期自动备份数据到本地
+                                                        </NText>
+                                                    </div>
+                                                </NFlex>
+                                            </NCheckbox>
+                                        </NFormItem>
+
+                                        <NFormItem v-if="settings.dataSync.autoBackup" label="备份间隔">
+                                            <NInputNumber v-model:value="settings.dataSync.backupInterval"
+                                                @update:value="updateSetting"
+                                                :min="1"
+                                                :max="168"
+                                                :step="1">
+                                                <template #suffix>小时</template>
+                                            </NInputNumber>
+                                        </NFormItem>
+
+                                        <NFlex :size="12">
+                                            <NButton type="primary" @click="createBackup">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Upload />
+                                                    </NIcon>
+                                                </template>
+                                                创建备份
+                                            </NButton>
+                                            <NButton @click="restoreBackup">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Download />
+                                                    </NIcon>
+                                                </template>
+                                                恢复备份
+                                            </NButton>
+                                        </NFlex>
+                                    </NFlex>
+                                </div>
+
+                                <NDivider />
+
+                                <!-- 数据导入导出 -->
+                                <div>
+                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
+                                        数据导入导出
+                                    </NText>
+                                    <NFlex vertical :size="16">
+                                        <NAlert type="info" show-icon>
+                                            <template #header>支持格式</template>
+                                            支持 JSON、CSV 格式的数据导入导出
+                                        </NAlert>
+
+                                        <NFlex vertical :size="12">
+                                            <NText depth="2">导出数据</NText>
+                                            <NFlex :size="12">
+                                                <NButton @click="exportData('json')" :loading="loading.export">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileExport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导出为 JSON
+                                                </NButton>
+                                                <NButton @click="exportData('csv')" :loading="loading.export">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileExport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导出为 CSV
+                                                </NButton>
+                                            </NFlex>
+                                        </NFlex>
+
+                                        <NFlex vertical :size="12">
+                                            <NText depth="2">导入数据</NText>
+                                            <NFlex :size="12">
+                                                <NButton @click="importData('json')" :loading="loading.import">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileImport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导入 JSON
+                                                </NButton>
+                                                <NButton @click="importData('csv')" :loading="loading.import">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileImport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导入 CSV
+                                                </NButton>
+                                            </NFlex>
+                                        </NFlex>
+
+                                        <NAlert type="warning" show-icon>
+                                            <template #header>注意</template>
+                                            导入数据将覆盖现有数据，请确保已备份重要数据
+                                        </NAlert>
+                                    </NFlex>
+                                </div>
+                            </NFlex>
+                        </NCard><!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
@@ -243,6 +477,8 @@ import {
     NSpin,
     NMenu,
     NDivider,
+    NInput,
+    NInputNumber,
     useMessage,
 } from "naive-ui";
 import {
@@ -257,8 +493,18 @@ import {
     Sun,
     Moon,
     Flask,
+    Cloud,
+    Database,
+    Upload,
+    Download,
+    FileImport,
+    FileExport,
+    BrandSoundcloud,
+    CloudStorm,
+    AlertCircle,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
+import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
 // 消息提示
 const message = useMessage();
@@ -274,6 +520,10 @@ const activeSettingKey = ref("appearance");
 const saving = ref(false);
 const loading = reactive({
     reset: false,
+    webdavTest: false,
+    sync: false,
+    export: false,
+    import: false,
 });
 
 // 设置数据
@@ -283,6 +533,21 @@ const settings = reactive({
     startMinimized: false,
     autoLaunch: false,
     themeSource: "system" as "system" | "light" | "dark",
+    // WebDAV 同步设置
+    webdav: {
+        enabled: false,
+        serverUrl: "",
+        username: "",
+        password: "",
+        autoSync: false,
+        syncInterval: 30, // 分钟
+    },
+    // 数据同步设置
+    dataSync: {
+        lastSyncTime: null as string | null,
+        autoBackup: true,
+        backupInterval: 24, // 小时
+    },
 });
 
 // 菜单选项
@@ -302,6 +567,16 @@ const menuOptions = computed(() => {
             label: "关闭行为设置",
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
+        },
+        {
+            label: "WebDAV 同步",
+            key: "webdav-sync",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
+        },
+        {
+            label: "数据管理",
+            key: "data-management",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
         },
     ];
 
@@ -334,6 +609,16 @@ const currentSectionInfo = computed(() => {
             title: "外观设置",
             icon: Sun,
             description: "配置应用的主题模式"
+        },
+        "webdav-sync": {
+            title: "WebDAV 同步",
+            icon: Cloud,
+            description: "配置 WebDAV 服务器连接和数据同步设置"
+        },
+        "data-management": {
+            title: "数据管理",
+            icon: Database,
+            description: "数据备份、恢复、导入导出功能"
         },
         laboratory: {
             title: "实验室",
@@ -381,6 +666,8 @@ const updateSetting = async () => {
                 startMinimized: settings.startMinimized,
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
+                webdav: settings.webdav,
+                dataSync: settings.dataSync,
             })
         );
 
@@ -400,6 +687,158 @@ const updateSetting = async () => {
         message.error("保存设置失败");
         saving.value = false;
     }
+};
+
+// 测试 WebDAV 连接
+const testWebDAVConnection = async () => {
+    if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
+        message.error("请填写完整的服务器信息");
+        return;
+    }
+
+    loading.webdavTest = true;
+    try {
+        const result = await WebDAVAPI.testConnection({
+            serverUrl: settings.webdav.serverUrl,
+            username: settings.webdav.username,
+            password: settings.webdav.password,
+        });
+        
+        if (result.success) {
+            message.success(`WebDAV 连接测试成功${result.serverInfo ? ` - ${result.serverInfo.name}` : ''}`);
+        } else {
+            message.error(result.message || "WebDAV 连接测试失败");
+        }
+    } catch (error) {
+        console.error("WebDAV 连接测试失败:", error);
+        message.error("WebDAV 连接测试失败");
+    }
+    loading.webdavTest = false;
+};
+
+// 立即同步
+const syncNow = async () => {
+    if (!settings.webdav.enabled) {
+        message.error("请先启用 WebDAV 同步");
+        return;
+    }
+
+    loading.sync = true;
+    try {
+        const result = await WebDAVAPI.syncNow();
+        
+        if (result.success) {
+            settings.dataSync.lastSyncTime = result.timestamp;
+            await updateSetting();
+            message.success(`数据同步成功 - 上传: ${result.filesUploaded} 文件, 下载: ${result.filesDownloaded} 文件`);
+        } else {
+            message.error(result.message || "数据同步失败");
+        }
+    } catch (error) {
+        console.error("数据同步失败:", error);
+        message.error("数据同步失败");
+    }
+    loading.sync = false;
+};
+
+// 创建备份
+const createBackup = async () => {
+    try {
+        const backup = await DataManagementAPI.createBackup("手动备份");
+        message.success(`备份创建成功 - ${backup.name}`);
+    } catch (error) {
+        console.error("创建备份失败:", error);
+        message.error("创建备份失败");
+    }
+};
+
+// 恢复备份
+const restoreBackup = async () => {
+    try {
+        const backups = await DataManagementAPI.getBackupList();
+        if (backups.length === 0) {
+            message.warning("没有可用的备份文件");
+            return;
+        }
+        
+        // 这里应该显示一个选择备份的对话框
+        // 暂时使用最新的备份
+        const latestBackup = backups[0];
+        await DataManagementAPI.restoreBackup(latestBackup.id);
+        message.success("备份恢复成功");
+    } catch (error) {
+        console.error("恢复备份失败:", error);
+        message.error("恢复备份失败");
+    }
+};
+
+// 导出数据
+const exportData = async (format: 'json' | 'csv') => {
+    loading.export = true;
+    try {
+        const defaultName = `ai-gist-data-${new Date().toISOString().split('T')[0]}.${format}`;
+        const exportPath = await DataManagementAPI.selectExportPath(defaultName);
+        
+        if (exportPath) {
+            await DataManagementAPI.exportData({
+                format,
+                includeCategories: true,
+                includePrompts: true,
+                includeSettings: true,
+                includeHistory: true,
+            });
+            message.success(`数据已导出为 ${format.toUpperCase()} 格式`);
+        }
+    } catch (error) {
+        console.error("导出数据失败:", error);
+        message.error("导出数据失败");
+    }
+    loading.export = false;
+};
+
+// 导入数据
+const importData = async (format: 'json' | 'csv') => {
+    loading.import = true;
+    try {
+        const filePath = await DataManagementAPI.selectImportFile(format);
+        
+        if (filePath) {
+            const result = await DataManagementAPI.importData(filePath, {
+                format,
+                overwrite: false,
+                mergeStrategy: 'merge',
+            });
+            
+            if (result.success) {
+                const imported = result.imported;
+                const totalImported = imported.categories + imported.prompts + imported.settings + imported.history;
+                message.success(`${format.toUpperCase()} 数据导入成功 - 共导入 ${totalImported} 项数据`);
+                
+                if (result.errors.length > 0) {
+                    console.warn("导入过程中的警告:", result.errors);
+                }
+            } else {
+                message.error(result.message || "数据导入失败");
+            }
+        }
+    } catch (error) {
+        console.error("导入数据失败:", error);
+        message.error("导入数据失败");
+    }
+    loading.import = false;
+};
+
+// 格式化同步时间
+const formatSyncTime = (timeString: string) => {
+    const date = new Date(timeString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
 };
 
 // 重置设置

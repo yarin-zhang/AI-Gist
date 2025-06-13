@@ -5,11 +5,15 @@ import {
   ipcHandlers,
   themeManager,
   preferencesManager,
-  singleInstanceManager
+  singleInstanceManager,
+  WebDAVService,
+  DataManagementService
 } from './electron';
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
+let webdavService: WebDAVService;
+let dataManagementService: DataManagementService;
 
 // 防止多重启动 - 初始化单实例管理器
 singleInstanceManager.initialize();
@@ -26,9 +30,12 @@ app.whenReady().then(async () => {
 
   // 初始化主题管理器
   themeManager.initialize();
-
   // 初始化 IPC 处理器
   ipcHandlers.initialize();
+
+  // 初始化新的服务
+  webdavService = new WebDAVService(preferencesManager);
+  dataManagementService = new DataManagementService(app.getPath('userData'));
 
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
