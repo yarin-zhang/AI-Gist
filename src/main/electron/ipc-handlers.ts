@@ -180,6 +180,10 @@ class IpcHandlers {
         updatedAt: new Date(config.updatedAt)
       };
       
+      // 调试：打印配置信息
+      console.log('IPC生成提示词 - 原始配置 systemPrompt:', config.systemPrompt);
+      console.log('IPC生成提示词 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
+      
       const requestWithConfig = {
         ...request,
         config: processedConfig
@@ -210,6 +214,10 @@ class IpcHandlers {
         createdAt: new Date(config.createdAt),
         updatedAt: new Date(config.updatedAt)
       };
+      
+      // 调试：打印配置信息
+      console.log('IPC流式生成提示词 - 原始配置 systemPrompt:', config.systemPrompt);
+      console.log('IPC流式生成提示词 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
         return await aiServiceManager.generatePromptWithStream(
         request,
         processedConfig,

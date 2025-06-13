@@ -741,7 +741,7 @@ const formatDate = (date: Date | string) => {
 
 // 序列化配置对象以确保可以通过 IPC 传递
 const serializeConfig = (config: AIConfig) => {
-    return {
+    const serialized = {
         id: config.id,
         configId: config.configId,
         name: config.name,
@@ -757,6 +757,11 @@ const serializeConfig = (config: AIConfig) => {
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
     }
+    
+    console.log('前端序列化配置 - 原始 systemPrompt:', config.systemPrompt);
+    console.log('前端序列化配置 - 序列化后 systemPrompt:', serialized.systemPrompt);
+    
+    return serialized;
 }
 
 // 获取生成状态文本

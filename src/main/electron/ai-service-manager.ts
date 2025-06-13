@@ -842,8 +842,11 @@ class AIServiceManager {
       throw new Error('未指定模型');
     }
 
-    // 构建系统提示词
-    const systemPrompt = request.systemPrompt || config.systemPrompt || 
+    // 构建系统提示词 - 优先使用配置中的自定义系统提示词
+    console.log('生成提示词 - 配置中的 systemPrompt:', config.systemPrompt);
+    console.log('生成提示词 - 请求中的 systemPrompt:', request.systemPrompt);
+    
+    const systemPrompt = config.systemPrompt || request.systemPrompt || 
       `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
 
 要求：
@@ -855,13 +858,22 @@ class AIServiceManager {
 
 请直接返回优化后的提示词内容，不需要额外的解释。`;
 
+    console.log('生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
+
     // 构建用户提示词
-    const userPrompt = request.customPrompt || 
+    // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
+    const userPrompt = request.customPrompt || (config.systemPrompt ? 
+      `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
       `请为以下主题生成一个专业的 AI 提示词：
 
 主题：${request.topic}
 
-请生成一个完整、可直接使用的提示词。`;    try {
+请生成一个完整、可直接使用的提示词。`);
+
+    console.log('生成提示词 - 用户提示词内容:', userPrompt);
+    console.log('生成提示词 - 请求主题:', request.topic);
+
+    try {
       let llm: any;
       
       if (config.type === 'openai' || config.type === 'deepseek') {
@@ -998,6 +1010,8 @@ class AIServiceManager {
     }
 
     // 系统提示词
+    console.log('流式生成提示词 - 配置中的 systemPrompt:', config.systemPrompt);
+    
     const systemPrompt = config.systemPrompt || `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
 
 要求：
@@ -1009,13 +1023,22 @@ class AIServiceManager {
 
 请直接返回优化后的提示词内容，不需要额外的解释。`;
 
+    console.log('流式生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
+
     // 构建用户提示词
-    const userPrompt = request.customPrompt || 
+    // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
+    const userPrompt = request.customPrompt || (config.systemPrompt ? 
+      `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
       `请为以下主题生成一个专业的 AI 提示词：
 
 主题：${request.topic}
 
-请生成一个完整、可直接使用的提示词。`;    try {
+请生成一个完整、可直接使用的提示词。`);
+
+    console.log('流式生成提示词 - 用户提示词内容:', userPrompt);
+    console.log('流式生成提示词 - 请求主题:', request.topic);
+
+    try {
       let llm: any;
       
       if (config.type === 'openai' || config.type === 'deepseek') {
