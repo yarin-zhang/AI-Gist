@@ -69,17 +69,16 @@
                                         </template>
                                         停止
                                     </n-button>
-                                    <n-dropdown :options="modelDropdownOptions" @select="onModelSelect" trigger="click"
-                                        v-if="configs.length > 0">
-                                        <n-button quaternary>
-                                            {{ getDisplayModelName() }}
-                                            <template #icon>
-                                                <n-icon>
-                                                    <ChevronDown />
-                                                </n-icon>
-                                            </template>
-                                        </n-button>
-                                    </n-dropdown>
+                                    <!-- 模型选择器 -->
+                                    <n-select
+                                        v-if="configs.length > 0"
+                                        v-model:value="selectedModelKey"
+                                        :options="modelDropdownOptions"
+                                        placeholder="选择模型"
+                                        style="min-width: 300px;"
+                                        filterable
+                                        @update:value="onModelSelect"
+                                    />
                                     <n-button @click="toggleHistory" quaternary>
                                         <template #icon>
                                             <n-icon>
@@ -215,7 +214,7 @@ import {
     NTag,
     NSpace,
     NThing,
-    NDropdown,
+    NSelect,
     NEmpty,
     NText,
     NSplit,
@@ -223,7 +222,7 @@ import {
     NPagination,
     useMessage
 } from 'naive-ui'
-import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
+import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
@@ -249,6 +248,7 @@ const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
 const currentConfigId = ref<string>('')
+const selectedModelKey = ref<string>('') // 选中的模型key，格式为 "configId:model"
 const generating = ref(false)
 const loading = ref(true)
 const showHistory = ref(false)
@@ -306,8 +306,8 @@ const formRef = ref()
 const modelDropdownOptions = computed(() => {
     if (!configs.value || configs.value.length === 0) return []
 
-    const preferredOptions: Array<{ label: string; key: string; configId: string; configName: string; isPreferred: boolean }> = []
-    const regularOptions: Array<{ label: string; key: string; configId: string; configName: string; isPreferred: boolean }> = []
+    const preferredOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
+    const regularOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
 
     // 遍历所有启用的配置，分别处理首选和普通配置
     configs.value.forEach(config => {
@@ -323,7 +323,7 @@ const modelDropdownOptions = computed(() => {
             
             targetArray.push({
                 label,
-                key: `${config.configId}:${config.defaultModel}`,
+                value: `${config.configId}:${config.defaultModel}`,
                 configId: config.configId,
                 configName: config.name,
                 isPreferred
@@ -339,7 +339,7 @@ const modelDropdownOptions = computed(() => {
                 
                 targetArray.push({
                     label,
-                    key: `${config.configId}:${model}`,
+                    value: `${config.configId}:${model}`,
                     configId: config.configId,
                     configName: config.name,
                     isPreferred
@@ -355,7 +355,7 @@ const modelDropdownOptions = computed(() => {
                 
             targetArray.push({
                 label,
-                key: `${config.configId}:${config.customModel}`,
+                value: `${config.configId}:${config.customModel}`,
                 configId: config.configId,
                 configName: config.name,
                 isPreferred
@@ -390,6 +390,7 @@ const loadConfigs = async () => {
             if (defaultModel) {
                 currentModel.value = defaultModel
                 currentConfigId.value = defaultConfig.value.configId
+                selectedModelKey.value = `${defaultConfig.value.configId}:${defaultModel}`
             }
             
             const configLabel = defaultConfig.value === preferred ? '首选配置' : '默认配置'
@@ -399,6 +400,7 @@ const loadConfigs = async () => {
             preferredConfig.value = null
             currentModel.value = ''
             currentConfigId.value = ''
+            selectedModelKey.value = ''
             console.log('没有找到启用的 AI 配置')
         }
     })
@@ -438,10 +440,13 @@ const toggleHistory = () => {
 
 // 模型选择处理
 const onModelSelect = (modelKey: string) => {
+    if (!modelKey) return
+    
     // 解析选择的模型key，格式为 "configId:model"
     const [configId, model] = modelKey.split(':')
     currentModel.value = model
     currentConfigId.value = configId
+    selectedModelKey.value = modelKey
 
     // 更新当前使用的配置
     const selectedConfig = configs.value.find(c => c.configId === configId)
