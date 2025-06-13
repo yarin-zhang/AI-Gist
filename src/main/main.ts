@@ -32,10 +32,9 @@ app.whenReady().then(async () => {
   themeManager.initialize();
   // 初始化 IPC 处理器
   ipcHandlers.initialize();
-
   // 初始化新的服务
-  webdavService = new WebDAVService(preferencesManager);
   dataManagementService = new DataManagementService(app.getPath('userData'));
+  webdavService = new WebDAVService(preferencesManager, dataManagementService);
 
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();

@@ -13,7 +13,20 @@ class PreferencesManager {
     closeAction: 'quit',
     startMinimized: false,
     autoLaunch: false,
-    themeSource: 'system'
+    themeSource: 'system',
+    webdav: {
+      enabled: false,
+      serverUrl: '',
+      username: '',
+      password: '',
+      autoSync: false,
+      syncInterval: 30,
+    },
+    dataSync: {
+      lastSyncTime: null,
+      autoBackup: true,
+      backupInterval: 24,
+    },
   };
 
   constructor() {
@@ -49,14 +62,26 @@ class PreferencesManager {
       if (fs.existsSync(this.configPath)) {
         const data = fs.readFileSync(this.configPath, 'utf8');
         const loadedPrefs = JSON.parse(data);
-        
-        // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
+          // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
         const cleanedPrefs: UserPreferences = {
           closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
           closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
           startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
           autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,
-          themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource
+          themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource,
+          webdav: {
+            enabled: loadedPrefs.webdav?.enabled ?? this.defaultPreferences.webdav!.enabled,
+            serverUrl: loadedPrefs.webdav?.serverUrl ?? this.defaultPreferences.webdav!.serverUrl,
+            username: loadedPrefs.webdav?.username ?? this.defaultPreferences.webdav!.username,
+            password: loadedPrefs.webdav?.password ?? this.defaultPreferences.webdav!.password,
+            autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
+            syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
+          },
+          dataSync: {
+            lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
+            autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
+            backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
+          },
         };
         
         // 如果配置发生了变化（比如删除了字段），重新保存清理后的配置

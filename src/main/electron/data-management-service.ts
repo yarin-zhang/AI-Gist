@@ -355,4 +355,11 @@ export class DataManagementService {
         // 实际应用中需要更复杂的逻辑
         return { categories: [], prompts: [], settings: {}, history: [] };
     }
+
+    /**
+     * 生成导出数据 - 供 WebDAV 同步使用
+     */
+    async generateExportData() {
+        return await this.exportAllData();
+    }
 }

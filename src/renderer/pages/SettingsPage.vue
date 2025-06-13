@@ -644,8 +644,34 @@ const handleMenuSelect = (key: string) => {
 const loadSettings = async () => {
     try {
         const prefs = await window.electronAPI.preferences.get();
-        Object.assign(settings, prefs);
-        console.log("设置加载成功:", prefs);
+        
+        // 确保 WebDAV 配置结构完整
+        const webdavConfig = prefs.webdav || {};
+        settings.webdav = {
+            enabled: webdavConfig.enabled || false,
+            serverUrl: webdavConfig.serverUrl || "",
+            username: webdavConfig.username || "",
+            password: webdavConfig.password || "",
+            autoSync: webdavConfig.autoSync || false,
+            syncInterval: webdavConfig.syncInterval || 30,
+        };
+        
+        // 确保数据同步配置结构完整  
+        const dataSyncConfig = prefs.dataSync || {};
+        settings.dataSync = {
+            lastSyncTime: dataSyncConfig.lastSyncTime || null,
+            autoBackup: dataSyncConfig.autoBackup !== undefined ? dataSyncConfig.autoBackup : true,
+            backupInterval: dataSyncConfig.backupInterval || 24,
+        };
+        
+        // 其他配置
+        settings.closeBehaviorMode = prefs.closeBehaviorMode || "ask";
+        settings.closeAction = prefs.closeAction || "quit";
+        settings.startMinimized = prefs.startMinimized || false;
+        settings.autoLaunch = prefs.autoLaunch || false;
+        settings.themeSource = prefs.themeSource || "system";
+        
+        console.log("设置加载成功:", settings);
     } catch (error) {
         console.error("加载设置失败:", error);
         message.error("加载设置失败");
@@ -677,6 +703,16 @@ const updateSetting = async () => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settings.themeSource) {
             await window.electronAPI.theme.setSource(settings.themeSource);
+        }
+
+        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
+        if (settingsData.webdav) {
+            try {
+                await window.electronAPI.webdav.setConfig(settingsData.webdav);
+                console.log("WebDAV 配置同步成功");
+            } catch (error) {
+                console.error("WebDAV 配置同步失败:", error);
+            }
         }
 
         setTimeout(() => {
@@ -871,6 +907,16 @@ const resetSettings = async () => {
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
+    
+    // 同步 WebDAV 配置到服务端
+    try {
+        if (settings.webdav) {
+            await window.electronAPI.webdav.setConfig(settings.webdav);
+            console.log("WebDAV 配置已同步到服务端");
+        }
+    } catch (error) {
+        console.error("同步 WebDAV 配置失败:", error);
+    }
 });
 </script>
 
