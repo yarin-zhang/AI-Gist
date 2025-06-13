@@ -903,31 +903,37 @@ const debugPrompt = async () => {
     try {
         console.log("开始调试提示词:", filledContent.value);
         
-        // 构建请求参数
-        const request = {
-            configId: selectedConfig.configId,
-            topic: `请分析并回应以下提示词：\n\n${filledContent.value}`,
-            model: selectedConfig.defaultModel || selectedConfig.models[0]
-        };
-
         // 序列化配置以确保可以通过 IPC 传递
         const serializedConfig = {
-            configId: selectedConfig.configId,
-            name: selectedConfig.name,
-            type: selectedConfig.type,
-            baseURL: selectedConfig.baseURL,
-            apiKey: selectedConfig.apiKey,
-            secretKey: selectedConfig.secretKey,
-            models: selectedConfig.models,
-            defaultModel: selectedConfig.defaultModel,
-            customModel: selectedConfig.customModel,
-            enabled: selectedConfig.enabled,
-            systemPrompt: selectedConfig.systemPrompt,
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
             createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
             updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
         };
 
-        // 调用AI接口
+        // 构建请求参数 - 不包含 config
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(`请分析并回应以下提示词：\n\n${filledContent.value}`),
+            customPrompt: String(filledContent.value),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("开始调试提示词:", filledContent.value);
+        console.log("选中的配置:", selectedConfig);
+        console.log("请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 调用AI接口 - 传递两个分离的参数：request 和 config
         const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
         
         debugResult.value = result.generatedPrompt;
