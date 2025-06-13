@@ -47,28 +47,38 @@
                             </n-split>
                         </n-form-item>
                         <n-form-item>
+                            <n-space vertical style="width: 100%;">
                             <n-space justify="space-between" align="center" style="width: 100%;">
                                 <n-space>
                                     <n-button type="primary" @click="generatePrompt" :loading="generating"
-                                        :disabled="configs.length === 0">
+                                        :disabled="configs.length === 0 || generating">
                                         <template #icon>
                                             <n-icon>
                                                 <Bolt />
                                             </n-icon>
                                         </template>
-                                        {{ generating ? '生成中...' : '生成' }}
+                                        生成
                                     </n-button>
-                                    <n-dropdown :options="modelDropdownOptions" @select="onModelSelect" trigger="click"
-                                        v-if="configs.length > 0">
-                                        <n-button quaternary>
-                                            {{ getDisplayModelName() }}
-                                            <template #icon>
-                                                <n-icon>
-                                                    <ChevronDown />
-                                                </n-icon>
-                                            </template>
-                                        </n-button>
-                                    </n-dropdown>
+                                    
+                                    <!-- 停止生成按钮 -->
+                                    <n-button v-if="generating" @click="stopGeneration" type="error" ghost>
+                                        <template #icon>
+                                            <n-icon>
+                                                <X />
+                                            </n-icon>
+                                        </template>
+                                        停止
+                                    </n-button>
+                                    <!-- 模型选择器 -->
+                                    <n-select
+                                        v-if="configs.length > 0"
+                                        v-model:value="selectedModelKey"
+                                        :options="modelDropdownOptions"
+                                        placeholder="选择模型"
+                                        style="min-width: 300px;"
+                                        filterable
+                                        @update:value="onModelSelect"
+                                    />
                                     <n-button @click="toggleHistory" quaternary>
                                         <template #icon>
                                             <n-icon>
@@ -92,6 +102,17 @@
                                         保存
                                     </n-button>
                                 </n-space>
+                            </n-space>
+                            
+                            <!-- 生成状态显示栏 - 放置在按钮下方 -->
+                            <!-- <div v-if="generating" class="generation-status-bar" style="margin-top: 12px;">
+                                <n-space align="center">
+                                    <n-icon size="16" :color="'var(--primary-color)'" class="rotating">
+                                        <Bolt />
+                                    </n-icon>
+                                    <n-text>{{ getGenerationStatusText() }}</n-text>
+                                </n-space>
+                            </div> -->
                             </n-space>
                         </n-form-item>
                     </n-form>
@@ -134,8 +155,13 @@
                             <n-thing>
                                 <template #header>{{ item.topic }}</template>
                                 <template #description>
-                                    <n-space>
-                                        <span>{{ getConfigName(item.configId) }}</span>
+                                    <n-space align="center">
+                                        <n-space align="center" :size="4">
+                                            <n-icon v-if="isConfigPreferred(item.configId)" size="14" color="#f0c674">
+                                                <Star />
+                                            </n-icon>
+                                            <span>{{ getConfigNameOnly(item.configId) }}</span>
+                                        </n-space>
                                         <span>{{ item.model }}</span>
                                         <span>{{ formatDate(item.createdAt) }}</span>
                                     </n-space>
@@ -188,7 +214,7 @@ import {
     NTag,
     NSpace,
     NThing,
-    NDropdown,
+    NSelect,
     NEmpty,
     NText,
     NSplit,
@@ -196,7 +222,7 @@ import {
     NPagination,
     useMessage
 } from 'naive-ui'
-import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy } from '@vicons/tabler'
+import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
@@ -217,10 +243,12 @@ const emit = defineEmits<Emits>()
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
+const preferredConfig = ref<AIConfig | null>(null)
 const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
 const currentConfigId = ref<string>('')
+const selectedModelKey = ref<string>('') // 选中的模型key，格式为 "configId:model"
 const generating = ref(false)
 const loading = ref(true)
 const showHistory = ref(false)
@@ -246,7 +274,16 @@ const streamStats = reactive({
     charCount: 0,
     isStreaming: false,
     lastCharCount: 0,  // 记录上次的字符数
-    noContentUpdateCount: 0  // 记录没有内容更新的次数
+    noContentUpdateCount: 0,  // 记录没有内容更新的次数
+    lastUpdateTime: 0, // 记录最后一次更新的时间
+    isGenerationActive: false, // 标记生成是否活跃
+    contentGrowthRate: 0 // 内容增长速率（字符/秒）
+})
+
+// 生成控制状态
+const generationControl = reactive({
+    shouldStop: false, // 是否应该停止生成
+    abortController: null as AbortController | null // 用于取消请求的控制器
 })
 
 // 表单数据
@@ -269,46 +306,65 @@ const formRef = ref()
 const modelDropdownOptions = computed(() => {
     if (!configs.value || configs.value.length === 0) return []
 
-    const options: Array<{ label: string; key: string; configId: string; configName: string }> = []
+    const preferredOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
+    const regularOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
 
-    // 遍历所有启用的配置
+    // 遍历所有启用的配置，分别处理首选和普通配置
     configs.value.forEach(config => {
         const models = Array.isArray(config.models) ? config.models : []
+        const isPreferred = config.isPreferred || false
+        const targetArray = isPreferred ? preferredOptions : regularOptions
 
         // 添加默认模型
         if (config.defaultModel) {
-            options.push({
-                label: `${config.defaultModel} (${config.name} - 默认)`,
-                key: `${config.configId}:${config.defaultModel}`,
+            const label = isPreferred 
+                ? `★ ${config.defaultModel} (${config.name} - 默认)`
+                : `${config.defaultModel} (${config.name} - 默认)`
+            
+            targetArray.push({
+                label,
+                value: `${config.configId}:${config.defaultModel}`,
                 configId: config.configId,
-                configName: config.name
+                configName: config.name,
+                isPreferred
             })
         }
 
         // 添加其他模型
         models.forEach(model => {
             if (model !== config.defaultModel) { // 避免重复添加默认模型
-                options.push({
-                    label: `${model} (${config.name})`,
-                    key: `${config.configId}:${model}`,
+                const label = isPreferred 
+                    ? `★ ${model} (${config.name})`
+                    : `${model} (${config.name})`
+                
+                targetArray.push({
+                    label,
+                    value: `${config.configId}:${model}`,
                     configId: config.configId,
-                    configName: config.name
+                    configName: config.name,
+                    isPreferred
                 })
             }
         })
 
         // 添加自定义模型
         if (config.customModel && !models.includes(config.customModel) && config.customModel !== config.defaultModel) {
-            options.push({
-                label: `${config.customModel} (${config.name} - 自定义)`,
-                key: `${config.configId}:${config.customModel}`,
+            const label = isPreferred 
+                ? `★ ${config.customModel} (${config.name} - 自定义)`
+                : `${config.customModel} (${config.name} - 自定义)`
+                
+            targetArray.push({
+                label,
+                value: `${config.configId}:${config.customModel}`,
                 configId: config.configId,
-                configName: config.name
+                configName: config.name,
+                isPreferred
             })
         }
     })
 
-    return options
+    // 首选配置的模型排在前面，然后是普通配置的模型
+    return [...preferredOptions, ...regularOptions]
 })
 
 // 加载 AI 配置
@@ -316,24 +372,35 @@ const loadConfigs = async () => {
     loading.value = true
     await safeDbOperation(async () => {
         console.log('开始加载 AI 配置')
-        const result = await databaseService.getEnabledAIConfigs()
+        const result = await databaseService.aiConfig.getEnabledAIConfigs()
         console.log('成功获取到启用的 AI 配置:', result)
         configs.value = result
 
-        // 自动选择第一个启用的配置作为默认配置
+        // 加载首选配置
+        const preferred = await databaseService.aiConfig.getPreferredAIConfig()
+        preferredConfig.value = preferred
+        console.log('首选配置:', preferred?.name || '无')
+
+        // 自动选择首选配置作为默认配置，如果没有首选则选择第一个启用的配置
         if (result && result.length > 0) {
-            defaultConfig.value = result[0]
+            defaultConfig.value = preferred || result[0]
+            
             // 设置默认选中的模型和配置
             const defaultModel = defaultConfig.value.defaultModel || ''
             if (defaultModel) {
                 currentModel.value = defaultModel
                 currentConfigId.value = defaultConfig.value.configId
+                selectedModelKey.value = `${defaultConfig.value.configId}:${defaultModel}`
             }
-            console.log('自动选择默认配置:', defaultConfig.value.name)
+            
+            const configLabel = defaultConfig.value === preferred ? '首选配置' : '默认配置'
+            console.log(`自动选择${configLabel}:`, defaultConfig.value.name)
         } else {
             defaultConfig.value = null
+            preferredConfig.value = null
             currentModel.value = ''
             currentConfigId.value = ''
+            selectedModelKey.value = ''
             console.log('没有找到启用的 AI 配置')
         }
     })
@@ -373,15 +440,60 @@ const toggleHistory = () => {
 
 // 模型选择处理
 const onModelSelect = (modelKey: string) => {
+    if (!modelKey) return
+    
     // 解析选择的模型key，格式为 "configId:model"
     const [configId, model] = modelKey.split(':')
     currentModel.value = model
     currentConfigId.value = configId
+    selectedModelKey.value = modelKey
 
     // 更新当前使用的配置
     const selectedConfig = configs.value.find(c => c.configId === configId)
     if (selectedConfig) {
         console.log('切换到配置:', selectedConfig.name, '模型:', model)
+    }
+}
+
+// 停止生成
+const stopGeneration = async () => {
+    console.log('用户请求停止生成')
+    
+    try {
+        // 调用后端API停止生成
+        const result = await window.electronAPI.ai.stopGeneration()
+        console.log('后端停止生成结果:', result)
+        
+        // 设置前端停止标志
+        generating.value = false
+        generationControl.shouldStop = true
+        
+        // 如果有 AbortController，则取消请求
+        if (generationControl.abortController) {
+            generationControl.abortController.abort()
+            generationControl.abortController = null
+        }
+        
+        // 重置所有状态
+        streamStats.isStreaming = false
+        streamStats.charCount = 0
+        streamStats.lastCharCount = 0
+        streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = 0
+        streamStats.isGenerationActive = false
+        streamStats.contentGrowthRate = 0
+        
+        // 恢复布局
+        animateSplit(splitSize.value, 1)
+        
+        message.info('已停止生成')
+    } catch (error) {
+        console.error('停止生成失败:', error)
+        // 即使API调用失败，也要重置前端状态
+        generating.value = false
+        generationControl.shouldStop = true
+        animateSplit(splitSize.value, 1)
+        message.warning('停止生成时出现错误，但已重置界面状态')
     }
 }
 
@@ -417,9 +529,19 @@ const generatePrompt = async () => {
     try {
         await formRef.value?.validate()
         generating.value = true
+        
+        // 重置生成控制状态
+        generationControl.shouldStop = false
+        generationControl.abortController = new AbortController()
+        
         // 重置流式传输状态
         streamStats.charCount = 0
         streamStats.isStreaming = true
+        streamStats.lastCharCount = 0
+        streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = Date.now()
+        streamStats.isGenerationActive = true
+        streamStats.contentGrowthRate = 0
         generatedResult.value = '' // 清空之前的结果
 
         // 立即开始分隔动画，让用户看到右侧面板
@@ -449,6 +571,13 @@ const generatePrompt = async () => {
                 request,
                 serializedConfig,
                 (charCount: number, partialContent?: string) => {
+                    // 检查是否应该停止
+                    if (generationControl.shouldStop) {
+                        console.log('检测到停止信号，中断流式传输')
+                        return false // 返回 false 表示停止流式传输
+                    }
+                    
+                    const now = Date.now();
                     console.log('流式传输回调:', {
                         charCount,
                         hasContent: !!partialContent,
@@ -457,44 +586,74 @@ const generatePrompt = async () => {
                         contentType: typeof partialContent,
                         isEmptyString: partialContent === '',
                         isNull: partialContent === null,
-                        isUndefined: partialContent === undefined
+                        isUndefined: partialContent === undefined,
+                        timeSinceLastUpdate: now - streamStats.lastUpdateTime
                     });
 
-                    // 更新字符统计
+                    // 更新时间统计
                     const prevCharCount = streamStats.charCount;
+                    const prevUpdateTime = streamStats.lastUpdateTime;
                     streamStats.charCount = charCount;
+                    streamStats.lastUpdateTime = now;
+                    
+                    // 计算内容增长速率
+                    if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                        const timeDiff = (now - prevUpdateTime) / 1000; // 转换为秒
+                        const charDiff = charCount - prevCharCount;
+                        streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                    }
 
                     // 检测是否有真实内容
                     const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                    
+                    // 判断生成是否活跃
+                    const isActiveGeneration = hasRealContent || 
+                        (charCount > prevCharCount && (now - prevUpdateTime) < 2000); // 2秒内有字符增长认为是活跃的
+                    
+                    streamStats.isGenerationActive = isActiveGeneration;
 
                     if (hasRealContent) {
                         // 有真实内容时直接显示
                         generatedResult.value = partialContent;
                         streamStats.noContentUpdateCount = 0; // 重置计数器
-                        console.log('✅ 内容已更新，当前长度:', partialContent.length);
+                        console.log('✅ 内容已更新，当前长度:', partialContent.length, '增长速率:', streamStats.contentGrowthRate.toFixed(2), '字符/秒');
                     } else {
                         // 没有内容时的处理
                         streamStats.noContentUpdateCount++;
-                        // 如果字符数增加了但没有内容，可能是后端只发送了字符数
+                        
                         if (charCount > prevCharCount) {
-                            // 如果连续多次没有内容更新，改变提示文本
-                            if (streamStats.noContentUpdateCount > 10) {
-                                console.warn('⚠️ 检测到可能的流式传输问题：字符数在增加但没有内容传递');
-                                console.warn('📋 这通常意味着后端流式传输实现只传递了字符数，没有传递部分内容');
-
-                                // 改变占位符文本，让用户知道正在等待最终结果
-                                const warningText = `生成中，请稍候... (已生成 ${charCount} 字符，等待内容传输)`;
-                                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...') || generatedResult.value.startsWith('生成中，请稍候...')) {
+                            // 字符数在增长，说明正在生成
+                            const timeSinceUpdate = now - prevUpdateTime;
+                            
+                            if (streamStats.noContentUpdateCount > 15 && timeSinceUpdate > 3000) {
+                                // 很久没有内容更新，但字符还在增长，可能有问题
+                                console.warn('⚠️ 检测到可能的流式传输问题：字符数持续增长但长时间没有内容传递');
+                                const warningText = `生成中，请稍候... (已生成 ${charCount} 字符，正在等待内容传输完成)`;
+                                if (!generatedResult.value || generatedResult.value.includes('生成中') || generatedResult.value.includes('正在生成中')) {
                                     generatedResult.value = warningText;
-                                    console.log('⚠️ 显示等待提示:', warningText);
+                                    console.log('⚠️ 显示长时间等待提示:', warningText);
+                                }
+                            } else if (streamStats.noContentUpdateCount > 5) {
+                                // 中等时间没有内容，但字符在增长
+                                const estimatedTimeRemaining = streamStats.contentGrowthRate > 0 ? 
+                                    Math.ceil((charCount * 0.1) / streamStats.contentGrowthRate) : '未知';
+                                const statusText = `正在生成中... (已生成 ${charCount} 字符，预计还需 ${estimatedTimeRemaining} 秒)`;
+                                if (!generatedResult.value || generatedResult.value.includes('生成中') || generatedResult.value.includes('正在生成中')) {
+                                    generatedResult.value = statusText;
+                                    console.log('📝 显示进度预估:', statusText);
                                 }
                             } else {
-                                // 正常的占位符
+                                // 正常的初期占位符
                                 const placeholderText = `正在生成中... (已生成 ${charCount} 字符)`;
-                                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...')) {
+                                if (!generatedResult.value || generatedResult.value.includes('正在生成中')) {
                                     generatedResult.value = placeholderText;
-                                    console.log('📝 显示占位符:', placeholderText);
+                                    console.log('📝 显示基础占位符:', placeholderText);
                                 }
+                            }
+                        } else {
+                            // 字符数没有增长，可能生成已完成或出现问题
+                            if (charCount > 0) {
+                                console.log('🔄 字符数未增长，但已有内容，可能生成完成');
                             }
                         }
                     }
@@ -558,6 +717,20 @@ const generatePrompt = async () => {
 
     } catch (error) {
         console.error('生成失败:', error)
+        
+        // 检查是否是用户中断错误
+        if (error instanceof Error && 
+            (error.message?.includes('中断生成') || 
+             error.message?.includes('用户中断') || 
+             generationControl.shouldStop)) {
+            console.log('用户主动中断生成，不显示错误消息')
+            // 用户主动中断，不显示错误消息，只是清理状态
+            generatedResult.value = ''
+            await animateSplit(splitSize.value, 1)
+            return
+        }
+        
+        // 真正的错误才显示错误消息
         message.error('生成失败: ' + (error as Error).message)
 
         // 失败时恢复分隔为1，清空结果
@@ -582,10 +755,21 @@ const generatePrompt = async () => {
         }
     } finally {
         generating.value = false
+        
+        // 清理生成控制状态
+        generationControl.shouldStop = false
+        if (generationControl.abortController) {
+            generationControl.abortController = null
+        }
+        
+        // 清理流式传输状态
         streamStats.isStreaming = false
         streamStats.charCount = 0
         streamStats.lastCharCount = 0
         streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = 0
+        streamStats.isGenerationActive = false
+        streamStats.contentGrowthRate = 0
     }
 }
 
@@ -598,9 +782,10 @@ const simulateStreamProgress = async (finalContent: string) => {
     console.log('开始模拟流式进度:', { totalChars, steps, stepSize })
 
     for (let i = 0; i < steps; i++) {
-        if (!generating.value) {
+        // 检查是否应该停止
+        if (!generating.value || generationControl.shouldStop) {
             console.log('生成已取消，停止模拟')
-            break // 如果已取消，停止模拟
+            break
         }
 
         const currentCharCount = Math.min((i + 1) * stepSize, totalChars)
@@ -680,7 +865,8 @@ const getDisplayModelName = () => {
 
     const selectedConfig = configs.value.find(c => c.configId === currentConfigId.value)
     if (selectedConfig) {
-        return `${currentModel.value} (${selectedConfig.name})`
+        const prefix = selectedConfig.isPreferred ? '★ ' : ''
+        return `${prefix}${currentModel.value} (${selectedConfig.name})`
     }
 
     return currentModel.value || '选择模型'
@@ -689,7 +875,22 @@ const getDisplayModelName = () => {
 // 获取配置名称
 const getConfigName = (configId: string) => {
     const config = configs.value.find(c => c.configId === configId)
+    if (!config) return '未知配置'
+    
+    const prefix = config.isPreferred ? '★ ' : ''
+    return `${prefix}${config.name}`
+}
+
+// 获取配置名称（不带星标，用于图标显示）
+const getConfigNameOnly = (configId: string) => {
+    const config = configs.value.find(c => c.configId === configId)
     return config ? config.name : '未知配置'
+}
+
+// 检查配置是否为首选
+const isConfigPreferred = (configId: string) => {
+    const config = configs.value.find(c => c.configId === configId)
+    return config?.isPreferred || false
 }
 
 // 格式化日期
@@ -699,7 +900,7 @@ const formatDate = (date: Date | string) => {
 
 // 序列化配置对象以确保可以通过 IPC 传递
 const serializeConfig = (config: AIConfig) => {
-    return {
+    const serialized = {
         id: config.id,
         configId: config.configId,
         name: config.name,
@@ -711,9 +912,34 @@ const serializeConfig = (config: AIConfig) => {
         defaultModel: config.defaultModel,
         customModel: config.customModel,
         enabled: config.enabled,
+        systemPrompt: config.systemPrompt, // 添加自定义系统提示词
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
     }
+    
+    console.log('前端序列化配置 - 原始 systemPrompt:', config.systemPrompt);
+    console.log('前端序列化配置 - 序列化后 systemPrompt:', serialized.systemPrompt);
+    
+    return serialized;
+}
+
+// 获取生成状态文本
+const getGenerationStatusText = () => {
+    if (!generating.value) {
+        return ''
+    }
+    
+    if (streamStats.isStreaming && streamStats.charCount > 0) {
+        if (streamStats.isGenerationActive && streamStats.contentGrowthRate > 0) {
+            // 显示生成速率
+            return `正在生成... 已生成 ${streamStats.charCount} 字符 (${streamStats.contentGrowthRate.toFixed(1)} 字符/秒)`
+        } else if (streamStats.charCount > 0) {
+            // 显示已生成字符数
+            return `正在生成... 已生成 ${streamStats.charCount} 字符`
+        }
+    }
+    
+    return '正在生成...'
 }
 
 // 提示词保存完成（保留此函数以防Modal组件需要）
@@ -781,5 +1007,48 @@ const loadCategories = async () => {
     font-size: 12px;
     color: var(--error-color);
     line-height: 1.4;
+}
+
+.generation-status-bar {
+    background-color: var(--primary-color-suppl);
+    border: 1px solid var(--primary-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.rotating {
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.generation-status-bar {
+    background: var(--info-color-suppl);
+    border: 1px solid var(--info-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.rotating {
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>

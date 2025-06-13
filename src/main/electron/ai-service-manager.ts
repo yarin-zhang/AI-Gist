@@ -18,6 +18,7 @@ interface ProcessedAIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +53,56 @@ class AIServiceManager {
         setTimeout(() => reject(new Error('请求超时')), timeoutMs)
       )
     ]);
+  }
+
+  /**
+   * 创建智能超时 - 基于活动状态的超时判断
+   * 如果有持续的活动（通过回调函数检测），则不会超时
+   */
+  private async withSmartTimeout<T>(
+    promise: Promise<T>, 
+    timeoutMs: number = 60000,
+    activityCheckMs: number = 5000, // 检查活动的间隔
+    onActivityCheck?: () => boolean // 返回true表示有活动，false表示无活动
+  ): Promise<T> {
+    let isActive = true;
+    let lastActivityTime = Date.now();
+    
+    // 定期检查活动状态
+    const activityChecker = setInterval(() => {
+      const now = Date.now();
+      const hasActivity = onActivityCheck ? onActivityCheck() : true;
+      
+      if (hasActivity) {
+        lastActivityTime = now;
+      }
+      
+      // 如果超过指定时间没有活动，标记为不活跃
+      if (now - lastActivityTime > timeoutMs) {
+        isActive = false;
+      }
+    }, activityCheckMs);
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const checkTimeout = () => {
+        if (!isActive) {
+          clearInterval(activityChecker);
+          reject(new Error('请求超时'));
+          return;
+        }
+        setTimeout(checkTimeout, activityCheckMs);
+      };
+      setTimeout(checkTimeout, activityCheckMs);
+    });
+
+    try {
+      const result = await Promise.race([promise, timeoutPromise]);
+      clearInterval(activityChecker);
+      return result;
+    } catch (error) {
+      clearInterval(activityChecker);
+      throw error;
+    }
   }
 
   /**
@@ -698,8 +749,7 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        try {
+          try {
           const response = await this.withTimeout(
             cohere.generate({
               model: model,
@@ -707,11 +757,11 @@ class AIServiceManager {
               maxTokens: 100
             }),
             20000
-          );
+          ) as any; // 临时类型断言来解决 Cohere 类型问题
           
           return {
             success: true,
-            response: response.generations[0]?.text || '测试成功',
+            response: response.generations?.[0]?.text || '测试成功',
             inputPrompt: testPrompt
           };
         } catch (error: any) {
@@ -792,8 +842,11 @@ class AIServiceManager {
       throw new Error('未指定模型');
     }
 
-    // 构建系统提示词
-    const systemPrompt = request.systemPrompt || 
+    // 构建系统提示词 - 优先使用配置中的自定义系统提示词
+    console.log('生成提示词 - 配置中的 systemPrompt:', config.systemPrompt);
+    console.log('生成提示词 - 请求中的 systemPrompt:', request.systemPrompt);
+    
+    const systemPrompt = config.systemPrompt || request.systemPrompt || 
       `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
 
 要求：
@@ -805,13 +858,22 @@ class AIServiceManager {
 
 请直接返回优化后的提示词内容，不需要额外的解释。`;
 
+    console.log('生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
+
     // 构建用户提示词
-    const userPrompt = request.customPrompt || 
+    // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
+    const userPrompt = request.customPrompt || (config.systemPrompt ? 
+      `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
       `请为以下主题生成一个专业的 AI 提示词：
 
 主题：${request.topic}
 
-请生成一个完整、可直接使用的提示词。`;    try {
+请生成一个完整、可直接使用的提示词。`);
+
+    console.log('生成提示词 - 用户提示词内容:', userPrompt);
+    console.log('生成提示词 - 请求主题:', request.topic);
+
+    try {
       let llm: any;
       
       if (config.type === 'openai' || config.type === 'deepseek') {
@@ -851,20 +913,21 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        // Cohere 使用不同的API格式，添加超时
+          // Cohere 使用不同的API格式，添加超时
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await this.withTimeout(
+        const response = await this.withSmartTimeout(
           cohere.generate({
             model: model,
             prompt: prompt,
             maxTokens: 2000,
             temperature: 0.7
           }),
-          60000 // 生成较长的内容，使用更长的超时
-        );
+          90000, // 90秒总超时，生成较长的内容
+          5000,  // 每5秒检查一次
+          () => true // 对于Cohere API，我们也无法检测活动状态
+        ) as any; // 临时类型断言来解决 Cohere 类型问题
         
-        const generatedPrompt = response.generations[0]?.text || '';
+        const generatedPrompt = response.generations?.[0]?.text || '';
         
         const result: AIGenerationResult = {
           id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -901,7 +964,12 @@ class AIServiceManager {
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];      const response = await this.withTimeout(llm.invoke(messages), 60000); // 60秒超时
+      ];      const response = await this.withSmartTimeout(
+        llm.invoke(messages), 
+        90000, // 90秒总超时
+        5000,  // 每5秒检查一次
+        () => true // 对于非流式生成，我们无法检测活动状态，所以使用固定超时
+      );
       const generatedPrompt = typeof response === 'string' ? response : (response as any)?.content || '';
 
       const result: AIGenerationResult = {
@@ -929,7 +997,8 @@ class AIServiceManager {
   async generatePromptWithStream(
     request: AIGenerationRequest,
     config: ProcessedAIConfig, 
-    onProgress: (charCount: number, partialContent?: string) => void
+    onProgress: (charCount: number, partialContent?: string) => boolean, // 修改返回类型为boolean，false表示应该停止
+    abortSignal?: AbortSignal // 添加 AbortSignal 支持
   ): Promise<AIGenerationResult> {
     const model = request.model || config.defaultModel || config.customModel;
     
@@ -942,7 +1011,9 @@ class AIServiceManager {
     }
 
     // 系统提示词
-    const systemPrompt = `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
+    console.log('流式生成提示词 - 配置中的 systemPrompt:', config.systemPrompt);
+    
+    const systemPrompt = config.systemPrompt || `你是一个专业的 AI 提示词工程师，专门帮助用户创建高质量的 AI 提示词。你需要根据用户提供的主题和要求，生成一个结构清晰、逻辑严密、实用性强的提示词。
 
 要求：
 1. 提示词应该清晰、具体、可操作
@@ -953,13 +1024,22 @@ class AIServiceManager {
 
 请直接返回优化后的提示词内容，不需要额外的解释。`;
 
+    console.log('流式生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
+
     // 构建用户提示词
-    const userPrompt = request.customPrompt || 
+    // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
+    const userPrompt = request.customPrompt || (config.systemPrompt ? 
+      `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
       `请为以下主题生成一个专业的 AI 提示词：
 
 主题：${request.topic}
 
-请生成一个完整、可直接使用的提示词。`;    try {
+请生成一个完整、可直接使用的提示词。`);
+
+    console.log('流式生成提示词 - 用户提示词内容:', userPrompt);
+    console.log('流式生成提示词 - 请求主题:', request.topic);
+
+    try {
       let llm: any;
       
       if (config.type === 'openai' || config.type === 'deepseek') {
@@ -1005,26 +1085,35 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-        
-        const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await this.withTimeout(
+          const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
+        const response = await this.withSmartTimeout(
           cohere.generate({
             model: model,
             prompt: prompt,
             maxTokens: 2000,
             temperature: 0.7
           }),
-          60000
-        );
+          90000, // 90秒总超时
+          5000,  // 每5秒检查一次
+          () => true // Cohere不支持真正的流式，所以无法检测活动状态
+        ) as any; // 临时类型断言来解决 Cohere 类型问题
         
-        const accumulatedContent = response.generations[0]?.text || '';
+        const accumulatedContent = response.generations?.[0]?.text || '';
         
         // 模拟流式进度
         const totalChars = accumulatedContent.length;
         for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+          // 检查中断信号
+          if (abortSignal?.aborted) {
+            throw new Error('用户中断生成');
+          }
+          
           const currentCharCount = Math.min(i, totalChars);
           const partialContent = accumulatedContent.substring(0, currentCharCount);
-          onProgress(currentCharCount, partialContent);
+          const continueGeneration = onProgress(currentCharCount, partialContent);
+          if (continueGeneration === false) {
+            throw new Error('用户中断生成');
+          }
           await new Promise(resolve => setTimeout(resolve, 50));
         }
         
@@ -1067,40 +1156,122 @@ class AIServiceManager {
       ];
       
       let accumulatedContent = '';
+      let lastContentUpdate = Date.now();
+      let shouldStop = false; // 添加停止标志
       
-      // 尝试使用流式传输，添加超时
+      // 检查是否已经被中断
+      if (abortSignal?.aborted) {
+        throw new Error('生成已被中断');
+      }
+      
+      // 尝试使用流式传输，添加智能超时
       try {
         const streamPromise = (async () => {
           const stream = await llm.stream(messages);
           for await (const chunk of stream) {
+            // 检查中断信号
+            if (abortSignal?.aborted || shouldStop) {
+              console.log('检测到中断信号，停止流式生成');
+              break;
+            }
+            
             const content = typeof chunk === 'string' ? chunk : chunk.content;
             if (content) {
               accumulatedContent += content;
-              // 传递字符数和当前累积的内容
-              onProgress(accumulatedContent.length, accumulatedContent);
+              lastContentUpdate = Date.now(); // 更新最后内容更新时间
+              
+              // 调用进度回调，如果返回false则停止
+              const continueGeneration = onProgress(accumulatedContent.length, accumulatedContent);
+              if (continueGeneration === false) {
+                console.log('前端请求停止生成');
+                shouldStop = true;
+                break;
+              }
             }
           }
         })();
         
-        await this.withTimeout(streamPromise, 60000); // 60秒超时
+        // 使用智能超时：如果有内容持续更新，就不会超时
+        await this.withSmartTimeout(
+          streamPromise, 
+          60000, // 总超时时间60秒
+          2000,  // 每2秒检查一次活动状态
+          () => {
+            // 如果已经标记为停止，不继续等待
+            if (shouldStop || abortSignal?.aborted) {
+              return false;
+            }
+            
+            const now = Date.now();
+            const timeSinceLastUpdate = now - lastContentUpdate;
+            // 如果5秒内有内容更新，认为还在活动中
+            return timeSinceLastUpdate < 5000;
+          }
+        );
         
       } catch (streamError) {
+        // 如果是用户中断或中止信号，直接抛出中断错误
+        if (shouldStop || abortSignal?.aborted) {
+          throw new Error('用户中断生成');
+        }
+        
         // 如果流式传输失败，回退到普通调用
         console.warn('流式传输失败，回退到普通调用:', streamError);
         if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
-          throw new Error('生成超时，请检查网络连接或服务状态');
+          // 检查是否是真正的超时还是无响应超时
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastContentUpdate;
+          if (timeSinceLastUpdate > 10000 && accumulatedContent.length === 0) {
+            // 超过10秒没有任何内容，真正的超时
+            throw new Error('生成超时，AI服务可能无响应，请检查网络连接或服务状态');
+          } else if (timeSinceLastUpdate > 30000) {
+            // 超过30秒没有新内容，但已有内容，可能是生成完成但连接未正常关闭
+            console.warn('检测到生成可能已完成，但连接未正常关闭，使用已有内容');
+          } else {
+            // 正在生成中被中断，抛出用户友好的错误
+            throw new Error(`生成中断，已生成${accumulatedContent.length}字符，请重试或检查网络连接`);
+          }
         }
         
-        const response = await this.withTimeout(llm.invoke(messages), 60000);
-        accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
-        // 模拟流式进度
-        const totalChars = accumulatedContent.length;
-        for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
-          const currentCharCount = Math.min(i, totalChars);
-          const partialContent = accumulatedContent.substring(0, currentCharCount);
-          onProgress(currentCharCount, partialContent);
-          await new Promise(resolve => setTimeout(resolve, 50));
+        // 如果已有部分内容，尝试使用现有内容
+        if (accumulatedContent.length > 0) {
+          console.log(`使用流式传输生成的部分内容，长度: ${accumulatedContent.length}`);
+        } else {
+          // 完全回退到普通调用
+          // 但在普通调用前也要检查中断信号
+          if (abortSignal?.aborted || shouldStop) {
+            throw new Error('用户中断生成');
+          }
+          
+          const response = await this.withSmartTimeout(
+            llm.invoke(messages), 
+            90000, // 90秒总超时
+            5000,  // 每5秒检查一次
+            () => true // 在fallback中无法检测活动状态
+          );
+          accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
+          // 模拟流式进度
+          const totalChars = accumulatedContent.length;
+          for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+            // 检查中断信号
+            if (abortSignal?.aborted || shouldStop) {
+              throw new Error('用户中断生成');
+            }
+            
+            const currentCharCount = Math.min(i, totalChars);
+            const partialContent = accumulatedContent.substring(0, currentCharCount);
+            const continueGeneration = onProgress(currentCharCount, partialContent);
+            if (continueGeneration === false) {
+              throw new Error('用户中断生成');
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
         }
+      }
+
+      // 检查是否被中断
+      if (shouldStop || abortSignal?.aborted) {
+        throw new Error('用户中断生成');
       }
 
       const result: AIGenerationResult = {

@@ -2,12 +2,12 @@
  * Should match main/preload.ts for typescript support in renderer
  */
 
-// AI 相    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }>类型定义
+// AI 相关类型定义
 export interface AIConfig {
   id?: number;
   configId: string; // 唯一标识符
   name: string;
-  type: 'openai' | 'ollama';
+  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
   baseURL: string;
   apiKey?: string;
   secretKey?: string;
@@ -15,6 +15,7 @@ export interface AIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,8 +81,9 @@ export default interface ElectronApi {
     testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
-    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => void) => Promise<AIGenerationResult>
+    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
     intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
+    stopGeneration: () => Promise<{ success: boolean; message: string }>
   }
 }
 

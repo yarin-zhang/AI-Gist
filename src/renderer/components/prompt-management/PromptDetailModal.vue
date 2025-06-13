@@ -6,7 +6,11 @@
             <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{
                 prompt?.title
                 }}</NText>
-            <NText depth="3" v-if="prompt.description">{{
+            <NText 
+                depth="3" 
+                v-if="prompt.description" 
+                class="header-description"
+            >{{
                 prompt.description || "暂无描述"
                 }}</NText>
         </template>
@@ -242,7 +246,7 @@
                                     </template>
 
                                     <NFlex vertical size="small">
-                                        <NText>{{ record.content.substring(0, 120)
+                                        <NText class="history-content-preview">{{ record.content.substring(0, 120)
                                             }}{{ record.content.length > 120 ? "..." : "" }}</NText>
 
                                         <NFlex v-if="
@@ -696,5 +700,27 @@ watch(
 </script>
 
 <style scoped>
-/* 完全移除自定义样式，仅依赖 NaiveUI 原生组件和属性 */
+/* Header 区域描述文本截断 - 最多显示 2 行 */
+.header-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    max-height: calc(1.4em * 2);
+    word-break: break-word;
+}
+
+/* 历史记录内容预览截断 - 最多显示 3 行 */
+.history-content-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    max-height: calc(1.4em * 3);
+    word-break: break-word;
+}
 </style>

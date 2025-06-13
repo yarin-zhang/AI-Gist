@@ -2837,11 +2837,11 @@ __metadata:
   linkType: hard
 
 "console-table-printer@npm:^2.12.1":
-  version: 2.14.1
-  resolution: "console-table-printer@npm:2.14.1"
+  version: 2.14.3
+  resolution: "console-table-printer@npm:2.14.3"
   dependencies:
     simple-wcswidth: "npm:^1.0.1"
-  checksum: 10c0/5de14abb5c05452be4ede12500bf94fbdc3850a2b448deaf4bb94453a3b25f54df0f37ffc548bd34dc1b9d0eea19af2d8be7ed2c6538ac9912c049039ef35458
+  checksum: 10c0/842a26c6978b691a34b56431cf280ae72c16c8d2d9019bba831a62cf4d8a5e5276dfb402b688f42400f4af5e4eed4d9206368a9c2123d03e1e39159fb1ffe50d
   languageName: node
   linkType: hard
 
@@ -6270,9 +6270,9 @@ __metadata:
   linkType: hard
 
 "zod@npm:^3.22.4, zod@npm:^3.24.1":
-  version: 3.25.53
-  resolution: "zod@npm:3.25.53"
-  checksum: 10c0/f27f13b15d5a165f4320c287e23eef689899714adcf793afcf51f4b79186a0d0dec3f3e67f87d5f658f913c3f035c1d212f1bfaac00ef1f55143b1d0a3fb5c6d
+  version: 3.25.57
+  resolution: "zod@npm:3.25.57"
+  checksum: 10c0/3b3d98bf31d4ca9ce92e151ec6a69f6d63a9a7e4e74ce2bd0dfac87a1955d77934fc0fd5caf0017c9c9746e86cdcd27c63b0e3378bbf5e8b62ec5833f94395ac
   languageName: node
   linkType: hard
 
