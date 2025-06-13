@@ -417,30 +417,45 @@ const onModelSelect = (modelKey: string) => {
 }
 
 // 停止生成
-const stopGeneration = () => {
+const stopGeneration = async () => {
     console.log('用户请求停止生成')
-    generating.value = false
-    generationControl.shouldStop = true
     
-    // 如果有 AbortController，则取消请求
-    if (generationControl.abortController) {
-        generationControl.abortController.abort()
-        generationControl.abortController = null
+    try {
+        // 调用后端API停止生成
+        const result = await window.electronAPI.ai.stopGeneration()
+        console.log('后端停止生成结果:', result)
+        
+        // 设置前端停止标志
+        generating.value = false
+        generationControl.shouldStop = true
+        
+        // 如果有 AbortController，则取消请求
+        if (generationControl.abortController) {
+            generationControl.abortController.abort()
+            generationControl.abortController = null
+        }
+        
+        // 重置所有状态
+        streamStats.isStreaming = false
+        streamStats.charCount = 0
+        streamStats.lastCharCount = 0
+        streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = 0
+        streamStats.isGenerationActive = false
+        streamStats.contentGrowthRate = 0
+        
+        // 恢复布局
+        animateSplit(splitSize.value, 1)
+        
+        message.info('已停止生成')
+    } catch (error) {
+        console.error('停止生成失败:', error)
+        // 即使API调用失败，也要重置前端状态
+        generating.value = false
+        generationControl.shouldStop = true
+        animateSplit(splitSize.value, 1)
+        message.warning('停止生成时出现错误，但已重置界面状态')
     }
-    
-    // 重置所有状态
-    streamStats.isStreaming = false
-    streamStats.charCount = 0
-    streamStats.lastCharCount = 0
-    streamStats.noContentUpdateCount = 0
-    streamStats.lastUpdateTime = 0
-    streamStats.isGenerationActive = false
-    streamStats.contentGrowthRate = 0
-    
-    // 恢复布局
-    animateSplit(splitSize.value, 1)
-    
-    message.info('已停止生成')
 }
 
 // 手动保存提示词
@@ -663,6 +678,20 @@ const generatePrompt = async () => {
 
     } catch (error) {
         console.error('生成失败:', error)
+        
+        // 检查是否是用户中断错误
+        if (error instanceof Error && 
+            (error.message?.includes('中断生成') || 
+             error.message?.includes('用户中断') || 
+             generationControl.shouldStop)) {
+            console.log('用户主动中断生成，不显示错误消息')
+            // 用户主动中断，不显示错误消息，只是清理状态
+            generatedResult.value = ''
+            await animateSplit(splitSize.value, 1)
+            return
+        }
+        
+        // 真正的错误才显示错误消息
         message.error('生成失败: ' + (error as Error).message)
 
         // 失败时恢复分隔为1，清空结果

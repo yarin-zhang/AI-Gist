@@ -9,6 +9,8 @@ import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from './t
  * IPC 处理器管理器
  */
 class IpcHandlers {
+  private activeGenerations = new Map<string, AbortController>(); // 存储活跃的生成请求
+  
   /**
    * 初始化所有 IPC 处理器
    */
@@ -207,25 +209,71 @@ class IpcHandlers {
 
     // 流式生成 Prompt
     ipcMain.handle('ai:generate-prompt-stream', async (event, request: AIGenerationRequest, config: any) => {
-      // 将配置转换为内部格式
-      const processedConfig = {
-        ...config,
-        models: Array.isArray(config.models) ? config.models : [],
-        createdAt: new Date(config.createdAt),
-        updatedAt: new Date(config.updatedAt)
-      };
+      // 生成唯一的请求ID
+      const requestId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // 调试：打印配置信息
-      console.log('IPC流式生成提示词 - 原始配置 systemPrompt:', config.systemPrompt);
-      console.log('IPC流式生成提示词 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
-        return await aiServiceManager.generatePromptWithStream(
-        request,
-        processedConfig,
-        (charCount: number, partialContent?: string) => {
-          // 发送进度更新到渲染进程，包括字符数和部分内容
-          event.sender.send('ai:stream-progress', charCount, partialContent);
+      // 创建 AbortController
+      const abortController = new AbortController();
+      this.activeGenerations.set(requestId, abortController);
+      
+      try {
+        // 将配置转换为内部格式
+        const processedConfig = {
+          ...config,
+          models: Array.isArray(config.models) ? config.models : [],
+          createdAt: new Date(config.createdAt),
+          updatedAt: new Date(config.updatedAt)
+        };
+        
+        // 调试：打印配置信息
+        console.log('IPC流式生成提示词 - 原始配置 systemPrompt:', config.systemPrompt);
+        console.log('IPC流式生成提示词 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
+        console.log('IPC流式生成提示词 - 请求ID:', requestId);
+        
+        const result = await aiServiceManager.generatePromptWithStream(
+          request,
+          processedConfig,
+          (charCount: number, partialContent?: string) => {
+            // 检查是否已被中断
+            if (abortController.signal.aborted) {
+              console.log('IPC: 检测到中断信号，停止发送进度');
+              return false;
+            }
+            
+            // 发送进度更新到渲染进程，包括字符数和部分内容
+            event.sender.send('ai:stream-progress', charCount, partialContent);
+            return true; // 继续生成
+          },
+          abortController.signal
+        );
+        
+        return result;
+      } catch (error: any) {
+        if (error.message?.includes('中断生成') || abortController.signal.aborted) {
+          console.log('IPC: 生成被中断');
+          throw new Error('生成已被中断');
         }
-      );
+        throw error;
+      } finally {
+        // 清理
+        this.activeGenerations.delete(requestId);
+      }
+    });
+
+    // 停止生成
+    ipcMain.handle('ai:stop-generation', async (event) => {
+      console.log('IPC: 收到停止生成请求，活跃请求数:', this.activeGenerations.size);
+      
+      // 中断所有活跃的生成请求
+      for (const [requestId, abortController] of this.activeGenerations) {
+        console.log(`IPC: 中断生成请求 ${requestId}`);
+        abortController.abort();
+      }
+      
+      // 清空活跃请求
+      this.activeGenerations.clear();
+      
+      return { success: true, message: '已停止所有生成请求' };
     });
   }
 
@@ -259,6 +307,13 @@ class IpcHandlers {
     ipcMain.removeHandler('ai:generate-prompt');
     ipcMain.removeHandler('ai:intelligent-test');
     ipcMain.removeHandler('ai:generate-prompt-stream');
+    ipcMain.removeHandler('ai:stop-generation');
+    
+    // 清理活跃的生成请求
+    for (const abortController of this.activeGenerations.values()) {
+      abortController.abort();
+    }
+    this.activeGenerations.clear();
   }
 }
 

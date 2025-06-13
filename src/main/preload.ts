@@ -41,10 +41,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
-    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => void) => {
+    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => {
       // 监听流式进度，接收字符数和部分内容
       const progressListener = (_: any, charCount: number, partialContent?: string) => {
-        onProgress(charCount, partialContent);
+        const shouldContinue = onProgress(charCount, partialContent);
+        // 如果前端返回false，表示要停止生成
+        if (shouldContinue === false) {
+          console.log('前端请求停止生成，调用停止API');
+          ipcRenderer.invoke('ai:stop-generation').catch(console.error);
+        }
       };
       ipcRenderer.on('ai:stream-progress', progressListener);
       
@@ -59,5 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return promise;
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
+    stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
   }
 });

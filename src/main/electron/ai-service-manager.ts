@@ -997,7 +997,8 @@ class AIServiceManager {
   async generatePromptWithStream(
     request: AIGenerationRequest,
     config: ProcessedAIConfig, 
-    onProgress: (charCount: number, partialContent?: string) => void
+    onProgress: (charCount: number, partialContent?: string) => boolean, // 修改返回类型为boolean，false表示应该停止
+    abortSignal?: AbortSignal // 添加 AbortSignal 支持
   ): Promise<AIGenerationResult> {
     const model = request.model || config.defaultModel || config.customModel;
     
@@ -1102,9 +1103,17 @@ class AIServiceManager {
         // 模拟流式进度
         const totalChars = accumulatedContent.length;
         for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+          // 检查中断信号
+          if (abortSignal?.aborted) {
+            throw new Error('用户中断生成');
+          }
+          
           const currentCharCount = Math.min(i, totalChars);
           const partialContent = accumulatedContent.substring(0, currentCharCount);
-          onProgress(currentCharCount, partialContent);
+          const continueGeneration = onProgress(currentCharCount, partialContent);
+          if (continueGeneration === false) {
+            throw new Error('用户中断生成');
+          }
           await new Promise(resolve => setTimeout(resolve, 50));
         }
         
@@ -1148,18 +1157,36 @@ class AIServiceManager {
       
       let accumulatedContent = '';
       let lastContentUpdate = Date.now();
+      let shouldStop = false; // 添加停止标志
+      
+      // 检查是否已经被中断
+      if (abortSignal?.aborted) {
+        throw new Error('生成已被中断');
+      }
       
       // 尝试使用流式传输，添加智能超时
       try {
         const streamPromise = (async () => {
           const stream = await llm.stream(messages);
           for await (const chunk of stream) {
+            // 检查中断信号
+            if (abortSignal?.aborted || shouldStop) {
+              console.log('检测到中断信号，停止流式生成');
+              break;
+            }
+            
             const content = typeof chunk === 'string' ? chunk : chunk.content;
             if (content) {
               accumulatedContent += content;
               lastContentUpdate = Date.now(); // 更新最后内容更新时间
-              // 传递字符数和当前累积的内容
-              onProgress(accumulatedContent.length, accumulatedContent);
+              
+              // 调用进度回调，如果返回false则停止
+              const continueGeneration = onProgress(accumulatedContent.length, accumulatedContent);
+              if (continueGeneration === false) {
+                console.log('前端请求停止生成');
+                shouldStop = true;
+                break;
+              }
             }
           }
         })();
@@ -1170,6 +1197,11 @@ class AIServiceManager {
           60000, // 总超时时间60秒
           2000,  // 每2秒检查一次活动状态
           () => {
+            // 如果已经标记为停止，不继续等待
+            if (shouldStop || abortSignal?.aborted) {
+              return false;
+            }
+            
             const now = Date.now();
             const timeSinceLastUpdate = now - lastContentUpdate;
             // 如果5秒内有内容更新，认为还在活动中
@@ -1178,6 +1210,11 @@ class AIServiceManager {
         );
         
       } catch (streamError) {
+        // 如果是用户中断或中止信号，直接抛出中断错误
+        if (shouldStop || abortSignal?.aborted) {
+          throw new Error('用户中断生成');
+        }
+        
         // 如果流式传输失败，回退到普通调用
         console.warn('流式传输失败，回退到普通调用:', streamError);
         if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
@@ -1201,6 +1238,11 @@ class AIServiceManager {
           console.log(`使用流式传输生成的部分内容，长度: ${accumulatedContent.length}`);
         } else {
           // 完全回退到普通调用
+          // 但在普通调用前也要检查中断信号
+          if (abortSignal?.aborted || shouldStop) {
+            throw new Error('用户中断生成');
+          }
+          
           const response = await this.withSmartTimeout(
             llm.invoke(messages), 
             90000, // 90秒总超时
@@ -1211,12 +1253,25 @@ class AIServiceManager {
           // 模拟流式进度
           const totalChars = accumulatedContent.length;
           for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+            // 检查中断信号
+            if (abortSignal?.aborted || shouldStop) {
+              throw new Error('用户中断生成');
+            }
+            
             const currentCharCount = Math.min(i, totalChars);
             const partialContent = accumulatedContent.substring(0, currentCharCount);
-            onProgress(currentCharCount, partialContent);
+            const continueGeneration = onProgress(currentCharCount, partialContent);
+            if (continueGeneration === false) {
+              throw new Error('用户中断生成');
+            }
             await new Promise(resolve => setTimeout(resolve, 50));
           }
         }
+      }
+
+      // 检查是否被中断
+      if (shouldStop || abortSignal?.aborted) {
+        throw new Error('用户中断生成');
       }
 
       const result: AIGenerationResult = {
