@@ -527,8 +527,8 @@ export class WebDAVService {
         // 生成唯一的设备ID（基于用户数据路径）
         const deviceId = this.generateDeviceId();
         
-        // 获取应用版本
-        const appVersion = require('../../../package.json').version || '1.0.0';
+        // 获取应用版本（在生产环境中安全的方式）
+        const appVersion = app.getVersion() || '1.0.0';
         
         return {
             lastSyncTime: dataSync?.lastSyncTime || new Date(0).toISOString(), // 如果从未同步，使用很早的时间
