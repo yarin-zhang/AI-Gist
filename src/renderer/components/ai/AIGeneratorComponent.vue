@@ -47,16 +47,27 @@
                             </n-split>
                         </n-form-item>
                         <n-form-item>
+                            <n-space vertical style="width: 100%;">
                             <n-space justify="space-between" align="center" style="width: 100%;">
                                 <n-space>
                                     <n-button type="primary" @click="generatePrompt" :loading="generating"
-                                        :disabled="configs.length === 0">
+                                        :disabled="configs.length === 0 || generating">
                                         <template #icon>
                                             <n-icon>
                                                 <Bolt />
                                             </n-icon>
                                         </template>
-                                        {{ getGenerationStatusText() }}
+                                        生成
+                                    </n-button>
+                                    
+                                    <!-- 停止生成按钮 -->
+                                    <n-button v-if="generating" @click="stopGeneration" type="error" ghost>
+                                        <template #icon>
+                                            <n-icon>
+                                                <X />
+                                            </n-icon>
+                                        </template>
+                                        停止
                                     </n-button>
                                     <n-dropdown :options="modelDropdownOptions" @select="onModelSelect" trigger="click"
                                         v-if="configs.length > 0">
@@ -92,6 +103,17 @@
                                         保存
                                     </n-button>
                                 </n-space>
+                            </n-space>
+                            
+                            <!-- 生成状态显示栏 - 放置在按钮下方 -->
+                            <!-- <div v-if="generating" class="generation-status-bar" style="margin-top: 12px;">
+                                <n-space align="center">
+                                    <n-icon size="16" :color="'var(--primary-color)'" class="rotating">
+                                        <Bolt />
+                                    </n-icon>
+                                    <n-text>{{ getGenerationStatusText() }}</n-text>
+                                </n-space>
+                            </div> -->
                             </n-space>
                         </n-form-item>
                     </n-form>
@@ -252,6 +274,12 @@ const streamStats = reactive({
     contentGrowthRate: 0 // 内容增长速率（字符/秒）
 })
 
+// 生成控制状态
+const generationControl = reactive({
+    shouldStop: false, // 是否应该停止生成
+    abortController: null as AbortController | null // 用于取消请求的控制器
+})
+
 // 表单数据
 const formData = reactive({
     topic: ''
@@ -388,6 +416,33 @@ const onModelSelect = (modelKey: string) => {
     }
 }
 
+// 停止生成
+const stopGeneration = () => {
+    console.log('用户请求停止生成')
+    generating.value = false
+    generationControl.shouldStop = true
+    
+    // 如果有 AbortController，则取消请求
+    if (generationControl.abortController) {
+        generationControl.abortController.abort()
+        generationControl.abortController = null
+    }
+    
+    // 重置所有状态
+    streamStats.isStreaming = false
+    streamStats.charCount = 0
+    streamStats.lastCharCount = 0
+    streamStats.noContentUpdateCount = 0
+    streamStats.lastUpdateTime = 0
+    streamStats.isGenerationActive = false
+    streamStats.contentGrowthRate = 0
+    
+    // 恢复布局
+    animateSplit(splitSize.value, 1)
+    
+    message.info('已停止生成')
+}
+
 // 手动保存提示词
 const manualSavePrompt = async () => {
     if (!generatedResult.value.trim()) {
@@ -420,6 +475,11 @@ const generatePrompt = async () => {
     try {
         await formRef.value?.validate()
         generating.value = true
+        
+        // 重置生成控制状态
+        generationControl.shouldStop = false
+        generationControl.abortController = new AbortController()
+        
         // 重置流式传输状态
         streamStats.charCount = 0
         streamStats.isStreaming = true
@@ -457,6 +517,12 @@ const generatePrompt = async () => {
                 request,
                 serializedConfig,
                 (charCount: number, partialContent?: string) => {
+                    // 检查是否应该停止
+                    if (generationControl.shouldStop) {
+                        console.log('检测到停止信号，中断流式传输')
+                        return false // 返回 false 表示停止流式传输
+                    }
+                    
                     const now = Date.now();
                     console.log('流式传输回调:', {
                         charCount,
@@ -621,6 +687,14 @@ const generatePrompt = async () => {
         }
     } finally {
         generating.value = false
+        
+        // 清理生成控制状态
+        generationControl.shouldStop = false
+        if (generationControl.abortController) {
+            generationControl.abortController = null
+        }
+        
+        // 清理流式传输状态
         streamStats.isStreaming = false
         streamStats.charCount = 0
         streamStats.lastCharCount = 0
@@ -640,9 +714,10 @@ const simulateStreamProgress = async (finalContent: string) => {
     console.log('开始模拟流式进度:', { totalChars, steps, stepSize })
 
     for (let i = 0; i < steps; i++) {
-        if (!generating.value) {
+        // 检查是否应该停止
+        if (!generating.value || generationControl.shouldStop) {
             console.log('生成已取消，停止模拟')
-            break // 如果已取消，停止模拟
+            break
         }
 
         const currentCharCount = Math.min((i + 1) * stepSize, totalChars)
@@ -767,20 +842,20 @@ const serializeConfig = (config: AIConfig) => {
 // 获取生成状态文本
 const getGenerationStatusText = () => {
     if (!generating.value) {
-        return '生成'
+        return ''
     }
     
     if (streamStats.isStreaming && streamStats.charCount > 0) {
         if (streamStats.isGenerationActive && streamStats.contentGrowthRate > 0) {
             // 显示生成速率
-            return `生成中 (${streamStats.charCount}字 ${streamStats.contentGrowthRate.toFixed(1)}/s)`
+            return `正在生成... 已生成 ${streamStats.charCount} 字符 (${streamStats.contentGrowthRate.toFixed(1)} 字符/秒)`
         } else if (streamStats.charCount > 0) {
             // 显示已生成字符数
-            return `生成中 (${streamStats.charCount}字)`
+            return `正在生成... 已生成 ${streamStats.charCount} 字符`
         }
     }
     
-    return '生成中...'
+    return '正在生成...'
 }
 
 // 提示词保存完成（保留此函数以防Modal组件需要）
@@ -848,5 +923,48 @@ const loadCategories = async () => {
     font-size: 12px;
     color: var(--error-color);
     line-height: 1.4;
+}
+
+.generation-status-bar {
+    background-color: var(--primary-color-suppl);
+    border: 1px solid var(--primary-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.rotating {
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.generation-status-bar {
+    background: var(--info-color-suppl);
+    border: 1px solid var(--info-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.rotating {
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>
