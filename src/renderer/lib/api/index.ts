@@ -11,6 +11,8 @@ import { PromptApiClient, createPromptApiClient } from './prompt.api';
 import { AIConfigApiClient, createAIConfigApiClient } from './ai-config.api';
 import { AIGenerationHistoryApiClient, createAIGenerationHistoryApiClient } from './ai-generation-history.api';
 import { AppSettingsApiClient, createAppSettingsApiClient } from './app-settings.api';
+import { WebDAVAPI } from './webdav.api';
+import { DataManagementAPI } from './data-management.api';
 
 // 导出所有API客户端类
 export { 
@@ -20,7 +22,9 @@ export {
   PromptApiClient,
   AIConfigApiClient,
   AIGenerationHistoryApiClient,
-  AppSettingsApiClient
+  AppSettingsApiClient,
+  WebDAVAPI,
+  DataManagementAPI
 };
 
 // 导出所有工厂函数

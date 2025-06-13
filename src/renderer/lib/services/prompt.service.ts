@@ -127,6 +127,24 @@ export class PromptService extends BaseDatabaseService {
     // 根据排序方式进行排序
     if (filters?.sortBy) {
       switch (filters.sortBy) {
+        case 'timeDesc': // 最新优先
+          filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          break;
+        case 'timeAsc': // 最早优先
+          filteredPrompts.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+          break;
+        case 'useCount': // 使用次数优先
+          filteredPrompts.sort((a, b) => b.useCount - a.useCount);
+          break;
+        case 'favorite': // 收藏优先
+          filteredPrompts.sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) {
+              return b.isFavorite ? 1 : -1;
+            }
+            // 收藏相同时按更新时间排序
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          });
+          break;
         case 'title':
           filteredPrompts.sort((a, b) => a.title.localeCompare(b.title));
           break;
@@ -135,9 +153,6 @@ export class PromptService extends BaseDatabaseService {
           break;
         case 'updatedAt':
           filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-          break;
-        case 'useCount':
-          filteredPrompts.sort((a, b) => b.useCount - a.useCount);
           break;
         default:
           // 默认排序逻辑

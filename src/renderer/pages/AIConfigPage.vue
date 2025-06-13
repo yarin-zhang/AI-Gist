@@ -212,7 +212,7 @@
                                 {{
                                     editingConfig
                                         ? "修改现有的 AI 配置信息"
-                                        : "添加新的 AI 服务配置，支持 OpenAI 兼容接口和 Ollama"
+                                        : "添加新的 AI 服务配置，支持多种接口。"
                                 }}
                             </NText>
                         </div>
@@ -448,7 +448,7 @@
             <!-- 底部固定区域 -->
             <template #footer>
                 <NFlex justify="space-between">
-                    <NButton @click="resetSystemPromptToDefault" type="warning">
+                    <NButton @click="resetSystemPromptToDefault" secondary type="warning">
                         重置为默认
                     </NButton>
                     <NFlex>

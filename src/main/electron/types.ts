@@ -8,6 +8,19 @@ export interface UserPreferences {
   startMinimized: boolean; // 启动时是否最小化到托盘
   autoLaunch: boolean; // 是否开机自启动
   themeSource: 'system' | 'light' | 'dark'; // 主题设置
+  webdav?: {
+    enabled: boolean;
+    serverUrl: string;
+    username: string;
+    password: string;
+    autoSync: boolean;
+    syncInterval: number;
+  };
+  dataSync?: {
+    lastSyncTime: string | null;
+    autoBackup: boolean;
+    backupInterval: number;
+  };
 }
 
 /**
@@ -71,5 +84,8 @@ export interface AIGenerationHistory {
   customPrompt?: string;
   status: 'success' | 'error';
   errorMessage?: string;
+  debugResult?: string;
+  debugStatus?: 'success' | 'error' | 'pending';
+  debugErrorMessage?: string;
   createdAt: Date;
 }

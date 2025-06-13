@@ -31,7 +31,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('theme-changed', listener);
     }
   },
-
   // AI 服务管理
   ai: {
     getConfigs: () => ipcRenderer.invoke('ai:get-configs'),
@@ -65,5 +64,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
+  },
+  // WebDAV 同步管理
+  webdav: {
+    testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
+    syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
+    getSyncStatus: () => ipcRenderer.invoke('webdav:get-sync-status'),
+    setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
+    getConfig: () => ipcRenderer.invoke('webdav:get-config'),
+    encryptPassword: (password: string) => ipcRenderer.invoke('webdav:encrypt-password', password),
+    decryptPassword: (encryptedPassword: any) => ipcRenderer.invoke('webdav:decrypt-password', encryptedPassword),
+  },
+  // 数据管理
+  data: {
+    createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),
+    getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
+    restoreBackup: (backupId: string) => ipcRenderer.invoke('data:restore-backup', { backupId }),
+    deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
+    export: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export', { options, exportPath }),
+    import: (filePath: string, options: any) => ipcRenderer.invoke('data:import', { filePath, options }),
+    selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
+    selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
+    getStats: () => ipcRenderer.invoke('data:get-stats'),
   }
 });

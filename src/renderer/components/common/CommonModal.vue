@@ -42,19 +42,40 @@
                     >
                         <!-- Header -->
                         <template #1>
-                            <NFlex 
+                            <div 
                                 class="modal-header" 
-                                vertical 
-                                justify="center" 
                                 :style="{ 
                                     padding: `0 ${contentPadding}px`,
                                     height: '100%',
                                     borderBottom: '1px solid var(--app-border-color)',
-                                    backgroundColor: 'var(--app-surface-color)'
+                                    backgroundColor: 'var(--app-surface-color)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    position: 'relative'
                                 }"
                             >
-                                <slot name="header" />
-                            </NFlex>
+                                <!-- Header Extra 区域 - 绝对定位在右上角 -->
+                                <div v-if="slots['header-extra']" :style="{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    right: '70px', // 为关闭按钮预留更多空间
+                                    transform: 'translateY(-50%)',
+                                    zIndex: 100,
+                                    whiteSpace: 'nowrap' // 防止按钮换行
+                                }">
+                                    <slot name="header-extra" />
+                                </div>
+                                
+                                <!-- 主要的 Header 内容 -->
+                                <div :style="{ 
+                                    paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
+                                    overflow: 'hidden',
+                                    width: '100%'
+                                }">
+                                    <slot name="header" />
+                                </div>
+                            </div>
                         </template>
                           <!-- Content -->
                         <template #2>
@@ -105,19 +126,40 @@
             >
                 <!-- Header -->
                 <template #1>
-                    <NFlex 
+                    <div 
                         class="modal-header" 
-                        vertical 
-                        justify="center" 
                         :style="{ 
                             padding: `0 ${contentPadding}px`,
                             height: '100%',
                             borderBottom: '1px solid var(--app-border-color)',
-                            backgroundColor: 'var(--app-surface-color)'
+                            backgroundColor: 'var(--app-surface-color)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            position: 'relative'
                         }"
                     >
-                        <slot name="header" />
-                    </NFlex>
+                        <!-- Header Extra 区域 - 绝对定位在右上角 -->
+                        <div v-if="slots['header-extra']" :style="{
+                            position: 'absolute',
+                            top: '50%',
+                            right: '70px', // 为关闭按钮预留更多空间
+                            transform: 'translateY(-50%)',
+                            zIndex: 100,
+                            whiteSpace: 'nowrap' // 防止按钮换行
+                        }">
+                            <slot name="header-extra" />
+                        </div>
+                        
+                        <!-- 主要的 Header 内容 -->
+                        <div :style="{ 
+                            paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
+                            overflow: 'hidden',
+                            width: '100%'
+                        }">
+                            <slot name="header" />
+                        </div>
+                    </div>
                 </template>
                   <!-- Content -->
                 <template #2>

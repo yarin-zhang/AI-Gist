@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { initDatabase } from './lib/db'
+import { initDatabase, databaseServiceManager } from './lib/db'
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
@@ -39,6 +39,12 @@ async function startApp() {
     
     await initDatabase();
     console.log('IndexedDB initialized successfully');
+    
+    // 将数据库服务暴露到 window 对象上，供主进程访问
+    (window as any).databaseAPI = {
+      databaseServiceManager
+    };
+    console.log('数据库服务已暴露到 window.databaseAPI');
     
     const app = createApp(App);
     app.mount('#app');

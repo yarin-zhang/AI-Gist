@@ -3,325 +3,556 @@
         @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{
-                prompt?.title
-                }}</NText>
-            <NText 
-                depth="3" 
-                v-if="prompt.description" 
-                class="header-description"
-            >{{
-                prompt.description || "暂无描述"
-                }}</NText>
+            <div :style="{ 
+                maxWidth: 'calc(100% - 240px)', /* 匹配 CommonModal 的右边距 */
+                overflow: 'hidden' 
+            }">
+                <NFlex vertical size="small">
+                    <NText :style="{ 
+                        fontSize: '20px', 
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }">{{
+                        prompt?.title
+                        }}</NText>
+                    <NText 
+                        depth="3" 
+                        v-if="prompt.description" 
+                        class="header-description"
+                    >{{
+                        prompt.description || "暂无描述"
+                        }}</NText>
+                </NFlex>
+            </div>
         </template>
-        <!-- 中间可操作区域 -->
-        <template #content="{ contentHeight }">
-            <!-- 标签区域 -->
-            <NFlex size="small" align="center" wrap style="margin-bottom: 16px">
-                <NText depth="3" style="margin-right: 8px">{{
-                    formatDate(prompt.updatedAt)
-                    }}</NText>
-                <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
-                    {{ prompt.variables.length }} 个变量
-                </NTag>
-                <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
+        
+        <!-- Header 额外区域 - 操作按钮 -->
+        <template #header-extra>
+            <NFlex size="small">
+                <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
                     <template #icon>
                         <NIcon>
-                            <Box />
+                            <Heart />
                         </NIcon>
                     </template>
-                    {{ prompt.category.name }}
-                </NTag>
-                <template v-if="prompt.tags">
-                    <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                        :color="getTagColor(tag)">
-                        <template #icon>
-                            <NIcon>
-                                <Tag />
-                            </NIcon>
-                        </template>
-                        {{ tag }}
-                    </NTag>
-                </template>
+                    {{ prompt.isFavorite ? "取消收藏" : "收藏" }}
+                </NButton>
+                <NButton type="primary" @click="$emit('edit', prompt)">
+                    <template #icon>
+                        <NIcon>
+                            <Edit />
+                        </NIcon>
+                    </template>
+                    编辑
+                </NButton>
             </NFlex>
-
-            <!-- 详情页面 -->
-            <NSplit v-show="!showHistoryPage" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
-                :style="{ height: `${contentHeight - 60}px` }">
-                <!-- 左侧：提示词内容 -->
-                <template #1>
-                    <NCard size="small" :style="{ height: '100%' }">
-                        <template #header>
-                            <NFlex justify="space-between" align="center">
-                                <NText strong>提示词内容</NText>
-                                <NFlex>
-                                    <NButton size="small" @click="copyToClipboard(filledContent)">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Copy />
-                                            </NIcon>
-                                        </template>
-                                        复制内容
-                                    </NButton>
-                                    <NButton size="small" type="primary" @click="usePrompt">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Check />
-                                            </NIcon>
-                                        </template>
-                                        使用此提示词
-                                    </NButton>
-                                </NFlex>
-                            </NFlex>
-                        </template>
-                        <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
-                            <NFlex vertical size="medium" style="padding-right: 12px">
-                                <NInput :value="filledContent" type="textarea" readonly :style="{
-                                    height: `${contentHeight - 200}px`,
-                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                }" :placeholder="!filledContent ? '内容为空' : ''" />
-
-                                <!-- 如果有未填写的变量，显示提示 -->
-                                <NFlex v-if="hasUnfilledVariables" align="center">
-                                    <NIcon color="#fa8c16">
-                                        <Wand />
-                                    </NIcon>
-                                    <NText>检测到未填写的变量，请在右侧填写以生成完整的提示词</NText>
-                                </NFlex>
-                            </NFlex>
-                        </NScrollbar>
-                    </NCard>
-                </template>
-
-                <!-- 右侧：变量输入区 -->
-                <template #2>
-                    <NCard size="small" :style="{ height: '100%' }">
-                        <template #header>
-                            <NFlex justify="space-between" align="center">
-                                <NText strong>变量设置</NText>
-                                <NButton v-if="prompt.variables && prompt.variables.length > 0" size="small"
-                                    @click="clearVariables">清空</NButton>
-                            </NFlex>
-                        </template>
-                        <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
-                            <NFlex vertical size="medium" style="padding-right: 12px"
-                                v-if="prompt.variables && prompt.variables.length > 0">
-                                <NFormItem v-for="variable in prompt.variables" :key="variable.id"
-                                    :label="variable.label" :required="variable.required">
-                                    <NInput v-if="variable.type === 'text'"
-                                        v-model:value="variableValues[variable.name]" type="textarea" :placeholder="variable.placeholder || `请输入${variable.label}`
-                                            " :rows="1" :autosize="{ minRows: 1, maxRows: 5 }" />
-                                    <NSelect v-else-if="variable.type === 'select'"
-                                        v-model:value="variableValues[variable.name]"
-                                        :options="getSelectOptions(variable.options)" :placeholder="variable.placeholder || `请选择${variable.label}`
-                                            " />
-                                </NFormItem>
-                            </NFlex>
-                            <NEmpty v-else description="此提示词没有可配置的变量">
-                                <template #icon>
-                                    <NIcon>
-                                        <Wand />
-                                    </NIcon>
-                                </template>
-                            </NEmpty>
-                        </NScrollbar>
-                    </NCard>
-                </template>
-            </NSplit>
-
-            <!-- 历史记录页面 -->
-            <NSplit v-show="showHistoryPage" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
-                :style="{ height: `${contentHeight - 60}px` }">
-                <!-- 左侧：历史记录预览 -->
-                <template #1>
-                    <NCard size="small" :style="{ height: '100%' }">
-                        <template #header>
-                            <NText strong>历史记录预览</NText>
-                        </template>
-
-                        <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
-                            <NFlex vertical size="medium" style="padding-right: 12px" v-if="selectedHistory">
-                                <!-- 变量信息 -->
-                                <div v-if="
-                                    selectedHistory.variables &&
-                                    Object.keys(selectedHistory.variables).length > 0
-                                ">
-                                    <NText strong>包含变量：</NText>
-                                    <NFlex vertical size="small">
-                                        <NFlex v-for="(value, key) in selectedHistory.variables" :key="key"
-                                            align="center" size="small">
-                                            <NTag size="small" type="primary" :bordered="false">{{
-                                                key
-                                                }}</NTag>
-                                            <NInput :value="value" readonly size="small" />
-                                        </NFlex>
+        </template>        <!-- 中间可操作区域 -->
+        <template #content="{ contentHeight }">
+            <!-- Tabs 切换 -->
+            <NTabs v-model:value="activeTab" type="segment" :style="{ height: `${contentHeight}px` }">
+                <!-- 详情 Tab -->
+                <NTabPane name="detail" tab="详情">
+                    <NSplit direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
+                        :style="{ height: `${contentHeight - 50}px` }">
+                        <!-- 左侧：提示词内容 -->
+                        <template #1>
+                            <NCard size="small" :style="{ height: '100%' }">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center">
+                                        <NText strong>提示词内容</NText>
+                                        <!-- 调试按钮 -->
+                                        <NButton 
+                                            v-if="canDebug && aiConfigs.length > 0" 
+                                            @click="debugPrompt" 
+                                            :loading="debugging"
+                                            type="primary" 
+                                            size="small"
+                                            :disabled="debugging"
+                                        >
+                                            <template #icon>
+                                                <NIcon>
+                                                    <Bug />
+                                                </NIcon>
+                                            </template>
+                                            调试
+                                        </NButton>
                                     </NFlex>
-                                </div>
+                                </template>
+                                <NScrollbar :style="{ height: `${contentHeight - 140}px` }">
+                                    <NFlex vertical size="medium" style="padding-right: 12px">
+                                        <NInput :value="filledContent" type="textarea" readonly :style="{
+                                            height: `${contentHeight - 320}px`,
+                                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                        }" :placeholder="!filledContent ? '内容为空' : ''" />
 
-                                <!-- 完整内容 -->
-                                <div>
-                                    <NText strong>完整内容：</NText>
-                                    <NInput :value="selectedHistory.content" type="textarea" readonly :style="{
-                                        height: `${Math.max(200, contentHeight - 300)}px`,
-                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                    }" />
-                                </div>
+                                        <!-- 如果有未填写的变量，显示提示 -->
+                                        <NFlex v-if="hasUnfilledVariables" align="center">
+                                            <NIcon color="#fa8c16">
+                                                <Wand />
+                                            </NIcon>
+                                            <NText>检测到未填写的变量，请在右侧填写以生成完整的提示词</NText>
+                                        </NFlex>
 
-                                <!-- 操作按钮 -->
-                                <NFlex justify="space-between">
-                                    <NPopconfirm @positive-click="deleteHistoryRecord">
-                                        <template #trigger>
-                                            <NButton type="error" secondary>
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Trash />
-                                                    </NIcon>
+                                        <!-- AI配置选择 -->
+                                        <NFormItem v-if="canDebug && aiConfigs.length > 0" label="调试配置" size="small">
+                                            <NSelect
+                                                v-model:value="selectedConfigId"
+                                                :options="aiConfigs.map(config => ({
+                                                    label: `${config.name} (${config.type})`,
+                                                    value: config.configId
+                                                }))"
+                                                placeholder="选择AI配置"
+                                                size="small"
+                                            />
+                                        </NFormItem>
+
+                                        <!-- 调试结果显示 -->
+                                        <div v-if="debugResult || debugError">
+                                            <NText strong style="margin-bottom: 8px; display: block;">调试结果:</NText>
+                                            
+                                            <!-- 成功结果 -->
+                                            <NAlert v-if="debugResult" type="success" :show-icon="false">
+                                                <template #header>
+                                                    <NFlex align="center" size="small">
+                                                        <NIcon>
+                                                            <CircleCheck />
+                                                        </NIcon>
+                                                        <NText>AI 响应</NText>
+                                                    </NFlex>
                                                 </template>
-                                                删除
-                                            </NButton>
-                                        </template>
-                                        确定要删除这条历史记录吗？删除后将无法恢复。
-                                    </NPopconfirm>
-                                    <NButton type="primary" @click="copyToClipboard(selectedHistory.content)">
+                                                <NInput
+                                                    v-model:value="debugResult"
+                                                    type="textarea"
+                                                    readonly
+                                                    :rows="4"
+                                                    :style="{ 
+                                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                        backgroundColor: 'var(--success-color-suppl)',
+                                                        marginTop: '8px'
+                                                    }"
+                                                />
+                                                <template #action>
+                                                    <NButton size="small" @click="copyToClipboard(debugResult)">
+                                                        <template #icon>
+                                                            <NIcon>
+                                                                <Copy />
+                                                            </NIcon>
+                                                        </template>
+                                                        复制结果
+                                                    </NButton>
+                                                </template>
+                                            </NAlert>
+
+                                            <!-- 错误结果 -->
+                                            <NAlert v-if="debugError" type="error" :show-icon="false">
+                                                <template #header>
+                                                    <NFlex align="center" size="small">
+                                                        <NIcon>
+                                                            <AlertTriangle />
+                                                        </NIcon>
+                                                        <NText>调试失败</NText>
+                                                    </NFlex>
+                                                </template>
+                                                <NText>{{ debugError }}</NText>
+                                            </NAlert>
+                                        </div>
+                                    </NFlex>
+                                </NScrollbar>
+                            </NCard>
+                        </template>
+
+                        <!-- 右侧：变量输入区 -->
+                        <template #2>
+                            <NCard size="small" :style="{ height: '100%' }">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center">
+                                        <NText strong>变量设置</NText>
+                                        <NButton v-if="prompt.variables && prompt.variables.length > 0" size="small"
+                                            @click="clearVariables">清空</NButton>
+                                    </NFlex>
+                                </template>
+                                <NScrollbar :style="{ height: `${contentHeight - 140}px` }">
+                                    <NFlex vertical size="medium" style="padding-right: 12px"
+                                        v-if="prompt.variables && prompt.variables.length > 0">
+                                        <NFormItem v-for="variable in prompt.variables" :key="variable.id"
+                                            :label="variable.label" :required="variable.required">
+                                            <NInput v-if="variable.type === 'text'"
+                                                v-model:value="variableValues[variable.name]" type="textarea" :placeholder="variable.placeholder || `请输入${variable.label}`
+                                                    " :rows="1" :autosize="{ minRows: 1, maxRows: 5 }" />
+                                            <NSelect v-else-if="variable.type === 'select'"
+                                                v-model:value="variableValues[variable.name]"
+                                                :options="getSelectOptions(variable.options)" :placeholder="variable.placeholder || `请选择${variable.label}`
+                                                    " />
+                                        </NFormItem>
+                                    </NFlex>
+                                    <NEmpty v-else description="此提示词没有可配置的变量">
                                         <template #icon>
                                             <NIcon>
-                                                <Copy />
+                                                <Wand />
                                             </NIcon>
                                         </template>
-                                        复制记录
-                                    </NButton>
-                                </NFlex>
-                            </NFlex>
-                            <NEmpty v-else description="请选择一条历史记录查看详情">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileText />
-                                    </NIcon>
+                                    </NEmpty>
+                                </NScrollbar>
+                            </NCard>
+                        </template>
+                    </NSplit>
+                </NTabPane>
+
+                <!-- 历史记录 Tab -->
+                <NTabPane name="history" :tab="`历史记录 (${useHistory.length + debugHistory.length})`" :disabled="useHistory.length === 0 && debugHistory.length === 0">
+                    <NSplit direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
+                        :style="{ height: `${contentHeight - 50}px` }">
+                        <!-- 左侧：历史记录预览 -->
+                        <template #1>
+                            <NCard size="small" :style="{ height: '100%' }">
+                                <template #header>
+                                    <NText strong>历史记录预览</NText>
                                 </template>
-                            </NEmpty>
-                        </NScrollbar>
-                    </NCard>
-                </template>
 
-                <!-- 右侧：历史记录列表 -->
-                <template #2>
-                    <NCard size="small" :style="{ height: '100%' }">
-                        <template #header>
-                            <NFlex justify="space-between" align="center" :style="{ height: `30px` }">
-                                <NText strong>使用历史记录</NText>
-                                <NText depth="3">{{ useHistory.length }} 条记录</NText>
-                            </NFlex>
-                        </template>
+                                <NScrollbar :style="{ height: `${contentHeight - 140}px` }">
+                                    <NFlex vertical size="medium" style="padding-right: 12px" v-if="selectedHistory || selectedDebugHistory">
+                                        <!-- 使用记录预览 -->
+                                        <div v-if="selectedHistory">
+                                            <NFlex align="center" size="small" style="margin-bottom: 12px;">
+                                                <NTag type="info" size="small">使用记录</NTag>
+                                                <NText depth="3">{{ selectedHistory.date }}</NText>
+                                            </NFlex>
+                                            
+                                            <!-- 变量信息 -->
+                                            <div v-if="
+                                                selectedHistory.variables &&
+                                                Object.keys(selectedHistory.variables).length > 0
+                                            ">
+                                                <NText strong>包含变量：</NText>
+                                                <NFlex vertical size="small">
+                                                    <NFlex v-for="(value, key) in selectedHistory.variables" :key="key"
+                                                        align="center" size="small">
+                                                        <NTag size="small" type="primary" :bordered="false">{{
+                                                            key
+                                                            }}</NTag>
+                                                        <NInput :value="value" readonly size="small" />
+                                                    </NFlex>
+                                                </NFlex>
+                                            </div>
 
-                        <template #action>
-                            <NFlex justify="center" :style="{ height: `30px` }">
-                                <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
-                                    size="small" show-quick-jumper show-size-picker :page-sizes="[1, 3, 5, 10, 20]"
-                                    :page-slot="7" @update:page-size="handlePageSizeChange" />
-                            </NFlex>
-                        </template>
+                                            <!-- 完整内容 -->
+                                            <div>
+                                                <NText strong>完整内容：</NText>
+                                                <NInput :value="selectedHistory.content" type="textarea" readonly :style="{
+                                                    height: `${Math.max(200, contentHeight - 290)}px`,
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                }" />
+                                            </div>
 
-                        <NScrollbar :style="{ height: `${contentHeight - 230}px` }">
-                            <NFlex vertical size="medium" style="padding-right: 12px"
-                                v-if="paginatedHistory.length > 0">
-                                <NCard v-for="(record, index) in paginatedHistory"
-                                    :key="(currentPage - 1) * pageSize + index" size="small" hoverable>
-                                    <template #header>
-                                        <NFlex justify="space-between" align="center">
-                                            <NText depth="3">{{ record.date }}</NText>
-                                            <NFlex size="small">
-                                                <NButton size="small" text type="info" @click.stop="
-                                                    selectHistoryRecord(
-                                                        (currentPage - 1) * pageSize + index
-                                                    )
-                                                    ">
-                                                    预览
-                                                </NButton>
-                                                <NButton size="small" text type="primary"
-                                                    @click.stop="loadHistoryRecord(record)">
-                                                    重新加载
+                                            <!-- 操作按钮 -->
+                                            <NFlex justify="space-between">
+                                                <NPopconfirm @positive-click="deleteHistoryRecord">
+                                                    <template #trigger>
+                                                        <NButton type="error" secondary>
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            删除
+                                                        </NButton>
+                                                    </template>
+                                                    确定要删除这条历史记录吗？删除后将无法恢复。
+                                                </NPopconfirm>
+                                                <NButton type="primary" @click="copyToClipboard(selectedHistory.content)">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Copy />
+                                                        </NIcon>
+                                                    </template>
+                                                    复制记录
                                                 </NButton>
                                             </NFlex>
-                                        </NFlex>
-                                    </template>
+                                        </div>
 
-                                    <NFlex vertical size="small">
-                                        <NText class="history-content-preview">{{ record.content.substring(0, 120)
-                                            }}{{ record.content.length > 120 ? "..." : "" }}</NText>
+                                        <!-- 调试记录预览 -->
+                                        <div v-if="selectedDebugHistory">
+                                            <NFlex align="center" size="small" style="margin-bottom: 12px;">
+                                                <NTag :type="selectedDebugHistory.debugStatus === 'success' ? 'success' : 'error'" size="small">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Robot />
+                                                        </NIcon>
+                                                    </template>
+                                                    调试记录
+                                                </NTag>
+                                                <NText depth="3">{{ formatDate(selectedDebugHistory.createdAt) }}</NText>
+                                            </NFlex>
+                                            
+                                            <!-- 调试配置信息 -->
+                                            <div style="margin-bottom: 12px;">
+                                                <NText strong>调试配置：</NText>
+                                                <NFlex size="small" style="margin-top: 4px;">
+                                                    <NTag size="small" type="primary" :bordered="false">{{ selectedDebugHistory.model }}</NTag>
+                                                    <NTag size="small" type="default" :bordered="false">{{ selectedDebugHistory.configId }}</NTag>
+                                                </NFlex>
+                                            </div>
 
-                                        <NFlex v-if="
-                                            record.variables &&
-                                            Object.keys(record.variables).length > 0
-                                        " size="small">
-                                            <NText depth="3">包含变量：</NText>
-                                            <NTag v-for="key in Object.keys(record.variables).slice(0, 3)" :key="key"
-                                                size="small" type="primary" :bordered="false">
-                                                {{ key }}
-                                            </NTag>
-                                            <NText v-if="Object.keys(record.variables).length > 3" depth="3">
-                                                +{{ Object.keys(record.variables).length - 3 }}...
-                                            </NText>
-                                        </NFlex>
+                                            <!-- 原始提示词 -->
+                                            <div style="margin-bottom: 12px;">
+                                                <NText strong>原始提示词：</NText>
+                                                <NInput :value="selectedDebugHistory.generatedPrompt" type="textarea" readonly :style="{
+                                                    height: '120px',
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                    marginTop: '4px'
+                                                }" />
+                                            </div>
+
+                                            <!-- AI响应结果 -->
+                                            <div v-if="selectedDebugHistory.debugResult" style="margin-bottom: 12px;">
+                                                <NText strong>AI 响应：</NText>
+                                                <NInput :value="selectedDebugHistory.debugResult" type="textarea" readonly :style="{
+                                                    height: `${Math.max(150, contentHeight - 400)}px`,
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                    marginTop: '4px'
+                                                }" />
+                                            </div>
+
+                                            <!-- 错误信息 -->
+                                            <div v-if="selectedDebugHistory.debugStatus === 'error' && selectedDebugHistory.debugErrorMessage" style="margin-bottom: 12px;">
+                                                <NText strong>错误信息：</NText>
+                                                <NAlert type="error" style="margin-top: 4px;">
+                                                    {{ selectedDebugHistory.debugErrorMessage }}
+                                                </NAlert>
+                                            </div>
+
+                                            <!-- 操作按钮 -->
+                                            <NFlex justify="space-between">
+                                                <NPopconfirm @positive-click="deleteDebugRecord">
+                                                    <template #trigger>
+                                                        <NButton type="error" secondary>
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            删除
+                                                        </NButton>
+                                                    </template>
+                                                    确定要删除这条调试记录吗？删除后将无法恢复。
+                                                </NPopconfirm>
+                                                <NFlex size="small">
+                                                    <NButton v-if="selectedDebugHistory.debugResult" @click="copyToClipboard(selectedDebugHistory.debugResult)">
+                                                        <template #icon>
+                                                            <NIcon>
+                                                                <Copy />
+                                                            </NIcon>
+                                                        </template>
+                                                        复制AI响应
+                                                    </NButton>
+                                                    <NButton @click="copyToClipboard(selectedDebugHistory.generatedPrompt)">
+                                                        <template #icon>
+                                                            <NIcon>
+                                                                <Copy />
+                                                            </NIcon>
+                                                        </template>
+                                                        复制提示词
+                                                    </NButton>
+                                                </NFlex>
+                                            </NFlex>
+                                        </div>
                                     </NFlex>
-                                </NCard>
-                            </NFlex>
+                                    <NEmpty v-else description="请选择一条历史记录查看详情">
+                                        <template #icon>
+                                            <NIcon>
+                                                <FileText />
+                                            </NIcon>
+                                        </template>
+                                    </NEmpty>
+                                </NScrollbar>
+                            </NCard>
+                        </template>
 
-                            <NEmpty v-else description="暂无使用历史记录">
-                                <template #icon>
-                                    <NIcon>
-                                        <History />
-                                    </NIcon>
+                        <!-- 右侧：历史记录列表 -->
+                        <template #2>
+                            <NCard size="small" :style="{ height: '100%' }">
+                                <template #header>
+                                    <NFlex justify="space-between" align="center" :style="{ height: `30px` }">
+                                        <NText strong>历史记录</NText>
+                                        <NText depth="3">使用记录 {{ useHistory.length }} 条，调试记录 {{ debugHistory.length }} 条</NText>
+                                    </NFlex>
                                 </template>
-                            </NEmpty>
-                        </NScrollbar>
-                    </NCard>
-                </template>
-            </NSplit>
-        </template><!-- 底部固定区域 -->
+
+                                <NScrollbar :style="{ height: `${contentHeight - 160}px` }">
+                                    <!-- 使用记录区域 -->
+                                    <div v-if="useHistory.length > 0" style="margin-bottom: 16px;">
+                                        <NFlex align="center" size="small" style="margin-bottom: 8px;">
+                                            <NText strong depth="2">使用记录</NText>
+                                            <NTag size="small" type="info">{{ useHistory.length }} 条</NTag>
+                                        </NFlex>
+                                        
+                                        <!-- 使用记录分页 -->
+                                        <NFlex justify="center" style="margin-bottom: 8px;">
+                                            <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
+                                                size="small" show-quick-jumper show-size-picker :page-sizes="[1, 3, 5, 10]"
+                                                :page-slot="5" @update:page-size="handlePageSizeChange" />
+                                        </NFlex>
+
+                                        <NFlex vertical size="small" style="padding-right: 12px">
+                                            <NCard v-for="(record, index) in paginatedHistory"
+                                                :key="(currentPage - 1) * pageSize + index" size="small" hoverable
+                                                :style="{ cursor: 'pointer' }"
+                                                @click="selectHistoryRecord((currentPage - 1) * pageSize + index)"
+                                                :class="{ 'selected-record': selectedHistoryIndex === (currentPage - 1) * pageSize + index }">
+                                                <template #header>
+                                                    <NFlex justify="space-between" align="center">
+                                                        <NText depth="3">{{ record.date }}</NText>
+                                                        <NFlex size="small">
+                                                            <NButton size="small" text type="primary"
+                                                                @click.stop="loadHistoryRecord(record)">
+                                                                重新加载
+                                                            </NButton>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </template>
+
+                                                <NFlex vertical size="small">
+                                                    <NText class="history-content-preview">{{ record.content.substring(0, 80)
+                                                        }}{{ record.content.length > 80 ? "..." : "" }}</NText>
+
+                                                    <NFlex v-if="
+                                                        record.variables &&
+                                                        Object.keys(record.variables).length > 0
+                                                    " size="small">
+                                                        <NText depth="3">变量：</NText>
+                                                        <NTag v-for="key in Object.keys(record.variables).slice(0, 2)" :key="key"
+                                                            size="small" type="primary" :bordered="false">
+                                                            {{ key }}
+                                                        </NTag>
+                                                        <NText v-if="Object.keys(record.variables).length > 2" depth="3">
+                                                            +{{ Object.keys(record.variables).length - 2 }}...
+                                                        </NText>
+                                                    </NFlex>
+                                                </NFlex>
+                                            </NCard>
+                                        </NFlex>
+                                    </div>
+
+                                    <!-- 调试记录区域 -->
+                                    <div v-if="debugHistory.length > 0">
+                                        <NFlex align="center" size="small" style="margin-bottom: 8px;">
+                                            <NText strong depth="2">调试记录</NText>
+                                            <NTag size="small" type="success">{{ debugHistory.length }} 条</NTag>
+                                        </NFlex>
+                                        
+                                        <!-- 调试记录分页 -->
+                                        <NFlex justify="center" style="margin-bottom: 8px;">
+                                            <NPagination v-model:page="debugCurrentPage" :page-count="debugTotalPages" :page-size="debugPageSize"
+                                                size="small" show-quick-jumper show-size-picker :page-sizes="[1, 3, 5, 10]"
+                                                :page-slot="5" @update:page-size="(newSize) => { debugPageSize = newSize; debugCurrentPage = 1; selectedDebugIndex = -1; }" />
+                                        </NFlex>
+
+                                        <NFlex vertical size="small" style="padding-right: 12px">
+                                            <NCard v-for="(record, index) in paginatedDebugHistory"
+                                                :key="record.id || index" size="small" hoverable
+                                                :style="{ cursor: 'pointer' }"
+                                                @click="selectDebugRecord((debugCurrentPage - 1) * debugPageSize + index)"
+                                                :class="{ 'selected-record': selectedDebugIndex === (debugCurrentPage - 1) * debugPageSize + index }">
+                                                <template #header>
+                                                    <NFlex justify="space-between" align="center">
+                                                        <NFlex size="small" align="center">
+                                                            <NTag :type="record.debugStatus === 'success' ? 'success' : 'error'" size="small">
+                                                                <template #icon>
+                                                                    <NIcon>
+                                                                        <Robot />
+                                                                    </NIcon>
+                                                                </template>
+                                                                {{ record.debugStatus === 'success' ? '成功' : '失败' }}
+                                                            </NTag>
+                                                            <NText depth="3" style="font-size: 12px;">{{ formatDate(record.createdAt) }}</NText>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </template>
+
+                                                <NFlex vertical size="small">
+                                                    <NFlex size="small" align="center">
+                                                        <NText depth="3">模型：</NText>
+                                                        <NTag size="small" type="primary" :bordered="false">{{ record.model }}</NTag>
+                                                    </NFlex>
+                                                    
+                                                    <NText class="history-content-preview">{{ 
+                                                        record.debugResult 
+                                                            ? record.debugResult.substring(0, 60) + (record.debugResult.length > 60 ? "..." : "")
+                                                            : record.debugErrorMessage || "调试失败"
+                                                    }}</NText>
+                                                </NFlex>
+                                            </NCard>
+                                        </NFlex>
+                                    </div>
+
+                                    <!-- 空状态 -->
+                                    <NEmpty v-if="useHistory.length === 0 && debugHistory.length === 0" description="暂无历史记录">
+                                        <template #icon>
+                                            <NIcon>
+                                                <History />
+                                            </NIcon>
+                                        </template>
+                                    </NEmpty>
+                                </NScrollbar>
+                            </NCard>
+                        </template>
+                    </NSplit>
+                </NTabPane>
+            </NTabs>
+        </template>        <!-- 底部固定区域 -->
         <template #footer>
             <NFlex justify="space-between" align="center">
                 <div>
-                    <!-- 左侧区域 -->
-                    <!-- 历史记录按钮（主页面左下角） -->
-                    <NButton v-show="!showHistoryPage" @click="showHistoryPage = true"
-                        :disabled="useHistory.length === 0">
-                        <template #icon>
-                            <NIcon>
-                                <History />
-                            </NIcon>
+                    <!-- 左侧区域 - 时间和标签信息 -->
+                    <NFlex size="small" align="center" wrap>
+                        <NText depth="3" style="margin-right: 8px">{{
+                            formatDate(prompt.updatedAt)
+                            }}</NText>
+                        <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
+                            {{ prompt.variables.length }} 个变量
+                        </NTag>
+                        <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
+                            <template #icon>
+                                <NIcon>
+                                    <Box />
+                                </NIcon>
+                            </template>
+                            {{ prompt.category.name }}
+                        </NTag>
+                        <template v-if="prompt.tags">
+                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                                :color="getTagColor(tag)">
+                                <template #icon>
+                                    <NIcon>
+                                        <Tag />
+                                    </NIcon>
+                                </template>
+                                {{ tag }}
+                            </NTag>
                         </template>
-                        查看历史记录 ({{ useHistory.length }})
-                    </NButton>
-
-                    <!-- 返回按钮（历史记录页面左下角） -->
-                    <NButton v-show="showHistoryPage" @click="showHistoryPage = false">
-                        <template #icon>
-                            <NIcon>
-                                <ArrowLeft />
-                            </NIcon>
-                        </template>
-                        返回
-                    </NButton>
+                    </NFlex>
                 </div>
 
                 <div>
-                    <!-- 右侧区域 -->
+                    <!-- 右侧区域 - 主要操作按钮 -->
                     <NFlex size="small">
-                        <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
+                        <NButton @click="copyToClipboard(filledContent)">
                             <template #icon>
                                 <NIcon>
-                                    <Heart />
+                                    <Copy />
                                 </NIcon>
                             </template>
-                            {{ prompt.isFavorite ? "取消收藏" : "收藏" }}
+                            复制内容
                         </NButton>
-                        <NButton type="primary" @click="$emit('edit', prompt)">
+                        <NButton type="primary" @click="usePrompt">
                             <template #icon>
                                 <NIcon>
-                                    <Edit />
+                                    <Check />
                                 </NIcon>
                             </template>
-                            编辑
+                            使用此提示词
                         </NButton>
                     </NFlex>
                 </div>
@@ -347,6 +578,10 @@ import {
     NPagination,
     NPopconfirm,
     NSplit,
+    NTabs,
+    NTabPane,
+    NAlert,
+    NSpace,
     useMessage,
 } from "naive-ui";
 import {
@@ -356,11 +591,14 @@ import {
     Wand,
     Check,
     History,
-    ArrowLeft,
     FileText,
     Trash,
     Tag,
     Box,
+    Bug,
+    Robot,
+    CircleCheck,
+    AlertTriangle,
 } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
@@ -389,12 +627,25 @@ const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors();
 // 响应式数据
 const variableValues = ref({});
 const useHistory = ref([]);
-const showHistoryPage = ref(false);
+const debugHistory = ref([]); // 调试历史记录
+const activeTab = ref("detail"); // 默认显示详情页面
 const selectedHistoryIndex = ref(-1);
+const selectedDebugIndex = ref(-1); // 选中的调试记录索引
+
+// 调试相关状态
+const debugging = ref(false);
+const debugResult = ref("");
+const debugError = ref("");
+
+// AI 配置相关
+const aiConfigs = ref([]);
+const selectedConfigId = ref("");
 
 // 分页相关
 const currentPage = ref(1);
 const pageSize = ref(3);
+const debugCurrentPage = ref(1);
+const debugPageSize = ref(3);
 
 // 分页计算属性
 const totalPages = computed(() =>
@@ -405,6 +656,28 @@ const paginatedHistory = computed(() => {
     const start = (currentPage.value - 1) * pageSize.value;
     const end = start + pageSize.value;
     return useHistory.value.slice(start, end);
+});
+
+// 调试记录分页计算属性
+const debugTotalPages = computed(() =>
+    Math.ceil(debugHistory.value.length / debugPageSize.value)
+);
+
+const paginatedDebugHistory = computed(() => {
+    const start = (debugCurrentPage.value - 1) * debugPageSize.value;
+    const end = start + debugPageSize.value;
+    return debugHistory.value.slice(start, end);
+});
+
+// 选中的调试记录
+const selectedDebugHistory = computed(() => {
+    if (
+        selectedDebugIndex.value >= 0 &&
+        selectedDebugIndex.value < debugHistory.value.length
+    ) {
+        return debugHistory.value[selectedDebugIndex.value];
+    }
+    return null;
 });
 
 // 处理页面大小变化
@@ -497,6 +770,11 @@ const hasUnfilledVariables = computed(() => {
     return hasPlaceholders;
 });
 
+// 是否可以调试 - 变量已填写完或没有变量
+const canDebug = computed(() => {
+    return !hasUnfilledVariables.value && props.prompt?.content && filledContent.value.trim().length > 0;
+});
+
 // 选中的历史记录
 const selectedHistory = computed(() => {
     if (
@@ -520,6 +798,192 @@ const copyToClipboard = async (text) => {
         message.success("已复制到剪贴板");
     } catch (error) {
         message.error("复制失败");
+    }
+};
+
+// 加载AI配置列表
+const loadAIConfigs = async () => {
+    try {
+        // 使用数据库API获取AI配置
+        const allConfigs = await api.aiConfigs.getAll.query();
+        aiConfigs.value = allConfigs.filter(config => config.enabled);
+        
+        // 设置默认选择的配置（优先选择首选配置）
+        const preferredConfig = aiConfigs.value.find(config => config.isPreferred);
+        if (preferredConfig) {
+            selectedConfigId.value = preferredConfig.configId;
+        } else if (aiConfigs.value.length > 0) {
+            selectedConfigId.value = aiConfigs.value[0].configId;
+        }
+    } catch (error) {
+        console.error("加载AI配置失败:", error);
+        message.error("加载AI配置失败");
+    }
+};
+
+// 加载调试历史记录
+const loadDebugHistory = async () => {
+    try {
+        if (!props.prompt?.id) return;
+        
+        // 获取所有AI生成历史记录并过滤出调试记录
+        const allHistory = await api.aiGenerationHistory.getAll.query();
+        
+        // 过滤出与当前提示词相关的调试记录
+        debugHistory.value = allHistory.filter(record => 
+            record.topic.includes(`${props.prompt.title}`) || 
+            record.topic.includes('提示词调试') ||
+            record.debugResult || 
+            record.debugStatus
+        ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+    } catch (error) {
+        console.error("加载调试历史失败:", error);
+        debugHistory.value = [];
+    }
+};
+
+// 选择调试记录
+const selectDebugRecord = (index) => {
+    selectedDebugIndex.value = index;
+    // 同时取消选择使用记录
+    selectedHistoryIndex.value = -1;
+};
+
+// 删除调试记录
+const deleteDebugRecord = async () => {
+    if (selectedDebugIndex.value >= 0) {
+        try {
+            const record = debugHistory.value[selectedDebugIndex.value];
+            if (record.id) {
+                await api.aiGenerationHistory.delete.mutate(record.id);
+                
+                // 从本地列表中移除
+                debugHistory.value.splice(selectedDebugIndex.value, 1);
+                
+                // 重置选择
+                selectedDebugIndex.value = -1;
+                
+                // 如果当前页面没有记录了，回到第一页
+                if (paginatedDebugHistory.value.length === 0 && debugCurrentPage.value > 1) {
+                    debugCurrentPage.value = 1;
+                }
+                
+                message.success("调试记录已删除");
+            }
+        } catch (error) {
+            console.error("删除调试记录失败:", error);
+            message.error("删除调试记录失败");
+        }
+    }
+};
+
+// 调试提示词功能
+const debugPrompt = async () => {
+    if (!canDebug.value) {
+        message.warning("请先完成变量填写");
+        return;
+    }
+
+    if (aiConfigs.value.length === 0) {
+        message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
+        return;
+    }
+
+    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+    if (!selectedConfig) {
+        message.error("请选择一个AI配置");
+        return;
+    }
+
+    debugging.value = true;
+    debugResult.value = "";
+    debugError.value = "";
+
+    try {
+        console.log("开始调试提示词:", filledContent.value);
+        
+        // 序列化配置以确保可以通过 IPC 传递
+        const serializedConfig = {
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
+            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+        };
+
+        // 构建请求参数 - 不包含 config
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(`请分析并回应以下提示词：\n\n${filledContent.value}`),
+            customPrompt: String(filledContent.value),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("开始调试提示词:", filledContent.value);
+        console.log("选中的配置:", selectedConfig);
+        console.log("请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 调用AI接口 - 传递两个分离的参数：request 和 config
+        const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        
+        debugResult.value = result.generatedPrompt;
+        message.success("调试完成");
+
+        // 保存调试结果到AI生成历史记录
+        await api.aiGenerationHistory.create.mutate({
+            historyId: `debug_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            configId: selectedConfig.configId,
+            topic: `提示词调试: ${props.prompt?.title || '未命名提示词'}`,
+            generatedPrompt: filledContent.value, // 原始提示词内容
+            model: request.model,
+            status: 'success',
+            debugResult: result.generatedPrompt, // AI的响应结果
+            debugStatus: 'success',
+            customPrompt: `调试提示词内容：\n${filledContent.value}`
+        });
+
+        // 刷新调试历史记录
+        await loadDebugHistory();
+
+    } catch (error) {
+        console.error("调试失败:", error);
+        debugError.value = error.message || "调试失败";
+        message.error("调试失败: " + (error.message || "未知错误"));
+
+        // 保存失败记录
+        try {
+            const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+            if (selectedConfig) {
+                await api.aiGenerationHistory.create.mutate({
+                    historyId: `debug_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    configId: selectedConfig.configId,
+                    topic: `提示词调试失败: ${props.prompt?.title || '未命名提示词'}`,
+                    generatedPrompt: filledContent.value,
+                    model: selectedConfig.defaultModel || selectedConfig.models[0],
+                    status: 'error',
+                    errorMessage: error.message || "调试失败",
+                    debugStatus: 'error',
+                    debugErrorMessage: error.message || "调试失败"
+                });
+                
+                // 刷新调试历史记录
+                await loadDebugHistory();
+            }
+        } catch (saveError) {
+            console.error("保存调试失败记录时出错:", saveError);
+        }
+    } finally {
+        debugging.value = false;
     }
 };
 
@@ -585,13 +1049,15 @@ const toggleFavorite = async () => {
 // 加载历史记录
 const loadHistoryRecord = (record) => {
     variableValues.value = { ...record.variables };
-    showHistoryPage.value = false; // 回到主页面
+    activeTab.value = "detail"; // 切换到详情页面
     message.success("已加载历史记录");
 };
 
 // 选择历史记录
 const selectHistoryRecord = (index) => {
     selectedHistoryIndex.value = index;
+    // 取消选择调试记录
+    selectedDebugIndex.value = -1;
 };
 
 // 删除历史记录
@@ -658,6 +1124,9 @@ watch(
             } else {
                 useHistory.value = [];
             }
+            
+            // 加载调试历史
+            loadDebugHistory();
         }
     },
     { immediate: true }
@@ -679,21 +1148,18 @@ watch(
     (show) => {
         if (!show) {
             // 关闭弹窗时重置状态
-            showHistoryPage.value = false;
+            activeTab.value = "detail";
             selectedHistoryIndex.value = -1;
+            selectedDebugIndex.value = -1;
             currentPage.value = 1;
-        }
-    }
-);
-
-// 监听历史记录页面显示状态
-watch(
-    () => showHistoryPage.value,
-    (show) => {
-        if (show) {
-            // 进入历史记录页面时重置选择
-            selectedHistoryIndex.value = -1;
-            currentPage.value = 1;
+            debugCurrentPage.value = 1;
+            // 重置调试状态
+            debugging.value = false;
+            debugResult.value = "";
+            debugError.value = "";
+        } else {
+            // 显示弹窗时加载AI配置
+            loadAIConfigs();
         }
     }
 );
@@ -704,6 +1170,7 @@ watch(
 .header-description {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -716,11 +1183,18 @@ watch(
 .history-content-preview {
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.4;
     max-height: calc(1.4em * 3);
     word-break: break-word;
+}
+
+/* 选中的记录样式 */
+.selected-record {
+    border: 2px solid var(--primary-color) !important;
+    background-color: var(--primary-color-suppl) !important;
 }
 </style>
