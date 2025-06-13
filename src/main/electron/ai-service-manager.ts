@@ -55,6 +55,56 @@ class AIServiceManager {
   }
 
   /**
+   * 创建智能超时 - 基于活动状态的超时判断
+   * 如果有持续的活动（通过回调函数检测），则不会超时
+   */
+  private async withSmartTimeout<T>(
+    promise: Promise<T>, 
+    timeoutMs: number = 60000,
+    activityCheckMs: number = 5000, // 检查活动的间隔
+    onActivityCheck?: () => boolean // 返回true表示有活动，false表示无活动
+  ): Promise<T> {
+    let isActive = true;
+    let lastActivityTime = Date.now();
+    
+    // 定期检查活动状态
+    const activityChecker = setInterval(() => {
+      const now = Date.now();
+      const hasActivity = onActivityCheck ? onActivityCheck() : true;
+      
+      if (hasActivity) {
+        lastActivityTime = now;
+      }
+      
+      // 如果超过指定时间没有活动，标记为不活跃
+      if (now - lastActivityTime > timeoutMs) {
+        isActive = false;
+      }
+    }, activityCheckMs);
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const checkTimeout = () => {
+        if (!isActive) {
+          clearInterval(activityChecker);
+          reject(new Error('请求超时'));
+          return;
+        }
+        setTimeout(checkTimeout, activityCheckMs);
+      };
+      setTimeout(checkTimeout, activityCheckMs);
+    });
+
+    try {
+      const result = await Promise.race([promise, timeoutPromise]);
+      clearInterval(activityChecker);
+      return result;
+    } catch (error) {
+      clearInterval(activityChecker);
+      throw error;
+    }
+  }
+
+  /**
    * 测试配置连接
    */
   async testConfig(config: ProcessedAIConfig): Promise<{ success: boolean; error?: string; models?: string[] }> {
@@ -854,14 +904,16 @@ class AIServiceManager {
         
         // Cohere 使用不同的API格式，添加超时
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await this.withTimeout(
+        const response = await this.withSmartTimeout(
           cohere.generate({
             model: model,
             prompt: prompt,
             maxTokens: 2000,
             temperature: 0.7
           }),
-          60000 // 生成较长的内容，使用更长的超时
+          90000, // 90秒总超时，生成较长的内容
+          5000,  // 每5秒检查一次
+          () => true // 对于Cohere API，我们也无法检测活动状态
         );
         
         const generatedPrompt = response.generations[0]?.text || '';
@@ -901,7 +953,12 @@ class AIServiceManager {
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];      const response = await this.withTimeout(llm.invoke(messages), 60000); // 60秒超时
+      ];      const response = await this.withSmartTimeout(
+        llm.invoke(messages), 
+        90000, // 90秒总超时
+        5000,  // 每5秒检查一次
+        () => true // 对于非流式生成，我们无法检测活动状态，所以使用固定超时
+      );
       const generatedPrompt = typeof response === 'string' ? response : (response as any)?.content || '';
 
       const result: AIGenerationResult = {
@@ -1007,14 +1064,16 @@ class AIServiceManager {
         });
         
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
-        const response = await this.withTimeout(
+        const response = await this.withSmartTimeout(
           cohere.generate({
             model: model,
             prompt: prompt,
             maxTokens: 2000,
             temperature: 0.7
           }),
-          60000
+          90000, // 90秒总超时
+          5000,  // 每5秒检查一次
+          () => true // Cohere不支持真正的流式，所以无法检测活动状态
         );
         
         const accumulatedContent = response.generations[0]?.text || '';
@@ -1067,8 +1126,9 @@ class AIServiceManager {
       ];
       
       let accumulatedContent = '';
+      let lastContentUpdate = Date.now();
       
-      // 尝试使用流式传输，添加超时
+      // 尝试使用流式传输，添加智能超时
       try {
         const streamPromise = (async () => {
           const stream = await llm.stream(messages);
@@ -1076,30 +1136,65 @@ class AIServiceManager {
             const content = typeof chunk === 'string' ? chunk : chunk.content;
             if (content) {
               accumulatedContent += content;
+              lastContentUpdate = Date.now(); // 更新最后内容更新时间
               // 传递字符数和当前累积的内容
               onProgress(accumulatedContent.length, accumulatedContent);
             }
           }
         })();
         
-        await this.withTimeout(streamPromise, 60000); // 60秒超时
+        // 使用智能超时：如果有内容持续更新，就不会超时
+        await this.withSmartTimeout(
+          streamPromise, 
+          60000, // 总超时时间60秒
+          2000,  // 每2秒检查一次活动状态
+          () => {
+            const now = Date.now();
+            const timeSinceLastUpdate = now - lastContentUpdate;
+            // 如果5秒内有内容更新，认为还在活动中
+            return timeSinceLastUpdate < 5000;
+          }
+        );
         
       } catch (streamError) {
         // 如果流式传输失败，回退到普通调用
         console.warn('流式传输失败，回退到普通调用:', streamError);
         if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
-          throw new Error('生成超时，请检查网络连接或服务状态');
+          // 检查是否是真正的超时还是无响应超时
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastContentUpdate;
+          if (timeSinceLastUpdate > 10000 && accumulatedContent.length === 0) {
+            // 超过10秒没有任何内容，真正的超时
+            throw new Error('生成超时，AI服务可能无响应，请检查网络连接或服务状态');
+          } else if (timeSinceLastUpdate > 30000) {
+            // 超过30秒没有新内容，但已有内容，可能是生成完成但连接未正常关闭
+            console.warn('检测到生成可能已完成，但连接未正常关闭，使用已有内容');
+          } else {
+            // 正在生成中被中断，抛出用户友好的错误
+            throw new Error(`生成中断，已生成${accumulatedContent.length}字符，请重试或检查网络连接`);
+          }
         }
         
-        const response = await this.withTimeout(llm.invoke(messages), 60000);
-        accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
-        // 模拟流式进度
-        const totalChars = accumulatedContent.length;
-        for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
-          const currentCharCount = Math.min(i, totalChars);
-          const partialContent = accumulatedContent.substring(0, currentCharCount);
-          onProgress(currentCharCount, partialContent);
-          await new Promise(resolve => setTimeout(resolve, 50));
+        // 如果已有部分内容，尝试使用现有内容
+        if (accumulatedContent.length > 0) {
+          console.log(`使用流式传输生成的部分内容，长度: ${accumulatedContent.length}`);
+        } else {
+          // 完全回退到普通调用
+          const response = await this.withSmartTimeout(
+            llm.invoke(messages), 
+            90000, // 90秒总超时
+            5000,  // 每5秒检查一次
+            () => true // 在fallback中无法检测活动状态
+          );
+          accumulatedContent = typeof response === 'string' ? response : (response as any)?.content || '';
+          // 模拟流式进度
+          const totalChars = accumulatedContent.length;
+          for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
+            const currentCharCount = Math.min(i, totalChars);
+            const partialContent = accumulatedContent.substring(0, currentCharCount);
+            onProgress(currentCharCount, partialContent);
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
         }
       }
 

@@ -56,7 +56,7 @@
                                                 <Bolt />
                                             </n-icon>
                                         </template>
-                                        {{ generating ? '生成中...' : '生成' }}
+                                        {{ getGenerationStatusText() }}
                                     </n-button>
                                     <n-dropdown :options="modelDropdownOptions" @select="onModelSelect" trigger="click"
                                         v-if="configs.length > 0">
@@ -246,7 +246,10 @@ const streamStats = reactive({
     charCount: 0,
     isStreaming: false,
     lastCharCount: 0,  // 记录上次的字符数
-    noContentUpdateCount: 0  // 记录没有内容更新的次数
+    noContentUpdateCount: 0,  // 记录没有内容更新的次数
+    lastUpdateTime: 0, // 记录最后一次更新的时间
+    isGenerationActive: false, // 标记生成是否活跃
+    contentGrowthRate: 0 // 内容增长速率（字符/秒）
 })
 
 // 表单数据
@@ -420,6 +423,11 @@ const generatePrompt = async () => {
         // 重置流式传输状态
         streamStats.charCount = 0
         streamStats.isStreaming = true
+        streamStats.lastCharCount = 0
+        streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = Date.now()
+        streamStats.isGenerationActive = true
+        streamStats.contentGrowthRate = 0
         generatedResult.value = '' // 清空之前的结果
 
         // 立即开始分隔动画，让用户看到右侧面板
@@ -449,6 +457,7 @@ const generatePrompt = async () => {
                 request,
                 serializedConfig,
                 (charCount: number, partialContent?: string) => {
+                    const now = Date.now();
                     console.log('流式传输回调:', {
                         charCount,
                         hasContent: !!partialContent,
@@ -457,44 +466,74 @@ const generatePrompt = async () => {
                         contentType: typeof partialContent,
                         isEmptyString: partialContent === '',
                         isNull: partialContent === null,
-                        isUndefined: partialContent === undefined
+                        isUndefined: partialContent === undefined,
+                        timeSinceLastUpdate: now - streamStats.lastUpdateTime
                     });
 
-                    // 更新字符统计
+                    // 更新时间统计
                     const prevCharCount = streamStats.charCount;
+                    const prevUpdateTime = streamStats.lastUpdateTime;
                     streamStats.charCount = charCount;
+                    streamStats.lastUpdateTime = now;
+                    
+                    // 计算内容增长速率
+                    if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                        const timeDiff = (now - prevUpdateTime) / 1000; // 转换为秒
+                        const charDiff = charCount - prevCharCount;
+                        streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                    }
 
                     // 检测是否有真实内容
                     const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                    
+                    // 判断生成是否活跃
+                    const isActiveGeneration = hasRealContent || 
+                        (charCount > prevCharCount && (now - prevUpdateTime) < 2000); // 2秒内有字符增长认为是活跃的
+                    
+                    streamStats.isGenerationActive = isActiveGeneration;
 
                     if (hasRealContent) {
                         // 有真实内容时直接显示
                         generatedResult.value = partialContent;
                         streamStats.noContentUpdateCount = 0; // 重置计数器
-                        console.log('✅ 内容已更新，当前长度:', partialContent.length);
+                        console.log('✅ 内容已更新，当前长度:', partialContent.length, '增长速率:', streamStats.contentGrowthRate.toFixed(2), '字符/秒');
                     } else {
                         // 没有内容时的处理
                         streamStats.noContentUpdateCount++;
-                        // 如果字符数增加了但没有内容，可能是后端只发送了字符数
+                        
                         if (charCount > prevCharCount) {
-                            // 如果连续多次没有内容更新，改变提示文本
-                            if (streamStats.noContentUpdateCount > 10) {
-                                console.warn('⚠️ 检测到可能的流式传输问题：字符数在增加但没有内容传递');
-                                console.warn('📋 这通常意味着后端流式传输实现只传递了字符数，没有传递部分内容');
-
-                                // 改变占位符文本，让用户知道正在等待最终结果
-                                const warningText = `生成中，请稍候... (已生成 ${charCount} 字符，等待内容传输)`;
-                                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...') || generatedResult.value.startsWith('生成中，请稍候...')) {
+                            // 字符数在增长，说明正在生成
+                            const timeSinceUpdate = now - prevUpdateTime;
+                            
+                            if (streamStats.noContentUpdateCount > 15 && timeSinceUpdate > 3000) {
+                                // 很久没有内容更新，但字符还在增长，可能有问题
+                                console.warn('⚠️ 检测到可能的流式传输问题：字符数持续增长但长时间没有内容传递');
+                                const warningText = `生成中，请稍候... (已生成 ${charCount} 字符，正在等待内容传输完成)`;
+                                if (!generatedResult.value || generatedResult.value.includes('生成中') || generatedResult.value.includes('正在生成中')) {
                                     generatedResult.value = warningText;
-                                    console.log('⚠️ 显示等待提示:', warningText);
+                                    console.log('⚠️ 显示长时间等待提示:', warningText);
+                                }
+                            } else if (streamStats.noContentUpdateCount > 5) {
+                                // 中等时间没有内容，但字符在增长
+                                const estimatedTimeRemaining = streamStats.contentGrowthRate > 0 ? 
+                                    Math.ceil((charCount * 0.1) / streamStats.contentGrowthRate) : '未知';
+                                const statusText = `正在生成中... (已生成 ${charCount} 字符，预计还需 ${estimatedTimeRemaining} 秒)`;
+                                if (!generatedResult.value || generatedResult.value.includes('生成中') || generatedResult.value.includes('正在生成中')) {
+                                    generatedResult.value = statusText;
+                                    console.log('📝 显示进度预估:', statusText);
                                 }
                             } else {
-                                // 正常的占位符
+                                // 正常的初期占位符
                                 const placeholderText = `正在生成中... (已生成 ${charCount} 字符)`;
-                                if (!generatedResult.value || generatedResult.value.startsWith('正在生成中...')) {
+                                if (!generatedResult.value || generatedResult.value.includes('正在生成中')) {
                                     generatedResult.value = placeholderText;
-                                    console.log('📝 显示占位符:', placeholderText);
+                                    console.log('📝 显示基础占位符:', placeholderText);
                                 }
+                            }
+                        } else {
+                            // 字符数没有增长，可能生成已完成或出现问题
+                            if (charCount > 0) {
+                                console.log('🔄 字符数未增长，但已有内容，可能生成完成');
                             }
                         }
                     }
@@ -586,6 +625,9 @@ const generatePrompt = async () => {
         streamStats.charCount = 0
         streamStats.lastCharCount = 0
         streamStats.noContentUpdateCount = 0
+        streamStats.lastUpdateTime = 0
+        streamStats.isGenerationActive = false
+        streamStats.contentGrowthRate = 0
     }
 }
 
@@ -714,6 +756,25 @@ const serializeConfig = (config: AIConfig) => {
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
     }
+}
+
+// 获取生成状态文本
+const getGenerationStatusText = () => {
+    if (!generating.value) {
+        return '生成'
+    }
+    
+    if (streamStats.isStreaming && streamStats.charCount > 0) {
+        if (streamStats.isGenerationActive && streamStats.contentGrowthRate > 0) {
+            // 显示生成速率
+            return `生成中 (${streamStats.charCount}字 ${streamStats.contentGrowthRate.toFixed(1)}/s)`
+        } else if (streamStats.charCount > 0) {
+            // 显示已生成字符数
+            return `生成中 (${streamStats.charCount}字)`
+        }
+    }
+    
+    return '生成中...'
 }
 
 // 提示词保存完成（保留此函数以防Modal组件需要）
