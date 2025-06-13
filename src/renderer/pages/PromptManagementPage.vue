@@ -10,6 +10,15 @@
                     </NText>
                 </div>
                 <NFlex>
+                    <NButton @click="showAIGenerator = !showAIGenerator"
+                        :type="showAIGenerator ? 'primary' : 'default'">
+                        <template #icon>
+                            <NIcon>
+                                <Robot />
+                            </NIcon>
+                        </template>
+                        AI 生成
+                    </NButton>
                     <NButton type="primary" @click="handleCreatePrompt">
                         <template #icon>
                             <NIcon>
@@ -18,33 +27,14 @@
                         </template>
                         新建提示词
                     </NButton>
-                    <NButton @click="showCategoryManagement = true">
-                        <template #icon>
-                            <NIcon>
-                                <Folder />
-                            </NIcon>
-                        </template>
-                        分类管理
-                    </NButton>
-                    <NButton @click="showAIGenerator = !showAIGenerator" :type="showAIGenerator ? 'primary' : 'default'">
-                        <template #icon>
-                            <NIcon>
-                                <Robot />
-                            </NIcon>
-                        </template>
-                        AI 生成器
-                    </NButton>
+
                 </NFlex>
-            </NFlex>              <!-- AI 生成器组件 -->
-            <AIGeneratorComponent 
-                v-if="showAIGenerator" 
-                @prompt-generated="handlePromptGenerated"
-                @prompt-saved="handleListRefresh"
-                @navigate-to-ai-config="handleNavigateToAIConfig" 
-            />
-              <!-- 提示词列表组件 -->
-<PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
-                @refresh="handleListRefresh" />
+            </NFlex> <!-- AI 生成器组件 -->
+            <AIGeneratorComponent v-if="showAIGenerator" @prompt-generated="handlePromptGenerated"
+                @prompt-saved="handleListRefresh" @navigate-to-ai-config="handleNavigateToAIConfig" />
+            <!-- 提示词列表组件 -->
+            <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
+                @refresh="handleListRefresh" @manage-categories="showCategoryManagement = true" />
         </NFlex>
 
         <!-- 模态框 -->
@@ -85,7 +75,7 @@ import { useDatabase } from '@/composables/useDatabase'
 
 // 定义事件
 const emit = defineEmits<{
-  'navigate-to-ai-config': []
+    'navigate-to-ai-config': []
 }>()
 
 const message = useMessage()
@@ -128,7 +118,8 @@ const loadCategories = async () => {
         categories.value = result
         // 同时刷新 PromptList 的分类数据
         if (promptListRef.value?.loadCategories) {
-            promptListRef.value.loadCategories()        }
+            promptListRef.value.loadCategories()
+        }
     }
 }
 

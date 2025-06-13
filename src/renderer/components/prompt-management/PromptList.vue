@@ -29,6 +29,14 @@
                         </template>
                         收藏
                     </NButton>
+                    <NButton @click="$emit('manage-categories')">
+                        <template #icon>
+                            <NIcon>
+                                <Folder />
+                            </NIcon>
+                        </template>
+                        分类
+                    </NButton>
                 </NFlex>
                 <!-- 搜索提示信息 -->
                 <div v-if="searchText.trim() || selectedCategory || showFavoritesOnly"
@@ -265,7 +273,8 @@ import {
     Tag,
     Box,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Folder
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
@@ -275,6 +284,7 @@ interface Emits {
     (e: 'edit', prompt: any): void
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
+    (e: 'manage-categories'): void
 }
 
 const emit = defineEmits<Emits>()
