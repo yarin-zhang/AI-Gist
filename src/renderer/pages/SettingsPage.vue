@@ -744,8 +744,9 @@ const syncNow = async () => {
 // 创建备份
 const createBackup = async () => {
     try {
-        const backup = await DataManagementAPI.createBackup("手动备份");
-        message.success(`备份创建成功 - ${backup.name}`);
+        const timestamp = new Date().toLocaleString('zh-CN');
+        const backup = await DataManagementAPI.createBackup(`手动备份 - ${timestamp}`);
+        message.success(`备份创建成功: ${backup.name} (大小: ${(backup.size / 1024).toFixed(2)} KB)`);
     } catch (error) {
         console.error("创建备份失败:", error);
         message.error("创建备份失败");
@@ -761,11 +762,13 @@ const restoreBackup = async () => {
             return;
         }
         
-        // 这里应该显示一个选择备份的对话框
-        // 暂时使用最新的备份
+        // 显示备份选择提示
+        message.info(`找到 ${backups.length} 个备份文件，将恢复最新的备份: ${backups[0].name}`);
+        
+        // 使用最新的备份
         const latestBackup = backups[0];
         await DataManagementAPI.restoreBackup(latestBackup.id);
-        message.success("备份恢复成功");
+        message.success(`备份恢复成功: ${latestBackup.name}`);
     } catch (error) {
         console.error("恢复备份失败:", error);
         message.error("恢复备份失败");
@@ -780,14 +783,19 @@ const exportData = async (format: 'json' | 'csv') => {
         const exportPath = await DataManagementAPI.selectExportPath(defaultName);
         
         if (exportPath) {
-            await DataManagementAPI.exportData({
+            const result = await DataManagementAPI.exportData({
                 format,
                 includeCategories: true,
                 includePrompts: true,
                 includeSettings: true,
                 includeHistory: true,
-            });
-            message.success(`数据已导出为 ${format.toUpperCase()} 格式`);
+            }, exportPath);
+            
+            if (result.success) {
+                message.success(`数据已导出为 ${format.toUpperCase()} 格式到: ${result.filePath}`);
+            } else {
+                message.error('导出失败');
+            }
         }
     } catch (error) {
         console.error("导出数据失败:", error);

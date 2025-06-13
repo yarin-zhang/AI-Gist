@@ -150,10 +150,17 @@ export class DataManagementService {
         });
 
         // 导出数据
-        ipcMain.handle('data:export', async (event, options) => {
+        ipcMain.handle('data:export', async (event, { options, exportPath }) => {
             try {
                 const data = await this.exportData(options);
-                return data;
+                
+                if (exportPath) {
+                    // 写入文件
+                    await fs.writeFile(exportPath, data, 'utf-8');
+                    console.log(`数据已导出到: ${exportPath}`);
+                }
+                
+                return { success: true, filePath: exportPath };
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`导出数据失败: ${errorMessage}`);
@@ -220,13 +227,48 @@ export class DataManagementService {
 
     private async exportAllData() {
         // 这里应该从数据库中导出所有数据
+        // 现在返回一些示例数据以便测试
         return {
-            categories: [],
-            prompts: [],
-            settings: {},
-            history: [],
+            categories: [
+                { id: 1, name: '示例分类1', description: '这是一个示例分类', createdAt: new Date().toISOString() },
+                { id: 2, name: '示例分类2', description: '这是另一个示例分类', createdAt: new Date().toISOString() }
+            ],
+            prompts: [
+                { 
+                    id: 1, 
+                    title: '示例提示词1', 
+                    content: '这是一个示例提示词内容', 
+                    categoryId: 1,
+                    tags: ['示例', '测试'],
+                    createdAt: new Date().toISOString() 
+                },
+                { 
+                    id: 2, 
+                    title: '示例提示词2', 
+                    content: '这是另一个示例提示词内容', 
+                    categoryId: 2,
+                    tags: ['示例', '演示'],
+                    createdAt: new Date().toISOString() 
+                }
+            ],
+            settings: {
+                themeSource: 'system',
+                closeBehaviorMode: 'ask',
+                autoLaunch: false,
+                startMinimized: false
+            },
+            history: [
+                {
+                    id: 1,
+                    promptId: 1,
+                    input: '示例输入',
+                    output: '示例输出',
+                    timestamp: new Date().toISOString()
+                }
+            ],
             exportTime: new Date().toISOString(),
             version: '1.0.0',
+            totalRecords: 6
         };
     }
 
@@ -273,8 +315,39 @@ export class DataManagementService {
 
     private convertToCSV(data: any): string {
         // 简单的 CSV 转换实现
-        // 实际应用中需要更复杂的逻辑
-        return 'CSV data placeholder';
+        let csv = '';
+        
+        // 添加分类数据
+        if (data.categories && data.categories.length > 0) {
+            csv += '--- 分类数据 ---\n';
+            csv += 'ID,名称,描述,创建时间\n';
+            data.categories.forEach((cat: any) => {
+                csv += `${cat.id},"${cat.name}","${cat.description || ''}","${cat.createdAt}"\n`;
+            });
+            csv += '\n';
+        }
+        
+        // 添加提示词数据
+        if (data.prompts && data.prompts.length > 0) {
+            csv += '--- 提示词数据 ---\n';
+            csv += 'ID,标题,内容,分类ID,标签,创建时间\n';
+            data.prompts.forEach((prompt: any) => {
+                const tags = Array.isArray(prompt.tags) ? prompt.tags.join(';') : '';
+                csv += `${prompt.id},"${prompt.title}","${prompt.content}","${prompt.categoryId}","${tags}","${prompt.createdAt}"\n`;
+            });
+            csv += '\n';
+        }
+        
+        // 添加历史数据
+        if (data.history && data.history.length > 0) {
+            csv += '--- 历史数据 ---\n';
+            csv += 'ID,提示词ID,输入,输出,时间戳\n';
+            data.history.forEach((hist: any) => {
+                csv += `${hist.id},"${hist.promptId}","${hist.input}","${hist.output}","${hist.timestamp}"\n`;
+            });
+        }
+        
+        return csv;
     }
 
     private parseCSV(content: string): any {

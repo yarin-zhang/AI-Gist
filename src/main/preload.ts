@@ -74,14 +74,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
     getConfig: () => ipcRenderer.invoke('webdav:get-config'),
   },
-
   // 数据管理
   data: {
     createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),
     getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
     restoreBackup: (backupId: string) => ipcRenderer.invoke('data:restore-backup', { backupId }),
     deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
-    export: (options: any) => ipcRenderer.invoke('data:export', options),
+    export: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export', { options, exportPath }),
     import: (filePath: string, options: any) => ipcRenderer.invoke('data:import', { filePath, options }),
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),

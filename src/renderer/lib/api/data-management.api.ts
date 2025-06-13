@@ -89,9 +89,9 @@ export class DataManagementAPI {
     /**
      * 导出数据
      */
-    static async exportData(options: ExportOptions): Promise<string> {
+    static async exportData(options: ExportOptions, exportPath?: string): Promise<any> {
         try {
-            return await ipcInvoke('data:export', options);
+            return await ipcInvoke('data:export', { options, exportPath });
         } catch (error) {
             console.error('导出数据失败:', error);
             throw error;

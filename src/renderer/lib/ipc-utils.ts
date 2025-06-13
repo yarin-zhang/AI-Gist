@@ -24,9 +24,8 @@ declare global {
                 createBackup: (description?: string) => Promise<any>;
                 getBackupList: () => Promise<any>;
                 restoreBackup: (backupId: string) => Promise<void>;
-                deleteBackup: (backupId: string) => Promise<void>;
-                export: (options: any) => Promise<string>;
-                import: (filePath: string, options: any) => Promise<any>;
+                deleteBackup: (backupId: string) => Promise<void>;            export: (options: any, exportPath?: string) => Promise<any>;
+            import: (filePath: string, options: any) => Promise<any>;
                 selectImportFile: (format: string) => Promise<string | null>;
                 selectExportPath: (defaultName: string) => Promise<string | null>;
                 getStats: () => Promise<any>;
@@ -72,7 +71,7 @@ export async function ipcInvoke<T = any>(channel: string, data?: any): Promise<T
                     case 'delete-backup':
                         return window.electronAPI.data.deleteBackup(data?.backupId);
                     case 'export':
-                        return window.electronAPI.data.export(data);
+                        return window.electronAPI.data.export(data.options, data.exportPath);
                     case 'import':
                         return window.electronAPI.data.import(data?.filePath, data?.options);
                     case 'select-import-file':
