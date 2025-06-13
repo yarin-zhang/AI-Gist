@@ -43,5 +43,6 @@
     "naive-ui": "^2.41.0",
     "vue": "^3.3.8",
     "zod": "^3.25.40"
-  }
+  },
+  "packageManager": "yarn@4.9.2"
 }
