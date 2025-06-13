@@ -156,8 +156,13 @@
                             <n-thing>
                                 <template #header>{{ item.topic }}</template>
                                 <template #description>
-                                    <n-space>
-                                        <span>{{ getConfigName(item.configId) }}</span>
+                                    <n-space align="center">
+                                        <n-space align="center" :size="4">
+                                            <n-icon v-if="isConfigPreferred(item.configId)" size="14" color="#f0c674">
+                                                <Star />
+                                            </n-icon>
+                                            <span>{{ getConfigNameOnly(item.configId) }}</span>
+                                        </n-space>
                                         <span>{{ item.model }}</span>
                                         <span>{{ formatDate(item.createdAt) }}</span>
                                     </n-space>
@@ -218,7 +223,7 @@ import {
     NPagination,
     useMessage
 } from 'naive-ui'
-import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy } from '@vicons/tabler'
+import { ChevronDown, History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
@@ -239,6 +244,7 @@ const emit = defineEmits<Emits>()
 
 // 数据状态
 const configs = ref<AIConfig[]>([])
+const preferredConfig = ref<AIConfig | null>(null)
 const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
@@ -300,46 +306,65 @@ const formRef = ref()
 const modelDropdownOptions = computed(() => {
     if (!configs.value || configs.value.length === 0) return []
 
-    const options: Array<{ label: string; key: string; configId: string; configName: string }> = []
+    const preferredOptions: Array<{ label: string; key: string; configId: string; configName: string; isPreferred: boolean }> = []
+    const regularOptions: Array<{ label: string; key: string; configId: string; configName: string; isPreferred: boolean }> = []
 
-    // 遍历所有启用的配置
+    // 遍历所有启用的配置，分别处理首选和普通配置
     configs.value.forEach(config => {
         const models = Array.isArray(config.models) ? config.models : []
+        const isPreferred = config.isPreferred || false
+        const targetArray = isPreferred ? preferredOptions : regularOptions
 
         // 添加默认模型
         if (config.defaultModel) {
-            options.push({
-                label: `${config.defaultModel} (${config.name} - 默认)`,
+            const label = isPreferred 
+                ? `★ ${config.defaultModel} (${config.name} - 默认)`
+                : `${config.defaultModel} (${config.name} - 默认)`
+            
+            targetArray.push({
+                label,
                 key: `${config.configId}:${config.defaultModel}`,
                 configId: config.configId,
-                configName: config.name
+                configName: config.name,
+                isPreferred
             })
         }
 
         // 添加其他模型
         models.forEach(model => {
             if (model !== config.defaultModel) { // 避免重复添加默认模型
-                options.push({
-                    label: `${model} (${config.name})`,
+                const label = isPreferred 
+                    ? `★ ${model} (${config.name})`
+                    : `${model} (${config.name})`
+                
+                targetArray.push({
+                    label,
                     key: `${config.configId}:${model}`,
                     configId: config.configId,
-                    configName: config.name
+                    configName: config.name,
+                    isPreferred
                 })
             }
         })
 
         // 添加自定义模型
         if (config.customModel && !models.includes(config.customModel) && config.customModel !== config.defaultModel) {
-            options.push({
-                label: `${config.customModel} (${config.name} - 自定义)`,
+            const label = isPreferred 
+                ? `★ ${config.customModel} (${config.name} - 自定义)`
+                : `${config.customModel} (${config.name} - 自定义)`
+                
+            targetArray.push({
+                label,
                 key: `${config.configId}:${config.customModel}`,
                 configId: config.configId,
-                configName: config.name
+                configName: config.name,
+                isPreferred
             })
         }
     })
 
-    return options
+    // 首选配置的模型排在前面，然后是普通配置的模型
+    return [...preferredOptions, ...regularOptions]
 })
 
 // 加载 AI 配置
@@ -351,18 +376,27 @@ const loadConfigs = async () => {
         console.log('成功获取到启用的 AI 配置:', result)
         configs.value = result
 
-        // 自动选择第一个启用的配置作为默认配置
+        // 加载首选配置
+        const preferred = await databaseService.getPreferredAIConfig()
+        preferredConfig.value = preferred
+        console.log('首选配置:', preferred?.name || '无')
+
+        // 自动选择首选配置作为默认配置，如果没有首选则选择第一个启用的配置
         if (result && result.length > 0) {
-            defaultConfig.value = result[0]
+            defaultConfig.value = preferred || result[0]
+            
             // 设置默认选中的模型和配置
             const defaultModel = defaultConfig.value.defaultModel || ''
             if (defaultModel) {
                 currentModel.value = defaultModel
                 currentConfigId.value = defaultConfig.value.configId
             }
-            console.log('自动选择默认配置:', defaultConfig.value.name)
+            
+            const configLabel = defaultConfig.value === preferred ? '首选配置' : '默认配置'
+            console.log(`自动选择${configLabel}:`, defaultConfig.value.name)
         } else {
             defaultConfig.value = null
+            preferredConfig.value = null
             currentModel.value = ''
             currentConfigId.value = ''
             console.log('没有找到启用的 AI 配置')
@@ -826,7 +860,8 @@ const getDisplayModelName = () => {
 
     const selectedConfig = configs.value.find(c => c.configId === currentConfigId.value)
     if (selectedConfig) {
-        return `${currentModel.value} (${selectedConfig.name})`
+        const prefix = selectedConfig.isPreferred ? '★ ' : ''
+        return `${prefix}${currentModel.value} (${selectedConfig.name})`
     }
 
     return currentModel.value || '选择模型'
@@ -835,7 +870,22 @@ const getDisplayModelName = () => {
 // 获取配置名称
 const getConfigName = (configId: string) => {
     const config = configs.value.find(c => c.configId === configId)
+    if (!config) return '未知配置'
+    
+    const prefix = config.isPreferred ? '★ ' : ''
+    return `${prefix}${config.name}`
+}
+
+// 获取配置名称（不带星标，用于图标显示）
+const getConfigNameOnly = (configId: string) => {
+    const config = configs.value.find(c => c.configId === configId)
     return config ? config.name : '未知配置'
+}
+
+// 检查配置是否为首选
+const isConfigPreferred = (configId: string) => {
+    const config = configs.value.find(c => c.configId === configId)
+    return config?.isPreferred || false
 }
 
 // 格式化日期
