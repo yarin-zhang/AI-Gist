@@ -3,16 +3,58 @@
         @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{
-                prompt?.title
-                }}</NText>
-            <NText 
-                depth="3" 
-                v-if="prompt.description" 
-                class="header-description"
-            >{{
-                prompt.description || "暂无描述"
-                }}</NText>
+            <div :style="{ 
+                maxWidth: 'calc(100% - 240px)', /* 匹配 CommonModal 的右边距 */
+                overflow: 'hidden' 
+            }">
+                <NFlex vertical size="small">
+                    <NText :style="{ 
+                        fontSize: '20px', 
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }">{{
+                        prompt?.title
+                        }}</NText>
+                    <NText 
+                        depth="3" 
+                        v-if="prompt.description" 
+                        class="header-description"
+                        style="{ 
+                        fontSize: '20px', 
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                        }"
+                    >{{
+                        prompt.description || "暂无描述"
+                        }}</NText>
+                </NFlex>
+            </div>
+        </template>
+        
+        <!-- Header 额外区域 - 操作按钮 -->
+        <template #header-extra>
+            <NFlex size="small">
+                <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
+                    <template #icon>
+                        <NIcon>
+                            <Heart />
+                        </NIcon>
+                    </template>
+                    {{ prompt.isFavorite ? "取消收藏" : "收藏" }}
+                </NButton>
+                <NButton type="primary" @click="$emit('edit', prompt)">
+                    <template #icon>
+                        <NIcon>
+                            <Edit />
+                        </NIcon>
+                    </template>
+                    编辑
+                </NButton>
+            </NFlex>
         </template>        <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
             <!-- Tabs 切换 -->
@@ -25,27 +67,7 @@
                         <template #1>
                             <NCard size="small" :style="{ height: '100%' }">
                                 <template #header>
-                                    <NFlex justify="space-between" align="center">
-                                        <NText strong>提示词内容</NText>
-                                        <NFlex>
-                                            <NButton size="small" @click="copyToClipboard(filledContent)">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Copy />
-                                                    </NIcon>
-                                                </template>
-                                                复制内容
-                                            </NButton>
-                                            <NButton size="small" type="primary" @click="usePrompt">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Check />
-                                                    </NIcon>
-                                                </template>
-                                                使用此提示词
-                                            </NButton>
-                                        </NFlex>
-                                    </NFlex>
+                                    <NText strong>提示词内容</NText>
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 140}px` }">
                                     <NFlex vertical size="medium" style="padding-right: 12px">
@@ -289,23 +311,23 @@
                 </div>
 
                 <div>
-                    <!-- 右侧区域 -->
+                    <!-- 右侧区域 - 主要操作按钮 -->
                     <NFlex size="small">
-                        <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
+                        <NButton @click="copyToClipboard(filledContent)">
                             <template #icon>
                                 <NIcon>
-                                    <Heart />
+                                    <Copy />
                                 </NIcon>
                             </template>
-                            {{ prompt.isFavorite ? "取消收藏" : "收藏" }}
+                            复制内容
                         </NButton>
-                        <NButton type="primary" @click="$emit('edit', prompt)">
+                        <NButton type="primary" @click="usePrompt">
                             <template #icon>
                                 <NIcon>
-                                    <Edit />
+                                    <Check />
                                 </NIcon>
                             </template>
-                            编辑
+                            使用此提示词
                         </NButton>
                     </NFlex>
                 </div>
