@@ -6,6 +6,7 @@
 import { ipcMain, app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 // 使用动态导入来避免 ES 模块问题
 let createWebDAVClient: any = null;
@@ -263,11 +264,20 @@ export class WebDAVService {
             localMetadata.totalRecords = this.calculateTotalRecords(localData);
             const localDataHash = this.calculateDataHash(localData);
             
+            console.log('本地数据信息:');
+            console.log('- 总记录数:', localMetadata.totalRecords);
+            console.log('- 数据哈希:', localDataHash);
+            console.log('- 同步时间:', localMetadata.lastSyncTime);
+            console.log('- 同步次数:', localMetadata.syncCount);
+            console.log('- 设备ID:', localMetadata.deviceId);
+            console.log('- 分类数量:', localData.categories?.length || 0);
+            console.log('- 提示词数量:', localData.prompts?.length || 0);
+            
             // 检查远程是否存在数据
             const remoteDataExists = await this.checkRemoteFileExists(client, dataFile);
             const remoteMetadataExists = await this.checkRemoteFileExists(client, metadataFile);
             
-            let remoteData = null;
+            let remoteData: any = null;
             let remoteMetadata: SyncMetadata | null = null;
             
             if (remoteDataExists && remoteMetadataExists) {
@@ -278,6 +288,17 @@ export class WebDAVService {
                     
                     remoteData = JSON.parse(remoteDataContent as string);
                     remoteMetadata = JSON.parse(remoteMetadataContent as string);
+                    
+                    if (remoteMetadata && remoteData) {
+                        console.log('远程数据信息:');
+                        console.log('- 总记录数:', remoteMetadata.totalRecords);
+                        console.log('- 数据哈希:', remoteMetadata.dataHash);
+                        console.log('- 同步时间:', remoteMetadata.lastSyncTime);
+                        console.log('- 同步次数:', remoteMetadata.syncCount);
+                        console.log('- 设备ID:', remoteMetadata.deviceId);
+                        console.log('- 分类数量:', remoteData.categories?.length || 0);
+                        console.log('- 提示词数量:', remoteData.prompts?.length || 0);
+                    }
                     
                     console.log('远程数据已下载，最后同步时间:', remoteMetadata?.lastSyncTime);
                 } catch (error) {
@@ -329,6 +350,7 @@ export class WebDAVService {
     private async getLocalSyncMetadata(): Promise<SyncMetadata> {
         const preferences = this.preferencesManager.getPreferences();
         const dataSync = preferences.dataSync;
+        const webdav = preferences.webdav;
         
         // 生成唯一的设备ID（基于用户数据路径）
         const deviceId = this.generateDeviceId();
@@ -337,11 +359,11 @@ export class WebDAVService {
         const appVersion = require('../../../package.json').version || '1.0.0';
         
         return {
-            lastSyncTime: dataSync?.lastSyncTime || new Date().toISOString(),
+            lastSyncTime: dataSync?.lastSyncTime || new Date(0).toISOString(), // 如果从未同步，使用很早的时间
             localVersion: '1.0.0',
             remoteVersion: '1.0.0', 
             dataHash: '',
-            syncCount: dataSync?.syncCount || 0,
+            syncCount: (dataSync?.syncCount || 0),
             deviceId: deviceId,
             appVersion: appVersion,
             totalRecords: 0, // 这将在同步时更新
@@ -351,15 +373,46 @@ export class WebDAVService {
     }
 
     private calculateDataHash(data: any): string {
-        // 简单的哈希算法，实际项目中应该使用更强的哈希算法
-        const dataString = JSON.stringify(data);
-        let hash = 0;
-        for (let i = 0; i < dataString.length; i++) {
-            const char = dataString.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
+        if (!data || typeof data !== 'object') {
+            return crypto.createHash('sha256').update('').digest('hex').substring(0, 16);
         }
-        return hash.toString(16);
+        
+        // 标准化数据：排序键、移除时间戳等易变字段
+        const normalizedData = this.normalizeDataForHashing(data);
+        const dataString = JSON.stringify(normalizedData);
+        return crypto.createHash('sha256').update(dataString).digest('hex').substring(0, 16);
+    }
+
+    private normalizeDataForHashing(data: any): any {
+        const normalized: any = {};
+        
+        // 只包含实际数据，排除元数据
+        if (data.categories) normalized.categories = this.sortArray(data.categories, 'id');
+        if (data.prompts) normalized.prompts = this.sortArray(data.prompts, 'id');
+        if (data.aiConfigs) normalized.aiConfigs = this.sortArray(data.aiConfigs, 'id');
+        if (data.users) normalized.users = this.sortArray(data.users, 'id');
+        if (data.posts) normalized.posts = this.sortArray(data.posts, 'id');
+        if (data.settings) normalized.settings = this.sortObject(data.settings);
+        
+        return normalized;
+    }
+
+    private sortArray(arr: any[], keyField: string = 'id'): any[] {
+        if (!Array.isArray(arr)) return arr;
+        return arr.slice().sort((a, b) => {
+            const aKey = a[keyField] || JSON.stringify(a);
+            const bKey = b[keyField] || JSON.stringify(b);
+            return aKey.toString().localeCompare(bKey.toString());
+        });
+    }
+
+    private sortObject(obj: any): any {
+        if (!obj || typeof obj !== 'object') return obj;
+        const sorted: any = {};
+        Object.keys(obj).sort().forEach(key => {
+            sorted[key] = obj[key];
+        });
+        return sorted;
     }
 
     private calculateTotalRecords(data: any): number {
@@ -383,8 +436,16 @@ export class WebDAVService {
         reason: string;
     }> {
         
+        console.log('\n=== WebDAV 同步决策分析 ===');
+        console.log('本地哈希:', localDataHash);
+        console.log('本地时间:', localMetadata.lastSyncTime);
+        console.log('本地同步次数:', localMetadata.syncCount);
+        console.log('本地设备ID:', localMetadata.deviceId);
+        console.log('本地记录数:', localMetadata.totalRecords);
+        
         // 情况1：远程没有数据，直接上传
         if (!remoteData || !remoteMetadata) {
+            console.log('决策: 首次上传');
             return {
                 action: 'upload_only',
                 strategy: ConflictResolutionStrategy.LOCAL_WINS,
@@ -392,62 +453,149 @@ export class WebDAVService {
             };
         }
         
+        const remoteDataHash = this.calculateDataHash(remoteData);
+        console.log('远程哈希:', remoteDataHash);
+        console.log('远程时间:', remoteMetadata.lastSyncTime);
+        console.log('远程同步次数:', remoteMetadata.syncCount);
+        console.log('远程设备ID:', remoteMetadata.deviceId);
+        console.log('远程记录数:', remoteMetadata.totalRecords);
+        
         // 情况2：本地数据为空，直接下载
-        if (!localData || Object.keys(localData).length === 0) {
+        if (!localData || Object.keys(localData).length === 0 || localMetadata.totalRecords === 0) {
+            console.log('决策: 本地无数据，下载远程数据');
             return {
                 action: 'download_only', 
                 strategy: ConflictResolutionStrategy.REMOTE_WINS,
                 reason: '本地无数据，执行首次下载'
             };
         }
-        
-        // 情况3：比较数据哈希，如果相同则无需同步
-        const remoteDataHash = this.calculateDataHash(remoteData);
+
+        // 情况3：数据完全相同
         if (localDataHash === remoteDataHash) {
+            console.log('决策: 数据相同，仅更新时间戳');
             return {
-                action: 'upload_only', // 只更新时间戳
+                action: 'upload_only',
                 strategy: ConflictResolutionStrategy.LOCAL_WINS,
                 reason: '数据相同，仅更新同步时间'
             };
         }
-        
-        // 情况4：比较时间戳判断冲突
+
         const localTime = new Date(localMetadata.lastSyncTime).getTime();
         const remoteTime = new Date(remoteMetadata.lastSyncTime).getTime();
         const timeDiff = Math.abs(localTime - remoteTime);
+
+        console.log('时间差:', timeDiff, 'ms');
+
+        // 情况4：检查记录数变化
+        const recordDiff = localMetadata.totalRecords - (remoteMetadata.totalRecords || 0);
+        console.log('记录数差异:', recordDiff);
         
-        // 如果时间差小于1分钟，认为是同一时间的更新，尝试合并
-        if (timeDiff < 60000) {
+        // 如果本地记录数明显更多，优先上传
+        if (recordDiff > 0) {
+            console.log('决策: 本地记录数更多，上传本地数据');
+            return {
+                action: 'upload_only',
+                strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                reason: `本地新增了 ${recordDiff} 条记录`
+            };
+        }
+        
+        // 如果远程记录数明显更多，可能需要下载
+        if (recordDiff < -5) { // 远程比本地多超过5条记录
+            console.log('决策: 远程记录数明显更多，下载远程数据');
+            return {
+                action: 'download_only',
+                strategy: ConflictResolutionStrategy.REMOTE_WINS,
+                reason: `远程多了 ${Math.abs(recordDiff)} 条记录`
+            };
+        }
+
+        // 情况5：检查是否是同一设备的不同同步
+        if (localMetadata.deviceId === remoteMetadata.deviceId) {
+            console.log('检测到同设备同步');
+            // 同一设备，比较同步计数
+            if (localMetadata.syncCount > remoteMetadata.syncCount) {
+                console.log('决策: 同设备，本地版本更新');
+                return {
+                    action: 'upload_only',
+                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                    reason: '同设备本地版本更新'
+                };
+            } else if (localMetadata.syncCount < remoteMetadata.syncCount) {
+                console.log('决策: 同设备，远程版本更新');
+                return {
+                    action: 'download_only',
+                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
+                    reason: '同设备远程版本更新'
+                };
+            } else {
+                console.log('警告: 同设备同步计数相同但数据不同');
+                return {
+                    action: 'conflict_detected',
+                    strategy: ConflictResolutionStrategy.CREATE_BACKUP,
+                    reason: '同设备同步计数相同但数据哈希不同，数据可能损坏'
+                };
+            }
+        }
+
+        // 情况5：不同设备的修改，需要更仔细的分析
+        
+        // 5.1：时间差很大，使用时间戳决策
+        if (timeDiff > 300000) { // 5分钟
+            if (localTime > remoteTime) {
+                console.log('决策: 本地时间较新（时间差>5分钟）');
+                return {
+                    action: 'upload_only',
+                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                    reason: '本地修改时间较新'
+                };
+            } else {
+                console.log('决策: 远程时间较新（时间差>5分钟）');
+                return {
+                    action: 'download_only',
+                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
+                    reason: '远程修改时间较新'
+                };
+            }
+        }
+
+        // 5.2：时间差较小，可能是并发修改
+        if (timeDiff < 60000) { // 1分钟内
+            console.log('决策: 检测到可能的并发修改，需要合并');
             return {
                 action: 'merge',
                 strategy: ConflictResolutionStrategy.AUTO_MERGE,
                 reason: '检测到并发修改，尝试自动合并'
             };
         }
-        
-        // 情况5：本地更新较新，上传本地数据
-        if (localTime > remoteTime) {
-            return {
-                action: 'upload_only',
-                strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                reason: '本地数据更新，上传到远程'
-            };
+
+        // 5.3：中等时间差，使用同步计数辅助判断
+        const syncCountDiff = localMetadata.syncCount - remoteMetadata.syncCount;
+        if (Math.abs(syncCountDiff) > 5) {
+            // 同步计数差异很大，可能有一方很久没同步
+            if (syncCountDiff > 0) {
+                console.log('决策: 本地同步计数远大于远程');
+                return {
+                    action: 'upload_only',
+                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                    reason: '本地同步次数更多'
+                };
+            } else {
+                console.log('决策: 远程同步计数远大于本地');
+                return {
+                    action: 'download_only',
+                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
+                    reason: '远程同步次数更多'
+                };
+            }
         }
-        
-        // 情况6：远程更新较新，下载远程数据
-        if (remoteTime > localTime) {
-            return {
-                action: 'download_only',
-                strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                reason: '远程数据更新，下载到本地'
-            };
-        }
-        
-        // 情况7：无法确定，标记为冲突
+
+        // 情况6：无法明确决策，标记为冲突
+        console.log('决策: 无法自动决策，标记为冲突');
         return {
             action: 'conflict_detected',
             strategy: ConflictResolutionStrategy.CREATE_BACKUP,
-            reason: '检测到数据冲突，需要人工处理'
+            reason: `无法自动解决冲突: 时间差${Math.round(timeDiff/1000)}秒, 同步计数差${syncCountDiff}`
         };
     }
 
@@ -732,17 +880,22 @@ export class WebDAVService {
     }
     
     /**
-     * 更新本地同步时间
+     * 更新本地同步时间和计数
      */
     private async updateLocalSyncTime(syncTime: string): Promise<void> {
         try {
             const currentPrefs = this.preferencesManager.getPreferences();
+            const currentSyncCount = currentPrefs.dataSync?.syncCount || 0;
+            
             await this.preferencesManager.updatePreferences({
                 dataSync: {
                     ...currentPrefs.dataSync,
-                    lastSyncTime: syncTime
+                    lastSyncTime: syncTime,
+                    syncCount: currentSyncCount + 1 // 增加同步计数
                 }
             });
+            
+            console.log(`本地同步信息已更新: 时间=${syncTime}, 计数=${currentSyncCount + 1}`);
         } catch (error) {
             console.error('更新本地同步时间失败:', error);
         }
