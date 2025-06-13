@@ -979,8 +979,15 @@ const restoreBackup = async () => {
         
         // 使用最新的备份
         const latestBackup = backups[0];
-        await DataManagementAPI.restoreBackup(latestBackup.id);
-        message.success(`备份恢复成功: ${latestBackup.name}`);
+        const result = await DataManagementAPI.restoreBackup(latestBackup.id);
+        
+        // 显示恢复结果
+        if (result.success) {
+            const successMessage = result.message || `备份恢复成功: ${latestBackup.name}`;
+            message.success(successMessage);
+        } else {
+            message.error(result.message || "备份恢复失败");
+        }
     } catch (error) {
         console.error("恢复备份失败:", error);
         message.error("恢复备份失败");

@@ -115,13 +115,19 @@ export class DataManagementService {
                     throw new Error('备份文件不存在');
                 }
 
-                // 这里应该将备份数据恢复到数据库
+                // 恢复数据到数据库
                 await this.restoreAllData(backupFile.data);
                 
-                return { success: true };
+                return { 
+                    success: true,
+                    message: `数据恢复成功: ${backupFile.name}`
+                };
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
-                throw new Error(`恢复备份失败: ${errorMessage}`);
+                return {
+                    success: false,
+                    message: `恢复备份失败: ${errorMessage}`
+                };
             }
         });
 
@@ -324,8 +330,175 @@ export class DataManagementService {
     }
 
     private async restoreAllData(data: any) {
-        // 这里应该将数据恢复到数据库
-        console.log('恢复数据:', data);
+        try {
+            // 通过渲染进程恢复数据到数据库
+            const mainWindow = BrowserWindow.getAllWindows()[0];
+            if (!mainWindow) {
+                throw new Error('没有找到主窗口，无法访问数据库');
+            }
+
+            console.log('正在恢复数据到数据库...');
+            
+            // 发送恢复数据的请求到渲染进程
+            const webContents = mainWindow.webContents;
+            
+            try {
+                // 执行渲染进程中的代码来恢复数据
+                const result = await webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            // 确保数据库服务已初始化
+                            const { databaseServiceManager } = window.databaseAPI || {};
+                            if (!databaseServiceManager) {
+                                throw new Error('数据库服务未初始化');
+                            }
+                            
+                            await databaseServiceManager.waitForInitialization();
+                            
+                            const backupData = ${JSON.stringify(data)};
+                            
+                            // 清空现有数据（可选，根据需求决定）
+                            console.log('正在清空现有数据...');
+                            
+                            // 恢复各类数据
+                            const restorePromises = [];
+                            
+                            // 恢复用户数据
+                            if (backupData.users && backupData.users.length > 0) {
+                                console.log('恢复用户数据:', backupData.users.length, '条');
+                                for (const user of backupData.users) {
+                                    restorePromises.push(
+                                        databaseServiceManager.user.addUser(user).catch(err => {
+                                            console.warn('恢复用户数据失败:', user.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复分类数据
+                            if (backupData.categories && backupData.categories.length > 0) {
+                                console.log('恢复分类数据:', backupData.categories.length, '条');
+                                for (const category of backupData.categories) {
+                                    restorePromises.push(
+                                        databaseServiceManager.category.addCategory(category).catch(err => {
+                                            console.warn('恢复分类数据失败:', category.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复提示词数据
+                            if (backupData.prompts && backupData.prompts.length > 0) {
+                                console.log('恢复提示词数据:', backupData.prompts.length, '条');
+                                for (const prompt of backupData.prompts) {
+                                    restorePromises.push(
+                                        databaseServiceManager.prompt.addPrompt(prompt).catch(err => {
+                                            console.warn('恢复提示词数据失败:', prompt.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复文章数据
+                            if (backupData.posts && backupData.posts.length > 0) {
+                                console.log('恢复文章数据:', backupData.posts.length, '条');
+                                for (const post of backupData.posts) {
+                                    restorePromises.push(
+                                        databaseServiceManager.post.addPost(post).catch(err => {
+                                            console.warn('恢复文章数据失败:', post.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复AI配置数据
+                            if (backupData.aiConfigs && backupData.aiConfigs.length > 0) {
+                                console.log('恢复AI配置数据:', backupData.aiConfigs.length, '条');
+                                for (const config of backupData.aiConfigs) {
+                                    restorePromises.push(
+                                        databaseServiceManager.aiConfig.addAIConfig(config).catch(err => {
+                                            console.warn('恢复AI配置数据失败:', config.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复AI历史数据
+                            if (backupData.aiHistory && backupData.aiHistory.length > 0) {
+                                console.log('恢复AI历史数据:', backupData.aiHistory.length, '条');
+                                for (const history of backupData.aiHistory) {
+                                    restorePromises.push(
+                                        databaseServiceManager.aiGenerationHistory.addAIGenerationHistory(history).catch(err => {
+                                            console.warn('恢复AI历史数据失败:', history.id, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 恢复设置数据
+                            if (backupData.settings && backupData.settings.length > 0) {
+                                console.log('恢复设置数据:', backupData.settings.length, '条');
+                                for (const setting of backupData.settings) {
+                                    restorePromises.push(
+                                        databaseServiceManager.appSettings.setSetting(setting.key, setting.value).catch(err => {
+                                            console.warn('恢复设置数据失败:', setting.key, err.message);
+                                        })
+                                    );
+                                }
+                            }
+                            
+                            // 等待所有恢复操作完成
+                            await Promise.all(restorePromises);
+                            
+                            const totalRestored = (backupData.users?.length || 0) + 
+                                                (backupData.categories?.length || 0) + 
+                                                (backupData.prompts?.length || 0) + 
+                                                (backupData.posts?.length || 0) + 
+                                                (backupData.aiConfigs?.length || 0) + 
+                                                (backupData.aiHistory?.length || 0) + 
+                                                (backupData.settings?.length || 0);
+                            
+                            console.log('数据恢复完成，总计恢复记录数:', totalRestored);
+                            
+                            return {
+                                success: true,
+                                totalRestored: totalRestored,
+                                details: {
+                                    users: backupData.users?.length || 0,
+                                    categories: backupData.categories?.length || 0,
+                                    prompts: backupData.prompts?.length || 0,
+                                    posts: backupData.posts?.length || 0,
+                                    aiConfigs: backupData.aiConfigs?.length || 0,
+                                    aiHistory: backupData.aiHistory?.length || 0,
+                                    settings: backupData.settings?.length || 0
+                                }
+                            };
+                        } catch (error) {
+                            console.error('恢复数据失败:', error);
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+                
+                if (!result.success) {
+                    throw new Error(`数据恢复失败: ${result.error}`);
+                }
+                
+                console.log(`数据恢复成功，总计恢复记录数: ${result.totalRestored}`);
+                console.log('恢复详情:', result.details);
+                
+            } catch (error) {
+                console.error('执行恢复脚本失败:', error);
+                throw new Error(`无法恢复数据到数据库: ${error instanceof Error ? error.message : '未知错误'}`);
+            }
+            
+        } catch (error) {
+            console.error('恢复数据失败:', error);
+            throw new Error(`数据恢复失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
     }
 
     private async exportData(options: any) {
