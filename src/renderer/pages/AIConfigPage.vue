@@ -448,7 +448,7 @@
             <!-- 底部固定区域 -->
             <template #footer>
                 <NFlex justify="space-between">
-                    <NButton @click="resetSystemPromptToDefault" type="warning">
+                    <NButton @click="resetSystemPromptToDefault" secondary type="warning">
                         重置为默认
                     </NButton>
                     <NFlex>
