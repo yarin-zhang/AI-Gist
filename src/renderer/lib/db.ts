@@ -83,6 +83,7 @@ export interface AIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  isPreferred?: boolean; // 是否为全局首选配置
   systemPrompt?: string; // 自定义的生成提示词的系统提示词
   createdAt: Date;
   updatedAt: Date;
@@ -101,6 +102,17 @@ export interface AIGenerationHistory {
   createdAt: Date;
 }
 
+// 全局设置接口
+export interface AppSettings {
+  id?: number;
+  key: string;
+  value: string;
+  type: 'string' | 'number' | 'boolean' | 'json';
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // 扩展的数据类型（包含关联数据）
 export interface PromptWithRelations extends Prompt {
   category?: Category;
@@ -117,7 +129,7 @@ export interface CategoryWithRelations extends Category {
 class DatabaseService {
   private db: IDBDatabase | null = null;
   private readonly dbName = 'AIGistDB';
-  private readonly dbVersion = 4; // 升级版本号以添加 promptHistories 表
+  private readonly dbVersion = 5; // 升级版本号以添加 settings 表和 isPreferred 字段
   private initializationPromise: Promise<void> | null = null;
   private isInitialized: boolean = false;
   /**
@@ -198,6 +210,7 @@ class DatabaseService {
           aiConfigStore.createIndex('configId', 'configId', { unique: true });
           aiConfigStore.createIndex('type', 'type', { unique: false });
           aiConfigStore.createIndex('enabled', 'enabled', { unique: false });
+          aiConfigStore.createIndex('isPreferred', 'isPreferred', { unique: false });
         }
 
         // 创建 ai_generation_history 表
@@ -207,6 +220,12 @@ class DatabaseService {
           aiHistoryStore.createIndex('configId', 'configId', { unique: false });
           aiHistoryStore.createIndex('status', 'status', { unique: false });
           aiHistoryStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // 创建 settings 表
+        if (!db.objectStoreNames.contains('settings')) {
+          const settingsStore = db.createObjectStore('settings', { keyPath: 'id', autoIncrement: true });
+          settingsStore.createIndex('key', 'key', { unique: true });
         }
 
         console.log('Database schema updated');
@@ -1149,6 +1168,92 @@ class DatabaseService {
 
     const histories = await this.getPromptHistoryByPromptId(promptId);
     return histories.length > 0 ? Math.max(...histories.map(h => h.version)) : 0;
+  }
+
+  // ===== Settings 相关方法 =====
+  async createSetting(data: Omit<AppSettings, 'id' | 'createdAt' | 'updatedAt'>): Promise<AppSettings> {
+    return this.add<AppSettings>('settings', data);
+  }
+
+  async getSettingByKey(key: string): Promise<AppSettings | null> {
+    const settings = await this.getByIndex<AppSettings>('settings', 'key', key);
+    return settings.length > 0 ? settings[0] : null;
+  }
+
+  async updateSettingByKey(key: string, value: string): Promise<AppSettings> {
+    const existingSetting = await this.getSettingByKey(key);
+    
+    if (existingSetting && existingSetting.id) {
+      return this.update<AppSettings>('settings', existingSetting.id, {
+        value,
+        updatedAt: new Date()
+      });
+    } else {
+      // 创建新设置
+      return this.createSetting({
+        key,
+        value,
+        type: 'string',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+  }
+
+  async deleteSetting(key: string): Promise<boolean> {
+    const setting = await this.getSettingByKey(key);
+    if (!setting || !setting.id) {
+      return false;
+    }
+    await this.delete('settings', setting.id);
+    return true;
+  }
+
+  // ===== AI Config 首选项管理 =====
+  async setPreferredAIConfig(configId: number): Promise<void> {
+    // 首先取消所有配置的首选项状态
+    const allConfigs = await this.getAllAIConfigs();
+    
+    for (const config of allConfigs) {
+      if (config.id && config.isPreferred) {
+        await this.updateAIConfig(config.id, { isPreferred: false });
+      }
+    }
+
+    // 设置新的首选配置
+    const targetConfig = await this.getAIConfigById(configId);
+    if (!targetConfig) {
+      throw new Error('AI Config not found');
+    }
+
+    if (!targetConfig.enabled) {
+      throw new Error('Cannot set disabled config as preferred');
+    }
+
+    await this.updateAIConfig(configId, { isPreferred: true });
+  }
+
+  async getPreferredAIConfig(): Promise<AIConfig | null> {
+    const allConfigs = await this.getAllAIConfigs();
+    const preferredConfig = allConfigs.find(config => config.isPreferred && config.enabled);
+    
+    if (preferredConfig) {
+      return preferredConfig;
+    }
+
+    // 如果没有设置首选项，返回第一个启用的配置
+    const enabledConfigs = allConfigs.filter(config => config.enabled);
+    return enabledConfigs.length > 0 ? enabledConfigs[0] : null;
+  }
+
+  async clearPreferredAIConfig(): Promise<void> {
+    const allConfigs = await this.getAllAIConfigs();
+    
+    for (const config of allConfigs) {
+      if (config.id && config.isPreferred) {
+        await this.updateAIConfig(config.id, { isPreferred: false });
+      }
+    }
   }
 
   /**

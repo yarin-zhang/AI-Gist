@@ -20,6 +20,37 @@
                     </NButton>
                 </NFlex>
             </NFlex>
+
+            <!-- 全局首选项状态显示 -->
+            <NAlert v-if="preferredConfig" type="info" :show-icon="false" style="margin-top: 16px">
+                <NFlex align="center" justify="space-between">
+                    <NFlex align="center" style="gap: 8px">
+                        <NIcon size="18">
+                            <Settings />
+                        </NIcon>
+                        <NText>
+                            当前全局首选配置：
+                            <NText strong>{{ preferredConfig.name }}</NText>
+                            <NTag size="small" :type="getConfigTagType(preferredConfig.type)" style="margin-left: 8px">
+                                {{ getConfigTypeLabel(preferredConfig.type) }}
+                            </NTag>
+                        </NText>
+                    </NFlex>
+                    <NButton size="small" @click="clearPreferred">
+                        取消首选
+                    </NButton>
+                </NFlex>
+            </NAlert>
+            <NAlert v-else-if="configs.filter(c => c.enabled).length > 1" type="warning" :show-icon="false" style="margin-top: 16px">
+                <NFlex align="center" style="gap: 8px">
+                    <NIcon size="18">
+                        <Settings />
+                    </NIcon>
+                    <NText>
+                        您有多个已启用的 AI 配置，建议设置一个全局首选配置
+                    </NText>
+                </NFlex>
+            </NAlert>
             <!-- 配置卡片列表 -->
             <div class="config-list">
                 <div v-if="configs.length === 0" style="text-align: center; padding: 40px">
@@ -38,7 +69,8 @@
                 </div>
                 <n-card v-for="config in configs" :key="config.id" class="config-card">
                     <template #header>
-                        <div class="config-header">                            <div class="config-info">
+                        <div class="config-header">
+                            <div class="config-info">
                                 <NIcon size="24">
                                     <Server v-if="['openai', 'azure', 'deepseek', 'mistral'].includes(config.type)" />
                                     <Robot v-else />
@@ -50,10 +82,28 @@
                                 <n-tag :type="config.enabled ? 'success' : 'warning'">
                                     {{ config.enabled ? "已启用" : "已禁用" }}
                                 </n-tag>
+                                <n-tag v-if="config.isPreferred" type="primary">
+                                    <template #icon>
+                                        <NIcon size="12">
+                                            <Settings />
+                                        </NIcon>
+                                    </template>
+                                    全局首选
+                                </n-tag>
                             </div>
                             <div class="config-actions">
                                 <n-switch v-model:value="config.enabled"
                                     @update:value="(value) => toggleConfig(config.id!, value)" />
+                                <n-button size="small" @click="setPreferred(config)" 
+                                    :type="config.isPreferred ? 'primary' : 'default'"
+                                    :disabled="!config.enabled">
+                                    <template #icon>
+                                        <NIcon>
+                                            <Settings />
+                                        </NIcon>
+                                    </template>
+                                    {{ config.isPreferred ? '已设为首选' : '设为首选' }}
+                                </n-button>
                                 <n-button size="small" @click="editSystemPrompt(config)" type="info">
                                     <template #icon>
                                         <NIcon>
@@ -107,6 +157,12 @@
                             <strong>系统提示词:</strong> 
                             <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
                                 {{ config.systemPrompt ? '已自定义' : '使用默认' }}
+                            </NTag>
+                        </p>
+                        <p>
+                            <strong>首选状态:</strong>
+                            <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
+                                {{ config.isPreferred ? '全局首选' : '普通配置' }}
                             </NTag>
                         </p>
                         <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
@@ -426,6 +482,7 @@ const { modalWidth } = useWindowSize();
 
 // 数据状态
 const configs = ref<AIConfig[]>([]);
+const preferredConfig = ref<AIConfig | null>(null);
 const showAddModal = ref(false);
 const editingConfig = ref<AIConfig | null>(null);
 const saving = ref(false);
@@ -614,6 +671,13 @@ const loadConfigs = async () => {
     );
     if (result) {
         configs.value = result;
+        
+        // 同时加载首选配置
+        const preferred = await safeDbOperation(
+            () => databaseService.getPreferredAIConfig(),
+            null
+        );
+        preferredConfig.value = preferred;
     }
 };
 
@@ -634,6 +698,8 @@ const saveConfig = async () => {
                 defaultModel: formData.defaultModel || undefined,
                 customModel: formData.customModel || undefined,
                 systemPrompt: formData.systemPrompt || undefined,
+                // 保持原有的首选项状态，除非配置被禁用
+                isPreferred: editingConfig.value.isPreferred,
             };
             await databaseService.updateAIConfig(editingConfig.value.id!, updateData);
             message.success("配置更新成功");
@@ -695,9 +761,51 @@ const deleteConfig = async (id: number) => {
 const toggleConfig = async (id: number, enabled: boolean) => {
     try {
         await databaseService.updateAIConfig(id, { enabled });
+        
+        // 如果禁用的是首选配置，需要清除首选项状态
+        if (!enabled) {
+            const config = configs.value.find(c => c.id === id);
+            if (config?.isPreferred) {
+                await databaseService.updateAIConfig(id, { isPreferred: false });
+            }
+        }
+        
         message.success(enabled ? "配置已启用" : "配置已禁用");
+        loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
         message.error("更新失败: " + (error as Error).message);
+    }
+};
+
+// 设置首选配置
+const setPreferred = async (config: AIConfig) => {
+    if (!config.id) return;
+    
+    try {
+        if (config.isPreferred) {
+            // 如果已经是首选，则取消首选
+            await databaseService.clearPreferredAIConfig();
+            message.success("已取消首选设置");
+        } else {
+            // 设置为首选
+            await databaseService.setPreferredAIConfig(config.id);
+            message.success(`已将 "${config.name}" 设置为全局首选配置`);
+        }
+        
+        loadConfigs(); // 重新加载以更新UI状态
+    } catch (error) {
+        message.error("设置失败: " + (error as Error).message);
+    }
+};
+
+// 清除首选配置
+const clearPreferred = async () => {
+    try {
+        await databaseService.clearPreferredAIConfig();
+        message.success("已清除全局首选配置");
+        loadConfigs(); // 重新加载以更新UI状态
+    } catch (error) {
+        message.error("清除失败: " + (error as Error).message);
     }
 };
 
