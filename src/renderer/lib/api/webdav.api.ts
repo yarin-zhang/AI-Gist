@@ -37,6 +37,24 @@ export interface ConflictDetail {
     remoteData?: any;
 }
 
+export interface EncryptedPassword {
+    encrypted: string;
+    iv: string;
+    tag: string;
+}
+
+export interface EncryptionResult {
+    success: boolean;
+    encryptedPassword?: EncryptedPassword;
+    error?: string;
+}
+
+export interface DecryptionResult {
+    success: boolean;
+    password?: string;
+    error?: string;
+}
+
 /**
  * WebDAV 同步 API
  */
@@ -102,6 +120,30 @@ export class WebDAVAPI {
             return await ipcInvoke('webdav:get-config');
         } catch (error) {
             console.error('获取 WebDAV 配置失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 加密密码
+     */
+    static async encryptPassword(password: string): Promise<EncryptionResult> {
+        try {
+            return await ipcInvoke('webdav:encrypt-password', password);
+        } catch (error) {
+            console.error('密码加密失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 解密密码
+     */
+    static async decryptPassword(encryptedPassword: EncryptedPassword): Promise<DecryptionResult> {
+        try {
+            return await ipcInvoke('webdav:decrypt-password', encryptedPassword);
+        } catch (error) {
+            console.error('密码解密失败:', error);
             throw error;
         }
     }

@@ -65,7 +65,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
   },
-
   // WebDAV 同步管理
   webdav: {
     testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
@@ -73,6 +72,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSyncStatus: () => ipcRenderer.invoke('webdav:get-sync-status'),
     setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
     getConfig: () => ipcRenderer.invoke('webdav:get-config'),
+    encryptPassword: (password: string) => ipcRenderer.invoke('webdav:encrypt-password', password),
+    decryptPassword: (encryptedPassword: any) => ipcRenderer.invoke('webdav:decrypt-password', encryptedPassword),
   },
   // 数据管理
   data: {

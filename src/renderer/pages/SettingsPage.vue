@@ -656,6 +656,24 @@ const loadSettings = async () => {
             syncInterval: webdavConfig.syncInterval || 30,
         };
         
+        // 如果密码是加密的，需要解密后显示
+        if (settings.webdav.password && typeof settings.webdav.password === 'object') {
+            try {
+                console.log('正在解密 WebDAV 密码...');
+                const decryptResult = await WebDAVAPI.decryptPassword(settings.webdav.password);
+                if (decryptResult.success && decryptResult.password) {
+                    settings.webdav.password = decryptResult.password;
+                    console.log('WebDAV 密码解密成功');
+                } else {
+                    console.error('WebDAV 密码解密失败:', decryptResult.error);
+                    settings.webdav.password = ''; // 解密失败时清空密码
+                }
+            } catch (error) {
+                console.error('WebDAV 密码解密出错:', error);
+                settings.webdav.password = ''; // 解密失败时清空密码
+            }
+        }
+        
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
         settings.dataSync = {
@@ -697,6 +715,28 @@ const updateSetting = async () => {
             })
         );
 
+        // 如果 WebDAV 配置包含密码，需要先加密
+        if (settingsData.webdav && settingsData.webdav.password) {
+            try {
+                console.log('正在加密 WebDAV 密码...');
+                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
+                if (encryptResult.success && encryptResult.encryptedPassword) {
+                    settingsData.webdav.password = encryptResult.encryptedPassword;
+                    console.log('WebDAV 密码加密成功');
+                } else {
+                    console.error('WebDAV 密码加密失败:', encryptResult.error);
+                    message.error('密码加密失败，请重试');
+                    saving.value = false;
+                    return;
+                }
+            } catch (error) {
+                console.error('WebDAV 密码加密出错:', error);
+                message.error('密码加密出错，请重试');
+                saving.value = false;
+                return;
+            }
+        }
+
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
         console.log("设置更新成功:", updatedPrefs);
 
@@ -734,6 +774,7 @@ const testWebDAVConnection = async () => {
 
     loading.webdavTest = true;
     try {
+        // 测试连接时使用明文密码
         const result = await WebDAVAPI.testConnection({
             serverUrl: settings.webdav.serverUrl,
             username: settings.webdav.username,

@@ -11,6 +11,17 @@ import * as crypto from 'crypto';
 // 使用动态导入来避免 ES 模块问题
 let createWebDAVClient: any = null;
 
+// 密码加密相关常量
+const ENCRYPTION_ALGORITHM = 'aes-256-cbc';
+const ENCRYPTION_KEY_LENGTH = 32;
+const IV_LENGTH = 16;
+
+interface EncryptedPassword {
+    encrypted: string;
+    iv: string;
+    tag: string;
+}
+
 interface WebDAVConfig {
     serverUrl: string;
     username: string;
@@ -73,6 +84,80 @@ export class WebDAVService {
 
     constructor(private preferencesManager: any, private dataManagementService?: any) {
         this.setupIpcHandlers();
+    }
+
+    /**
+     * 生成加密密钥（基于设备信息）
+     */
+    private getEncryptionKey(): Buffer {
+        const deviceInfo = require('os').hostname() + require('os').platform() + require('os').arch();
+        return crypto.scryptSync(deviceInfo, 'ai-gist-salt', ENCRYPTION_KEY_LENGTH);
+    }
+
+    /**
+     * 加密密码
+     */
+    private encryptPassword(password: string): EncryptedPassword {
+        if (!password) {
+            return { encrypted: '', iv: '', tag: '' };
+        }
+
+        try {
+            const key = this.getEncryptionKey();
+            const iv = crypto.randomBytes(16);
+            const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+            
+            let encrypted = cipher.update(password, 'utf8', 'hex');
+            encrypted += cipher.final('hex');
+            
+            return {
+                encrypted,
+                iv: iv.toString('hex'),
+                tag: '' // CBC 模式不需要 auth tag
+            };
+        } catch (error) {
+            console.error('密码加密失败:', error);
+            // 如果加密失败，返回原始密码（向后兼容）
+            return { encrypted: password, iv: '', tag: '' };
+        }
+    }
+
+    /**
+     * 解密密码
+     */
+    private decryptPassword(encryptedPassword: EncryptedPassword): string {
+        if (!encryptedPassword.encrypted || !encryptedPassword.iv) {
+            return '';
+        }
+
+        try {
+            const key = this.getEncryptionKey();
+            const iv = Buffer.from(encryptedPassword.iv, 'hex');
+            
+            const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+            
+            let decrypted = decipher.update(encryptedPassword.encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            
+            return decrypted;
+        } catch (error) {
+            console.error('密码解密失败:', error);
+            // 如果解密失败，可能是未加密的原始密码
+            if (typeof encryptedPassword.encrypted === 'string' && !encryptedPassword.tag) {
+                console.log('检测到可能是未加密的密码，直接返回');
+                return encryptedPassword.encrypted;
+            }
+            throw new Error('密码解密失败，可能是数据损坏或密钥错误');
+        }
+    }
+
+    /**
+     * 检查密码是否已加密
+     */
+    private isPasswordEncrypted(password: any): password is EncryptedPassword {
+        return password && typeof password === 'object' && 
+               'encrypted' in password && 'iv' in password &&
+               password.encrypted && password.iv; // tag 在 CBC 模式下可能为空
     }
 
     private async getWebDAVClient() {
@@ -147,7 +232,7 @@ export class WebDAVService {
             try {
                 // 获取当前保存的 WebDAV 配置
                 const preferences = this.preferencesManager.getPreferences();
-                const config = preferences.webdav;
+                let config = preferences.webdav;
                 
                 if (!config || !config.enabled) {
                     return {
@@ -159,6 +244,27 @@ export class WebDAVService {
                         conflictsDetected: 0,
                         conflictsResolved: 0,
                     };
+                }
+                
+                // 解密密码用于同步
+                if (config.password && this.isPasswordEncrypted(config.password)) {
+                    try {
+                        console.log('正在解密密码进行同步...');
+                        config = { ...config };
+                        config.password = this.decryptPassword(config.password);
+                        console.log('密码解密成功，开始同步');
+                    } catch (error) {
+                        console.error('同步时密码解密失败:', error);
+                        return {
+                            success: false,
+                            message: '密码解密失败，请重新设置密码',
+                            timestamp: new Date().toISOString(),
+                            filesUploaded: 0,
+                            filesDownloaded: 0,
+                            conflictsDetected: 0,
+                            conflictsResolved: 0,
+                        };
+                    }
                 }
                 
                 if (!config.serverUrl || !config.username || !config.password) {
@@ -211,8 +317,16 @@ export class WebDAVService {
 
         // 设置 WebDAV 配置
         ipcMain.handle('webdav:set-config', async (event, config) => {
-            this.config = config;
-            await this.preferencesManager.updatePreferences({ webdav: config });
+            // 加密密码后保存
+            const configToSave = { ...config };
+            if (configToSave.password) {
+                console.log('正在加密密码...');
+                configToSave.password = this.encryptPassword(configToSave.password);
+                console.log('密码已加密存储');
+            }
+            
+            this.config = config; // 保留明文密码在内存中用于当前会话
+            await this.preferencesManager.updatePreferences({ webdav: configToSave });
             
             if (config.enabled && config.autoSync) {
                 this.startAutoSync();
@@ -224,7 +338,7 @@ export class WebDAVService {
         // 获取 WebDAV 配置
         ipcMain.handle('webdav:get-config', async () => {
             const preferences = this.preferencesManager.getPreferences();
-            return preferences.webdav || {
+            const webdavConfig = preferences.webdav || {
                 enabled: false,
                 serverUrl: '',
                 username: '',
@@ -232,6 +346,52 @@ export class WebDAVService {
                 autoSync: false,
                 syncInterval: 30,
             };
+            
+            // 解密密码后返回
+            if (webdavConfig.password && this.isPasswordEncrypted(webdavConfig.password)) {
+                try {
+                    console.log('正在解密密码...');
+                    webdavConfig.password = this.decryptPassword(webdavConfig.password);
+                    console.log('密码已解密');
+                } catch (error) {
+                    console.error('密码解密失败:', error);
+                    webdavConfig.password = ''; // 解密失败时清空密码
+                }
+            }
+            
+            return webdavConfig;
+        });
+
+        // 加密密码（供前端调用）
+        ipcMain.handle('webdav:encrypt-password', async (event, password: string) => {
+            try {
+                return {
+                    success: true,
+                    encryptedPassword: this.encryptPassword(password)
+                };
+            } catch (error) {
+                console.error('密码加密失败:', error);
+                return {
+                    success: false,
+                    error: '密码加密失败'
+                };
+            }
+        });
+
+        // 解密密码（供前端调用）
+        ipcMain.handle('webdav:decrypt-password', async (event, encryptedPassword: EncryptedPassword) => {
+            try {
+                return {
+                    success: true,
+                    password: this.decryptPassword(encryptedPassword)
+                };
+            } catch (error) {
+                console.error('密码解密失败:', error);
+                return {
+                    success: false,
+                    error: '密码解密失败'
+                };
+            }
         });
     }
 
