@@ -1,4 +1,4 @@
-import { ipcInvoke } from '../ipc-utils';
+import { ipcInvoke } from '../../ipc/ipc-utils';
 
 export interface BackupInfo {
     id: string;
@@ -65,9 +65,12 @@ export class DataManagementAPI {
     /**
      * 恢复备份
      */
-    static async restoreBackup(backupId: string): Promise<void> {
+    static async restoreBackup(backupId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
         try {
-            await ipcInvoke('data:restore-backup', { backupId });
+            return await ipcInvoke('data:restore-backup', { backupId });
         } catch (error) {
             console.error('恢复备份失败:', error);
             throw error;

@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { initDatabase, databaseServiceManager } from './lib/db'
-import { DatabaseIpcHandlers } from './lib/ipc-handlers'
+import { databaseIpcHandler } from './ipc'
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
@@ -48,7 +48,7 @@ async function startApp() {
     console.log('数据库服务已暴露到 window.databaseAPI');
     
     // 设置数据库相关的 IPC 处理程序
-    DatabaseIpcHandlers.getInstance().initialize();
+    await databaseIpcHandler.initialize(databaseServiceManager);
 
     const app = createApp(App);
     app.mount('#app');

@@ -71,16 +71,75 @@
                                 </template>
                                 创建备份
                             </NButton>
-                            <NButton @click="restoreBackup">
+                            <NButton @click="refreshBackupList">
                                 <template #icon>
                                     <NIcon>
-                                        <Download />
+                                        <Refresh />
                                     </NIcon>
                                 </template>
-                                恢复备份
+                                刷新备份列表
                             </NButton>
                         </NFlex>
                     </NFlex>
+
+                    <!-- 备份版本列表 -->
+                    <div v-if="backupList.length > 0">
+                        <NFlex vertical :size="12">
+                            <NText depth="2">备份版本列表</NText>
+                            <div v-for="backup in backupList" :key="backup.id" class="backup-item">
+                                <NCard size="small">
+                                    <NFlex justify="space-between" align="center">
+                                        <NFlex vertical :size="4">
+                                            <NFlex align="center" :size="8">
+                                                <NText strong>{{ backup.name }}</NText>
+                                                <NTag type="info" size="small">{{ backup.version }}</NTag>
+                                            </NFlex>
+                                            <NFlex :size="16">
+                                                <NText depth="3" style="font-size: 12px;">
+                                                    {{ backup.createdAt }}
+                                                </NText>
+                                                <NText depth="3" style="font-size: 12px;">
+                                                    {{ backup.size }}
+                                                </NText>
+                                            </NFlex>
+                                        </NFlex>
+                                        <NFlex :size="8">
+                                            <NButton 
+                                                type="primary" 
+                                                size="small" 
+                                                @click="restoreSpecificBackup(backup.id)"
+                                            >
+                                                恢复
+                                            </NButton>
+                                            <NPopconfirm
+                                                @positive-click="deleteBackup(backup.id)"
+                                                negative-text="取消"
+                                                positive-text="确定"
+                                            >
+                                                <template #trigger>
+                                                    <NButton type="error" size="small">
+                                                        <template #icon>
+                                                            <NIcon>
+                                                                <Trash />
+                                                            </NIcon>
+                                                        </template>
+                                                        删除
+                                                    </NButton>
+                                                </template>
+                                                确定要删除这个备份吗？
+                                            </NPopconfirm>
+                                        </NFlex>
+                                    </NFlex>
+                                </NCard>
+                            </div>
+                        </NFlex>
+                    </div>
+
+                    <div v-else>
+                        <NText depth="3" style="color: #999; font-size: 14px;">
+                            暂无备份版本，请先创建备份
+                        </NText>
+                    </div>
                 </NFlex>
             </div>
 
@@ -142,6 +201,8 @@ import {
     NIcon,
     NAlert,
     NDivider,
+    NPopconfirm,
+    NTag,
 } from "naive-ui";
 import {
     FileExport,
@@ -151,16 +212,31 @@ import {
     AlertCircle,
     Database,
     Refresh,
+    Trash,
 } from "@vicons/tabler";
+import { ref } from "vue";
 
 const emit = defineEmits<{
     "export-data": [format: "csv" | "json"];
     "import-data": [format: "csv" | "json"];
     "create-backup": [];
-    "restore-backup": [];
+    "restore-backup": [backupId: string];
+    "delete-backup": [backupId: string];
+    "refresh-backup-list": [];
     "check-database-health": [];
     "repair-database": [];
 }>();
+
+// 备份列表数据
+interface BackupItem {
+    id: string;
+    name: string;
+    createdAt: string;
+    size: string;
+    version: string;
+}
+
+const backupList = ref<BackupItem[]>([]);
 
 const exportData = (format: "csv" | "json") => {
     emit("export-data", format);
@@ -174,8 +250,16 @@ const createBackup = () => {
     emit("create-backup");
 };
 
-const restoreBackup = () => {
-    emit("restore-backup");
+const restoreSpecificBackup = (backupId: string) => {
+    emit("restore-backup", backupId);
+};
+
+const deleteBackup = (backupId: string) => {
+    emit("delete-backup", backupId);
+};
+
+const refreshBackupList = () => {
+    emit("refresh-backup-list");
 };
 
 const checkDatabaseHealth = () => {
@@ -185,4 +269,23 @@ const checkDatabaseHealth = () => {
 const repairDatabase = () => {
     emit("repair-database");
 };
+
+// 暴露方法供父组件调用
+const updateBackupList = (list: BackupItem[]) => {
+    backupList.value = list;
+};
+
+defineExpose({
+    updateBackupList,
+});
 </script>
+
+<style scoped>
+.backup-item {
+    margin-bottom: 8px;
+}
+
+.backup-item:last-child {
+    margin-bottom: 0;
+}
+</style>

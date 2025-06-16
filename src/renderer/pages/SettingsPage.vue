@@ -98,11 +98,14 @@
 
                         <!-- 数据管理设置 -->
                         <DataManagementSettings 
+                            ref="dataManagementRef"
                             v-show="activeSettingKey === 'data-management'"
                             @export-data="exportData"
                             @import-data="importData"
                             @create-backup="createBackup"
-                            @restore-backup="restoreBackup"
+                            @restore-backup="restoreSpecificBackup"
+                            @delete-backup="deleteBackup"
+                            @refresh-backup-list="refreshBackupList"
                             @check-database-health="checkDatabaseHealth"
                             @repair-database="repairDatabase"
                         /><!-- 实验室 (仅开发环境) -->
@@ -130,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, h } from "vue";
+import { ref, reactive, onMounted, computed, h, watch } from "vue";
 import {
     NCard,
     NAlert,
@@ -170,6 +173,9 @@ const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
 const activeSettingKey = ref("appearance");
+
+// 组件引用
+const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
 
 // 状态管理
 const saving = ref(false);
@@ -635,6 +641,62 @@ const restoreBackup = async () => {
     }
 };
 
+// 恢复指定备份
+const restoreSpecificBackup = async (backupId: string) => {
+    try {
+        const result = await DataManagementAPI.restoreBackup(backupId);
+        
+        if (result.success) {
+            const successMessage = result.message || "备份恢复成功";
+            message.success(successMessage);
+            // 恢复成功后刷新备份列表
+            await refreshBackupList();
+        } else {
+            message.error(result.message || "备份恢复失败");
+        }
+    } catch (error) {
+        console.error("恢复备份失败:", error);
+        message.error("恢复备份失败");
+    }
+};
+
+// 删除备份
+const deleteBackup = async (backupId: string) => {
+    try {
+        await DataManagementAPI.deleteBackup(backupId);
+        message.success("备份删除成功");
+        // 删除成功后刷新备份列表
+        await refreshBackupList();
+    } catch (error) {
+        console.error("删除备份失败:", error);
+        message.error("删除备份失败");
+    }
+};
+
+// 刷新备份列表
+const refreshBackupList = async () => {
+    try {
+        const backups = await DataManagementAPI.getBackupList();
+        
+        // 转换备份数据格式以匹配组件期望的格式
+        const formattedBackups = backups.map(backup => ({
+            id: backup.id,
+            name: backup.name,
+            createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
+            size: `${(backup.size / 1024).toFixed(2)} KB`,
+            version: backup.description || 'v1.0'
+        }));
+        
+        // 更新子组件的备份列表
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateBackupList(formattedBackups);
+        }
+    } catch (error) {
+        console.error("获取备份列表失败:", error);
+        message.error("获取备份列表失败");
+    }
+};
+
 // 导出数据
 const exportData = async (format: 'json' | 'csv') => {
     loading.export = true;
@@ -796,6 +858,15 @@ const checkDatabaseHealth = async () => {
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
+    // 加载备份列表
+    await refreshBackupList();
+});
+
+// 监听设置页面切换，当切换到数据管理页面时刷新备份列表
+watch(activeSettingKey, async (newKey) => {
+    if (newKey === 'data-management') {
+        await refreshBackupList();
+    }
 });
 </script>
 

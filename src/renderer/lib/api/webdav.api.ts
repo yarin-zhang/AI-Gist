@@ -1,4 +1,4 @@
-import { ipcInvoke } from '../ipc-utils';
+import { ipcInvoke } from '../../ipc/ipc-utils';
 
 export interface WebDAVConfig {
     enabled: boolean;
