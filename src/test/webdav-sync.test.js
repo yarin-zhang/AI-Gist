@@ -110,11 +110,24 @@ class WebDAVSyncTester {
                     reason: '同设备远程版本更新'
                 };
             } else {
-                console.log('决策: 同设备同步计数相同但数据不同，可能出现问题');
-                return {
-                    action: 'conflict_detected',
-                    reason: '同设备同步计数相同但数据哈希不同，数据可能损坏'
-                };
+                // 同设备同步计数相同但数据不同，这通常表示本地有未同步的修改
+                console.log('检测到同设备未同步的本地修改（删除、编辑等）');
+                
+                // 比较记录数
+                const recordDiff = localMetadata.totalRecords - (remoteMetadata.totalRecords || 0);
+                if (recordDiff !== 0) {
+                    console.log(`决策: 同设备本地数据有变化（记录数差异: ${recordDiff}），上传本地版本`);
+                    return {
+                        action: 'upload_only',
+                        reason: `同设备本地数据有变化（${recordDiff > 0 ? '新增' : '删除'}了${Math.abs(recordDiff)}条记录）`
+                    };
+                } else {
+                    console.log('决策: 同设备记录数相同但内容有修改，上传本地版本');
+                    return {
+                        action: 'upload_only',
+                        reason: '同设备本地数据有编辑修改'
+                    };
+                }
             }
         }
 
@@ -292,6 +305,67 @@ function runTests() {
     console.log('结果:', decision4);
     console.log('预期: upload_only (同设备本地版本更新)');
     console.log('通过:', decision4.action === 'upload_only' && decision4.reason.includes('同设备'));
+
+    // 测试用例5：同设备删除操作测试
+    console.log('\n=== 测试用例5: 同设备删除操作（不应误判为冲突） ===');
+    const testData5Local = {
+        categories: [{ id: 1, name: '分类1' }],
+        prompts: [{ id: 1, title: '提示词1' }] // 删除了一个提示词
+    };
+    const testData5Remote = {
+        categories: [{ id: 1, name: '分类1' }],
+        prompts: [
+            { id: 1, title: '提示词1' },
+            { id: 2, title: '提示词2' } // 远程还有这个提示词
+        ]
+    };
+    const localMeta5 = {
+        lastSyncTime: '2025-06-13T10:00:00.000Z',
+        deviceId: 'device-001',
+        syncCount: 5, // 相同的同步计数
+        totalRecords: 2 // 本地总记录数少了1
+    };
+    const remoteMeta5 = {
+        lastSyncTime: '2025-06-13T10:00:00.000Z',
+        deviceId: 'device-001', // 同一设备
+        syncCount: 5, // 相同的同步计数
+        totalRecords: 3 // 远程总记录数多1
+    };
+    
+    const localHash5 = tester.calculateDataHash(testData5Local);
+    const decision5 = tester.makeSyncDecision(testData5Local, localMeta5, localHash5, testData5Remote, remoteMeta5);
+    console.log('结果:', decision5);
+    console.log('预期: upload_only (同设备删除操作，应上传本地版本)');
+    console.log('通过:', decision5.action === 'upload_only' && decision5.reason.includes('删除'));
+
+    // 测试用例6：同设备编辑操作测试
+    console.log('\n=== 测试用例6: 同设备编辑操作（不应误判为冲突） ===');
+    const testData6Local = {
+        categories: [{ id: 1, name: '分类1-编辑后' }],
+        prompts: [{ id: 1, title: '提示词1' }]
+    };
+    const testData6Remote = {
+        categories: [{ id: 1, name: '分类1-编辑前' }],
+        prompts: [{ id: 1, title: '提示词1' }]
+    };
+    const localMeta6 = {
+        lastSyncTime: '2025-06-13T10:00:00.000Z',
+        deviceId: 'device-001',
+        syncCount: 5, // 相同的同步计数
+        totalRecords: 2 // 相同的记录数
+    };
+    const remoteMeta6 = {
+        lastSyncTime: '2025-06-13T10:00:00.000Z',
+        deviceId: 'device-001', // 同一设备
+        syncCount: 5, // 相同的同步计数
+        totalRecords: 2 // 相同的记录数
+    };
+    
+    const localHash6 = tester.calculateDataHash(testData6Local);
+    const decision6 = tester.makeSyncDecision(testData6Local, localMeta6, localHash6, testData6Remote, remoteMeta6);
+    console.log('结果:', decision6);
+    console.log('预期: upload_only (同设备编辑操作，应上传本地版本)');
+    console.log('通过:', decision6.action === 'upload_only' && decision6.reason.includes('编辑'));
 
     console.log('\n=== 测试完成 ===');
 }

@@ -744,12 +744,27 @@ export class WebDAVService {
                     reason: '同设备远程版本更新'
                 };
             } else {
-                console.log('警告: 同设备同步计数相同但数据不同');
-                return {
-                    action: 'conflict_detected',
-                    strategy: ConflictResolutionStrategy.CREATE_BACKUP,
-                    reason: '同设备同步计数相同但数据哈希不同，数据可能损坏'
-                };
+                // 同设备同步计数相同但数据不同，这通常表示本地有未同步的修改
+                // 比如删除、编辑等操作，这是正常情况，不应标记为冲突
+                console.log('检测到同设备未同步的本地修改（删除、编辑等）');
+                
+                // 比较记录数，如果本地记录数变化，说明是正常的增删操作
+                if (recordDiff !== 0) {
+                    console.log(`决策: 同设备本地数据有变化（记录数差异: ${recordDiff}），上传本地版本`);
+                    return {
+                        action: 'upload_only',
+                        strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                        reason: `同设备本地数据有变化（${recordDiff > 0 ? '新增' : '删除'}了${Math.abs(recordDiff)}条记录）`
+                    };
+                } else {
+                    // 记录数相同但内容不同，可能是编辑操作
+                    console.log('决策: 同设备记录数相同但内容有修改，上传本地版本');
+                    return {
+                        action: 'upload_only',
+                        strategy: ConflictResolutionStrategy.LOCAL_WINS,
+                        reason: '同设备本地数据有编辑修改'
+                    };
+                }
             }
         }
 
