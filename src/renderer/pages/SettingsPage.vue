@@ -61,379 +61,54 @@
                         </NCard>
 
                         <!-- 关闭行为设置 -->
-                        <NCard v-show="activeSettingKey === 'close-behavior'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="关闭行为模式">
-                                    <NRadioGroup v-model:value="settings.closeBehaviorMode"
-                                        @update:value="updateSetting">
-                                        <NFlex vertical :size="12">
-                                            <NRadio value="ask">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>每次询问</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            弹出对话框让您选择
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="fixed">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>固定行为</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            直接执行指定动作
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-
-                                <NFormItem v-if="settings.closeBehaviorMode === 'fixed'" label="关闭动作"
-                                    style="margin-left: 24px">
-                                    <NRadioGroup v-model:value="settings.closeAction" @update:value="updateSetting">
-                                        <NFlex vertical :size="8">
-                                            <NRadio value="quit">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>退出应用</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            完全退出程序
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="minimize">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>最小化到托盘</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            后台继续运行
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-
-                                <NAlert v-if="settings.closeBehaviorMode === 'ask'" type="info" show-icon>
-                                    <template #header>当前设置</template>
-                                    关闭时弹出选择对话框
-                                </NAlert>
-
-                                <NAlert v-if="settings.closeBehaviorMode === 'fixed'" type="success" show-icon>
-                                    <template #header>当前设置</template>
-                                    关闭时直接{{ settings.closeAction === "quit" ? "退出应用" : "最小化到托盘" }}
-                                </NAlert>
-                            </NFlex>
-                        </NCard>
+                        <CloseBehaviorSettings 
+                            v-show="activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
+                        />
 
                         <!-- 启动行为设置 -->
-                        <NCard v-show="activeSettingKey === 'startup-behavior'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="启动模式">
-                                    <NCheckbox v-model:checked="settings.startMinimized"
-                                        @update:checked="updateSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>启动时最小化到托盘</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    启动时不显示主窗口
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-
-                                <NDivider />
-
-                                <NFormItem label="自启动设置">
-                                    <NCheckbox v-model:checked="settings.autoLaunch" @update:checked="updateSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>开机自动启动</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    系统启动时自动运行
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-                            </NFlex>
-                        </NCard>                        <!-- 外观设置 -->
-                        <NCard v-show="activeSettingKey === 'appearance'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="主题模式">
-                                    <NRadioGroup v-model:value="settings.themeSource" @update:value="updateSetting">
-                                        <NFlex vertical :size="8">
-                                            <NRadio value="system">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>跟随系统</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            自动切换主题
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="light">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>浅色主题</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            始终使用浅色
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="dark">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>深色主题</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            始终使用深色
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-                            </NFlex>
-                        </NCard>
+                        <StartupBehaviorSettings 
+                            v-show="activeSettingKey === 'startup-behavior'"
+                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
+                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
+                        />                        <!-- 外观设置 -->
+                        <AppearanceSettings 
+                            v-show="activeSettingKey === 'appearance'"
+                            :model-value="{ themeSource: settings.themeSource }"
+                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        />
 
                         <!-- WebDAV 同步设置 -->
-                        <NCard v-show="activeSettingKey === 'webdav-sync'">
-                            <NFlex vertical :size="20">
-                                <!-- 启用 WebDAV 同步 -->                                <NFormItem label="启用 WebDAV 同步">
-                                    <NCheckbox v-model:checked="settings.webdav.enabled"
-                                        @update:checked="updateNonWebDAVSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>启用 WebDAV 数据同步</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    将数据同步到 WebDAV 服务器
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-
-                                <!-- WebDAV 服务器配置 -->
-                                <div v-if="settings.webdav.enabled">
-                                    <NDivider>服务器配置</NDivider>
-                                    
-                                    <NFlex vertical :size="16">                                        <NFormItem label="服务器地址">
-                                            <NInput v-model:value="settings.webdav.serverUrl"
-                                                @blur="saveWebDAVSettings"
-                                                placeholder="https://example.com/webdav"
-                                                type="url">
-                                                <template #prefix>
-                                                    <NIcon>
-                                                        <Cloud />
-                                                    </NIcon>
-                                                </template>
-                                            </NInput>
-                                        </NFormItem>
-
-                                        <NFlex :size="16">                                            <NFormItem label="用户名" style="flex: 1">
-                                                <NInput v-model:value="settings.webdav.username"
-                                                    @blur="saveWebDAVSettings"
-                                                    placeholder="用户名" />
-                                            </NFormItem>
-                                            <NFormItem label="密码" style="flex: 1">
-                                                <NInput v-model:value="settings.webdav.password"
-                                                    @blur="saveWebDAVSettings"
-                                                    type="password"
-                                                    placeholder="密码"
-                                                    show-password-on="click" />
-                                            </NFormItem>
-                                        </NFlex>
-
-                                        <NFlex :size="12">
-                                            <NButton type="primary" @click="testWebDAVConnection"
-                                                :loading="loading.webdavTest">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <CloudStorm />
-                                                    </NIcon>
-                                                </template>
-                                                测试连接
-                                            </NButton>
-                                        </NFlex>
-                                    </NFlex>
-                                </div>
-
-                                <!-- 自动同步设置 -->
-                                <div v-if="settings.webdav.enabled">
-                                    <NDivider>同步设置</NDivider>
-                                    
-                                    <NFlex vertical :size="16">                                        <NFormItem label="自动同步">
-                                            <NCheckbox v-model:checked="settings.webdav.autoSync"
-                                                @update:checked="saveWebDAVSettings">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>启用自动同步</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            定时自动同步数据
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NCheckbox>
-                                        </NFormItem>
-
-                                        <NFormItem v-if="settings.webdav.autoSync" label="同步间隔">
-                                            <NInputNumber v-model:value="settings.webdav.syncInterval"
-                                                @update:value="saveWebDAVSettings"
-                                                :min="5"
-                                                :max="1440"
-                                                :step="5">
-                                                <template #suffix>分钟</template>
-                                            </NInputNumber>
-                                        </NFormItem>
-
-                                        <NFlex :size="12">
-                                            <NButton @click="syncNow" :loading="loading.sync">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <BrandSoundcloud />
-                                                    </NIcon>
-                                                </template>
-                                                立即同步
-                                            </NButton>
-                                        </NFlex>
-
-                                        <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
-                                            <template #header>上次同步时间</template>
-                                            {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
-                                        </NAlert>
-                                    </NFlex>
-                                </div>
-                            </NFlex>
-                        </NCard>
+                        <WebDAVSyncSettings 
+                            v-show="activeSettingKey === 'webdav-sync'"
+                            :model-value="{ 
+                                webdav: { ...settings.webdav }, 
+                                dataSync: { ...settings.dataSync } 
+                            }"
+                            @update:model-value="(val) => { 
+                                Object.assign(settings.webdav, val.webdav); 
+                                Object.assign(settings.dataSync, val.dataSync); 
+                                updateNonWebDAVSetting(); 
+                            }"
+                            @save-webdav="saveWebDAVSettings"
+                            @test-connection="testWebDAVConnection"
+                            @sync-now="syncNow"
+                        />
 
                         <!-- 数据管理设置 -->
-                        <NCard v-show="activeSettingKey === 'data-management'">
-                            <NFlex vertical :size="20">
-                                <!-- 数据备份 -->
-                                <div>
-                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
-                                        数据备份
-                                    </NText>
-                                    <NFlex vertical :size="16">
-                                        <NFormItem label="自动备份">
-                                            <NCheckbox v-model:checked="settings.dataSync.autoBackup"
-                                                @update:checked="updateSetting">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>启用自动备份</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            定期自动备份数据到本地
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NCheckbox>
-                                        </NFormItem>
-
-                                        <NFormItem v-if="settings.dataSync.autoBackup" label="备份间隔">
-                                            <NInputNumber v-model:value="settings.dataSync.backupInterval"
-                                                @update:value="updateSetting"
-                                                :min="1"
-                                                :max="168"
-                                                :step="1">
-                                                <template #suffix>小时</template>
-                                            </NInputNumber>
-                                        </NFormItem>
-
-                                        <NFlex :size="12">
-                                            <NButton type="primary" @click="createBackup">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Upload />
-                                                    </NIcon>
-                                                </template>
-                                                创建备份
-                                            </NButton>
-                                            <NButton @click="restoreBackup">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Download />
-                                                    </NIcon>
-                                                </template>
-                                                恢复备份
-                                            </NButton>
-                                        </NFlex>
-                                    </NFlex>
-                                </div>
-
-                                <NDivider />
-
-                                <!-- 数据导入导出 -->
-                                <div>
-                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
-                                        数据导入导出
-                                    </NText>
-                                    <NFlex vertical :size="16">
-                                        <NAlert type="info" show-icon>
-                                            <template #header>支持格式</template>
-                                            支持 JSON、CSV 格式的数据导入导出
-                                        </NAlert>
-
-                                        <NFlex vertical :size="12">
-                                            <NText depth="2">导出数据</NText>
-                                            <NFlex :size="12">
-                                                <NButton @click="exportData('json')" :loading="loading.export">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileExport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导出为 JSON
-                                                </NButton>
-                                                <NButton @click="exportData('csv')" :loading="loading.export">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileExport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导出为 CSV
-                                                </NButton>
-                                            </NFlex>
-                                        </NFlex>
-
-                                        <NFlex vertical :size="12">
-                                            <NText depth="2">导入数据</NText>
-                                            <NFlex :size="12">
-                                                <NButton @click="importData('json')" :loading="loading.import">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileImport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导入 JSON
-                                                </NButton>
-                                                <NButton @click="importData('csv')" :loading="loading.import">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileImport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导入 CSV
-                                                </NButton>
-                                            </NFlex>
-                                        </NFlex>
-
-                                        <NAlert type="warning" show-icon>
-                                            <template #header>注意</template>
-                                            导入数据将覆盖现有数据，请确保已备份重要数据
-                                        </NAlert>
-                                    </NFlex>
-                                </div>
-                            </NFlex>
-                        </NCard><!-- 实验室 (仅开发环境) -->
+                        <DataManagementSettings 
+                            ref="dataManagementRef"
+                            v-show="activeSettingKey === 'data-management'"
+                            @export-data="exportData"
+                            @import-data="importData"
+                            @create-backup="createBackup"
+                            @restore-backup="restoreSpecificBackup"
+                            @delete-backup="deleteBackup"
+                            @refresh-backup-list="refreshBackupList"
+                            @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase"
+                        /><!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
@@ -458,23 +133,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, h } from "vue";
+import { ref, reactive, onMounted, computed, h, watch } from "vue";
 import {
     NCard,
     NAlert,
     NFlex,
     NIcon,
-    NFormItem,
-    NRadioGroup,
-    NRadio,
-    NCheckbox,
     NButton,
     NText,
     NSpin,
     NMenu,
-    NDivider,
-    NInput,
-    NInputNumber,
     useMessage,
 } from "naive-ui";
 import {
@@ -482,24 +150,18 @@ import {
     Check,
     Refresh,
     Power,
-    Minimize,
-    EyeOff,
     Rocket,
-    DeviceDesktop,
     Sun,
-    Moon,
     Flask,
     Cloud,
     Database,
-    Upload,
-    Download,
-    FileImport,
-    FileExport,
-    BrandSoundcloud,
-    CloudStorm,
-    AlertCircle,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
+import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
+import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
+import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
+import WebDAVSyncSettings from "@/components/settings/WebDAVSyncSettings.vue";
+import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
 // 消息提示
@@ -512,6 +174,9 @@ const currentMode = import.meta.env.MODE;
 // 当前激活的设置项
 const activeSettingKey = ref("appearance");
 
+// 组件引用
+const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
+
 // 状态管理
 const saving = ref(false);
 const loading = reactive({
@@ -520,6 +185,8 @@ const loading = reactive({
     sync: false,
     export: false,
     import: false,
+    repair: false,
+    healthCheck: false,
 });
 
 // 设置数据
@@ -639,36 +306,40 @@ const handleMenuSelect = (key: string) => {
 // 加载设置
 const loadSettings = async () => {
     try {
+        console.log('开始加载设置...');
         const prefs = await window.electronAPI.preferences.get();
+        console.log('获取到的原始配置:', prefs);
         
-        // 确保 WebDAV 配置结构完整
-        const webdavConfig = prefs.webdav || {};
-        settings.webdav = {
-            enabled: webdavConfig.enabled || false,
-            serverUrl: webdavConfig.serverUrl || "",
-            username: webdavConfig.username || "",
-            password: webdavConfig.password || "",
-            autoSync: webdavConfig.autoSync || false,
-            syncInterval: webdavConfig.syncInterval || 30,
-        };
-        
-        // 如果密码是加密的，需要解密后显示
-        if (settings.webdav.password && typeof settings.webdav.password === 'object') {
-            try {
-                console.log('正在解密 WebDAV 密码...');
-                const decryptResult = await WebDAVAPI.decryptPassword(settings.webdav.password);
-                if (decryptResult.success && decryptResult.password) {
-                    settings.webdav.password = decryptResult.password;
-                    console.log('WebDAV 密码解密成功');
-                } else {
-                    console.error('WebDAV 密码解密失败:', decryptResult.error);
-                    settings.webdav.password = ''; // 解密失败时清空密码
-                }
-            } catch (error) {
-                console.error('WebDAV 密码解密出错:', error);
-                settings.webdav.password = ''; // 解密失败时清空密码
-            }
+        // 直接从 WebDAV API 获取配置
+        try {
+            const webdavConfig = await WebDAVAPI.getConfig();
+            console.log('从 WebDAV API 获取的配置:', webdavConfig);
+            
+            settings.webdav = {
+                enabled: webdavConfig.enabled || false,
+                serverUrl: webdavConfig.serverUrl || "",
+                username: webdavConfig.username || "",
+                password: webdavConfig.password || "",
+                autoSync: webdavConfig.autoSync || false,
+                syncInterval: webdavConfig.syncInterval || 30,
+            };
+        } catch (error) {
+            console.error('从 WebDAV API 获取配置失败，使用 preferences:', error);
+            // 回退到使用 preferences
+            const webdavConfig = prefs.webdav || {};
+            console.log('WebDAV 配置:', webdavConfig);
+            
+            settings.webdav = {
+                enabled: webdavConfig.enabled || false,
+                serverUrl: webdavConfig.serverUrl || "",
+                username: webdavConfig.username || "",
+                password: webdavConfig.password || "",
+                autoSync: webdavConfig.autoSync || false,
+                syncInterval: webdavConfig.syncInterval || 30,
+            };
         }
+        
+        console.log('最终设置的 WebDAV 配置:', settings.webdav);
         
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
@@ -685,20 +356,26 @@ const loadSettings = async () => {
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
         
-        console.log("设置加载成功:", settings);
+        console.log("设置加载成功:", {
+            ...settings,
+            webdav: {
+                ...settings.webdav,
+                password: settings.webdav.password ? '[已设置]' : '[未设置]'
+            }
+        });
     } catch (error) {
         console.error("加载设置失败:", error);
         message.error("加载设置失败");
     }
 };
 
-// 更新设置
+// 更新设置（排除WebDAV设置，避免密码处理问题）
 const updateSetting = async () => {
     if (saving.value) return;
 
     saving.value = true;
     try {
-        // 创建纯对象副本，避免传递 Vue 响应式对象
+        // 创建纯对象副本，排除WebDAV设置，避免密码加密问题
         const settingsData = JSON.parse(
             JSON.stringify({
                 closeBehaviorMode: settings.closeBehaviorMode,
@@ -706,30 +383,10 @@ const updateSetting = async () => {
                 startMinimized: settings.startMinimized,
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
-                webdav: settings.webdav,
                 dataSync: settings.dataSync,
+                // 排除 webdav 设置，由专门的函数处理
             })
-        );        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
-        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
-            try {
-                console.log('正在加密 WebDAV 密码...');
-                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
-                if (encryptResult.success && encryptResult.encryptedPassword) {
-                    settingsData.webdav.password = encryptResult.encryptedPassword;
-                    console.log('WebDAV 密码加密成功');
-                } else {
-                    console.error('WebDAV 密码加密失败:', encryptResult.error);
-                    message.error('密码加密失败，请重试');
-                    saving.value = false;
-                    return;
-                }
-            } catch (error) {
-                console.error('WebDAV 密码加密出错:', error);
-                message.error('密码加密出错，请重试');
-                saving.value = false;
-                return;
-            }
-        }
+        );
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
         console.log("设置更新成功:", updatedPrefs);
@@ -737,16 +394,6 @@ const updateSetting = async () => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settings.themeSource) {
             await window.electronAPI.theme.setSource(settings.themeSource);
-        }
-
-        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
-        if (settingsData.webdav) {
-            try {
-                await window.electronAPI.webdav.setConfig(settingsData.webdav);
-                console.log("WebDAV 配置同步成功");
-            } catch (error) {
-                console.error("WebDAV 配置同步失败:", error);
-            }
         }
 
         setTimeout(() => {
@@ -759,7 +406,7 @@ const updateSetting = async () => {
     }
 };
 
-// 更新设置（智能版本，避免重复加密）
+// 更新设置（智能版本，用于特定字段更新）
 const updateSettingsSmart = async (fieldsToUpdate = null) => {
     if (saving.value) return;
 
@@ -771,7 +418,9 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
             settingsData = {};
             for (const field of fieldsToUpdate) {
                 if (field === 'webdav') {
-                    settingsData.webdav = JSON.parse(JSON.stringify(settings.webdav));
+                    // WebDAV 设置由专门的函数处理，这里跳过
+                    console.log('跳过 WebDAV 设置，由专门函数处理');
+                    continue;
                 } else if (field === 'dataSync') {
                     settingsData.dataSync = JSON.parse(JSON.stringify(settings.dataSync));
                 } else {
@@ -779,7 +428,7 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
                 }
             }
         } else {
-            // 创建纯对象副本，避免传递 Vue 响应式对象
+            // 创建纯对象副本，排除 WebDAV 设置
             settingsData = JSON.parse(
                 JSON.stringify({
                     closeBehaviorMode: settings.closeBehaviorMode,
@@ -787,32 +436,17 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
                     startMinimized: settings.startMinimized,
                     autoLaunch: settings.autoLaunch,
                     themeSource: settings.themeSource,
-                    webdav: settings.webdav,
                     dataSync: settings.dataSync,
+                    // 排除 webdav 设置，由专门的函数处理
                 })
             );
         }
 
-        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
-        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
-            try {
-                console.log('正在加密 WebDAV 密码...');
-                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
-                if (encryptResult.success && encryptResult.encryptedPassword) {
-                    settingsData.webdav.password = encryptResult.encryptedPassword;
-                    console.log('WebDAV 密码加密成功');
-                } else {
-                    console.error('WebDAV 密码加密失败:', encryptResult.error);
-                    message.error('密码加密失败，请重试');
-                    saving.value = false;
-                    return;
-                }
-            } catch (error) {
-                console.error('WebDAV 密码加密出错:', error);
-                message.error('密码加密出错，请重试');
-                saving.value = false;
-                return;
-            }
+        // 如果没有要更新的数据，直接返回
+        if (!settingsData || Object.keys(settingsData).length === 0) {
+            console.log('没有需要更新的设置');
+            saving.value = false;
+            return;
         }
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
@@ -821,16 +455,6 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settingsData.themeSource) {
             await window.electronAPI.theme.setSource(settingsData.themeSource);
-        }
-
-        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
-        if (settingsData.webdav) {
-            try {
-                await window.electronAPI.webdav.setConfig(settingsData.webdav);
-                console.log("WebDAV 配置同步成功");
-            } catch (error) {
-                console.error("WebDAV 配置同步失败:", error);
-            }
         }
 
         setTimeout(() => {
@@ -882,8 +506,23 @@ const updateNonWebDAVSetting = async () => {
     }
 };
 
+// 确保 WebDAV 配置已保存到后端（简化版本）
+const ensureWebdavConfigSaved = async () => {
+    try {
+        console.log('确保WebDAV配置已保存到后端...');
+        
+        // 直接保存 WebDAV 配置，不需要复杂的密码状态管理
+        await saveWebDAVSettings();
+        console.log('WebDAV配置已确保保存');
+    } catch (error) {
+        console.error('确保WebDAV配置保存失败:', error);
+        throw new Error('配置保存失败，无法进行同步');
+    }
+};
+
 // 测试 WebDAV 连接
 const testWebDAVConnection = async () => {
+    // 简单验证
     if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
         message.error("请填写完整的服务器信息");
         return;
@@ -891,11 +530,10 @@ const testWebDAVConnection = async () => {
 
     loading.webdavTest = true;
     try {
-        // 测试连接时使用明文密码
         const result = await WebDAVAPI.testConnection({
             serverUrl: settings.webdav.serverUrl,
             username: settings.webdav.username,
-            password: settings.webdav.password,
+            password: settings.webdav.password
         });
         
         if (result.success) {
@@ -917,9 +555,18 @@ const syncNow = async () => {
         return;
     }
 
+    // 简单验证
+    if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
+        message.error("WebDAV配置不完整，请检查服务器地址、用户名和密码");
+        return;
+    }
+
     loading.sync = true;
     try {
-        const result = await WebDAVAPI.syncNow();        if (result.success) {
+        // 使用安全同步方法，包含数据库健康检查
+        const result = await WebDAVAPI.safeSyncNow();
+        
+        if (result.success) {
             settings.dataSync.lastSyncTime = result.timestamp;
             
             // 只更新 dataSync 配置，避免重复加密 WebDAV 密码
@@ -994,6 +641,62 @@ const restoreBackup = async () => {
     }
 };
 
+// 恢复指定备份
+const restoreSpecificBackup = async (backupId: string) => {
+    try {
+        const result = await DataManagementAPI.restoreBackup(backupId);
+        
+        if (result.success) {
+            const successMessage = result.message || "备份恢复成功";
+            message.success(successMessage);
+            // 恢复成功后刷新备份列表
+            await refreshBackupList();
+        } else {
+            message.error(result.message || "备份恢复失败");
+        }
+    } catch (error) {
+        console.error("恢复备份失败:", error);
+        message.error("恢复备份失败");
+    }
+};
+
+// 删除备份
+const deleteBackup = async (backupId: string) => {
+    try {
+        await DataManagementAPI.deleteBackup(backupId);
+        message.success("备份删除成功");
+        // 删除成功后刷新备份列表
+        await refreshBackupList();
+    } catch (error) {
+        console.error("删除备份失败:", error);
+        message.error("删除备份失败");
+    }
+};
+
+// 刷新备份列表
+const refreshBackupList = async () => {
+    try {
+        const backups = await DataManagementAPI.getBackupList();
+        
+        // 转换备份数据格式以匹配组件期望的格式
+        const formattedBackups = backups.map(backup => ({
+            id: backup.id,
+            name: backup.name,
+            createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
+            size: `${(backup.size / 1024).toFixed(2)} KB`,
+            version: backup.description || 'v1.0'
+        }));
+        
+        // 更新子组件的备份列表
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateBackupList(formattedBackups);
+        }
+    } catch (error) {
+        console.error("获取备份列表失败:", error);
+        message.error("获取备份列表失败");
+    }
+};
+
 // 导出数据
 const exportData = async (format: 'json' | 'csv') => {
     loading.export = true;
@@ -1055,18 +758,7 @@ const importData = async (format: 'json' | 'csv') => {
     loading.import = false;
 };
 
-// 格式化同步时间
-const formatSyncTime = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-};
+// 格式化同步时间 - 已移至子组件，删除此函数
 
 // 重置设置
 const resetSettings = async () => {
@@ -1091,48 +783,89 @@ const resetSettings = async () => {
 const saveWebDAVSettings = async () => {
     if (saving.value) return;
     
-    // 如果关键信息不完整，不进行保存
-    if (!settings.webdav.enabled || !settings.webdav.password || !settings.webdav.username || !settings.webdav.serverUrl) {
-        return;
-    }
-
     saving.value = true;
     try {
         console.log('保存 WebDAV 设置...');
         
-        // 创建完整的 WebDAV 配置副本
-        const webdavConfig = {
+        // 创建纯对象副本，避免Vue响应式对象问题
+        const cleanConfig = JSON.parse(JSON.stringify({
             enabled: settings.webdav.enabled,
             serverUrl: settings.webdav.serverUrl,
             username: settings.webdav.username,
-            password: settings.webdav.password, // 保持明文，让后端处理加密
+            password: settings.webdav.password,
             autoSync: settings.webdav.autoSync,
-            syncInterval: settings.webdav.syncInterval,
-        };
-
-        // 通过 WebDAV API 设置配置（后端会处理加密和完整保存）
-        await WebDAVAPI.setConfig(webdavConfig);
+            syncInterval: settings.webdav.syncInterval
+        }));
+        
+        // 直接保存配置
+        await WebDAVAPI.setConfig(cleanConfig);
         
         console.log('WebDAV 设置保存成功');
+        message.success('WebDAV 设置保存成功');
     } catch (error) {
         console.error('保存 WebDAV 设置失败:', error);
-        // 不显示错误消息，避免干扰用户输入
+        message.error('保存 WebDAV 设置失败');
     }
     saving.value = false;
+};
+
+// 数据库修复
+const repairDatabase = async () => {
+    loading.repair = true;
+    try {
+        const { databaseServiceManager } = await import("@/lib/services");
+        const result = await databaseServiceManager.checkAndRepairDatabase();
+        
+        if (result.healthy) {
+            if (result.repaired) {
+                message.success(`数据库修复成功：${result.message}`);
+            } else {
+                message.success("数据库状态正常，无需修复");
+            }
+        } else {
+            message.error(`数据库修复失败：${result.message}`);
+            if (result.missingStores && result.missingStores.length > 0) {
+                console.error('仍缺失的对象存储:', result.missingStores);
+            }
+        }
+    } catch (error) {
+        console.error("数据库修复失败:", error);
+        message.error("数据库修复失败");
+    }
+    loading.repair = false;
+};
+
+// 检查数据库健康状态
+const checkDatabaseHealth = async () => {
+    loading.healthCheck = true;
+    try {
+        const { databaseServiceManager } = await import("@/lib/services");
+        const result = await databaseServiceManager.getHealthStatus();
+        
+        if (result.healthy) {
+            message.success("数据库状态正常");
+        } else {
+            message.warning(`数据库存在异常，缺失的对象存储: ${result.missingStores.join(', ')}`);
+            console.warn('数据库健康检查结果:', result);
+        }
+    } catch (error) {
+        console.error("数据库健康检查失败:", error);
+        message.error("数据库健康检查失败");
+    }
+    loading.healthCheck = false;
 };
 
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
-    
-    // 同步 WebDAV 配置到服务端
-    try {
-        if (settings.webdav) {
-            await window.electronAPI.webdav.setConfig(settings.webdav);
-            console.log("WebDAV 配置已同步到服务端");
-        }
-    } catch (error) {
-        console.error("同步 WebDAV 配置失败:", error);
+    // 加载备份列表
+    await refreshBackupList();
+});
+
+// 监听设置页面切换，当切换到数据管理页面时刷新备份列表
+watch(activeSettingKey, async (newKey) => {
+    if (newKey === 'data-management') {
+        await refreshBackupList();
     }
 });
 </script>

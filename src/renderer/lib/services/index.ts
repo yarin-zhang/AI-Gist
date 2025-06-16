@@ -13,8 +13,14 @@ import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
 
+// 导入 IPC 相关类型
+import type { 
+  DataExportResult, 
+  DataImportResult 
+} from '../../shared/types/ipc.types';
+
 // 导出所有类型定义
-export * from '../types/database';
+export * from '../../../shared/types/database';
 
 // 导出基础服务类
 export { BaseDatabaseService };
@@ -142,23 +148,128 @@ export class DatabaseServiceManager {
   }
 
   /**
-   * 获取数据库统计信息
-   * 返回所有表的记录数量统计
-   * @returns Promise<Record<string, number>> 各表的记录数量
+   * 修复数据库
+   * 当检测到数据库问题时调用此方法进行修复
+   * @returns Promise<{ success: boolean; message: string }> 修复结果
    */
-  async getDatabaseStats(): Promise<Record<string, number>> {
-    const stats: Record<string, number> = {};
-
+  async repairDatabase(): Promise<{ success: boolean; message: string }> {
     try {
-      const [
-        users,
-        posts,
-        categories,
-        prompts,
-        aiConfigs,
-        aiHistory,
-        settings
-      ] = await Promise.all([
+      console.log('DatabaseServiceManager: 开始修复数据库...');
+      
+      // 使用基础服务的修复功能
+      const repairResult = await this.user.repairDatabase();
+      
+      if (repairResult.success) {
+        console.log('DatabaseServiceManager: 数据库修复成功');
+        
+        // 重新检查健康状态
+        const healthStatus = await this.getHealthStatus();
+        
+        if (healthStatus.healthy) {
+          return {
+            success: true,
+            message: '数据库修复成功，所有对象存储已正常'
+          };
+        } else {
+          return {
+            success: false,
+            message: `数据库修复部分成功，仍缺失: ${healthStatus.missingStores.join(', ')}`
+          };
+        }
+      } else {
+        return repairResult;
+      }
+    } catch (error) {
+      console.error('DatabaseServiceManager: 数据库修复失败:', error);
+      return {
+        success: false,
+        message: `数据库修复失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
+  }
+
+  /**
+   * 检查并修复数据库
+   * 自动检查数据库健康状态，如果有问题则尝试修复
+   * @returns Promise<{ healthy: boolean; repaired: boolean; message: string }> 检查和修复结果
+   */
+  async checkAndRepairDatabase(): Promise<{ 
+    healthy: boolean; 
+    repaired: boolean; 
+    message: string;
+    missingStores?: string[];
+  }> {
+    try {
+      console.log('正在检查数据库健康状态...');
+      
+      const healthStatus = await this.getHealthStatus();
+      
+      if (healthStatus.healthy) {
+        return {
+          healthy: true,
+          repaired: false,
+          message: '数据库状态正常'
+        };
+      }
+      
+      console.log('检测到数据库问题，缺失的对象存储:', healthStatus.missingStores);
+      
+      // 首先尝试普通修复
+      console.log('尝试修复数据库...');
+      let repairResult = await this.repairDatabase();
+      
+      if (repairResult.success) {
+        return {
+          healthy: true,
+          repaired: true,
+          message: `数据库已修复，已创建缺失的对象存储: ${healthStatus.missingStores.join(', ')}`
+        };
+      }
+      
+      // 如果修复失败，返回失败结果
+      return {
+        healthy: false,
+        repaired: false,
+        message: `数据库修复失败: ${repairResult.message}`,
+        missingStores: healthStatus.missingStores
+      };
+    } catch (error) {
+      console.error('检查和修复数据库过程中出错:', error);
+      return {
+        healthy: false,
+        repaired: false,
+        message: `操作失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
+  }
+  
+  /**
+   * 导出所有数据
+   */
+  async exportAllData(): Promise<DataExportResult> {
+    try {
+      console.log('渲染进程: 开始导出数据库数据...');
+      
+      // 首先检查数据库健康状态
+      console.log('正在检查数据库健康状态...');
+      const healthStatus = await this.getHealthStatus();
+      
+      if (!healthStatus.healthy) {
+        console.warn('检测到数据库异常，缺失的对象存储:', healthStatus.missingStores);
+        
+        // 尝试修复数据库
+        console.log('正在尝试修复数据库...');
+        const repairResult = await this.repairDatabase();
+        
+        if (!repairResult.success) {
+          throw new Error(`数据库修复失败: ${repairResult.message}`);
+        }
+        
+        console.log('数据库修复成功，继续导出数据...');
+      }
+      
+      // 安全地获取所有数据
+      const results = await Promise.allSettled([
         this.user.getAllUsers(),
         this.post.getAllPosts(),
         this.category.getBasicCategories(),
@@ -167,19 +278,371 @@ export class DatabaseServiceManager {
         this.aiGenerationHistory.getAllAIGenerationHistory(),
         this.appSettings.getAllSettings()
       ]);
-
-      stats.users = users.length;
-      stats.posts = posts.length;
-      stats.categories = categories.length;
-      stats.prompts = prompts.length;
-      stats.aiConfigs = aiConfigs.length;
-      stats.aiHistory = aiHistory.length;
-      stats.settings = settings.length;
+      
+      // 处理结果，对失败的操作返回空数组
+      const [
+        users,
+        posts,
+        categories,
+        prompts,
+        aiConfigs,
+        aiHistory,
+        settings
+      ] = results.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value || [];
+        } else {
+          const tableNames = ['users', 'posts', 'categories', 'prompts', 'aiConfigs', 'aiHistory', 'settings'];
+          console.warn(`获取 ${tableNames[index]} 数据失败:`, result.reason);
+          return [];
+        }
+      });
+      
+      const exportData = {
+        users: users as any[],
+        posts: posts as any[],
+        categories: categories as any[],
+        prompts: prompts as any[],
+        aiConfigs: aiConfigs as any[],
+        aiHistory: aiHistory as any[],
+        settings: settings as any[]
+      };
+      
+      console.log('渲染进程: 数据导出完成', {
+        用户数: exportData.users.length,
+        文章数: exportData.posts.length,
+        分类数: exportData.categories.length,
+        提示词数: exportData.prompts.length,
+        AI配置数: exportData.aiConfigs.length,
+        AI历史数: exportData.aiHistory.length,
+        设置数: exportData.settings.length
+      });
+      
+      return {
+        success: true,
+        data: exportData,
+        message: '数据导出成功'
+      };
+      
     } catch (error) {
-      console.error('Failed to get database stats:', error);
+      console.error('渲染进程: 导出数据库数据失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: '数据导出失败'
+      };
     }
-
-    return stats;
+  }
+  
+  /**
+   * 导入数据
+   */
+  async importData(data: any): Promise<DataImportResult> {
+    try {
+      console.log('渲染进程: 开始导入数据库数据...');
+      
+      if (!data || typeof data !== 'object') {
+        throw new Error('导入数据格式无效');
+      }
+      
+      const details: Record<string, number> = {};
+      const importPromises: Promise<void>[] = [];
+      let totalErrors = 0;
+      
+      // 导入用户数据
+      if (data.users && data.users.length > 0) {
+        console.log(`导入用户数据: ${data.users.length} 条`);
+        for (const user of data.users) {
+          const { id, ...userDataWithoutId } = user;
+          importPromises.push(
+            this.user.createUser(userDataWithoutId).catch(err => {
+              console.warn('导入用户数据失败:', user.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入分类数据
+      if (data.categories && data.categories.length > 0) {
+        console.log(`导入分类数据: ${data.categories.length} 条`);
+        for (const category of data.categories) {
+          const { id, ...categoryDataWithoutId } = category;
+          importPromises.push(
+            this.category.createCategory(categoryDataWithoutId).catch(err => {
+              console.warn('导入分类数据失败:', category.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入提示词数据
+      if (data.prompts && data.prompts.length > 0) {
+        console.log(`导入提示词数据: ${data.prompts.length} 条`);
+        for (const prompt of data.prompts) {
+          const { id, ...promptDataWithoutId } = prompt;
+          importPromises.push(
+            this.prompt.createPrompt(promptDataWithoutId).catch(err => {
+              console.warn('导入提示词数据失败:', prompt.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入文章数据
+      if (data.posts && data.posts.length > 0) {
+        console.log(`导入文章数据: ${data.posts.length} 条`);
+        for (const post of data.posts) {
+          const { id, ...postDataWithoutId } = post;
+          importPromises.push(
+            this.post.createPost(postDataWithoutId).catch(err => {
+              console.warn('导入文章数据失败:', post.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入AI配置数据
+      if (data.aiConfigs && data.aiConfigs.length > 0) {
+        console.log(`导入AI配置数据: ${data.aiConfigs.length} 条`);
+        for (const config of data.aiConfigs) {
+          const { id, ...configDataWithoutId } = config;
+          importPromises.push(
+            this.aiConfig.createAIConfig(configDataWithoutId).catch(err => {
+              console.warn('导入AI配置数据失败:', config.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入AI历史数据
+      if (data.aiHistory && data.aiHistory.length > 0) {
+        console.log(`导入AI历史数据: ${data.aiHistory.length} 条`);
+        for (const history of data.aiHistory) {
+          const { id, ...historyDataWithoutId } = history;
+          importPromises.push(
+            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).catch(err => {
+              console.warn('导入AI历史数据失败:', history.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 导入设置数据
+      if (data.settings && data.settings.length > 0) {
+        console.log(`导入设置数据: ${data.settings.length} 条`);
+        for (const setting of data.settings) {
+          importPromises.push(
+            this.appSettings.setSetting(setting.key, setting.value).catch(err => {
+              console.warn('导入设置数据失败:', setting.key, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 等待所有导入操作完成
+      await Promise.all(importPromises);
+      
+      // 统计导入结果
+      details.users = (data.users?.length || 0);
+      details.categories = (data.categories?.length || 0);
+      details.prompts = (data.prompts?.length || 0);
+      details.posts = (data.posts?.length || 0);
+      details.aiConfigs = (data.aiConfigs?.length || 0);
+      details.aiHistory = (data.aiHistory?.length || 0);
+      details.settings = (data.settings?.length || 0);
+      
+      const totalImported = Object.values(details).reduce((sum, count) => sum + count, 0);
+      
+      console.log('渲染进程: 数据导入完成', details);
+      
+      return {
+        success: true,
+        message: `数据导入成功，共导入 ${totalImported} 条记录${totalErrors > 0 ? `，失败 ${totalErrors} 条` : ''}`,
+        details
+      };
+      
+    } catch (error) {
+      console.error('渲染进程: 导入数据库数据失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: '数据导入失败'
+      };
+    }
+  }
+  
+  /**
+   * 备份数据
+   */
+  async backupData(): Promise<DataExportResult> {
+    // 备份和导出是相同的逻辑
+    return await this.exportAllData();
+  }
+  
+  /**
+   * 恢复数据
+   */
+  async restoreData(backupData: any): Promise<DataImportResult> {
+    try {
+      console.log('渲染进程: 开始恢复数据...');
+      
+      if (!backupData || typeof backupData !== 'object') {
+        throw new Error('恢复数据格式无效');
+      }
+      
+      // 清空现有数据表（如果支持的话）
+      if (this.clearAllTables) {
+        console.log('清空现有数据表...');
+        await this.clearAllTables();
+      }
+      
+      const details: Record<string, number> = {};
+      const restorePromises: Promise<void>[] = [];
+      let totalErrors = 0;
+      
+      // 恢复用户数据
+      if (backupData.users && backupData.users.length > 0) {
+        console.log(`恢复用户数据: ${backupData.users.length} 条`);
+        for (const user of backupData.users) {
+          // 移除ID以避免主键冲突，让数据库自动生成新ID
+          const { id, ...userDataWithoutId } = user;
+          restorePromises.push(
+            this.user.createUser(userDataWithoutId).catch(err => {
+              console.warn('恢复用户数据失败:', user.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复分类数据
+      if (backupData.categories && backupData.categories.length > 0) {
+        console.log(`恢复分类数据: ${backupData.categories.length} 条`);
+        for (const category of backupData.categories) {
+          const { id, ...categoryDataWithoutId } = category;
+          restorePromises.push(
+            this.category.createCategory(categoryDataWithoutId).catch(err => {
+              console.warn('恢复分类数据失败:', category.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复提示词数据
+      if (backupData.prompts && backupData.prompts.length > 0) {
+        console.log(`恢复提示词数据: ${backupData.prompts.length} 条`);
+        for (const prompt of backupData.prompts) {
+          const { id, ...promptDataWithoutId } = prompt;
+          restorePromises.push(
+            this.prompt.createPrompt(promptDataWithoutId).catch(err => {
+              console.warn('恢复提示词数据失败:', prompt.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复文章数据
+      if (backupData.posts && backupData.posts.length > 0) {
+        console.log(`恢复文章数据: ${backupData.posts.length} 条`);
+        for (const post of backupData.posts) {
+          const { id, ...postDataWithoutId } = post;
+          restorePromises.push(
+            this.post.createPost(postDataWithoutId).catch(err => {
+              console.warn('恢复文章数据失败:', post.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复AI配置数据
+      if (backupData.aiConfigs && backupData.aiConfigs.length > 0) {
+        console.log(`恢复AI配置数据: ${backupData.aiConfigs.length} 条`);
+        for (const config of backupData.aiConfigs) {
+          const { id, ...configDataWithoutId } = config;
+          restorePromises.push(
+            this.aiConfig.createAIConfig(configDataWithoutId).catch(err => {
+              console.warn('恢复AI配置数据失败:', config.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复AI历史数据
+      if (backupData.aiHistory && backupData.aiHistory.length > 0) {
+        console.log(`恢复AI历史数据: ${backupData.aiHistory.length} 条`);
+        for (const history of backupData.aiHistory) {
+          const { id, ...historyDataWithoutId } = history;
+          restorePromises.push(
+            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).catch(err => {
+              console.warn('恢复AI历史数据失败:', history.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 恢复设置数据
+      if (backupData.settings && backupData.settings.length > 0) {
+        console.log(`恢复设置数据: ${backupData.settings.length} 条`);
+        for (const setting of backupData.settings) {
+          restorePromises.push(
+            this.appSettings.setSetting(setting.key, setting.value).catch(err => {
+              console.warn('恢复设置数据失败:', setting.key, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 等待所有恢复操作完成
+      await Promise.all(restorePromises);
+      
+      // 统计恢复结果
+      details.users = (backupData.users?.length || 0);
+      details.categories = (backupData.categories?.length || 0);
+      details.prompts = (backupData.prompts?.length || 0);
+      details.posts = (backupData.posts?.length || 0);
+      details.aiConfigs = (backupData.aiConfigs?.length || 0);
+      details.aiHistory = (backupData.aiHistory?.length || 0);
+      details.settings = (backupData.settings?.length || 0);
+      
+      const totalRestored = Object.values(details).reduce((sum, count) => sum + count, 0);
+      
+      console.log(`渲染进程: 数据恢复完成，总计恢复记录数: ${totalRestored}, 错误数: ${totalErrors}`);
+      
+      return {
+        success: true,
+        message: `数据恢复成功，共恢复 ${totalRestored} 条记录${totalErrors > 0 ? `，失败 ${totalErrors} 条` : ''}`,
+        details
+      };
+      
+    } catch (error) {
+      console.error('渲染进程: 恢复数据失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: '数据恢复失败'
+      };
+    }
+  }
+  
+  /**
+   * 清空所有数据表（可选方法）
+   */
+  async clearAllTables?(): Promise<void> {
+    // 这个方法需要根据具体的数据库实现来定义
+    // 暂时留作可选方法
   }
 }
 

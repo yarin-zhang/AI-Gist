@@ -3,7 +3,7 @@ import { Ollama } from '@langchain/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { CohereClient } from 'cohere-ai';
-import { AIGenerationRequest, AIGenerationResult } from './types';
+import { AIGenerationRequest, AIGenerationResult } from '../../shared/types';
 
 // 定义配置接口，适配前端数据库的结构
 interface ProcessedAIConfig {

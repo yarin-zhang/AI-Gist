@@ -6,9 +6,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "../../build/main",
+    "outDir": "../../build",
     "allowJs": true,
     "noImplicitAny": false,
+    "rootDir": ".."
   },
+  "include": ["**/*"],
   "exclude": ["static"]
 }

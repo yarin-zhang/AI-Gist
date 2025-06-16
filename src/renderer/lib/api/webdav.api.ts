@@ -1,4 +1,4 @@
-import { ipcInvoke } from '../ipc-utils';
+import { ipcInvoke } from '../ipc';
 
 export interface WebDAVConfig {
     enabled: boolean;
@@ -79,6 +79,41 @@ export class WebDAVAPI {
             return await ipcInvoke('webdav:sync-now');
         } catch (error) {
             console.error('WebDAV 同步失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 安全同步数据
+     * 在同步前检查数据库健康状态，必要时修复
+     */
+    static async safeSyncNow(): Promise<SyncResult> {
+        try {
+            // 检查数据库健康状态
+            const { databaseServiceManager } = await import('../services');
+            const checkResult = await databaseServiceManager.checkAndRepairDatabase();
+            
+            if (!checkResult.healthy) {
+                console.error('数据库健康检查失败:', checkResult.message);
+                return {
+                    success: false,
+                    message: `同步失败: 数据库异常 - ${checkResult.message}`,
+                    timestamp: new Date().toISOString(),
+                    filesUploaded: 0,
+                    filesDownloaded: 0,
+                    conflictsDetected: 0,
+                    conflictsResolved: 0,
+                };
+            }
+            
+            if (checkResult.repaired) {
+                console.log('数据库已修复，继续同步:', checkResult.message);
+            }
+            
+            // 执行同步
+            return await ipcInvoke('webdav:sync-now');
+        } catch (error) {
+            console.error('WebDAV 安全同步失败:', error);
             throw error;
         }
     }

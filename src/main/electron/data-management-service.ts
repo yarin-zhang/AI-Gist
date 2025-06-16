@@ -257,6 +257,36 @@ export class DataManagementService {
                 throw new Error('没有找到主窗口，无法访问数据库');
             }
 
+            // 首先检查数据库健康状态并尝试修复
+            console.log('正在检查数据库健康状态...');
+            const healthCheckResult = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                            throw new Error('数据库API未初始化');
+                        }
+                        
+                        const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                        return await databaseServiceManager.checkAndRepairDatabase();
+                    } catch (error) {
+                        return {
+                            healthy: false,
+                            repaired: false,
+                            message: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+
+            if (!healthCheckResult.healthy) {
+                console.error('数据库健康检查失败:', healthCheckResult.message);
+                throw new Error(`数据库异常: ${healthCheckResult.message}`);
+            }
+
+            if (healthCheckResult.repaired) {
+                console.log('数据库已修复:', healthCheckResult.message);
+            }
+
             // 调用渲染进程中暴露的导出方法
             const result = await mainWindow.webContents.executeJavaScript(`
                 (async () => {

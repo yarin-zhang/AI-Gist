@@ -48,8 +48,27 @@ export class BaseDatabaseService {
       };
 
       request.onupgradeneeded = (event) => {
+        console.log('Database upgrade needed');
         const db = (event.target as IDBOpenDBRequest).result;
+        const transaction = (event.target as IDBOpenDBRequest).transaction;
+        
+        console.log(`数据库升级: 从版本 ${event.oldVersion} 到版本 ${event.newVersion}`);
+        console.log('现有对象存储:', Array.from(db.objectStoreNames));
+        
+        // 确保创建所有必要的对象存储
         this.createObjectStores(db);
+        
+        // 等待事务完成
+        if (transaction) {
+          transaction.oncomplete = () => {
+            console.log('数据库升级事务完成');
+            console.log('升级后的对象存储:', Array.from(db.objectStoreNames));
+          };
+          
+          transaction.onerror = () => {
+            console.error('数据库升级事务失败:', transaction.error);
+          };
+        }
       };
     });
 
@@ -62,73 +81,109 @@ export class BaseDatabaseService {
    * @param db IDBDatabase 数据库实例
    */
   private createObjectStores(db: IDBDatabase): void {
-    // 创建 users 表
-    if (!db.objectStoreNames.contains('users')) {
-      const userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
-      userStore.createIndex('email', 'email', { unique: true });
-    }
+    console.log('开始创建对象存储...');
+    
+    try {
+      // 创建 users 表
+      if (!db.objectStoreNames.contains('users')) {
+        console.log('创建 users 对象存储');
+        const userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
+        userStore.createIndex('email', 'email', { unique: true });
+      } else {
+        console.log('users 对象存储已存在');
+      }
 
-    // 创建 posts 表
-    if (!db.objectStoreNames.contains('posts')) {
-      const postStore = db.createObjectStore('posts', { keyPath: 'id', autoIncrement: true });
-      postStore.createIndex('authorId', 'authorId', { unique: false });
-      postStore.createIndex('published', 'published', { unique: false });
-    }
+      // 创建 posts 表
+      if (!db.objectStoreNames.contains('posts')) {
+        console.log('创建 posts 对象存储');
+        const postStore = db.createObjectStore('posts', { keyPath: 'id', autoIncrement: true });
+        postStore.createIndex('authorId', 'authorId', { unique: false });
+        postStore.createIndex('published', 'published', { unique: false });
+      } else {
+        console.log('posts 对象存储已存在');
+      }
 
-    // 创建 categories 表
-    if (!db.objectStoreNames.contains('categories')) {
-      const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
-      categoryStore.createIndex('name', 'name', { unique: true });
-    }
+      // 创建 categories 表
+      if (!db.objectStoreNames.contains('categories')) {
+        console.log('创建 categories 对象存储');
+        const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
+        categoryStore.createIndex('name', 'name', { unique: true });
+      } else {
+        console.log('categories 对象存储已存在');
+      }
 
-    // 创建 prompts 表
-    if (!db.objectStoreNames.contains('prompts')) {
-      const promptStore = db.createObjectStore('prompts', { keyPath: 'id', autoIncrement: true });
-      promptStore.createIndex('categoryId', 'categoryId', { unique: false });
-      promptStore.createIndex('isFavorite', 'isFavorite', { unique: false });
-      promptStore.createIndex('title', 'title', { unique: false });
-      promptStore.createIndex('tags', 'tags', { unique: false });
-      promptStore.createIndex('useCount', 'useCount', { unique: false });
-      promptStore.createIndex('createdAt', 'createdAt', { unique: false });
-      promptStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-    }
+      // 创建 prompts 表
+      if (!db.objectStoreNames.contains('prompts')) {
+        console.log('创建 prompts 对象存储');
+        const promptStore = db.createObjectStore('prompts', { keyPath: 'id', autoIncrement: true });
+        promptStore.createIndex('categoryId', 'categoryId', { unique: false });
+        promptStore.createIndex('isFavorite', 'isFavorite', { unique: false });
+        promptStore.createIndex('title', 'title', { unique: false });
+        promptStore.createIndex('tags', 'tags', { unique: false });
+        promptStore.createIndex('useCount', 'useCount', { unique: false });
+        promptStore.createIndex('createdAt', 'createdAt', { unique: false });
+        promptStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+      } else {
+        console.log('prompts 对象存储已存在');
+      }
 
-    // 创建 promptVariables 表
-    if (!db.objectStoreNames.contains('promptVariables')) {
-      const variableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
-      variableStore.createIndex('promptId', 'promptId', { unique: false });
-      variableStore.createIndex('name', 'name', { unique: false });
-    }
+      // 创建 promptVariables 表
+      if (!db.objectStoreNames.contains('promptVariables')) {
+        console.log('创建 promptVariables 对象存储');
+        const variableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
+        variableStore.createIndex('promptId', 'promptId', { unique: false });
+        variableStore.createIndex('name', 'name', { unique: false });
+      } else {
+        console.log('promptVariables 对象存储已存在');
+      }
 
-    // 创建 promptHistories 表
-    if (!db.objectStoreNames.contains('promptHistories')) {
-      const historyStore = db.createObjectStore('promptHistories', { keyPath: 'id', autoIncrement: true });
-      historyStore.createIndex('promptId', 'promptId', { unique: false });
-      historyStore.createIndex('version', 'version', { unique: false });
-    }
+      // 创建 promptHistories 表
+      if (!db.objectStoreNames.contains('promptHistories')) {
+        console.log('创建 promptHistories 对象存储');
+        const historyStore = db.createObjectStore('promptHistories', { keyPath: 'id', autoIncrement: true });
+        historyStore.createIndex('promptId', 'promptId', { unique: false });
+        historyStore.createIndex('version', 'version', { unique: false });
+      } else {
+        console.log('promptHistories 对象存储已存在');
+      }
 
-    // 创建 ai_configs 表
-    if (!db.objectStoreNames.contains('ai_configs')) {
-      const configStore = db.createObjectStore('ai_configs', { keyPath: 'id', autoIncrement: true });
-      configStore.createIndex('configId', 'configId', { unique: true });
-      configStore.createIndex('type', 'type', { unique: false });
-      configStore.createIndex('enabled', 'enabled', { unique: false });
-      configStore.createIndex('isPreferred', 'isPreferred', { unique: false });
-    }
+      // 创建 ai_configs 表
+      if (!db.objectStoreNames.contains('ai_configs')) {
+        console.log('创建 ai_configs 对象存储');
+        const configStore = db.createObjectStore('ai_configs', { keyPath: 'id', autoIncrement: true });
+        configStore.createIndex('configId', 'configId', { unique: true });
+        configStore.createIndex('type', 'type', { unique: false });
+        configStore.createIndex('enabled', 'enabled', { unique: false });
+        configStore.createIndex('isPreferred', 'isPreferred', { unique: false });
+      } else {
+        console.log('ai_configs 对象存储已存在');
+      }
 
-    // 创建 ai_generation_history 表
-    if (!db.objectStoreNames.contains('ai_generation_history')) {
-      const generationStore = db.createObjectStore('ai_generation_history', { keyPath: 'id', autoIncrement: true });
-      generationStore.createIndex('historyId', 'historyId', { unique: true });
-      generationStore.createIndex('configId', 'configId', { unique: false });
-      generationStore.createIndex('status', 'status', { unique: false });
-      generationStore.createIndex('createdAt', 'createdAt', { unique: false });
-    }
+      // 创建 ai_generation_history 表
+      if (!db.objectStoreNames.contains('ai_generation_history')) {
+        console.log('创建 ai_generation_history 对象存储');
+        const generationStore = db.createObjectStore('ai_generation_history', { keyPath: 'id', autoIncrement: true });
+        generationStore.createIndex('historyId', 'historyId', { unique: true });
+        generationStore.createIndex('configId', 'configId', { unique: false });
+        generationStore.createIndex('status', 'status', { unique: false });
+        generationStore.createIndex('createdAt', 'createdAt', { unique: false });
+      } else {
+        console.log('ai_generation_history 对象存储已存在');
+      }
 
-    // 创建 settings 表
-    if (!db.objectStoreNames.contains('settings')) {
-      const settingsStore = db.createObjectStore('settings', { keyPath: 'id', autoIncrement: true });
-      settingsStore.createIndex('key', 'key', { unique: true });
+      // 创建 settings 表
+      if (!db.objectStoreNames.contains('settings')) {
+        console.log('创建 settings 对象存储');
+        const settingsStore = db.createObjectStore('settings', { keyPath: 'id', autoIncrement: true });
+        settingsStore.createIndex('key', 'key', { unique: true });
+      } else {
+        console.log('settings 对象存储已存在');
+      }
+      
+      console.log('对象存储创建完成，最终对象存储列表:', Array.from(db.objectStoreNames));
+    } catch (error) {
+      console.error('创建对象存储时出错:', error);
+      throw error;
     }
   }
 
@@ -414,5 +469,243 @@ export class BaseDatabaseService {
     }
     this.isInitialized = false;
     this.initializationPromise = null;
+  }
+
+  /**
+   * 检查数据库健康状态
+   * 验证所有必需的对象存储是否存在
+   * @returns Promise<{ healthy: boolean; missingStores: string[]; currentVersion: number }> 健康状态信息
+   */
+  async checkDatabaseHealth(): Promise<{ 
+    healthy: boolean; 
+    missingStores: string[]; 
+    currentVersion: number;
+    needsRepair: boolean;
+  }> {
+    try {
+      await this.waitForInitialization();
+      
+      if (!this.db) {
+        return {
+          healthy: false,
+          missingStores: [],
+          currentVersion: 0,
+          needsRepair: true
+        };
+      }
+
+      const requiredStores = [
+        'users',
+        'posts', 
+        'categories',
+        'prompts',
+        'promptVariables',
+        'promptHistories',
+        'ai_configs',
+        'ai_generation_history',
+        'settings'
+      ];
+
+      const missingStores: string[] = [];
+      const existingStores = Array.from(this.db.objectStoreNames);
+
+      for (const storeName of requiredStores) {
+        if (!existingStores.includes(storeName)) {
+          missingStores.push(storeName);
+        }
+      }
+
+      const healthy = missingStores.length === 0;
+      const needsRepair = !healthy || this.db.version < this.dbVersion;
+
+      console.log('数据库健康检查结果:', {
+        healthy,
+        missingStores,
+        currentVersion: this.db.version,
+        expectedVersion: this.dbVersion,
+        needsRepair,
+        existingStores
+      });
+
+      return {
+        healthy,
+        missingStores,
+        currentVersion: this.db.version,
+        needsRepair
+      };
+    } catch (error) {
+      console.error('数据库健康检查失败:', error);
+      return {
+        healthy: false,
+        missingStores: [],
+        currentVersion: 0,
+        needsRepair: true
+      };
+    }
+  }
+
+  /**
+   * 修复数据库
+   * 通过删除并重新创建数据库来修复缺失的对象存储
+   * @returns Promise<boolean> 修复是否成功
+   */
+  async repairDatabase(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('开始修复数据库...');
+
+      // 检查当前健康状态
+      const healthStatus = await this.checkDatabaseHealth();
+      
+      if (healthStatus.healthy && !healthStatus.needsRepair) {
+        return {
+          success: true,
+          message: '数据库状态正常，无需修复'
+        };
+      }
+
+      console.log('检测到数据库问题:', {
+        healthy: healthStatus.healthy,
+        missingStores: healthStatus.missingStores,
+        currentVersion: healthStatus.currentVersion,
+        expectedVersion: this.dbVersion,
+        needsRepair: healthStatus.needsRepair
+      });
+
+      // 关闭当前连接
+      this.close();
+
+      // 如果缺失关键表，需要完全重建数据库
+      if (healthStatus.missingStores.length > 0) {
+        console.log('准备删除并重建数据库...');
+        
+        // 删除现有数据库
+        await this.deleteDatabase();
+        
+        // 重新创建数据库
+        console.log('重新创建数据库...');
+        await this.initialize();
+      } else {
+        // 如果只是版本问题，尝试版本升级
+        console.log('尝试通过版本升级修复...');
+        
+        // 强制升级到更高版本
+        this.dbVersion = this.dbVersion + 1;
+        await this.initialize();
+        
+        // 恢复原版本号
+        this.dbVersion = this.dbVersion - 1;
+      }
+
+      // 再次检查健康状态
+      const newHealthStatus = await this.checkDatabaseHealth();
+      
+      if (newHealthStatus.healthy) {
+        console.log('数据库修复成功');
+        return {
+          success: true,
+          message: `数据库修复成功，已创建 ${healthStatus.missingStores.length} 个缺失的对象存储`
+        };
+      } else {
+        console.error('数据库修复失败，仍有缺失的对象存储:', newHealthStatus.missingStores);
+        return {
+          success: false,
+          message: `数据库修复失败，仍缺失: ${newHealthStatus.missingStores.join(', ')}`
+        };
+      }
+    } catch (error) {
+      console.error('数据库修复过程中出错:', error);
+      return {
+        success: false,
+        message: `数据库修复失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
+  }
+
+  /**
+   * 删除数据库
+   * 彻底删除IndexedDB数据库
+   * @returns Promise<void>
+   */
+  private async deleteDatabase(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      console.log(`准备删除数据库: ${this.dbName}`);
+      
+      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+      
+      deleteRequest.onsuccess = () => {
+        console.log(`数据库 ${this.dbName} 已删除`);
+        resolve();
+      };
+      
+      deleteRequest.onerror = () => {
+        console.error('删除数据库失败:', deleteRequest.error);
+        reject(new Error(`删除数据库失败: ${deleteRequest.error?.message || '未知错误'}`));
+      };
+      
+      deleteRequest.onblocked = () => {
+        console.warn('删除数据库被阻塞，可能有其他连接正在使用');
+        // 等待一段时间后重试
+        setTimeout(() => {
+          reject(new Error('删除数据库被阻塞，请关闭所有应用窗口后重试'));
+        }, 5000);
+      };
+    });
+  }
+
+  /**
+   * 安全执行数据库操作
+   * 在操作前检查数据库健康状态，必要时自动修复
+   * @param operation 要执行的数据库操作
+   * @param requiredStores 操作需要的对象存储列表
+   * @returns Promise<T> 操作结果
+   */
+  protected async safeDbOperation<T>(
+    operation: () => Promise<T>, 
+    requiredStores: string[] = []
+  ): Promise<T> {
+    try {
+      // 确保数据库已初始化
+      await this.waitForInitialization();
+
+      // 如果指定了需要的对象存储，检查它们是否存在
+      if (requiredStores.length > 0) {
+        const missingStores: string[] = [];
+        for (const storeName of requiredStores) {
+          const exists = await this.checkObjectStoreExists(storeName);
+          if (!exists) {
+            missingStores.push(storeName);
+          }
+        }
+
+        // 如果有缺失的对象存储，尝试修复
+        if (missingStores.length > 0) {
+          console.warn(`检测到缺失的对象存储: ${missingStores.join(', ')}，正在尝试修复...`);
+          
+          const repairResult = await this.repairDatabase();
+          if (!repairResult.success) {
+            throw new Error(`数据库修复失败: ${repairResult.message}`);
+          }
+        }
+      }
+
+      // 执行操作
+      return await operation();
+    } catch (error) {
+      // 如果是对象存储不存在的错误，尝试修复后重试一次
+      if (error instanceof Error && 
+          error.message.includes('object store') && 
+          error.message.includes('not found')) {
+        
+        console.warn('检测到对象存储错误，尝试修复数据库...');
+        const repairResult = await this.repairDatabase();
+        
+        if (repairResult.success) {
+          console.log('数据库修复成功，重试操作...');
+          return await operation();
+        }
+      }
+      
+      throw error;
+    }
   }
 }
