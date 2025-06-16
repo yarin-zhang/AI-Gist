@@ -155,13 +155,11 @@ import {
     Database,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
-import {
-    AppearanceSettings,
-    CloseBehaviorSettings,
-    StartupBehaviorSettings,
-    WebDAVSyncSettings,
-    DataManagementSettings,
-} from "@/components/settings";
+import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
+import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
+import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
+import WebDAVSyncSettings from "@/components/settings/WebDAVSyncSettings.vue";
+import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
 // 消息提示
