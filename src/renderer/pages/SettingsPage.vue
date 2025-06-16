@@ -263,12 +263,25 @@
                                                 </template>
                                                 测试连接
                                             </NButton>
+                                            <NButton @click="syncNow" :loading="loading.sync">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <BrandSoundcloud />
+                                                    </NIcon>
+                                                </template>
+                                                立即同步
+                                            </NButton>
                                         </NFlex>
                                     </NFlex>
+
+                                    <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
+                                        <template #header>上次同步时间</template>
+                                        {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
+                                    </NAlert>
                                 </div>
 
                                 <!-- 自动同步设置 -->
-                                <div v-if="settings.webdav.enabled">
+                                <!-- <div v-if="settings.webdav.enabled">
                                     <NDivider>同步设置</NDivider>
                                     
                                     <NFlex vertical :size="16">                                        <NFormItem label="自动同步">
@@ -311,7 +324,7 @@
                                             {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
                                         </NAlert>
                                     </NFlex>
-                                </div>
+                                </div> -->
                             </NFlex>
                         </NCard>
 
@@ -319,7 +332,7 @@
                         <NCard v-show="activeSettingKey === 'data-management'">
                             <NFlex vertical :size="20">
                                 <!-- 数据备份 -->
-                                <div>
+                                <!-- <div>
                                     <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
                                         数据备份
                                     </NText>
@@ -367,9 +380,9 @@
                                             </NButton>
                                         </NFlex>
                                     </NFlex>
-                                </div>
+                                </div> -->
 
-                                <NDivider />
+                                <!-- <NDivider /> -->
 
                                 <!-- 数据导入导出 -->
                                 <div>
