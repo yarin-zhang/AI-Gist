@@ -564,7 +564,6 @@ import {
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
-import { webdavPasswordManager } from "@/lib/utils/webdav-password-manager";
 
 // 消息提示
 const message = useMessage();
@@ -769,13 +768,13 @@ const loadSettings = async () => {
     }
 };
 
-// 更新设置
+// 更新设置（排除WebDAV设置，避免密码处理问题）
 const updateSetting = async () => {
     if (saving.value) return;
 
     saving.value = true;
     try {
-        // 创建纯对象副本，避免传递 Vue 响应式对象
+        // 创建纯对象副本，排除WebDAV设置，避免密码加密问题
         const settingsData = JSON.parse(
             JSON.stringify({
                 closeBehaviorMode: settings.closeBehaviorMode,
@@ -783,30 +782,10 @@ const updateSetting = async () => {
                 startMinimized: settings.startMinimized,
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
-                webdav: settings.webdav,
                 dataSync: settings.dataSync,
+                // 排除 webdav 设置，由专门的函数处理
             })
-        );        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
-        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
-            try {
-                console.log('正在加密 WebDAV 密码...');
-                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
-                if (encryptResult.success && encryptResult.encryptedPassword) {
-                    settingsData.webdav.password = encryptResult.encryptedPassword;
-                    console.log('WebDAV 密码加密成功');
-                } else {
-                    console.error('WebDAV 密码加密失败:', encryptResult.error);
-                    message.error('密码加密失败，请重试');
-                    saving.value = false;
-                    return;
-                }
-            } catch (error) {
-                console.error('WebDAV 密码加密出错:', error);
-                message.error('密码加密出错，请重试');
-                saving.value = false;
-                return;
-            }
-        }
+        );
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
         console.log("设置更新成功:", updatedPrefs);
@@ -814,16 +793,6 @@ const updateSetting = async () => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settings.themeSource) {
             await window.electronAPI.theme.setSource(settings.themeSource);
-        }
-
-        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
-        if (settingsData.webdav) {
-            try {
-                await window.electronAPI.webdav.setConfig(settingsData.webdav);
-                console.log("WebDAV 配置同步成功");
-            } catch (error) {
-                console.error("WebDAV 配置同步失败:", error);
-            }
         }
 
         setTimeout(() => {
@@ -836,7 +805,7 @@ const updateSetting = async () => {
     }
 };
 
-// 更新设置（智能版本，避免重复加密）
+// 更新设置（智能版本，用于特定字段更新）
 const updateSettingsSmart = async (fieldsToUpdate = null) => {
     if (saving.value) return;
 
@@ -848,7 +817,9 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
             settingsData = {};
             for (const field of fieldsToUpdate) {
                 if (field === 'webdav') {
-                    settingsData.webdav = JSON.parse(JSON.stringify(settings.webdav));
+                    // WebDAV 设置由专门的函数处理，这里跳过
+                    console.log('跳过 WebDAV 设置，由专门函数处理');
+                    continue;
                 } else if (field === 'dataSync') {
                     settingsData.dataSync = JSON.parse(JSON.stringify(settings.dataSync));
                 } else {
@@ -856,7 +827,7 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
                 }
             }
         } else {
-            // 创建纯对象副本，避免传递 Vue 响应式对象
+            // 创建纯对象副本，排除 WebDAV 设置
             settingsData = JSON.parse(
                 JSON.stringify({
                     closeBehaviorMode: settings.closeBehaviorMode,
@@ -864,32 +835,17 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
                     startMinimized: settings.startMinimized,
                     autoLaunch: settings.autoLaunch,
                     themeSource: settings.themeSource,
-                    webdav: settings.webdav,
                     dataSync: settings.dataSync,
+                    // 排除 webdav 设置，由专门的函数处理
                 })
             );
         }
 
-        // 如果 WebDAV 配置包含密码，需要先加密（但不重复加密已加密的密码）
-        if (settingsData.webdav && settingsData.webdav.password && typeof settingsData.webdav.password === 'string') {
-            try {
-                console.log('正在加密 WebDAV 密码...');
-                const encryptResult = await WebDAVAPI.encryptPassword(settingsData.webdav.password);
-                if (encryptResult.success && encryptResult.encryptedPassword) {
-                    settingsData.webdav.password = encryptResult.encryptedPassword;
-                    console.log('WebDAV 密码加密成功');
-                } else {
-                    console.error('WebDAV 密码加密失败:', encryptResult.error);
-                    message.error('密码加密失败，请重试');
-                    saving.value = false;
-                    return;
-                }
-            } catch (error) {
-                console.error('WebDAV 密码加密出错:', error);
-                message.error('密码加密出错，请重试');
-                saving.value = false;
-                return;
-            }
+        // 如果没有要更新的数据，直接返回
+        if (!settingsData || Object.keys(settingsData).length === 0) {
+            console.log('没有需要更新的设置');
+            saving.value = false;
+            return;
         }
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
@@ -898,16 +854,6 @@ const updateSettingsSmart = async (fieldsToUpdate = null) => {
         // 如果更改了主题设置，也要更新主题管理器
         if (settingsData.themeSource) {
             await window.electronAPI.theme.setSource(settingsData.themeSource);
-        }
-
-        // 如果更新了 WebDAV 配置，同步到 WebDAV 服务
-        if (settingsData.webdav) {
-            try {
-                await window.electronAPI.webdav.setConfig(settingsData.webdav);
-                console.log("WebDAV 配置同步成功");
-            } catch (error) {
-                console.error("WebDAV 配置同步失败:", error);
-            }
         }
 
         setTimeout(() => {
@@ -959,33 +905,13 @@ const updateNonWebDAVSetting = async () => {
     }
 };
 
-// 确保 WebDAV 配置已保存到后端
+// 确保 WebDAV 配置已保存到后端（简化版本）
 const ensureWebdavConfigSaved = async () => {
     try {
-        // 检查是否需要保存配置
-        if (!passwordState.isModified && passwordState.hasStoredPassword) {
-            // 密码未修改且已存储，配置应该已经在后端
-            console.log('WebDAV配置无需重新保存');
-            return;
-        }
-        
         console.log('确保WebDAV配置已保存到后端...');
         
-        // 准备配置数据，处理密码逻辑
-        const configToSave = { ...settings.webdav };
-        
-        // 如果密码被修改了，或者是新密码，需要传递给后端加密
-        if (passwordState.isModified && !passwordState.isPlaceholder) {
-            // 密码已修改且不是占位符，保持原样传递给后端
-            console.log('传递修改后的密码给后端');
-        } else if (passwordState.isPlaceholder && passwordState.hasStoredPassword && !passwordState.isModified) {
-            // 密码是占位符且未修改，传递空字符串让后端使用存储的密码
-            configToSave.password = '';
-            console.log('使用后端存储的密码');
-        }
-        
-        // 保存配置
-        await updateSettingsSmart(['webdav']);
+        // 直接保存 WebDAV 配置，不需要复杂的密码状态管理
+        await saveWebDAVSettings();
         console.log('WebDAV配置已确保保存');
     } catch (error) {
         console.error('确保WebDAV配置保存失败:', error);
