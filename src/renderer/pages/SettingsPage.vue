@@ -105,7 +105,6 @@
                             @restore-backup="restoreBackup"
                             @check-database-health="checkDatabaseHealth"
                             @repair-database="repairDatabase"
-                            @force-rebuild-database="forceRebuildDatabase"
                         /><!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
@@ -182,7 +181,6 @@ const loading = reactive({
     import: false,
     repair: false,
     healthCheck: false,
-    forceRebuild: false,
 });
 
 // 设置数据
@@ -773,26 +771,6 @@ const repairDatabase = async () => {
         message.error("数据库修复失败");
     }
     loading.repair = false;
-};
-
-// 强制重建数据库
-const forceRebuildDatabase = async () => {
-    loading.forceRebuild = true;
-    try {
-        const { databaseServiceManager } = await import("@/lib/services");
-        const result = await databaseServiceManager.forceRebuildDatabase();
-        
-        if (result.success) {
-            message.success(`数据库重建成功：${result.message}`);
-            console.log('数据库重建成功，应用将正常工作');
-        } else {
-            message.error(`数据库重建失败：${result.message}`);
-        }
-    } catch (error) {
-        console.error("数据库重建失败:", error);
-        message.error("数据库重建失败");
-    }
-    loading.forceRebuild = false;
 };
 
 // 检查数据库健康状态

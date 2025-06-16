@@ -653,49 +653,6 @@ export class BaseDatabaseService {
   }
 
   /**
-   * 强制重建数据库
-   * 删除现有数据库并重新创建，确保所有对象存储都正确创建
-   * @returns Promise<{ success: boolean; message: string }>
-   */
-  async forceRebuildDatabase(): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('开始强制重建数据库...');
-      
-      // 关闭所有连接
-      this.close();
-      
-      // 删除数据库
-      await this.deleteDatabase();
-      
-      // 重新初始化
-      await this.initialize();
-      
-      // 检查重建结果
-      const healthStatus = await this.checkDatabaseHealth();
-      
-      if (healthStatus.healthy) {
-        console.log('数据库重建成功');
-        return {
-          success: true,
-          message: '数据库重建成功，所有对象存储已正确创建'
-        };
-      } else {
-        console.error('数据库重建后仍有问题:', healthStatus.missingStores);
-        return {
-          success: false,
-          message: `数据库重建失败，仍缺失: ${healthStatus.missingStores.join(', ')}`
-        };
-      }
-    } catch (error) {
-      console.error('强制重建数据库失败:', error);
-      return {
-        success: false,
-        message: `数据库重建失败: ${error instanceof Error ? error.message : '未知错误'}`
-      };
-    }
-  }
-
-  /**
    * 安全执行数据库操作
    * 在操作前检查数据库健康状态，必要时自动修复
    * @param operation 要执行的数据库操作

@@ -111,14 +111,7 @@
                                 </template>
                                 修复数据库
                             </NButton>
-                            <NButton type="error" @click="forceRebuildDatabase">
-                                <template #icon>
-                                    <NIcon>
-                                        <Refresh />
-                                    </NIcon>
-                                </template>
-                                重建数据库
-                            </NButton>
+
                         </NFlex>
                     </NFlex>
 
@@ -127,13 +120,12 @@
                         <div>
                             <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
                             <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
-                            <p>• <strong>重建数据库</strong>：删除并重新创建数据库（会丢失所有数据）</p>
                         </div>
                     </NAlert>
 
                     <NAlert type="warning" show-icon>
                         <template #header>重要提示</template>
-                        重建数据库会删除所有本地数据，请确保已备份重要数据或可以从WebDAV恢复
+                        修复数据库会尝试恢复缺失的数据表，但可能需要重新登录或重新配置某些设置
                     </NAlert>
                 </NFlex>
             </div>
@@ -168,7 +160,6 @@ const emit = defineEmits<{
     "restore-backup": [];
     "check-database-health": [];
     "repair-database": [];
-    "force-rebuild-database": [];
 }>();
 
 const exportData = (format: "csv" | "json") => {
@@ -193,9 +184,5 @@ const checkDatabaseHealth = () => {
 
 const repairDatabase = () => {
     emit("repair-database");
-};
-
-const forceRebuildDatabase = () => {
-    emit("force-rebuild-database");
 };
 </script>

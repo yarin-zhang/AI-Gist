@@ -220,71 +220,19 @@ export class DatabaseServiceManager {
         };
       }
       
-      // 如果普通修复失败，尝试强制重建
-      console.log('普通修复失败，尝试强制重建数据库...');
-      repairResult = await this.forceRebuildDatabase();
-      
-      if (repairResult.success) {
-        return {
-          healthy: true,
-          repaired: true,
-          message: `数据库已重建，${repairResult.message}`
-        };
-      } else {
-        return {
-          healthy: false,
-          repaired: false,
-          message: repairResult.message,
-          missingStores: healthStatus.missingStores
-        };
-      }
+      // 如果修复失败，返回失败结果
+      return {
+        healthy: false,
+        repaired: false,
+        message: `数据库修复失败: ${repairResult.message}`,
+        missingStores: healthStatus.missingStores
+      };
     } catch (error) {
       console.error('检查和修复数据库过程中出错:', error);
       return {
         healthy: false,
         repaired: false,
         message: `操作失败: ${error instanceof Error ? error.message : '未知错误'}`
-      };
-    }
-  }
-
-  /**
-   * 强制重建数据库
-   * 删除现有数据库并重新创建
-   * @returns Promise<{ success: boolean; message: string }> 重建结果
-   */
-  async forceRebuildDatabase(): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('DatabaseServiceManager: 开始强制重建数据库...');
-      
-      // 使用基础服务的强制重建功能
-      const rebuildResult = await this.user.forceRebuildDatabase();
-      
-      if (rebuildResult.success) {
-        console.log('DatabaseServiceManager: 数据库重建成功');
-        
-        // 重新检查健康状态
-        const healthStatus = await this.getHealthStatus();
-        
-        if (healthStatus.healthy) {
-          return {
-            success: true,
-            message: '数据库重建成功，所有对象存储已正常'
-          };
-        } else {
-          return {
-            success: false,
-            message: `数据库重建部分成功，仍缺失: ${healthStatus.missingStores.join(', ')}`
-          };
-        }
-      } else {
-        return rebuildResult;
-      }
-    } catch (error) {
-      console.error('DatabaseServiceManager: 数据库重建失败:', error);
-      return {
-        success: false,
-        message: `数据库重建失败: ${error instanceof Error ? error.message : '未知错误'}`
       };
     }
   }
