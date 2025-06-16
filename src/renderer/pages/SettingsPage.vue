@@ -227,7 +227,6 @@
                                     
                                     <NFlex vertical :size="16">                                        <NFormItem label="服务器地址">
                                             <NInput v-model:value="settings.webdav.serverUrl"
-                                                @blur="saveWebDAVSettings"
                                                 placeholder="https://example.com/webdav"
                                                 type="url">
                                                 <template #prefix>
@@ -240,20 +239,26 @@
 
                                         <NFlex :size="16">                                            <NFormItem label="用户名" style="flex: 1">
                                                 <NInput v-model:value="settings.webdav.username"
-                                                    @blur="saveWebDAVSettings"
                                                     placeholder="用户名" />
                                             </NFormItem>
                                             <NFormItem label="密码" style="flex: 1">
                                                 <NInput v-model:value="settings.webdav.password"
-                                                    @blur="saveWebDAVSettings"
                                                     type="password"
-                                                    placeholder="密码"
-                                                    @input="handlePasswordChange"
-                                                    @focus="handlePasswordFocus" />
+                                                    placeholder="密码" />
                                             </NFormItem>
                                         </NFlex>
 
                                         <NFlex :size="12">
+                                            <NButton type="success" @click="saveWebDAVSettings"
+                                                :loading="saving">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <DeviceFloppy />
+                                                    </NIcon>
+                                                </template>
+                                                保存配置
+                                            </NButton>
+                                            
                                             <NButton type="primary" @click="testWebDAVConnection"
                                                 :loading="loading.webdavTest">
                                                 <template #icon>
@@ -272,12 +277,12 @@
                                                 立即同步
                                             </NButton>
                                         </NFlex>
-                                    </NFlex>
 
-                                    <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
-                                        <template #header>上次同步时间</template>
-                                        {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
-                                    </NAlert>
+                                        <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
+                                            <template #header>上次同步时间</template>
+                                            {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
+                                        </NAlert>
+                                    </NFlex>
                                 </div>
 
                                 <!-- 自动同步设置 -->
@@ -285,8 +290,7 @@
                                     <NDivider>同步设置</NDivider>
                                     
                                     <NFlex vertical :size="16">                                        <NFormItem label="自动同步">
-                                            <NCheckbox v-model:checked="settings.webdav.autoSync"
-                                                @update:checked="saveWebDAVSettings">
+                                            <NCheckbox v-model:checked="settings.webdav.autoSync">
                                                 <NFlex align="center" :size="8">
                                                     <div>
                                                         <div>启用自动同步</div>
@@ -300,7 +304,6 @@
 
                                         <NFormItem v-if="settings.webdav.autoSync" label="同步间隔">
                                             <NInputNumber v-model:value="settings.webdav.syncInterval"
-                                                @update:value="saveWebDAVSettings"
                                                 :min="5"
                                                 :max="1440"
                                                 :step="5">
@@ -557,6 +560,7 @@ import {
     BrandSoundcloud,
     CloudStorm,
     AlertCircle,
+    DeviceFloppy,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
@@ -571,13 +575,6 @@ const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
 const activeSettingKey = ref("appearance");
-
-// 密码输入状态
-const passwordState = reactive({
-    isPlaceholder: false, // 是否显示占位符
-    hasStoredPassword: false, // 是否有存储的密码
-    isModified: false, // 密码是否被修改
-});
 
 // 状态管理
 const saving = ref(false);
@@ -743,11 +740,6 @@ const loadSettings = async () => {
         }
         
         console.log('最终设置的 WebDAV 配置:', settings.webdav);
-        
-        // 重置密码状态
-        passwordState.isPlaceholder = false;
-        passwordState.hasStoredPassword = !!settings.webdav.password;
-        passwordState.isModified = false;
         
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
@@ -1236,10 +1228,6 @@ const saveWebDAVSettings = async () => {
         // 直接保存配置
         await WebDAVAPI.setConfig(cleanConfig);
         
-        // 重置状态
-        passwordState.isModified = false;
-        passwordState.hasStoredPassword = !!settings.webdav.password;
-        
         console.log('WebDAV 设置保存成功');
         message.success('WebDAV 设置保存成功');
     } catch (error) {
@@ -1315,39 +1303,9 @@ const checkDatabaseHealth = async () => {
     loading.healthCheck = false;
 };
 
-// 监听密码输入变化
-const handlePasswordChange = () => {
-    passwordState.isModified = true;
-};
-
-// 密码输入框的焦点事件
-const handlePasswordFocus = () => {
-    // 简化逻辑，不做特殊处理
-};
-
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
-    
-    // 同步 WebDAV 配置到服务端（但不包含密码相关的敏感信息）
-    try {
-        if (settings.webdav.enabled) {
-            // 只同步非敏感配置
-            const safeConfig = {
-                enabled: settings.webdav.enabled,
-                serverUrl: settings.webdav.serverUrl,
-                username: settings.webdav.username,
-                autoSync: settings.webdav.autoSync,
-                syncInterval: settings.webdav.syncInterval,
-                // 不包含password字段
-            };
-            
-            await window.electronAPI.webdav.setConfig(safeConfig);
-            console.log("WebDAV 基础配置已同步到服务端");
-        }
-    } catch (error) {
-        console.error("同步 WebDAV 配置失败:", error);
-    }
 });
 </script>
 
