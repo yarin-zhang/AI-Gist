@@ -224,7 +224,6 @@
 
                                 <!-- WebDAV 服务器配置 -->
                                 <div v-if="settings.webdav.enabled">
-                                    <NDivider>服务器配置</NDivider>
                                     
                                     <NFlex vertical :size="16">                                        <NFormItem label="服务器地址">
                                             <NInput v-model:value="settings.webdav.serverUrl"
@@ -386,26 +385,10 @@
 
                                 <!-- 数据导入导出 -->
                                 <div>
-                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
-                                        数据导入导出
-                                    </NText>
                                     <NFlex vertical :size="16">
-                                        <NAlert type="info" show-icon>
-                                            <template #header>支持格式</template>
-                                            支持 JSON、CSV 格式的数据导入导出
-                                        </NAlert>
-
                                         <NFlex vertical :size="12">
                                             <NText depth="2">导出数据</NText>
                                             <NFlex :size="12">
-                                                <NButton @click="exportData('json')" :loading="loading.export">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileExport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导出为 JSON
-                                                </NButton>
                                                 <NButton @click="exportData('csv')" :loading="loading.export">
                                                     <template #icon>
                                                         <NIcon>
@@ -414,20 +397,20 @@
                                                     </template>
                                                     导出为 CSV
                                                 </NButton>
+                                                <NButton @click="exportData('json')" :loading="loading.export">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileExport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导出为 JSON
+                                                </NButton>
                                             </NFlex>
                                         </NFlex>
 
                                         <NFlex vertical :size="12">
                                             <NText depth="2">导入数据</NText>
                                             <NFlex :size="12">
-                                                <NButton @click="importData('json')" :loading="loading.import">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileImport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导入 JSON
-                                                </NButton>
                                                 <NButton @click="importData('csv')" :loading="loading.import">
                                                     <template #icon>
                                                         <NIcon>
@@ -435,6 +418,14 @@
                                                         </NIcon>
                                                     </template>
                                                     导入 CSV
+                                                </NButton>
+                                                <NButton @click="importData('json')" :loading="loading.import">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <FileImport />
+                                                        </NIcon>
+                                                    </template>
+                                                    导入 JSON
                                                 </NButton>
                                             </NFlex>
                                         </NFlex>
