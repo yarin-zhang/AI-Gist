@@ -61,441 +61,52 @@
                         </NCard>
 
                         <!-- 关闭行为设置 -->
-                        <NCard v-show="activeSettingKey === 'close-behavior'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="关闭行为模式">
-                                    <NRadioGroup v-model:value="settings.closeBehaviorMode"
-                                        @update:value="updateSetting">
-                                        <NFlex vertical :size="12">
-                                            <NRadio value="ask">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>每次询问</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            弹出对话框让您选择
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="fixed">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>固定行为</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            直接执行指定动作
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-
-                                <NFormItem v-if="settings.closeBehaviorMode === 'fixed'" label="关闭动作"
-                                    style="margin-left: 24px">
-                                    <NRadioGroup v-model:value="settings.closeAction" @update:value="updateSetting">
-                                        <NFlex vertical :size="8">
-                                            <NRadio value="quit">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>退出应用</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            完全退出程序
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="minimize">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>最小化到托盘</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            后台继续运行
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-
-                                <NAlert v-if="settings.closeBehaviorMode === 'ask'" type="info" show-icon>
-                                    <template #header>当前设置</template>
-                                    关闭时弹出选择对话框
-                                </NAlert>
-
-                                <NAlert v-if="settings.closeBehaviorMode === 'fixed'" type="success" show-icon>
-                                    <template #header>当前设置</template>
-                                    关闭时直接{{ settings.closeAction === "quit" ? "退出应用" : "最小化到托盘" }}
-                                </NAlert>
-                            </NFlex>
-                        </NCard>
+                        <CloseBehaviorSettings 
+                            v-show="activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
+                        />
 
                         <!-- 启动行为设置 -->
-                        <NCard v-show="activeSettingKey === 'startup-behavior'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="启动模式">
-                                    <NCheckbox v-model:checked="settings.startMinimized"
-                                        @update:checked="updateSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>启动时最小化到托盘</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    启动时不显示主窗口
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-
-                                <NDivider />
-
-                                <NFormItem label="自启动设置">
-                                    <NCheckbox v-model:checked="settings.autoLaunch" @update:checked="updateSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>开机自动启动</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    系统启动时自动运行
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-                            </NFlex>
-                        </NCard>                        <!-- 外观设置 -->
-                        <NCard v-show="activeSettingKey === 'appearance'">
-                            <NFlex vertical :size="16">
-                                <NFormItem label="主题模式">
-                                    <NRadioGroup v-model:value="settings.themeSource" @update:value="updateSetting">
-                                        <NFlex vertical :size="8">
-                                            <NRadio value="system">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>跟随系统</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            自动切换主题
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="light">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>浅色主题</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            始终使用浅色
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                            <NRadio value="dark">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>深色主题</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            始终使用深色
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NRadio>
-                                        </NFlex>
-                                    </NRadioGroup>
-                                </NFormItem>
-                            </NFlex>
-                        </NCard>
+                        <StartupBehaviorSettings 
+                            v-show="activeSettingKey === 'startup-behavior'"
+                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
+                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
+                        />                        <!-- 外观设置 -->
+                        <AppearanceSettings 
+                            v-show="activeSettingKey === 'appearance'"
+                            :model-value="{ themeSource: settings.themeSource }"
+                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        />
 
                         <!-- WebDAV 同步设置 -->
-                        <NCard v-show="activeSettingKey === 'webdav-sync'">
-                            <NFlex vertical :size="20">
-                                <!-- 启用 WebDAV 同步 -->                                <NFormItem label="启用 WebDAV 同步">
-                                    <NCheckbox v-model:checked="settings.webdav.enabled"
-                                        @update:checked="updateNonWebDAVSetting">
-                                        <NFlex align="center" :size="8">
-                                            <div>
-                                                <div>启用 WebDAV 数据同步</div>
-                                                <NText depth="3" style="font-size: 12px">
-                                                    将数据同步到 WebDAV 服务器
-                                                </NText>
-                                            </div>
-                                        </NFlex>
-                                    </NCheckbox>
-                                </NFormItem>
-
-                                <!-- WebDAV 服务器配置 -->
-                                <div v-if="settings.webdav.enabled">
-                                    
-                                    <NFlex vertical :size="16">                                        <NFormItem label="服务器地址">
-                                            <NInput v-model:value="settings.webdav.serverUrl"
-                                                placeholder="https://example.com/webdav"
-                                                type="url">
-                                                <template #prefix>
-                                                    <NIcon>
-                                                        <Cloud />
-                                                    </NIcon>
-                                                </template>
-                                            </NInput>
-                                        </NFormItem>
-
-                                        <NFlex :size="16">                                            <NFormItem label="用户名" style="flex: 1">
-                                                <NInput v-model:value="settings.webdav.username"
-                                                    placeholder="用户名" />
-                                            </NFormItem>
-                                            <NFormItem label="密码" style="flex: 1">
-                                                <NInput v-model:value="settings.webdav.password"
-                                                    type="password"
-                                                    placeholder="密码" />
-                                            </NFormItem>
-                                        </NFlex>
-
-                                        <NFlex :size="12">
-                                            <NButton type="success" @click="saveWebDAVSettings"
-                                                :loading="saving">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <DeviceFloppy />
-                                                    </NIcon>
-                                                </template>
-                                                保存配置
-                                            </NButton>
-                                            
-                                            <NButton type="primary" @click="testWebDAVConnection"
-                                                :loading="loading.webdavTest">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <CloudStorm />
-                                                    </NIcon>
-                                                </template>
-                                                测试连接
-                                            </NButton>
-                                            <NButton @click="syncNow" :loading="loading.sync">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <BrandSoundcloud />
-                                                    </NIcon>
-                                                </template>
-                                                立即同步
-                                            </NButton>
-                                        </NFlex>
-
-                                        <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
-                                            <template #header>上次同步时间</template>
-                                            {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
-                                        </NAlert>
-                                    </NFlex>
-                                </div>
-
-                                <!-- 自动同步设置 -->
-                                <!-- <div v-if="settings.webdav.enabled">
-                                    <NDivider>同步设置</NDivider>
-                                    
-                                    <NFlex vertical :size="16">                                        <NFormItem label="自动同步">
-                                            <NCheckbox v-model:checked="settings.webdav.autoSync">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>启用自动同步</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            定时自动同步数据
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NCheckbox>
-                                        </NFormItem>
-
-                                        <NFormItem v-if="settings.webdav.autoSync" label="同步间隔">
-                                            <NInputNumber v-model:value="settings.webdav.syncInterval"
-                                                :min="5"
-                                                :max="1440"
-                                                :step="5">
-                                                <template #suffix>分钟</template>
-                                            </NInputNumber>
-                                        </NFormItem>
-
-                                        <NFlex :size="12">
-                                            <NButton @click="syncNow" :loading="loading.sync">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <BrandSoundcloud />
-                                                    </NIcon>
-                                                </template>
-                                                立即同步
-                                            </NButton>
-                                        </NFlex>
-
-                                        <NAlert v-if="settings.dataSync.lastSyncTime" type="info" show-icon>
-                                            <template #header>上次同步时间</template>
-                                            {{ formatSyncTime(settings.dataSync.lastSyncTime) }}
-                                        </NAlert>
-                                    </NFlex>
-                                </div> -->
-                            </NFlex>
-                        </NCard>
+                        <WebDAVSyncSettings 
+                            v-show="activeSettingKey === 'webdav-sync'"
+                            :model-value="{ 
+                                webdav: { ...settings.webdav }, 
+                                dataSync: { ...settings.dataSync } 
+                            }"
+                            @update:model-value="(val) => { 
+                                Object.assign(settings.webdav, val.webdav); 
+                                Object.assign(settings.dataSync, val.dataSync); 
+                                updateNonWebDAVSetting(); 
+                            }"
+                            @save-webdav="saveWebDAVSettings"
+                            @test-connection="testWebDAVConnection"
+                            @sync-now="syncNow"
+                        />
 
                         <!-- 数据管理设置 -->
-                        <NCard v-show="activeSettingKey === 'data-management'">
-                            <NFlex vertical :size="20">
-                                <!-- 数据备份 -->
-                                <!-- <div>
-                                    <NText strong style="font-size: 16px; margin-bottom: 12px; display: block">
-                                        数据备份
-                                    </NText>
-                                    <NFlex vertical :size="16">
-                                        <NFormItem label="自动备份">
-                                            <NCheckbox v-model:checked="settings.dataSync.autoBackup"
-                                                @update:checked="updateSetting">
-                                                <NFlex align="center" :size="8">
-                                                    <div>
-                                                        <div>启用自动备份</div>
-                                                        <NText depth="3" style="font-size: 12px">
-                                                            定期自动备份数据到本地
-                                                        </NText>
-                                                    </div>
-                                                </NFlex>
-                                            </NCheckbox>
-                                        </NFormItem>
-
-                                        <NFormItem v-if="settings.dataSync.autoBackup" label="备份间隔">
-                                            <NInputNumber v-model:value="settings.dataSync.backupInterval"
-                                                @update:value="updateSetting"
-                                                :min="1"
-                                                :max="168"
-                                                :step="1">
-                                                <template #suffix>小时</template>
-                                            </NInputNumber>
-                                        </NFormItem>
-
-                                        <NFlex :size="12">
-                                            <NButton type="primary" @click="createBackup">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Upload />
-                                                    </NIcon>
-                                                </template>
-                                                创建备份
-                                            </NButton>
-                                            <NButton @click="restoreBackup">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Download />
-                                                    </NIcon>
-                                                </template>
-                                                恢复备份
-                                            </NButton>
-                                        </NFlex>
-                                    </NFlex>
-                                </div> -->
-
-                                <!-- <NDivider /> -->
-
-                                <!-- 数据导入导出 -->
-                                <div>
-                                    <NFlex vertical :size="16">
-                                        <NFlex vertical :size="12">
-                                            <NText depth="2">导出数据</NText>
-                                            <NFlex :size="12">
-                                                <NButton @click="exportData('csv')" :loading="loading.export">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileExport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导出为 CSV
-                                                </NButton>
-                                                <NButton @click="exportData('json')" :loading="loading.export">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileExport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导出为 JSON
-                                                </NButton>
-                                            </NFlex>
-                                        </NFlex>
-
-                                        <NFlex vertical :size="12">
-                                            <NText depth="2">导入数据</NText>
-                                            <NFlex :size="12">
-                                                <NButton @click="importData('csv')" :loading="loading.import">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileImport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导入 CSV
-                                                </NButton>
-                                                <NButton @click="importData('json')" :loading="loading.import">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <FileImport />
-                                                        </NIcon>
-                                                    </template>
-                                                    导入 JSON
-                                                </NButton>
-                                            </NFlex>
-                                        </NFlex>
-
-                                        <NAlert type="warning" show-icon>
-                                            <template #header>注意</template>
-                                            导入数据将覆盖现有数据，请确保已备份重要数据
-                                        </NAlert>
-                                    </NFlex>
-                                </div>
-
-                                <NDivider />
-
-                                <!-- 数据库维护 -->
-                                <div>
-                                    <NFlex vertical :size="16">
-                                        <NFlex vertical :size="12">
-                                            <NText depth="2">数据库维护</NText>
-                                            <NText depth="3" style="font-size: 12px">
-                                                当遇到同步错误或数据异常时，可尝试修复数据库
-                                            </NText>
-                                            <NFlex :size="12">
-                                                <NButton type="primary" @click="checkDatabaseHealth" :loading="loading.healthCheck">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <AlertCircle />
-                                                        </NIcon>
-                                                    </template>
-                                                    检查数据库状态
-                                                </NButton>
-                                                <NButton type="warning" @click="repairDatabase" :loading="loading.repair">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Database />
-                                                        </NIcon>
-                                                    </template>
-                                                    修复数据库
-                                                </NButton>
-                                                <NButton type="error" @click="forceRebuildDatabase" :loading="loading.forceRebuild">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Refresh />
-                                                        </NIcon>
-                                                    </template>
-                                                    重建数据库
-                                                </NButton>
-                                            </NFlex>
-                                        </NFlex>
-
-                                        <NAlert type="info" show-icon>
-                                            <template #header>数据库修复说明</template>
-                                            <div>
-                                                <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
-                                                <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
-                                                <p>• <strong>重建数据库</strong>：删除并重新创建数据库（会丢失所有数据）</p>
-                                            </div>
-                                        </NAlert>
-
-                                        <NAlert type="warning" show-icon>
-                                            <template #header>重要提示</template>
-                                            重建数据库会删除所有本地数据，请确保已备份重要数据或可以从WebDAV恢复
-                                        </NAlert>
-                                    </NFlex>
-                                </div>
-                            </NFlex>
-                        </NCard><!-- 实验室 (仅开发环境) -->
+                        <DataManagementSettings 
+                            v-show="activeSettingKey === 'data-management'"
+                            @export-data="exportData"
+                            @import-data="importData"
+                            @create-backup="createBackup"
+                            @restore-backup="restoreBackup"
+                            @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase"
+                            @force-rebuild-database="forceRebuildDatabase"
+                        /><!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
@@ -526,17 +137,10 @@ import {
     NAlert,
     NFlex,
     NIcon,
-    NFormItem,
-    NRadioGroup,
-    NRadio,
-    NCheckbox,
     NButton,
     NText,
     NSpin,
     NMenu,
-    NDivider,
-    NInput,
-    NInputNumber,
     useMessage,
 } from "naive-ui";
 import {
@@ -544,25 +148,20 @@ import {
     Check,
     Refresh,
     Power,
-    Minimize,
-    EyeOff,
     Rocket,
-    DeviceDesktop,
     Sun,
-    Moon,
     Flask,
     Cloud,
     Database,
-    Upload,
-    Download,
-    FileImport,
-    FileExport,
-    BrandSoundcloud,
-    CloudStorm,
-    AlertCircle,
-    DeviceFloppy,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
+import {
+    AppearanceSettings,
+    CloseBehaviorSettings,
+    StartupBehaviorSettings,
+    WebDAVSyncSettings,
+    DataManagementSettings,
+} from "@/components/settings";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
 // 消息提示
@@ -1101,18 +700,7 @@ const importData = async (format: 'json' | 'csv') => {
     loading.import = false;
 };
 
-// 格式化同步时间
-const formatSyncTime = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-};
+// 格式化同步时间 - 已移至子组件，删除此函数
 
 // 重置设置
 const resetSettings = async () => {
