@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { initDatabase, databaseServiceManager } from './lib/db'
-import { databaseIpcHandler } from './ipc'
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
@@ -43,12 +42,41 @@ async function startApp() {
     
     // 将数据库服务暴露到 window 对象上，供主进程访问
     (window as any).databaseAPI = {
-      databaseServiceManager
+      databaseServiceManager,
+      
+      // 数据导出方法
+      exportAllData: async () => {
+        return await databaseServiceManager.exportAllData();
+      },
+      
+      // 数据导入方法
+      importData: async (data: any) => {
+        return await databaseServiceManager.importData(data);
+      },
+      
+      // 数据备份方法
+      backupData: async () => {
+        return await databaseServiceManager.backupData();
+      },
+      
+      // 数据恢复方法
+      restoreData: async (backupData: any) => {
+        return await databaseServiceManager.restoreData(backupData);
+      },
+      
+      // 健康检查方法
+      getHealthStatus: async () => {
+        return await databaseServiceManager.getHealthStatus();
+      },
+      
+      // 获取统计信息
+      getStats: async () => {
+        return await databaseServiceManager.getDatabaseStats();
+      }
     };
     console.log('数据库服务已暴露到 window.databaseAPI');
     
-    // 设置数据库相关的 IPC 处理程序
-    await databaseIpcHandler.initialize(databaseServiceManager);
+    // 数据库服务已经暴露，不再需要单独的 IPC 处理器
 
     const app = createApp(App);
     app.mount('#app');

@@ -1,5 +1,5 @@
 import { nativeTheme, BrowserWindow } from 'electron';
-import { SystemTheme } from './types';
+import { SystemTheme } from '../../shared/types';
 
 /**
  * 主题变化回调函数类型

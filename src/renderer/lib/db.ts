@@ -4,10 +4,168 @@
  */
 
 // 导出所有类型定义
-export * from './types/database';
+export * from '../../shared/types/database';
 
 // 导出所有服务类和服务管理器
 export * from './services';
 
 // 为了保持向后兼容，导出传统的数据库服务实例
 export { databaseService, initDatabase } from './services';
+
+// 数据库服务管理器，提供数据导入导出等高级功能
+export class DatabaseManager {
+  private static instance: DatabaseManager;
+
+  private constructor() {}
+
+  static getInstance(): DatabaseManager {
+    if (!DatabaseManager.instance) {
+      DatabaseManager.instance = new DatabaseManager();
+    }
+    return DatabaseManager.instance;
+  }
+
+  /**
+   * 导出所有数据
+   */
+  async exportAllData(): Promise<any> {
+    const { databaseService } = await import('./services');
+    
+    return {
+      users: await databaseService.users.getAll(),
+      posts: await databaseService.posts.getAll(),
+      categories: await databaseService.categories.getAll(),
+      prompts: await databaseService.prompts.getAll(),
+      aiConfigs: await databaseService.aiConfigs.getAll(),
+      aiHistory: await databaseService.aiHistory.getAll(),
+      settings: await databaseService.settings.getAll()
+    };
+  }
+
+  /**
+   * 导入数据
+   */
+  async importData(data: any): Promise<void> {
+    const { databaseService } = await import('./services');
+    
+    if (data.users) {
+      for (const user of data.users) {
+        await databaseService.users.create(user);
+      }
+    }
+    
+    if (data.posts) {
+      for (const post of data.posts) {
+        await databaseService.posts.create(post);
+      }
+    }
+    
+    if (data.categories) {
+      for (const category of data.categories) {
+        await databaseService.categories.create(category);
+      }
+    }
+    
+    if (data.prompts) {
+      for (const prompt of data.prompts) {
+        await databaseService.prompts.create(prompt);
+      }
+    }
+    
+    if (data.aiConfigs) {
+      for (const config of data.aiConfigs) {
+        await databaseService.aiConfigs.create(config);
+      }
+    }
+    
+    if (data.aiHistory) {
+      for (const history of data.aiHistory) {
+        await databaseService.aiHistory.create(history);
+      }
+    }
+    
+    if (data.settings) {
+      for (const setting of data.settings) {
+        await databaseService.settings.create(setting);
+      }
+    }
+  }
+
+  /**
+   * 备份数据
+   */
+  async backupData(): Promise<any> {
+    const data = await this.exportAllData();
+    return {
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      data
+    };
+  }
+
+  /**
+   * 恢复数据
+   */
+  async restoreData(backupData: any): Promise<void> {
+    if (backupData.data) {
+      await this.importData(backupData.data);
+    }
+  }
+
+  /**
+   * 获取数据库健康状态
+   */
+  async getHealthStatus(): Promise<any> {
+    const { databaseService } = await import('./services');
+    
+    try {
+      const stats = {
+        users: await databaseService.users.count(),
+        posts: await databaseService.posts.count(),
+        categories: await databaseService.categories.count(),
+        prompts: await databaseService.prompts.count(),
+        aiConfigs: await databaseService.aiConfigs.count(),
+        aiHistory: await databaseService.aiHistory.count(),
+        settings: await databaseService.settings.count()
+      };
+      
+      return {
+        status: 'healthy',
+        stats,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * 等待数据库初始化完成
+   */
+  async waitForInitialization(): Promise<void> {
+    const { databaseService } = await import('./services');
+    // 这里可以添加等待数据库初始化的逻辑
+    // 目前简单地尝试访问一个服务来确保数据库已就绪
+    await databaseService.users.count();
+  }
+}
+
+// 导出单例实例
+export const databaseManager = DatabaseManager.getInstance();
+
+// 向后兼容：将数据库管理器暴露到 window 对象
+if (typeof window !== 'undefined') {
+  (window as any).databaseAPI = {
+    ...((window as any).databaseAPI || {}),
+    databaseServiceManager: databaseManager,
+    exportAllData: () => databaseManager.exportAllData(),
+    importData: (data: any) => databaseManager.importData(data),
+    backupData: () => databaseManager.backupData(),
+    restoreData: (backupData: any) => databaseManager.restoreData(backupData),
+    getHealthStatus: () => databaseManager.getHealthStatus()
+  };
+}

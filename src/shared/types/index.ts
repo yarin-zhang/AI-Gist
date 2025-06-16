@@ -1,6 +1,8 @@
 /**
- * 共享类型模块入口文件
+ * 共享类型定义统一导出
  */
 
-export * from './ipc.types';
-export * from './database.types';
+export * from './common';
+export * from './database';
+export * from './electron';
+export * from './ipc';

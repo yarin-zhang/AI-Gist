@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { UserPreferences } from './types';
+import { UserPreferences } from '../../shared/types';
 
 /**
  * 用户偏好设置管理器
@@ -9,16 +9,33 @@ import { UserPreferences } from './types';
 class PreferencesManager {
   private userPrefs: UserPreferences;
   private configPath: string;  private readonly defaultPreferences: UserPreferences = {
+    // 旧属性
     closeBehaviorMode: 'ask',
     closeAction: 'quit',
     startMinimized: false,
     autoLaunch: false,
     themeSource: 'system',
+    // 新属性
+    theme: 'system',
+    language: 'zh-CN',
+    autoStartup: false,
+    minimizeToTray: true,
+    showNotifications: true,
+    checkUpdates: true,
+    windowSize: {
+      width: 1200,
+      height: 800,
+    },
+    windowPosition: {
+      x: -1,
+      y: -1,
+    },
     webdav: {
       enabled: false,
       serverUrl: '',
       username: '',
       password: '',
+      encryptedPassword: '',
       autoSync: false,
       syncInterval: 30,
     },
@@ -64,16 +81,33 @@ class PreferencesManager {
         const loadedPrefs = JSON.parse(data);
           // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
         const cleanedPrefs: UserPreferences = {
+          // 旧属性
           closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
           closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
           startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
           autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,
           themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource,
+          // 新属性
+          theme: loadedPrefs.theme ?? this.defaultPreferences.theme,
+          language: loadedPrefs.language ?? this.defaultPreferences.language,
+          autoStartup: loadedPrefs.autoStartup ?? this.defaultPreferences.autoStartup,
+          minimizeToTray: loadedPrefs.minimizeToTray ?? this.defaultPreferences.minimizeToTray,
+          showNotifications: loadedPrefs.showNotifications ?? this.defaultPreferences.showNotifications,
+          checkUpdates: loadedPrefs.checkUpdates ?? this.defaultPreferences.checkUpdates,
+          windowSize: {
+            width: loadedPrefs.windowSize?.width ?? this.defaultPreferences.windowSize.width,
+            height: loadedPrefs.windowSize?.height ?? this.defaultPreferences.windowSize.height,
+          },
+          windowPosition: {
+            x: loadedPrefs.windowPosition?.x ?? this.defaultPreferences.windowPosition.x,
+            y: loadedPrefs.windowPosition?.y ?? this.defaultPreferences.windowPosition.y,
+          },
           webdav: {
             enabled: loadedPrefs.webdav?.enabled ?? this.defaultPreferences.webdav!.enabled,
             serverUrl: loadedPrefs.webdav?.serverUrl ?? this.defaultPreferences.webdav!.serverUrl,
             username: loadedPrefs.webdav?.username ?? this.defaultPreferences.webdav!.username,
             password: loadedPrefs.webdav?.password ?? this.defaultPreferences.webdav!.password,
+            encryptedPassword: loadedPrefs.webdav?.encryptedPassword ?? this.defaultPreferences.webdav!.encryptedPassword,
             autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
             syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
           },

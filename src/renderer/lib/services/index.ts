@@ -20,7 +20,7 @@ import type {
 } from '../../shared/types/ipc.types';
 
 // 导出所有类型定义
-export * from '../types/database';
+export * from '../../../shared/types/database';
 
 // 导出基础服务类
 export { BaseDatabaseService };
