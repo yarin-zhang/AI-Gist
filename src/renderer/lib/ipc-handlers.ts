@@ -58,16 +58,26 @@ export class DatabaseIpcHandlers {
         try {
           console.log('渲染进程: 开始导出数据库数据...');
           
-          // 获取所有数据
-          const [
-            users,
-            posts,
-            categories,
-            prompts,
-            aiConfigs,
-            aiHistory,
-            settings
-          ] = await Promise.all([
+          // 首先检查数据库健康状态
+          console.log('正在检查数据库健康状态...');
+          const healthStatus = await databaseServiceManager.getHealthStatus();
+          
+          if (!healthStatus.healthy) {
+            console.warn('检测到数据库异常，缺失的对象存储:', healthStatus.missingStores);
+            
+            // 尝试修复数据库
+            console.log('正在尝试修复数据库...');
+            const repairResult = await databaseServiceManager.user.repairDatabase();
+            
+            if (!repairResult.success) {
+              throw new Error(`数据库修复失败: ${repairResult.message}`);
+            }
+            
+            console.log('数据库修复成功，继续导出数据...');
+          }
+          
+          // 安全地获取所有数据
+          const results = await Promise.allSettled([
             databaseServiceManager.user.getAllUsers(),
             databaseServiceManager.post.getAllPosts(),
             databaseServiceManager.category.getBasicCategories(),
@@ -76,6 +86,25 @@ export class DatabaseIpcHandlers {
             databaseServiceManager.aiGenerationHistory.getAllAIGenerationHistory(),
             databaseServiceManager.appSettings.getAllSettings()
           ]);
+          
+          // 处理结果，对失败的操作返回空数组
+          const [
+            users,
+            posts,
+            categories,
+            prompts,
+            aiConfigs,
+            aiHistory,
+            settings
+          ] = results.map((result, index) => {
+            if (result.status === 'fulfilled') {
+              return result.value || [];
+            } else {
+              const tableNames = ['users', 'posts', 'categories', 'prompts', 'aiConfigs', 'aiHistory', 'settings'];
+              console.warn(`获取 ${tableNames[index]} 数据失败:`, result.reason);
+              return [];
+            }
+          });
           
           const totalRecords = (users?.length || 0) + (posts?.length || 0) + (categories?.length || 0) + 
                               (prompts?.length || 0) + (aiConfigs?.length || 0) + (aiHistory?.length || 0) + 

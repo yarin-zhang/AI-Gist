@@ -142,44 +142,151 @@ export class DatabaseServiceManager {
   }
 
   /**
-   * 获取数据库统计信息
-   * 返回所有表的记录数量统计
-   * @returns Promise<Record<string, number>> 各表的记录数量
+   * 修复数据库
+   * 当检测到数据库问题时调用此方法进行修复
+   * @returns Promise<{ success: boolean; message: string }> 修复结果
    */
-  async getDatabaseStats(): Promise<Record<string, number>> {
-    const stats: Record<string, number> = {};
-
+  async repairDatabase(): Promise<{ success: boolean; message: string }> {
     try {
-      const [
-        users,
-        posts,
-        categories,
-        prompts,
-        aiConfigs,
-        aiHistory,
-        settings
-      ] = await Promise.all([
-        this.user.getAllUsers(),
-        this.post.getAllPosts(),
-        this.category.getBasicCategories(),
-        this.prompt.getAllPromptsForTags(),
-        this.aiConfig.getAllAIConfigs(),
-        this.aiGenerationHistory.getAllAIGenerationHistory(),
-        this.appSettings.getAllSettings()
-      ]);
-
-      stats.users = users.length;
-      stats.posts = posts.length;
-      stats.categories = categories.length;
-      stats.prompts = prompts.length;
-      stats.aiConfigs = aiConfigs.length;
-      stats.aiHistory = aiHistory.length;
-      stats.settings = settings.length;
+      console.log('DatabaseServiceManager: 开始修复数据库...');
+      
+      // 使用基础服务的修复功能
+      const repairResult = await this.user.repairDatabase();
+      
+      if (repairResult.success) {
+        console.log('DatabaseServiceManager: 数据库修复成功');
+        
+        // 重新检查健康状态
+        const healthStatus = await this.getHealthStatus();
+        
+        if (healthStatus.healthy) {
+          return {
+            success: true,
+            message: '数据库修复成功，所有对象存储已正常'
+          };
+        } else {
+          return {
+            success: false,
+            message: `数据库修复部分成功，仍缺失: ${healthStatus.missingStores.join(', ')}`
+          };
+        }
+      } else {
+        return repairResult;
+      }
     } catch (error) {
-      console.error('Failed to get database stats:', error);
+      console.error('DatabaseServiceManager: 数据库修复失败:', error);
+      return {
+        success: false,
+        message: `数据库修复失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
     }
+  }
 
-    return stats;
+  /**
+   * 检查并修复数据库
+   * 自动检查数据库健康状态，如果有问题则尝试修复
+   * @returns Promise<{ healthy: boolean; repaired: boolean; message: string }> 检查和修复结果
+   */
+  async checkAndRepairDatabase(): Promise<{ 
+    healthy: boolean; 
+    repaired: boolean; 
+    message: string;
+    missingStores?: string[];
+  }> {
+    try {
+      console.log('正在检查数据库健康状态...');
+      
+      const healthStatus = await this.getHealthStatus();
+      
+      if (healthStatus.healthy) {
+        return {
+          healthy: true,
+          repaired: false,
+          message: '数据库状态正常'
+        };
+      }
+      
+      console.log('检测到数据库问题，缺失的对象存储:', healthStatus.missingStores);
+      
+      // 首先尝试普通修复
+      console.log('尝试修复数据库...');
+      let repairResult = await this.repairDatabase();
+      
+      if (repairResult.success) {
+        return {
+          healthy: true,
+          repaired: true,
+          message: `数据库已修复，已创建缺失的对象存储: ${healthStatus.missingStores.join(', ')}`
+        };
+      }
+      
+      // 如果普通修复失败，尝试强制重建
+      console.log('普通修复失败，尝试强制重建数据库...');
+      repairResult = await this.forceRebuildDatabase();
+      
+      if (repairResult.success) {
+        return {
+          healthy: true,
+          repaired: true,
+          message: `数据库已重建，${repairResult.message}`
+        };
+      } else {
+        return {
+          healthy: false,
+          repaired: false,
+          message: repairResult.message,
+          missingStores: healthStatus.missingStores
+        };
+      }
+    } catch (error) {
+      console.error('检查和修复数据库过程中出错:', error);
+      return {
+        healthy: false,
+        repaired: false,
+        message: `操作失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
+  }
+
+  /**
+   * 强制重建数据库
+   * 删除现有数据库并重新创建
+   * @returns Promise<{ success: boolean; message: string }> 重建结果
+   */
+  async forceRebuildDatabase(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('DatabaseServiceManager: 开始强制重建数据库...');
+      
+      // 使用基础服务的强制重建功能
+      const rebuildResult = await this.user.forceRebuildDatabase();
+      
+      if (rebuildResult.success) {
+        console.log('DatabaseServiceManager: 数据库重建成功');
+        
+        // 重新检查健康状态
+        const healthStatus = await this.getHealthStatus();
+        
+        if (healthStatus.healthy) {
+          return {
+            success: true,
+            message: '数据库重建成功，所有对象存储已正常'
+          };
+        } else {
+          return {
+            success: false,
+            message: `数据库重建部分成功，仍缺失: ${healthStatus.missingStores.join(', ')}`
+          };
+        }
+      } else {
+        return rebuildResult;
+      }
+    } catch (error) {
+      console.error('DatabaseServiceManager: 数据库重建失败:', error);
+      return {
+        success: false,
+        message: `数据库重建失败: ${error instanceof Error ? error.message : '未知错误'}`
+      };
+    }
   }
 }
 

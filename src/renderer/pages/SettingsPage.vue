@@ -248,7 +248,8 @@
                                                     @blur="saveWebDAVSettings"
                                                     type="password"
                                                     placeholder="密码"
-                                                    show-password-on="click" />
+                                                    @input="handlePasswordChange"
+                                                    @focus="handlePasswordFocus" />
                                             </NFormItem>
                                         </NFlex>
 
@@ -436,6 +437,60 @@
                                         </NAlert>
                                     </NFlex>
                                 </div>
+
+                                <NDivider />
+
+                                <!-- 数据库维护 -->
+                                <div>
+                                    <NFlex vertical :size="16">
+                                        <NFlex vertical :size="12">
+                                            <NText depth="2">数据库维护</NText>
+                                            <NText depth="3" style="font-size: 12px">
+                                                当遇到同步错误或数据异常时，可尝试修复数据库
+                                            </NText>
+                                            <NFlex :size="12">
+                                                <NButton type="primary" @click="checkDatabaseHealth" :loading="loading.healthCheck">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <AlertCircle />
+                                                        </NIcon>
+                                                    </template>
+                                                    检查数据库状态
+                                                </NButton>
+                                                <NButton type="warning" @click="repairDatabase" :loading="loading.repair">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Database />
+                                                        </NIcon>
+                                                    </template>
+                                                    修复数据库
+                                                </NButton>
+                                                <NButton type="error" @click="forceRebuildDatabase" :loading="loading.forceRebuild">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Refresh />
+                                                        </NIcon>
+                                                    </template>
+                                                    重建数据库
+                                                </NButton>
+                                            </NFlex>
+                                        </NFlex>
+
+                                        <NAlert type="info" show-icon>
+                                            <template #header>数据库修复说明</template>
+                                            <div>
+                                                <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
+                                                <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
+                                                <p>• <strong>重建数据库</strong>：删除并重新创建数据库（会丢失所有数据）</p>
+                                            </div>
+                                        </NAlert>
+
+                                        <NAlert type="warning" show-icon>
+                                            <template #header>重要提示</template>
+                                            重建数据库会删除所有本地数据，请确保已备份重要数据或可以从WebDAV恢复
+                                        </NAlert>
+                                    </NFlex>
+                                </div>
                             </NFlex>
                         </NCard><!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
@@ -505,6 +560,7 @@ import {
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
+import { webdavPasswordManager } from "@/lib/utils/webdav-password-manager";
 
 // 消息提示
 const message = useMessage();
@@ -516,6 +572,13 @@ const currentMode = import.meta.env.MODE;
 // 当前激活的设置项
 const activeSettingKey = ref("appearance");
 
+// 密码输入状态
+const passwordState = reactive({
+    isPlaceholder: false, // 是否显示占位符
+    hasStoredPassword: false, // 是否有存储的密码
+    isModified: false, // 密码是否被修改
+});
+
 // 状态管理
 const saving = ref(false);
 const loading = reactive({
@@ -524,6 +587,9 @@ const loading = reactive({
     sync: false,
     export: false,
     import: false,
+    repair: false,
+    healthCheck: false,
+    forceRebuild: false,
 });
 
 // 设置数据
@@ -643,36 +709,45 @@ const handleMenuSelect = (key: string) => {
 // 加载设置
 const loadSettings = async () => {
     try {
+        console.log('开始加载设置...');
         const prefs = await window.electronAPI.preferences.get();
+        console.log('获取到的原始配置:', prefs);
         
-        // 确保 WebDAV 配置结构完整
-        const webdavConfig = prefs.webdav || {};
-        settings.webdav = {
-            enabled: webdavConfig.enabled || false,
-            serverUrl: webdavConfig.serverUrl || "",
-            username: webdavConfig.username || "",
-            password: webdavConfig.password || "",
-            autoSync: webdavConfig.autoSync || false,
-            syncInterval: webdavConfig.syncInterval || 30,
-        };
-        
-        // 如果密码是加密的，需要解密后显示
-        if (settings.webdav.password && typeof settings.webdav.password === 'object') {
-            try {
-                console.log('正在解密 WebDAV 密码...');
-                const decryptResult = await WebDAVAPI.decryptPassword(settings.webdav.password);
-                if (decryptResult.success && decryptResult.password) {
-                    settings.webdav.password = decryptResult.password;
-                    console.log('WebDAV 密码解密成功');
-                } else {
-                    console.error('WebDAV 密码解密失败:', decryptResult.error);
-                    settings.webdav.password = ''; // 解密失败时清空密码
-                }
-            } catch (error) {
-                console.error('WebDAV 密码解密出错:', error);
-                settings.webdav.password = ''; // 解密失败时清空密码
-            }
+        // 直接从 WebDAV API 获取配置
+        try {
+            const webdavConfig = await WebDAVAPI.getConfig();
+            console.log('从 WebDAV API 获取的配置:', webdavConfig);
+            
+            settings.webdav = {
+                enabled: webdavConfig.enabled || false,
+                serverUrl: webdavConfig.serverUrl || "",
+                username: webdavConfig.username || "",
+                password: webdavConfig.password || "",
+                autoSync: webdavConfig.autoSync || false,
+                syncInterval: webdavConfig.syncInterval || 30,
+            };
+        } catch (error) {
+            console.error('从 WebDAV API 获取配置失败，使用 preferences:', error);
+            // 回退到使用 preferences
+            const webdavConfig = prefs.webdav || {};
+            console.log('WebDAV 配置:', webdavConfig);
+            
+            settings.webdav = {
+                enabled: webdavConfig.enabled || false,
+                serverUrl: webdavConfig.serverUrl || "",
+                username: webdavConfig.username || "",
+                password: webdavConfig.password || "",
+                autoSync: webdavConfig.autoSync || false,
+                syncInterval: webdavConfig.syncInterval || 30,
+            };
         }
+        
+        console.log('最终设置的 WebDAV 配置:', settings.webdav);
+        
+        // 重置密码状态
+        passwordState.isPlaceholder = false;
+        passwordState.hasStoredPassword = !!settings.webdav.password;
+        passwordState.isModified = false;
         
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
@@ -689,7 +764,13 @@ const loadSettings = async () => {
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
         
-        console.log("设置加载成功:", settings);
+        console.log("设置加载成功:", {
+            ...settings,
+            webdav: {
+                ...settings.webdav,
+                password: settings.webdav.password ? '[已设置]' : '[未设置]'
+            }
+        });
     } catch (error) {
         console.error("加载设置失败:", error);
         message.error("加载设置失败");
@@ -886,8 +967,43 @@ const updateNonWebDAVSetting = async () => {
     }
 };
 
+// 确保 WebDAV 配置已保存到后端
+const ensureWebdavConfigSaved = async () => {
+    try {
+        // 检查是否需要保存配置
+        if (!passwordState.isModified && passwordState.hasStoredPassword) {
+            // 密码未修改且已存储，配置应该已经在后端
+            console.log('WebDAV配置无需重新保存');
+            return;
+        }
+        
+        console.log('确保WebDAV配置已保存到后端...');
+        
+        // 准备配置数据，处理密码逻辑
+        const configToSave = { ...settings.webdav };
+        
+        // 如果密码被修改了，或者是新密码，需要传递给后端加密
+        if (passwordState.isModified && !passwordState.isPlaceholder) {
+            // 密码已修改且不是占位符，保持原样传递给后端
+            console.log('传递修改后的密码给后端');
+        } else if (passwordState.isPlaceholder && passwordState.hasStoredPassword && !passwordState.isModified) {
+            // 密码是占位符且未修改，传递空字符串让后端使用存储的密码
+            configToSave.password = '';
+            console.log('使用后端存储的密码');
+        }
+        
+        // 保存配置
+        await updateSettingsSmart(['webdav']);
+        console.log('WebDAV配置已确保保存');
+    } catch (error) {
+        console.error('确保WebDAV配置保存失败:', error);
+        throw new Error('配置保存失败，无法进行同步');
+    }
+};
+
 // 测试 WebDAV 连接
 const testWebDAVConnection = async () => {
+    // 简单验证
     if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
         message.error("请填写完整的服务器信息");
         return;
@@ -895,11 +1011,10 @@ const testWebDAVConnection = async () => {
 
     loading.webdavTest = true;
     try {
-        // 测试连接时使用明文密码
         const result = await WebDAVAPI.testConnection({
             serverUrl: settings.webdav.serverUrl,
             username: settings.webdav.username,
-            password: settings.webdav.password,
+            password: settings.webdav.password
         });
         
         if (result.success) {
@@ -921,9 +1036,18 @@ const syncNow = async () => {
         return;
     }
 
+    // 简单验证
+    if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
+        message.error("WebDAV配置不完整，请检查服务器地址、用户名和密码");
+        return;
+    }
+
     loading.sync = true;
     try {
-        const result = await WebDAVAPI.syncNow();        if (result.success) {
+        // 使用安全同步方法，包含数据库健康检查
+        const result = await WebDAVAPI.safeSyncNow();
+        
+        if (result.success) {
             settings.dataSync.lastSyncTime = result.timestamp;
             
             // 只更新 dataSync 配置，避免重复加密 WebDAV 密码
@@ -1095,45 +1219,131 @@ const resetSettings = async () => {
 const saveWebDAVSettings = async () => {
     if (saving.value) return;
     
-    // 如果关键信息不完整，不进行保存
-    if (!settings.webdav.enabled || !settings.webdav.password || !settings.webdav.username || !settings.webdav.serverUrl) {
-        return;
-    }
-
     saving.value = true;
     try {
         console.log('保存 WebDAV 设置...');
         
-        // 创建完整的 WebDAV 配置副本
-        const webdavConfig = {
+        // 创建纯对象副本，避免Vue响应式对象问题
+        const cleanConfig = JSON.parse(JSON.stringify({
             enabled: settings.webdav.enabled,
             serverUrl: settings.webdav.serverUrl,
             username: settings.webdav.username,
-            password: settings.webdav.password, // 保持明文，让后端处理加密
+            password: settings.webdav.password,
             autoSync: settings.webdav.autoSync,
-            syncInterval: settings.webdav.syncInterval,
-        };
-
-        // 通过 WebDAV API 设置配置（后端会处理加密和完整保存）
-        await WebDAVAPI.setConfig(webdavConfig);
+            syncInterval: settings.webdav.syncInterval
+        }));
+        
+        // 直接保存配置
+        await WebDAVAPI.setConfig(cleanConfig);
+        
+        // 重置状态
+        passwordState.isModified = false;
+        passwordState.hasStoredPassword = !!settings.webdav.password;
         
         console.log('WebDAV 设置保存成功');
+        message.success('WebDAV 设置保存成功');
     } catch (error) {
         console.error('保存 WebDAV 设置失败:', error);
-        // 不显示错误消息，避免干扰用户输入
+        message.error('保存 WebDAV 设置失败');
     }
     saving.value = false;
+};
+
+// 数据库修复
+const repairDatabase = async () => {
+    loading.repair = true;
+    try {
+        const { databaseServiceManager } = await import("@/lib/services");
+        const result = await databaseServiceManager.checkAndRepairDatabase();
+        
+        if (result.healthy) {
+            if (result.repaired) {
+                message.success(`数据库修复成功：${result.message}`);
+            } else {
+                message.success("数据库状态正常，无需修复");
+            }
+        } else {
+            message.error(`数据库修复失败：${result.message}`);
+            if (result.missingStores && result.missingStores.length > 0) {
+                console.error('仍缺失的对象存储:', result.missingStores);
+            }
+        }
+    } catch (error) {
+        console.error("数据库修复失败:", error);
+        message.error("数据库修复失败");
+    }
+    loading.repair = false;
+};
+
+// 强制重建数据库
+const forceRebuildDatabase = async () => {
+    loading.forceRebuild = true;
+    try {
+        const { databaseServiceManager } = await import("@/lib/services");
+        const result = await databaseServiceManager.forceRebuildDatabase();
+        
+        if (result.success) {
+            message.success(`数据库重建成功：${result.message}`);
+            console.log('数据库重建成功，应用将正常工作');
+        } else {
+            message.error(`数据库重建失败：${result.message}`);
+        }
+    } catch (error) {
+        console.error("数据库重建失败:", error);
+        message.error("数据库重建失败");
+    }
+    loading.forceRebuild = false;
+};
+
+// 检查数据库健康状态
+const checkDatabaseHealth = async () => {
+    loading.healthCheck = true;
+    try {
+        const { databaseServiceManager } = await import("@/lib/services");
+        const result = await databaseServiceManager.getHealthStatus();
+        
+        if (result.healthy) {
+            message.success("数据库状态正常");
+        } else {
+            message.warning(`数据库存在异常，缺失的对象存储: ${result.missingStores.join(', ')}`);
+            console.warn('数据库健康检查结果:', result);
+        }
+    } catch (error) {
+        console.error("数据库健康检查失败:", error);
+        message.error("数据库健康检查失败");
+    }
+    loading.healthCheck = false;
+};
+
+// 监听密码输入变化
+const handlePasswordChange = () => {
+    passwordState.isModified = true;
+};
+
+// 密码输入框的焦点事件
+const handlePasswordFocus = () => {
+    // 简化逻辑，不做特殊处理
 };
 
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
     
-    // 同步 WebDAV 配置到服务端
+    // 同步 WebDAV 配置到服务端（但不包含密码相关的敏感信息）
     try {
-        if (settings.webdav) {
-            await window.electronAPI.webdav.setConfig(settings.webdav);
-            console.log("WebDAV 配置已同步到服务端");
+        if (settings.webdav.enabled) {
+            // 只同步非敏感配置
+            const safeConfig = {
+                enabled: settings.webdav.enabled,
+                serverUrl: settings.webdav.serverUrl,
+                username: settings.webdav.username,
+                autoSync: settings.webdav.autoSync,
+                syncInterval: settings.webdav.syncInterval,
+                // 不包含password字段
+            };
+            
+            await window.electronAPI.webdav.setConfig(safeConfig);
+            console.log("WebDAV 基础配置已同步到服务端");
         }
     } catch (error) {
         console.error("同步 WebDAV 配置失败:", error);

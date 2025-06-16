@@ -28,6 +28,16 @@ interface WebDAVConfig {
     password: string;
 }
 
+// 存储配置的接口，密码可以是加密的
+interface WebDAVStorageConfig {
+    serverUrl: string;
+    username: string;
+    password: string | EncryptedPassword;
+    enabled?: boolean;
+    autoSync?: boolean;
+    syncInterval?: number;
+}
+
 interface WebDAVTestResult {
     success: boolean;
     message: string;
@@ -185,6 +195,14 @@ export class WebDAVService {
             try {
                 console.log('开始测试 WebDAV 连接:', config.serverUrl);
                 
+                // 基本验证
+                if (!config.serverUrl || !config.username || !config.password) {
+                    return {
+                        success: false,
+                        message: '请填写完整的连接信息',
+                    };
+                }
+                
                 const webdavClient = await this.getWebDAVClient();
                 
                 // 使用真实的 WebDAV 客户端
@@ -233,10 +251,17 @@ export class WebDAVService {
 
         // 立即同步
         ipcMain.handle('webdav:sync-now', async (): Promise<SyncResult> => {
-            try {
-                // 获取当前保存的 WebDAV 配置
+            try {                // 获取当前保存的 WebDAV 配置
                 const preferences = this.preferencesManager.getPreferences();
-                let config = preferences.webdav;
+                let config: WebDAVStorageConfig = preferences.webdav;
+                
+                console.log('同步时检查WebDAV配置:', {
+                    hasConfig: !!config,
+                    enabled: config?.enabled,
+                    serverUrl: config?.serverUrl ? '[已设置]' : '[未设置]',
+                    username: config?.username ? '[已设置]' : '[未设置]',
+                    hasPassword: !!config?.password
+                });
                 
                 if (!config || !config.enabled) {
                     return {
@@ -250,31 +275,11 @@ export class WebDAVService {
                     };
                 }
                 
-                // 解密密码用于同步
-                if (config.password && this.isPasswordEncrypted(config.password)) {
-                    try {
-                        console.log('正在解密密码进行同步...');
-                        config = { ...config };
-                        config.password = this.decryptPassword(config.password);
-                        console.log('密码解密成功，开始同步');
-                    } catch (error) {
-                        console.error('同步时密码解密失败:', error);
-                        return {
-                            success: false,
-                            message: '密码解密失败，请重新设置密码',
-                            timestamp: new Date().toISOString(),
-                            filesUploaded: 0,
-                            filesDownloaded: 0,
-                            conflictsDetected: 0,
-                            conflictsResolved: 0,
-                        };
-                    }
-                }
-                
-                if (!config.serverUrl || !config.username || !config.password) {
+                // 验证基本配置
+                if (!config.serverUrl || config.serverUrl.trim() === '') {
                     return {
                         success: false,
-                        message: 'WebDAV 配置不完整，请检查服务器地址、用户名和密码',
+                        message: 'WebDAV 服务器地址未设置，请在设置中配置',
                         timestamp: new Date().toISOString(),
                         filesUploaded: 0,
                         filesDownloaded: 0,
@@ -283,17 +288,34 @@ export class WebDAVService {
                     };
                 }
                 
-                // 临时设置配置用于同步
-                const oldConfig = this.config;
-                this.config = config;
-                
-                try {
-                    const result = await this.performSync();
-                    return result;
-                } finally {
-                    // 恢复原配置
-                    this.config = oldConfig;
+                if (!config.username || config.username.trim() === '') {
+                    return {
+                        success: false,
+                        message: 'WebDAV 用户名未设置，请在设置中配置',
+                        timestamp: new Date().toISOString(),
+                        filesUploaded: 0,
+                        filesDownloaded: 0,
+                        conflictsDetected: 0,
+                        conflictsResolved: 0,
+                    };
                 }
+                
+                if (!config.password) {
+                    return {
+                        success: false,
+                        message: 'WebDAV 密码未设置，请在设置中配置密码',
+                        timestamp: new Date().toISOString(),
+                        filesUploaded: 0,
+                        filesDownloaded: 0,
+                        conflictsDetected: 0,
+                        conflictsResolved: 0,
+                    };
+                }
+                
+                // 直接使用配置进行同步
+                this.config = config;
+                const result = await this.performSync();
+                return result;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '同步失败';
                 return {
@@ -321,30 +343,54 @@ export class WebDAVService {
 
         // 设置 WebDAV 配置
         ipcMain.handle('webdav:set-config', async (event, config) => {
-            // 加密密码后保存（但不重复加密已加密的密码）
-            const configToSave = { ...config };
-            if (configToSave.password && !this.isPasswordEncrypted(configToSave.password)) {
-                console.log('正在加密明文密码...');
-                configToSave.password = this.encryptPassword(configToSave.password);
-                console.log('密码已加密存储');
-            } else if (configToSave.password && this.isPasswordEncrypted(configToSave.password)) {
-                console.log('密码已经是加密状态，跳过加密');
-            }
-            
-            this.config = config; // 保留明文密码在内存中用于当前会话
-            await this.preferencesManager.updatePreferences({ webdav: configToSave });
-            
-            if (config.enabled && config.autoSync) {
-                this.startAutoSync();
-            } else {
-                this.stopAutoSync();
+            try {
+                console.log('收到WebDAV配置保存请求:', {
+                    enabled: config.enabled,
+                    serverUrl: config.serverUrl ? '[已设置]' : '[未设置]',
+                    username: config.username ? '[已设置]' : '[未设置]',
+                    hasPassword: !!config.password,
+                    passwordValue: config.password ? `[长度:${config.password.length}]` : '[空]'
+                });
+                
+                // 直接保存配置，不加密密码
+                const configToSave = {
+                    enabled: Boolean(config.enabled),
+                    serverUrl: String(config.serverUrl || ''),
+                    username: String(config.username || ''),
+                    password: String(config.password || ''),
+                    autoSync: Boolean(config.autoSync),
+                    syncInterval: Number(config.syncInterval || 30),
+                };
+                
+                console.log('准备保存的配置:', {
+                    enabled: configToSave.enabled,
+                    serverUrl: configToSave.serverUrl ? '[已设置]' : '[未设置]',
+                    username: configToSave.username ? '[已设置]' : '[未设置]',
+                    hasPassword: !!configToSave.password,
+                    passwordLength: configToSave.password.length
+                });
+                
+                // 保存到内存和持久化存储
+                this.config = configToSave;
+                await this.preferencesManager.updatePreferences({ webdav: configToSave });
+                
+                if (configToSave.enabled && configToSave.autoSync) {
+                    this.startAutoSync();
+                } else {
+                    this.stopAutoSync();
+                }
+                
+                console.log('WebDAV 配置设置成功');
+            } catch (error) {
+                console.error('设置 WebDAV 配置失败:', error);
+                throw error;
             }
         });
 
         // 获取 WebDAV 配置
         ipcMain.handle('webdav:get-config', async () => {
             const preferences = this.preferencesManager.getPreferences();
-            const webdavConfig = preferences.webdav || {
+            const webdavConfig: WebDAVStorageConfig = preferences.webdav || {
                 enabled: false,
                 serverUrl: '',
                 username: '',
@@ -353,18 +399,15 @@ export class WebDAVService {
                 syncInterval: 30,
             };
             
-            // 解密密码后返回
-            if (webdavConfig.password && this.isPasswordEncrypted(webdavConfig.password)) {
-                try {
-                    console.log('正在解密密码...');
-                    webdavConfig.password = this.decryptPassword(webdavConfig.password);
-                    console.log('密码已解密');
-                } catch (error) {
-                    console.error('密码解密失败:', error);
-                    webdavConfig.password = ''; // 解密失败时清空密码
-                }
-            }
+            console.log('获取WebDAV配置:', {
+                enabled: webdavConfig.enabled,
+                serverUrl: webdavConfig.serverUrl ? '[已设置]' : '[未设置]',
+                username: webdavConfig.username ? '[已设置]' : '[未设置]',
+                password: webdavConfig.password ? '[已设置]' : '[未设置]',
+                passwordLength: webdavConfig.password ? (typeof webdavConfig.password === 'string' ? webdavConfig.password.length : 'encrypted') : 0
+            });
             
+            // 直接返回配置，密码已经是明文
             return webdavConfig;
         });
 
