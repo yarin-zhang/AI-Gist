@@ -96,8 +96,7 @@ export class WebDAVService {
 
     constructor(private preferencesManager: any, private dataManagementService?: any) {
         console.log('WebDAV 服务初始化中...');
-        this.setupIpcHandlers();
-        console.log('WebDAV IPC 处理程序已设置');
+        console.log('WebDAV 服务已初始化');
     }
 
     /**
@@ -189,7 +188,7 @@ export class WebDAVService {
         return createWebDAVClient;
     }
 
-    private setupIpcHandlers() {
+    public setupIpcHandlers() {
         console.log('正在设置 WebDAV IPC 处理程序...');
         
         // 测试 WebDAV 连接
@@ -705,8 +704,51 @@ export class WebDAVService {
                 };
             }
         });
+
+        // 设置 WebDAV 配置
+        ipcMain.handle('webdav:set-config', async (event, config: WebDAVConfig): Promise<any> => {
+            console.log('WebDAV 设置配置 IPC 处理程序被调用');
+            try {
+                // 保存配置到偏好设置
+                this.preferencesManager.updatePreferences({
+                    webdav: config
+                });
+                
+                return {
+                    success: true,
+                    message: '配置已保存'
+                };
+            } catch (error) {
+                console.error('保存 WebDAV 配置失败:', error);
+                return {
+                    success: false,
+                    error: error instanceof Error ? error.message : '保存配置失败'
+                };
+            }
+        });
         
         console.log('WebDAV IPC 处理程序设置完成，包括加密/解密处理程序');
+    }
+
+    /**
+     * 清理 WebDAV IPC 处理器
+     */
+    public cleanup() {
+        console.log('正在清理 WebDAV IPC 处理程序...');
+        
+        // 移除所有 WebDAV 相关的 IPC 处理器
+        ipcMain.removeHandler('webdav:test-connection');
+        ipcMain.removeHandler('webdav:sync-now');
+        ipcMain.removeHandler('webdav:manual-upload');
+        ipcMain.removeHandler('webdav:manual-download');
+        ipcMain.removeHandler('webdav:apply-downloaded-data');
+        ipcMain.removeHandler('webdav:get-remote-preview');
+        ipcMain.removeHandler('webdav:compare-data');
+        ipcMain.removeHandler('webdav:encrypt-password');
+        ipcMain.removeHandler('webdav:decrypt-password');
+        ipcMain.removeHandler('webdav:set-config');
+        
+        console.log('WebDAV IPC 处理程序清理完成');
     }
 
     private async performSync(): Promise<SyncResult> {
@@ -1516,365 +1558,19 @@ export class WebDAVService {
             if (timeDiff > 300000) { // 5分钟
                 conflicts.push({
                     type: 'timestamp_conflict',
-                    description: `时间差异较大: ${Math.round(timeDiff / 60000)} 分钟`,
-                    resolution: localTime > remoteTime ? 'local_wins' : 'remote_wins'
+                    description: `时间戳冲突: 本地 ${localMetadata.lastSyncTime}, 远程 ${remoteMetadata.lastSyncTime}`,
+                    resolution: 'manual'
                 });
             }
         }
 
-        // 检查数据内容冲突
-        const dataConflicts = this.compareDataContent(localData, remoteData);
-        conflicts.push(...dataConflicts);
+        // 数据内容不同
+        conflicts.push({
+            type: 'data_conflict',
+            description: '本地和远程数据不同',
+            resolution: 'manual'
+        });
 
         return conflicts;
-    }
-
-    /**
-     * 比较数据内容，找出具体的冲突项
-     */
-    private compareDataContent(localData: any, remoteData: any): any[] {
-        const conflicts: any[] = [];
-
-        // 比较分类
-        if (localData.categories && remoteData.categories) {
-            const categoryConflicts = this.compareArrayData(
-                localData.categories,
-                remoteData.categories,
-                'categories',
-                'id'
-            );
-            conflicts.push(...categoryConflicts);
-        }
-
-        // 比较提示词
-        if (localData.prompts && remoteData.prompts) {
-            const promptConflicts = this.compareArrayData(
-                localData.prompts,
-                remoteData.prompts,
-                'prompts',
-                'id'
-            );
-            conflicts.push(...promptConflicts);
-        }
-
-        // 比较AI配置
-        if (localData.aiConfigs && remoteData.aiConfigs) {
-            const aiConfigConflicts = this.compareArrayData(
-                localData.aiConfigs,
-                remoteData.aiConfigs,
-                'aiConfigs',
-                'id'
-            );
-            conflicts.push(...aiConfigConflicts);
-        }
-
-        return conflicts;
-    }
-
-    /**
-     * 比较数组数据
-     */
-    private compareArrayData(localArray: any[], remoteArray: any[], dataType: string, keyField: string): any[] {
-        const conflicts: any[] = [];
-        const localMap = new Map();
-        const remoteMap = new Map();
-
-        // 构建映射
-        localArray.forEach(item => {
-            localMap.set(item[keyField], item);
-        });
-
-        remoteArray.forEach(item => {
-            remoteMap.set(item[keyField], item);
-        });
-
-        // 检查修改的项
-        for (const [key, localItem] of localMap) {
-            if (remoteMap.has(key)) {
-                const remoteItem = remoteMap.get(key);
-                if (JSON.stringify(localItem) !== JSON.stringify(remoteItem)) {
-                    conflicts.push({
-                        type: 'data_conflict',
-                        description: `${dataType} 中的项目 "${localItem.name || localItem.title || key}" 在本地和远程都有修改`,
-                        resolution: 'merged',
-                        localData: localItem,
-                        remoteData: remoteItem
-                    });
-                }
-            }
-        }
-
-        return conflicts;
-    }
-
-    /**
-     * 生成专业的详细差异分析
-     */
-    private async generateDetailedDifferences(localData: any, remoteData: any, localMetadata: any, remoteMetadata: any): Promise<any> {
-        console.log('开始生成详细差异分析...');
-        
-        const differences = {
-            hasDifferences: false,
-            added: [] as any[],
-            modified: [] as any[],
-            deleted: [] as any[],
-            summary: {
-                localTotal: this.calculateTotalRecords(localData),
-                remoteTotal: this.calculateTotalRecords(remoteData),
-                conflicts: 0,
-                addedCount: 0,
-                modifiedCount: 0,
-                deletedCount: 0
-            }
-        };
-
-        // 比较各个数据类型
-        const dataTypes = [
-            { key: 'categories', name: '分类' },
-            { key: 'prompts', name: '提示词' },
-            { key: 'aiConfigs', name: 'AI配置' },
-            { key: 'history', name: '历史记录' }
-        ];
-        
-        for (const dataType of dataTypes) {
-            const localItems = localData[dataType.key] || [];
-            const remoteItems = remoteData[dataType.key] || [];
-            
-            const comparison = this.compareDataTypeItems(localItems, remoteItems, dataType.key, dataType.name);
-            differences.added.push(...comparison.added);
-            differences.modified.push(...comparison.modified);
-            differences.deleted.push(...comparison.deleted);
-        }
-
-        differences.summary.addedCount = differences.added.length;
-        differences.summary.modifiedCount = differences.modified.length;
-        differences.summary.deletedCount = differences.deleted.length;
-        differences.summary.conflicts = differences.modified.length;
-        
-        differences.hasDifferences = differences.added.length > 0 || differences.modified.length > 0 || differences.deleted.length > 0;
-
-        console.log(`差异分析完成: 新增${differences.summary.addedCount}, 修改${differences.summary.modifiedCount}, 删除${differences.summary.deletedCount}`);
-        return differences;
-    }
-
-    /**
-     * 比较特定数据类型的项目
-     */
-    private compareDataTypeItems(localItems: any[], remoteItems: any[], type: string, typeName: string): any {
-        const result = {
-            added: [] as any[],
-            modified: [] as any[],
-            deleted: [] as any[]
-        };
-
-        const localMap = new Map();
-        const remoteMap = new Map();
-
-        // 建立映射，便于查找
-        localItems.forEach(item => {
-            localMap.set(item.id, item);
-        });
-
-        remoteItems.forEach(item => {
-            remoteMap.set(item.id, item);
-        });
-
-        // 查找新增的项（远程有，本地没有）
-        for (const [id, remoteItem] of remoteMap) {
-            if (!localMap.has(id)) {
-                result.added.push({
-                    ...remoteItem,
-                    _type: type,
-                    _typeName: typeName,
-                    _changeType: 'added'
-                });
-            }
-        }
-
-        // 查找删除的项（本地有，远程没有）
-        for (const [id, localItem] of localMap) {
-            if (!remoteMap.has(id)) {
-                result.deleted.push({
-                    ...localItem,
-                    _type: type,
-                    _typeName: typeName,
-                    _changeType: 'deleted'
-                });
-            }
-        }
-
-        // 查找修改的项（两边都有但内容不同）
-        for (const [id, localItem] of localMap) {
-            const remoteItem = remoteMap.get(id);
-            if (remoteItem) {
-                // 创建用于比较的副本，移除时间戳等可能不同的字段
-                const localCompare = this.prepareForComparison(localItem);
-                const remoteCompare = this.prepareForComparison(remoteItem);
-                
-                if (JSON.stringify(localCompare) !== JSON.stringify(remoteCompare)) {
-                    result.modified.push({
-                        id,
-                        _type: type,
-                        _typeName: typeName,
-                        _changeType: 'modified',
-                        local: localItem,
-                        remote: remoteItem,
-                        localLastModified: localItem.updatedAt || localItem.lastModified || localItem.createdAt,
-                        remoteLastModified: remoteItem.updatedAt || remoteItem.lastModified || remoteItem.createdAt
-                    });
-                }
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * 准备用于比较的对象，移除不重要的字段
-     */
-    private prepareForComparison(obj: any): any {
-        const copy = { ...obj };
-        
-        // 移除时间戳字段，因为它们可能因同步而不同
-        delete copy.createdAt;
-        delete copy.updatedAt;
-        delete copy.lastModified;
-        delete copy.lastSyncTime;
-        delete copy._id;
-        delete copy.__v;
-        
-        // 对于字符串字段，规范化空白字符
-        Object.keys(copy).forEach(key => {
-            if (typeof copy[key] === 'string') {
-                copy[key] = copy[key].trim();
-            }
-        });
-        
-        return copy;
-    }
-
-    /**
-     * 比较两个数据集的差异
-     */
-    private compareDataSets(localData: any, remoteData: any): any {
-        const differences = {
-            added: [] as any[],
-            modified: [] as any[],
-            deleted: [] as any[],
-            summary: {
-                localTotal: 0,
-                remoteTotal: 0,
-                conflicts: 0
-            }
-        };
-
-        // 计算总数
-        differences.summary.localTotal = this.calculateTotalRecords(localData);
-        differences.summary.remoteTotal = this.calculateTotalRecords(remoteData);
-
-        // 比较各个数据类型
-        const dataTypes = ['categories', 'prompts', 'aiConfigs', 'history'];
-        
-        for (const type of dataTypes) {
-            const localItems = localData[type] || [];
-            const remoteItems = remoteData[type] || [];
-            
-            const comparison = this.compareArrayItems(localItems, remoteItems, type);
-            differences.added.push(...comparison.added);
-            differences.modified.push(...comparison.modified);
-            differences.deleted.push(...comparison.deleted);
-        }
-
-        differences.summary.conflicts = differences.modified.length;
-
-        return differences;
-    }
-
-    /**
-     * 比较数组项目
-     */
-    private compareArrayItems(localItems: any[], remoteItems: any[], type: string): any {
-        const result = {
-            added: [] as any[],
-            modified: [] as any[],
-            deleted: [] as any[]
-        };
-
-        const localMap = new Map();
-        const remoteMap = new Map();
-
-        localItems.forEach(item => {
-            localMap.set(item.id, { ...item, _type: type });
-        });
-
-        remoteItems.forEach(item => {
-            remoteMap.set(item.id, { ...item, _type: type });
-        });
-
-        // 查找新增的项（远程有，本地没有）
-        for (const [id, remoteItem] of remoteMap) {
-            if (!localMap.has(id)) {
-                result.added.push({
-                    ...remoteItem,
-                    _changeType: 'added'
-                });
-            }
-        }
-
-        // 查找删除的项（本地有，远程没有）
-        for (const [id, localItem] of localMap) {
-            if (!remoteMap.has(id)) {
-                result.deleted.push({
-                    ...localItem,
-                    _changeType: 'deleted'
-                });
-            }
-        }
-
-        // 查找修改的项
-        for (const [id, localItem] of localMap) {
-            if (remoteMap.has(id)) {
-                const remoteItem = remoteMap.get(id);
-                if (JSON.stringify(localItem) !== JSON.stringify(remoteItem)) {
-                    result.modified.push({
-                        id: id,
-                        _type: type,
-                        _changeType: 'modified',
-                        local: localItem,
-                        remote: remoteItem
-                    });
-                }
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * 获取存储的配置（解密密码）
-     */
-    private async getStoredConfig(): Promise<WebDAVConfig | null> {
-        try {
-            const preferences = this.preferencesManager.getPreferences();
-            const webdavConfig = preferences.webdav;
-
-            if (!webdavConfig || !webdavConfig.enabled) {
-                return null;
-            }
-
-            let password = webdavConfig.password;
-            if (this.isPasswordEncrypted(password)) {
-                password = this.decryptPassword(password);
-            }
-
-            return {
-                serverUrl: webdavConfig.serverUrl,
-                username: webdavConfig.username,
-                password: password
-            };
-        } catch (error) {
-            console.error('获取WebDAV配置失败:', error);
-            return null;
-        }
     }
 }
