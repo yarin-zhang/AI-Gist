@@ -91,6 +91,8 @@ export class WebDAVService {
     private client: any = null;
     private config: any = null;
     private syncTimer: NodeJS.Timeout | null = null;
+    private tempRemoteData: any = null;
+    private tempRemoteMetadata: any = null;
 
     constructor(private preferencesManager: any, private dataManagementService?: any) {
         console.log('WebDAV 服务初始化中...');
@@ -330,85 +332,344 @@ export class WebDAVService {
             }
         });
 
-        // 获取同步状态
-        ipcMain.handle('webdav:get-sync-status', async () => {
-            const preferences = this.preferencesManager.getPreferences();
-            return {
-                isEnabled: preferences.webdav?.enabled || false,
-                lastSyncTime: preferences.dataSync?.lastSyncTime || null,
-                nextSyncTime: this.getNextSyncTime(),
-                isSyncing: false, // 实际应该跟踪同步状态
-            };
-        });
-
-        // 设置 WebDAV 配置
-        ipcMain.handle('webdav:set-config', async (event, config) => {
+        // 手动上传数据
+        ipcMain.handle('webdav:manual-upload', async (): Promise<any> => {
             try {
-                console.log('收到WebDAV配置保存请求:', {
-                    enabled: config.enabled,
-                    serverUrl: config.serverUrl ? '[已设置]' : '[未设置]',
-                    username: config.username ? '[已设置]' : '[未设置]',
-                    hasPassword: !!config.password,
-                    passwordValue: config.password ? `[长度:${config.password.length}]` : '[空]'
-                });
+                console.log('开始手动上传数据...');
                 
-                // 直接保存配置，不加密密码
-                const configToSave = {
-                    enabled: Boolean(config.enabled),
-                    serverUrl: String(config.serverUrl || ''),
-                    username: String(config.username || ''),
-                    password: String(config.password || ''),
-                    autoSync: Boolean(config.autoSync),
-                    syncInterval: Number(config.syncInterval || 30),
-                };
-                
-                console.log('准备保存的配置:', {
-                    enabled: configToSave.enabled,
-                    serverUrl: configToSave.serverUrl ? '[已设置]' : '[未设置]',
-                    username: configToSave.username ? '[已设置]' : '[未设置]',
-                    hasPassword: !!configToSave.password,
-                    passwordLength: configToSave.password.length
-                });
-                
-                // 保存到内存和持久化存储
-                this.config = configToSave;
-                await this.preferencesManager.updatePreferences({ webdav: configToSave });
-                
-                if (configToSave.enabled && configToSave.autoSync) {
-                    this.startAutoSync();
-                } else {
-                    this.stopAutoSync();
+                // 获取配置
+                const config = await this.getStoredConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        message: '未找到 WebDAV 配置',
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: false
+                    };
                 }
+
+                // 创建客户端
+                const WebDAVClient = await this.getWebDAVClient();
+                const client = WebDAVClient(config.serverUrl, {
+                    username: config.username,
+                    password: config.password,
+                });
+
+                // 生成本地数据
+                const localData = await this.generateExportData();
+                const localMetadata = await this.getLocalSyncMetadata();
                 
-                console.log('WebDAV 配置设置成功');
+                // 上传数据
+                const remoteDir = '/ai-gist-sync';
+                const dataFile = `${remoteDir}/data.json`;
+                const metadataFile = `${remoteDir}/metadata.json`;
+
+                await this.ensureRemoteDirectory(client, remoteDir);
+                
+                // 上传数据和元数据
+                await client.putFileContents(dataFile, JSON.stringify(localData, null, 2));
+                await client.putFileContents(metadataFile, JSON.stringify(localMetadata, null, 2));
+
+                // 更新本地同步时间
+                await this.updateLocalSyncTime(new Date().toISOString());
+
+                console.log('手动上传完成');
+                return {
+                    success: true,
+                    message: '数据上传成功',
+                    timestamp: new Date().toISOString(),
+                    hasConflicts: false
+                };
+
             } catch (error) {
-                console.error('设置 WebDAV 配置失败:', error);
-                throw error;
+                console.error('手动上传失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `上传失败: ${errorMessage}`,
+                    timestamp: new Date().toISOString(),
+                    hasConflicts: false
+                };
             }
         });
 
-        // 获取 WebDAV 配置
-        ipcMain.handle('webdav:get-config', async () => {
-            const preferences = this.preferencesManager.getPreferences();
-            const webdavConfig: WebDAVStorageConfig = preferences.webdav || {
-                enabled: false,
-                serverUrl: '',
-                username: '',
-                password: '',
-                autoSync: false,
-                syncInterval: 30,
-            };
-            
-            console.log('获取WebDAV配置:', {
-                enabled: webdavConfig.enabled,
-                serverUrl: webdavConfig.serverUrl ? '[已设置]' : '[未设置]',
-                username: webdavConfig.username ? '[已设置]' : '[未设置]',
-                password: webdavConfig.password ? '[已设置]' : '[未设置]',
-                passwordLength: webdavConfig.password ? (typeof webdavConfig.password === 'string' ? webdavConfig.password.length : 'encrypted') : 0
-            });
-            
-            // 直接返回配置，密码已经是明文
-            return webdavConfig;
+        // 手动下载数据（检测冲突但不应用）
+        ipcMain.handle('webdav:manual-download', async (): Promise<any> => {
+            try {
+                console.log('开始手动下载数据...');
+                
+                // 获取配置
+                const config = await this.getStoredConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        message: '未找到 WebDAV 配置',
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: false
+                    };
+                }
+
+                // 创建客户端
+                const WebDAVClient = await this.getWebDAVClient();
+                const client = WebDAVClient(config.serverUrl, {
+                    username: config.username,
+                    password: config.password,
+                });
+
+                const remoteDir = '/ai-gist-sync';
+                const dataFile = `${remoteDir}/data.json`;
+                const metadataFile = `${remoteDir}/metadata.json`;
+
+                // 检查远程文件是否存在
+                const dataExists = await this.checkRemoteFileExists(client, dataFile);
+                const metadataExists = await this.checkRemoteFileExists(client, metadataFile);
+
+                if (!dataExists) {
+                    return {
+                        success: false,
+                        message: '服务器上没有找到数据文件',
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: false
+                    };
+                }
+
+                // 下载远程数据
+                const remoteDataContent = await client.getFileContents(dataFile, { format: 'text' });
+                const remoteData = JSON.parse(remoteDataContent);
+
+                let remoteMetadata = null;
+                if (metadataExists) {
+                    const remoteMetadataContent = await client.getFileContents(metadataFile, { format: 'text' });
+                    remoteMetadata = JSON.parse(remoteMetadataContent);
+                }
+
+                // 获取本地数据
+                const localData = await this.generateExportData();
+                const localMetadata = await this.getLocalSyncMetadata();
+
+                // 检测冲突并生成专业的差异分析
+                const detailedDifferences = await this.generateDetailedDifferences(localData, remoteData, localMetadata, remoteMetadata);
+                
+                // 暂存远程数据供后续使用
+                this.tempRemoteData = remoteData;
+                this.tempRemoteMetadata = remoteMetadata;
+
+                console.log('手动下载完成，差异分析:', detailedDifferences);
+                return {
+                    success: true,
+                    message: detailedDifferences.hasDifferences ? '发现数据差异，请手动解决' : '数据下载成功，无差异',
+                    timestamp: new Date().toISOString(),
+                    hasConflicts: detailedDifferences.hasDifferences,
+                    differences: detailedDifferences,
+                    localData: localData,
+                    remoteData: remoteData
+                };
+
+            } catch (error) {
+                console.error('手动下载失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `下载失败: ${errorMessage}`,
+                    timestamp: new Date().toISOString(),
+                    hasConflicts: false
+                };
+            }
+        });
+
+        // 应用下载的数据
+        ipcMain.handle('webdav:apply-downloaded-data', async (event, resolution: any): Promise<SyncResult> => {
+            try {
+                console.log('应用下载的数据，解决方案:', resolution.strategy);
+
+                if (!this.tempRemoteData) {
+                    throw new Error('没有可应用的远程数据，请先下载');
+                }
+
+                let finalData = null;
+                
+                switch (resolution.strategy) {
+                    case 'use_remote':
+                        finalData = this.tempRemoteData;
+                        break;
+                    case 'use_local':
+                        // 不需要应用，直接返回成功
+                        return {
+                            success: true,
+                            message: '保持使用本地数据',
+                            timestamp: new Date().toISOString(),
+                            filesUploaded: 0,
+                            filesDownloaded: 0,
+                            conflictsDetected: 0,
+                            conflictsResolved: 1
+                        };
+                    case 'merge_smart':
+                    case 'merge_manual':
+                        finalData = resolution.mergedData;
+                        break;
+                    case 'cancel':
+                        return {
+                            success: false,
+                            message: '用户取消操作',
+                            timestamp: new Date().toISOString(),
+                            filesUploaded: 0,
+                            filesDownloaded: 0,
+                            conflictsDetected: 0,
+                            conflictsResolved: 0
+                        };
+                    default:
+                        throw new Error(`未知的解决策略: ${resolution.strategy}`);
+                }
+
+                // 应用数据到本地
+                if (this.dataManagementService) {
+                    await this.dataManagementService.importDataObject(finalData);
+                }
+                
+                // 更新同步时间
+                await this.updateLocalSyncTime(new Date().toISOString());
+
+                // 清理临时数据
+                this.tempRemoteData = null;
+                this.tempRemoteMetadata = null;
+
+                return {
+                    success: true,
+                    message: '数据应用成功',
+                    timestamp: new Date().toISOString(),
+                    filesUploaded: 0,
+                    filesDownloaded: 1,
+                    conflictsDetected: 1,
+                    conflictsResolved: 1
+                };
+
+            } catch (error) {
+                console.error('应用数据失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `应用数据失败: ${errorMessage}`,
+                    timestamp: new Date().toISOString(),
+                    filesUploaded: 0,
+                    filesDownloaded: 0,
+                    conflictsDetected: 0,
+                    conflictsResolved: 0
+                };
+            }
+        });
+
+        // 获取远程数据预览
+        ipcMain.handle('webdav:get-remote-preview', async () => {
+            try {
+                const config = await this.getStoredConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        message: '未找到 WebDAV 配置'
+                    };
+                }
+
+                const WebDAVClient = await this.getWebDAVClient();
+                const client = WebDAVClient(config.serverUrl, {
+                    username: config.username,
+                    password: config.password,
+                });
+
+                const remoteDir = '/ai-gist-sync';
+                const dataFile = `${remoteDir}/data.json`;
+                const metadataFile = `${remoteDir}/metadata.json`;
+
+                const dataExists = await this.checkRemoteFileExists(client, dataFile);
+                if (!dataExists) {
+                    return {
+                        success: false,
+                        message: '服务器上没有找到数据文件'
+                    };
+                }
+
+                const remoteDataContent = await client.getFileContents(dataFile, { format: 'text' });
+                const remoteData = JSON.parse(remoteDataContent);
+
+                let timestamp = new Date().toISOString();
+                if (await this.checkRemoteFileExists(client, metadataFile)) {
+                    const remoteMetadataContent = await client.getFileContents(metadataFile, { format: 'text' });
+                    const remoteMetadata = JSON.parse(remoteMetadataContent);
+                    timestamp = remoteMetadata.lastSyncTime || timestamp;
+                }
+
+                return {
+                    success: true,
+                    data: remoteData,
+                    timestamp: timestamp
+                };
+
+            } catch (error) {
+                console.error('获取远程数据预览失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `获取预览失败: ${errorMessage}`
+                };
+            }
+        });
+
+        // 比较本地和远程数据
+        ipcMain.handle('webdav:compare-data', async () => {
+            try {
+                const config = await this.getStoredConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        message: '未找到 WebDAV 配置'
+                    };
+                }
+
+                const WebDAVClient = await this.getWebDAVClient();
+                const client = WebDAVClient(config.serverUrl, {
+                    username: config.username,
+                    password: config.password,
+                });
+
+                const remoteDir = '/ai-gist-sync';
+                const dataFile = `${remoteDir}/data.json`;
+                const metadataFile = `${remoteDir}/metadata.json`;
+
+                const dataExists = await this.checkRemoteFileExists(client, dataFile);
+                if (!dataExists) {
+                    return {
+                        success: false,
+                        message: '服务器上没有找到数据文件'
+                    };
+                }
+
+                const remoteDataContent = await client.getFileContents(dataFile, { format: 'text' });
+                const remoteData = JSON.parse(remoteDataContent);
+                
+                let remoteMetadata = null;
+                if (await this.checkRemoteFileExists(client, metadataFile)) {
+                    const remoteMetadataContent = await client.getFileContents(metadataFile, { format: 'text' });
+                    remoteMetadata = JSON.parse(remoteMetadataContent);
+                }
+
+                const localData = await this.generateExportData();
+                const localMetadata = await this.getLocalSyncMetadata();
+
+                // 使用新的详细差异分析
+                const differences = await this.generateDetailedDifferences(localData, remoteData, localMetadata, remoteMetadata);
+
+                return {
+                    success: true,
+                    differences: differences
+                };
+
+            } catch (error) {
+                console.error('比较数据失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `比较失败: ${errorMessage}`
+                };
+            }
         });
 
         // 加密密码（供前端调用）
@@ -1207,5 +1468,413 @@ export class WebDAVService {
         
         const uniqueString = `${os.hostname()}-${os.platform()}-${app.getPath('userData')}`;
         return crypto.createHash('md5').update(uniqueString).digest('hex').substring(0, 12);
+    }
+
+    /**
+     * 检测本地和远程数据之间的冲突
+     */
+    private async detectConflicts(localData: any, remoteData: any, localMetadata: any, remoteMetadata: any): Promise<any[]> {
+        const conflicts: any[] = [];
+
+        if (!localData && !remoteData) {
+            return conflicts;
+        }
+
+        if (!localData) {
+            conflicts.push({
+                type: 'data_conflict',
+                description: '本地无数据，远程有数据',
+                resolution: 'remote_wins'
+            });
+            return conflicts;
+        }
+
+        if (!remoteData) {
+            conflicts.push({
+                type: 'data_conflict',
+                description: '远程无数据，本地有数据',
+                resolution: 'local_wins'
+            });
+            return conflicts;
+        }
+
+        // 比较数据哈希
+        const localHash = this.calculateDataHash(localData);
+        const remoteHash = this.calculateDataHash(remoteData);
+
+        if (localHash === remoteHash) {
+            // 数据相同，无冲突
+            return conflicts;
+        }
+
+        // 检查时间戳冲突
+        if (localMetadata && remoteMetadata) {
+            const localTime = new Date(localMetadata.lastSyncTime).getTime();
+            const remoteTime = new Date(remoteMetadata.lastSyncTime).getTime();
+            const timeDiff = Math.abs(localTime - remoteTime);
+
+            if (timeDiff > 300000) { // 5分钟
+                conflicts.push({
+                    type: 'timestamp_conflict',
+                    description: `时间差异较大: ${Math.round(timeDiff / 60000)} 分钟`,
+                    resolution: localTime > remoteTime ? 'local_wins' : 'remote_wins'
+                });
+            }
+        }
+
+        // 检查数据内容冲突
+        const dataConflicts = this.compareDataContent(localData, remoteData);
+        conflicts.push(...dataConflicts);
+
+        return conflicts;
+    }
+
+    /**
+     * 比较数据内容，找出具体的冲突项
+     */
+    private compareDataContent(localData: any, remoteData: any): any[] {
+        const conflicts: any[] = [];
+
+        // 比较分类
+        if (localData.categories && remoteData.categories) {
+            const categoryConflicts = this.compareArrayData(
+                localData.categories,
+                remoteData.categories,
+                'categories',
+                'id'
+            );
+            conflicts.push(...categoryConflicts);
+        }
+
+        // 比较提示词
+        if (localData.prompts && remoteData.prompts) {
+            const promptConflicts = this.compareArrayData(
+                localData.prompts,
+                remoteData.prompts,
+                'prompts',
+                'id'
+            );
+            conflicts.push(...promptConflicts);
+        }
+
+        // 比较AI配置
+        if (localData.aiConfigs && remoteData.aiConfigs) {
+            const aiConfigConflicts = this.compareArrayData(
+                localData.aiConfigs,
+                remoteData.aiConfigs,
+                'aiConfigs',
+                'id'
+            );
+            conflicts.push(...aiConfigConflicts);
+        }
+
+        return conflicts;
+    }
+
+    /**
+     * 比较数组数据
+     */
+    private compareArrayData(localArray: any[], remoteArray: any[], dataType: string, keyField: string): any[] {
+        const conflicts: any[] = [];
+        const localMap = new Map();
+        const remoteMap = new Map();
+
+        // 构建映射
+        localArray.forEach(item => {
+            localMap.set(item[keyField], item);
+        });
+
+        remoteArray.forEach(item => {
+            remoteMap.set(item[keyField], item);
+        });
+
+        // 检查修改的项
+        for (const [key, localItem] of localMap) {
+            if (remoteMap.has(key)) {
+                const remoteItem = remoteMap.get(key);
+                if (JSON.stringify(localItem) !== JSON.stringify(remoteItem)) {
+                    conflicts.push({
+                        type: 'data_conflict',
+                        description: `${dataType} 中的项目 "${localItem.name || localItem.title || key}" 在本地和远程都有修改`,
+                        resolution: 'merged',
+                        localData: localItem,
+                        remoteData: remoteItem
+                    });
+                }
+            }
+        }
+
+        return conflicts;
+    }
+
+    /**
+     * 生成专业的详细差异分析
+     */
+    private async generateDetailedDifferences(localData: any, remoteData: any, localMetadata: any, remoteMetadata: any): Promise<any> {
+        console.log('开始生成详细差异分析...');
+        
+        const differences = {
+            hasDifferences: false,
+            added: [] as any[],
+            modified: [] as any[],
+            deleted: [] as any[],
+            summary: {
+                localTotal: this.calculateTotalRecords(localData),
+                remoteTotal: this.calculateTotalRecords(remoteData),
+                conflicts: 0,
+                addedCount: 0,
+                modifiedCount: 0,
+                deletedCount: 0
+            }
+        };
+
+        // 比较各个数据类型
+        const dataTypes = [
+            { key: 'categories', name: '分类' },
+            { key: 'prompts', name: '提示词' },
+            { key: 'aiConfigs', name: 'AI配置' },
+            { key: 'history', name: '历史记录' }
+        ];
+        
+        for (const dataType of dataTypes) {
+            const localItems = localData[dataType.key] || [];
+            const remoteItems = remoteData[dataType.key] || [];
+            
+            const comparison = this.compareDataTypeItems(localItems, remoteItems, dataType.key, dataType.name);
+            differences.added.push(...comparison.added);
+            differences.modified.push(...comparison.modified);
+            differences.deleted.push(...comparison.deleted);
+        }
+
+        differences.summary.addedCount = differences.added.length;
+        differences.summary.modifiedCount = differences.modified.length;
+        differences.summary.deletedCount = differences.deleted.length;
+        differences.summary.conflicts = differences.modified.length;
+        
+        differences.hasDifferences = differences.added.length > 0 || differences.modified.length > 0 || differences.deleted.length > 0;
+
+        console.log(`差异分析完成: 新增${differences.summary.addedCount}, 修改${differences.summary.modifiedCount}, 删除${differences.summary.deletedCount}`);
+        return differences;
+    }
+
+    /**
+     * 比较特定数据类型的项目
+     */
+    private compareDataTypeItems(localItems: any[], remoteItems: any[], type: string, typeName: string): any {
+        const result = {
+            added: [] as any[],
+            modified: [] as any[],
+            deleted: [] as any[]
+        };
+
+        const localMap = new Map();
+        const remoteMap = new Map();
+
+        // 建立映射，便于查找
+        localItems.forEach(item => {
+            localMap.set(item.id, item);
+        });
+
+        remoteItems.forEach(item => {
+            remoteMap.set(item.id, item);
+        });
+
+        // 查找新增的项（远程有，本地没有）
+        for (const [id, remoteItem] of remoteMap) {
+            if (!localMap.has(id)) {
+                result.added.push({
+                    ...remoteItem,
+                    _type: type,
+                    _typeName: typeName,
+                    _changeType: 'added'
+                });
+            }
+        }
+
+        // 查找删除的项（本地有，远程没有）
+        for (const [id, localItem] of localMap) {
+            if (!remoteMap.has(id)) {
+                result.deleted.push({
+                    ...localItem,
+                    _type: type,
+                    _typeName: typeName,
+                    _changeType: 'deleted'
+                });
+            }
+        }
+
+        // 查找修改的项（两边都有但内容不同）
+        for (const [id, localItem] of localMap) {
+            const remoteItem = remoteMap.get(id);
+            if (remoteItem) {
+                // 创建用于比较的副本，移除时间戳等可能不同的字段
+                const localCompare = this.prepareForComparison(localItem);
+                const remoteCompare = this.prepareForComparison(remoteItem);
+                
+                if (JSON.stringify(localCompare) !== JSON.stringify(remoteCompare)) {
+                    result.modified.push({
+                        id,
+                        _type: type,
+                        _typeName: typeName,
+                        _changeType: 'modified',
+                        local: localItem,
+                        remote: remoteItem,
+                        localLastModified: localItem.updatedAt || localItem.lastModified || localItem.createdAt,
+                        remoteLastModified: remoteItem.updatedAt || remoteItem.lastModified || remoteItem.createdAt
+                    });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 准备用于比较的对象，移除不重要的字段
+     */
+    private prepareForComparison(obj: any): any {
+        const copy = { ...obj };
+        
+        // 移除时间戳字段，因为它们可能因同步而不同
+        delete copy.createdAt;
+        delete copy.updatedAt;
+        delete copy.lastModified;
+        delete copy.lastSyncTime;
+        delete copy._id;
+        delete copy.__v;
+        
+        // 对于字符串字段，规范化空白字符
+        Object.keys(copy).forEach(key => {
+            if (typeof copy[key] === 'string') {
+                copy[key] = copy[key].trim();
+            }
+        });
+        
+        return copy;
+    }
+
+    /**
+     * 比较两个数据集的差异
+     */
+    private compareDataSets(localData: any, remoteData: any): any {
+        const differences = {
+            added: [] as any[],
+            modified: [] as any[],
+            deleted: [] as any[],
+            summary: {
+                localTotal: 0,
+                remoteTotal: 0,
+                conflicts: 0
+            }
+        };
+
+        // 计算总数
+        differences.summary.localTotal = this.calculateTotalRecords(localData);
+        differences.summary.remoteTotal = this.calculateTotalRecords(remoteData);
+
+        // 比较各个数据类型
+        const dataTypes = ['categories', 'prompts', 'aiConfigs', 'history'];
+        
+        for (const type of dataTypes) {
+            const localItems = localData[type] || [];
+            const remoteItems = remoteData[type] || [];
+            
+            const comparison = this.compareArrayItems(localItems, remoteItems, type);
+            differences.added.push(...comparison.added);
+            differences.modified.push(...comparison.modified);
+            differences.deleted.push(...comparison.deleted);
+        }
+
+        differences.summary.conflicts = differences.modified.length;
+
+        return differences;
+    }
+
+    /**
+     * 比较数组项目
+     */
+    private compareArrayItems(localItems: any[], remoteItems: any[], type: string): any {
+        const result = {
+            added: [] as any[],
+            modified: [] as any[],
+            deleted: [] as any[]
+        };
+
+        const localMap = new Map();
+        const remoteMap = new Map();
+
+        localItems.forEach(item => {
+            localMap.set(item.id, { ...item, _type: type });
+        });
+
+        remoteItems.forEach(item => {
+            remoteMap.set(item.id, { ...item, _type: type });
+        });
+
+        // 查找新增的项（远程有，本地没有）
+        for (const [id, remoteItem] of remoteMap) {
+            if (!localMap.has(id)) {
+                result.added.push({
+                    ...remoteItem,
+                    _changeType: 'added'
+                });
+            }
+        }
+
+        // 查找删除的项（本地有，远程没有）
+        for (const [id, localItem] of localMap) {
+            if (!remoteMap.has(id)) {
+                result.deleted.push({
+                    ...localItem,
+                    _changeType: 'deleted'
+                });
+            }
+        }
+
+        // 查找修改的项
+        for (const [id, localItem] of localMap) {
+            if (remoteMap.has(id)) {
+                const remoteItem = remoteMap.get(id);
+                if (JSON.stringify(localItem) !== JSON.stringify(remoteItem)) {
+                    result.modified.push({
+                        id: id,
+                        _type: type,
+                        _changeType: 'modified',
+                        local: localItem,
+                        remote: remoteItem
+                    });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取存储的配置（解密密码）
+     */
+    private async getStoredConfig(): Promise<WebDAVConfig | null> {
+        try {
+            const preferences = this.preferencesManager.getPreferences();
+            const webdavConfig = preferences.webdav;
+
+            if (!webdavConfig || !webdavConfig.enabled) {
+                return null;
+            }
+
+            let password = webdavConfig.password;
+            if (this.isPasswordEncrypted(password)) {
+                password = this.decryptPassword(password);
+            }
+
+            return {
+                serverUrl: webdavConfig.serverUrl,
+                username: webdavConfig.username,
+                password: password
+            };
+        } catch (error) {
+            console.error('获取WebDAV配置失败:', error);
+            return null;
+        }
     }
 }

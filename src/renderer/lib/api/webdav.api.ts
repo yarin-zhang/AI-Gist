@@ -37,6 +37,21 @@ export interface ConflictDetail {
     remoteData?: any;
 }
 
+export interface ManualSyncResult {
+    success: boolean;
+    message: string;
+    timestamp: string;
+    hasConflicts: boolean;
+    conflictDetails?: ConflictDetail[];
+    localData?: any;
+    remoteData?: any;
+}
+
+export interface ConflictResolution {
+    strategy: 'use_local' | 'use_remote' | 'merge_manual' | 'cancel';
+    mergedData?: any;
+}
+
 export interface EncryptedPassword {
     encrypted: string;
     iv: string;
@@ -179,6 +194,84 @@ export class WebDAVAPI {
             return await ipcInvoke('webdav:decrypt-password', encryptedPassword);
         } catch (error) {
             console.error('密码解密失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 手动上传数据到 WebDAV 服务器
+     */
+    static async manualUpload(): Promise<ManualSyncResult> {
+        try {
+            return await ipcInvoke('webdav:manual-upload');
+        } catch (error) {
+            console.error('手动上传失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 手动从 WebDAV 服务器下载数据（检测冲突但不自动应用）
+     */
+    static async manualDownload(): Promise<ManualSyncResult> {
+        try {
+            return await ipcInvoke('webdav:manual-download');
+        } catch (error) {
+            console.error('手动下载失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 应用下载的数据（解决冲突后）
+     */
+    static async applyDownloadedData(resolution: ConflictResolution): Promise<SyncResult> {
+        try {
+            return await ipcInvoke('webdav:apply-downloaded-data', resolution);
+        } catch (error) {
+            console.error('应用下载数据失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 获取服务器上的数据预览（不下载）
+     */
+    static async getRemoteDataPreview(): Promise<{
+        success: boolean;
+        data?: any;
+        timestamp?: string;
+        message?: string;
+    }> {
+        try {
+            return await ipcInvoke('webdav:get-remote-preview');
+        } catch (error) {
+            console.error('获取远程数据预览失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 比较本地和远程数据差异
+     */
+    static async compareData(): Promise<{
+        success: boolean;
+        differences?: {
+            added: any[];
+            modified: any[];
+            deleted: any[];
+            summary: {
+                localTotal: number;
+                remoteTotal: number;
+                conflicts: number;
+            };
+        };
+        message?: string;
+    }> {
+        try {
+            return await ipcInvoke('webdav:compare-data');
+        } catch (error) {
+            console.error('比较数据失败:', error);
             throw error;
         }
     }

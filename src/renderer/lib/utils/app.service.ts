@@ -106,6 +106,31 @@ export class AppService {
     return { success: false, error: 'WebDAV API 不可用' };
   }
 
+  // 手动上传数据
+  async manualUploadWebDAV(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:manual-upload');
+  }
+
+  // 手动下载数据（检测冲突）
+  async manualDownloadWebDAV(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:manual-download');
+  }
+
+  // 应用下载的数据
+  async applyDownloadedData(resolution: any): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:apply-downloaded-data', resolution);
+  }
+
+  // 获取远程数据预览
+  async getRemoteDataPreview(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:get-remote-preview');
+  }
+
+  // 比较本地和远程数据
+  async compareWebDAVData(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:compare-data');
+  }
+
   async getWebDAVSyncStatus(): Promise<IpcResult<any>> {
     if (window.electronAPI?.webdav?.getSyncStatus) {
       try {
