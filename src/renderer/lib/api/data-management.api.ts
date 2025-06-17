@@ -78,6 +78,21 @@ export class DataManagementAPI {
     }
 
     /**
+     * 恢复备份（完全替换现有数据）
+     */
+    static async restoreBackupWithReplace(backupId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            return await ipcInvoke('data:restore-backup-replace', { backupId });
+        } catch (error) {
+            console.error('恢复备份失败:', error);
+            throw error;
+        }
+    }
+
+    /**
      * 删除备份
      */
     static async deleteBackup(backupId: string): Promise<void> {

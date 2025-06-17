@@ -96,23 +96,31 @@
                                             </NFlex>
                                         </NFlex>
                                         <NFlex :size="8">
-                                            <NButton 
-                                                type="primary" 
-                                                size="small" 
-                                                @click="restoreSpecificBackup(backup.id)"
-                                            >
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Recharging />
-                                                    </NIcon>
+                                            <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
+                                                negative-text="取消" positive-text="确定恢复" placement="top" :show-icon="false">
+                                                <template #trigger>
+                                                    <NButton type="primary" size="small"
+                                                        :loading="props.loading?.backup"
+                                                        :disabled="props.loading?.backup">
+                                                        <template #icon>
+                                                            <NIcon>
+                                                                <Recharging />
+                                                            </NIcon>
+                                                        </template>
+                                                        恢复
+                                                    </NButton>
                                                 </template>
-                                                恢复
-                                            </NButton>
-                                            <NPopconfirm
-                                                @positive-click="deleteBackup(backup.id)"
-                                                negative-text="取消"
-                                                positive-text="确定"
-                                            >
+                                                <div style="max-width: 300px;">
+                                                    <p>恢复备份将会：</p>
+                                                    <ul style="margin: 8px 0; padding-left: 20px;">
+                                                        <li>自动备份当前数据</li>
+                                                        <li>完全覆盖现有数据库</li>
+                                                        <li>此操作不可撤销</li>
+                                                    </ul>
+                                                </div>
+                                            </NPopconfirm>
+                                            <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
+                                                positive-text="确定">
                                                 <template #trigger>
                                                     <NButton type="error" size="small">
                                                         <template #icon>
@@ -129,18 +137,12 @@
                                     </NFlex>
                                 </NCard>
                             </div>
-                            
+
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination
-                                    v-model:page="currentPage"
-                                    :page-count="totalPages"
-                                    :page-size="pageSize"
-                                    :item-count="totalItems"
-                                    show-size-picker
-                                    show-quick-jumper
-                                    :page-sizes="[5, 10, 20]"
-                                />
+                                <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
+                                    :item-count="totalItems" show-size-picker show-quick-jumper
+                                    :page-sizes="[5, 10, 20]" />
                             </div>
                         </NFlex>
                     </div>
@@ -180,9 +182,53 @@
                                 </template>
                                 修复数据库
                             </NButton>
-
+                            <NPopconfirm
+                                @positive-click="clearDatabase"
+                                negative-text="取消"
+                                positive-text="确定清空"
+                                placement="top"
+                            >
+                                <template #trigger>
+                                    <NButton type="error" :loading="props.loading?.clearDatabase">
+                                        <template #icon>
+                                            <NIcon>
+                                                <DatabaseOff />
+                                            </NIcon>
+                                        </template>
+                                        清空数据库
+                                    </NButton>
+                                </template>
+                                <div style="max-width: 350px;">
+                                    <p><strong>⚠️ 危险操作警告</strong></p>
+                                    <p>清空数据库将会：</p>
+                                    <ul style="margin: 8px 0; padding-left: 20px;">
+                                        <li>自动创建当前数据的备份</li>
+                                        <li>删除所有现有数据</li>
+                                        <li>重置数据库到初始状态</li>
+                                        <li>此操作不可撤销</li>
+                                    </ul>
+                                    <p><strong>确定要清空整个数据库吗？</strong></p>
+                                </div>
+                            </NPopconfirm>
                         </NFlex>
                     </NFlex>
+
+                    <NAlert type="info" show-icon>
+                        <template #header>数据库维护说明</template>
+                        <div>
+                            <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
+                            <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
+                            <p>• <strong>清空数据库</strong>：完全清空所有数据（会先自动备份）</p>
+                        </div>
+                    </NAlert>
+
+                    <NAlert type="warning" show-icon>
+                        <template #header>重要提示</template>
+                        <div>
+                            <p>• 修复数据库会尝试恢复缺失的数据表，但可能需要重新登录或重新配置某些设置</p>
+                            <p>• 清空数据库是不可逆操作，执行前会自动创建备份以防意外</p>
+                        </div>
+                    </NAlert>
 
                 </NFlex>
             </div>
@@ -213,6 +259,7 @@ import {
     Refresh,
     Trash,
     Recharging,
+    DatabaseOff,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
 
@@ -224,6 +271,7 @@ const props = defineProps<{
         import?: boolean;
         repair?: boolean;
         healthCheck?: boolean;
+        clearDatabase?: boolean;
     };
 }>();
 
@@ -236,6 +284,7 @@ const emit = defineEmits<{
     "refresh-backup-list": [];
     "check-database-health": [];
     "repair-database": [];
+    "clear-database": [];
 }>();
 
 // 备份列表数据
@@ -293,6 +342,10 @@ const checkDatabaseHealth = () => {
 
 const repairDatabase = () => {
     emit("repair-database");
+};
+
+const clearDatabase = () => {
+    emit("clear-database");
 };
 
 // 暴露方法供父组件调用

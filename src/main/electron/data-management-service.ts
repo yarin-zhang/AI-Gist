@@ -152,6 +152,44 @@ export class DataManagementService {
             }
         });
 
+        // 恢复备份（完全替换现有数据）
+        ipcMain.handle('data:restore-backup-replace', async (event, { backupId }) => {
+            try {
+                const backups = await fs.readdir(this.backupDir);
+                let backupFile: BackupInfo | null = null;
+
+                for (const file of backups) {
+                    if (file.endsWith('.json')) {
+                        const filePath = path.join(this.backupDir, file);
+                        const content = await fs.readFile(filePath, 'utf-8');
+                        const backup: BackupInfo = JSON.parse(content);
+                        if (backup.id === backupId) {
+                            backupFile = backup;
+                            break;
+                        }
+                    }
+                }
+
+                if (!backupFile) {
+                    throw new Error('备份文件不存在');
+                }
+
+                // 使用替换模式恢复数据到数据库
+                await this.restoreAllDataWithReplace(backupFile.data);
+                
+                return { 
+                    success: true,
+                    message: `数据完全恢复成功: ${backupFile.name}`
+                };
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    message: `恢复备份失败: ${errorMessage}`
+                };
+            }
+        });
+
         // 删除备份
         ipcMain.handle('data:delete-backup', async (event, { backupId }) => {
             try {
@@ -404,6 +442,47 @@ export class DataManagementService {
         } catch (error) {
             console.error('恢复数据失败:', error);
             throw new Error(`数据恢复失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
+    }
+
+    private async restoreAllDataWithReplace(data: any) {
+        try {
+            console.log('正在完全替换数据库数据...');
+            
+            // 通过 executeJavaScript 调用渲染进程暴露的方法
+            const mainWindow = BrowserWindow.getAllWindows()[0];
+            if (!mainWindow) {
+                throw new Error('没有找到主窗口，无法访问数据库');
+            }
+
+            // 调用渲染进程中暴露的替换恢复方法
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.replaceAllData) {
+                            throw new Error('数据库API未初始化或不支持完全替换');
+                        }
+                        const data = ${JSON.stringify(data)};
+                        return await window.databaseAPI.replaceAllData(data);
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+            
+            if (!result.success) {
+                throw new Error(`数据替换失败: ${result.error}`);
+            }
+            
+            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log('替换详情:', result.details);
+            
+        } catch (error) {
+            console.error('替换数据失败:', error);
+            throw new Error(`数据完全替换失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
     }
 

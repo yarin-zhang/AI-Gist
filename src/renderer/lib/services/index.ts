@@ -638,6 +638,224 @@ export class DatabaseServiceManager {
   }
   
   /**
+   * 完全替换所有数据（先清空，再恢复）
+   */
+  async replaceAllData(backupData: any): Promise<DataImportResult> {
+    try {
+      console.log('渲染进程: 开始完全替换数据...');
+      
+      if (!backupData || typeof backupData !== 'object') {
+        throw new Error('恢复数据格式无效');
+      }
+      
+      // 强制清空所有数据表
+      console.log('强制清空所有数据表...');
+      await this.forceCleanAllTables();
+      
+      const details: Record<string, number> = {};
+      const restorePromises: Promise<void>[] = [];
+      let totalErrors = 0;
+      
+      // 恢复用户数据
+      if (backupData.users && backupData.users.length > 0) {
+        console.log(`恢复用户数据: ${backupData.users.length} 条`);
+        for (const user of backupData.users) {
+          // 移除ID以避免主键冲突，让数据库自动生成新ID
+          const { id, ...userDataWithoutId } = user;
+          restorePromises.push(
+            this.user.createUser(userDataWithoutId).catch(err => {
+              console.warn('恢复用户数据失败:', user.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.users = backupData.users.length;
+      }
+      
+      // 恢复Gist数据（使用 post 服务）
+      if (backupData.gists && backupData.gists.length > 0) {
+        console.log(`恢复Gist数据: ${backupData.gists.length} 条`);
+        for (const gist of backupData.gists) {
+          const { id, ...gistDataWithoutId } = gist;
+          restorePromises.push(
+            this.post.createPost(gistDataWithoutId).catch(err => {
+              console.warn('恢复Gist数据失败:', gist.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.gists = backupData.gists.length;
+      }
+      
+      // 恢复 Posts 数据（如果有的话）
+      if (backupData.posts && backupData.posts.length > 0) {
+        console.log(`恢复Posts数据: ${backupData.posts.length} 条`);
+        for (const post of backupData.posts) {
+          const { id, ...postDataWithoutId } = post;
+          restorePromises.push(
+            this.post.createPost(postDataWithoutId).catch(err => {
+              console.warn('恢复Posts数据失败:', post.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.posts = backupData.posts.length;
+      }
+      
+      // 恢复 Prompts 数据
+      if (backupData.prompts && backupData.prompts.length > 0) {
+        console.log(`恢复Prompts数据: ${backupData.prompts.length} 条`);
+        for (const prompt of backupData.prompts) {
+          const { id, ...promptDataWithoutId } = prompt;
+          restorePromises.push(
+            this.prompt.createPrompt(promptDataWithoutId).catch(err => {
+              console.warn('恢复Prompts数据失败:', prompt.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.prompts = backupData.prompts.length;
+      }
+      
+      // 恢复分类数据
+      if (backupData.categories && backupData.categories.length > 0) {
+        console.log(`恢复分类数据: ${backupData.categories.length} 条`);
+        for (const category of backupData.categories) {
+          const { id, ...categoryDataWithoutId } = category;
+          restorePromises.push(
+            this.category.createCategory(categoryDataWithoutId).catch(err => {
+              console.warn('恢复分类数据失败:', category.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.categories = backupData.categories.length;
+      }
+      
+      // 恢复AI历史数据
+      if (backupData.aiHistory && backupData.aiHistory.length > 0) {
+        console.log(`恢复AI历史数据: ${backupData.aiHistory.length} 条`);
+        for (const history of backupData.aiHistory) {
+          const { id, ...historyDataWithoutId } = history;
+          restorePromises.push(
+            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).catch(err => {
+              console.warn('恢复AI历史数据失败:', history.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.aiHistory = backupData.aiHistory.length;
+      }
+      
+      // 恢复设置数据
+      if (backupData.settings && backupData.settings.length > 0) {
+        console.log(`恢复设置数据: ${backupData.settings.length} 条`);
+        for (const setting of backupData.settings) {
+          restorePromises.push(
+            this.appSettings.setSetting(setting.key, setting.value).catch(err => {
+              console.warn('恢复设置数据失败:', setting.key, err.message);
+              totalErrors++;
+            })
+          );
+        }
+        details.settings = backupData.settings.length;
+      }
+      
+      // 等待所有恢复操作完成
+      await Promise.all(restorePromises);
+      
+      const totalRestored = Object.values(details).reduce((sum, count) => sum + count, 0);
+      
+      console.log(`渲染进程: 数据完全替换完成，总计恢复记录数: ${totalRestored}, 错误数: ${totalErrors}`);
+      
+      return {
+        success: true,
+        message: `数据完全替换成功，共恢复 ${totalRestored} 条记录${totalErrors > 0 ? `，失败 ${totalErrors} 条` : ''}`,
+        details,
+        totalRestored
+      };
+      
+    } catch (error) {
+      console.error('渲染进程: 完全替换数据失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: '数据完全替换失败'
+      };
+    }
+  }
+  
+  /**
+   * 强制清空所有数据表（公开方法）
+   */
+  async forceCleanAllTables(): Promise<void> {
+    try {
+      console.log('开始强制清空所有数据表...');
+      
+      // 使用更安全的方式清空数据表
+      const clearPromises: Promise<any>[] = [];
+      
+      // 只清空有清空方法的服务
+      if (this.appSettings.clearAllSettings) {
+        clearPromises.push(this.appSettings.clearAllSettings());
+      }
+      
+      // 对于其他服务，使用删除的方式来清空
+      try {
+        // 获取所有数据并删除
+        const [posts, categories, users, prompts, aiHistory] = await Promise.all([
+          this.post.getAllPosts().catch(() => []),
+          this.category.getAllCategories().catch(() => []),
+          this.user.getAllUsers().catch(() => []),
+          this.prompt.getAllPrompts().catch(() => []),
+          this.aiGenerationHistory.getAllAIGenerationHistory().catch(() => [])
+        ]);
+        
+        // 删除所有数据
+        for (const post of posts) {
+          if (post.id) {
+            clearPromises.push(this.post.deletePost(post.id).catch(() => {}));
+          }
+        }
+        
+        for (const category of categories) {
+          if (category.id) {
+            clearPromises.push(this.category.deleteCategory(category.id).catch(() => {}));
+          }
+        }
+        
+        for (const user of users) {
+          if (user.id) {
+            clearPromises.push(this.user.deleteUser(user.id).catch(() => {}));
+          }
+        }
+        
+        for (const prompt of prompts) {
+          if (prompt.id) {
+            clearPromises.push(this.prompt.deletePrompt(prompt.id).catch(() => {}));
+          }
+        }
+        
+        for (const history of aiHistory) {
+          if (history.id) {
+            clearPromises.push(this.aiGenerationHistory.deleteAIGenerationHistory(history.id).catch(() => {}));
+          }
+        }
+        
+      } catch (error) {
+        console.warn('清空部分数据表时出错:', error);
+      }
+      
+      await Promise.all(clearPromises);
+      console.log('所有数据表清空完成');
+      
+    } catch (error) {
+      console.error('清空数据表失败:', error);
+      throw new Error(`清空数据表失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
+  /**
    * 清空所有数据表（可选方法）
    */
   async clearAllTables?(): Promise<void> {

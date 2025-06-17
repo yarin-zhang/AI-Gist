@@ -74,6 +74,7 @@
                             @refresh-backup-list="refreshBackupList"
                             @check-database-health="checkDatabaseHealth"
                             @repair-database="repairDatabase"
+                            @clear-database="clearDatabase"
                         />
 
                         <!-- WebDAV 同步设置 -->
@@ -195,6 +196,7 @@ const loading = reactive({
     repair: false,
     healthCheck: false,
     backup: false,
+    clearDatabase: false,
 });
 
 // 设置数据
@@ -888,6 +890,37 @@ const checkDatabaseHealth = async () => {
         message.error("数据库健康检查失败");
     }
     loading.healthCheck = false;
+};
+
+// 清空数据库
+const clearDatabase = async () => {
+    loading.clearDatabase = true;
+    try {
+        // 步骤1: 先创建当前数据的备份
+        message.info("正在创建数据备份...");
+        const timestamp = new Date().toLocaleString('zh-CN');
+        const autoBackup = await DataManagementAPI.createBackup(`清空前自动备份 - ${timestamp}`);
+        console.log(`自动备份创建成功: ${autoBackup.name}`);
+        
+        // 步骤2: 清空数据库
+        message.info("正在清空数据库...");
+        const { databaseServiceManager } = await import("@/lib/services");
+        
+        // 使用强制清空方法
+        await databaseServiceManager.forceCleanAllTables();
+        
+        message.success(`数据库清空成功！已自动备份原数据: ${autoBackup.name}`);
+        
+        // 刷新备份列表
+        await refreshBackupList();
+        
+    } catch (error) {
+        console.error("清空数据库失败:", error);
+        const errorMessage = error instanceof Error ? error.message : '清空数据库失败';
+        message.error(`清空数据库失败: ${errorMessage}`);
+    } finally {
+        loading.clearDatabase = false;
+    }
 };
 
 // 组件挂载时加载设置

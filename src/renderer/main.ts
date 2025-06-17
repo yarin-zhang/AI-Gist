@@ -64,6 +64,11 @@ async function startApp() {
         return await databaseServiceManager.restoreData(backupData);
       },
       
+      // 数据完全替换方法
+      replaceAllData: async (backupData: any) => {
+        return await databaseServiceManager.replaceAllData(backupData);
+      },
+      
       // 健康检查方法
       getHealthStatus: async () => {
         return await databaseServiceManager.getHealthStatus();

@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),
     getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
     restoreBackup: (backupId: string) => ipcRenderer.invoke('data:restore-backup', { backupId }),
+    restoreBackupWithReplace: (backupId: string) => ipcRenderer.invoke('data:restore-backup-replace', { backupId }),
     deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
     export: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export', { options, exportPath }),
     import: (filePath: string, options: any) => ipcRenderer.invoke('data:import', { filePath, options }),
