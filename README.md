@@ -129,9 +129,9 @@ yarn build:linux    # 构建 Linux 安装包
 
 欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
 
-<div style="max-width: 300px; padding: 16px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); text-align: center;">
-  <img src="docs/images/QQ-QRCode.png?v=202506171718" alt="QQ 群" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
-</div>
+<p align="center">
+  <img src="docs/images/QQ-QRCode.png?v=202506171718" alt="QQ 群" width="200" />
+</p>
 
 ## 许可证
 
