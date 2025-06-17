@@ -132,6 +132,7 @@
                                     <NCheckbox v-model:checked="exportOptions.includeAIConfigs">
                                         <NFlex align="center" :size="8">
                                             <NText>AI 配置</NText>
+                                            <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
                                             <NTag size="small" type="warning">包含敏感信息</NTag>
                                         </NFlex>
                                     </NCheckbox>
@@ -144,6 +145,7 @@
                                     <NCheckbox v-model:checked="exportOptions.includeSettings">
                                         <NFlex align="center" :size="8">
                                             <NText>应用设置</NText>
+                                            <NTag size="small" type="info">{{ dataStats.settings || 0 }} 条</NTag>
                                             <NTag size="small" type="default">系统配置</NTag>
                                         </NFlex>
                                     </NCheckbox>

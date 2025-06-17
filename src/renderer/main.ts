@@ -76,7 +76,25 @@ async function startApp() {
       
       // 获取统计信息
       getStats: async () => {
-        return await databaseService.getDataStats();
+        try {
+          const result = await databaseService.getDataStatistics();
+          if (result.success) {
+            return {
+              success: true,
+              stats: result.data
+            };
+          } else {
+            return {
+              success: false,
+              error: result.error || '获取数据统计失败'
+            };
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : '未知错误'
+          };
+        }
       }
     };
     console.log('数据库服务已暴露到 window.databaseAPI');

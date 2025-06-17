@@ -110,8 +110,25 @@ if (typeof window !== 'undefined') {
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
     getHealthStatus: () => databaseManager.getHealthStatus(),
     getStats: async () => {
-      const { databaseService } = await import('./services');
-      return await databaseService.getDataStats();
+      try {
+        const result = await databaseManager.getDataStatistics();
+        if (result.success) {
+          return {
+            success: true,
+            stats: result.data
+          };
+        } else {
+          return {
+            success: false,
+            error: result.error || '获取数据统计失败'
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '未知错误'
+        };
+      }
     }
   };
 }

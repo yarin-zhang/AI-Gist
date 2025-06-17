@@ -889,7 +889,19 @@ const refreshDataStats = async () => {
         }
     } catch (error) {
         console.error('获取数据统计失败:', error);
-        // 不显示错误消息，因为这不是用户主动操作
+        // 在失败时使用默认值
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateDataStats({
+                categories: 0,
+                prompts: 0,
+                history: 0,
+                aiConfigs: 0,
+                settings: 0,
+                posts: 0,
+                users: 0,
+                totalRecords: 0,
+            });
+        }
     }
 };
 
