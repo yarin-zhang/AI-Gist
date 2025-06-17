@@ -60,23 +60,20 @@
                             </NFlex>
                         </NCard>
 
-                        <!-- 关闭行为设置 -->
-                        <CloseBehaviorSettings 
-                            v-show="activeSettingKey === 'close-behavior'"
-                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
-                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
-                        />
 
-                        <!-- 启动行为设置 -->
-                        <StartupBehaviorSettings 
-                            v-show="activeSettingKey === 'startup-behavior'"
-                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
-                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
-                        />                        <!-- 外观设置 -->
-                        <AppearanceSettings 
-                            v-show="activeSettingKey === 'appearance'"
-                            :model-value="{ themeSource: settings.themeSource }"
-                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        <!-- 数据管理设置 -->
+                        <DataManagementSettings 
+                            ref="dataManagementRef"
+                            v-show="activeSettingKey === 'data-management'"
+                            :loading="loading"
+                            @export-data="exportData"
+                            @import-data="importData"
+                            @create-backup="createBackup"
+                            @restore-backup="restoreSpecificBackup"
+                            @delete-backup="deleteBackup"
+                            @refresh-backup-list="refreshBackupList"
+                            @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase"
                         />
 
                         <!-- WebDAV 同步设置 -->
@@ -96,20 +93,29 @@
                             @sync-now="syncNow"
                         />
 
-                        <!-- 数据管理设置 -->
-                        <DataManagementSettings 
-                            ref="dataManagementRef"
-                            v-show="activeSettingKey === 'data-management'"
-                            :loading="loading"
-                            @export-data="exportData"
-                            @import-data="importData"
-                            @create-backup="createBackup"
-                            @restore-backup="restoreSpecificBackup"
-                            @delete-backup="deleteBackup"
-                            @refresh-backup-list="refreshBackupList"
-                            @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase"
-                        /><!-- 实验室 (仅开发环境) -->
+                        <!-- 外观设置 -->
+                        <AppearanceSettings 
+                            v-show="activeSettingKey === 'appearance'"
+                            :model-value="{ themeSource: settings.themeSource }"
+                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        />
+
+                        <!-- 关闭行为设置 -->
+                        <CloseBehaviorSettings 
+                            v-show="activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
+                        />
+
+                        <!-- 启动行为设置 -->
+                        <StartupBehaviorSettings 
+                            v-show="activeSettingKey === 'startup-behavior'"
+                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
+                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
+                        />
+                        
+                        
+                        <!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
@@ -173,7 +179,7 @@ const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
-const activeSettingKey = ref("appearance");
+const activeSettingKey = ref("data-management");
 
 // 组件引用
 const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
@@ -219,6 +225,16 @@ const settings = reactive({
 const menuOptions = computed(() => {
     const baseOptions = [
         {
+            label: "数据管理",
+            key: "data-management",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
+        },
+        {
+            label: "WebDAV 同步",
+            key: "webdav-sync",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
+        },
+        {
             label: "外观设置",
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
@@ -232,16 +248,6 @@ const menuOptions = computed(() => {
             label: "关闭行为设置",
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
-        },
-        {
-            label: "WebDAV 同步",
-            key: "webdav-sync",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
-        },
-        {
-            label: "数据管理",
-            key: "data-management",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
         },
     ];
 
@@ -291,7 +297,7 @@ const currentSectionInfo = computed(() => {
             description: "开发中的实验性功能和组件测试"
         },
     };
-    return sections[activeSettingKey.value] || sections["appearance"];
+    return sections[activeSettingKey.value] || sections["data-management"];
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
@@ -651,12 +657,21 @@ const restoreBackup = async () => {
 
 // 恢复指定备份
 const restoreSpecificBackup = async (backupId: string) => {
+    loading.backup = true;
     try {
-        const result = await DataManagementAPI.restoreBackup(backupId);
+        // 步骤1: 先创建当前数据的自动备份
+        message.info("正在创建当前数据的自动备份...");
+        const timestamp = new Date().toLocaleString('zh-CN');
+        const autoBackup = await DataManagementAPI.createBackup(`恢复前自动备份 - ${timestamp}`);
+        console.log(`自动备份创建成功: ${autoBackup.name}`);
+        
+        // 步骤2: 执行恢复操作
+        message.info("正在恢复备份数据...");
+        const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
         
         if (result.success) {
             const successMessage = result.message || "备份恢复成功";
-            message.success(successMessage);
+            message.success(`${successMessage}。已自动备份原数据: ${autoBackup.name}`);
             // 恢复成功后刷新备份列表
             await refreshBackupList();
         } else {
@@ -664,7 +679,10 @@ const restoreSpecificBackup = async (backupId: string) => {
         }
     } catch (error) {
         console.error("恢复备份失败:", error);
-        message.error("恢复备份失败");
+        const errorMessage = error instanceof Error ? error.message : '恢复备份失败';
+        message.error(`恢复备份失败: ${errorMessage}`);
+    } finally {
+        loading.backup = false;
     }
 };
 
