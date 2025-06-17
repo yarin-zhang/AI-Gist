@@ -35,6 +35,13 @@ export interface ImportResult {
     errors: string[];
 }
 
+export interface ExportResult {
+    success: boolean;
+    message?: string;
+    filePath?: string;
+    error?: string;
+}
+
 export interface DataStats {
     categories: number;
     prompts: number;

@@ -141,16 +141,7 @@
                         </NCard>
                         
                         <NFlex :size="12">
-                            <NButton type="primary" @click="exportSelectedData('json')" 
-                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 JSON
-                            </NButton>
-                            <NButton @click="exportSelectedData('csv')" 
+                            <NButton type="primary" @click="exportSelectedData('csv')" 
                                      :disabled="!hasSelectedData" :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
@@ -158,6 +149,15 @@
                                     </NIcon>
                                 </template>
                                 导出为 CSV
+                            </NButton>
+                            <NButton @click="exportSelectedData('json')" 
+                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 JSON
                             </NButton>
                         </NFlex>
                         
