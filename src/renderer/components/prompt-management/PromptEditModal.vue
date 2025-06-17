@@ -32,9 +32,45 @@
                                             </NFormItem>
                                         </NFlex>
                                         <NAlert type="info" :show-icon="false" style="margin: 0;">
-                                            <NText depth="3" style="font-size: 12px;">
-                                                ❇ 可使用 <code v-pre>{{变量名}}</code> 来定义可替换的变量
-                                            </NText>
+                                            <NFlex justify="space-between" align="center">
+                                                <NText depth="3" style="font-size: 12px;">
+                                                    快速优化提示词：
+                                                </NText>
+                                                <NFlex size="small">
+                                                    <NButton 
+                                                        size="small" 
+                                                        @click="optimizePrompt('shorter')"
+                                                        :loading="optimizing === 'shorter'"
+                                                        :disabled="!formData.content.trim() || optimizing !== null"
+                                                    >
+                                                        更简短
+                                                    </NButton>
+                                                    <NButton 
+                                                        size="small" 
+                                                        @click="optimizePrompt('richer')"
+                                                        :loading="optimizing === 'richer'"
+                                                        :disabled="!formData.content.trim() || optimizing !== null"
+                                                    >
+                                                        更丰富
+                                                    </NButton>
+                                                    <NButton 
+                                                        size="small" 
+                                                        @click="optimizePrompt('general')"
+                                                        :loading="optimizing === 'general'"
+                                                        :disabled="!formData.content.trim() || optimizing !== null"
+                                                    >
+                                                        更通用
+                                                    </NButton>
+                                                    <NButton 
+                                                        size="small" 
+                                                        @click="optimizePrompt('extract')"
+                                                        :loading="optimizing === 'extract'"
+                                                        :disabled="!formData.content.trim() || optimizing !== null"
+                                                    >
+                                                        提取变量
+                                                    </NButton>
+                                                </NFlex>
+                                            </NFlex>
                                         </NAlert>
                                     </NScrollbar>
                                 </NCard>
@@ -508,6 +544,11 @@ const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
 const previewHistory = ref<PromptHistory | null>(null);
 
+// 优化相关状态
+const optimizing = ref<string | null>(null);
+const aiConfigs = ref([]);
+const selectedConfigId = ref("");
+
 // 获取窗口尺寸用于响应式布局
 const { modalWidth } = useWindowSize();
 
@@ -606,6 +647,9 @@ const resetForm = () => {
     };
     activeTab.value = "edit";
     historyList.value = [];
+    
+    // 重置优化状态
+    optimizing.value = null;
 
     // 清理表单验证状态
     nextTick(() => {
@@ -676,6 +720,128 @@ const createHistoryRecord = async (currentPrompt: any) => {
     }
 };
 
+// 加载AI配置列表
+const loadAIConfigs = async () => {
+    try {
+        // 使用数据库API获取AI配置
+        const allConfigs = await api.aiConfigs.getAll.query();
+        aiConfigs.value = allConfigs.filter(config => config.enabled);
+        
+        // 设置默认选择的配置（优先选择首选配置）
+        const preferredConfig = aiConfigs.value.find(config => config.isPreferred);
+        if (preferredConfig) {
+            selectedConfigId.value = preferredConfig.configId;
+        } else if (aiConfigs.value.length > 0) {
+            selectedConfigId.value = aiConfigs.value[0].configId;
+        }
+    } catch (error) {
+        console.error("加载AI配置失败:", error);
+        message.error("加载AI配置失败");
+    }
+};
+
+// 优化提示词功能
+const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract') => {
+    if (!formData.value.content.trim()) {
+        message.warning("请先输入提示词内容");
+        return;
+    }
+
+    if (aiConfigs.value.length === 0) {
+        message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
+        return;
+    }
+
+    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+    if (!selectedConfig) {
+        message.error("请选择一个AI配置");
+        return;
+    }
+
+    optimizing.value = type;
+
+    try {
+        console.log("开始优化提示词:", type, formData.value.content);
+        
+        // 构建优化指令
+        let optimizationPrompt = "";
+        switch (type) {
+            case 'shorter':
+                optimizationPrompt = `请将以下提示词优化得更加简短和精炼，保留核心要求，去除冗余内容：\n\n${formData.value.content}`;
+                break;
+            case 'richer':
+                optimizationPrompt = `请将以下提示词优化得更加丰富和详细，添加更多具体的要求和细节：\n\n${formData.value.content}`;
+                break;
+            case 'general':
+                optimizationPrompt = `请将以下提示词优化得更加通用，适用于更广泛的场景和用途：\n\n${formData.value.content}`;
+                break;
+            case 'extract':
+                optimizationPrompt = `请分析以下提示词，将其中可以变化的部分提取为变量，使用 {{变量名}} 的格式标记：\n\n${formData.value.content}`;
+                break;
+        }
+        
+        // 序列化配置以确保可以通过 IPC 传递
+        const serializedConfig = {
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
+            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+        };
+
+        // 构建请求参数
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(optimizationPrompt),
+            customPrompt: String(optimizationPrompt),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("优化请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 调用AI接口
+        const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        
+        // 更新提示词内容
+        formData.value.content = result.generatedPrompt;
+        
+        // 如果是提取变量类型，立即重新提取变量
+        if (type === 'extract') {
+            nextTick(() => {
+                extractVariables(result.generatedPrompt);
+            });
+        }
+        
+        message.success(`提示词已优化（${getOptimizationTypeName(type)}）`);
+
+    } catch (error) {
+        console.error("优化失败:", error);
+        message.error("优化失败: " + (error.message || "未知错误"));
+    } finally {
+        optimizing.value = null;
+    }
+};
+
+// 获取优化类型名称
+const getOptimizationTypeName = (type: string) => {
+    switch (type) {
+        case 'shorter': return '更简短';
+        case 'richer': return '更丰富';
+        case 'general': return '更通用';
+        case 'extract': return '提取变量';
+        default: return '优化';
+    }
+};
+
 // 格式化日期
 const formatDate = (date: Date | string) => {
     const d = new Date(date);
@@ -687,8 +853,6 @@ const formatDate = (date: Date | string) => {
         minute: "2-digit",
     });
 };
-
-// 获取内容预览
 const getContentPreview = (content: string) => {
     return content.length > 100 ? content.substring(0, 100) + "..." : content;
 };
@@ -890,6 +1054,9 @@ watch(
         if (newShow && !oldShow) {
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
+            
+            // 加载AI配置
+            loadAIConfigs();
 
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
@@ -905,6 +1072,9 @@ watch(
                 clearTimeout(debounceTimer.value);
                 debounceTimer.value = null;
             }
+            
+            // 重置优化状态
+            optimizing.value = null;
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
             setTimeout(() => {
@@ -1027,6 +1197,9 @@ const handleCancel = () => {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
+    
+    // 重置优化状态
+    optimizing.value = null;
 
     emit("update:show", false);
 };
