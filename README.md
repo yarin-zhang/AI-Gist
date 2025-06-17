@@ -10,16 +10,18 @@
 
 ![](docs/images/imageMain.png?v=4)
 
-## 特点
+## 📌 特点
 
 - **提示词模板管理**：集中管理和组织所有 AI 提示词模板
 - **变量填充**：支持在提示词中定义变量，使用时可动态填充
 - **分类与标签**：通过分类和标签系统轻松查找和过滤提示词
-- **一键复制**：一键复制生成的提示词，直接粘贴到其他 AI 工具中使用
 - **历史记录**：保存使用过的提示词，方便重复使用和优化
+- **100% 数据**：拥有完整的数据控制，完整支持导出和导入
+- **本地优先**：所有数据存储在本地，确保隐私和安全
+- **WebDAV**：支持 WebDAV 同步，方便在多设备间共享数据
 - **跨平台支持**：支持 Windows、macOS 和 Linux 系统
 
-## 🚀 下载
+## ⬇️ 下载
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/yarin-zhang/AI-Gist?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases/latest) [![GitHub all releases](https://img.shields.io/github/downloads/yarin-zhang/AI-Gist/total?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases)
 
@@ -30,7 +32,7 @@
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
 
-### 安装说明
+## 🚀 安装说明
 
 - **Windows：** 下载 `.exe` 文件后双击运行安装
 - **macOS：** 下载 `.dmg` 文件后打开，将应用拖拽到应用程序文件夹，在终端执行 `xattr -cr /Applications/AI\ Gist.app` 以解除“已损坏”报错后启动。
@@ -38,12 +40,15 @@
 
 ## 📒 使用说明
 
-1. **创建提示词模板**：点击"新建"按钮创建新的提示词模板，设置标题、内容和变量
-2. **使用变量**：在提示词内容中使用 `{{变量名}}` 格式定义变量
-3. **填充变量**：选择模板后，系统会提示填写变量值
-4. **生成提示词**：填写变量后自动生成最终提示词
-5. **复制使用**：点击复制按钮，将生成的提示词粘贴到任何 AI 工具中
-6. **管理模板**：通过左侧导航栏管理分类和标签，组织你的提示词库
+方法一：手动维护数据
+
+- 在应用中手动添加提示词模板、变量和分类标签
+- 使用时直接选择模板，输入变量值即可
+
+方法二：AI 生成提示词
+
+- 先在应用中添加 AI 模型（支持纯本地 Ollama、LM Studio 模型，以及常见的 OpenAI、DeepSeek 等在线模型）。
+- 在首页使用 AI 模型生成提示词。
 
 ## 开发说明
 
