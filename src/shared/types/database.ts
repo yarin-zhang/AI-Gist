@@ -5,6 +5,7 @@
 
 /**
  * 用户数据模型
+ * @deprecated 不再使用，保留仅为了向后兼容
  */
 export interface User {
   id?: number;
@@ -16,6 +17,7 @@ export interface User {
 
 /**
  * 文章数据模型
+ * @deprecated 不再使用，保留仅为了向后兼容
  */
 export interface Post {
   id?: number;
@@ -196,8 +198,6 @@ export interface DatabaseHealthStatus {
 export interface DatabaseExportResult {
   success: boolean;
   data?: {
-    users: User[];
-    posts: Post[];
     categories: Category[];
     prompts: Prompt[];
     aiConfigs: AIConfig[];
@@ -223,8 +223,6 @@ export interface DatabaseImportResult {
   totalImported?: number;
   totalErrors?: number;
   details?: {
-    users?: number;
-    posts?: number;
     categories?: number;
     prompts?: number;
     aiConfigs?: number;

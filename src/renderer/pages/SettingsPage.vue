@@ -60,23 +60,24 @@
                             </NFlex>
                         </NCard>
 
-                        <!-- 关闭行为设置 -->
-                        <CloseBehaviorSettings 
-                            v-show="activeSettingKey === 'close-behavior'"
-                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
-                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
-                        />
 
-                        <!-- 启动行为设置 -->
-                        <StartupBehaviorSettings 
-                            v-show="activeSettingKey === 'startup-behavior'"
-                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
-                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
-                        />                        <!-- 外观设置 -->
-                        <AppearanceSettings 
-                            v-show="activeSettingKey === 'appearance'"
-                            :model-value="{ themeSource: settings.themeSource }"
-                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        <!-- 数据管理设置 -->
+                        <DataManagementSettings 
+                            ref="dataManagementRef"
+                            v-show="activeSettingKey === 'data-management'"
+                            :loading="loading"
+                            @export-data="exportData"
+                            @import-data="importData"
+                            @export-selected-data="exportSelectedData"
+                            @export-full-backup="exportFullBackup"
+                            @import-full-backup="importFullBackup"
+                            @create-backup="createBackup"
+                            @restore-backup="restoreSpecificBackup"
+                            @delete-backup="deleteBackup"
+                            @refresh-backup-list="refreshBackupList"
+                            @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase"
+                            @clear-database="clearDatabase"
                         />
 
                         <!-- WebDAV 同步设置 -->
@@ -96,19 +97,29 @@
                             @sync-now="syncNow"
                         />
 
-                        <!-- 数据管理设置 -->
-                        <DataManagementSettings 
-                            ref="dataManagementRef"
-                            v-show="activeSettingKey === 'data-management'"
-                            @export-data="exportData"
-                            @import-data="importData"
-                            @create-backup="createBackup"
-                            @restore-backup="restoreSpecificBackup"
-                            @delete-backup="deleteBackup"
-                            @refresh-backup-list="refreshBackupList"
-                            @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase"
-                        /><!-- 实验室 (仅开发环境) -->
+                        <!-- 外观设置 -->
+                        <AppearanceSettings 
+                            v-show="activeSettingKey === 'appearance'"
+                            :model-value="{ themeSource: settings.themeSource }"
+                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
+                        />
+
+                        <!-- 关闭行为设置 -->
+                        <CloseBehaviorSettings 
+                            v-show="activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
+                        />
+
+                        <!-- 启动行为设置 -->
+                        <StartupBehaviorSettings 
+                            v-show="activeSettingKey === 'startup-behavior'"
+                            :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
+                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
+                        />
+                        
+                        
+                        <!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
@@ -172,7 +183,7 @@ const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
-const activeSettingKey = ref("appearance");
+const activeSettingKey = ref("data-management");
 
 // 组件引用
 const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
@@ -187,6 +198,8 @@ const loading = reactive({
     import: false,
     repair: false,
     healthCheck: false,
+    backup: false,
+    clearDatabase: false,
 });
 
 // 设置数据
@@ -217,6 +230,16 @@ const settings = reactive({
 const menuOptions = computed(() => {
     const baseOptions = [
         {
+            label: "数据管理",
+            key: "data-management",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
+        },
+        {
+            label: "WebDAV 同步",
+            key: "webdav-sync",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
+        },
+        {
             label: "外观设置",
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
@@ -230,16 +253,6 @@ const menuOptions = computed(() => {
             label: "关闭行为设置",
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
-        },
-        {
-            label: "WebDAV 同步",
-            key: "webdav-sync",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
-        },
-        {
-            label: "数据管理",
-            key: "data-management",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
         },
     ];
 
@@ -289,7 +302,7 @@ const currentSectionInfo = computed(() => {
             description: "开发中的实验性功能和组件测试"
         },
     };
-    return sections[activeSettingKey.value] || sections["appearance"];
+    return sections[activeSettingKey.value] || sections["data-management"];
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
@@ -602,13 +615,19 @@ const syncNow = async () => {
 
 // 创建备份
 const createBackup = async () => {
+    loading.backup = true;
     try {
         const timestamp = new Date().toLocaleString('zh-CN');
         const backup = await DataManagementAPI.createBackup(`手动备份 - ${timestamp}`);
         message.success(`备份创建成功: ${backup.name} (大小: ${(backup.size / 1024).toFixed(2)} KB)`);
+        
+        // 创建成功后立即刷新备份列表
+        await refreshBackupList();
     } catch (error) {
         console.error("创建备份失败:", error);
         message.error("创建备份失败");
+    } finally {
+        loading.backup = false;
     }
 };
 
@@ -643,12 +662,21 @@ const restoreBackup = async () => {
 
 // 恢复指定备份
 const restoreSpecificBackup = async (backupId: string) => {
+    loading.backup = true;
     try {
-        const result = await DataManagementAPI.restoreBackup(backupId);
+        // 步骤1: 先创建当前数据的自动备份
+        message.info("正在创建当前数据的自动备份...");
+        const timestamp = new Date().toLocaleString('zh-CN');
+        const autoBackup = await DataManagementAPI.createBackup(`恢复前自动备份 - ${timestamp}`);
+        console.log(`自动备份创建成功: ${autoBackup.name}`);
+        
+        // 步骤2: 执行恢复操作
+        message.info("正在恢复备份数据...");
+        const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
         
         if (result.success) {
             const successMessage = result.message || "备份恢复成功";
-            message.success(successMessage);
+            message.success(`${successMessage}。已自动备份原数据: ${autoBackup.name}`);
             // 恢复成功后刷新备份列表
             await refreshBackupList();
         } else {
@@ -656,20 +684,32 @@ const restoreSpecificBackup = async (backupId: string) => {
         }
     } catch (error) {
         console.error("恢复备份失败:", error);
-        message.error("恢复备份失败");
+        const errorMessage = error instanceof Error ? error.message : '恢复备份失败';
+        message.error(`恢复备份失败: ${errorMessage}`);
+    } finally {
+        loading.backup = false;
     }
 };
 
 // 删除备份
 const deleteBackup = async (backupId: string) => {
     try {
+        console.log(`开始删除备份: ${backupId}`);
         await DataManagementAPI.deleteBackup(backupId);
         message.success("备份删除成功");
         // 删除成功后刷新备份列表
         await refreshBackupList();
     } catch (error) {
         console.error("删除备份失败:", error);
-        message.error("删除备份失败");
+        const errorMessage = error instanceof Error ? error.message : '删除备份失败';
+        message.error(`删除备份失败: ${errorMessage}`);
+        
+        // 删除失败后也刷新备份列表，以确保UI状态正确
+        try {
+            await refreshBackupList();
+        } catch (refreshError) {
+            console.error("刷新备份列表失败:", refreshError);
+        }
     }
 };
 
@@ -758,7 +798,113 @@ const importData = async (format: 'json' | 'csv') => {
     loading.import = false;
 };
 
-// 格式化同步时间 - 已移至子组件，删除此函数
+// 选择性数据导出
+const exportSelectedData = async (format: 'json' | 'csv', options: any) => {
+    loading.export = true;
+    try {
+        console.log('开始选择性数据导出:', { format, options });
+        
+        const result = await DataManagementAPI.exportSelectedData({
+            format,
+            ...options
+        });
+        
+        if (result.success) {
+            const sizeText = result.size ? ` (${(result.size / 1024).toFixed(2)} KB)` : '';
+            message.success(result.message || `选择性数据导出成功${sizeText}`);
+            
+            // 如果包含AI配置，显示安全提醒
+            if (options.includeAIConfigs) {
+                message.warning('导出文件包含AI配置信息，请妥善保管避免泄露', {
+                    duration: 5000
+                });
+            }
+        } else {
+            message.error(result.message || '选择性数据导出失败');
+        }
+    } catch (error) {
+        console.error('选择性数据导出失败:', error);
+        message.error('选择性数据导出失败');
+    }
+    loading.export = false;
+};
+
+// 完整备份导出
+const exportFullBackup = async () => {
+    loading.export = true;
+    try {
+        console.log('开始完整备份导出...');
+        
+        const result = await DataManagementAPI.exportFullBackup();
+        
+        if (result.success) {
+            const sizeText = result.size ? ` (${(result.size / 1024 / 1024).toFixed(2)} MB)` : '';
+            message.success(result.message || `完整备份导出成功${sizeText}`);
+            
+            // 提醒用户备份包含敏感信息
+            message.warning('完整备份包含所有数据和配置信息，请妥善保管', {
+                duration: 5000
+            });
+        } else {
+            message.error(result.message || '完整备份导出失败');
+        }
+    } catch (error) {
+        console.error('完整备份导出失败:', error);
+        message.error('完整备份导出失败');
+    }
+    loading.export = false;
+};
+
+// 完整备份导入
+const importFullBackup = async () => {
+    loading.import = true;
+    try {
+        console.log('开始完整备份导入...');
+        
+        const result = await DataManagementAPI.importFullBackup();
+        
+        if (result.success) {
+            message.success(result.message || '完整备份导入成功');
+            // 导入成功后刷新备份列表和数据统计
+            await refreshBackupList();
+            await refreshDataStats();
+        } else {
+            message.error(result.message || '完整备份导入失败');
+        }
+    } catch (error) {
+        console.error('完整备份导入失败:', error);
+        message.error('完整备份导入失败');
+    }
+    loading.import = false;
+};
+
+// 刷新数据统计
+const refreshDataStats = async () => {
+    try {
+        const stats = await DataManagementAPI.getDataStats();
+        
+        // 更新子组件的数据统计
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateDataStats(stats);
+        }
+    } catch (error) {
+        console.error('获取数据统计失败:', error);
+        // 在失败时使用默认值
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateDataStats({
+                categories: 0,
+                prompts: 0,
+                history: 0,
+                aiConfigs: 0,
+                settings: 0,
+                posts: 0,
+                users: 0,
+                totalRecords: 0,
+            });
+        }
+    }
+};
+
 
 // 重置设置
 const resetSettings = async () => {
@@ -855,17 +1001,50 @@ const checkDatabaseHealth = async () => {
     loading.healthCheck = false;
 };
 
+// 清空数据库
+const clearDatabase = async () => {
+    loading.clearDatabase = true;
+    try {
+        // 步骤1: 先创建当前数据的备份
+        message.info("正在创建数据备份...");
+        const timestamp = new Date().toLocaleString('zh-CN');
+        const autoBackup = await DataManagementAPI.createBackup(`清空前自动备份 - ${timestamp}`);
+        console.log(`自动备份创建成功: ${autoBackup.name}`);
+        
+        // 步骤2: 清空数据库
+        message.info("正在清空数据库...");
+        const { databaseServiceManager } = await import("@/lib/services");
+        
+        // 使用强制清空方法
+        await databaseServiceManager.forceCleanAllTables();
+        
+        message.success(`数据库清空成功！已自动备份原数据: ${autoBackup.name}`);
+        
+        // 刷新备份列表
+        await refreshBackupList();
+        
+    } catch (error) {
+        console.error("清空数据库失败:", error);
+        const errorMessage = error instanceof Error ? error.message : '清空数据库失败';
+        message.error(`清空数据库失败: ${errorMessage}`);
+    } finally {
+        loading.clearDatabase = false;
+    }
+};
+
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
-    // 加载备份列表
+    // 加载备份列表和数据统计
     await refreshBackupList();
+    await refreshDataStats();
 });
 
-// 监听设置页面切换，当切换到数据管理页面时刷新备份列表
+// 监听设置页面切换，当切换到数据管理页面时刷新备份列表和数据统计
 watch(activeSettingKey, async (newKey) => {
     if (newKey === 'data-management') {
         await refreshBackupList();
+        await refreshDataStats();
     }
 });
 </script>

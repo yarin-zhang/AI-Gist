@@ -84,25 +84,6 @@ export class BaseDatabaseService {
     console.log('开始创建对象存储...');
     
     try {
-      // 创建 users 表
-      if (!db.objectStoreNames.contains('users')) {
-        console.log('创建 users 对象存储');
-        const userStore = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
-        userStore.createIndex('email', 'email', { unique: true });
-      } else {
-        console.log('users 对象存储已存在');
-      }
-
-      // 创建 posts 表
-      if (!db.objectStoreNames.contains('posts')) {
-        console.log('创建 posts 对象存储');
-        const postStore = db.createObjectStore('posts', { keyPath: 'id', autoIncrement: true });
-        postStore.createIndex('authorId', 'authorId', { unique: false });
-        postStore.createIndex('published', 'published', { unique: false });
-      } else {
-        console.log('posts 对象存储已存在');
-      }
-
       // 创建 categories 表
       if (!db.objectStoreNames.contains('categories')) {
         console.log('创建 categories 对象存储');
@@ -495,8 +476,6 @@ export class BaseDatabaseService {
       }
 
       const requiredStores = [
-        'users',
-        'posts', 
         'categories',
         'prompts',
         'promptVariables',

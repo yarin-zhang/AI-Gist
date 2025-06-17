@@ -31,15 +31,7 @@ export class DatabaseManager {
   async exportAllData(): Promise<any> {
     const { databaseService } = await import('./services');
     
-    return {
-      users: await databaseService.users.getAll(),
-      posts: await databaseService.posts.getAll(),
-      categories: await databaseService.categories.getAll(),
-      prompts: await databaseService.prompts.getAll(),
-      aiConfigs: await databaseService.aiConfigs.getAll(),
-      aiHistory: await databaseService.aiHistory.getAll(),
-      settings: await databaseService.settings.getAll()
-    };
+    return await databaseService.exportAllData();
   }
 
   /**
@@ -48,47 +40,7 @@ export class DatabaseManager {
   async importData(data: any): Promise<void> {
     const { databaseService } = await import('./services');
     
-    if (data.users) {
-      for (const user of data.users) {
-        await databaseService.users.create(user);
-      }
-    }
-    
-    if (data.posts) {
-      for (const post of data.posts) {
-        await databaseService.posts.create(post);
-      }
-    }
-    
-    if (data.categories) {
-      for (const category of data.categories) {
-        await databaseService.categories.create(category);
-      }
-    }
-    
-    if (data.prompts) {
-      for (const prompt of data.prompts) {
-        await databaseService.prompts.create(prompt);
-      }
-    }
-    
-    if (data.aiConfigs) {
-      for (const config of data.aiConfigs) {
-        await databaseService.aiConfigs.create(config);
-      }
-    }
-    
-    if (data.aiHistory) {
-      for (const history of data.aiHistory) {
-        await databaseService.aiHistory.create(history);
-      }
-    }
-    
-    if (data.settings) {
-      for (const setting of data.settings) {
-        await databaseService.settings.create(setting);
-      }
-    }
+    await databaseService.importData(data);
   }
 
   /**
@@ -119,15 +71,7 @@ export class DatabaseManager {
     const { databaseService } = await import('./services');
     
     try {
-      const stats = {
-        users: await databaseService.users.count(),
-        posts: await databaseService.posts.count(),
-        categories: await databaseService.categories.count(),
-        prompts: await databaseService.prompts.count(),
-        aiConfigs: await databaseService.aiConfigs.count(),
-        aiHistory: await databaseService.aiHistory.count(),
-        settings: await databaseService.settings.count()
-      };
+      const stats = await databaseService.getDataStats();
       
       return {
         status: 'healthy',
@@ -148,9 +92,7 @@ export class DatabaseManager {
    */
   async waitForInitialization(): Promise<void> {
     const { databaseService } = await import('./services');
-    // 这里可以添加等待数据库初始化的逻辑
-    // 目前简单地尝试访问一个服务来确保数据库已就绪
-    await databaseService.users.count();
+    await databaseService.waitForInitialization();
   }
 }
 
@@ -166,6 +108,47 @@ if (typeof window !== 'undefined') {
     importData: (data: any) => databaseManager.importData(data),
     backupData: () => databaseManager.backupData(),
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
+    getHealthStatus: () => databaseManager.getHealthStatus(),
+    getStats: async () => {
+      try {
+        const result = await databaseManager.getDataStatistics();
+        if (result.success) {
+          return {
+            success: true,
+            stats: result.data
+          };
+        } else {
+          return {
+            success: false,
+            error: result.error || '获取数据统计失败'
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '未知错误'
+        };
+      }
+    }
+  };
+}
+
+/**
+ * 创建数据库 API
+ * @returns 数据库 API 对象
+ */
+export function createDatabaseAPI() {
+  const databaseManager = new DatabaseManager();
+  
+  return {
+    databaseServiceManager: databaseManager.serviceManager,
+    exportAllData: () => databaseManager.serviceManager.exportAllData(),
+    restoreData: (backupData: any) => databaseManager.serviceManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.serviceManager.replaceAllData(backupData),
+    importDataObject: (data: any) => databaseManager.serviceManager.importData(data),
+    getDataStatistics: () => databaseManager.serviceManager.getDataStatistics(),
+    checkAndRepairDatabase: () => databaseManager.serviceManager.checkAndRepairDatabase(),
+    backupData: () => databaseManager.backupData(),
     getHealthStatus: () => databaseManager.getHealthStatus()
   };
 }

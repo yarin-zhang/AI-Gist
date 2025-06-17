@@ -98,3 +98,19 @@ yarn build:linux    # 构建 Linux 安装包
 ![](docs/images/image08.png?v=4)
 
 ![](docs/images/image09.png?v=4)
+
+## 贡献
+
+本项目主要由个人开发，如果你喜欢这个项目，请考虑点击右上角的 Star ⭐️ 来支持我！这将激励我继续改进和维护这个项目。
+
+如果有问题或建议，欢迎在 GitHub 上提交 Issue 或 Pull Request。
+
+欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
+
+<div style="max-width: 300px; padding: 16px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); text-align: center;">
+  <img src="docs/images/QQ-QRCode.png?v=4" alt="QQ 群" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+</div>
+
+## 许可证
+
+本项目采用最宽松的 [MIT 许可证](./LICENSE)，你可以自由使用、修改和分发代码，但请保留原作者信息。

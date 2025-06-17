@@ -36,6 +36,9 @@ app.whenReady().then(async () => {
   
   // 初始化 IPC 处理器（放在服务初始化之后）
   ipcHandlers.initialize();
+  
+  // 设置 WebDAV IPC 处理器
+  webdavService.setupIpcHandlers();
 
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
@@ -110,6 +113,7 @@ app.on('before-quit', () => {
   
   // 清理资源
   ipcHandlers.cleanup();
+  webdavService.cleanup();
   trayManager.destroy();
   themeManager.cleanup();
   
