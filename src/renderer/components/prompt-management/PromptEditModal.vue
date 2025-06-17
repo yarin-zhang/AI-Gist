@@ -2,12 +2,14 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">
         <!-- 顶部固定区域 -->
         <template #header>
+            <NFlex vertical>
             <NText :style="{ fontSize: '20px', fontWeight: 600 }">
                 {{ isEdit ? "编辑提示词" : "创建提示词" }}
             </NText>
             <NText depth="3">
                 {{ getTabDescription() }}
             </NText>
+            </NFlex>
         </template>
         <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
@@ -20,20 +22,129 @@
                             <!-- 左侧：内容编辑区 -->
                             <template #1>
                                 <NCard title="提示词内容" size="small" :style="{ height: '100%' }">
-                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                    <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }" y-placement="bottom">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;">
-                                                <NInput v-model:value="formData.content" type="textarea"
-                                                    placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" show-count
-                                                    :style="{ height: `${contentHeight - 250}px`, fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                                    :autosize="false" />
+                                                <NInput 
+                                                    v-model:value="formData.content" 
+                                                    type="textarea"
+                                                    placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" 
+                                                    show-count
+                                                    :style="{ 
+                                                        height: `${contentHeight - 250}px`, 
+                                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                        backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
+                                                        border: isStreaming ? '1px solid var(--success-color)' : undefined
+                                                    }"
+                                                    :autosize="false" 
+                                                    :readonly="isStreaming"
+                                                />
                                             </NFormItem>
                                         </NFlex>
                                         <NAlert type="info" :show-icon="false" style="margin: 0;">
-                                            <NText depth="3" style="font-size: 12px;">
-                                                ❇ 可使用 <code v-pre>{{变量名}}</code> 来定义可替换的变量
-                                            </NText>
+                                            <NFlex justify="space-between" align="center">
+                                                <div>
+                                                    <NText depth="3" style="font-size: 12px;">
+                                                        快速优化提示词：
+                                                    </NText>
+                                                    <!-- 流式传输状态显示 -->
+                                                    <div v-if="isStreaming" style="margin-top: 4px;">
+                                                        <NText type="success" style="font-size: 11px;">
+                                                            正在生成... ({{ streamStats.charCount }} 字符)
+                                                        </NText>
+                                                    </div>
+                                                </div>
+                                                <NFlex size="small">
+                                                    <!-- 停止按钮 -->
+                                                    <NButton 
+                                                        v-if="isStreaming"
+                                                        size="small" 
+                                                        type="error"
+                                                        @click="stopOptimization"
+                                                    >
+                                                        停止生成
+                                                    </NButton>
+                                                    <!-- 优化按钮 -->
+                                                    <template v-else>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('shorter')"
+                                                            :loading="optimizing === 'shorter'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更简短
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('richer')"
+                                                            :loading="optimizing === 'richer'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更丰富
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('general')"
+                                                            :loading="optimizing === 'general'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更通用
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('extract')"
+                                                            :loading="optimizing === 'extract'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            提取变量
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="showManualAdjustment"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            手动调整
+                                                        </NButton>
+                                                    </template>
+                                                </NFlex>
+                                            </NFlex>
                                         </NAlert>
+                                        
+                                        <!-- 手动调整输入框 -->
+                                        <div v-if="showManualInput" style="margin-top: 8px;">
+                                            <NCard size="small" title="手动调整指令">
+                                                <NFlex vertical size="small">
+                                                    <NInput
+                                                        v-model:value="manualInstruction"
+                                                        type="textarea"
+                                                        placeholder="请输入您希望如何调整提示词的指令，例如：'添加更多技术细节'、'简化语言表达'等..."
+                                                        :rows="3"
+                                                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
+                                                        show-count
+                                                        :maxlength="500"
+                                                    />
+                                                    <NFlex justify="space-between" align="center">
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            AI 将根据您的指令调整当前提示词内容
+                                                        </NText>
+                                                        <NFlex size="small">
+                                                            <NButton size="small" @click="hideManualAdjustment">
+                                                                取消
+                                                            </NButton>
+                                                            <NButton 
+                                                                size="small" 
+                                                                type="primary"
+                                                                @click="applyManualAdjustment"
+                                                                :loading="optimizing === 'manual'"
+                                                                :disabled="!manualInstruction.trim()"
+                                                            >
+                                                                确定调整
+                                                            </NButton>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </NFlex>
+                                            </NCard>
+                                        </div>
                                     </NScrollbar>
                                 </NCard>
                             </template>
@@ -444,7 +555,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive } from "vue";
 import {
     NForm,
     NFormItem,
@@ -499,12 +610,41 @@ const emit = defineEmits<Emits>();
 
 const message = useMessage();
 const formRef = ref();
+const contentScrollbarRef = ref(); // 内容区域滚动条引用
 const saving = ref(false);
 const activeTab = ref("edit");
 const historyList = ref<PromptHistory[]>([]);
 const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
 const previewHistory = ref<PromptHistory | null>(null);
+
+// 优化相关状态
+const optimizing = ref<string | null>(null);
+const aiConfigs = ref([]);
+const selectedConfigId = ref("");
+
+// 手动调整状态
+const showManualInput = ref(false);
+const manualInstruction = ref("");
+
+// 流式传输状态
+const streamingContent = ref("");
+const isStreaming = ref(false);
+const streamStats = reactive({
+    charCount: 0,
+    isStreaming: false,
+    lastCharCount: 0,
+    noContentUpdateCount: 0,
+    lastUpdateTime: 0,
+    isGenerationActive: false,
+    contentGrowthRate: 0
+});
+
+// 生成控制状态
+const generationControl = reactive({
+    shouldStop: false,
+    abortController: null as AbortController | null
+});
 
 // 获取窗口尺寸用于响应式布局
 const { modalWidth } = useWindowSize();
@@ -604,6 +744,27 @@ const resetForm = () => {
     };
     activeTab.value = "edit";
     historyList.value = [];
+    
+    // 重置优化状态
+    optimizing.value = null;
+    isStreaming.value = false;
+    streamingContent.value = "";
+    generationControl.shouldStop = false;
+    
+    // 重置手动调整状态
+    showManualInput.value = false;
+    manualInstruction.value = "";
+    
+    // 重置流式统计
+    Object.assign(streamStats, {
+        charCount: 0,
+        isStreaming: false,
+        lastCharCount: 0,
+        noContentUpdateCount: 0,
+        lastUpdateTime: 0,
+        isGenerationActive: false,
+        contentGrowthRate: 0
+    });
 
     // 清理表单验证状态
     nextTick(() => {
@@ -674,6 +835,430 @@ const createHistoryRecord = async (currentPrompt: any) => {
     }
 };
 
+// 加载AI配置列表
+const loadAIConfigs = async () => {
+    try {
+        // 使用数据库API获取AI配置
+        const allConfigs = await api.aiConfigs.getAll.query();
+        aiConfigs.value = allConfigs.filter(config => config.enabled);
+        
+        // 设置默认选择的配置（优先选择首选配置）
+        const preferredConfig = aiConfigs.value.find(config => config.isPreferred);
+        if (preferredConfig) {
+            selectedConfigId.value = preferredConfig.configId;
+        } else if (aiConfigs.value.length > 0) {
+            selectedConfigId.value = aiConfigs.value[0].configId;
+        }
+    } catch (error) {
+        console.error("加载AI配置失败:", error);
+        message.error("加载AI配置失败");
+    }
+};
+
+// 停止优化生成
+const stopOptimization = async () => {
+    console.log('用户请求停止优化生成');
+    
+    try {
+        generationControl.shouldStop = true;
+        
+        // 调用停止API
+        if (window.electronAPI.ai.stopGeneration) {
+            await window.electronAPI.ai.stopGeneration();
+        }
+        
+        // 重置状态
+        isStreaming.value = false;
+        optimizing.value = null;
+        generationControl.shouldStop = false;
+        
+        message.info('已停止优化生成');
+    } catch (error) {
+        console.error('停止优化失败:', error);
+        message.error('停止优化失败');
+    }
+};
+
+// 启动流式生成
+const startStreamingGeneration = async (request: any, serializedConfig: any) => {
+    let result;
+    
+    // 检查是否支持流式传输
+    if (window.electronAPI.ai.generatePromptStream) {
+        console.log('使用流式传输模式');
+        
+        // 使用流式传输
+        result = await window.electronAPI.ai.generatePromptStream(
+            request,
+            serializedConfig,
+            (charCount: number, partialContent?: string) => {
+                // 检查是否应该停止
+                if (generationControl.shouldStop) {
+                    console.log('检测到停止信号，中断流式优化');
+                    return false; // 返回 false 表示停止流式传输
+                }
+                
+                const now = Date.now();
+                console.log('优化流式传输回调:', {
+                    charCount,
+                    hasContent: !!partialContent,
+                    contentLength: partialContent?.length || 0,
+                    timeSinceLastUpdate: now - streamStats.lastUpdateTime
+                });
+
+                // 更新时间统计
+                const prevCharCount = streamStats.charCount;
+                const prevUpdateTime = streamStats.lastUpdateTime;
+                streamStats.charCount = charCount;
+                streamStats.lastUpdateTime = now;
+                
+                // 计算内容增长速率
+                if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                    const timeDiff = (now - prevUpdateTime) / 1000;
+                    const charDiff = charCount - prevCharCount;
+                    streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                }
+
+                // 检测是否有真实内容
+                const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                
+                // 判断生成是否活跃
+                streamStats.isGenerationActive = hasRealContent || 
+                    (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
+
+                if (hasRealContent) {
+                    // 有真实内容时直接更新输入框
+                    formData.value.content = partialContent;
+                    streamingContent.value = partialContent;
+                    streamStats.noContentUpdateCount = 0;
+                    console.log('✅ 优化内容已更新，当前长度:', partialContent.length);
+                } else {
+                    // 没有内容时的处理
+                    streamStats.noContentUpdateCount++;
+                    
+                    if (charCount > prevCharCount) {
+                        // 字符数在增长，说明正在生成
+                        const placeholderText = `正在优化中... (已生成 ${charCount} 字符)`;
+                        if (streamStats.noContentUpdateCount > 3 && !streamingContent.value) {
+                            streamingContent.value = placeholderText;
+                            console.log('📝 显示优化占位符:', placeholderText);
+                        }
+                    }
+                }
+
+                return true; // 继续生成
+            }
+        );
+        
+        console.log('流式传输完成，最终结果:', {
+            success: !!result,
+            contentLength: result?.generatedPrompt?.length || 0
+        });
+
+        // 如果流式传输过程中没有获得内容，但最终结果有内容，则立即显示
+        if (result && result.generatedPrompt &&
+            (!formData.value.content || formData.value.content.startsWith('正在优化中...'))) {
+            console.log('🔧 流式传输未提供内容，使用最终结果');
+            formData.value.content = result.generatedPrompt;
+            streamingContent.value = result.generatedPrompt;
+        }
+    } else {
+        console.log('使用普通生成模式');
+        // 使用普通生成
+        result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        
+        // 模拟流式更新
+        if (result?.generatedPrompt) {
+            const content = result.generatedPrompt;
+            const totalChars = content.length;
+            const steps = Math.min(30, totalChars);
+            const stepSize = Math.ceil(totalChars / steps);
+            
+            for (let i = 0; i < steps; i++) {
+                if (generationControl.shouldStop) break;
+                
+                const currentCharCount = Math.min((i + 1) * stepSize, totalChars);
+                const partialContent = content.substring(0, currentCharCount);
+                
+                streamStats.charCount = currentCharCount;
+                formData.value.content = partialContent;
+                streamingContent.value = partialContent;
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // 确保显示完整内容
+            formData.value.content = content;
+            streamingContent.value = content;
+        }
+    }
+    
+    return result;
+};
+
+// 优化提示词功能（支持流式传输）
+const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract') => {
+    if (!formData.value.content.trim()) {
+        message.warning("请先输入提示词内容");
+        return;
+    }
+
+    if (aiConfigs.value.length === 0) {
+        message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
+        return;
+    }
+
+    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+    if (!selectedConfig) {
+        message.error("请选择一个AI配置");
+        return;
+    }
+
+    // 重置状态
+    optimizing.value = type;
+    isStreaming.value = true;
+    generationControl.shouldStop = false;
+    streamingContent.value = "";
+    
+    // 重置流式统计
+    Object.assign(streamStats, {
+        charCount: 0,
+        isStreaming: true,
+        lastCharCount: 0,
+        noContentUpdateCount: 0,
+        lastUpdateTime: Date.now(),
+        isGenerationActive: true,
+        contentGrowthRate: 0
+    });
+
+    // 保存原始内容，以便出错时恢复
+    const originalContent = formData.value.content;
+
+    try {
+        console.log("开始流式优化提示词:", type, formData.value.content);
+        
+        // 构建优化指令
+        let optimizationPrompt = "";
+        switch (type) {
+            case 'shorter':
+                optimizationPrompt = `请将以下提示词优化得更加简短和精炼，保留核心要求，去除冗余内容：\n\n${formData.value.content}`;
+                break;
+            case 'richer':
+                optimizationPrompt = `请将以下提示词优化得更加丰富和详细，添加更多具体的要求和细节：\n\n${formData.value.content}`;
+                break;
+            case 'general':
+                optimizationPrompt = `请将以下提示词优化得更加通用，适用于更广泛的场景和用途：\n\n${formData.value.content}`;
+                break;
+            case 'extract':
+                optimizationPrompt = `请分析以下提示词，将其中可以变化的部分提取为变量，使用 {{变量名}} 的格式标记：\n\n${formData.value.content}`;
+                break;
+        }
+        
+        // 序列化配置以确保可以通过 IPC 传递
+        const serializedConfig = {
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
+            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+        };
+
+        // 构建请求参数
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(optimizationPrompt),
+            customPrompt: String(optimizationPrompt),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("流式优化请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 创建 AbortController 用于取消请求
+        generationControl.abortController = new AbortController();
+
+        // 启动流式传输监听
+        await startStreamingGeneration(request, serializedConfig);
+        
+        // 如果是提取变量类型，立即重新提取变量
+        if (type === 'extract') {
+            nextTick(() => {
+                extractVariables(formData.value.content);
+            });
+        }
+        
+        message.success(`提示词已优化（${getOptimizationTypeName(type)}）`);
+
+    } catch (error) {
+        console.error("优化失败:", error);
+        message.error("优化失败: " + (error.message || "未知错误"));
+        
+        // 出错时恢复原始内容
+        formData.value.content = originalContent;
+    } finally {
+        // 重置所有状态
+        optimizing.value = null;
+        isStreaming.value = false;
+        generationControl.shouldStop = false;
+        streamingContent.value = "";
+        streamStats.isStreaming = false;
+        streamStats.isGenerationActive = false;
+        generationControl.abortController = null;
+    }
+};
+
+// 显示手动调整输入框
+const showManualAdjustment = () => {
+    showManualInput.value = true;
+    manualInstruction.value = "";
+    
+    // 使用 nextTick 确保 DOM 更新后再滚动
+    nextTick(() => {
+        // 滚动到底部以显示手动调整输入框
+        if (contentScrollbarRef.value) {
+            contentScrollbarRef.value.scrollTo({ top: 999999, behavior: 'smooth' });
+        }
+    });
+};
+
+// 隐藏手动调整输入框
+const hideManualAdjustment = () => {
+    showManualInput.value = false;
+    manualInstruction.value = "";
+};
+
+// 应用手动调整
+const applyManualAdjustment = async () => {
+    if (!manualInstruction.value.trim()) {
+        message.warning("请输入调整指令");
+        return;
+    }
+    
+    if (!formData.value.content.trim()) {
+        message.warning("请先输入提示词内容");
+        return;
+    }
+
+    if (aiConfigs.value.length === 0) {
+        message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
+        return;
+    }
+
+    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+    if (!selectedConfig) {
+        message.error("请选择一个AI配置");
+        return;
+    }
+
+    // 重置状态
+    optimizing.value = 'manual';
+    isStreaming.value = true;
+    generationControl.shouldStop = false;
+    streamingContent.value = "";
+    
+    // 立即隐藏手动调整输入框并向上滚动
+    hideManualAdjustment();
+    nextTick(() => {
+        if (contentScrollbarRef.value) {
+            contentScrollbarRef.value.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+    
+    // 重置流式传输统计
+    streamStats.charCount = 0;
+    streamStats.isStreaming = true;
+    streamStats.lastCharCount = 0;
+    streamStats.noContentUpdateCount = 0;
+    streamStats.lastUpdateTime = Date.now();
+    streamStats.isGenerationActive = true;
+    streamStats.contentGrowthRate = 0;
+
+    try {
+        console.log("开始手动调整提示词:", manualInstruction.value, formData.value.content);
+        
+        // 构建手动调整指令，包含原有提示词
+        const adjustmentPrompt = `请根据以下调整指令来改进提示词。
+
+原有提示词：
+${formData.value.content}
+
+调整指令：
+${manualInstruction.value.trim()}
+
+请输出改进后的完整提示词内容：`;
+        
+        // 序列化配置以确保可以通过 IPC 传递
+        const serializedConfig = {
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
+            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+        };
+
+        // 构建请求参数
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(adjustmentPrompt),
+            customPrompt: String(adjustmentPrompt),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("手动调整请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 创建 AbortController 用于取消请求
+        generationControl.abortController = new AbortController();
+
+        // 启动流式传输监听
+        await startStreamingGeneration(request, serializedConfig);
+        
+        message.success("提示词已根据指令调整完成");
+
+    } catch (error) {
+        console.error("手动调整失败:", error);
+        if (error.name === 'AbortError') {
+            message.info("手动调整已取消");
+        } else {
+            message.error("手动调整失败: " + (error.message || "未知错误"));
+        }
+    } finally {
+        optimizing.value = null;
+        isStreaming.value = false;
+        streamStats.isStreaming = false;
+        streamStats.isGenerationActive = false;
+        generationControl.abortController = null;
+    }
+};
+
+// 获取优化类型名称
+const getOptimizationTypeName = (type: string) => {
+    switch (type) {
+        case 'shorter': return '更简短';
+        case 'richer': return '更丰富';
+        case 'general': return '更通用';
+        case 'extract': return '提取变量';
+        case 'manual': return '手动调整';
+        default: return '优化';
+    }
+};
+
 // 格式化日期
 const formatDate = (date: Date | string) => {
     const d = new Date(date);
@@ -685,8 +1270,6 @@ const formatDate = (date: Date | string) => {
         minute: "2-digit",
     });
 };
-
-// 获取内容预览
 const getContentPreview = (content: string) => {
     return content.length > 100 ? content.substring(0, 100) + "..." : content;
 };
@@ -888,6 +1471,9 @@ watch(
         if (newShow && !oldShow) {
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
+            
+            // 加载AI配置
+            loadAIConfigs();
 
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
@@ -903,6 +1489,16 @@ watch(
                 clearTimeout(debounceTimer.value);
                 debounceTimer.value = null;
             }
+            
+            // 重置优化状态
+            optimizing.value = null;
+            isStreaming.value = false;
+            streamingContent.value = "";
+            generationControl.shouldStop = false;
+            
+            // 重置手动调整状态
+            showManualInput.value = false;
+            manualInstruction.value = "";
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
             setTimeout(() => {
@@ -1025,6 +1621,16 @@ const handleCancel = () => {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
+    
+    // 重置优化和流式传输状态
+    optimizing.value = null;
+    isStreaming.value = false;
+    streamingContent.value = "";
+    generationControl.shouldStop = true; // 如果正在生成，停止生成
+    
+    // 重置手动调整状态
+    showManualInput.value = false;
+    manualInstruction.value = "";
 
     emit("update:show", false);
 };
