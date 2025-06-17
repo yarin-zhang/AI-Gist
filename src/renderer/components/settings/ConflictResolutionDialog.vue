@@ -474,9 +474,9 @@ const getDataTypeColor = (type: string) => {
 // 获取数据类型标签
 const getDataTypeLabel = (type: string) => {
     const labels = {
-        categories: '分类',
         prompts: '提示词',
         aiConfigs: 'AI配置',
+        categories: '分类',
         history: '历史记录',
         settings: '设置'
     };

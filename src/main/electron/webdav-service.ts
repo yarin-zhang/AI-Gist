@@ -948,6 +948,7 @@ export class WebDAVService {
         let total = 0;
         if (data.categories) total += data.categories.length;
         if (data.prompts) total += data.prompts.length;
+        if (data.aiConfigs) total += data.aiConfigs.length;
         if (data.history) total += data.history.length;
         if (data.settings) total += Object.keys(data.settings).length;
         
@@ -1568,13 +1569,16 @@ export class WebDAVService {
         const differences: any = {
             hasDifferences: false,
             summary: {
-                localRecords: 0,
-                remoteRecords: 0,
-                conflictCount: 0,
+                localTotal: 0,
+                remoteTotal: 0,
+                conflicts: 0,
                 onlyInLocal: 0,
                 onlyInRemote: 0,
                 modified: 0
             },
+            added: [],
+            modified: [],
+            deleted: [],
             details: {
                 categories: { added: [], removed: [], modified: [] },
                 prompts: { added: [], removed: [], modified: [] },
@@ -1592,8 +1596,8 @@ export class WebDAVService {
 
         try {
             // 计算总记录数
-            differences.summary.localRecords = this.calculateTotalRecords(localData);
-            differences.summary.remoteRecords = this.calculateTotalRecords(remoteData);
+            differences.summary.localTotal = this.calculateTotalRecords(localData);
+            differences.summary.remoteTotal = this.calculateTotalRecords(remoteData);
 
             // 比较分类
             if (localData?.categories || remoteData?.categories) {
@@ -1603,7 +1607,9 @@ export class WebDAVService {
                 // 只在本地存在的分类
                 for (const [id, category] of localCategories) {
                     if (!remoteCategories.has(id)) {
+                        const deletedItem = category ? { ...category, _type: 'categories' } : { id, _type: 'categories' };
                         differences.details.categories.removed.push(category);
+                        differences.deleted.push(deletedItem);
                         differences.summary.onlyInLocal++;
                     }
                 }
@@ -1611,7 +1617,9 @@ export class WebDAVService {
                 // 只在远程存在的分类
                 for (const [id, category] of remoteCategories) {
                     if (!localCategories.has(id)) {
+                        const addedItem = category ? { ...category, _type: 'categories' } : { id, _type: 'categories' };
                         differences.details.categories.added.push(category);
+                        differences.added.push(addedItem);
                         differences.summary.onlyInRemote++;
                     }
                 }
@@ -1620,11 +1628,14 @@ export class WebDAVService {
                 for (const [id, localCategory] of localCategories) {
                     const remoteCategory = remoteCategories.get(id);
                     if (remoteCategory && JSON.stringify(localCategory) !== JSON.stringify(remoteCategory)) {
-                        differences.details.categories.modified.push({
+                        const modifiedItem = {
                             id,
+                            _type: 'categories',
                             local: localCategory,
                             remote: remoteCategory
-                        });
+                        };
+                        differences.details.categories.modified.push(modifiedItem);
+                        differences.modified.push(modifiedItem);
                         differences.summary.modified++;
                     }
                 }
@@ -1638,7 +1649,9 @@ export class WebDAVService {
                 // 只在本地存在的提示词
                 for (const [id, prompt] of localPrompts) {
                     if (!remotePrompts.has(id)) {
+                        const deletedItem = prompt ? { ...prompt, _type: 'prompts' } : { id, _type: 'prompts' };
                         differences.details.prompts.removed.push(prompt);
+                        differences.deleted.push(deletedItem);
                         differences.summary.onlyInLocal++;
                     }
                 }
@@ -1646,7 +1659,9 @@ export class WebDAVService {
                 // 只在远程存在的提示词
                 for (const [id, prompt] of remotePrompts) {
                     if (!localPrompts.has(id)) {
+                        const addedItem = prompt ? { ...prompt, _type: 'prompts' } : { id, _type: 'prompts' };
                         differences.details.prompts.added.push(prompt);
+                        differences.added.push(addedItem);
                         differences.summary.onlyInRemote++;
                     }
                 }
@@ -1655,11 +1670,59 @@ export class WebDAVService {
                 for (const [id, localPrompt] of localPrompts) {
                     const remotePrompt = remotePrompts.get(id);
                     if (remotePrompt && JSON.stringify(localPrompt) !== JSON.stringify(remotePrompt)) {
-                        differences.details.prompts.modified.push({
+                        const modifiedItem = {
                             id,
+                            _type: 'prompts',
                             local: localPrompt,
                             remote: remotePrompt
-                        });
+                        };
+                        differences.details.prompts.modified.push(modifiedItem);
+                        differences.modified.push(modifiedItem);
+                        differences.summary.modified++;
+                    }
+                }
+            }
+
+            // 比较AI配置
+            if (localData?.aiConfigs || remoteData?.aiConfigs) {
+                const localAiConfigs = new Map((localData?.aiConfigs || []).map((c: any) => [c.id, c]));
+                const remoteAiConfigs = new Map((remoteData?.aiConfigs || []).map((c: any) => [c.id, c]));
+                
+                // 只在本地存在的AI配置
+                for (const [id, config] of localAiConfigs) {
+                    if (!remoteAiConfigs.has(id)) {
+                        const deletedItem = config ? { ...config, _type: 'aiConfigs' } : { id, _type: 'aiConfigs' };
+                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
+                        differences.details.aiConfigs.removed.push(config);
+                        differences.deleted.push(deletedItem);
+                        differences.summary.onlyInLocal++;
+                    }
+                }
+                
+                // 只在远程存在的AI配置
+                for (const [id, config] of remoteAiConfigs) {
+                    if (!localAiConfigs.has(id)) {
+                        const addedItem = config ? { ...config, _type: 'aiConfigs' } : { id, _type: 'aiConfigs' };
+                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
+                        differences.details.aiConfigs.added.push(config);
+                        differences.added.push(addedItem);
+                        differences.summary.onlyInRemote++;
+                    }
+                }
+                
+                // 两边都存在但内容不同的AI配置
+                for (const [id, localConfig] of localAiConfigs) {
+                    const remoteConfig = remoteAiConfigs.get(id);
+                    if (remoteConfig && JSON.stringify(localConfig) !== JSON.stringify(remoteConfig)) {
+                        const modifiedItem = {
+                            id,
+                            _type: 'aiConfigs',
+                            local: localConfig,
+                            remote: remoteConfig
+                        };
+                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
+                        differences.details.aiConfigs.modified.push(modifiedItem);
+                        differences.modified.push(modifiedItem);
                         differences.summary.modified++;
                     }
                 }
@@ -1671,7 +1734,7 @@ export class WebDAVService {
                 differences.summary.onlyInRemote > 0 ||
                 differences.summary.modified > 0;
 
-            differences.summary.conflictCount = 
+            differences.summary.conflicts = 
                 differences.summary.onlyInLocal +
                 differences.summary.onlyInRemote +
                 differences.summary.modified;

@@ -63,25 +63,12 @@
                     <div>
                         <NFlex vertical :size="16">
                             <div>
-                                <NText depth="2" style="font-size: 16px; font-weight: 600;">📋 手动同步操作</NText>
+                                <NText depth="2" style="font-size: 16px; font-weight: 600;">同步操作</NText>
                                 <NText depth="3" style="font-size: 12px; margin-top: 4px; display: block;">
-                                    完全控制数据的上传和下载过程，遇到差异时可以详细比较并手动选择处理方式
+                                    手动控制数据的上传和下载过程，遇到差异时可以详细比较并手动选择处理方式
                                 </NText>
                             </div>
-                            
-                            <NCard size="small" style="background-color: var(--info-color-suppl); border: 1px solid var(--info-color);">
-                                <NFlex vertical :size="12">
-                                    <div>
-                                        <div style="font-weight: 600; margin-bottom: 4px;">🔄 推荐的同步流程</div>
-                                        <div style="font-size: 12px; line-height: 1.5;">
-                                            1. <strong>比较数据</strong> - 查看本地与远程的差异<br>
-                                            2. <strong>上传到服务器</strong> - 将本地数据推送到服务器<br>
-                                            3. <strong>从服务器下载</strong> - 获取服务器数据并处理冲突
-                                        </div>
-                                    </div>
-                                </NFlex>
-                            </NCard>
-                            
+                                                        
                             <NFlex :size="12" style="flex-wrap: wrap;">
                                 <NButton 
                                     type="info" 
@@ -152,42 +139,6 @@
                         </NFlex>
                     </div>
 
-                    <NDivider />
-
-                    <!-- 自动同步设置 -->
-                    <div>
-                        <NFlex vertical :size="16">
-                            <NText depth="2">自动同步设置</NText>
-                            <NCheckbox v-model:checked="props.modelValue.webdav.autoSync" @update:checked="handleConfigChange">
-                                启用自动同步
-                            </NCheckbox>
-                            
-                            <div v-if="props.modelValue.webdav.autoSync">
-                                <NFormItem label="同步间隔（分钟）">
-                                    <NInputNumber 
-                                        v-model:value="props.modelValue.webdav.syncInterval" 
-                                        :min="5" 
-                                        :max="1440"
-                                        @update:value="handleConfigChange"
-                                    />
-                                </NFormItem>
-                                
-                                <NButton @click="syncNow" :loading="syncLoading">
-                                    <template #icon>
-                                        <NIcon>
-                                            <BrandSoundcloud />
-                                        </NIcon>
-                                    </template>
-                                    立即同步
-                                </NButton>
-                            </div>
-                        </NFlex>
-                    </div>
-
-                    <NAlert v-if="props.modelValue.dataSync.lastSyncTime" type="info" show-icon>
-                        <template #header>上次同步时间</template>
-                        {{ formatSyncTime(props.modelValue.dataSync.lastSyncTime) }}
-                    </NAlert>
                 </NFlex>
             </div>
         </NFlex>
