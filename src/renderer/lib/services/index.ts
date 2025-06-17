@@ -792,61 +792,36 @@ export class DatabaseServiceManager {
     try {
       console.log('开始强制清空所有数据表...');
       
-      // 使用更安全的方式清空数据表
-      const clearPromises: Promise<any>[] = [];
+      // 直接通过 IndexedDB 清空所有数据表
+      const db = await this.getDatabase();
       
-      // 只清空有清空方法的服务
-      if (this.appSettings.clearAllSettings) {
-        clearPromises.push(this.appSettings.clearAllSettings());
+      if (!db) {
+        throw new Error('无法获取数据库连接');
       }
       
-      // 对于其他服务，使用删除的方式来清空
-      try {
-        // 获取所有数据并删除
-        const [posts, categories, users, prompts, aiHistory] = await Promise.all([
-          this.post.getAllPosts().catch(() => []),
-          this.category.getAllCategories().catch(() => []),
-          this.user.getAllUsers().catch(() => []),
-          this.prompt.getAllPrompts().catch(() => []),
-          this.aiGenerationHistory.getAllAIGenerationHistory().catch(() => [])
-        ]);
-        
-        // 删除所有数据
-        for (const post of posts) {
-          if (post.id) {
-            clearPromises.push(this.post.deletePost(post.id).catch(() => {}));
-          }
-        }
-        
-        for (const category of categories) {
-          if (category.id) {
-            clearPromises.push(this.category.deleteCategory(category.id).catch(() => {}));
-          }
-        }
-        
-        for (const user of users) {
-          if (user.id) {
-            clearPromises.push(this.user.deleteUser(user.id).catch(() => {}));
-          }
-        }
-        
-        for (const prompt of prompts) {
-          if (prompt.id) {
-            clearPromises.push(this.prompt.deletePrompt(prompt.id).catch(() => {}));
-          }
-        }
-        
-        for (const history of aiHistory) {
-          if (history.id) {
-            clearPromises.push(this.aiGenerationHistory.deleteAIGenerationHistory(history.id).catch(() => {}));
-          }
-        }
-        
-      } catch (error) {
-        console.warn('清空部分数据表时出错:', error);
-      }
+      // 获取所有对象存储的名称
+      const storeNames = Array.from(db.objectStoreNames);
+      console.log('找到的数据表:', storeNames);
       
+      // 创建读写事务
+      const transaction = db.transaction(storeNames, 'readwrite');
+      
+      // 清空每个对象存储
+      const clearPromises = storeNames.map(storeName => {
+        const store = transaction.objectStore(storeName);
+        console.log(`清空数据表: ${storeName}`);
+        return store.clear();
+      });
+      
+      // 等待所有清空操作完成
       await Promise.all(clearPromises);
+      
+      // 等待事务完成
+      await new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve(true);
+        transaction.onerror = () => reject(transaction.error);
+      });
+      
       console.log('所有数据表清空完成');
       
     } catch (error) {
@@ -854,14 +829,35 @@ export class DatabaseServiceManager {
       throw new Error(`清空数据表失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
-
+  
   /**
-   * 清空所有数据表（可选方法）
+   * 获取数据库连接
    */
-  async clearAllTables?(): Promise<void> {
-    // 这个方法需要根据具体的数据库实现来定义
-    // 暂时留作可选方法
+  private async getDatabase(): Promise<IDBDatabase | null> {
+    try {
+      // 尝试通过各个服务获取数据库连接
+      const userServiceDb = await this.user.getDatabase?.();
+      if (userServiceDb) return userServiceDb;
+      
+      const postServiceDb = await this.post.getDatabase?.();
+      if (postServiceDb) return postServiceDb;
+      
+      const categoryServiceDb = await this.category.getDatabase?.();
+      if (categoryServiceDb) return categoryServiceDb;
+      
+      // 如果都没有，直接打开数据库
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('AIGistDB'); // 使用实际的数据库名
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.error('获取数据库连接失败:', error);
+      return null;
+    }
   }
+
+
 }
 
 // 创建并导出单例实例
