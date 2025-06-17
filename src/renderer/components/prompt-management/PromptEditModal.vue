@@ -2,12 +2,14 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">
         <!-- 顶部固定区域 -->
         <template #header>
+            <NFlex vertical>
             <NText :style="{ fontSize: '20px', fontWeight: 600 }">
                 {{ isEdit ? "编辑提示词" : "创建提示词" }}
             </NText>
             <NText depth="3">
                 {{ getTabDescription() }}
             </NText>
+            </NFlex>
         </template>
         <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
