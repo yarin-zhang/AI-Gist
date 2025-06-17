@@ -63,7 +63,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">数据备份</NText>
                         <NFlex :size="12">
-                            <NButton type="primary" @click="createBackup">
+                            <NButton type="primary" @click="createBackup" :loading="props.loading?.backup">
                                 <template #icon>
                                     <NIcon>
                                         <Upload />
@@ -215,6 +215,17 @@ import {
     Recharging,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
+
+// Props
+const props = defineProps<{
+    loading?: {
+        backup?: boolean;
+        export?: boolean;
+        import?: boolean;
+        repair?: boolean;
+        healthCheck?: boolean;
+    };
+}>();
 
 const emit = defineEmits<{
     "export-data": [format: "csv" | "json"];

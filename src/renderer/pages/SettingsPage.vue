@@ -100,6 +100,7 @@
                         <DataManagementSettings 
                             ref="dataManagementRef"
                             v-show="activeSettingKey === 'data-management'"
+                            :loading="loading"
                             @export-data="exportData"
                             @import-data="importData"
                             @create-backup="createBackup"
@@ -187,6 +188,7 @@ const loading = reactive({
     import: false,
     repair: false,
     healthCheck: false,
+    backup: false,
 });
 
 // 设置数据
@@ -602,13 +604,19 @@ const syncNow = async () => {
 
 // 创建备份
 const createBackup = async () => {
+    loading.backup = true;
     try {
         const timestamp = new Date().toLocaleString('zh-CN');
         const backup = await DataManagementAPI.createBackup(`手动备份 - ${timestamp}`);
         message.success(`备份创建成功: ${backup.name} (大小: ${(backup.size / 1024).toFixed(2)} KB)`);
+        
+        // 创建成功后立即刷新备份列表
+        await refreshBackupList();
     } catch (error) {
         console.error("创建备份失败:", error);
         message.error("创建备份失败");
+    } finally {
+        loading.backup = false;
     }
 };
 
