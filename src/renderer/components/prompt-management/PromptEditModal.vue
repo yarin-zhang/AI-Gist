@@ -125,7 +125,7 @@
                                                     />
                                                     <NFlex justify="space-between" align="center">
                                                         <NText depth="3" style="font-size: 12px;">
-                                                            AI将根据您的指令调整当前提示词内容
+                                                            AI 将根据您的指令调整当前提示词内容
                                                         </NText>
                                                         <NFlex size="small">
                                                             <NButton size="small" @click="hideManualAdjustment">
@@ -879,6 +879,123 @@ const stopOptimization = async () => {
     }
 };
 
+// 启动流式生成
+const startStreamingGeneration = async (request: any, serializedConfig: any) => {
+    let result;
+    
+    // 检查是否支持流式传输
+    if (window.electronAPI.ai.generatePromptStream) {
+        console.log('使用流式传输模式');
+        
+        // 使用流式传输
+        result = await window.electronAPI.ai.generatePromptStream(
+            request,
+            serializedConfig,
+            (charCount: number, partialContent?: string) => {
+                // 检查是否应该停止
+                if (generationControl.shouldStop) {
+                    console.log('检测到停止信号，中断流式优化');
+                    return false; // 返回 false 表示停止流式传输
+                }
+                
+                const now = Date.now();
+                console.log('优化流式传输回调:', {
+                    charCount,
+                    hasContent: !!partialContent,
+                    contentLength: partialContent?.length || 0,
+                    timeSinceLastUpdate: now - streamStats.lastUpdateTime
+                });
+
+                // 更新时间统计
+                const prevCharCount = streamStats.charCount;
+                const prevUpdateTime = streamStats.lastUpdateTime;
+                streamStats.charCount = charCount;
+                streamStats.lastUpdateTime = now;
+                
+                // 计算内容增长速率
+                if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                    const timeDiff = (now - prevUpdateTime) / 1000;
+                    const charDiff = charCount - prevCharCount;
+                    streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                }
+
+                // 检测是否有真实内容
+                const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                
+                // 判断生成是否活跃
+                streamStats.isGenerationActive = hasRealContent || 
+                    (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
+
+                if (hasRealContent) {
+                    // 有真实内容时直接更新输入框
+                    formData.value.content = partialContent;
+                    streamingContent.value = partialContent;
+                    streamStats.noContentUpdateCount = 0;
+                    console.log('✅ 优化内容已更新，当前长度:', partialContent.length);
+                } else {
+                    // 没有内容时的处理
+                    streamStats.noContentUpdateCount++;
+                    
+                    if (charCount > prevCharCount) {
+                        // 字符数在增长，说明正在生成
+                        const placeholderText = `正在优化中... (已生成 ${charCount} 字符)`;
+                        if (streamStats.noContentUpdateCount > 3 && !streamingContent.value) {
+                            streamingContent.value = placeholderText;
+                            console.log('📝 显示优化占位符:', placeholderText);
+                        }
+                    }
+                }
+
+                return true; // 继续生成
+            }
+        );
+        
+        console.log('流式传输完成，最终结果:', {
+            success: !!result,
+            contentLength: result?.generatedPrompt?.length || 0
+        });
+
+        // 如果流式传输过程中没有获得内容，但最终结果有内容，则立即显示
+        if (result && result.generatedPrompt &&
+            (!formData.value.content || formData.value.content.startsWith('正在优化中...'))) {
+            console.log('🔧 流式传输未提供内容，使用最终结果');
+            formData.value.content = result.generatedPrompt;
+            streamingContent.value = result.generatedPrompt;
+        }
+    } else {
+        console.log('使用普通生成模式');
+        // 使用普通生成
+        result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        
+        // 模拟流式更新
+        if (result?.generatedPrompt) {
+            const content = result.generatedPrompt;
+            const totalChars = content.length;
+            const steps = Math.min(30, totalChars);
+            const stepSize = Math.ceil(totalChars / steps);
+            
+            for (let i = 0; i < steps; i++) {
+                if (generationControl.shouldStop) break;
+                
+                const currentCharCount = Math.min((i + 1) * stepSize, totalChars);
+                const partialContent = content.substring(0, currentCharCount);
+                
+                streamStats.charCount = currentCharCount;
+                formData.value.content = partialContent;
+                streamingContent.value = partialContent;
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // 确保显示完整内容
+            formData.value.content = content;
+            streamingContent.value = content;
+        }
+    }
+    
+    return result;
+};
+
 // 优化提示词功能（支持流式传输）
 const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract') => {
     if (!formData.value.content.trim()) {
@@ -965,81 +1082,11 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         console.log("流式优化请求参数:", request);
         console.log("配置参数:", serializedConfig);
 
-        let result;
-        
-        // 检查是否支持流式传输
-        if (window.electronAPI.ai.generatePromptStream) {
-            console.log('使用流式传输模式进行优化');
-            
-            // 使用流式传输
-            result = await window.electronAPI.ai.generatePromptStream(
-                request,
-                serializedConfig,
-                (charCount: number, partialContent?: string) => {
-                    // 检查是否应该停止
-                    if (generationControl.shouldStop) {
-                        console.log('检测到停止信号，中断流式优化');
-                        return false; // 返回 false 表示停止流式传输
-                    }
-                    
-                    const now = Date.now();
-                    console.log('优化流式传输回调:', {
-                        charCount,
-                        hasContent: !!partialContent,
-                        contentLength: partialContent?.length || 0,
-                        timeSinceLastUpdate: now - streamStats.lastUpdateTime
-                    });
+        // 创建 AbortController 用于取消请求
+        generationControl.abortController = new AbortController();
 
-                    // 更新时间统计
-                    const prevCharCount = streamStats.charCount;
-                    const prevUpdateTime = streamStats.lastUpdateTime;
-                    streamStats.charCount = charCount;
-                    streamStats.lastUpdateTime = now;
-                    
-                    // 计算内容增长速率
-                    if (prevUpdateTime > 0 && charCount > prevCharCount) {
-                        const timeDiff = (now - prevUpdateTime) / 1000;
-                        const charDiff = charCount - prevCharCount;
-                        streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
-                    }
-
-                    // 检测是否有真实内容
-                    const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
-                    
-                    streamStats.isGenerationActive = hasRealContent || 
-                        (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
-
-                    if (hasRealContent) {
-                        // 有真实内容时直接更新输入框
-                        formData.value.content = partialContent;
-                        streamingContent.value = partialContent;
-                        streamStats.noContentUpdateCount = 0;
-                        console.log('✅ 优化内容已更新，当前长度:', partialContent.length);
-                    } else {
-                        // 没有内容时的处理
-                        streamStats.noContentUpdateCount++;
-                        
-                        if (charCount > prevCharCount) {
-                            // 字符数在增长，说明正在生成
-                            const placeholderText = `正在优化中... (已生成 ${charCount} 字符)`;
-                            if (streamStats.noContentUpdateCount > 3 && !streamingContent.value) {
-                                streamingContent.value = placeholderText;
-                                console.log('📝 显示优化占位符:', placeholderText);
-                            }
-                        }
-                    }
-                    
-                    return true; // 继续流式传输
-                }
-            );
-        } else {
-            console.log('不支持流式传输，使用常规模式');
-            // 如果不支持流式传输，使用常规生成
-            result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
-            
-            // 直接更新内容
-            formData.value.content = result.generatedPrompt;
-        }
+        // 启动流式传输监听
+        await startStreamingGeneration(request, serializedConfig);
         
         // 如果是提取变量类型，立即重新提取变量
         if (type === 'extract') {
@@ -1064,6 +1111,7 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         streamingContent.value = "";
         streamStats.isStreaming = false;
         streamStats.isGenerationActive = false;
+        generationControl.abortController = null;
     }
 };
 
