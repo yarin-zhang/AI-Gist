@@ -115,34 +115,46 @@
                         <!-- 数据类型选择 -->
                         <NCard size="small" >
                             <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型：</NText>
+                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型（单选）：</NText>
                                 <NFlex vertical :size="8">
-                                    <NCheckbox v-model:checked="exportOptions.includePrompts">
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'prompts'" 
+                                        value="prompts"
+                                        @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>描述词库</NText>
                                             <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
                                         </NFlex>
-                                    </NCheckbox>
-                                    <NCheckbox v-model:checked="exportOptions.includeCategories">
+                                    </NRadio>
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'categories'" 
+                                        value="categories"
+                                        @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>分类管理</NText>
                                             <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
                                         </NFlex>
-                                    </NCheckbox>
-                                    <NCheckbox v-model:checked="exportOptions.includeAIConfigs">
+                                    </NRadio>
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'aiConfigs'" 
+                                        value="aiConfigs"
+                                        @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>AI 配置</NText>
                                             <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
                                             <NTag size="small" type="warning">包含敏感信息</NTag>
                                         </NFlex>
-                                    </NCheckbox>
+                                    </NRadio>
                                 </NFlex>
                             </NFlex>
                         </NCard>
                         
                         <NFlex :size="12">
-                            <NButton type="primary" @click="exportSelectedData('csv')" 
-                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
+                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" 
+                                     type="primary" 
+                                     @click="exportSelectedData('csv')" 
+                                     :disabled="!hasSelectedData" 
+                                     :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -151,7 +163,8 @@
                                 导出为 CSV
                             </NButton>
                             <NButton @click="exportSelectedData('json')" 
-                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
+                                     :disabled="!hasSelectedData" 
+                                     :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -161,9 +174,14 @@
                             </NButton>
                         </NFlex>
                         
-                        <NAlert v-if="exportOptions.includeAIConfigs" type="warning" show-icon>
+                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
                             <template #header>⚠️ 安全提示</template>
                             您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                        </NAlert>
+                        
+                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
+                            <template #header>💡 格式说明</template>
+                            AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。
                         </NAlert>
                     </NFlex>
                 </NFlex>
@@ -279,6 +297,7 @@ import {
     NTag,
     NPagination,
     NCheckbox,
+    NRadio,
 } from "naive-ui";
 import {
     FileExport,
@@ -336,9 +355,7 @@ const backupList = ref<BackupItem[]>([]);
 
 // 选择性导出选项
 const exportOptions = ref({
-    includePrompts: true,
-    includeCategories: true,
-    includeAIConfigs: false,
+    selectedType: '' as 'prompts' | 'categories' | 'aiConfigs' | '',
 });
 
 // 数据统计
@@ -355,10 +372,17 @@ const dataStats = ref({
 
 // 计算是否选择了数据
 const hasSelectedData = computed(() => {
-    return exportOptions.value.includePrompts ||
-           exportOptions.value.includeCategories ||
-           exportOptions.value.includeAIConfigs;
+    return exportOptions.value.selectedType !== '';
 });
+
+// 处理类型选择
+const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', checked: boolean) => {
+    if (checked) {
+        exportOptions.value.selectedType = type;
+    } else {
+        exportOptions.value.selectedType = '';
+    }
+};
 
 // 分页相关状态
 const currentPage = ref(1);
@@ -414,9 +438,9 @@ const clearDatabase = () => {
 const exportSelectedData = (format: "csv" | "json") => {
     const options = {
         format,
-        includePrompts: exportOptions.value.includePrompts,
-        includeCategories: exportOptions.value.includeCategories,
-        includeAIConfigs: exportOptions.value.includeAIConfigs,
+        includePrompts: exportOptions.value.selectedType === 'prompts',
+        includeCategories: exportOptions.value.selectedType === 'categories',
+        includeAIConfigs: exportOptions.value.selectedType === 'aiConfigs',
     };
     emit("export-selected-data", format, options);
 };
