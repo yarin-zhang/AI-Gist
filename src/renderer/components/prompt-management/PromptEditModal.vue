@@ -25,50 +25,80 @@
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;">
-                                                <NInput v-model:value="formData.content" type="textarea"
-                                                    placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" show-count
-                                                    :style="{ height: `${contentHeight - 250}px`, fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                                    :autosize="false" />
+                                                <NInput 
+                                                    v-model:value="formData.content" 
+                                                    type="textarea"
+                                                    placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" 
+                                                    show-count
+                                                    :style="{ 
+                                                        height: `${contentHeight - 250}px`, 
+                                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                        backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
+                                                        border: isStreaming ? '1px solid var(--success-color)' : undefined
+                                                    }"
+                                                    :autosize="false" 
+                                                    :readonly="isStreaming"
+                                                />
                                             </NFormItem>
                                         </NFlex>
                                         <NAlert type="info" :show-icon="false" style="margin: 0;">
                                             <NFlex justify="space-between" align="center">
-                                                <NText depth="3" style="font-size: 12px;">
-                                                    快速优化提示词：
-                                                </NText>
+                                                <div>
+                                                    <NText depth="3" style="font-size: 12px;">
+                                                        快速优化提示词：
+                                                    </NText>
+                                                    <!-- 流式传输状态显示 -->
+                                                    <div v-if="isStreaming" style="margin-top: 4px;">
+                                                        <NText type="success" style="font-size: 11px;">
+                                                            正在生成... ({{ streamStats.charCount }} 字符)
+                                                        </NText>
+                                                    </div>
+                                                </div>
                                                 <NFlex size="small">
+                                                    <!-- 停止按钮 -->
                                                     <NButton 
+                                                        v-if="isStreaming"
                                                         size="small" 
-                                                        @click="optimizePrompt('shorter')"
-                                                        :loading="optimizing === 'shorter'"
-                                                        :disabled="!formData.content.trim() || optimizing !== null"
+                                                        type="error"
+                                                        @click="stopOptimization"
                                                     >
-                                                        更简短
+                                                        停止生成
                                                     </NButton>
-                                                    <NButton 
-                                                        size="small" 
-                                                        @click="optimizePrompt('richer')"
-                                                        :loading="optimizing === 'richer'"
-                                                        :disabled="!formData.content.trim() || optimizing !== null"
-                                                    >
-                                                        更丰富
-                                                    </NButton>
-                                                    <NButton 
-                                                        size="small" 
-                                                        @click="optimizePrompt('general')"
-                                                        :loading="optimizing === 'general'"
-                                                        :disabled="!formData.content.trim() || optimizing !== null"
-                                                    >
-                                                        更通用
-                                                    </NButton>
-                                                    <NButton 
-                                                        size="small" 
-                                                        @click="optimizePrompt('extract')"
-                                                        :loading="optimizing === 'extract'"
-                                                        :disabled="!formData.content.trim() || optimizing !== null"
-                                                    >
-                                                        提取变量
-                                                    </NButton>
+                                                    <!-- 优化按钮 -->
+                                                    <template v-else>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('shorter')"
+                                                            :loading="optimizing === 'shorter'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更简短
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('richer')"
+                                                            :loading="optimizing === 'richer'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更丰富
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('general')"
+                                                            :loading="optimizing === 'general'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            更通用
+                                                        </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="optimizePrompt('extract')"
+                                                            :loading="optimizing === 'extract'"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            提取变量
+                                                        </NButton>
+                                                    </template>
                                                 </NFlex>
                                             </NFlex>
                                         </NAlert>
@@ -482,7 +512,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive } from "vue";
 import {
     NForm,
     NFormItem,
@@ -548,6 +578,25 @@ const previewHistory = ref<PromptHistory | null>(null);
 const optimizing = ref<string | null>(null);
 const aiConfigs = ref([]);
 const selectedConfigId = ref("");
+
+// 流式传输状态
+const streamingContent = ref("");
+const isStreaming = ref(false);
+const streamStats = reactive({
+    charCount: 0,
+    isStreaming: false,
+    lastCharCount: 0,
+    noContentUpdateCount: 0,
+    lastUpdateTime: 0,
+    isGenerationActive: false,
+    contentGrowthRate: 0
+});
+
+// 生成控制状态
+const generationControl = reactive({
+    shouldStop: false,
+    abortController: null as AbortController | null
+});
 
 // 获取窗口尺寸用于响应式布局
 const { modalWidth } = useWindowSize();
@@ -650,6 +699,20 @@ const resetForm = () => {
     
     // 重置优化状态
     optimizing.value = null;
+    isStreaming.value = false;
+    streamingContent.value = "";
+    generationControl.shouldStop = false;
+    
+    // 重置流式统计
+    Object.assign(streamStats, {
+        charCount: 0,
+        isStreaming: false,
+        lastCharCount: 0,
+        noContentUpdateCount: 0,
+        lastUpdateTime: 0,
+        isGenerationActive: false,
+        contentGrowthRate: 0
+    });
 
     // 清理表单验证状态
     nextTick(() => {
@@ -740,7 +803,31 @@ const loadAIConfigs = async () => {
     }
 };
 
-// 优化提示词功能
+// 停止优化生成
+const stopOptimization = async () => {
+    console.log('用户请求停止优化生成');
+    
+    try {
+        generationControl.shouldStop = true;
+        
+        // 调用停止API
+        if (window.electronAPI.ai.stopGeneration) {
+            await window.electronAPI.ai.stopGeneration();
+        }
+        
+        // 重置状态
+        isStreaming.value = false;
+        optimizing.value = null;
+        generationControl.shouldStop = false;
+        
+        message.info('已停止优化生成');
+    } catch (error) {
+        console.error('停止优化失败:', error);
+        message.error('停止优化失败');
+    }
+};
+
+// 优化提示词功能（支持流式传输）
 const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract') => {
     if (!formData.value.content.trim()) {
         message.warning("请先输入提示词内容");
@@ -758,10 +845,28 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         return;
     }
 
+    // 重置状态
     optimizing.value = type;
+    isStreaming.value = true;
+    generationControl.shouldStop = false;
+    streamingContent.value = "";
+    
+    // 重置流式统计
+    Object.assign(streamStats, {
+        charCount: 0,
+        isStreaming: true,
+        lastCharCount: 0,
+        noContentUpdateCount: 0,
+        lastUpdateTime: Date.now(),
+        isGenerationActive: true,
+        contentGrowthRate: 0
+    });
+
+    // 保存原始内容，以便出错时恢复
+    const originalContent = formData.value.content;
 
     try {
-        console.log("开始优化提示词:", type, formData.value.content);
+        console.log("开始流式优化提示词:", type, formData.value.content);
         
         // 构建优化指令
         let optimizationPrompt = "";
@@ -805,19 +910,89 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
             model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
         };
 
-        console.log("优化请求参数:", request);
+        console.log("流式优化请求参数:", request);
         console.log("配置参数:", serializedConfig);
 
-        // 调用AI接口
-        const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        let result;
         
-        // 更新提示词内容
-        formData.value.content = result.generatedPrompt;
+        // 检查是否支持流式传输
+        if (window.electronAPI.ai.generatePromptStream) {
+            console.log('使用流式传输模式进行优化');
+            
+            // 使用流式传输
+            result = await window.electronAPI.ai.generatePromptStream(
+                request,
+                serializedConfig,
+                (charCount: number, partialContent?: string) => {
+                    // 检查是否应该停止
+                    if (generationControl.shouldStop) {
+                        console.log('检测到停止信号，中断流式优化');
+                        return false; // 返回 false 表示停止流式传输
+                    }
+                    
+                    const now = Date.now();
+                    console.log('优化流式传输回调:', {
+                        charCount,
+                        hasContent: !!partialContent,
+                        contentLength: partialContent?.length || 0,
+                        timeSinceLastUpdate: now - streamStats.lastUpdateTime
+                    });
+
+                    // 更新时间统计
+                    const prevCharCount = streamStats.charCount;
+                    const prevUpdateTime = streamStats.lastUpdateTime;
+                    streamStats.charCount = charCount;
+                    streamStats.lastUpdateTime = now;
+                    
+                    // 计算内容增长速率
+                    if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                        const timeDiff = (now - prevUpdateTime) / 1000;
+                        const charDiff = charCount - prevCharCount;
+                        streamStats.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                    }
+
+                    // 检测是否有真实内容
+                    const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                    
+                    streamStats.isGenerationActive = hasRealContent || 
+                        (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
+
+                    if (hasRealContent) {
+                        // 有真实内容时直接更新输入框
+                        formData.value.content = partialContent;
+                        streamingContent.value = partialContent;
+                        streamStats.noContentUpdateCount = 0;
+                        console.log('✅ 优化内容已更新，当前长度:', partialContent.length);
+                    } else {
+                        // 没有内容时的处理
+                        streamStats.noContentUpdateCount++;
+                        
+                        if (charCount > prevCharCount) {
+                            // 字符数在增长，说明正在生成
+                            const placeholderText = `正在优化中... (已生成 ${charCount} 字符)`;
+                            if (streamStats.noContentUpdateCount > 3 && !streamingContent.value) {
+                                streamingContent.value = placeholderText;
+                                console.log('📝 显示优化占位符:', placeholderText);
+                            }
+                        }
+                    }
+                    
+                    return true; // 继续流式传输
+                }
+            );
+        } else {
+            console.log('不支持流式传输，使用常规模式');
+            // 如果不支持流式传输，使用常规生成
+            result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+            
+            // 直接更新内容
+            formData.value.content = result.generatedPrompt;
+        }
         
         // 如果是提取变量类型，立即重新提取变量
         if (type === 'extract') {
             nextTick(() => {
-                extractVariables(result.generatedPrompt);
+                extractVariables(formData.value.content);
             });
         }
         
@@ -826,8 +1001,17 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
     } catch (error) {
         console.error("优化失败:", error);
         message.error("优化失败: " + (error.message || "未知错误"));
+        
+        // 出错时恢复原始内容
+        formData.value.content = originalContent;
     } finally {
+        // 重置所有状态
         optimizing.value = null;
+        isStreaming.value = false;
+        generationControl.shouldStop = false;
+        streamingContent.value = "";
+        streamStats.isStreaming = false;
+        streamStats.isGenerationActive = false;
     }
 };
 
@@ -1075,6 +1259,9 @@ watch(
             
             // 重置优化状态
             optimizing.value = null;
+            isStreaming.value = false;
+            streamingContent.value = "";
+            generationControl.shouldStop = false;
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
             setTimeout(() => {
@@ -1198,8 +1385,11 @@ const handleCancel = () => {
         debounceTimer.value = null;
     }
     
-    // 重置优化状态
+    // 重置优化和流式传输状态
     optimizing.value = null;
+    isStreaming.value = false;
+    streamingContent.value = "";
+    generationControl.shouldStop = true; // 如果正在生成，停止生成
 
     emit("update:show", false);
 };
