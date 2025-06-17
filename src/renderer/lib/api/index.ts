@@ -4,8 +4,6 @@
  */
 
 // 导入所有API客户端类和工厂函数
-import { UserApiClient, createUserApiClient } from './user.api';
-import { PostApiClient, createPostApiClient } from './post.api';
 import { CategoryApiClient, createCategoryApiClient } from './category.api';
 import { PromptApiClient, createPromptApiClient } from './prompt.api';
 import { AIConfigApiClient, createAIConfigApiClient } from './ai-config.api';
@@ -16,8 +14,6 @@ import { DataManagementAPI } from './data-management.api';
 
 // 导出所有API客户端类
 export { 
-  UserApiClient,
-  PostApiClient,
   CategoryApiClient,
   PromptApiClient,
   AIConfigApiClient,
@@ -29,8 +25,6 @@ export {
 
 // 导出所有工厂函数
 export { 
-  createUserApiClient,
-  createPostApiClient,
   createCategoryApiClient,
   createPromptApiClient,
   createAIConfigApiClient,
@@ -46,8 +40,6 @@ export class ApiClientManager {
   private static instance: ApiClientManager;
   
   // 各个API客户端实例
-  public readonly user: UserApiClient;
-  public readonly post: PostApiClient;
   public readonly category: CategoryApiClient;
   public readonly prompt: PromptApiClient;
   public readonly aiConfig: AIConfigApiClient;
@@ -56,8 +48,6 @@ export class ApiClientManager {
 
   private constructor() {
     // 初始化所有API客户端实例
-    this.user = createUserApiClient();
-    this.post = createPostApiClient();
     this.category = createCategoryApiClient();
     this.prompt = createPromptApiClient();
     this.aiConfig = createAIConfigApiClient();
@@ -82,8 +72,6 @@ export class ApiClientManager {
  * 为了保持向后兼容，创建类似原始api.ts的结构
  */
 function createApiClient() {
-  const userClient = createUserApiClient();
-  const postClient = createPostApiClient();
   const categoryClient = createCategoryApiClient();
   const promptClient = createPromptApiClient();
   const aiConfigClient = createAIConfigApiClient();
@@ -91,12 +79,6 @@ function createApiClient() {
   const appSettingsClient = createAppSettingsApiClient();
 
   return {
-    // 用户相关API
-    users: userClient.users,
-
-    // 文章相关API
-    posts: postClient.posts,
-
     // 分类相关API
     categories: categoryClient.categories,
 

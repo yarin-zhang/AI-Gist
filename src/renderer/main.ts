@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { initDatabase, databaseServiceManager } from './lib/db'
+import { initDatabase, databaseService } from './lib/services'
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
@@ -42,41 +42,41 @@ async function startApp() {
     
     // 将数据库服务暴露到 window 对象上，供主进程访问
     (window as any).databaseAPI = {
-      databaseServiceManager,
+      databaseServiceManager: databaseService,
       
       // 数据导出方法
       exportAllData: async () => {
-        return await databaseServiceManager.exportAllData();
+        return await databaseService.exportAllData();
       },
       
       // 数据导入方法
       importData: async (data: any) => {
-        return await databaseServiceManager.importData(data);
+        return await databaseService.importData(data);
       },
       
       // 数据备份方法
       backupData: async () => {
-        return await databaseServiceManager.backupData();
+        return await databaseService.backupData();
       },
       
       // 数据恢复方法
       restoreData: async (backupData: any) => {
-        return await databaseServiceManager.restoreData(backupData);
+        return await databaseService.restoreData(backupData);
       },
       
       // 数据完全替换方法
       replaceAllData: async (backupData: any) => {
-        return await databaseServiceManager.replaceAllData(backupData);
+        return await databaseService.replaceAllData(backupData);
       },
       
       // 健康检查方法
       getHealthStatus: async () => {
-        return await databaseServiceManager.getHealthStatus();
+        return await databaseService.getHealthStatus();
       },
       
       // 获取统计信息
       getStats: async () => {
-        return await databaseServiceManager.getDatabaseStats();
+        return await databaseService.getDataStats();
       }
     };
     console.log('数据库服务已暴露到 window.databaseAPI');
