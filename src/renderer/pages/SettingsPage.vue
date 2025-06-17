@@ -663,13 +663,22 @@ const restoreSpecificBackup = async (backupId: string) => {
 // 删除备份
 const deleteBackup = async (backupId: string) => {
     try {
+        console.log(`开始删除备份: ${backupId}`);
         await DataManagementAPI.deleteBackup(backupId);
         message.success("备份删除成功");
         // 删除成功后刷新备份列表
         await refreshBackupList();
     } catch (error) {
         console.error("删除备份失败:", error);
-        message.error("删除备份失败");
+        const errorMessage = error instanceof Error ? error.message : '删除备份失败';
+        message.error(`删除备份失败: ${errorMessage}`);
+        
+        // 删除失败后也刷新备份列表，以确保UI状态正确
+        try {
+            await refreshBackupList();
+        } catch (refreshError) {
+            console.error("刷新备份列表失败:", refreshError);
+        }
     }
 };
 

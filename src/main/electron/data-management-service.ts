@@ -72,22 +72,43 @@ export class DataManagementService {
         // 获取备份列表
         ipcMain.handle('data:get-backup-list', async () => {
             try {
+                // 确保备份目录存在
+                await this.ensureBackupDir();
+                
                 const files = await fs.readdir(this.backupDir);
                 const backups: BackupInfo[] = [];
+                
+                console.log(`备份目录中有 ${files.length} 个文件:`, files);
 
                 for (const file of files) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        const { data, ...backupWithoutData } = backup;
-                        backups.push(backupWithoutData);
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            
+                            // 验证备份文件的必要字段
+                            if (!backup.id || !backup.name || !backup.createdAt) {
+                                console.warn(`备份文件 ${file} 缺少必要字段, 跳过`);
+                                continue;
+                            }
+                            
+                            const { data, ...backupWithoutData } = backup;
+                            backups.push(backupWithoutData);
+                            console.log(`成功加载备份: ${backup.name} (ID: ${backup.id})`);
+                        } catch (fileError) {
+                            console.error(`读取备份文件 ${file} 失败:`, fileError);
+                            // 继续处理其他文件
+                        }
                     }
                 }
 
                 // 按创建时间排序
-                return backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const sortedBackups = backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                console.log(`返回 ${sortedBackups.length} 个有效备份`);
+                return sortedBackups;
             } catch (error) {
+                console.error('获取备份列表失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`获取备份列表失败: ${errorMessage}`);
             }
@@ -134,22 +155,52 @@ export class DataManagementService {
         // 删除备份
         ipcMain.handle('data:delete-backup', async (event, { backupId }) => {
             try {
+                console.log(`尝试删除备份: ${backupId}`);
+                console.log(`备份目录: ${this.backupDir}`);
+                
+                // 检查备份目录是否存在
+                try {
+                    await fs.access(this.backupDir);
+                } catch (error) {
+                    console.error('备份目录不存在:', this.backupDir);
+                    throw new Error('备份目录不存在');
+                }
+                
                 const backups = await fs.readdir(this.backupDir);
+                console.log(`找到 ${backups.length} 个文件:`, backups);
+                
+                let foundBackup = false;
                 
                 for (const file of backups) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        if (backup.id === backupId) {
-                            await fs.unlink(filePath);
-                            return { success: true };
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
+                            
+                            if (backup.id === backupId) {
+                                foundBackup = true;
+                                console.log(`找到匹配的备份文件: ${file}, 开始删除`);
+                                await fs.unlink(filePath);
+                                console.log(`成功删除备份文件: ${file}`);
+                                return { success: true };
+                            }
+                        } catch (fileError) {
+                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
+                            // 继续处理其他文件，不抛出错误
                         }
                     }
                 }
 
-                throw new Error('备份文件不存在');
+                if (!foundBackup) {
+                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
+                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
+                }
+                
+                return { success: true };
             } catch (error) {
+                console.error('删除备份时发生错误:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`删除备份失败: ${errorMessage}`);
             }
@@ -329,11 +380,11 @@ export class DataManagementService {
             const result = await mainWindow.webContents.executeJavaScript(`
                 (async () => {
                     try {
-                        if (!window.databaseAPI || !window.databaseAPI.restoreAllData) {
+                        if (!window.databaseAPI || !window.databaseAPI.restoreData) {
                             throw new Error('数据库API未初始化');
                         }
                         const data = ${JSON.stringify(data)};
-                        return await window.databaseAPI.restoreAllData(data);
+                        return await window.databaseAPI.restoreData(data);
                     } catch (error) {
                         return {
                             success: false,

@@ -86,21 +86,13 @@
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
                             <NText depth="2">备份版本列表</NText>
-                            <div v-for="backup in backupList" :key="backup.id" class="backup-item">
+                            <div v-for="backup in paginatedBackups" :key="backup.id" class="backup-item">
                                 <NCard size="small">
                                     <NFlex justify="space-between" align="center">
                                         <NFlex vertical :size="4">
                                             <NFlex align="center" :size="8">
                                                 <NText strong>{{ backup.name }}</NText>
                                                 <NTag type="info" size="small">{{ backup.version }}</NTag>
-                                            </NFlex>
-                                            <NFlex :size="16">
-                                                <NText depth="3" style="font-size: 12px;">
-                                                    {{ backup.createdAt }}
-                                                </NText>
-                                                <NText depth="3" style="font-size: 12px;">
-                                                    {{ backup.size }}
-                                                </NText>
                                             </NFlex>
                                         </NFlex>
                                         <NFlex :size="8">
@@ -109,6 +101,11 @@
                                                 size="small" 
                                                 @click="restoreSpecificBackup(backup.id)"
                                             >
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Recharging />
+                                                    </NIcon>
+                                                </template>
                                                 恢复
                                             </NButton>
                                             <NPopconfirm
@@ -131,6 +128,19 @@
                                         </NFlex>
                                     </NFlex>
                                 </NCard>
+                            </div>
+                            
+                            <!-- 分页组件 -->
+                            <div v-if="totalPages > 1" class="pagination-container">
+                                <NPagination
+                                    v-model:page="currentPage"
+                                    :page-count="totalPages"
+                                    :page-size="pageSize"
+                                    :item-count="totalItems"
+                                    show-size-picker
+                                    show-quick-jumper
+                                    :page-sizes="[5, 10, 20]"
+                                />
                             </div>
                         </NFlex>
                     </div>
@@ -174,18 +184,6 @@
                         </NFlex>
                     </NFlex>
 
-                    <NAlert type="info" show-icon>
-                        <template #header>数据库修复说明</template>
-                        <div>
-                            <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
-                            <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
-                        </div>
-                    </NAlert>
-
-                    <NAlert type="warning" show-icon>
-                        <template #header>重要提示</template>
-                        修复数据库会尝试恢复缺失的数据表，但可能需要重新登录或重新配置某些设置
-                    </NAlert>
                 </NFlex>
             </div>
         </NFlex>
@@ -203,6 +201,7 @@ import {
     NDivider,
     NPopconfirm,
     NTag,
+    NPagination,
 } from "naive-ui";
 import {
     FileExport,
@@ -213,8 +212,9 @@ import {
     Database,
     Refresh,
     Trash,
+    Recharging,
 } from "@vicons/tabler";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 const emit = defineEmits<{
     "export-data": [format: "csv" | "json"];
@@ -237,6 +237,20 @@ interface BackupItem {
 }
 
 const backupList = ref<BackupItem[]>([]);
+
+// 分页相关状态
+const currentPage = ref(1);
+const pageSize = 5;
+
+// 计算分页数据
+const paginatedBackups = computed(() => {
+    const start = (currentPage.value - 1) * pageSize;
+    const end = start + pageSize;
+    return backupList.value.slice(start, end);
+});
+
+const totalItems = computed(() => backupList.value.length);
+const totalPages = computed(() => Math.ceil(totalItems.value / pageSize));
 
 const exportData = (format: "csv" | "json") => {
     emit("export-data", format);
@@ -273,6 +287,8 @@ const repairDatabase = () => {
 // 暴露方法供父组件调用
 const updateBackupList = (list: BackupItem[]) => {
     backupList.value = list;
+    // 重置到第一页
+    currentPage.value = 1;
 };
 
 defineExpose({
@@ -287,5 +303,13 @@ defineExpose({
 
 .backup-item:last-child {
     margin-bottom: 0;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
 }
 </style>

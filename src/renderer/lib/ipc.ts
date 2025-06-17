@@ -240,9 +240,9 @@ export class IpcUtils {
           case 'get-backup-list':
             return api.data.getBackupList();
           case 'restore-backup':
-            return api.data.restoreBackup(data);
+            return api.data.restoreBackup(data.backupId);
           case 'delete-backup':
-            return api.data.deleteBackup(data);
+            return api.data.deleteBackup(data.backupId);
           case 'export':
             return api.data.export(data.options, data.exportPath);
           case 'import':
