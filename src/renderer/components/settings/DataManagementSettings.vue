@@ -195,7 +195,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">完整备份管理</NText>
                         <NText depth="3" style="font-size: 12px; ">
-                            导出完整备份压缩包，或从压缩包导入完整备份
+                            导出完整备份压缩包，或从压缩包导入完整备份。导出的数据将包含 AI 配置信息中的 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
                         </NText>
                         
                         <NFlex :size="12">
