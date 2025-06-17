@@ -1,61 +1,6 @@
 <template>
     <NCard>
         <NFlex vertical :size="20">
-            <!-- 数据导入导出 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">导出数据</NText>
-                        <NFlex :size="12">
-                            <NButton @click="exportData('csv')">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 CSV
-                            </NButton>
-                            <NButton @click="exportData('json')">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 JSON
-                            </NButton>
-                        </NFlex>
-                    </NFlex>
-
-                    <NFlex vertical :size="12">
-                        <NText depth="2">导入数据</NText>
-                        <NFlex :size="12">
-                            <NButton @click="importData('csv')">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileImport />
-                                    </NIcon>
-                                </template>
-                                导入 CSV
-                            </NButton>
-                            <NButton @click="importData('json')">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileImport />
-                                    </NIcon>
-                                </template>
-                                导入 JSON
-                            </NButton>
-                        </NFlex>
-                    </NFlex>
-
-                    <NAlert type="warning" show-icon>
-                        <template #header>注意</template>
-                        导入数据将覆盖现有数据，请确保已备份重要数据
-                    </NAlert>
-                </NFlex>
-            </div>
-
-            <NDivider />
 
             <!-- 数据备份恢复 -->
             <div>
@@ -97,7 +42,8 @@
                                         </NFlex>
                                         <NFlex :size="8">
                                             <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
-                                                negative-text="取消" positive-text="确定恢复" placement="top" :show-icon="false">
+                                                negative-text="取消" positive-text="确定恢复" placement="top"
+                                                :show-icon="false">
                                                 <template #trigger>
                                                     <NButton type="primary" size="small"
                                                         :loading="props.loading?.backup"
@@ -156,6 +102,61 @@
             </div>
 
             <NDivider />
+            <!-- 数据导入导出 -->
+            <div>
+                <NFlex vertical :size="16">
+                    <NFlex vertical :size="12">
+                        <NText depth="2">导出数据</NText>
+                        <NFlex :size="12">
+                            <NButton @click="exportData('csv')">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 CSV
+                            </NButton>
+                            <NButton @click="exportData('json')">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 JSON
+                            </NButton>
+                        </NFlex>
+                    </NFlex>
+
+                    <NFlex vertical :size="12">
+                        <NText depth="2">导入数据</NText>
+                        <NFlex :size="12">
+                            <NButton @click="importData('csv')">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileImport />
+                                    </NIcon>
+                                </template>
+                                导入 CSV
+                            </NButton>
+                            <NButton @click="importData('json')">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileImport />
+                                    </NIcon>
+                                </template>
+                                导入 JSON
+                            </NButton>
+                        </NFlex>
+                    </NFlex>
+
+                    <NAlert type="warning" show-icon>
+                        <template #header>注意</template>
+                        导入数据将覆盖现有数据，请确保已备份重要数据
+                    </NAlert>
+                </NFlex>
+            </div>
+
+            <NDivider />
 
             <!-- 数据库维护 -->
             <div>
@@ -182,12 +183,8 @@
                                 </template>
                                 修复数据库
                             </NButton>
-                            <NPopconfirm
-                                @positive-click="clearDatabase"
-                                negative-text="取消"
-                                positive-text="确定清空"
-                                placement="top"
-                            >
+                            <NPopconfirm @positive-click="clearDatabase" negative-text="取消" positive-text="确定清空"
+                                placement="top">
                                 <template #trigger>
                                     <NButton type="error" :loading="props.loading?.clearDatabase">
                                         <template #icon>
@@ -212,23 +209,6 @@
                             </NPopconfirm>
                         </NFlex>
                     </NFlex>
-
-                    <NAlert type="info" show-icon>
-                        <template #header>数据库维护说明</template>
-                        <div>
-                            <p>• <strong>检查状态</strong>：检查数据库是否存在问题</p>
-                            <p>• <strong>修复数据库</strong>：尝试修复缺失的数据表</p>
-                            <p>• <strong>清空数据库</strong>：完全清空所有数据（会先自动备份）</p>
-                        </div>
-                    </NAlert>
-
-                    <NAlert type="warning" show-icon>
-                        <template #header>重要提示</template>
-                        <div>
-                            <p>• 修复数据库会尝试恢复缺失的数据表，但可能需要重新登录或重新配置某些设置</p>
-                            <p>• 清空数据库是不可逆操作，执行前会自动创建备份以防意外</p>
-                        </div>
-                    </NAlert>
 
                 </NFlex>
             </div>
