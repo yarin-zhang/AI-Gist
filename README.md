@@ -10,7 +10,7 @@
 
 </div>
 
-![](docs/images/imageMain.png?v=4)
+![主要截图](docs/images/imageMain.png?v=202506171718)
 
 ## 📌 特点
 
@@ -21,11 +21,15 @@ AI Gist 提供基础的 AI 提示词管理功能，旨在帮助用户高效地�
 - **分类与标签**：通过分类和标签系统轻松查找和过滤提示词
 - **历史记录**：保存使用过的提示词，方便重复使用和优化
 
+![特点01](docs/images/imageFeature01.png?v=202506171718)
+
 AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升管理效率。用之前，改一改。
 
 - **AI 模型集成**：支持多种 AI 模型，包括本地模型和在线模型
 - **AI 提示词生成**：通过 AI 模型自动生成提示词，提升创作效率
 - **AI 快速调整**：支持快速调整提示词风格并提取变量
+
+![特点02](docs/images/imageFeature02.png?v=202506171718)
 
 AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持 WebDAV 在不同设备间同步。
 
@@ -33,6 +37,8 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 - **本地优先**：所有数据存储在本地，确保隐私和安全
 - **WebDAV**：支持 WebDAV 同步，方便在多设备间共享数据
 - **跨平台支持**：支持 Windows、macOS 和 Linux 系统
+
+![特点03](docs/images/imageFeature03.png?v=202506171718)
 
 ## ⬇️ 下载
 
@@ -99,23 +105,21 @@ yarn build:linux    # 构建 Linux 安装包
 
 ## 应用截图
 
-![](docs/images/image01.png?v=4)
+![截图01](docs/images/image01.png?v=202506171718)
 
-![](docs/images/image02.png?v=4)
+![截图02](docs/images/image02.png?v=202506171718)
 
-![](docs/images/image03.png?v=4)
+![截图03](docs/images/image03.png?v=202506171718)
 
-![](docs/images/image04.png?v=4)
+![截图04](docs/images/image04.png?v=202506171718)
 
-![](docs/images/image05.png?v=4)
+![截图05](docs/images/image05.png?v=202506171718)
 
-![](docs/images/image06.png?v=4)
+![截图06](docs/images/image06.png?v=202506171718)
 
-![](docs/images/image07.png?v=4)
+![截图07](docs/images/image07.png?v=202506171718)
 
-![](docs/images/image08.png?v=4)
-
-![](docs/images/image09.png?v=4)
+![截图08](docs/images/image08.png?v=202506171718)
 
 ## 贡献
 
@@ -126,7 +130,7 @@ yarn build:linux    # 构建 Linux 安装包
 欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
 
 <div style="max-width: 300px; padding: 16px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); text-align: center;">
-  <img src="docs/images/QQ-QRCode.png?v=4" alt="QQ 群" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+  <img src="docs/images/QQ-QRCode.png?v=202506171718" alt="QQ 群" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
 </div>
 
 ## 许可证
