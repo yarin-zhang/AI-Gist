@@ -74,6 +74,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfig: () => ipcRenderer.invoke('webdav:get-config'),
     encryptPassword: (password: string) => ipcRenderer.invoke('webdav:encrypt-password', password),
     decryptPassword: (encryptedPassword: any) => ipcRenderer.invoke('webdav:decrypt-password', encryptedPassword),
+    manualUpload: () => ipcRenderer.invoke('webdav:manual-upload'),
+    manualDownload: () => ipcRenderer.invoke('webdav:manual-download'),
+    getRemotePreview: () => ipcRenderer.invoke('webdav:get-remote-preview'),
+    compareData: () => ipcRenderer.invoke('webdav:compare-data'),
+    applyDownloadedData: (resolution: any) => ipcRenderer.invoke('webdav:apply-downloaded-data', resolution),
   },
   // 数据管理
   data: {

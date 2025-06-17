@@ -191,8 +191,9 @@ export class WebDAVService {
     public setupIpcHandlers() {
         console.log('正在设置 WebDAV IPC 处理程序...');
         
-        // 测试 WebDAV 连接
-        ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig): Promise<WebDAVTestResult> => {
+        try {
+            // 测试 WebDAV 连接
+            ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig): Promise<WebDAVTestResult> => {
             try {
                 console.log('开始测试 WebDAV 连接:', config.serverUrl);
                 
@@ -332,6 +333,7 @@ export class WebDAVService {
         });
 
         // 手动上传数据
+        console.log('注册 webdav:manual-upload 处理程序');
         ipcMain.handle('webdav:manual-upload', async (): Promise<any> => {
             try {
                 console.log('开始手动上传数据...');
@@ -393,6 +395,7 @@ export class WebDAVService {
         });
 
         // 手动下载数据（检测冲突但不应用）
+        console.log('注册 webdav:manual-download 处理程序');
         ipcMain.handle('webdav:manual-download', async (): Promise<any> => {
             try {
                 console.log('开始手动下载数据...');
@@ -558,6 +561,7 @@ export class WebDAVService {
         });
 
         // 获取远程数据预览
+        console.log('注册 webdav:get-remote-preview 处理程序');
         ipcMain.handle('webdav:get-remote-preview', async () => {
             try {
                 const config = await this.getStoredConfig();
@@ -613,6 +617,7 @@ export class WebDAVService {
         });
 
         // 比较本地和远程数据
+        console.log('注册 webdav:compare-data 处理程序');
         ipcMain.handle('webdav:compare-data', async () => {
             try {
                 const config = await this.getStoredConfig();
@@ -728,6 +733,10 @@ export class WebDAVService {
         });
         
         console.log('WebDAV IPC 处理程序设置完成，包括加密/解密处理程序');
+        } catch (error) {
+            console.error('WebDAV IPC 处理程序设置失败:', error);
+            throw error;
+        }
     }
 
     /**
@@ -1513,64 +1522,172 @@ export class WebDAVService {
     }
 
     /**
-     * 检测本地和远程数据之间的冲突
+     * 获取存储的 WebDAV 配置
      */
-    private async detectConflicts(localData: any, remoteData: any, localMetadata: any, remoteMetadata: any): Promise<any[]> {
-        const conflicts: any[] = [];
-
-        if (!localData && !remoteData) {
-            return conflicts;
-        }
-
-        if (!localData) {
-            conflicts.push({
-                type: 'data_conflict',
-                description: '本地无数据，远程有数据',
-                resolution: 'remote_wins'
-            });
-            return conflicts;
-        }
-
-        if (!remoteData) {
-            conflicts.push({
-                type: 'data_conflict',
-                description: '远程无数据，本地有数据',
-                resolution: 'local_wins'
-            });
-            return conflicts;
-        }
-
-        // 比较数据哈希
-        const localHash = this.calculateDataHash(localData);
-        const remoteHash = this.calculateDataHash(remoteData);
-
-        if (localHash === remoteHash) {
-            // 数据相同，无冲突
-            return conflicts;
-        }
-
-        // 检查时间戳冲突
-        if (localMetadata && remoteMetadata) {
-            const localTime = new Date(localMetadata.lastSyncTime).getTime();
-            const remoteTime = new Date(remoteMetadata.lastSyncTime).getTime();
-            const timeDiff = Math.abs(localTime - remoteTime);
-
-            if (timeDiff > 300000) { // 5分钟
-                conflicts.push({
-                    type: 'timestamp_conflict',
-                    description: `时间戳冲突: 本地 ${localMetadata.lastSyncTime}, 远程 ${remoteMetadata.lastSyncTime}`,
-                    resolution: 'manual'
-                });
+    private async getStoredConfig(): Promise<WebDAVConfig | null> {
+        try {
+            const preferences = this.preferencesManager.getPreferences();
+            const config: WebDAVStorageConfig = preferences.webdav;
+            
+            if (!config || !config.enabled) {
+                return null;
             }
+            
+            if (!config.serverUrl || !config.username || !config.password) {
+                return null;
+            }
+            
+            // 解密密码
+            let password: string;
+            if (this.isPasswordEncrypted(config.password)) {
+                password = this.decryptPassword(config.password);
+            } else {
+                password = config.password as string;
+            }
+            
+            return {
+                serverUrl: config.serverUrl,
+                username: config.username,
+                password: password
+            };
+        } catch (error) {
+            console.error('获取存储的 WebDAV 配置失败:', error);
+            return null;
         }
+    }
 
-        // 数据内容不同
-        conflicts.push({
-            type: 'data_conflict',
-            description: '本地和远程数据不同',
-            resolution: 'manual'
-        });
+    /**
+     * 生成详细的差异分析
+     */
+    private async generateDetailedDifferences(
+        localData: any, 
+        remoteData: any, 
+        localMetadata: any, 
+        remoteMetadata: any
+    ): Promise<any> {
+        const differences: any = {
+            hasDifferences: false,
+            summary: {
+                localRecords: 0,
+                remoteRecords: 0,
+                conflictCount: 0,
+                onlyInLocal: 0,
+                onlyInRemote: 0,
+                modified: 0
+            },
+            details: {
+                categories: { added: [], removed: [], modified: [] },
+                prompts: { added: [], removed: [], modified: [] },
+                settings: { added: [], removed: [], modified: [] }
+            },
+            metadata: {
+                localLastSync: localMetadata?.lastSyncTime || 'Never',
+                remoteLastSync: remoteMetadata?.lastSyncTime || 'Never',
+                localSyncCount: localMetadata?.syncCount || 0,
+                remoteSyncCount: remoteMetadata?.syncCount || 0,
+                localDeviceId: localMetadata?.deviceId || 'Unknown',
+                remoteDeviceId: remoteMetadata?.deviceId || 'Unknown'
+            }
+        };
 
-        return conflicts;
+        try {
+            // 计算总记录数
+            differences.summary.localRecords = this.calculateTotalRecords(localData);
+            differences.summary.remoteRecords = this.calculateTotalRecords(remoteData);
+
+            // 比较分类
+            if (localData?.categories || remoteData?.categories) {
+                const localCategories = new Map((localData?.categories || []).map((c: any) => [c.id, c]));
+                const remoteCategories = new Map((remoteData?.categories || []).map((c: any) => [c.id, c]));
+                
+                // 只在本地存在的分类
+                for (const [id, category] of localCategories) {
+                    if (!remoteCategories.has(id)) {
+                        differences.details.categories.removed.push(category);
+                        differences.summary.onlyInLocal++;
+                    }
+                }
+                
+                // 只在远程存在的分类
+                for (const [id, category] of remoteCategories) {
+                    if (!localCategories.has(id)) {
+                        differences.details.categories.added.push(category);
+                        differences.summary.onlyInRemote++;
+                    }
+                }
+                
+                // 两边都存在但内容不同的分类
+                for (const [id, localCategory] of localCategories) {
+                    const remoteCategory = remoteCategories.get(id);
+                    if (remoteCategory && JSON.stringify(localCategory) !== JSON.stringify(remoteCategory)) {
+                        differences.details.categories.modified.push({
+                            id,
+                            local: localCategory,
+                            remote: remoteCategory
+                        });
+                        differences.summary.modified++;
+                    }
+                }
+            }
+
+            // 比较提示词
+            if (localData?.prompts || remoteData?.prompts) {
+                const localPrompts = new Map((localData?.prompts || []).map((p: any) => [p.id, p]));
+                const remotePrompts = new Map((remoteData?.prompts || []).map((p: any) => [p.id, p]));
+                
+                // 只在本地存在的提示词
+                for (const [id, prompt] of localPrompts) {
+                    if (!remotePrompts.has(id)) {
+                        differences.details.prompts.removed.push(prompt);
+                        differences.summary.onlyInLocal++;
+                    }
+                }
+                
+                // 只在远程存在的提示词
+                for (const [id, prompt] of remotePrompts) {
+                    if (!localPrompts.has(id)) {
+                        differences.details.prompts.added.push(prompt);
+                        differences.summary.onlyInRemote++;
+                    }
+                }
+                
+                // 两边都存在但内容不同的提示词
+                for (const [id, localPrompt] of localPrompts) {
+                    const remotePrompt = remotePrompts.get(id);
+                    if (remotePrompt && JSON.stringify(localPrompt) !== JSON.stringify(remotePrompt)) {
+                        differences.details.prompts.modified.push({
+                            id,
+                            local: localPrompt,
+                            remote: remotePrompt
+                        });
+                        differences.summary.modified++;
+                    }
+                }
+            }
+
+            // 计算是否有差异
+            differences.hasDifferences = 
+                differences.summary.onlyInLocal > 0 ||
+                differences.summary.onlyInRemote > 0 ||
+                differences.summary.modified > 0;
+
+            differences.summary.conflictCount = 
+                differences.summary.onlyInLocal +
+                differences.summary.onlyInRemote +
+                differences.summary.modified;
+
+            console.log('详细差异分析完成:', differences.summary);
+            return differences;
+            
+        } catch (error) {
+            console.error('生成详细差异分析失败:', error);
+            return {
+                hasDifferences: false,
+                error: error instanceof Error ? error.message : '未知错误',
+                summary: differences.summary,
+                details: differences.details,
+                metadata: differences.metadata
+            };
+        }
     }
 }

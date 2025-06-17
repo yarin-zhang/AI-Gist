@@ -48,6 +48,12 @@ declare global {
         setConfig: (config: any) => Promise<void>;
         getConfig: () => Promise<any>;
         encryptPassword: (password: string) => Promise<any>;
+        decryptPassword: (encryptedPassword: any) => Promise<any>;
+        manualUpload: () => Promise<any>;
+        manualDownload: () => Promise<any>;
+        getRemotePreview: () => Promise<any>;
+        compareData: () => Promise<any>;
+        applyDownloadedData: (resolution: any) => Promise<any>;
         decryptPassword: (encryptedPassword: any) => Promise<string>;
       };
       data: {
@@ -230,6 +236,16 @@ export class IpcUtils {
             return api.webdav.encryptPassword(data);
           case 'decrypt-password':
             return api.webdav.decryptPassword(data);
+          case 'manual-upload':
+            return api.webdav.manualUpload();
+          case 'manual-download':
+            return api.webdav.manualDownload();
+          case 'get-remote-preview':
+            return api.webdav.getRemotePreview();
+          case 'compare-data':
+            return api.webdav.compareData();
+          case 'apply-downloaded-data':
+            return api.webdav.applyDownloadedData(data);
         }
         break;
         
