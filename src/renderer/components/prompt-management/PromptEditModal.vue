@@ -22,7 +22,7 @@
                             <!-- 左侧：内容编辑区 -->
                             <template #1>
                                 <NCard title="提示词内容" size="small" :style="{ height: '100%' }">
-                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
+                                    <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }" y-placement="bottom">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;">
                                                 <NInput 
@@ -98,10 +98,53 @@
                                                         >
                                                             提取变量
                                                         </NButton>
+                                                        <NButton 
+                                                            size="small" 
+                                                            @click="showManualAdjustment"
+                                                            :disabled="!formData.content.trim() || optimizing !== null"
+                                                        >
+                                                            手动调整
+                                                        </NButton>
                                                     </template>
                                                 </NFlex>
                                             </NFlex>
                                         </NAlert>
+                                        
+                                        <!-- 手动调整输入框 -->
+                                        <div v-if="showManualInput" style="margin-top: 8px;">
+                                            <NCard size="small" title="手动调整指令">
+                                                <NFlex vertical size="small">
+                                                    <NInput
+                                                        v-model:value="manualInstruction"
+                                                        type="textarea"
+                                                        placeholder="请输入您希望如何调整提示词的指令，例如：'添加更多技术细节'、'简化语言表达'等..."
+                                                        :rows="3"
+                                                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
+                                                        show-count
+                                                        :maxlength="500"
+                                                    />
+                                                    <NFlex justify="space-between" align="center">
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            AI将根据您的指令调整当前提示词内容
+                                                        </NText>
+                                                        <NFlex size="small">
+                                                            <NButton size="small" @click="hideManualAdjustment">
+                                                                取消
+                                                            </NButton>
+                                                            <NButton 
+                                                                size="small" 
+                                                                type="primary"
+                                                                @click="applyManualAdjustment"
+                                                                :loading="optimizing === 'manual'"
+                                                                :disabled="!manualInstruction.trim()"
+                                                            >
+                                                                确定调整
+                                                            </NButton>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </NFlex>
+                                            </NCard>
+                                        </div>
                                     </NScrollbar>
                                 </NCard>
                             </template>
@@ -567,6 +610,7 @@ const emit = defineEmits<Emits>();
 
 const message = useMessage();
 const formRef = ref();
+const contentScrollbarRef = ref(); // 内容区域滚动条引用
 const saving = ref(false);
 const activeTab = ref("edit");
 const historyList = ref<PromptHistory[]>([]);
@@ -578,6 +622,10 @@ const previewHistory = ref<PromptHistory | null>(null);
 const optimizing = ref<string | null>(null);
 const aiConfigs = ref([]);
 const selectedConfigId = ref("");
+
+// 手动调整状态
+const showManualInput = ref(false);
+const manualInstruction = ref("");
 
 // 流式传输状态
 const streamingContent = ref("");
@@ -702,6 +750,10 @@ const resetForm = () => {
     isStreaming.value = false;
     streamingContent.value = "";
     generationControl.shouldStop = false;
+    
+    // 重置手动调整状态
+    showManualInput.value = false;
+    manualInstruction.value = "";
     
     // 重置流式统计
     Object.assign(streamStats, {
@@ -1015,6 +1067,133 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
     }
 };
 
+// 显示手动调整输入框
+const showManualAdjustment = () => {
+    showManualInput.value = true;
+    manualInstruction.value = "";
+    
+    // 使用 nextTick 确保 DOM 更新后再滚动
+    nextTick(() => {
+        // 滚动到底部以显示手动调整输入框
+        if (contentScrollbarRef.value) {
+            contentScrollbarRef.value.scrollTo({ top: 999999, behavior: 'smooth' });
+        }
+    });
+};
+
+// 隐藏手动调整输入框
+const hideManualAdjustment = () => {
+    showManualInput.value = false;
+    manualInstruction.value = "";
+};
+
+// 应用手动调整
+const applyManualAdjustment = async () => {
+    if (!manualInstruction.value.trim()) {
+        message.warning("请输入调整指令");
+        return;
+    }
+    
+    if (!formData.value.content.trim()) {
+        message.warning("请先输入提示词内容");
+        return;
+    }
+
+    if (aiConfigs.value.length === 0) {
+        message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
+        return;
+    }
+
+    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+    if (!selectedConfig) {
+        message.error("请选择一个AI配置");
+        return;
+    }
+
+    // 重置状态
+    optimizing.value = 'manual';
+    isStreaming.value = true;
+    generationControl.shouldStop = false;
+    streamingContent.value = "";
+    
+    // 重置流式传输统计
+    streamStats.charCount = 0;
+    streamStats.isStreaming = true;
+    streamStats.lastCharCount = 0;
+    streamStats.noContentUpdateCount = 0;
+    streamStats.lastUpdateTime = Date.now();
+    streamStats.isGenerationActive = true;
+    streamStats.contentGrowthRate = 0;
+
+    try {
+        console.log("开始手动调整提示词:", manualInstruction.value, formData.value.content);
+        
+        // 构建手动调整指令，包含原有提示词
+        const adjustmentPrompt = `请根据以下调整指令来改进提示词。
+
+原有提示词：
+${formData.value.content}
+
+调整指令：
+${manualInstruction.value.trim()}
+
+请输出改进后的完整提示词内容：`;
+        
+        // 序列化配置以确保可以通过 IPC 传递
+        const serializedConfig = {
+            configId: selectedConfig.configId || '',
+            name: selectedConfig.name || '',
+            type: selectedConfig.type || 'openai',
+            baseURL: selectedConfig.baseURL || '',
+            apiKey: selectedConfig.apiKey || '',
+            secretKey: selectedConfig.secretKey || '',
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
+            customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
+            enabled: Boolean(selectedConfig.enabled),
+            systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
+            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+        };
+
+        // 构建请求参数
+        const request = {
+            configId: String(selectedConfig.configId || ''),
+            topic: String(adjustmentPrompt),
+            customPrompt: String(adjustmentPrompt),
+            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+        };
+
+        console.log("手动调整请求参数:", request);
+        console.log("配置参数:", serializedConfig);
+
+        // 创建 AbortController 用于取消请求
+        generationControl.abortController = new AbortController();
+
+        // 启动流式传输监听
+        await startStreamingGeneration(request, serializedConfig);
+        
+        // 隐藏手动调整输入框
+        hideManualAdjustment();
+        
+        message.success("提示词已根据指令调整完成");
+
+    } catch (error) {
+        console.error("手动调整失败:", error);
+        if (error.name === 'AbortError') {
+            message.info("手动调整已取消");
+        } else {
+            message.error("手动调整失败: " + (error.message || "未知错误"));
+        }
+    } finally {
+        optimizing.value = null;
+        isStreaming.value = false;
+        streamStats.isStreaming = false;
+        streamStats.isGenerationActive = false;
+        generationControl.abortController = null;
+    }
+};
+
 // 获取优化类型名称
 const getOptimizationTypeName = (type: string) => {
     switch (type) {
@@ -1022,6 +1201,7 @@ const getOptimizationTypeName = (type: string) => {
         case 'richer': return '更丰富';
         case 'general': return '更通用';
         case 'extract': return '提取变量';
+        case 'manual': return '手动调整';
         default: return '优化';
     }
 };
@@ -1262,6 +1442,10 @@ watch(
             isStreaming.value = false;
             streamingContent.value = "";
             generationControl.shouldStop = false;
+            
+            // 重置手动调整状态
+            showManualInput.value = false;
+            manualInstruction.value = "";
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
             setTimeout(() => {
@@ -1390,6 +1574,10 @@ const handleCancel = () => {
     isStreaming.value = false;
     streamingContent.value = "";
     generationControl.shouldStop = true; // 如果正在生成，停止生成
+    
+    // 重置手动调整状态
+    showManualInput.value = false;
+    manualInstruction.value = "";
 
     emit("update:show", false);
 };
