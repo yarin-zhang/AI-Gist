@@ -1164,6 +1164,14 @@ const applyManualAdjustment = async () => {
     generationControl.shouldStop = false;
     streamingContent.value = "";
     
+    // 立即隐藏手动调整输入框并向上滚动
+    hideManualAdjustment();
+    nextTick(() => {
+        if (contentScrollbarRef.value) {
+            contentScrollbarRef.value.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+    
     // 重置流式传输统计
     streamStats.charCount = 0;
     streamStats.isStreaming = true;
@@ -1220,9 +1228,6 @@ ${manualInstruction.value.trim()}
 
         // 启动流式传输监听
         await startStreamingGeneration(request, serializedConfig);
-        
-        // 隐藏手动调整输入框
-        hideManualAdjustment();
         
         message.success("提示词已根据指令调整完成");
 
