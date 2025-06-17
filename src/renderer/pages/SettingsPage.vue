@@ -68,6 +68,9 @@
                             :loading="loading"
                             @export-data="exportData"
                             @import-data="importData"
+                            @export-selected-data="exportSelectedData"
+                            @export-full-backup="exportFullBackup"
+                            @import-full-backup="importFullBackup"
                             @create-backup="createBackup"
                             @restore-backup="restoreSpecificBackup"
                             @delete-backup="deleteBackup"
@@ -795,7 +798,101 @@ const importData = async (format: 'json' | 'csv') => {
     loading.import = false;
 };
 
-// 格式化同步时间 - 已移至子组件，删除此函数
+// 选择性数据导出
+const exportSelectedData = async (format: 'json' | 'csv', options: any) => {
+    loading.export = true;
+    try {
+        console.log('开始选择性数据导出:', { format, options });
+        
+        const result = await DataManagementAPI.exportSelectedData({
+            format,
+            ...options
+        });
+        
+        if (result.success) {
+            const sizeText = result.size ? ` (${(result.size / 1024).toFixed(2)} KB)` : '';
+            message.success(result.message || `选择性数据导出成功${sizeText}`);
+            
+            // 如果包含AI配置，显示安全提醒
+            if (options.includeAIConfigs) {
+                message.warning('导出文件包含AI配置信息，请妥善保管避免泄露', {
+                    duration: 5000
+                });
+            }
+        } else {
+            message.error(result.message || '选择性数据导出失败');
+        }
+    } catch (error) {
+        console.error('选择性数据导出失败:', error);
+        message.error('选择性数据导出失败');
+    }
+    loading.export = false;
+};
+
+// 完整备份导出
+const exportFullBackup = async () => {
+    loading.export = true;
+    try {
+        console.log('开始完整备份导出...');
+        
+        const result = await DataManagementAPI.exportFullBackup();
+        
+        if (result.success) {
+            const sizeText = result.size ? ` (${(result.size / 1024 / 1024).toFixed(2)} MB)` : '';
+            message.success(result.message || `完整备份导出成功${sizeText}`);
+            
+            // 提醒用户备份包含敏感信息
+            message.warning('完整备份包含所有数据和配置信息，请妥善保管', {
+                duration: 5000
+            });
+        } else {
+            message.error(result.message || '完整备份导出失败');
+        }
+    } catch (error) {
+        console.error('完整备份导出失败:', error);
+        message.error('完整备份导出失败');
+    }
+    loading.export = false;
+};
+
+// 完整备份导入
+const importFullBackup = async () => {
+    loading.import = true;
+    try {
+        console.log('开始完整备份导入...');
+        
+        const result = await DataManagementAPI.importFullBackup();
+        
+        if (result.success) {
+            message.success(result.message || '完整备份导入成功');
+            // 导入成功后刷新备份列表和数据统计
+            await refreshBackupList();
+            await refreshDataStats();
+        } else {
+            message.error(result.message || '完整备份导入失败');
+        }
+    } catch (error) {
+        console.error('完整备份导入失败:', error);
+        message.error('完整备份导入失败');
+    }
+    loading.import = false;
+};
+
+// 刷新数据统计
+const refreshDataStats = async () => {
+    try {
+        const stats = await DataManagementAPI.getDataStats();
+        
+        // 更新子组件的数据统计
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateDataStats(stats);
+        }
+    } catch (error) {
+        console.error('获取数据统计失败:', error);
+        // 不显示错误消息，因为这不是用户主动操作
+    }
+};
+
 
 // 重置设置
 const resetSettings = async () => {
@@ -926,14 +1023,16 @@ const clearDatabase = async () => {
 // 组件挂载时加载设置
 onMounted(async () => {
     await loadSettings();
-    // 加载备份列表
+    // 加载备份列表和数据统计
     await refreshBackupList();
+    await refreshDataStats();
 });
 
-// 监听设置页面切换，当切换到数据管理页面时刷新备份列表
+// 监听设置页面切换，当切换到数据管理页面时刷新备份列表和数据统计
 watch(activeSettingKey, async (newKey) => {
     if (newKey === 'data-management') {
         await refreshBackupList();
+        await refreshDataStats();
     }
 });
 </script>

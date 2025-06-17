@@ -115,3 +115,23 @@ if (typeof window !== 'undefined') {
     }
   };
 }
+
+/**
+ * 创建数据库 API
+ * @returns 数据库 API 对象
+ */
+export function createDatabaseAPI() {
+  const databaseManager = new DatabaseManager();
+  
+  return {
+    databaseServiceManager: databaseManager.serviceManager,
+    exportAllData: () => databaseManager.serviceManager.exportAllData(),
+    restoreData: (backupData: any) => databaseManager.serviceManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.serviceManager.replaceAllData(backupData),
+    importDataObject: (data: any) => databaseManager.serviceManager.importData(data),
+    getDataStatistics: () => databaseManager.serviceManager.getDataStatistics(),
+    checkAndRepairDatabase: () => databaseManager.serviceManager.checkAndRepairDatabase(),
+    backupData: () => databaseManager.backupData(),
+    getHealthStatus: () => databaseManager.getHealthStatus()
+  };
+}

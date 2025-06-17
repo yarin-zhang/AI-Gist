@@ -7,6 +7,8 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import * as archiver from 'archiver';
+import * as unzipper from 'unzipper';
 
 interface BackupInfo {
     id: string;
@@ -15,6 +17,25 @@ interface BackupInfo {
     createdAt: string;
     size: number;
     data?: any;
+}
+
+interface ExportOptions {
+    includePrompts?: boolean;
+    includeCategories?: boolean;
+    includeAIConfigs?: boolean;
+    includeHistory?: boolean;
+    includeSettings?: boolean;
+}
+
+interface DataStats {
+    categories: number;
+    prompts: number;
+    history: number;
+    aiConfigs: number;
+    settings: number;
+    posts: number;
+    users: number;
+    totalRecords: number;
 }
 
 export class DataManagementService {

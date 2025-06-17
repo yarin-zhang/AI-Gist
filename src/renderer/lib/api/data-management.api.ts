@@ -12,6 +12,7 @@ export interface ExportOptions {
     format: 'json' | 'csv';
     includeCategories?: boolean;
     includePrompts?: boolean;
+    includeAIConfigs?: boolean;
     includeSettings?: boolean;
     includeHistory?: boolean;
 }
@@ -32,6 +33,24 @@ export interface ImportResult {
         history: number;
     };
     errors: string[];
+}
+
+export interface DataStats {
+    categories: number;
+    prompts: number;
+    history: number;
+    aiConfigs: number;
+    settings: number;
+    posts: number;
+    users: number;
+    totalRecords: number;
+}
+
+export interface ExportResult {
+    success: boolean;
+    filePath?: string;
+    size?: number;
+    message: string;
 }
 
 /**
@@ -153,15 +172,48 @@ export class DataManagementAPI {
     }
 
     /**
+     * 选择性数据导出
+     */
+    static async exportSelectedData(options: ExportOptions, exportPath?: string): Promise<ExportResult> {
+        try {
+            return await ipcInvoke('data:export-selected', { options, exportPath });
+        } catch (error) {
+            console.error('选择性数据导出失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 导出完整备份压缩包
+     */
+    static async exportFullBackup(): Promise<ExportResult> {
+        try {
+            return await ipcInvoke('data:export-full-backup');
+        } catch (error) {
+            console.error('完整备份导出失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 导入完整备份压缩包
+     */
+    static async importFullBackup(): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        try {
+            return await ipcInvoke('data:import-full-backup');
+        } catch (error) {
+            console.error('完整备份导入失败:', error);
+            throw error;
+        }
+    }
+
+    /**
      * 获取数据统计信息
      */
-    static async getDataStats(): Promise<{
-        categories: number;
-        prompts: number;
-        history: number;
-        totalSize: number;
-        lastBackupTime: string | null;
-    }> {
+    static async getDataStats(): Promise<DataStats> {
         try {
             return await ipcInvoke('data:get-stats');
         } catch (error) {

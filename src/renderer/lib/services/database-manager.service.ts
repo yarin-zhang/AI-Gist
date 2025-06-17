@@ -669,6 +669,65 @@ export class DatabaseServiceManager {
   }
 
   /**
+   * 获取数据统计信息
+   */
+  async getDataStatistics(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('开始获取数据统计信息...');
+      
+      const [
+        categories,
+        prompts,
+        aiConfigs,
+        aiHistory,
+        settings
+      ] = await Promise.all([
+        this.category.getBasicCategories(),
+        this.prompt.getAllPromptsForTags(),
+        this.aiConfig.getAllAIConfigs(),
+        this.aiGenerationHistory.getAllAIGenerationHistory(),
+        this.appSettings.getAllSettings()
+      ]);
+
+      // 计算敏感数据
+      const sensitivePrompts = prompts.filter(p => 
+        p.content?.toLowerCase().includes('api') ||
+        p.content?.toLowerCase().includes('key') ||
+        p.content?.toLowerCase().includes('token') ||
+        p.content?.toLowerCase().includes('password')
+      ).length;
+
+      const sensitiveAIConfigs = aiConfigs.filter(config =>
+        config.apiKey || config.baseUrl
+      ).length;
+
+      const stats = {
+        categories: categories.length,
+        prompts: prompts.length,
+        aiConfigs: aiConfigs.length,
+        history: aiHistory.length,
+        settings: settings.length,
+        totalRecords: categories.length + prompts.length + aiConfigs.length + 
+                     aiHistory.length + settings.length,
+        sensitiveData: {
+          prompts: sensitivePrompts,
+          aiConfigs: sensitiveAIConfigs,
+          total: sensitivePrompts + sensitiveAIConfigs
+        }
+      };
+
+      console.log('数据统计获取成功:', stats);
+      return { success: true, data: stats };
+    } catch (error) {
+      console.error('获取数据统计失败:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : '未知错误' 
+      };
+    }
+  }
+
+  /**
    * 获取数据库健康状态的详细信息
    */
   async getDetailedHealthStatus(): Promise<{

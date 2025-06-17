@@ -94,7 +94,7 @@
                     </div>
 
                     <div v-else>
-                        <NText depth="3" style="color: #999; font-size: 14px;">
+                        <NText depth="3" style="font-size: 14px;">
                             暂无备份版本，请先创建备份
                         </NText>
                     </div>
@@ -102,21 +102,58 @@
             </div>
 
             <NDivider />
-            <!-- 数据导入导出 -->
+            
+            <!-- 选择性数据导出 -->
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">导出数据</NText>
+                        <NText depth="2">选择性数据导出</NText>
+                        <NText depth="3" style="font-size: 12px; ">
+                            从备份中选择特定数据类型进行导出，便于数据分享。但无法恢复到应用中。
+                        </NText>
+                        
+                        <!-- 数据类型选择 -->
+                        <NCard size="small" >
+                            <NFlex vertical :size="12">
+                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型：</NText>
+                                <NFlex vertical :size="8">
+                                    <NCheckbox v-model:checked="exportOptions.includePrompts">
+                                        <NFlex align="center" :size="8">
+                                            <NText>描述词库</NText>
+                                            <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
+                                        </NFlex>
+                                    </NCheckbox>
+                                    <NCheckbox v-model:checked="exportOptions.includeCategories">
+                                        <NFlex align="center" :size="8">
+                                            <NText>分类管理</NText>
+                                            <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
+                                        </NFlex>
+                                    </NCheckbox>
+                                    <NCheckbox v-model:checked="exportOptions.includeAIConfigs">
+                                        <NFlex align="center" :size="8">
+                                            <NText>AI 配置</NText>
+                                            <NTag size="small" type="warning">包含敏感信息</NTag>
+                                        </NFlex>
+                                    </NCheckbox>
+                                    <NCheckbox v-model:checked="exportOptions.includeHistory">
+                                        <NFlex align="center" :size="8">
+                                            <NText>使用历史</NText>
+                                            <NTag size="small" type="info">{{ dataStats.history || 0 }} 条</NTag>
+                                        </NFlex>
+                                    </NCheckbox>
+                                    <NCheckbox v-model:checked="exportOptions.includeSettings">
+                                        <NFlex align="center" :size="8">
+                                            <NText>应用设置</NText>
+                                            <NTag size="small" type="default">系统配置</NTag>
+                                        </NFlex>
+                                    </NCheckbox>
+                                </NFlex>
+                            </NFlex>
+                        </NCard>
+                        
                         <NFlex :size="12">
-                            <NButton @click="exportData('csv')">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 CSV
-                            </NButton>
-                            <NButton @click="exportData('json')">
+                            <NButton type="primary" @click="exportSelectedData('json')" 
+                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -124,35 +161,78 @@
                                 </template>
                                 导出为 JSON
                             </NButton>
+                            <NButton @click="exportSelectedData('csv')" 
+                                     :disabled="!hasSelectedData" :loading="props.loading?.export">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 CSV
+                            </NButton>
                         </NFlex>
+                        
+                        <NAlert v-if="exportOptions.includeAIConfigs" type="warning" show-icon>
+                            <template #header>⚠️ 安全提示</template>
+                            您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                        </NAlert>
                     </NFlex>
+                </NFlex>
+            </div>
 
+            <NDivider />
+            
+            <!-- 完整备份导出/导入 -->
+            <div>
+                <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">导入数据</NText>
+                        <NText depth="2">完整备份管理</NText>
+                        <NText depth="3" style="font-size: 12px; ">
+                            导出完整备份压缩包，或从压缩包导入完整备份
+                        </NText>
+                        
                         <NFlex :size="12">
-                            <NButton @click="importData('csv')">
+                            <NButton type="primary" @click="exportFullBackup" 
+                                     :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
-                                        <FileImport />
+                                        <Archive />
                                     </NIcon>
                                 </template>
-                                导入 CSV
+                                导出完整备份
                             </NButton>
-                            <NButton @click="importData('json')">
+                            <NButton @click="importFullBackup" 
+                                     :loading="props.loading?.import">
                                 <template #icon>
                                     <NIcon>
-                                        <FileImport />
+                                        <Folder />
                                     </NIcon>
                                 </template>
-                                导入 JSON
+                                导入完整备份
                             </NButton>
                         </NFlex>
+                        
+                        <NCard size="small">
+                            <NFlex vertical :size="8">
+                                <NText depth="2" style="font-size: 14px;">完整备份包含：</NText>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 12px; ">
+                                    <li>所有数据表的完整内容</li>
+                                    <li>备份元数据和版本信息</li>
+                                    <li>数据完整性校验信息</li>
+                                    <li>可用于完整恢复应用状态</li>
+                                </ul>
+                            </NFlex>
+                        </NCard>
+                        
+                        <NAlert type="info" show-icon>
+                            <template #header>💡 使用建议</template>
+                            <div style="font-size: 12px;">
+                                <p>• 完整备份适用于设备迁移、系统重装等场景</p>
+                                <p>• 导入时会自动校验数据完整性和版本兼容性</p>
+                                <p>• 建议定期导出完整备份以防数据丢失</p>
+                            </div>
+                        </NAlert>
                     </NFlex>
-
-                    <NAlert type="warning" show-icon>
-                        <template #header>注意</template>
-                        导入数据将覆盖现有数据，请确保已备份重要数据
-                    </NAlert>
                 </NFlex>
             </div>
 
@@ -228,6 +308,7 @@ import {
     NPopconfirm,
     NTag,
     NPagination,
+    NCheckbox,
 } from "naive-ui";
 import {
     FileExport,
@@ -240,6 +321,8 @@ import {
     Trash,
     Recharging,
     DatabaseOff,
+    Archive,
+    Folder,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
 
@@ -258,6 +341,9 @@ const props = defineProps<{
 const emit = defineEmits<{
     "export-data": [format: "csv" | "json"];
     "import-data": [format: "csv" | "json"];
+    "export-selected-data": [format: "csv" | "json", options: any];
+    "export-full-backup": [];
+    "import-full-backup": [];
     "create-backup": [];
     "restore-backup": [backupId: string];
     "delete-backup": [backupId: string];
@@ -277,6 +363,36 @@ interface BackupItem {
 }
 
 const backupList = ref<BackupItem[]>([]);
+
+// 选择性导出选项
+const exportOptions = ref({
+    includePrompts: true,
+    includeCategories: true,
+    includeAIConfigs: false,
+    includeHistory: false,
+    includeSettings: false,
+});
+
+// 数据统计
+const dataStats = ref({
+    categories: 0,
+    prompts: 0,
+    history: 0,
+    aiConfigs: 0,
+    settings: 0,
+    posts: 0,
+    users: 0,
+    totalRecords: 0,
+});
+
+// 计算是否选择了数据
+const hasSelectedData = computed(() => {
+    return exportOptions.value.includePrompts ||
+           exportOptions.value.includeCategories ||
+           exportOptions.value.includeAIConfigs ||
+           exportOptions.value.includeHistory ||
+           exportOptions.value.includeSettings;
+});
 
 // 分页相关状态
 const currentPage = ref(1);
@@ -328,15 +444,52 @@ const clearDatabase = () => {
     emit("clear-database");
 };
 
-// 暴露方法供父组件调用
-const updateBackupList = (list: BackupItem[]) => {
-    backupList.value = list;
-    // 重置到第一页
-    currentPage.value = 1;
+// 选择性数据导出
+const exportSelectedData = (format: "csv" | "json") => {
+    const options = {
+        format,
+        includePrompts: exportOptions.value.includePrompts,
+        includeCategories: exportOptions.value.includeCategories,
+        includeAIConfigs: exportOptions.value.includeAIConfigs,
+        includeHistory: exportOptions.value.includeHistory,
+        includeSettings: exportOptions.value.includeSettings,
+    };
+    emit("export-selected-data", format, options);
 };
 
+// 完整备份导出
+const exportFullBackup = () => {
+    emit("export-full-backup");
+};
+
+// 完整备份导入
+const importFullBackup = () => {
+    emit("import-full-backup");
+};
+
+// 更新备份列表
+const updateBackupList = (backups: BackupItem[]) => {
+    backupList.value = backups;
+};
+
+// 更新数据统计
+const updateDataStats = (stats: any) => {
+    dataStats.value = {
+        categories: stats.categories || 0,
+        prompts: stats.prompts || 0,
+        history: stats.history || 0,
+        aiConfigs: stats.aiConfigs || 0,
+        settings: stats.settings || 0,
+        posts: stats.posts || 0,
+        users: stats.users || 0,
+        totalRecords: stats.totalRecords || 0,
+    };
+};
+
+// 暴露方法供父组件调用
 defineExpose({
     updateBackupList,
+    updateDataStats,
 });
 </script>
 
