@@ -249,6 +249,12 @@ export class IpcUtils {
             return api.data.export(data.options, data.exportPath);
           case 'import':
             return api.data.import(data.filePath, data.options);
+          case 'export-selected':
+            return api.data.exportSelected(data.options, data.exportPath);
+          case 'export-full-backup':
+            return api.data.exportFullBackup();
+          case 'import-full-backup':
+            return api.data.importFullBackup();
           case 'select-import-file':
             return api.data.selectImportFile(data?.format);
           case 'select-export-path':

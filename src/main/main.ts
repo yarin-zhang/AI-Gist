@@ -31,9 +31,7 @@ app.whenReady().then(async () => {
   themeManager.initialize();
   
   // 初始化新的服务（在 IPC 处理器之前）
-  console.log('Main: 初始化 DataManagementService...');
   dataManagementService = new DataManagementService(app.getPath('userData'));
-  console.log('Main: DataManagementService 初始化完成');
   webdavService = new WebDAVService(preferencesManager, dataManagementService);
   
   // 初始化 IPC 处理器（放在服务初始化之后）
