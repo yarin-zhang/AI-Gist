@@ -136,19 +136,6 @@
                                             <NTag size="small" type="warning">包含敏感信息</NTag>
                                         </NFlex>
                                     </NCheckbox>
-                                    <NCheckbox v-model:checked="exportOptions.includeHistory">
-                                        <NFlex align="center" :size="8">
-                                            <NText>使用历史</NText>
-                                            <NTag size="small" type="info">{{ dataStats.history || 0 }} 条</NTag>
-                                        </NFlex>
-                                    </NCheckbox>
-                                    <NCheckbox v-model:checked="exportOptions.includeSettings">
-                                        <NFlex align="center" :size="8">
-                                            <NText>应用设置</NText>
-                                            <NTag size="small" type="info">{{ dataStats.settings || 0 }} 条</NTag>
-                                            <NTag size="small" type="default">系统配置</NTag>
-                                        </NFlex>
-                                    </NCheckbox>
                                 </NFlex>
                             </NFlex>
                         </NCard>
@@ -214,26 +201,7 @@
                             </NButton>
                         </NFlex>
                         
-                        <NCard size="small">
-                            <NFlex vertical :size="8">
-                                <NText depth="2" style="font-size: 14px;">完整备份包含：</NText>
-                                <ul style="margin: 0; padding-left: 20px; font-size: 12px; ">
-                                    <li>所有数据表的完整内容</li>
-                                    <li>备份元数据和版本信息</li>
-                                    <li>数据完整性校验信息</li>
-                                    <li>可用于完整恢复应用状态</li>
-                                </ul>
-                            </NFlex>
-                        </NCard>
                         
-                        <NAlert type="info" show-icon>
-                            <template #header>💡 使用建议</template>
-                            <div style="font-size: 12px;">
-                                <p>• 完整备份适用于设备迁移、系统重装等场景</p>
-                                <p>• 导入时会自动校验数据完整性和版本兼容性</p>
-                                <p>• 建议定期导出完整备份以防数据丢失</p>
-                            </div>
-                        </NAlert>
                     </NFlex>
                 </NFlex>
             </div>
@@ -371,8 +339,6 @@ const exportOptions = ref({
     includePrompts: true,
     includeCategories: true,
     includeAIConfigs: false,
-    includeHistory: false,
-    includeSettings: false,
 });
 
 // 数据统计
@@ -391,9 +357,7 @@ const dataStats = ref({
 const hasSelectedData = computed(() => {
     return exportOptions.value.includePrompts ||
            exportOptions.value.includeCategories ||
-           exportOptions.value.includeAIConfigs ||
-           exportOptions.value.includeHistory ||
-           exportOptions.value.includeSettings;
+           exportOptions.value.includeAIConfigs;
 });
 
 // 分页相关状态
@@ -453,8 +417,6 @@ const exportSelectedData = (format: "csv" | "json") => {
         includePrompts: exportOptions.value.includePrompts,
         includeCategories: exportOptions.value.includeCategories,
         includeAIConfigs: exportOptions.value.includeAIConfigs,
-        includeHistory: exportOptions.value.includeHistory,
-        includeSettings: exportOptions.value.includeSettings,
     };
     emit("export-selected-data", format, options);
 };

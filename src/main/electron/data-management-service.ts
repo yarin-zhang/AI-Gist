@@ -42,9 +42,11 @@ export class DataManagementService {
     private backupDir: string;
 
     constructor(userDataPath: string) {
+        console.log('DataManagementService: 正在初始化...');
         this.backupDir = path.join(userDataPath, 'backups');
         this.ensureBackupDir();
         this.setupIpcHandlers();
+        console.log('DataManagementService: 初始化完成');
     }
 
     private async ensureBackupDir() {
@@ -56,6 +58,7 @@ export class DataManagementService {
     }
 
     private setupIpcHandlers() {
+        console.log('DataManagementService: 开始注册IPC处理程序...');
         // 创建备份
         ipcMain.handle('data:create-backup', async (event, { description }) => {
             try {
@@ -357,6 +360,305 @@ export class DataManagementService {
                 throw new Error(`获取数据统计失败: ${errorMessage}`);
             }
         });
+
+        // 选择性数据导出
+        console.log('DataManagementService: 注册 data:export-selected 处理程序');
+        ipcMain.handle('data:export-selected', async (event, { options, exportPath }) => {
+            try {
+                console.log('开始选择性数据导出:', options);
+                
+                // 通过 executeJavaScript 调用渲染进程暴露的方法获取数据
+                const mainWindow = BrowserWindow.getAllWindows()[0];
+                if (!mainWindow) {
+                    throw new Error('没有找到主窗口，无法访问数据库');
+                }
+
+                // 调用渲染进程导出数据
+                const exportResult = await mainWindow.webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                                throw new Error('数据库API未初始化');
+                            }
+                            
+                            const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                            return await databaseServiceManager.exportAllData();
+                        } catch (error) {
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+
+                if (!exportResult.success) {
+                    throw new Error(`获取数据失败: ${exportResult.error}`);
+                }
+
+                // 根据选项过滤数据
+                const filteredData: any = {};
+                if (options.includeCategories && exportResult.data.categories) {
+                    filteredData.categories = exportResult.data.categories;
+                }
+                if (options.includePrompts && exportResult.data.prompts) {
+                    filteredData.prompts = exportResult.data.prompts;
+                }
+                if (options.includeAIConfigs && exportResult.data.aiConfigs) {
+                    filteredData.aiConfigs = exportResult.data.aiConfigs;
+                }
+
+                // 生成文件名
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const selectedTypes: string[] = [];
+                if (options.includeCategories) selectedTypes.push('分类');
+                if (options.includePrompts) selectedTypes.push('提示词');
+                if (options.includeAIConfigs) selectedTypes.push('AI配置');
+                
+                const fileName = `AI-Gist-选择性导出-${selectedTypes.join('_')}-${timestamp}.${options.format}`;
+                
+                // 如果没有提供导出路径，则显示保存对话框
+                let finalExportPath = exportPath;
+                if (!finalExportPath) {
+                    const { dialog } = await import('electron');
+                    const result = await dialog.showSaveDialog({
+                        title: '选择导出位置',
+                        defaultPath: fileName,
+                        filters: [
+                            { name: options.format.toUpperCase() + ' 文件', extensions: [options.format] },
+                            { name: '所有文件', extensions: ['*'] }
+                        ]
+                    });
+                    
+                    if (result.canceled) {
+                        return { success: false, message: '用户取消了导出操作' };
+                    }
+                    
+                    finalExportPath = result.filePath;
+                }
+
+                // 根据格式导出数据
+                let exportContent: string;
+                if (options.format === 'json') {
+                    exportContent = JSON.stringify(filteredData, null, 2);
+                } else if (options.format === 'csv') {
+                    // 简单的CSV导出（仅支持提示词数据）
+                    if (options.includePrompts && filteredData.prompts) {
+                        const prompts = filteredData.prompts;
+                        const csvHeaders = ['ID', '标题', '内容', '标签', '创建时间'];
+                        const csvRows = [csvHeaders.join(',')];
+                        
+                        prompts.forEach((prompt: any) => {
+                            const row = [
+                                prompt.id || '',
+                                `"${(prompt.title || '').replace(/"/g, '""')}"`,
+                                `"${(prompt.content || '').replace(/"/g, '""')}"`,
+                                `"${(prompt.tags || []).join(';')}"`,
+                                prompt.createdAt || ''
+                            ];
+                            csvRows.push(row.join(','));
+                        });
+                        
+                        exportContent = csvRows.join('\n');
+                    } else {
+                        throw new Error('CSV 格式目前仅支持导出提示词数据');
+                    }
+                } else {
+                    throw new Error(`不支持的导出格式: ${options.format}`);
+                }
+
+                // 写入文件
+                const fs = await import('fs').then(m => m.promises);
+                await fs.writeFile(finalExportPath!, exportContent, 'utf-8');
+                
+                console.log(`选择性数据已导出到: ${finalExportPath}`);
+                
+                return {
+                    success: true,
+                    filePath: finalExportPath,
+                    message: `数据已成功导出到 ${finalExportPath}`
+                };
+                
+            } catch (error) {
+                console.error('选择性数据导出失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    error: errorMessage,
+                    message: `选择性数据导出失败: ${errorMessage}`
+                };
+            }
+        });
+
+        // 导出完整备份
+        ipcMain.handle('data:export-full-backup', async () => {
+            try {
+                console.log('开始导出完整备份...');
+                
+                // 通过 executeJavaScript 调用渲染进程暴露的方法
+                const mainWindow = BrowserWindow.getAllWindows()[0];
+                if (!mainWindow) {
+                    throw new Error('没有找到主窗口，无法访问数据库');
+                }
+
+                // 调用渲染进程导出数据
+                const exportResult = await mainWindow.webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                                throw new Error('数据库API未初始化');
+                            }
+                            
+                            const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                            return await databaseServiceManager.exportAllData();
+                        } catch (error) {
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+
+                if (!exportResult.success) {
+                    throw new Error(`获取数据失败: ${exportResult.error}`);
+                }
+
+                // 添加备份元数据
+                const backupData = {
+                    version: '1.0.0',
+                    createdAt: new Date().toISOString(),
+                    appName: 'AI-Gist',
+                    ...exportResult.data
+                };
+
+                // 生成文件名
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const fileName = `AI-Gist-完整备份-${timestamp}.json`;
+                
+                // 显示保存对话框
+                const { dialog } = await import('electron');
+                const result = await dialog.showSaveDialog({
+                    title: '选择完整备份导出位置',
+                    defaultPath: fileName,
+                    filters: [
+                        { name: 'JSON 文件', extensions: ['json'] },
+                        { name: '所有文件', extensions: ['*'] }
+                    ]
+                });
+                
+                if (result.canceled) {
+                    return { success: false, message: '用户取消了导出操作' };
+                }
+
+                // 写入文件
+                const fs = await import('fs').then(m => m.promises);
+                await fs.writeFile(result.filePath!, JSON.stringify(backupData, null, 2), 'utf-8');
+                
+                console.log(`完整备份已导出到: ${result.filePath}`);
+                
+                return {
+                    success: true,
+                    filePath: result.filePath,
+                    message: `完整备份已成功导出到 ${result.filePath}`
+                };
+                
+            } catch (error) {
+                console.error('完整备份导出失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    error: errorMessage,
+                    message: `完整备份导出失败: ${errorMessage}`
+                };
+            }
+        });
+
+        // 导入完整备份
+        ipcMain.handle('data:import-full-backup', async () => {
+            try {
+                console.log('开始导入完整备份...');
+                
+                // 显示文件选择对话框
+                const { dialog } = await import('electron');
+                const result = await dialog.showOpenDialog({
+                    title: '选择要导入的完整备份文件',
+                    filters: [
+                        { name: 'JSON 文件', extensions: ['json'] },
+                        { name: '所有文件', extensions: ['*'] }
+                    ],
+                    properties: ['openFile']
+                });
+                
+                if (result.canceled || !result.filePaths.length) {
+                    return { success: false, message: '用户取消了导入操作' };
+                }
+
+                const filePath = result.filePaths[0];
+                
+                // 读取文件
+                const fs = await import('fs').then(m => m.promises);
+                const fileContent = await fs.readFile(filePath, 'utf-8');
+                
+                let backupData;
+                try {
+                    backupData = JSON.parse(fileContent);
+                } catch (error) {
+                    throw new Error('备份文件格式无效，请确保是有效的 JSON 文件');
+                }
+
+                // 验证备份数据结构
+                if (!backupData || typeof backupData !== 'object') {
+                    throw new Error('备份文件数据结构无效');
+                }
+
+                // 通过 executeJavaScript 调用渲染进程暴露的方法
+                const mainWindow = BrowserWindow.getAllWindows()[0];
+                if (!mainWindow) {
+                    throw new Error('没有找到主窗口，无法访问数据库');
+                }
+
+                // 调用渲染进程导入数据
+                const importResult = await mainWindow.webContents.executeJavaScript(`
+                    (async () => {
+                        try {
+                            if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                                throw new Error('数据库API未初始化');
+                            }
+                            
+                            const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                            return await databaseServiceManager.replaceAllData(${JSON.stringify(backupData)});
+                        } catch (error) {
+                            return {
+                                success: false,
+                                error: error.message || '未知错误'
+                            };
+                        }
+                    })()
+                `);
+
+                if (!importResult.success) {
+                    throw new Error(`导入数据失败: ${importResult.error}`);
+                }
+                
+                console.log('完整备份导入成功');
+                
+                return {
+                    success: true,
+                    message: '完整备份导入成功，数据已完全替换'
+                };
+                
+            } catch (error) {
+                console.error('完整备份导入失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    error: errorMessage,
+                    message: `完整备份导入失败: ${errorMessage}`
+                };
+            }
+        });
+        console.log('DataManagementService: 所有IPC处理程序注册完成');
     }    private async exportAllData() {
         try {
             console.log('正在从渲染进程获取数据库数据...');
