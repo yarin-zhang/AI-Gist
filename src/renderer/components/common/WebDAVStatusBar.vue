@@ -209,28 +209,27 @@ const openWebDAVSettings = () => {
 };
 
 // 监听同步状态变化
-let statusUnsubscribe: (() => void) | null = null;
-
 const updateSyncStatus = (status: SyncStatus) => {
   syncStatus.value = { ...status };
 };
 
 const loadWebDAVConfig = async () => {
   try {
-    // 从应用设置中加载 WebDAV 配置
-    const { databaseServiceManager } = await import('@/lib/services');
-    const settings = await databaseServiceManager.appSettings.getAllSettings();
+    // 从用户偏好设置中加载 WebDAV 配置
+    const userPrefs = await window.electronAPI?.preferences?.get();
     
-    const webdavSettings = settings.find(s => s.key === 'webdav');
-    if (webdavSettings?.value) {
-      const config = JSON.parse(webdavSettings.value);
+    if (userPrefs?.webdav) {
       webdavConfig.value = {
-        enabled: config.enabled || false,
-        serverUrl: config.serverUrl || '',
-        lastSyncTime: config.lastSyncTime || null,
-        lastSyncError: config.lastSyncError || null,
-        lastSyncErrorTime: config.lastSyncErrorTime || null
+        enabled: userPrefs.webdav.enabled || false,
+        serverUrl: userPrefs.webdav.serverUrl || '',
+        lastSyncTime: userPrefs.dataSync?.lastSyncTime || null,
+        lastSyncError: null, // 错误信息暂时从同步状态获取
+        lastSyncErrorTime: null
       };
+      
+      console.log('WebDAV 状态栏配置已加载:', webdavConfig.value);
+    } else {
+      console.log('未找到 WebDAV 配置');
     }
   } catch (error) {
     console.error('加载 WebDAV 配置失败:', error);
@@ -242,7 +241,7 @@ onMounted(async () => {
   await loadWebDAVConfig();
   
   // 监听同步状态
-  statusUnsubscribe = autoSyncManager.onStatusChange(updateSyncStatus);
+  autoSyncManager.addStatusListener(updateSyncStatus);
   
   // 获取初始状态
   updateSyncStatus(autoSyncManager.getStatus());
@@ -267,9 +266,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (statusUnsubscribe) {
-    statusUnsubscribe();
-  }
+  autoSyncManager.removeStatusListener(updateSyncStatus);
 });
 </script>
 

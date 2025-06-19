@@ -26,6 +26,9 @@ interface WebDAVConfig {
     serverUrl: string;
     username: string;
     password: string;
+    enabled?: boolean;
+    autoSync?: boolean;
+    syncInterval?: number;
 }
 
 // 存储配置的接口，密码可以是加密的
@@ -714,9 +717,28 @@ export class WebDAVService {
         ipcMain.handle('webdav:set-config', async (event, config: WebDAVConfig): Promise<any> => {
             console.log('WebDAV 设置配置 IPC 处理程序被调用');
             try {
+                // 获取当前配置，确保不丢失现有的非敏感设置
+                const currentPrefs = this.preferencesManager.getPreferences();
+                const currentWebdavConfig = currentPrefs.webdav || {};
+                
+                // 合并配置，确保所有字段都正确保存
+                const mergedConfig = {
+                    ...currentWebdavConfig,
+                    ...config,
+                    // 确保这些重要字段不被意外覆盖为 undefined
+                    enabled: config.enabled !== undefined ? config.enabled : currentWebdavConfig.enabled,
+                    autoSync: config.autoSync !== undefined ? config.autoSync : currentWebdavConfig.autoSync,
+                    syncInterval: config.syncInterval !== undefined ? config.syncInterval : currentWebdavConfig.syncInterval,
+                };
+                
+                console.log('保存 WebDAV 配置:', {
+                    ...mergedConfig,
+                    password: mergedConfig.password ? '[已设置]' : '[未设置]'
+                });
+                
                 // 保存配置到偏好设置
                 this.preferencesManager.updatePreferences({
-                    webdav: config
+                    webdav: mergedConfig
                 });
                 
                 return {

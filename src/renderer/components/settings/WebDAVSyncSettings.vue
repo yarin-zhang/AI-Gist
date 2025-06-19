@@ -372,26 +372,33 @@ const compareData = ref(null);
 // 启用/禁用 WebDAV 同步
 const handleEnabledChange = () => {
     emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
 };
 
 // 配置变更
 const handleConfigChange = () => {
     emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
 };
 
 // 自动同步开关变更
-const handleAutoSyncChange = () => {
+const handleAutoSyncChange = async () => {
     emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
     
-    // 通知自动同步管理器更新状态
-    if (typeof window !== 'undefined' && (window as any).autoSyncManager) {
-        const autoSyncManager = (window as any).autoSyncManager;
-        if (props.modelValue.webdav.autoSync && props.modelValue.webdav.enabled) {
-            autoSyncManager.enable();
-        } else {
-            autoSyncManager.disable();
+    // 等待一下确保配置已保存，然后重新初始化自动同步管理器
+    setTimeout(async () => {
+        try {
+            const { autoSyncManager } = await import('@/lib/utils/auto-sync-manager');
+            await autoSyncManager.reinitializeFromSettings();
+            console.log('自动同步管理器配置已更新');
+        } catch (error) {
+            console.error('更新自动同步管理器配置失败:', error);
         }
-    }
+    }, 500);
 };
 
 // 保存设置

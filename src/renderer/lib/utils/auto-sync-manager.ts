@@ -308,14 +308,27 @@ class AutoSyncManager {
       // 获取用户设置中的 WebDAV 配置
       const userPrefs = await window.electronAPI?.preferences?.get();
       if (userPrefs?.webdav) {
+        const wasEnabled = this.config.enabled;
         this.config.enabled = userPrefs.webdav.enabled && userPrefs.webdav.autoSync;
-        if (userPrefs.webdav.syncInterval) {
-          // 这里可以设置定时同步间隔，但目前我们主要关注实时同步
+        
+        console.log('自动同步配置已从用户设置更新:', {
+          enabled: this.config.enabled,
+          webdavEnabled: userPrefs.webdav.enabled,
+          autoSync: userPrefs.webdav.autoSync,
+          syncInterval: userPrefs.webdav.syncInterval
+        });
+        
+        // 如果状态发生变化，通知监听器
+        if (wasEnabled !== this.config.enabled) {
+          this.notifyStatusChange();
         }
-        console.log('自动同步配置已从用户设置更新:', this.config.enabled ? '启用' : '禁用');
+      } else {
+        console.log('未找到 WebDAV 配置，禁用自动同步');
+        this.config.enabled = false;
       }
     } catch (error) {
       console.warn('无法从用户设置读取自动同步配置:', error);
+      this.config.enabled = false;
     }
   }
 
@@ -324,7 +337,15 @@ class AutoSyncManager {
    */
   enable() {
     this.config.enabled = true;
+    this.notifyStatusChange();
     console.log('自动同步已启用');
+  }
+
+  /**
+   * 重新从用户设置初始化配置（用于设置变更后的更新）
+   */
+  async reinitializeFromSettings() {
+    await this.initializeFromUserSettings();
   }
 
   /**

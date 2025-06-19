@@ -494,12 +494,6 @@ const updateNonWebDAVSetting = async () => {
             autoLaunch: settings.autoLaunch,
             themeSource: settings.themeSource,
             dataSync: settings.dataSync,
-            // WebDAV 配置中只包含非敏感字段
-            webdav: {
-                enabled: settings.webdav.enabled,
-                autoSync: settings.webdav.autoSync,
-                syncInterval: settings.webdav.syncInterval,
-            }
         };
 
         await window.electronAPI.preferences.set(settingsData);
