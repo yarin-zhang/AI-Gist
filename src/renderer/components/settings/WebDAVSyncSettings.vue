@@ -208,7 +208,7 @@
           </NButton>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-3 mt-3">
           <NButton 
             @click="syncNow" 
             :loading="syncLoading"
@@ -222,22 +222,6 @@
               </NIcon>
             </template>
             立即同步
-          </NButton>
-          
-          <NButton 
-            @click="handleGetRemotePreview" 
-            :loading="previewLoading"
-            :disabled="!props.modelValue.webdav.enabled"
-            type="default"
-            ghost
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <Eye />
-              </NIcon>
-            </template>
-            预览远程数据
           </NButton>
         </div>
       </div>
@@ -258,6 +242,23 @@
               {{ props.modelValue.webdav.enabled ? '已启用' : '已禁用' }}
             </span>
           </div>
+
+          
+          <NButton 
+            @click="handleGetRemotePreview" 
+            :loading="previewLoading"
+            :disabled="!props.modelValue.webdav.enabled"
+            type="default"
+            ghost
+            block
+          >
+            <template #icon>
+              <NIcon>
+                <Eye />
+              </NIcon>
+            </template>
+            预览远程数据
+          </NButton>
         </div>
       </div>
     </NCard>
