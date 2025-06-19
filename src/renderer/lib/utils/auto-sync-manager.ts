@@ -1,9 +1,10 @@
 /**
  * 自动同步管理器
- * 负责在数据变更后自动触发 WebDAV 同步，以及监听网络状态变化进行离线补同步
+ * 负责在数据变更后自动触发 WebDAV 和 iCloud 同步，以及监听网络状态变化进行离线补同步
  */
 
 import { WebDAVAPI } from '../api/webdav.api';
+import { ICloudAPI } from '../api/icloud.api';
 
 export interface AutoSyncConfig {
   enabled: boolean;
@@ -169,15 +170,20 @@ class AutoSyncManager {
     try {
       console.log(`自动同步管理器: 开始执行同步 - ${reason}`);
       
-      const result = await WebDAVAPI.syncNow();
+      // 尝试同步到所有启用的服务
+      const results = await this.performAllSyncs();
       
-      if (result.success) {
-        console.log('自动同步成功:', result.message);
-        this.status.lastSyncTime = result.timestamp;
+      // 只要有一个成功就认为同步成功
+      const hasSuccess = results.some(r => r.success);
+      if (hasSuccess) {
+        const successResults = results.filter(r => r.success);
+        console.log('自动同步成功:', successResults.map(r => r.service + ': ' + r.message).join(', '));
+        this.status.lastSyncTime = new Date().toISOString();
         this.status.lastSyncError = null;
         this.retryCount = 0; // 重置重试计数
       } else {
-        throw new Error(result.message || '同步失败');
+        const errorMessages = results.map(r => r.service + ': ' + r.message).join(', ');
+        throw new Error('所有同步服务都失败: ' + errorMessages);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '未知错误';
@@ -192,6 +198,73 @@ class AutoSyncManager {
       this.status.isSyncing = false;
       this.notifyStatusChange();
     }
+  }
+
+  /**
+   * 执行所有启用的同步服务
+   */
+  private async performAllSyncs(): Promise<Array<{service: string, success: boolean, message: string}>> {
+    const results: Array<{service: string, success: boolean, message: string}> = [];
+    
+    try {
+      // 获取用户设置
+      const userPrefs = await window.electronAPI?.preferences?.get();
+      
+      // WebDAV 同步
+      if (userPrefs?.webdav?.enabled && userPrefs?.webdav?.autoSync) {
+        try {
+          const result = await WebDAVAPI.syncNow();
+          results.push({
+            service: 'WebDAV',
+            success: result.success,
+            message: result.message
+          });
+        } catch (error) {
+          results.push({
+            service: 'WebDAV',
+            success: false,
+            message: error instanceof Error ? error.message : '未知错误'
+          });
+        }
+      }
+      
+      // iCloud 同步
+      if (userPrefs?.icloud?.enabled && userPrefs?.icloud?.autoSync) {
+        try {
+          const result = await ICloudAPI.syncNow();
+          results.push({
+            service: 'iCloud',
+            success: result.success,
+            message: result.message
+          });
+        } catch (error) {
+          results.push({
+            service: 'iCloud',
+            success: false,
+            message: error instanceof Error ? error.message : '未知错误'
+          });
+        }
+      }
+      
+      // 如果没有启用任何同步服务
+      if (results.length === 0) {
+        results.push({
+          service: 'None',
+          success: false,
+          message: '没有启用的同步服务'
+        });
+      }
+      
+    } catch (error) {
+      console.error('获取同步配置失败:', error);
+      results.push({
+        service: 'Config',
+        success: false,
+        message: '获取同步配置失败'
+      });
+    }
+    
+    return results;
   }
 
   /**
@@ -323,17 +396,25 @@ class AutoSyncManager {
    */
   async initializeFromUserSettings() {
     try {
-      // 获取用户设置中的 WebDAV 配置
+      // 获取用户设置中的同步配置
       const userPrefs = await window.electronAPI?.preferences?.get();
-      if (userPrefs?.webdav) {
+      if (userPrefs) {
         const wasEnabled = this.config.enabled;
-        this.config.enabled = userPrefs.webdav.enabled && userPrefs.webdav.autoSync;
+        
+        // 检查是否有任何同步服务启用了自动同步
+        const webdavAutoSync = userPrefs.webdav?.enabled && userPrefs.webdav?.autoSync;
+        const icloudAutoSync = userPrefs.icloud?.enabled && userPrefs.icloud?.autoSync;
+        
+        this.config.enabled = webdavAutoSync || icloudAutoSync;
         
         console.log('自动同步配置已从用户设置更新:', {
           enabled: this.config.enabled,
-          webdavEnabled: userPrefs.webdav.enabled,
-          autoSync: userPrefs.webdav.autoSync,
-          syncInterval: userPrefs.webdav.syncInterval
+          webdavEnabled: userPrefs.webdav?.enabled,
+          webdavAutoSync: userPrefs.webdav?.autoSync,
+          icloudEnabled: userPrefs.icloud?.enabled,
+          icloudAutoSync: userPrefs.icloud?.autoSync,
+          webdavSyncInterval: userPrefs.webdav?.syncInterval,
+          icloudSyncInterval: userPrefs.icloud?.syncInterval
         });
         
         // 如果状态发生变化，通知监听器

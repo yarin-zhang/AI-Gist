@@ -35,6 +35,12 @@ export interface UserPreferences {
     syncInterval: number;
     autoSync: boolean;
   };
+  icloud?: {
+    enabled: boolean;
+    autoSync: boolean;
+    syncInterval: number; // 分钟
+    customPath?: string; // 可选的自定义同步路径
+  };
   dataSync?: {
     lastSyncTime: string | null;
     autoBackup: boolean;
