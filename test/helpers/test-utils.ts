@@ -26,7 +26,27 @@ export const mockElectron = {
 
 // Mock IndexedDB
 export const mockIndexedDB = {
-  open: vi.fn(),
+  open: vi.fn().mockReturnValue({
+    onerror: null,
+    onsuccess: null,
+    onupgradeneeded: null,
+    result: {
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          get: vi.fn().mockReturnValue({ onsuccess: null, result: null }),
+          put: vi.fn().mockReturnValue({ onsuccess: null }),
+          delete: vi.fn().mockReturnValue({ onsuccess: null }),
+          getAll: vi.fn().mockReturnValue({ onsuccess: null, result: [] }),
+          createIndex: vi.fn(),
+          index: vi.fn().mockReturnValue({
+            get: vi.fn().mockReturnValue({ onsuccess: null, result: null })
+          })
+        })
+      }),
+      createObjectStore: vi.fn(),
+      close: vi.fn()
+    }
+  }),
   deleteDatabase: vi.fn()
 }
 
@@ -96,6 +116,7 @@ export const mockIpcUtils = {
 export const testDataGenerators = {
   createMockCategory: (overrides = {}) => ({
     id: 1,
+    uuid: overrides.uuid || `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: '测试分类',
     description: '测试分类描述',
     color: '#FF0000',
@@ -106,6 +127,7 @@ export const testDataGenerators = {
 
   createMockPrompt: (overrides = {}) => ({
     id: 1,
+    uuid: overrides.uuid || `prompt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: '测试提示词',
     content: '测试提示词内容',
     categoryId: 1,
@@ -118,6 +140,7 @@ export const testDataGenerators = {
 
   createMockAIConfig: (overrides = {}) => ({
     id: 1,
+    uuid: overrides.uuid || `ai-config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: '测试AI配置',
     provider: 'openai',
     model: 'gpt-3.5-turbo',
@@ -134,8 +157,124 @@ export const testDataGenerators = {
     deviceId: 'test-device-001',
     syncCount: 1,
     totalRecords: 0,
+    localVersion: '1.0.0',
+    remoteVersion: '1.0.0',
+    dataHash: 'test-hash',
+    appVersion: '1.0.0',
+    lastModifiedTime: new Date().toISOString(),
+    syncStrategy: 'auto_merge',
     ...overrides
-  })
+  }),
+
+  // 创建具有冲突的数据对
+  createConflictingDataPair: (uuid: string, baseTime: number) => {
+    const localTime = new Date(baseTime).toISOString()
+    const remoteTime = new Date(baseTime + 60000).toISOString() // 远程晚1分钟
+    
+    return {
+      local: {
+        uuid,
+        title: `本地版本 - ${uuid}`,
+        content: '本地内容',
+        updatedAt: localTime,
+        createdAt: localTime
+      },
+      remote: {
+        uuid,
+        title: `远程版本 - ${uuid}`,
+        content: '远程内容',
+        updatedAt: remoteTime,
+        createdAt: localTime
+      }
+    }
+  },
+
+  // 创建大量测试数据
+  createBulkTestData: (prefix: string, count: number, options: any = {}) => {
+    const baseTime = options.baseTime || Date.now()
+    const timeIncrement = options.timeIncrement || 1000
+    
+    return {
+      prompts: Array.from({ length: count }, (_, i) => ({
+        ...testDataGenerators.createMockPrompt({
+          uuid: `${prefix}-prompt-${i.toString().padStart(4, '0')}`,
+          title: `${prefix} 提示词 ${i}`,
+          content: `${prefix} 内容 ${i}`,
+          updatedAt: new Date(baseTime + i * timeIncrement).toISOString()
+        })
+      })),
+      categories: Array.from({ length: Math.floor(count / 10) }, (_, i) => ({
+        ...testDataGenerators.createMockCategory({
+          uuid: `${prefix}-cat-${i.toString().padStart(3, '0')}`,
+          name: `${prefix} 分类 ${i}`,
+          description: `${prefix} 分类描述 ${i}`,
+          updatedAt: new Date(baseTime + i * timeIncrement * 10).toISOString()
+        })
+      }))
+    }
+  },
+
+  // 创建模拟的同步冲突场景
+  createSyncConflictScenario: (scenarioType: 'timestamp_conflict' | 'content_conflict' | 'mixed_conflict') => {
+    const baseTime = Date.now()
+    const uuid = `conflict-${Date.now()}`
+    
+    switch (scenarioType) {
+      case 'timestamp_conflict':
+        return {
+          local: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '本地标题',
+            content: '相同内容',
+            updatedAt: new Date(baseTime + 1000).toISOString()
+          }),
+          remote: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '远程标题',
+            content: '相同内容',
+            updatedAt: new Date(baseTime + 2000).toISOString()
+          })
+        }
+      
+      case 'content_conflict':
+        const sameTime = new Date(baseTime).toISOString()
+        return {
+          local: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '本地标题',
+            content: '本地内容',
+            updatedAt: sameTime
+          }),
+          remote: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '远程标题',
+            content: '远程内容',
+            updatedAt: sameTime
+          })
+        }
+      
+      case 'mixed_conflict':
+        return {
+          local: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '本地标题',
+            content: '本地内容',
+            tags: ['local', 'test'],
+            updatedAt: new Date(baseTime + 1000).toISOString()
+          }),
+          remote: testDataGenerators.createMockPrompt({
+            uuid,
+            title: '远程标题',
+            content: '远程内容',
+            tags: ['remote', 'test'],
+            updatedAt: new Date(baseTime + 2000).toISOString()
+          })
+        }
+      
+      default:
+        throw new Error(`未知的冲突场景类型: ${scenarioType}`)
+    }
+  }
 }
 
 // 异步测试辅助函数
