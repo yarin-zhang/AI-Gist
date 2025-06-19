@@ -1,8 +1,43 @@
 <template>
   <div class="status-bar">
     <NFlex justify="space-between" align="center" style="height: 100%; padding: 0 16px;">
-      <!-- 左侧：同步状态 -->
+      <!-- 左侧 -->
       <NFlex align="center" :size="12">
+        <NText></NText>
+      </NFlex>
+      
+      <!-- 右侧：操作按钮和信息 -->
+      <NFlex align="center" :size="12">
+
+        <!-- 最后同步时间 -->
+        <NText v-if="showLastSyncTime" depth="3" style="font-size: 12px;">
+          {{ formatSyncTime(lastSyncTime) }}
+        </NText>
+
+        <!-- 同步进度条 -->
+        <div v-if="isSyncing" class="sync-progress-container">
+          <div class="sync-progress-bar">
+            <div class="sync-progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- 手动同步按钮 -->
+        <NButton 
+          v-if="showManualSyncButton" 
+          size="tiny" 
+          text 
+          @click="triggerManualSync"
+          :loading="isSyncing"
+        >
+          <template #icon>
+            <NIcon>
+              <Refresh />
+            </NIcon>
+          </template>
+          手动同步
+        </NButton>
+        
+        
         <!-- 状态图标 -->
         <NTooltip :show-arrow="false" placement="top">
           <template #trigger>
@@ -19,42 +54,11 @@
           </template>
           <div>{{ statusTooltip }}</div>
         </NTooltip>
-        
         <!-- 状态文本 -->
         <span class="status-text" @click="handleStatusClick" style="cursor: pointer;">
           {{ statusText }}
         </span>
         
-        <!-- 同步进度条（只在左侧显示） -->
-        <div v-if="isSyncing" class="sync-progress-container">
-          <div class="sync-progress-bar">
-            <div class="sync-progress-fill"></div>
-          </div>
-        </div>
-      </NFlex>
-      
-      <!-- 右侧：操作按钮和信息 -->
-      <NFlex align="center" :size="12">
-        <!-- 最后同步时间 -->
-        <NText v-if="showLastSyncTime" depth="3" style="font-size: 12px;">
-          {{ formatSyncTime(lastSyncTime) }}
-        </NText>
-        
-        <!-- 手动同步按钮 -->
-        <NButton 
-          v-if="showManualSyncButton" 
-          size="tiny" 
-          text 
-          @click="triggerManualSync"
-          :loading="isSyncing"
-        >
-          <template #icon>
-            <NIcon>
-              <Refresh />
-            </NIcon>
-          </template>
-          手动同步
-        </NButton>
         
         <!-- 错误详情 -->
         <NPopover v-if="lastSyncError" trigger="hover" placement="top">
@@ -211,7 +215,7 @@ const statusText = computed(() => {
   }
   
   if (isSyncing.value) {
-    return '同步中...';
+    return '同步中';
   }
   
   if (lastSyncError.value) {
