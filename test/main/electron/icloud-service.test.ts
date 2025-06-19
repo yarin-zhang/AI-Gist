@@ -69,6 +69,7 @@ const mockDataManagementService = {
 describe('iCloud 同步服务', () => {
   let icloudService: any
   let mockFs: any
+  let mockElectron: any
 
   beforeEach(async () => {
     // 重置所有模拟
@@ -77,8 +78,8 @@ describe('iCloud 同步服务', () => {
     // 动态导入服务类
     const { ICloudService } = await import('../../../src/main/electron/icloud-service')
     
-    // 设置默认的 fs 模拟行为
-    const mockFs = await import('fs')
+    // 设置 fs 模拟
+    mockFs = await import('fs')
     vi.mocked(mockFs.promises.stat).mockResolvedValue({ isDirectory: () => true } as any)
     vi.mocked(mockFs.promises.readdir).mockResolvedValue([])
     vi.mocked(mockFs.promises.mkdir).mockResolvedValue(undefined)
@@ -86,6 +87,9 @@ describe('iCloud 同步服务', () => {
     vi.mocked(mockFs.promises.readFile).mockResolvedValue('{}')
     vi.mocked(mockFs.promises.access).mockResolvedValue(undefined)
     vi.mocked(mockFs.existsSync).mockReturnValue(true)
+    
+    // 设置 electron 模拟
+    mockElectron = await import('electron')
     
     // 初始化服务
     icloudService = new ICloudService(mockPreferencesManager, mockDataManagementService)
@@ -148,7 +152,7 @@ describe('iCloud 同步服务', () => {
       mockFs.promises.rmdir.mockResolvedValueOnce(undefined)
 
       icloudService.setupIpcHandlers()
-      const { ipcMain } = mockElectron
+      const { ipcMain } = await import('electron')
       const handler = ipcMain.handle.mock.calls.find(call => call[0] === 'icloud:test-availability')[1]
       
       const result = await handler()
@@ -162,7 +166,7 @@ describe('iCloud 同步服务', () => {
       mockFs.promises.stat.mockRejectedValueOnce(new Error('ENOENT: no such file or directory'))
 
       icloudService.setupIpcHandlers()
-      const { ipcMain } = mockElectron
+      const { ipcMain } = await import('electron')
       const handler = ipcMain.handle.mock.calls.find(call => call[0] === 'icloud:test-availability')[1]
       
       const result = await handler()

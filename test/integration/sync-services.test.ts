@@ -6,8 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { WebDAVService } from '../../src/main/electron/webdav-service'
 import { ICloudService } from '../../src/main/electron/icloud-service'
-import { testDataGenerators, async      const { ipcMain } = await import('electron')
-      const handler = vi.mocked(ipcMain.handle).mock.calls.find(call => call[0] === 'webdav:sync-now')[1]stHelpers } from '../helpers/test-utils'
+import { testDataGenerators, testHelpers } from '../helpers/test-utils'
 
 // Mock 依赖
 vi.mock('webdav', () => ({
