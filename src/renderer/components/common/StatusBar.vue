@@ -2,7 +2,7 @@
   <div class="status-bar">
     <NFlex class="status-bar-content" align="center" justify="space-between">
       <!-- 左侧：预留扩展空间 -->
-      <NFlex class="status-bar-left" align="center" gap="8px"> >
+      <NFlex class="status-bar-left" align="center" gap="8px">
         <!-- 未来可以在这里添加其他状态信息 -->
       </NFlex>
 
