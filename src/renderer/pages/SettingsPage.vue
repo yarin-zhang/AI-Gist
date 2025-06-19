@@ -735,7 +735,7 @@ const refreshBackupList = async () => {
 const exportData = async (format: 'json' | 'csv') => {
     loading.export = true;
     try {
-        const defaultName = `ai-gist-data-${new Date().toISOString().split('T')[0]}.${format}`;
+        const defaultName = `ai-gist-sync-${new Date().toISOString().split('T')[0]}.${format}`;
         const exportPath = await DataManagementAPI.selectExportPath(defaultName);
         
         if (exportPath) {

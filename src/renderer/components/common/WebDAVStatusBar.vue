@@ -152,16 +152,16 @@ const statusText = computed(() => {
     return 'WebDAV 同步已关闭';
   }
   
+  if (!isOnline.value) {
+    return '网络离线';
+  }
+  
   if (isSyncing.value) {
     return '正在同步...';
   }
   
   if (lastSyncError.value) {
     return '同步失败';
-  }
-  
-  if (!isOnline.value) {
-    return '网络离线';
   }
   
   if (syncStatus.value.pendingSyncCount > 0) {

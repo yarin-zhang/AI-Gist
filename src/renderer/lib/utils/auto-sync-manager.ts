@@ -118,11 +118,11 @@ class AutoSyncManager {
   }
 
   /**
-   * 立即触发同步（无防抖）
+   * 强制触发同步（不检查是否启用，用于手动同步）
    */
-  triggerImmediateSync(reason = '立即同步') {
-    if (!this.config.enabled) {
-      console.log('自动同步已禁用，跳过立即同步');
+  forceTriggerSync(reason = '强制同步') {
+    if (!this.status.isOnline) {
+      console.log('强制同步跳过: 网络离线');
       return;
     }
 
@@ -136,9 +136,14 @@ class AutoSyncManager {
   }
 
   /**
-   * 强制执行同步（忽略自动同步状态，用于手动同步）
+   * 立即触发同步（无防抖）
    */
-  forceTriggerSync(reason = '手动强制同步') {
+  triggerImmediateSync(reason = '立即同步') {
+    if (!this.config.enabled) {
+      console.log('自动同步已禁用，跳过立即同步');
+      return;
+    }
+
     // 清除防抖定时器
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
