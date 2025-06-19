@@ -937,21 +937,41 @@ export class DataManagementService {
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             throw new Error(`创建备份失败: ${errorMessage}`);
         }
-    }
-
-    /**
+    }    /**
      * 生成导出数据 - 供 WebDAV 同步使用
      */
     async generateExportData() {
         const exportData = await this.exportAllData();
         
-        // 检查并补全 UUID
+        // 检查并补全 UUID，返回实际的数据部分
         if (exportData && exportData.data) {
-            exportData.data = this.ensureUUIDsInExportData(exportData.data);
+            const actualData = this.ensureUUIDsInExportData(exportData.data);
+            return {
+                success: true,
+                data: actualData
+            };
+        } else if (exportData) {
+            // 如果exportData直接是数据，而不是包装在data字段中
+            const actualData = this.ensureUUIDsInExportData(exportData);
+            return {
+                success: true,
+                data: actualData
+            };
+        } else {
+            // 如果没有数据，返回空的数据结构
+            return {
+                success: true,
+                data: {
+                    categories: [],
+                    prompts: [],
+                    aiConfigs: [],
+                    aiHistory: [],
+                    settings: [],
+                    exportTime: new Date().toISOString()
+                }
+            };
         }
-        
-        return exportData;
-    }    /**
+    }/**
      * 直接导入数据对象 - 供 WebDAV 同步使用
      */
     async importDataObject(data: any): Promise<{
