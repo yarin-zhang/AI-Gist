@@ -56,15 +56,14 @@
       
       <div class="space-y-4" :class="{ 'config-disabled': !props.modelValue.webdav.enabled }">
         <div class="font-medium mb-2">服务器配置</div>
-        
-        <div class="space-y-3">
+          <div class="space-y-3">
           <div>
             <div class="text-sm font-medium mb-1">服务器地址</div>
             <NInput 
               v-model:value="props.modelValue.webdav.serverUrl" 
               placeholder="https://example.com/webdav" 
               type="url" 
-              @update:value="handleConfigChange"
+              @update:value="handleServerConfigChange"
               :disabled="!props.modelValue.webdav.enabled"
             >
               <template #prefix>
@@ -81,7 +80,7 @@
               <NInput 
                 v-model:value="props.modelValue.webdav.username" 
                 placeholder="用户名" 
-                @update:value="handleConfigChange"
+                @update:value="handleServerConfigChange"
                 :disabled="!props.modelValue.webdav.enabled"
               />
             </div>
@@ -91,9 +90,35 @@
                 v-model:value="props.modelValue.webdav.password" 
                 type="password" 
                 placeholder="密码" 
-                @update:value="handleConfigChange"
+                @update:value="handleServerConfigChange"
                 :disabled="!props.modelValue.webdav.enabled"
               />
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-between mt-3">
+            <NButton 
+              @click="saveServerConfig" 
+              :loading="savingServerConfig"
+              :disabled="!props.modelValue.webdav.enabled || !hasUnsavedServerConfig"
+              type="primary"
+              size="small"
+            >
+              <template #icon>
+                <NIcon>
+                  <Cloud />
+                </NIcon>
+              </template>
+              保存配置
+            </NButton>
+            <div v-if="hasUnsavedServerConfig" class="text-sm text-orange-600">
+              <NIcon class="mr-1">
+                <CloudStorm />
+              </NIcon>
+              服务器配置有未保存的更改
+            </div>
+            <div v-else class="text-sm text-gray-500">
+              服务器配置已保存
             </div>
           </div>
         </div>
@@ -390,7 +415,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import {
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
   NInput, NModal, NTabs, NTabPane, NTag, NEmpty,
@@ -447,6 +472,15 @@ const syncLoading = ref(false)
 const resolveLoading = ref(false)
 const compareLoading = ref(false)
 const previewLoading = ref(false)
+const savingServerConfig = ref(false)
+
+// 服务器配置状态
+const hasUnsavedServerConfig = ref(false)
+const originalServerConfig = ref({
+  serverUrl: '',
+  username: '',
+  password: ''
+})
 
 // 对话框状态
 const showConflictDialog = ref(false);
@@ -507,6 +541,16 @@ const handleEnabledChange = () => {
   emit("update:modelValue", props.modelValue)
   emit("save-webdav")
   notifyConfigChange()
+  
+  // 启用时初始化原始配置
+  if (props.modelValue.webdav.enabled) {
+    originalServerConfig.value = {
+      serverUrl: props.modelValue.webdav.serverUrl,
+      username: props.modelValue.webdav.username,
+      password: props.modelValue.webdav.password
+    }
+    hasUnsavedServerConfig.value = false
+  }
 }
 
 // 配置变更
@@ -532,6 +576,50 @@ const handleAutoSyncChange = async () => {
   }, 500)
   
   notifyConfigChange()
+}
+
+// 服务器配置变更（不立即保存）
+const handleServerConfigChange = () => {
+  const current = props.modelValue.webdav
+  const original = originalServerConfig.value
+  
+  hasUnsavedServerConfig.value = (
+    current.serverUrl !== original.serverUrl ||
+    current.username !== original.username ||
+    current.password !== original.password
+  )
+  
+  emit("update:modelValue", props.modelValue)
+}
+
+// 保存服务器配置
+const saveServerConfig = async () => {
+  savingServerConfig.value = true
+  try {
+    emit("save-webdav")
+    
+    // 更新原始配置
+    originalServerConfig.value = {
+      serverUrl: props.modelValue.webdav.serverUrl,
+      username: props.modelValue.webdav.username,
+      password: props.modelValue.webdav.password
+    }
+    
+    hasUnsavedServerConfig.value = false
+    
+    // 重置连接状态，需要重新测试连接
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+    
+    message.success('服务器配置已保存')
+    notifyConfigChange()
+  } catch (error) {
+    console.error('保存服务器配置失败:', error)
+    message.error('保存服务器配置失败')
+  } finally {
+    savingServerConfig.value = false
+  }
 }
 
 // 通知配置变更
@@ -701,10 +789,19 @@ const getDataTypeLabel = (type: string) => {
         prompts: '提示词',
         aiConfigs: 'AI配置',
         history: '历史记录',
-        settings: '设置'
-    };
+        settings: '设置'    };
     return labels[type] || type;
 };
+
+// 初始化原始服务器配置
+onMounted(() => {
+    originalServerConfig.value = {
+        serverUrl: props.modelValue.webdav.serverUrl,
+        username: props.modelValue.webdav.username,
+        password: props.modelValue.webdav.password
+    }
+    hasUnsavedServerConfig.value = false
+});
 </script>
 
 <style scoped>
@@ -827,6 +924,14 @@ const getDataTypeLabel = (type: string) => {
 
 .compare-item:hover {
   background-color: var(--hover-color);
+}
+
+.text-orange-600 {
+  color: #ea580c;
+}
+
+.mr-1 {
+  margin-right: 0.25rem;
 }
 
 .config-disabled {
