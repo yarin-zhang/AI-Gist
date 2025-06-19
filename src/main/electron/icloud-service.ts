@@ -1192,9 +1192,12 @@ export class ICloudService {
             case 'upload_only':
                 console.log('执行上传操作...');
                 
+                // 分析数据变更详情
+                const changeAnalysis = this.analyzeDataChanges(localData, remoteData);
+                
                 // 上传数据文件
                 await fs.promises.writeFile(dataFile, JSON.stringify(localData, null, 2));
-                filesUploaded++;
+                if (changeAnalysis.hasChanges) filesUploaded++;
                 
                 // 更新并上传元数据
                 const uploadMetadata: SyncMetadata = {
@@ -1207,10 +1210,53 @@ export class ICloudService {
                 };
                 
                 await fs.promises.writeFile(metadataFile, JSON.stringify(uploadMetadata, null, 2));
-                filesUploaded++;
+                filesUploaded++; // 元数据总是会更新
                 
                 // 更新本地同步时间
                 await this.updateLocalSyncTime(now);
+                
+                // 构建有意义的成功消息
+                const successMessage = this.buildSyncSuccessMessage('upload', changeAnalysis);
+                
+                return {
+                    success: true,
+                    message: successMessage,
+                    timestamp: now,
+                    filesUploaded,
+                    filesDownloaded,
+                    conflictsDetected,
+                    conflictsResolved,
+                    conflictDetails
+                };
+                
+            case 'download_only':
+                console.log('执行下载操作...');
+                
+                if (remoteData && this.dataManagementService) {
+                    // 分析下载的数据变更
+                    const downloadAnalysis = this.analyzeDataChanges(remoteData, localData);
+                    
+                    // 导入远程数据到本地
+                    await this.dataManagementService.importDataObject(remoteData);
+                    filesDownloaded++;
+                    
+                    // 更新本地同步时间
+                    await this.updateLocalSyncTime(remoteMetadata?.lastSyncTime || now);
+                    
+                    // 构建有意义的成功消息
+                    const successMessage = this.buildSyncSuccessMessage('download', downloadAnalysis);
+                    
+                    return {
+                        success: true,
+                        message: successMessage,
+                        timestamp: now,
+                        filesUploaded,
+                        filesDownloaded,
+                        conflictsDetected,
+                        conflictsResolved,
+                        conflictDetails
+                    };
+                }
                 
                 break;
                 
@@ -1218,12 +1264,29 @@ export class ICloudService {
                 console.log('执行下载操作...');
                 
                 if (remoteData && this.dataManagementService) {
+                    // 分析下载的数据变更
+                    const downloadAnalysis = this.analyzeDataChanges(remoteData, localData);
+                    
                     // 导入远程数据到本地
                     await this.dataManagementService.importDataObject(remoteData);
                     filesDownloaded++;
                     
                     // 更新本地同步时间
                     await this.updateLocalSyncTime(remoteMetadata?.lastSyncTime || now);
+                    
+                    // 构建有意义的成功消息
+                    const successMessage = this.buildSyncSuccessMessage('download', downloadAnalysis);
+                    
+                    return {
+                        success: true,
+                        message: successMessage,
+                        timestamp: now,
+                        filesUploaded,
+                        filesDownloaded,
+                        conflictsDetected,
+                        conflictsResolved,
+                        conflictDetails
+                    };
                 }
                 
                 break;
@@ -1476,5 +1539,146 @@ export class ICloudService {
             console.error('获取 iCloud 配置失败:', error);
             return null;
         }
+    }
+
+    /**
+     * 分析数据变更详情
+     */
+    private analyzeDataChanges(newData: any, oldData: any): {
+        hasChanges: boolean;
+        categoriesAdded: number;
+        categoriesModified: number;
+        categoriesDeleted: number;
+        promptsAdded: number;
+        promptsModified: number;
+        promptsDeleted: number;
+        totalChanges: number;
+        details: string[];
+    } {
+        const analysis = {
+            hasChanges: false,
+            categoriesAdded: 0,
+            categoriesModified: 0,
+            categoriesDeleted: 0,
+            promptsAdded: 0,
+            promptsModified: 0,
+            promptsDeleted: 0,
+            totalChanges: 0,
+            details: [] as string[]
+        };
+
+        if (!oldData) {
+            // 首次同步
+            const newCategories = newData.categories || [];
+            const newPrompts = newData.prompts || [];
+            
+            analysis.categoriesAdded = newCategories.length;
+            analysis.promptsAdded = newPrompts.length;
+            analysis.hasChanges = analysis.categoriesAdded > 0 || analysis.promptsAdded > 0;
+            analysis.totalChanges = analysis.categoriesAdded + analysis.promptsAdded;
+            
+            if (analysis.hasChanges) {
+                if (analysis.categoriesAdded > 0) {
+                    analysis.details.push(`新增 ${analysis.categoriesAdded} 个分类`);
+                }
+                if (analysis.promptsAdded > 0) {
+                    analysis.details.push(`新增 ${analysis.promptsAdded} 个提示词`);
+                }
+            }
+            
+            return analysis;
+        }
+
+        // 比较分类变化
+        const oldCategories = oldData.categories || [];
+        const newCategories = newData.categories || [];
+        
+        // 使用 UUID 进行精确比较
+        const oldCategoryMap = new Map(oldCategories.map((c: any) => [c.uuid || c.id, c]));
+        const newCategoryMap = new Map(newCategories.map((c: any) => [c.uuid || c.id, c]));
+        
+        for (const [uuid, newCategory] of newCategoryMap) {
+            if (!oldCategoryMap.has(uuid)) {
+                analysis.categoriesAdded++;
+            } else {
+                const oldCategory = oldCategoryMap.get(uuid);
+                if (this.calculateDataHash(newCategory) !== this.calculateDataHash(oldCategory)) {
+                    analysis.categoriesModified++;
+                }
+            }
+        }
+        
+        for (const [uuid] of oldCategoryMap) {
+            if (!newCategoryMap.has(uuid)) {
+                analysis.categoriesDeleted++;
+            }
+        }
+
+        // 比较提示词变化
+        const oldPrompts = oldData.prompts || [];
+        const newPrompts = newData.prompts || [];
+        
+        const oldPromptMap = new Map(oldPrompts.map((p: any) => [p.uuid || p.id, p]));
+        const newPromptMap = new Map(newPrompts.map((p: any) => [p.uuid || p.id, p]));
+        
+        for (const [uuid, newPrompt] of newPromptMap) {
+            if (!oldPromptMap.has(uuid)) {
+                analysis.promptsAdded++;
+            } else {
+                const oldPrompt = oldPromptMap.get(uuid);
+                if (this.calculateDataHash(newPrompt) !== this.calculateDataHash(oldPrompt)) {
+                    analysis.promptsModified++;
+                }
+            }
+        }
+        
+        for (const [uuid] of oldPromptMap) {
+            if (!newPromptMap.has(uuid)) {
+                analysis.promptsDeleted++;
+            }
+        }
+
+        // 计算总变更和生成详情
+        analysis.totalChanges = 
+            analysis.categoriesAdded + analysis.categoriesModified + analysis.categoriesDeleted +
+            analysis.promptsAdded + analysis.promptsModified + analysis.promptsDeleted;
+        
+        analysis.hasChanges = analysis.totalChanges > 0;
+
+        // 生成变更详情
+        if (analysis.categoriesAdded > 0) {
+            analysis.details.push(`新增 ${analysis.categoriesAdded} 个分类`);
+        }
+        if (analysis.categoriesModified > 0) {
+            analysis.details.push(`修改 ${analysis.categoriesModified} 个分类`);
+        }
+        if (analysis.categoriesDeleted > 0) {
+            analysis.details.push(`删除 ${analysis.categoriesDeleted} 个分类`);
+        }
+        if (analysis.promptsAdded > 0) {
+            analysis.details.push(`新增 ${analysis.promptsAdded} 个提示词`);
+        }
+        if (analysis.promptsModified > 0) {
+            analysis.details.push(`修改 ${analysis.promptsModified} 个提示词`);
+        }
+        if (analysis.promptsDeleted > 0) {
+            analysis.details.push(`删除 ${analysis.promptsDeleted} 个提示词`);
+        }
+
+        return analysis;
+    }
+
+    /**
+     * 构建同步成功消息
+     */
+    private buildSyncSuccessMessage(operation: 'upload' | 'download', analysis: any): string {
+        if (!analysis.hasChanges) {
+            return operation === 'upload' ? '数据已上传，无变更' : '数据已下载，无变更';
+        }
+
+        const action = operation === 'upload' ? '上传' : '下载';
+        const details = analysis.details.join('，');
+        
+        return `${action}完成：${details}`;
     }
 }
