@@ -313,7 +313,7 @@ const currentSectionInfo = computed(() => {
         "icloud-sync": {
             title: "iCloud 同步",
             icon: Cloud,
-            description: "配置 iCloud Drive 数据同步设置"
+            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端"
         },
         "data-management": {
             title: "数据管理",
