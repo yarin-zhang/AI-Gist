@@ -708,9 +708,6 @@ const getDataTypeLabel = (type: string) => {
 </script>
 
 <style scoped>
-.webdav-sync-settings {
-  max-width: 800px;
-}
 
 .grid {
   display: grid;

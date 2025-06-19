@@ -637,9 +637,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.icloud-sync-settings {
-  max-width: 800px;
-}
 
 .grid {
   display: grid;
