@@ -931,7 +931,14 @@ export class DataManagementService {
      * 生成导出数据 - 供 WebDAV 同步使用
      */
     async generateExportData() {
-        return await this.exportAllData();
+        const exportData = await this.exportAllData();
+        
+        // 检查并补全 UUID
+        if (exportData && exportData.data) {
+            exportData.data = this.ensureUUIDsInExportData(exportData.data);
+        }
+        
+        return exportData;
     }    /**
      * 直接导入数据对象 - 供 WebDAV 同步使用
      */
@@ -1016,5 +1023,38 @@ export class DataManagementService {
                 errors: [error instanceof Error ? error.message : '未知错误'],
             };
         }
+    }
+
+    /**
+     * 确保导出数据中所有需要同步的条目都有 UUID
+     */
+    private ensureUUIDsInExportData(data: any): any {
+        const crypto = require('crypto');
+        
+        // 生成简单的 UUID（类似 v4 格式）
+        const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+
+        // 需要同步的数据类型
+        const syncableTypes = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'aiGenerationHistory'];
+        
+        for (const type of syncableTypes) {
+            if (data[type] && Array.isArray(data[type])) {
+                data[type] = data[type].map((item: any) => {
+                    if (!item.uuid) {
+                        console.log(`为 ${type} 中的条目补全 UUID: ${item.id || item.name || '未知'}`);
+                        item.uuid = generateUUID();
+                    }
+                    return item;
+                });
+            }
+        }
+        
+        return data;
     }
 }

@@ -34,6 +34,7 @@ export interface Post {
  */
 export interface Category {
   id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
   name: string;
   description?: string;
   color?: string;  
@@ -50,6 +51,7 @@ export interface Category {
  */
 export interface Prompt {
   id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
   title: string;
   content: string;
   description?: string;
@@ -69,6 +71,7 @@ export interface Prompt {
  */
 export interface PromptVariable {
   id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
   promptId: number;
   name: string;
   label: string;
@@ -95,6 +98,7 @@ export interface PromptVariable {
  */
 export interface AIConfig {
   id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
   configId: string;
   name: string;
   type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
@@ -105,6 +109,7 @@ export interface AIConfig {
   defaultModel?: string;
   customModel?: string;
   enabled: boolean;
+  isPreferred?: boolean; // 是否为首选配置
   systemPrompt?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -115,6 +120,8 @@ export interface AIConfig {
  */
 export interface AIGenerationHistory {
   id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
+  historyId: string; // 历史记录的业务ID
   configId: string;
   topic: string;
   generatedPrompt: string;
@@ -164,11 +171,15 @@ export interface CategoryWithRelations extends Category {
  * 提示词查询过滤条件
  */
 export interface PromptFilters {
-  categoryId?: number;
-  tags?: string[];
+  categoryId?: number | null;
+  tags?: string;
   isFavorite?: boolean;
   isActive?: boolean;
+  search?: string;
   searchText?: string;
+  sortBy?: 'timeDesc' | 'timeAsc' | 'useCount' | 'favorite' | 'title' | 'createdAt' | 'updatedAt';
+  page?: number;
+  limit?: number;
 }
 
 /**
@@ -177,9 +188,10 @@ export interface PromptFilters {
 export interface PaginatedResult<T> {
   data: T[];
   total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  hasMore: boolean;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
 }
 
 /**
@@ -229,4 +241,30 @@ export interface DatabaseImportResult {
     aiHistory?: number;
     settings?: number;
   };
+}
+
+/**
+ * 提示词历史记录数据模型
+ */
+export interface PromptHistory {
+  id?: number;
+  uuid: string; // 全局唯一标识符，用于WebDAV同步
+  promptId: number;
+  title: string;
+  content: string;
+  description?: string;
+  tags?: string;
+  version: number;
+  changeDescription?: string; // 变更描述
+  createdAt: Date;
+}
+
+/**
+ * 提示词填充结果
+ */
+export interface PromptFillResult {
+  originalContent: string;
+  filledContent: string;
+  variables: Record<string, string>;
+  promptVariables: PromptVariable[];
 }

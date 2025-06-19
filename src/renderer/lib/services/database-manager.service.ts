@@ -13,6 +13,7 @@ import { PromptService } from './prompt.service';
 import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * 统一的数据库服务管理类
@@ -309,6 +310,9 @@ export class DatabaseServiceManager {
         throw new Error('导入数据格式无效');
       }
       
+      // 确保导入数据具有完整的UUID
+      data = this.ensureUUIDsInImportData(data);
+      
       const details: Record<string, number> = {};
       const importPromises: Promise<void>[] = [];
       let totalErrors = 0;
@@ -430,6 +434,9 @@ export class DatabaseServiceManager {
       if (!backupData || typeof backupData !== 'object') {
         throw new Error('恢复数据格式无效');
       }
+      
+      // 确保导入数据具有完整的UUID
+      backupData = this.ensureUUIDsInImportData(backupData);
       
       // 清空现有数据表（如果支持的话）
       if (this.forceCleanAllTables) {
@@ -765,5 +772,32 @@ export class DatabaseServiceManager {
     } catch {
       return 0;
     }
+  }
+
+  /**
+   * 确保导入数据中的UUID完整性
+   * 为缺失UUID的数据项自动生成UUID
+   */
+  private ensureUUIDsInImportData(data: any): any {
+    if (!data || typeof data !== 'object') {
+      return data;
+    }
+
+    // 需要UUID的数据类型
+    const syncableTypes = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'aiGenerationHistory'];
+    
+    for (const type of syncableTypes) {
+      if (data[type] && Array.isArray(data[type])) {
+        data[type] = data[type].map((item: any) => {
+          if (!item.uuid) {
+            console.log(`为导入的 ${type} 数据补全 UUID: ${item.id || item.name || '未知条目'}`);
+            item.uuid = generateUUID();
+          }
+          return item;
+        });
+      }
+    }
+    
+    return data;
   }
 }

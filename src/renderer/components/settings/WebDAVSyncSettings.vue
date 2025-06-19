@@ -59,6 +59,45 @@
 
                     <NDivider />
 
+                    <!-- 自动同步设置 -->
+                    <div>
+                        <NFlex vertical :size="12">
+                            <div>
+                                <NText depth="2" style="font-size: 16px; font-weight: 600;">自动同步设置</NText>
+                                <NText depth="3" style="font-size: 12px; margin-top: 4px; display: block;">
+                                    配置自动实时同步功能，在数据变更后自动同步到服务器
+                                </NText>
+                            </div>
+                            
+                            <NFormItem label="自动实时同步">
+                                <NCheckbox v-model:checked="props.modelValue.webdav.autoSync" @update:checked="handleAutoSyncChange">
+                                    <NFlex align="center" :size="8">
+                                        <div>
+                                            <div>启用自动实时同步</div>
+                                            <NText depth="3" style="font-size: 12px">
+                                                数据变更后自动同步，网络恢复时自动补同步
+                                            </NText>
+                                        </div>
+                                    </NFlex>
+                                </NCheckbox>
+                            </NFormItem>
+
+                            <NFormItem v-if="props.modelValue.webdav.autoSync" label="同步间隔" help="定时同步的时间间隔（分钟）">
+                                <NInputNumber 
+                                    v-model:value="props.modelValue.webdav.syncInterval" 
+                                    :min="1" 
+                                    :max="1440" 
+                                    @update:value="handleConfigChange"
+                                    style="width: 120px"
+                                >
+                                    <template #suffix>分钟</template>
+                                </NInputNumber>
+                            </NFormItem>
+                        </NFlex>
+                    </div>
+
+                    <NDivider />
+
                     <!-- 手动同步操作 -->
                     <div>
                         <NFlex vertical :size="16">
@@ -333,11 +372,46 @@ const compareData = ref(null);
 // 启用/禁用 WebDAV 同步
 const handleEnabledChange = () => {
     emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
+    // 通知配置变更
+    notifyConfigChange();
 };
 
 // 配置变更
 const handleConfigChange = () => {
     emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
+    // 通知配置变更
+    notifyConfigChange();
+};
+
+// 自动同步开关变更
+const handleAutoSyncChange = async () => {
+    emit("update:modelValue", props.modelValue);
+    // 立即保存配置
+    emit("save-webdav");
+    
+    // 等待一下确保配置已保存，然后重新初始化自动同步管理器
+    setTimeout(async () => {
+        try {
+            const { autoSyncManager } = await import('@/lib/utils/auto-sync-manager');
+            await autoSyncManager.reinitializeFromSettings();
+            console.log('自动同步管理器配置已更新');
+        } catch (error) {
+            console.error('更新自动同步管理器配置失败:', error);
+        }
+    }, 500);
+    
+    // 通知配置变更
+    notifyConfigChange();
+};
+
+// 通知配置变更（用于状态栏等组件重新加载配置）
+const notifyConfigChange = () => {
+    // 发送自定义事件，其他组件可以监听此事件来更新配置
+    window.dispatchEvent(new CustomEvent('webdav-config-changed'));
 };
 
 // 保存设置

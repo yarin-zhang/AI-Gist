@@ -3,6 +3,9 @@
  * 提供IndexedDB的基础操作和连接管理
  */
 
+import { generateUUID } from '../utils/uuid';
+import { autoSyncManager } from '../utils/auto-sync-manager';
+
 /**
  * IndexedDB 基础数据库服务类
  * 负责数据库的初始化、连接管理以及通用的CRUD操作
@@ -10,7 +13,7 @@
 export class BaseDatabaseService {
   protected db: IDBDatabase | null = null;
   protected readonly dbName = 'AIGistDB';
-  protected readonly dbVersion = 5;
+  protected readonly dbVersion = 6; // 增加版本号以支持UUID索引
   protected initializationPromise: Promise<void> | null = null;
   protected isInitialized: boolean = false;
 
@@ -89,6 +92,7 @@ export class BaseDatabaseService {
         console.log('创建 categories 对象存储');
         const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
         categoryStore.createIndex('name', 'name', { unique: true });
+        categoryStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('categories 对象存储已存在');
       }
@@ -104,6 +108,7 @@ export class BaseDatabaseService {
         promptStore.createIndex('useCount', 'useCount', { unique: false });
         promptStore.createIndex('createdAt', 'createdAt', { unique: false });
         promptStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+        promptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('prompts 对象存储已存在');
       }
@@ -114,6 +119,7 @@ export class BaseDatabaseService {
         const variableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
         variableStore.createIndex('promptId', 'promptId', { unique: false });
         variableStore.createIndex('name', 'name', { unique: false });
+        variableStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptVariables 对象存储已存在');
       }
@@ -124,6 +130,7 @@ export class BaseDatabaseService {
         const historyStore = db.createObjectStore('promptHistories', { keyPath: 'id', autoIncrement: true });
         historyStore.createIndex('promptId', 'promptId', { unique: false });
         historyStore.createIndex('version', 'version', { unique: false });
+        historyStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptHistories 对象存储已存在');
       }
@@ -136,6 +143,7 @@ export class BaseDatabaseService {
         configStore.createIndex('type', 'type', { unique: false });
         configStore.createIndex('enabled', 'enabled', { unique: false });
         configStore.createIndex('isPreferred', 'isPreferred', { unique: false });
+        configStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_configs 对象存储已存在');
       }
@@ -148,6 +156,7 @@ export class BaseDatabaseService {
         generationStore.createIndex('configId', 'configId', { unique: false });
         generationStore.createIndex('status', 'status', { unique: false });
         generationStore.createIndex('createdAt', 'createdAt', { unique: false });
+        generationStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_generation_history 对象存储已存在');
       }
@@ -162,9 +171,65 @@ export class BaseDatabaseService {
       }
       
       console.log('对象存储创建完成，最终对象存储列表:', Array.from(db.objectStoreNames));
+      
+      // 为现有的对象存储添加缺失的UUID索引
+      this.upgradeExistingStoresIndexes(db);
     } catch (error) {
       console.error('创建对象存储时出错:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 升级现有对象存储的索引
+   * 为已存在的对象存储添加缺失的UUID索引
+   * @param db IDBDatabase 数据库实例
+   */
+  private upgradeExistingStoresIndexes(db: IDBDatabase): void {
+    console.log('开始升级现有对象存储的索引...');
+    
+    try {
+      const storeIndexMapping = {
+        'categories': ['uuid'],
+        'prompts': ['uuid'],
+        'promptVariables': ['uuid'],
+        'promptHistories': ['uuid'],
+        'ai_configs': ['uuid'],
+        'ai_generation_history': ['uuid']
+      };
+      
+      // 获取当前事务
+      const transaction = db.transaction ? db.transaction : null;
+      
+      for (const [storeName, requiredIndexes] of Object.entries(storeIndexMapping)) {
+        if (db.objectStoreNames.contains(storeName)) {
+          try {
+            // 只有在有活动事务时才能修改索引
+            if (transaction) {
+              const store = transaction.objectStore(storeName);
+              
+              for (const indexName of requiredIndexes) {
+                if (!Array.from(store.indexNames).includes(indexName)) {
+                  console.log(`为 ${storeName} 添加 ${indexName} 索引`);
+                  try {
+                    store.createIndex(indexName, indexName, { unique: true });
+                  } catch (indexError) {
+                    console.warn(`添加索引 ${storeName}.${indexName} 失败:`, indexError);
+                  }
+                } else {
+                  console.log(`索引 ${storeName}.${indexName} 已存在`);
+                }
+              }
+            }
+          } catch (storeError) {
+            console.warn(`升级存储 ${storeName} 索引时出错:`, storeError);
+          }
+        }
+      }
+      
+      console.log('索引升级完成');
+    } catch (error) {
+      console.error('升级索引时出错:', error);
     }
   }
 
@@ -229,10 +294,15 @@ export class BaseDatabaseService {
       const request = store.add(dataWithTimestamps);
 
       request.onsuccess = () => {
-        resolve({
+        const result = {
           ...dataWithTimestamps,
           id: request.result as number,
-        } as T);
+        } as T;
+        
+        // 触发自动同步
+        this.triggerAutoSyncAfterChange('add', storeName);
+        
+        resolve(result);
       };
 
       request.onerror = () => {
@@ -355,6 +425,9 @@ export class BaseDatabaseService {
         const putRequest = store.put(updatedData);
         
         putRequest.onsuccess = () => {
+          // 触发自动同步
+          this.triggerAutoSyncAfterChange('update', storeName);
+          
           resolve(updatedData as T);
         };
 
@@ -384,6 +457,9 @@ export class BaseDatabaseService {
       const request = store.delete(id);
 
       request.onsuccess = () => {
+        // 触发自动同步
+        this.triggerAutoSyncAfterChange('delete', storeName);
+        
         resolve();
       };
 
@@ -685,6 +761,187 @@ export class BaseDatabaseService {
       }
       
       throw error;
+    }
+  }
+
+  /**
+   * 为现有记录添加UUID
+   * 数据库升级时调用，为没有UUID的记录生成UUID
+   * @param storeName 对象存储名称
+   * @returns Promise<number> 添加UUID的记录数量
+   */
+  async addUUIDsToExistingRecords(storeName: string): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    console.log(`开始为 ${storeName} 添加UUID...`);
+    
+    const transaction = this.db.transaction([storeName], 'readwrite');
+    const store = transaction.objectStore(storeName);
+    const request = store.getAll();
+    
+    return new Promise((resolve, reject) => {
+      request.onsuccess = async () => {
+        const records = request.result;
+        let updatedCount = 0;
+        
+        // 检查是否需要UUID索引
+        const needsUUIDIndex = !Array.from(store.indexNames).includes('uuid');
+        if (needsUUIDIndex) {
+          console.log(`${storeName} 需要创建UUID索引`);
+          // 注意：在活动事务中无法创建索引，这需要在数据库升级时完成
+        }
+        
+        for (const record of records) {
+          if (!record.uuid) {
+            // 生成UUID
+            const { generateUUID } = await import('../utils/uuid');
+            record.uuid = generateUUID();
+            
+            try {
+              const updateRequest = store.put(record);
+              await new Promise<void>((resolveUpdate, rejectUpdate) => {
+                updateRequest.onsuccess = () => resolveUpdate();
+                updateRequest.onerror = () => rejectUpdate(updateRequest.error);
+              });
+              updatedCount++;
+            } catch (error) {
+              console.error(`Failed to update record with UUID in ${storeName}:`, error);
+            }
+          }
+        }
+        
+        console.log(`为 ${storeName} 成功添加了 ${updatedCount} 个UUID`);
+        resolve(updatedCount);
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
+   * 批量为所有需要同步的表添加UUID
+   * @returns Promise<{ [storeName: string]: number }> 每个表添加UUID的记录数量
+   */
+  async migrateAllRecordsToUUID(): Promise<{ [storeName: string]: number }> {
+    const syncStores = [
+      'categories',
+      'prompts', 
+      'promptVariables',
+      'promptHistories',
+      'ai_configs',
+      'ai_generation_history'
+    ];
+    
+    const results: { [storeName: string]: number } = {};
+    
+    for (const storeName of syncStores) {
+      try {
+        if (await this.checkObjectStoreExists(storeName)) {
+          results[storeName] = await this.addUUIDsToExistingRecords(storeName);
+        } else {
+          results[storeName] = 0;
+        }
+      } catch (error) {
+        console.error(`Failed to migrate ${storeName} to UUID:`, error);
+        results[storeName] = -1; // 表示失败
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * 根据UUID查找记录
+   * @param storeName 对象存储名称
+   * @param uuid UUID值
+   * @returns Promise<T | null> 找到的记录或null
+   */
+  async getByUUID<T>(storeName: string, uuid: string): Promise<T | null> {
+    return this.executeWithRetry(async () => {
+      if (!this.db) throw new Error('Database not initialized');
+      
+      const transaction = this.db.transaction([storeName], 'readonly');
+      const store = transaction.objectStore(storeName);
+      
+      try {
+        const index = store.index('uuid');
+        const request = index.get(uuid);
+        
+        return new Promise<T | null>((resolve, reject) => {
+          request.onsuccess = () => {
+            resolve(request.result as T || null);
+          };
+          request.onerror = () => reject(request.error);
+        });
+      } catch (error) {
+        // 如果UUID索引不存在，则遍历所有记录查找
+        console.warn(`UUID index not found for ${storeName}, falling back to full scan`);
+        const request = store.getAll();
+        
+        return new Promise<T | null>((resolve, reject) => {
+          request.onsuccess = () => {
+            const records = request.result as T[];
+            const found = records.find((record: any) => record.uuid === uuid);
+            resolve(found || null);
+          };
+          request.onerror = () => reject(request.error);
+        });
+      }
+    }, [storeName]);
+  }
+
+  /**
+   * 根据UUID更新记录
+   * @param storeName 对象存储名称
+   * @param uuid UUID值
+   * @param updates 要更新的字段
+   * @returns Promise<T | null> 更新后的记录或null
+   */
+  async updateByUUID<T>(storeName: string, uuid: string, updates: Partial<T>): Promise<T | null> {
+    return this.executeWithRetry(async () => {
+      const record = await this.getByUUID<T>(storeName, uuid);
+      if (!record) return null;
+      
+      const updatedRecord = {
+        ...record,
+        ...updates,
+        updatedAt: new Date()
+      } as T;
+      
+      return this.update<T>(storeName, (record as any).id, updates);
+    }, [storeName]);
+  }
+
+  /**
+   * 根据UUID删除记录
+   * @param storeName 对象存储名称
+   * @param uuid UUID值
+   * @returns Promise<boolean> 是否成功删除
+   */
+  async deleteByUUID(storeName: string, uuid: string): Promise<boolean> {
+    return this.executeWithRetry(async () => {
+      const record = await this.getByUUID(storeName, uuid);
+      if (!record) return false;
+      
+      await this.delete(storeName, (record as any).id);
+      return true;
+    }, [storeName]);
+  }
+
+  /**
+   * 在数据变更后触发自动同步
+   * @param operation 操作类型
+   * @param storeName 对象存储名称
+   */
+  private triggerAutoSyncAfterChange(operation: 'add' | 'update' | 'delete', storeName: string) {
+    try {
+      // 异步触发，不阻塞数据库操作
+      setTimeout(() => {
+        autoSyncManager.triggerAutoSync(`数据变更: ${operation} in ${storeName}`);
+      }, 0);
+    } catch (error) {
+      // 自动同步失败不应该影响数据操作
+      console.warn('触发自动同步失败:', error);
     }
   }
 }

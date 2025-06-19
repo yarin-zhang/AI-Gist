@@ -14,6 +14,7 @@ import {
   PaginatedResult, 
   PromptFillResult 
 } from '../types/database';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * 提示词数据服务类
@@ -40,24 +41,26 @@ export class PromptService extends BaseDatabaseService {
    * @param data 提示词数据和变量数据
    * @returns Promise<PromptWithRelations> 创建成功的提示词记录（包含关联数据）
    */
-  async createPrompt(data: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> & { 
-    variables?: Omit<PromptVariable, 'id' | 'promptId' | 'createdAt' | 'updatedAt'>[] 
+  async createPrompt(data: Omit<Prompt, 'id' | 'uuid' | 'createdAt' | 'updatedAt'> & { 
+    variables?: Omit<PromptVariable, 'id' | 'uuid' | 'promptId' | 'createdAt' | 'updatedAt'>[] 
   }): Promise<PromptWithRelations> {
     const { variables, ...promptData } = data;
     
-    // 创建 prompt
+    // 创建 prompt，自动生成UUID
     const prompt = await this.add<Prompt>('prompts', {
       ...promptData,
+      uuid: generateUUID(),
       isFavorite: promptData.isFavorite || false,
       useCount: promptData.useCount || 0,
     });
 
-    // 创建 variables
+    // 创建 variables，每个变量也生成UUID
     let createdVariables: PromptVariable[] = [];
     if (variables && variables.length > 0) {
       for (const variable of variables) {
         const createdVariable = await this.add<PromptVariable>('promptVariables', {
           ...variable,
+          uuid: generateUUID(),
           promptId: prompt.id!,
         });
         createdVariables.push(createdVariable);
@@ -250,6 +253,26 @@ export class PromptService extends BaseDatabaseService {
   }
 
   /**
+   * 根据UUID获取提示词
+   * 通过提示词UUID查询特定提示词的详细信息，包含关联数据
+   * @param uuid string 提示词的UUID
+   * @returns Promise<PromptWithRelations | null> 提示词记录，如果不存在则返回null
+   */
+  async getPromptByUUID(uuid: string): Promise<PromptWithRelations | null> {
+    const prompt = await this.getByUUID<Prompt>('prompts', uuid);
+    if (!prompt) return null;
+
+    const category = prompt.categoryId ? await this.getById<Category>('categories', prompt.categoryId) : undefined;
+    const variables = await this.getByIndex<PromptVariable>('promptVariables', 'promptId', prompt.id!);
+
+    return {
+      ...prompt,
+      category: category || undefined,
+      variables,
+    };
+  }
+
+  /**
    * 更新提示词
    * 更新指定提示词的信息，支持同时更新关联的变量
    * @param id number 提示词ID
@@ -291,6 +314,51 @@ export class PromptService extends BaseDatabaseService {
   }
 
   /**
+   * 根据UUID更新提示词
+   * 通过UUID更新指定提示词的信息，支持同时更新关联的变量
+   * @param uuid string 提示词UUID
+   * @param data 更新数据，包含提示词字段和变量数据
+   * @returns Promise<PromptWithRelations | null> 更新后的完整提示词记录
+   */
+  async updatePromptByUUID(
+    uuid: string, 
+    data: Partial<Omit<Prompt, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>> & { 
+      variables?: Omit<PromptVariable, 'id' | 'uuid' | 'promptId' | 'createdAt' | 'updatedAt'>[] 
+    }
+  ): Promise<PromptWithRelations | null> {
+    const existingPrompt = await this.getByUUID<Prompt>('prompts', uuid);
+    if (!existingPrompt || !existingPrompt.id) return null;
+
+    const { variables, ...promptData } = data;
+    
+    // 更新 prompt
+    const updatedPrompt = await this.update<Prompt>('prompts', existingPrompt.id, promptData);
+
+    // 处理 variables 更新
+    if (variables !== undefined) {
+      // 删除现有的 variables
+      const existingVariables = await this.getByIndex<PromptVariable>('promptVariables', 'promptId', existingPrompt.id);
+      for (const variable of existingVariables) {
+        if (variable.id) {
+          await this.delete('promptVariables', variable.id);
+        }
+      }
+
+      // 创建新的 variables，每个都生成UUID
+      for (const variable of variables) {
+        await this.add<PromptVariable>('promptVariables', {
+          ...variable,
+          uuid: generateUUID(),
+          promptId: existingPrompt.id,
+        });
+      }
+    }
+
+    // 返回更新后的完整数据
+    return this.getPromptByUUID(uuid);
+  }
+
+  /**
    * 删除提示词
    * 从数据库中永久删除指定提示词及其关联的变量和历史记录
    * @param id number 要删除的提示词ID
@@ -310,6 +378,31 @@ export class PromptService extends BaseDatabaseService {
     
     // 删除 prompt
     await this.delete('prompts', id);
+  }
+
+  /**
+   * 根据UUID删除提示词
+   * 通过UUID删除指定提示词及其关联的变量和历史记录
+   * @param uuid string 要删除的提示词UUID
+   * @returns Promise<boolean> 删除是否成功
+   */
+  async deletePromptByUUID(uuid: string): Promise<boolean> {
+    const prompt = await this.getByUUID<Prompt>('prompts', uuid);
+    if (!prompt || !prompt.id) return false;
+
+    // 先删除关联的 variables
+    const variables = await this.getByIndex<PromptVariable>('promptVariables', 'promptId', prompt.id);
+    for (const variable of variables) {
+      if (variable.id) {
+        await this.delete('promptVariables', variable.id);
+      }
+    }
+    
+    // 删除关联的历史记录
+    await this.deletePromptHistoriesByPromptId(prompt.id);
+    
+    // 删除 prompt
+    return this.deleteByUUID('prompts', uuid);
   }
 
   /**
@@ -412,11 +505,15 @@ export class PromptService extends BaseDatabaseService {
   /**
    * 创建提示词变量
    * 为指定提示词添加新的变量定义
-   * @param data Omit<PromptVariable, 'id' | 'createdAt' | 'updatedAt'> 变量数据
+   * @param data Omit<PromptVariable, 'id' | 'uuid' | 'createdAt' | 'updatedAt'> 变量数据
    * @returns Promise<PromptVariable> 创建的变量记录
    */
-  async createPromptVariable(data: Omit<PromptVariable, 'id' | 'createdAt' | 'updatedAt'>): Promise<PromptVariable> {
-    return this.add<PromptVariable>('promptVariables', data);
+  async createPromptVariable(data: Omit<PromptVariable, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<PromptVariable> {
+    const variableWithUUID = {
+      ...data,
+      uuid: generateUUID()
+    };
+    return this.add<PromptVariable>('promptVariables', variableWithUUID);
   }
 
   /**
@@ -442,26 +539,27 @@ export class PromptService extends BaseDatabaseService {
   /**
    * 创建提示词历史记录
    * 在提示词被修改时创建历史版本记录
-   * @param history Omit<PromptHistory, 'id'> 历史记录数据
+   * @param history Omit<PromptHistory, 'id' | 'uuid'> 历史记录数据
    * @returns Promise<PromptHistory> 创建的历史记录
    */
-  async createPromptHistory(history: Omit<PromptHistory, 'id'>): Promise<PromptHistory> {
+  async createPromptHistory(history: Omit<PromptHistory, 'id' | 'uuid'>): Promise<PromptHistory> {
     if (!this.db) throw new Error('Database not initialized');
 
     const transaction = this.db.transaction(['promptHistories'], 'readwrite');
     const store = transaction.objectStore('promptHistories');
     
-    const historyWithTimestamp = {
+    const historyWithUUIDAndTimestamp = {
       ...history,
+      uuid: generateUUID(),
       createdAt: new Date()
     };
     
-    const request = store.add(historyWithTimestamp);
+    const request = store.add(historyWithUUIDAndTimestamp);
     
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
         resolve({
-          ...historyWithTimestamp,
+          ...historyWithUUIDAndTimestamp,
           id: request.result as number
         });
       };

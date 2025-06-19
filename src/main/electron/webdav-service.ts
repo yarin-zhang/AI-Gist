@@ -26,6 +26,9 @@ interface WebDAVConfig {
     serverUrl: string;
     username: string;
     password: string;
+    enabled?: boolean;
+    autoSync?: boolean;
+    syncInterval?: number;
 }
 
 // 存储配置的接口，密码可以是加密的
@@ -714,9 +717,28 @@ export class WebDAVService {
         ipcMain.handle('webdav:set-config', async (event, config: WebDAVConfig): Promise<any> => {
             console.log('WebDAV 设置配置 IPC 处理程序被调用');
             try {
+                // 获取当前配置，确保不丢失现有的非敏感设置
+                const currentPrefs = this.preferencesManager.getPreferences();
+                const currentWebdavConfig = currentPrefs.webdav || {};
+                
+                // 合并配置，确保所有字段都正确保存
+                const mergedConfig = {
+                    ...currentWebdavConfig,
+                    ...config,
+                    // 确保这些重要字段不被意外覆盖为 undefined
+                    enabled: config.enabled !== undefined ? config.enabled : currentWebdavConfig.enabled,
+                    autoSync: config.autoSync !== undefined ? config.autoSync : currentWebdavConfig.autoSync,
+                    syncInterval: config.syncInterval !== undefined ? config.syncInterval : currentWebdavConfig.syncInterval,
+                };
+                
+                console.log('保存 WebDAV 配置:', {
+                    ...mergedConfig,
+                    password: mergedConfig.password ? '[已设置]' : '[未设置]'
+                });
+                
                 // 保存配置到偏好设置
                 this.preferencesManager.updatePreferences({
-                    webdav: config
+                    webdav: mergedConfig
                 });
                 
                 return {
@@ -776,9 +798,13 @@ export class WebDAVService {
                 timeout: 30000,
             });
             
-            const remoteDir = '/ai-gist-data';
-            const metadataFile = `${remoteDir}/sync-metadata.json`;
-            const dataFile = `${remoteDir}/data-export.json`;
+            // 统一使用 ai-gist-sync 目录
+            const remoteDir = '/ai-gist-sync';
+            const metadataFile = `${remoteDir}/metadata.json`;
+            const dataFile = `${remoteDir}/data.json`;
+            
+            // 检查并处理老版本数据迁移
+            await this.handleLegacyDataMigration(client);
             
             // 确保远程目录存在
             await this.ensureRemoteDirectory(client, remoteDir);
@@ -1558,199 +1584,224 @@ export class WebDAVService {
     }
 
     /**
-     * 生成详细的差异分析
+     * 处理老版本数据迁移
+     * 检查 ai-gist-data 目录是否存在数据，如果存在则迁移到 ai-gist-sync 目录
+     */
+    private async handleLegacyDataMigration(client: any): Promise<void> {
+        try {
+            const legacyRemoteDir = '/ai-gist-data';
+            const legacyDataFile = `${legacyRemoteDir}/data-export.json`;
+            const legacyMetadataFile = `${legacyRemoteDir}/sync-metadata.json`;
+            
+            const newRemoteDir = '/ai-gist-sync';
+            const newDataFile = `${newRemoteDir}/data.json`;
+            const newMetadataFile = `${newRemoteDir}/metadata.json`;
+            
+            // 检查老版本目录是否存在数据
+            const legacyDataExists = await this.checkRemoteFileExists(client, legacyDataFile);
+            const legacyMetadataExists = await this.checkRemoteFileExists(client, legacyMetadataFile);
+            
+            if (!legacyDataExists && !legacyMetadataExists) {
+                console.log('未发现老版本数据，无需迁移');
+                return;
+            }
+            
+            // 检查新版本目录是否已有数据
+            const newDataExists = await this.checkRemoteFileExists(client, newDataFile);
+            const newMetadataExists = await this.checkRemoteFileExists(client, newMetadataFile);
+            
+            if (newDataExists || newMetadataExists) {
+                console.log('检测到老版本和新版本数据共存，创建冲突备份');
+                
+                // 创建冲突备份目录
+                const conflictBackupDir = `/ai-gist-data-backup-${new Date().toISOString().split('T')[0]}`;
+                await this.ensureRemoteDirectory(client, conflictBackupDir);
+                
+                // 备份老版本数据
+                if (legacyDataExists) {
+                    const legacyData = await client.getFileContents(legacyDataFile, { format: 'text' });
+                    await client.putFileContents(`${conflictBackupDir}/legacy-data.json`, legacyData);
+                }
+                if (legacyMetadataExists) {
+                    const legacyMetadata = await client.getFileContents(legacyMetadataFile, { format: 'text' });
+                    await client.putFileContents(`${conflictBackupDir}/legacy-metadata.json`, legacyMetadata);
+                }
+                
+                console.log(`老版本数据已备份到: ${conflictBackupDir}`);
+                return;
+            }
+            
+            console.log('开始迁移老版本数据到新版本目录...');
+            
+            // 确保新版本目录存在
+            await this.ensureRemoteDirectory(client, newRemoteDir);
+            
+            // 迁移数据文件
+            if (legacyDataExists) {
+                const legacyData = await client.getFileContents(legacyDataFile, { format: 'text' });
+                await client.putFileContents(newDataFile, legacyData);
+                console.log('数据文件迁移完成');
+            }
+            
+            // 迁移并转换元数据文件
+            if (legacyMetadataExists) {
+                const legacyMetadataContent = await client.getFileContents(legacyMetadataFile, { format: 'text' });
+                const legacyMetadata = JSON.parse(legacyMetadataContent as string);
+                
+                // 转换为新格式（统一字段名）
+                const newMetadata: SyncMetadata = {
+                    lastSyncTime: legacyMetadata.lastSyncTime || new Date().toISOString(),
+                    localVersion: legacyMetadata.localVersion || '1.0.0',
+                    remoteVersion: legacyMetadata.remoteVersion || '1.0.0',
+                    dataHash: legacyMetadata.dataHash || '',
+                    syncCount: legacyMetadata.syncCount || 0,
+                    deviceId: legacyMetadata.deviceId || this.generateDeviceId(),
+                    appVersion: legacyMetadata.appVersion || app.getVersion() || '1.0.0',
+                    totalRecords: legacyMetadata.totalRecords || 0,
+                    lastModifiedTime: legacyMetadata.lastModifiedTime || new Date().toISOString(),
+                    syncStrategy: legacyMetadata.syncStrategy || 'auto_merge'
+                };
+                
+                await client.putFileContents(newMetadataFile, JSON.stringify(newMetadata, null, 2));
+                console.log('元数据文件迁移完成');
+            }
+            
+            // 创建迁移完成标记
+            const migrationLogFile = `${newRemoteDir}/migration-log.json`;
+            const migrationLog = {
+                migratedAt: new Date().toISOString(),
+                sourceDirectory: legacyRemoteDir,
+                targetDirectory: newRemoteDir,
+                migratedFiles: {
+                    data: legacyDataExists,
+                    metadata: legacyMetadataExists
+                }
+            };
+            await client.putFileContents(migrationLogFile, JSON.stringify(migrationLog, null, 2));
+            
+            console.log('老版本数据迁移完成');
+            
+        } catch (error) {
+            console.warn('处理老版本数据迁移时出错:', error);
+            // 迁移失败不应阻断正常同步流程
+        }
+    }
+
+    /**
+     * 生成详细的数据差异分析
      */
     private async generateDetailedDifferences(
         localData: any, 
         remoteData: any, 
-        localMetadata: any, 
-        remoteMetadata: any
-    ): Promise<any> {
-        const differences: any = {
+        localMetadata: SyncMetadata, 
+        remoteMetadata: SyncMetadata | null
+    ): Promise<{
+        hasDifferences: boolean;
+        added: any[];
+        modified: any[];
+        deleted: any[];
+        summary: {
+            localTotal: number;
+            remoteTotal: number;
+            conflicts: number;
+        };
+    }> {
+        const differences = {
             hasDifferences: false,
+            added: [] as any[],
+            modified: [] as any[],
+            deleted: [] as any[],
             summary: {
                 localTotal: 0,
                 remoteTotal: 0,
-                conflicts: 0,
-                onlyInLocal: 0,
-                onlyInRemote: 0,
-                modified: 0
-            },
-            added: [],
-            modified: [],
-            deleted: [],
-            details: {
-                categories: { added: [], removed: [], modified: [] },
-                prompts: { added: [], removed: [], modified: [] },
-                settings: { added: [], removed: [], modified: [] }
-            },
-            metadata: {
-                localLastSync: localMetadata?.lastSyncTime || 'Never',
-                remoteLastSync: remoteMetadata?.lastSyncTime || 'Never',
-                localSyncCount: localMetadata?.syncCount || 0,
-                remoteSyncCount: remoteMetadata?.syncCount || 0,
-                localDeviceId: localMetadata?.deviceId || 'Unknown',
-                remoteDeviceId: remoteMetadata?.deviceId || 'Unknown'
+                conflicts: 0
             }
         };
 
-        try {
-            // 计算总记录数
-            differences.summary.localTotal = this.calculateTotalRecords(localData);
-            differences.summary.remoteTotal = this.calculateTotalRecords(remoteData);
-
-            // 比较分类
-            if (localData?.categories || remoteData?.categories) {
-                const localCategories = new Map((localData?.categories || []).map((c: any) => [c.id, c]));
-                const remoteCategories = new Map((remoteData?.categories || []).map((c: any) => [c.id, c]));
-                
-                // 只在本地存在的分类
-                for (const [id, category] of localCategories) {
-                    if (!remoteCategories.has(id)) {
-                        const deletedItem = category ? { ...category, _type: 'categories' } : { id, _type: 'categories' };
-                        differences.details.categories.removed.push(category);
-                        differences.deleted.push(deletedItem);
-                        differences.summary.onlyInLocal++;
-                    }
-                }
-                
-                // 只在远程存在的分类
-                for (const [id, category] of remoteCategories) {
-                    if (!localCategories.has(id)) {
-                        const addedItem = category ? { ...category, _type: 'categories' } : { id, _type: 'categories' };
-                        differences.details.categories.added.push(category);
-                        differences.added.push(addedItem);
-                        differences.summary.onlyInRemote++;
-                    }
-                }
-                
-                // 两边都存在但内容不同的分类
-                for (const [id, localCategory] of localCategories) {
-                    const remoteCategory = remoteCategories.get(id);
-                    if (remoteCategory && JSON.stringify(localCategory) !== JSON.stringify(remoteCategory)) {
-                        const modifiedItem = {
-                            id,
-                            _type: 'categories',
-                            local: localCategory,
-                            remote: remoteCategory
-                        };
-                        differences.details.categories.modified.push(modifiedItem);
-                        differences.modified.push(modifiedItem);
-                        differences.summary.modified++;
-                    }
-                }
-            }
-
-            // 比较提示词
-            if (localData?.prompts || remoteData?.prompts) {
-                const localPrompts = new Map((localData?.prompts || []).map((p: any) => [p.id, p]));
-                const remotePrompts = new Map((remoteData?.prompts || []).map((p: any) => [p.id, p]));
-                
-                // 只在本地存在的提示词
-                for (const [id, prompt] of localPrompts) {
-                    if (!remotePrompts.has(id)) {
-                        const deletedItem = prompt ? { ...prompt, _type: 'prompts' } : { id, _type: 'prompts' };
-                        differences.details.prompts.removed.push(prompt);
-                        differences.deleted.push(deletedItem);
-                        differences.summary.onlyInLocal++;
-                    }
-                }
-                
-                // 只在远程存在的提示词
-                for (const [id, prompt] of remotePrompts) {
-                    if (!localPrompts.has(id)) {
-                        const addedItem = prompt ? { ...prompt, _type: 'prompts' } : { id, _type: 'prompts' };
-                        differences.details.prompts.added.push(prompt);
-                        differences.added.push(addedItem);
-                        differences.summary.onlyInRemote++;
-                    }
-                }
-                
-                // 两边都存在但内容不同的提示词
-                for (const [id, localPrompt] of localPrompts) {
-                    const remotePrompt = remotePrompts.get(id);
-                    if (remotePrompt && JSON.stringify(localPrompt) !== JSON.stringify(remotePrompt)) {
-                        const modifiedItem = {
-                            id,
-                            _type: 'prompts',
-                            local: localPrompt,
-                            remote: remotePrompt
-                        };
-                        differences.details.prompts.modified.push(modifiedItem);
-                        differences.modified.push(modifiedItem);
-                        differences.summary.modified++;
-                    }
-                }
-            }
-
-            // 比较AI配置
-            if (localData?.aiConfigs || remoteData?.aiConfigs) {
-                const localAiConfigs = new Map((localData?.aiConfigs || []).map((c: any) => [c.id, c]));
-                const remoteAiConfigs = new Map((remoteData?.aiConfigs || []).map((c: any) => [c.id, c]));
-                
-                // 只在本地存在的AI配置
-                for (const [id, config] of localAiConfigs) {
-                    if (!remoteAiConfigs.has(id)) {
-                        const deletedItem = config ? { ...config, _type: 'aiConfigs' } : { id, _type: 'aiConfigs' };
-                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
-                        differences.details.aiConfigs.removed.push(config);
-                        differences.deleted.push(deletedItem);
-                        differences.summary.onlyInLocal++;
-                    }
-                }
-                
-                // 只在远程存在的AI配置
-                for (const [id, config] of remoteAiConfigs) {
-                    if (!localAiConfigs.has(id)) {
-                        const addedItem = config ? { ...config, _type: 'aiConfigs' } : { id, _type: 'aiConfigs' };
-                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
-                        differences.details.aiConfigs.added.push(config);
-                        differences.added.push(addedItem);
-                        differences.summary.onlyInRemote++;
-                    }
-                }
-                
-                // 两边都存在但内容不同的AI配置
-                for (const [id, localConfig] of localAiConfigs) {
-                    const remoteConfig = remoteAiConfigs.get(id);
-                    if (remoteConfig && JSON.stringify(localConfig) !== JSON.stringify(remoteConfig)) {
-                        const modifiedItem = {
-                            id,
-                            _type: 'aiConfigs',
-                            local: localConfig,
-                            remote: remoteConfig
-                        };
-                        if (!differences.details.aiConfigs) differences.details.aiConfigs = { added: [], removed: [], modified: [] };
-                        differences.details.aiConfigs.modified.push(modifiedItem);
-                        differences.modified.push(modifiedItem);
-                        differences.summary.modified++;
-                    }
-                }
-            }
-
-            // 计算是否有差异
-            differences.hasDifferences = 
-                differences.summary.onlyInLocal > 0 ||
-                differences.summary.onlyInRemote > 0 ||
-                differences.summary.modified > 0;
-
-            differences.summary.conflicts = 
-                differences.summary.onlyInLocal +
-                differences.summary.onlyInRemote +
-                differences.summary.modified;
-
-            console.log('详细差异分析完成:', differences.summary);
+        if (!remoteData) {
             return differences;
-            
-        } catch (error) {
-            console.error('生成详细差异分析失败:', error);
-            return {
-                hasDifferences: false,
-                error: error instanceof Error ? error.message : '未知错误',
-                summary: differences.summary,
-                details: differences.details,
-                metadata: differences.metadata
-            };
         }
+
+        // 计算总记录数
+        differences.summary.localTotal = this.calculateTotalRecords(localData);
+        differences.summary.remoteTotal = this.calculateTotalRecords(remoteData);
+
+        // 比较各种数据类型
+        const dataTypes = ['categories', 'prompts', 'aiConfigs', 'history'];
+        
+        for (const dataType of dataTypes) {
+            const localItems = localData[dataType] || [];
+            const remoteItems = remoteData[dataType] || [];
+            
+            // 创建ID映射
+            const localMap = new Map();
+            const remoteMap = new Map();
+            
+            localItems.forEach((item: any) => {
+                if (item.id || item.uuid) {
+                    localMap.set(item.id || item.uuid, item);
+                }
+            });
+            
+            remoteItems.forEach((item: any) => {
+                if (item.id || item.uuid) {
+                    remoteMap.set(item.id || item.uuid, item);
+                }
+            });
+            
+            // 查找新增项 (远程有但本地没有)
+            for (const [id, item] of remoteMap) {
+                if (!localMap.has(id)) {
+                    differences.added.push({
+                        _type: dataType,
+                        id: id,
+                        ...item
+                    });
+                }
+            }
+            
+            // 查找删除项 (本地有但远程没有)
+            for (const [id, item] of localMap) {
+                if (!remoteMap.has(id)) {
+                    differences.deleted.push({
+                        _type: dataType,
+                        id: id,
+                        ...item
+                    });
+                }
+            }
+            
+            // 查找修改项 (两边都有但内容不同)
+            for (const [id, localItem] of localMap) {
+                const remoteItem = remoteMap.get(id);
+                if (remoteItem) {
+                    // 简单的内容比较（排除时间戳字段）
+                    const localCopy = { ...localItem };
+                    const remoteCopy = { ...remoteItem };
+                    
+                    // 移除时间戳字段进行比较
+                    delete localCopy.createdAt;
+                    delete localCopy.updatedAt;
+                    delete remoteCopy.createdAt;
+                    delete remoteCopy.updatedAt;
+                    
+                    if (JSON.stringify(localCopy) !== JSON.stringify(remoteCopy)) {
+                        differences.modified.push({
+                            _type: dataType,
+                            id: id,
+                            local: localItem,
+                            remote: remoteItem
+                        });
+                    }
+                }
+            }
+        }
+        
+        differences.summary.conflicts = differences.modified.length;
+        differences.hasDifferences = differences.added.length > 0 || 
+                                    differences.modified.length > 0 || 
+                                    differences.deleted.length > 0;
+        
+        return differences;
     }
 }
