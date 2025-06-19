@@ -97,6 +97,11 @@
                             @sync-now="syncNow"
                         />
 
+                        <!-- iCloud 同步设置 -->
+                        <ICloudSyncSettings 
+                            v-show="activeSettingKey === 'icloud-sync'"
+                        />
+
                         <!-- 外观设置 -->
                         <AppearanceSettings 
                             v-show="activeSettingKey === 'appearance'"
@@ -172,6 +177,7 @@ import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
 import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
 import WebDAVSyncSettings from "@/components/settings/WebDAVSyncSettings.vue";
+import ICloudSyncSettings from "@/components/settings/ICloudSyncSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
@@ -249,6 +255,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
         },
         {
+            label: "iCloud 同步",
+            key: "icloud-sync",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
+        },
+        {
             label: "外观设置",
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
@@ -299,6 +310,11 @@ const currentSectionInfo = computed(() => {
             title: "WebDAV 同步",
             icon: Cloud,
             description: "配置 WebDAV 服务器连接和数据同步设置"
+        },
+        "icloud-sync": {
+            title: "iCloud 同步",
+            icon: Cloud,
+            description: "配置 iCloud Drive 数据同步设置"
         },
         "data-management": {
             title: "数据管理",

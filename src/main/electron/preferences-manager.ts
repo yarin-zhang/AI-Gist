@@ -39,6 +39,12 @@ class PreferencesManager {
       autoSync: false,
       syncInterval: 30,
     },
+    icloud: {
+      enabled: false,
+      autoSync: false,
+      syncInterval: 30,
+      customPath: '',
+    },
     dataSync: {
       lastSyncTime: null,
       autoBackup: true,
@@ -111,6 +117,12 @@ class PreferencesManager {
             autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
             syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
           },
+          icloud: {
+            enabled: loadedPrefs.icloud?.enabled ?? this.defaultPreferences.icloud!.enabled,
+            autoSync: loadedPrefs.icloud?.autoSync ?? this.defaultPreferences.icloud!.autoSync,
+            syncInterval: loadedPrefs.icloud?.syncInterval ?? this.defaultPreferences.icloud!.syncInterval,
+            customPath: loadedPrefs.icloud?.customPath ?? this.defaultPreferences.icloud!.customPath,
+          },
           dataSync: {
             lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
             autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
@@ -169,13 +181,16 @@ class PreferencesManager {
     if (newPrefs.webdav) {
       this.userPrefs.webdav = { ...this.userPrefs.webdav, ...newPrefs.webdav };
     }
+    if (newPrefs.icloud) {
+      this.userPrefs.icloud = { ...this.userPrefs.icloud, ...newPrefs.icloud };
+    }
     if (newPrefs.dataSync) {
       this.userPrefs.dataSync = { ...this.userPrefs.dataSync, ...newPrefs.dataSync };
     }
     
     // 合并其他属性
     for (const key in newPrefs) {
-      if (key !== 'webdav' && key !== 'dataSync') {
+      if (key !== 'webdav' && key !== 'icloud' && key !== 'dataSync') {
         (this.userPrefs as any)[key] = (newPrefs as any)[key];
       }
     }
