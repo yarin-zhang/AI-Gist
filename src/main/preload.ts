@@ -80,6 +80,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     compareData: () => ipcRenderer.invoke('webdav:compare-data'),
     applyDownloadedData: (resolution: any) => ipcRenderer.invoke('webdav:apply-downloaded-data', resolution),
   },
+  // iCloud 同步管理
+  icloud: {
+    testAvailability: () => ipcRenderer.invoke('icloud:test-availability'),
+    syncNow: () => ipcRenderer.invoke('icloud:sync-now'),
+    getConfig: () => ipcRenderer.invoke('icloud:get-config'),
+    setConfig: (config: any) => ipcRenderer.invoke('icloud:set-config', config),
+    manualUpload: () => ipcRenderer.invoke('icloud:manual-upload'),
+    manualDownload: () => ipcRenderer.invoke('icloud:manual-download'),
+    compareData: () => ipcRenderer.invoke('icloud:compare-data'),
+    applyDownloadedData: (resolution: any) => ipcRenderer.invoke('icloud:apply-downloaded-data', resolution),
+  },
   // 数据管理
   data: {
     createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),

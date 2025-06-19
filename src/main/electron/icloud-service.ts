@@ -586,45 +586,105 @@ export class ICloudService {
     private async testICloudAvailability(): Promise<ICloudTestResult> {
         try {
             const iCloudPath = this.getICloudPath();
+            console.log('测试 iCloud Drive 可用性，路径:', iCloudPath);
             
             // 检查 iCloud Drive 目录是否存在
-            const stats = await fs.promises.stat(iCloudPath);
-            if (!stats.isDirectory()) {
+            try {
+                const stats = await fs.promises.stat(iCloudPath);
+                if (!stats.isDirectory()) {
+                    console.log('iCloud Drive 路径存在但不是目录');
+                    return {
+                        success: false,
+                        message: 'iCloud Drive 路径不是有效目录',
+                        iCloudPath,
+                        available: false
+                    };
+                }
+                console.log('iCloud Drive 根目录存在且可访问');
+            } catch (statError) {
+                console.log('iCloud Drive 根目录不存在或无法访问:', statError);
                 return {
                     success: false,
-                    message: 'iCloud Drive 路径不是有效目录',
+                    message: `iCloud Drive 目录不存在或无法访问: ${statError instanceof Error ? statError.message : '未知错误'}`,
+                    iCloudPath,
                     available: false
                 };
             }
 
-            // 尝试在 iCloud Drive 中创建测试文件
-            const testDir = path.join(iCloudPath, this.syncDirName, 'test');
+            // 检查是否可以读取目录内容
+            try {
+                const files = await fs.promises.readdir(iCloudPath);
+                console.log('iCloud Drive 目录内容:', files.length, '个项目');
+            } catch (readError) {
+                console.log('无法读取 iCloud Drive 目录:', readError);
+                return {
+                    success: false,
+                    message: `无法读取 iCloud Drive 目录: ${readError instanceof Error ? readError.message : '未知错误'}`,
+                    iCloudPath,
+                    available: false
+                };
+            }
+
+            // 尝试在 iCloud Drive 中创建测试目录和文件
+            const testDirName = `test-${Date.now()}`;
+            const testDir = path.join(iCloudPath, testDirName);
             const testFile = path.join(testDir, 'test.txt');
 
             try {
+                console.log('尝试创建测试目录:', testDir);
                 await fs.promises.mkdir(testDir, { recursive: true });
-                await fs.promises.writeFile(testFile, 'test');
+                
+                console.log('尝试写入测试文件:', testFile);
+                const testContent = `iCloud Drive 测试文件 - 创建于 ${new Date().toISOString()}`;
+                await fs.promises.writeFile(testFile, testContent);
+                
+                console.log('尝试读取测试文件');
+                const content = await fs.promises.readFile(testFile, 'utf-8');
+                
+                if (content !== testContent) {
+                    throw new Error('读取的内容与写入的内容不匹配');
+                }
+
+                console.log('清理测试文件');
                 await fs.promises.unlink(testFile);
                 await fs.promises.rmdir(testDir);
+                
+                console.log('iCloud Drive 测试成功完成');
             } catch (testError) {
+                console.error('iCloud Drive 写入测试失败:', testError);
+                
+                // 尝试清理可能残留的测试文件
+                try {
+                    await fs.promises.unlink(testFile);
+                } catch (e) {
+                    // 忽略清理错误
+                }
+                try {
+                    await fs.promises.rmdir(testDir);
+                } catch (e) {
+                    // 忽略清理错误
+                }
+                
                 return {
                     success: false,
-                    message: `iCloud Drive 写入测试失败: ${testError instanceof Error ? testError.message : '未知错误'}`,
+                    message: `iCloud Drive 读写测试失败: ${testError instanceof Error ? testError.message : '未知错误'}`,
+                    iCloudPath,
                     available: false
                 };
             }
 
             return {
                 success: true,
-                message: 'iCloud Drive 可用',
+                message: 'iCloud Drive 可用并可正常读写',
                 iCloudPath,
                 available: true
             };
 
         } catch (error) {
+            console.error('iCloud Drive 可用性测试出现异常:', error);
             return {
                 success: false,
-                message: `iCloud Drive 不可用: ${error instanceof Error ? error.message : '未知错误'}`,
+                message: `iCloud Drive 测试异常: ${error instanceof Error ? error.message : '未知错误'}`,
                 available: false
             };
         }

@@ -56,6 +56,16 @@ declare global {
         applyDownloadedData: (resolution: any) => Promise<any>;
         decryptPassword: (encryptedPassword: any) => Promise<string>;
       };
+      icloud: {
+        testAvailability: () => Promise<any>;
+        syncNow: () => Promise<any>;
+        getConfig: () => Promise<any>;
+        setConfig: (config: any) => Promise<void>;
+        manualUpload: () => Promise<any>;
+        manualDownload: () => Promise<any>;
+        compareData: () => Promise<any>;
+        applyDownloadedData: (resolution: any) => Promise<any>;
+      };
       data: {
         createBackup: (description?: string) => Promise<any>;
         getBackupList: () => Promise<any>;
@@ -246,6 +256,27 @@ export class IpcUtils {
             return api.webdav.compareData();
           case 'apply-downloaded-data':
             return api.webdav.applyDownloadedData(data);
+        }
+        break;
+        
+      case 'icloud':
+        switch (method) {
+          case 'test-availability':
+            return api.icloud.testAvailability();
+          case 'sync-now':
+            return api.icloud.syncNow();
+          case 'get-config':
+            return api.icloud.getConfig();
+          case 'set-config':
+            return api.icloud.setConfig(data);
+          case 'manual-upload':
+            return api.icloud.manualUpload();
+          case 'manual-download':
+            return api.icloud.manualDownload();
+          case 'compare-data':
+            return api.icloud.compareData();
+          case 'apply-downloaded-data':
+            return api.icloud.applyDownloadedData(data);
         }
         break;
         

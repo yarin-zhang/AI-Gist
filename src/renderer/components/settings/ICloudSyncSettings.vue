@@ -13,7 +13,17 @@
       <!-- iCloud 状态检查 -->
       <div class="mb-6">
         <NAlert 
-          v-if="iCloudStatus.checked && !iCloudStatus.available"
+          v-if="!iCloudStatus.checked"
+          type="info" 
+          :show-icon="true"
+          class="mb-4"
+        >
+          <template #header>iCloud Drive 状态未检测</template>
+          点击下方"检测可用性"按钮来检查 iCloud Drive 是否可用。
+        </NAlert>
+
+        <NAlert 
+          v-else-if="iCloudStatus.checked && !iCloudStatus.available"
           type="warning" 
           :show-icon="true"
           class="mb-4"
@@ -214,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { 
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
   useMessage, useDialog
@@ -301,7 +311,15 @@ const checkICloudStatus = async () => {
 // 处理配置变更
 const handleConfigChange = async () => {
   try {
-    await ICloudAPI.setConfig(localConfig)
+    // 将 reactive 对象转换为普通对象，避免 IPC 传递时的克隆错误
+    const plainConfig: ICloudConfig = {
+      enabled: localConfig.enabled,
+      autoSync: localConfig.autoSync,
+      syncInterval: localConfig.syncInterval,
+      customPath: localConfig.customPath
+    }
+    
+    await ICloudAPI.setConfig(plainConfig)
     message.success('配置已保存')
     
     // 更新同步状态
@@ -498,16 +516,8 @@ const initializeSettings = async () => {
       console.warn('更新同步状态失败:', statusError)
     }
     
-    // 检查 iCloud 状态
-    try {
-      await checkICloudStatus()
-    } catch (statusError) {
-      console.warn('检查 iCloud 状态失败:', statusError)
-      // 设置默认状态
-      iCloudStatus.checked = true
-      iCloudStatus.available = false
-      iCloudStatus.message = 'iCloud 服务暂不可用，请稍后重试'
-    }
+    // 不再在初始化时检查 iCloud 状态，只有用户手动点击时才检查
+    // 避免在设置页面加载时就触发错误提示
   } catch (error) {
     console.error('初始化 iCloud 设置失败:', error)
     // 不显示错误消息，避免在组件加载时弹出错误
@@ -516,8 +526,14 @@ const initializeSettings = async () => {
 }
 
 // 组件挂载时初始化
-onMounted(() => {
-  initializeSettings()
+onMounted(async () => {
+  // 延迟初始化，确保组件完全挂载
+  await nextTick()
+  try {
+    await initializeSettings()
+  } catch (error) {
+    console.warn('延迟初始化 iCloud 设置失败:', error)
+  }
 })
 </script>
 

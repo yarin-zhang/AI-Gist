@@ -11,10 +11,41 @@ const getElectronAPI = () => {
 
 const safeIpcInvoke = async (channel: string, ...args: any[]) => {
     const electronAPI = getElectronAPI();
-    if (!electronAPI || !electronAPI.ipcInvoke) {
+    if (!electronAPI) {
         throw new Error('Electron API 不可用，请确保应用已正确初始化');
     }
-    return await electronAPI.ipcInvoke(channel, ...args);
+    
+    // 根据 channel 路由到对应的 API
+    const [namespace, method] = channel.split(':');
+    
+    if (namespace === 'icloud') {
+        if (!electronAPI.icloud) {
+            throw new Error('iCloud API 不可用，请确保 preload 脚本已正确加载');
+        }
+        
+        switch (method) {
+            case 'test-availability':
+                return await electronAPI.icloud.testAvailability();
+            case 'sync-now':
+                return await electronAPI.icloud.syncNow();
+            case 'get-config':
+                return await electronAPI.icloud.getConfig();
+            case 'set-config':
+                return await electronAPI.icloud.setConfig(args[0]);
+            case 'manual-upload':
+                return await electronAPI.icloud.manualUpload();
+            case 'manual-download':
+                return await electronAPI.icloud.manualDownload();
+            case 'compare-data':
+                return await electronAPI.icloud.compareData();
+            case 'apply-downloaded-data':
+                return await electronAPI.icloud.applyDownloadedData(args[0]);
+            default:
+                throw new Error(`Unknown iCloud method: ${method}`);
+        }
+    }
+    
+    throw new Error(`Unknown channel: ${channel}`);
 };
 
 export interface ICloudConfig {
