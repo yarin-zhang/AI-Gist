@@ -4,6 +4,7 @@ import {
     NLayout,
     NConfigProvider,
     NMessageProvider,
+    NDialogProvider,
     zhCN,
     dateZhCN
 } from 'naive-ui'
@@ -24,11 +25,13 @@ onMounted(async () => {
 <template>
     <NConfigProvider :theme="naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
         <NMessageProvider>
-            <AppInitializer>
-                <!-- 数据库状态横幅 -->
-                <DatabaseStatusBanner />
-                <MainPage />
-            </AppInitializer>
+            <NDialogProvider>
+                <AppInitializer>
+                    <!-- 数据库状态横幅 -->
+                    <DatabaseStatusBanner />
+                    <MainPage />
+                </AppInitializer>
+            </NDialogProvider>
         </NMessageProvider>
     </NConfigProvider>
 </template>

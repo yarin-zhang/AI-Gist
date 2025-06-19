@@ -305,15 +305,23 @@ const handleConfigChange = async () => {
     message.success('配置已保存')
     
     // 更新同步状态
-    await updateSyncStatus()
+    try {
+      await updateSyncStatus()
+    } catch (statusError) {
+      console.warn('更新同步状态失败:', statusError)
+    }
     
     // 如果启用了自动同步管理器，通知更新
-    if (window.autoSyncManager && window.autoSyncManager.reinitializeFromSettings) {
-      await window.autoSyncManager.reinitializeFromSettings()
+    try {
+      if (window.autoSyncManager && window.autoSyncManager.reinitializeFromSettings) {
+        await window.autoSyncManager.reinitializeFromSettings()
+      }
+    } catch (managerError) {
+      console.warn('通知自动同步管理器失败:', managerError)
     }
   } catch (error) {
     console.error('保存配置失败:', error)
-    message.error('保存配置失败')
+    message.error('保存配置失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
 }
 
@@ -469,17 +477,41 @@ const updateSyncStatus = async () => {
 const initializeSettings = async () => {
   try {
     // 加载配置
-    const config = await ICloudAPI.getConfig()
-    Object.assign(localConfig, config)
+    try {
+      const config = await ICloudAPI.getConfig()
+      Object.assign(localConfig, config)
+    } catch (configError) {
+      console.warn('加载 iCloud 配置失败，使用默认配置:', configError)
+      // 使用默认配置
+      Object.assign(localConfig, {
+        enabled: false,
+        autoSync: false,
+        syncInterval: 30,
+        customPath: undefined
+      })
+    }
     
     // 更新同步状态
-    await updateSyncStatus()
+    try {
+      await updateSyncStatus()
+    } catch (statusError) {
+      console.warn('更新同步状态失败:', statusError)
+    }
     
     // 检查 iCloud 状态
-    await checkICloudStatus()
+    try {
+      await checkICloudStatus()
+    } catch (statusError) {
+      console.warn('检查 iCloud 状态失败:', statusError)
+      // 设置默认状态
+      iCloudStatus.checked = true
+      iCloudStatus.available = false
+      iCloudStatus.message = 'iCloud 服务暂不可用，请稍后重试'
+    }
   } catch (error) {
     console.error('初始化 iCloud 设置失败:', error)
-    message.error('初始化设置失败')
+    // 不显示错误消息，避免在组件加载时弹出错误
+    console.warn('iCloud 同步功能暂不可用')
   }
 }
 

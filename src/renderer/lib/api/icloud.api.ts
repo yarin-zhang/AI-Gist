@@ -3,8 +3,19 @@
  * 渲染进程中的 iCloud 同步接口封装
  */
 
-// @ts-ignore
-const { ipcInvoke } = window.electronAPI || {};
+// 安全获取 electronAPI
+const getElectronAPI = () => {
+    // @ts-ignore
+    return window.electronAPI;
+};
+
+const safeIpcInvoke = async (channel: string, ...args: any[]) => {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI || !electronAPI.ipcInvoke) {
+        throw new Error('Electron API 不可用，请确保应用已正确初始化');
+    }
+    return await electronAPI.ipcInvoke(channel, ...args);
+};
 
 export interface ICloudConfig {
     enabled: boolean;
@@ -73,7 +84,7 @@ export class ICloudAPI {
      */
     static async testAvailability(): Promise<ICloudTestResult> {
         try {
-            return await ipcInvoke('icloud:test-availability');
+            return await safeIpcInvoke('icloud:test-availability');
         } catch (error) {
             console.error('测试 iCloud 可用性失败:', error);
             throw error;
@@ -85,7 +96,7 @@ export class ICloudAPI {
      */
     static async syncNow(): Promise<SyncResult> {
         try {
-            return await ipcInvoke('icloud:sync-now');
+            return await safeIpcInvoke('icloud:sync-now');
         } catch (error) {
             console.error('iCloud 同步失败:', error);
             throw error;
@@ -111,7 +122,7 @@ export class ICloudAPI {
             }
             
             // 执行同步
-            return await ipcInvoke('icloud:sync-now');
+            return await safeIpcInvoke('icloud:sync-now');
         } catch (error) {
             console.error('iCloud 安全同步失败:', error);
             throw error;
@@ -162,7 +173,7 @@ export class ICloudAPI {
      */
     static async setConfig(config: ICloudConfig): Promise<void> {
         try {
-            await ipcInvoke('icloud:set-config', config);
+            await safeIpcInvoke('icloud:set-config', config);
         } catch (error) {
             console.error('设置 iCloud 配置失败:', error);
             throw error;
@@ -174,7 +185,7 @@ export class ICloudAPI {
      */
     static async getConfig(): Promise<ICloudConfig> {
         try {
-            return await ipcInvoke('icloud:get-config');
+            return await safeIpcInvoke('icloud:get-config');
         } catch (error) {
             console.error('获取 iCloud 配置失败:', error);
             throw error;
@@ -186,7 +197,7 @@ export class ICloudAPI {
      */
     static async manualUpload(): Promise<ManualSyncResult> {
         try {
-            return await ipcInvoke('icloud:manual-upload');
+            return await safeIpcInvoke('icloud:manual-upload');
         } catch (error) {
             console.error('手动上传失败:', error);
             throw error;
@@ -198,7 +209,7 @@ export class ICloudAPI {
      */
     static async manualDownload(): Promise<ManualSyncResult> {
         try {
-            return await ipcInvoke('icloud:manual-download');
+            return await safeIpcInvoke('icloud:manual-download');
         } catch (error) {
             console.error('手动下载失败:', error);
             throw error;
@@ -210,7 +221,7 @@ export class ICloudAPI {
      */
     static async applyDownloadedData(resolution: ConflictResolution): Promise<SyncResult> {
         try {
-            return await ipcInvoke('icloud:apply-downloaded-data', resolution);
+            return await safeIpcInvoke('icloud:apply-downloaded-data', resolution);
         } catch (error) {
             console.error('应用下载数据失败:', error);
             throw error;
@@ -235,7 +246,7 @@ export class ICloudAPI {
         message?: string;
     }> {
         try {
-            return await ipcInvoke('icloud:compare-data');
+            return await safeIpcInvoke('icloud:compare-data');
         } catch (error) {
             console.error('比较数据失败:', error);
             throw error;
