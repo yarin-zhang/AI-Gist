@@ -15,7 +15,6 @@
           <NSwitch 
             v-model:value="props.modelValue.webdav.enabled" 
             @update:value="handleEnabledChange"
-            :disabled="!connectionStatus.connected"
           />
         </div>
 
@@ -55,7 +54,7 @@
       <!-- 服务器配置 -->
       <NDivider />
       
-      <div class="space-y-4">
+      <div class="space-y-4" :class="{ 'config-disabled': !props.modelValue.webdav.enabled }">
         <div class="font-medium mb-2">服务器配置</div>
         
         <div class="space-y-3">
@@ -66,6 +65,7 @@
               placeholder="https://example.com/webdav" 
               type="url" 
               @update:value="handleConfigChange"
+              :disabled="!props.modelValue.webdav.enabled"
             >
               <template #prefix>
                 <NIcon>
@@ -81,7 +81,8 @@
               <NInput 
                 v-model:value="props.modelValue.webdav.username" 
                 placeholder="用户名" 
-                @update:value="handleConfigChange" 
+                @update:value="handleConfigChange"
+                :disabled="!props.modelValue.webdav.enabled"
               />
             </div>
             <div>
@@ -90,7 +91,8 @@
                 v-model:value="props.modelValue.webdav.password" 
                 type="password" 
                 placeholder="密码" 
-                @update:value="handleConfigChange" 
+                @update:value="handleConfigChange"
+                :disabled="!props.modelValue.webdav.enabled"
               />
             </div>
           </div>
@@ -99,7 +101,7 @@
       <!-- WebDAV 连接状态检查 -->
       <div class="mb-6">
         <NAlert 
-          v-if="!connectionStatus.checked"
+          v-if="!connectionStatus.checked && props.modelValue.webdav.enabled"
           type="info" 
           :show-icon="true"
           class="mb-4"
@@ -109,7 +111,7 @@
         </NAlert>
 
         <NAlert 
-          v-else-if="connectionStatus.checked && !connectionStatus.connected"
+          v-else-if="connectionStatus.checked && !connectionStatus.connected && props.modelValue.webdav.enabled"
           type="warning" 
           :show-icon="true"
           class="mb-4"
@@ -123,7 +125,7 @@
         </NAlert>
 
         <NAlert 
-          v-else-if="connectionStatus.checked && connectionStatus.connected"
+          v-else-if="connectionStatus.checked && connectionStatus.connected && props.modelValue.webdav.enabled"
           type="success" 
           :show-icon="true"
           class="mb-4"
@@ -132,10 +134,21 @@
           服务器地址: {{ props.modelValue.webdav.serverUrl }}
         </NAlert>
 
+        <NAlert 
+          v-if="!props.modelValue.webdav.enabled"
+          type="default" 
+          :show-icon="true"
+          class="mb-4"
+        >
+          <template #header>WebDAV 同步已禁用</template>
+          请先启用 WebDAV 同步功能，然后配置服务器信息。
+        </NAlert>
+
         <div class="flex gap-2">
           <NButton 
             @click="testConnection" 
             :loading="testingConnection"
+            :disabled="!props.modelValue.webdav.enabled || !props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username"
             type="primary"
             ghost
             size="small"
@@ -447,6 +460,11 @@ const compareData = ref(null);
 
 // 测试连接
 const testConnection = async () => {
+  if (!props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username) {
+    message.warning('请先填写完整的服务器配置信息')
+    return
+  }
+
   testingConnection.value = true
   try {
     emit("test-connection")
@@ -479,6 +497,13 @@ const testConnection = async () => {
 
 // 启用/禁用 WebDAV 同步
 const handleEnabledChange = () => {
+  // 禁用时重置连接状态
+  if (!props.modelValue.webdav.enabled) {
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+  }
+  
   emit("update:modelValue", props.modelValue)
   emit("save-webdav")
   notifyConfigChange()
@@ -805,5 +830,23 @@ const getDataTypeLabel = (type: string) => {
 
 .compare-item:hover {
   background-color: var(--hover-color);
+}
+
+.config-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.config-disabled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  backdrop-filter: blur(1px);
 }
 </style>
