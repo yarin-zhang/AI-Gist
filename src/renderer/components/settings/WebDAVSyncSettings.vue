@@ -2,59 +2,6 @@
   <div class="webdav-sync-settings">
     <NCard :bordered="false">
 
-      <!-- WebDAV 连接状态检查 -->
-      <div class="mb-6">
-        <NAlert 
-          v-if="!connectionStatus.checked"
-          type="info" 
-          :show-icon="true"
-          class="mb-4"
-        >
-          <template #header>WebDAV 服务器状态未检测</template>
-          点击下方"测试连接"按钮来检查 WebDAV 服务器连接状态。
-        </NAlert>
-
-        <NAlert 
-          v-else-if="connectionStatus.checked && !connectionStatus.connected"
-          type="warning" 
-          :show-icon="true"
-          class="mb-4"
-        >
-          <template #header>WebDAV 服务器连接失败</template>
-          {{ connectionStatus.message }}
-          <br>
-          <small class="text-gray-500">
-            请检查服务器地址、用户名和密码是否正确。
-          </small>
-        </NAlert>
-
-        <NAlert 
-          v-else-if="connectionStatus.checked && connectionStatus.connected"
-          type="success" 
-          :show-icon="true"
-          class="mb-4"
-        >
-          <template #header>WebDAV 服务器连接正常</template>
-          服务器地址: {{ props.modelValue.webdav.serverUrl }}
-        </NAlert>
-
-        <div class="flex gap-2">
-          <NButton 
-            @click="testConnection" 
-            :loading="testingConnection"
-            type="primary"
-            ghost
-            size="small"
-          >
-            <template #icon>
-              <NIcon>
-                <CloudStorm />
-              </NIcon>
-            </template>
-            测试连接
-          </NButton>
-        </div>
-      </div>
 
       <!-- 基本设置 -->
       <div class="space-y-4">
@@ -148,7 +95,62 @@
             </div>
           </div>
         </div>
+
+      <!-- WebDAV 连接状态检查 -->
+      <div class="mb-6">
+        <NAlert 
+          v-if="!connectionStatus.checked"
+          type="info" 
+          :show-icon="true"
+          class="mb-4"
+        >
+          <template #header>WebDAV 服务器状态未检测</template>
+          点击下方"测试连接"按钮来检查 WebDAV 服务器连接状态。
+        </NAlert>
+
+        <NAlert 
+          v-else-if="connectionStatus.checked && !connectionStatus.connected"
+          type="warning" 
+          :show-icon="true"
+          class="mb-4"
+        >
+          <template #header>WebDAV 服务器连接失败</template>
+          {{ connectionStatus.message }}
+          <br>
+          <small class="text-gray-500">
+            请检查服务器地址、用户名和密码是否正确。
+          </small>
+        </NAlert>
+
+        <NAlert 
+          v-else-if="connectionStatus.checked && connectionStatus.connected"
+          type="success" 
+          :show-icon="true"
+          class="mb-4"
+        >
+          <template #header>WebDAV 服务器连接正常</template>
+          服务器地址: {{ props.modelValue.webdav.serverUrl }}
+        </NAlert>
+
+        <div class="flex gap-2">
+          <NButton 
+            @click="testConnection" 
+            :loading="testingConnection"
+            type="primary"
+            ghost
+            size="small"
+          >
+            <template #icon>
+              <NIcon>
+                <CloudStorm />
+              </NIcon>
+            </template>
+            测试连接
+          </NButton>
+        </div>
       </div>
+      </div>
+
 
       <!-- 同步操作 -->
       <NDivider />
