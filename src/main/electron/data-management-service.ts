@@ -323,8 +323,7 @@ export class DataManagementService {
                 ],
             });
 
-            return result.canceled ? null : result.filePath;
-        });        // 获取数据统计
+            return result.canceled ? null : result.filePath;        });        // 获取数据统计
         ipcMain.handle('data:get-stats', async () => {
             try {
                 // 通过 executeJavaScript 调用渲染进程暴露的方法
@@ -350,11 +349,24 @@ export class DataManagementService {
                     })()
                 `);
                 
+                console.log('数据统计结果:', result);
+                
                 if (!result.success) {
                     throw new Error(`获取数据统计失败: ${result.error}`);
                 }
                 
-                return result.stats;
+                // 返回统计数据，确保包含所有必需字段
+                const stats = result.stats || {};
+                return {
+                    categories: stats.categories || 0,
+                    prompts: stats.prompts || 0,
+                    history: stats.history || 0,
+                    aiConfigs: stats.aiConfigs || 0,
+                    settings: stats.settings || 0,
+                    posts: 0, // 暂时没有这个数据
+                    users: 0, // 暂时没有这个数据
+                    totalRecords: stats.totalRecords || 0
+                };
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`获取数据统计失败: ${errorMessage}`);

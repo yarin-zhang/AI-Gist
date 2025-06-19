@@ -162,18 +162,38 @@ export class WebDAVService {
      * 初始化服务
      */
     async initialize(): Promise<void> {
+        console.log('[WebDAV] 开始初始化服务...');
         try {
+            console.log('[WebDAV] 正在加载配置...');
             this.config = await this.loadConfig();
+            console.log('[WebDAV] 配置加载结果:', {
+                hasConfig: !!this.config,
+                enabled: this.config?.enabled,
+                serverUrl: this.config?.serverUrl,
+                username: this.config?.username,
+                hasPassword: !!this.config?.password,
+                autoSync: this.config?.autoSync,
+                syncInterval: this.config?.syncInterval
+            });
+            
+            console.log('[WebDAV] 正在设置IPC处理程序...');
             this.setupIpcHandlers();
+            console.log('[WebDAV] IPC处理程序设置完成');
             
             if (this.config?.enabled && this.config.autoSync) {
+                console.log('[WebDAV] 启动自动同步...');
                 this.startAutoSync();
+            } else {
+                console.log('[WebDAV] 自动同步未启用:', {
+                    enabled: this.config?.enabled,
+                    autoSync: this.config?.autoSync
+                });
             }
 
             this.isInitialized = true;
-            console.log('WebDAVService 初始化完成');
+            console.log('[WebDAV] 服务初始化完成 ✓');
         } catch (error) {
-            console.error('WebDAVService 初始化失败:', error);
+            console.error('[WebDAV] 服务初始化失败:', error);
             throw error;
         }
     }
@@ -224,11 +244,27 @@ export class WebDAVService {
      * 加载配置
      */
     private async loadConfig(): Promise<WebDAVConfig | null> {
+        console.log('[WebDAV] loadConfig() - 开始加载配置');
         try {
+            console.log('[WebDAV] loadConfig() - 获取用户偏好设置...');
             const prefs = this.preferencesManager.getPreferences();
-            return prefs.webdav || null;
+            console.log('[WebDAV] loadConfig() - 用户偏好设置获取成功，检查webdav配置...');
+            
+            const webdavConfig = prefs.webdav || null;
+            console.log('[WebDAV] loadConfig() - WebDAV配置:', {
+                exists: !!webdavConfig,
+                enabled: webdavConfig?.enabled,
+                serverUrl: webdavConfig?.serverUrl,
+                username: webdavConfig?.username,
+                hasPassword: !!webdavConfig?.password,
+                autoSync: webdavConfig?.autoSync,
+                syncInterval: webdavConfig?.syncInterval,
+                rawConfig: webdavConfig
+            });
+            
+            return webdavConfig;
         } catch (error) {
-            console.error('加载WebDAV配置失败:', error);
+            console.error('[WebDAV] loadConfig() - 加载WebDAV配置失败:', error);
             return null;
         }
     }
@@ -237,20 +273,36 @@ export class WebDAVService {
      * 创建WebDAV客户端
      */
     private async createClient(config?: WebDAVConfig): Promise<any> {
+        console.log('[WebDAV] createClient() - 开始创建WebDAV客户端');
         const clientConfig = config || this.config;
         
+        console.log('[WebDAV] createClient() - 使用的配置:', {
+            hasConfig: !!clientConfig,
+            serverUrl: clientConfig?.serverUrl,
+            username: clientConfig?.username,
+            hasPassword: !!clientConfig?.password,
+            source: config ? 'parameter' : 'instance'
+        });
+        
         if (!clientConfig) {
+            console.error('[WebDAV] createClient() - 配置为空，抛出错误');
             throw new Error('WebDAV 配置未加载');
         }
 
         try {
+            console.log('[WebDAV] createClient() - 获取WebDAV客户端创建函数...');
             const createWebDAVClient = await getWebDAVCreateClient();
-            return createWebDAVClient(clientConfig.serverUrl, {
+            console.log('[WebDAV] createClient() - WebDAV模块加载成功，创建客户端...');
+            
+            const client = createWebDAVClient(clientConfig.serverUrl, {
                 username: clientConfig.username,
                 password: clientConfig.password
             });
+            
+            console.log('[WebDAV] createClient() - WebDAV客户端创建成功 ✓');
+            return client;
         } catch (error) {
-            console.error('创建 WebDAV 客户端失败:', error);
+            console.error('[WebDAV] createClient() - 创建WebDAV客户端失败:', error);
             throw new Error(`WebDAV 客户端创建失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
     }
@@ -259,12 +311,26 @@ export class WebDAVService {
      * 获取本地数据快照
      */
     private async getLocalSnapshot(): Promise<SyncSnapshot> {
+        console.log('[WebDAV] 开始获取本地数据快照...');
+        
         try {
             // 从数据库获取所有数据
+            console.log('[WebDAV] 正在导出本地数据...');
             const localData = await this.exportLocalData();
+            console.log('[WebDAV] 本地数据导出完成:', {
+                hasData: !!localData,
+                dataType: typeof localData,
+                categories: localData?.categories?.length || 0,
+                prompts: localData?.prompts?.length || 0,
+                aiConfigs: localData?.aiConfigs?.length || 0,
+                settings: localData?.settings?.length || 0,
+                exportTime: localData?.exportTime
+            });
             
             // 转换为现代化数据结构
+            console.log('[WebDAV] 正在转换为现代化数据结构...');
             const items = await this.convertToModernFormat(localData);
+            console.log('[WebDAV] 数据结构转换完成，共生成', items.length, '个数据项');
             
             const metadata: SnapshotMetadata = {
                 totalItems: items.length,
@@ -278,16 +344,39 @@ export class WebDAVService {
                     appVersion: app.getVersion() || '1.0.0'
                 }
             };
+            
+            console.log('[WebDAV] 快照元数据创建完成:', {
+                totalItems: metadata.totalItems,
+                checksumLength: metadata.checksum.length,
+                syncId: metadata.syncId,
+                deviceId: metadata.deviceInfo.id,
+                platform: metadata.deviceInfo.platform,
+                appVersion: metadata.deviceInfo.appVersion
+            });
 
-            return {
+            const snapshot: SyncSnapshot = {
                 timestamp: new Date().toISOString(),
                 version: '2.0.0',
                 deviceId: this.deviceId,
                 items,
                 metadata
             };
+            
+            console.log('[WebDAV] 本地快照创建成功:', {
+                timestamp: snapshot.timestamp,
+                version: snapshot.version,
+                deviceId: snapshot.deviceId,
+                itemsCount: snapshot.items.length,
+                metadataTotalItems: snapshot.metadata.totalItems
+            });
+
+            return snapshot;
         } catch (error) {
-            console.error('获取本地快照失败:', error);
+            console.error('[WebDAV] 获取本地快照失败:', error);
+            console.error('[WebDAV] 错误详情:', {
+                message: error instanceof Error ? error.message : '未知错误',
+                stack: error instanceof Error ? error.stack : undefined
+            });
             throw error;
         }
     }
@@ -296,12 +385,40 @@ export class WebDAVService {
      * 将传统数据格式转换为现代格式
      */
     private async convertToModernFormat(legacyData: any): Promise<DataItem[]> {
+        console.log('[WebDAV] 开始转换传统数据格式为现代格式...');
+        console.log('[WebDAV] 输入数据详情:', {
+            hasData: !!legacyData,
+            dataType: typeof legacyData,
+            isArray: Array.isArray(legacyData),
+            keys: legacyData ? Object.keys(legacyData) : [],
+            categories: legacyData?.categories ? {
+                isArray: Array.isArray(legacyData.categories),
+                length: legacyData.categories.length || 0
+            } : null,
+            prompts: legacyData?.prompts ? {
+                isArray: Array.isArray(legacyData.prompts),
+                length: legacyData.prompts.length || 0
+            } : null,
+            aiConfigs: legacyData?.aiConfigs ? {
+                isArray: Array.isArray(legacyData.aiConfigs),
+                length: legacyData.aiConfigs.length || 0
+            } : null
+        });
+        
         const items: DataItem[] = [];
         const now = new Date().toISOString();
 
         // 转换分类
-        if (legacyData.categories) {
+        if (legacyData.categories && Array.isArray(legacyData.categories)) {
+            console.log('[WebDAV] 转换分类数据，共', legacyData.categories.length, '个分类');
             for (const category of legacyData.categories) {
+                console.log('[WebDAV] 转换分类:', {
+                    id: category.id,
+                    name: category.name || category.title,
+                    hasId: !!category.id,
+                    hasName: !!(category.name || category.title)
+                });
+                
                 const item: DataItem = {
                     id: category.id || uuidv4(),
                     type: 'category',
@@ -319,11 +436,22 @@ export class WebDAVService {
                 };
                 items.push(item);
             }
+            console.log('[WebDAV] 分类转换完成，生成', items.length, '个分类项');
+        } else {
+            console.log('[WebDAV] 无分类数据或分类数据格式错误');
         }
 
         // 转换提示词
-        if (legacyData.prompts) {
+        if (legacyData.prompts && Array.isArray(legacyData.prompts)) {
+            console.log('[WebDAV] 转换提示词数据，共', legacyData.prompts.length, '个提示词');
             for (const prompt of legacyData.prompts) {
+                console.log('[WebDAV] 转换提示词:', {
+                    id: prompt.id,
+                    title: prompt.title,
+                    hasId: !!prompt.id,
+                    hasTitle: !!prompt.title
+                });
+                
                 const item: DataItem = {
                     id: prompt.id || uuidv4(),
                     type: 'prompt',
@@ -342,11 +470,22 @@ export class WebDAVService {
                 };
                 items.push(item);
             }
+            console.log('[WebDAV] 提示词转换完成，总计', items.length, '个项目');
+        } else {
+            console.log('[WebDAV] 无提示词数据或提示词数据格式错误');
         }
 
         // 转换AI配置
-        if (legacyData.aiConfigs) {
+        if (legacyData.aiConfigs && Array.isArray(legacyData.aiConfigs)) {
+            console.log('[WebDAV] 转换AI配置数据，共', legacyData.aiConfigs.length, '个配置');
             for (const config of legacyData.aiConfigs) {
+                console.log('[WebDAV] 转换AI配置:', {
+                    id: config.id,
+                    name: config.name || config.title,
+                    hasId: !!config.id,
+                    hasName: !!(config.name || config.title)
+                });
+                
                 const item: DataItem = {
                     id: config.id || uuidv4(),
                     type: 'aiConfig',
@@ -364,11 +503,15 @@ export class WebDAVService {
                 };
                 items.push(item);
             }
+            console.log('[WebDAV] AI配置转换完成，总计', items.length, '个项目');
+        } else {
+            console.log('[WebDAV] 无AI配置数据或AI配置数据格式错误');
         }
 
         // 转换其他数据类型...
         this.convertOtherDataTypes(legacyData, items, now);
 
+        console.log('[WebDAV] 数据格式转换完成，最终生成', items.length, '个数据项');
         return items;
     }
 
@@ -455,38 +598,65 @@ export class WebDAVService {
      * 执行智能同步
      */
     async performIntelligentSync(config?: WebDAVConfig): Promise<SyncResult> {
+        console.log('[WebDAV] performIntelligentSync() - 开始执行智能同步');
+        console.log('[WebDAV] performIntelligentSync() - 参数:', {
+            hasConfigParam: !!config,
+            syncInProgress: this.syncInProgress
+        });
+        
         if (this.syncInProgress) {
+            console.warn('[WebDAV] performIntelligentSync() - 同步正在进行中，退出');
             throw new Error('同步正在进行中');
         }
 
         this.syncInProgress = true;
-        console.log('开始智能同步...');
+        console.log('[WebDAV] performIntelligentSync() - 设置同步进行中标志');
 
         try {
             const syncConfig = config || this.config;
+            console.log('[WebDAV] performIntelligentSync() - 使用的同步配置:', {
+                hasConfig: !!syncConfig,
+                enabled: syncConfig?.enabled,
+                serverUrl: syncConfig?.serverUrl,
+                username: syncConfig?.username,
+                hasPassword: !!syncConfig?.password
+            });
+            
             if (!syncConfig) {
+                console.error('[WebDAV] performIntelligentSync() - 同步配置为空');
                 throw new Error('WebDAV 配置未加载');
             }
 
+            console.log('[WebDAV] performIntelligentSync() - 创建WebDAV客户端...');
             const client = await this.createClient(syncConfig);
+            console.log('[WebDAV] performIntelligentSync() - 客户端创建成功');
+
+            console.log('[WebDAV] performIntelligentSync() - 获取本地数据快照...');
             const localSnapshot = await this.getLocalSnapshot();
+            console.log('[WebDAV] performIntelligentSync() - 本地快照获取成功，项目数量:', localSnapshot.items.length);
+
+            console.log('[WebDAV] performIntelligentSync() - 获取远程数据快照...');
             const remoteSnapshot = await this.getRemoteSnapshot(client);
+            console.log('[WebDAV] performIntelligentSync() - 远程快照获取结果:', {
+                hasRemoteSnapshot: !!remoteSnapshot,
+                remoteItemsCount: remoteSnapshot?.items?.length || 0
+            });
 
             let result: SyncResult;
 
             if (!remoteSnapshot) {
-                // 首次同步，直接上传
+                console.log('[WebDAV] performIntelligentSync() - 远程无数据，执行初始上传');
                 result = await this.performInitialUpload(client, localSnapshot);
             } else {
-                // 执行智能合并
+                console.log('[WebDAV] performIntelligentSync() - 远程有数据，执行智能合并');
                 result = await this.performIntelligentMerge(client, localSnapshot, remoteSnapshot);
             }
 
-            console.log('智能同步完成:', result);
+            console.log('[WebDAV] performIntelligentSync() - 智能同步完成 ✓:', result);
             return result;
 
         } catch (error) {
-            console.error('智能同步失败:', error);
+            console.error('[WebDAV] performIntelligentSync() - 智能同步失败:', error);
             return {
                 success: false,
                 message: error instanceof Error ? error.message : '同步失败',
@@ -501,6 +671,7 @@ export class WebDAVService {
             };
         } finally {
             this.syncInProgress = false;
+            console.log('[WebDAV] performIntelligentSync() - 清除同步进行中标志');
         }
     }
 
@@ -1053,23 +1224,64 @@ export class WebDAVService {
      * 导出本地数据
      */
     private async exportLocalData(): Promise<any> {
+        console.log('[WebDAV] 开始导出本地数据...');
+        
         if (this.dataManagementService) {
             try {
-                // 使用数据管理服务导出数据
+                console.log('[WebDAV] 调用数据管理服务的 generateExportData 方法...');
                 const exportResult = await this.dataManagementService.generateExportData();
-                return exportResult?.data || {
-                    categories: [],
-                    prompts: [],
-                    aiConfigs: [],
-                    settings: [],
-                    exportTime: new Date().toISOString()
-                };
+                console.log('[WebDAV] 数据管理服务返回结果:', {
+                    hasResult: !!exportResult,
+                    hasData: !!exportResult?.data,
+                    resultType: typeof exportResult,
+                    dataType: typeof exportResult?.data,
+                    resultKeys: exportResult ? Object.keys(exportResult) : [],
+                    dataKeys: exportResult?.data ? Object.keys(exportResult.data) : []
+                });
+                
+                if (exportResult?.data) {
+                    const data = exportResult.data;
+                    console.log('[WebDAV] 成功获取数据管理服务数据:', {
+                        categories: data.categories?.length || 0,
+                        prompts: data.prompts?.length || 0,
+                        aiConfigs: data.aiConfigs?.length || 0,
+                        settings: data.settings?.length || 0,
+                        exportTime: data.exportTime
+                    });
+                    return data;
+                } else if (exportResult) {
+                    // 可能直接返回了数据，没有包装在 data 属性中
+                    console.log('[WebDAV] 数据管理服务直接返回数据（无 data 包装）:', {
+                        categories: exportResult.categories?.length || 0,
+                        prompts: exportResult.prompts?.length || 0,
+                        aiConfigs: exportResult.aiConfigs?.length || 0,
+                        settings: exportResult.settings?.length || 0,
+                        exportTime: exportResult.exportTime
+                    });
+                    return exportResult;
+                } else {
+                    console.warn('[WebDAV] 数据管理服务返回空结果，使用占位符数据');
+                    return {
+                        categories: [],
+                        prompts: [],
+                        aiConfigs: [],
+                        settings: [],
+                        exportTime: new Date().toISOString()
+                    };
+                }
             } catch (error) {
-                console.error('从数据管理服务导出数据失败:', error);
+                console.error('[WebDAV] 从数据管理服务导出数据失败:', error);
+                console.error('[WebDAV] 错误详情:', {
+                    message: error instanceof Error ? error.message : '未知错误',
+                    stack: error instanceof Error ? error.stack : undefined
+                });
             }
+        } else {
+            console.warn('[WebDAV] 数据管理服务未初始化');
         }
         
         // 降级到占位符数据
+        console.log('[WebDAV] 使用占位符数据作为降级方案');
         return {
             categories: [],
             prompts: [],
