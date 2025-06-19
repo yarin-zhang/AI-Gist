@@ -374,6 +374,8 @@ const handleEnabledChange = () => {
     emit("update:modelValue", props.modelValue);
     // 立即保存配置
     emit("save-webdav");
+    // 通知配置变更
+    notifyConfigChange();
 };
 
 // 配置变更
@@ -381,6 +383,8 @@ const handleConfigChange = () => {
     emit("update:modelValue", props.modelValue);
     // 立即保存配置
     emit("save-webdav");
+    // 通知配置变更
+    notifyConfigChange();
 };
 
 // 自动同步开关变更
@@ -399,6 +403,15 @@ const handleAutoSyncChange = async () => {
             console.error('更新自动同步管理器配置失败:', error);
         }
     }, 500);
+    
+    // 通知配置变更
+    notifyConfigChange();
+};
+
+// 通知配置变更（用于状态栏等组件重新加载配置）
+const notifyConfigChange = () => {
+    // 发送自定义事件，其他组件可以监听此事件来更新配置
+    window.dispatchEvent(new CustomEvent('webdav-config-changed'));
 };
 
 // 保存设置

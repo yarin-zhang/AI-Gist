@@ -136,6 +136,19 @@ class AutoSyncManager {
   }
 
   /**
+   * 强制执行同步（忽略自动同步状态，用于手动同步）
+   */
+  forceTriggerSync(reason = '手动强制同步') {
+    // 清除防抖定时器
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+
+    this.performSync(reason);
+  }
+
+  /**
    * 执行实际的同步操作
    */
   private async performSync(reason: string) {

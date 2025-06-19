@@ -25,7 +25,7 @@
         
         <!-- 手动同步按钮 -->
         <NButton 
-          v-if="webdavConfig.enabled" 
+          v-if="webdavConfig.serverUrl && webdavConfig.serverUrl.trim() !== ''" 
           size="tiny" 
           text 
           @click="triggerManualSync"
@@ -150,25 +150,39 @@ const statusIconColor = computed(() => {
 });
 
 const statusText = computed(() => {
+  // 检查是否配置了基本的 WebDAV 信息
+  const isConfigured = webdavConfig.value.serverUrl && 
+                      webdavConfig.value.serverUrl.trim() !== '';
+  
+  if (!isConfigured) {
+    return 'WebDAV 未配置';
+  }
+  
   if (!webdavConfig.value.enabled) {
     return 'WebDAV 同步已关闭';
   }
+  
   if (isSyncing.value) {
     return '正在同步...';
   }
+  
   if (lastSyncError.value) {
     return '同步失败';
   }
+  
   if (!isOnline.value) {
     return '网络离线';
   }
+  
   if (syncStatus.value.pendingSyncCount > 0) {
     return `待同步 ${syncStatus.value.pendingSyncCount} 项`;
   }
+  
   if (lastSyncTime.value) {
     return '同步正常';
   }
-  return 'WebDAV 同步已启用';
+  
+  return 'WebDAV 已配置';
 });
 
 // 方法
@@ -197,7 +211,8 @@ const formatSyncTime = (timeStr: string | null) => {
 const triggerManualSync = async () => {
   try {
     message.info('开始手动同步...');
-    autoSyncManager.triggerAutoSync('手动触发');
+    // 使用强制同步，不检查自动同步是否启用
+    autoSyncManager.forceTriggerSync('手动触发');
   } catch (error) {
     console.error('手动同步失败:', error);
     message.error('手动同步失败');
@@ -227,12 +242,30 @@ const loadWebDAVConfig = async () => {
         lastSyncErrorTime: null
       };
       
-      console.log('WebDAV 状态栏配置已加载:', webdavConfig.value);
+      console.log('WebDAV 状态栏配置已加载:', {
+        enabled: webdavConfig.value.enabled,
+        hasServerUrl: !!webdavConfig.value.serverUrl,
+        lastSyncTime: webdavConfig.value.lastSyncTime
+      });
     } else {
       console.log('未找到 WebDAV 配置');
+      webdavConfig.value = {
+        enabled: false,
+        serverUrl: '',
+        lastSyncTime: null,
+        lastSyncError: null,
+        lastSyncErrorTime: null
+      };
     }
   } catch (error) {
     console.error('加载 WebDAV 配置失败:', error);
+    webdavConfig.value = {
+      enabled: false,
+      serverUrl: '',
+      lastSyncTime: null,
+      lastSyncError: null,
+      lastSyncErrorTime: null
+    };
   }
 };
 
@@ -255,13 +288,21 @@ onMounted(async () => {
     syncStatus.value.isOnline = false;
   };
   
+  // 监听 WebDAV 配置变更
+  const handleConfigChange = async () => {
+    console.log('WebDAV 配置已变更，重新加载...');
+    await loadWebDAVConfig();
+  };
+  
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
+  window.addEventListener('webdav-config-changed', handleConfigChange);
   
   // 清理函数
   onUnmounted(() => {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
+    window.removeEventListener('webdav-config-changed', handleConfigChange);
   });
 });
 
