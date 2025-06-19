@@ -6,7 +6,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { WebDAVService } from '../../src/main/electron/webdav-service'
 import { ICloudService } from '../../src/main/electron/icloud-service'
-import { testDataGenerators, asyncTestHelpers, mockElectron } from '../helpers/test-utils'
+import { testDataGenerators, async      const { ipcMain } = await import('electron')
+      const handler = vi.mocked(ipcMain.handle).mock.calls.find(call => call[0] === 'webdav:sync-now')[1]stHelpers } from '../helpers/test-utils'
 
 // Mock 依赖
 vi.mock('webdav', () => ({
@@ -19,7 +20,20 @@ vi.mock('webdav', () => ({
   }))
 }))
 
-vi.mock('electron', () => mockElectron)
+vi.mock('electron', () => ({
+  ipcMain: {
+    handle: vi.fn(),
+    removeHandler: vi.fn(),
+    removeAllListeners: vi.fn()
+  },
+  app: {
+    getPath: vi.fn(() => '/mock/path'),
+    getName: vi.fn(() => 'mock-app')
+  },
+  shell: {
+    openPath: vi.fn()
+  }
+}))
 vi.mock('fs', () => ({
   promises: {
     stat: vi.fn(),
@@ -87,16 +101,15 @@ describe('同步服务集成测试', () => {
     const { createClient } = await import('webdav')
     vi.mocked(createClient).mockReturnValue(mockWebDAVClient)
     
-    // 初始化服务
-    webdavService = new WebDAVService(mockPreferencesManager, mockDataManagementService)
-    icloudService = new ICloudService(mockPreferencesManager, mockDataManagementService)
-    mockFs.promises.stat.mockResolvedValue({ isDirectory: () => true })
-    mockFs.promises.readdir.mockResolvedValue([])
-    mockFs.promises.mkdir.mockResolvedValue(undefined)
-    mockFs.promises.writeFile.mockResolvedValue(undefined)
-    mockFs.promises.readFile.mockResolvedValue('{}')
-    mockFs.promises.access.mockResolvedValue(undefined)
-    mockFs.existsSync.mockReturnValue(true)
+    // 设置文件系统 mock
+    const mockFs = await import('fs')
+    vi.mocked(mockFs.promises.stat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockFs.promises.readdir).mockResolvedValue([])
+    vi.mocked(mockFs.promises.mkdir).mockResolvedValue(undefined)
+    vi.mocked(mockFs.promises.writeFile).mockResolvedValue(undefined)
+    vi.mocked(mockFs.promises.readFile).mockResolvedValue('{}')
+    vi.mocked(mockFs.promises.access).mockResolvedValue(undefined)
+    vi.mocked(mockFs.existsSync).mockReturnValue(true)
     
     // 初始化服务
     webdavService = new WebDAVService(mockPreferencesManager, mockDataManagementService)

@@ -10,7 +10,8 @@ import { testDataGenerators, asyncTestHelpers } from '../../helpers/test-utils'
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
-    removeHandler: vi.fn()
+    removeHandler: vi.fn(),
+    removeAllListeners: vi.fn()
   },
   app: {
     getPath: vi.fn(() => '/mock/path'),
@@ -76,17 +77,15 @@ describe('iCloud 同步服务', () => {
     // 动态导入服务类
     const { ICloudService } = await import('../../../src/main/electron/icloud-service')
     
-    // 初始化服务
-    icloudService = new ICloudService(mockPreferencesManager, mockDataManagementService)
-    
     // 设置默认的 fs 模拟行为
+    const mockFs = await import('fs')
     vi.mocked(mockFs.promises.stat).mockResolvedValue({ isDirectory: () => true } as any)
-    mockFs.promises.readdir.mockResolvedValue([])
-    mockFs.promises.mkdir.mockResolvedValue(undefined)
-    mockFs.promises.writeFile.mockResolvedValue(undefined)
-    mockFs.promises.readFile.mockResolvedValue('{}')
-    mockFs.promises.access.mockResolvedValue(undefined)
-    mockFs.existsSync.mockReturnValue(true)
+    vi.mocked(mockFs.promises.readdir).mockResolvedValue([])
+    vi.mocked(mockFs.promises.mkdir).mockResolvedValue(undefined)
+    vi.mocked(mockFs.promises.writeFile).mockResolvedValue(undefined)
+    vi.mocked(mockFs.promises.readFile).mockResolvedValue('{}')
+    vi.mocked(mockFs.promises.access).mockResolvedValue(undefined)
+    vi.mocked(mockFs.existsSync).mockReturnValue(true)
     
     // 初始化服务
     icloudService = new ICloudService(mockPreferencesManager, mockDataManagementService)
