@@ -90,7 +90,7 @@ interface WebDAVConfig {
  * 现代化 WebDAV 同步服务
  * 基于 UUID 的可靠数据同步
  */
-export class ModernWebDAVService {
+export class WebDAVService {
     private client: any = null;
     private config: WebDAVConfig | null = null;
     private deviceId: string;
@@ -98,11 +98,13 @@ export class ModernWebDAVService {
     private syncInProgress = false;
     private autoSyncTimer: NodeJS.Timeout | null = null;
     private preferencesManager: any;
+    private dataManagementService: any;
 
-    constructor(preferencesManager: any) {
+    constructor(preferencesManager: any, dataManagementService?: any) {
         this.preferencesManager = preferencesManager;
+        this.dataManagementService = dataManagementService;
         this.deviceId = this.generateDeviceId();
-        console.log(`ModernWebDAVService initialized with device ID: ${this.deviceId}`);
+        console.log(`WebDAVService initialized with device ID: ${this.deviceId}`);
     }
 
     /**
@@ -124,9 +126,9 @@ export class ModernWebDAVService {
             }
 
             this.isInitialized = true;
-            console.log('ModernWebDAVService 初始化完成');
+            console.log('WebDAVService 初始化完成');
         } catch (error) {
-            console.error('ModernWebDAVService 初始化失败:', error);
+            console.error('WebDAVService 初始化失败:', error);
             throw error;
         }
     }
@@ -228,7 +230,9 @@ export class ModernWebDAVService {
                 conflictsResolved: [],
                 deviceInfo: {
                     id: this.deviceId,
-                    platform: process.platform
+                    name: require('os').hostname(),
+                    platform: process.platform,
+                    appVersion: app.getVersion() || '1.0.0'
                 }
             };
 
@@ -642,7 +646,9 @@ export class ModernWebDAVService {
                 conflictsResolved,
                 deviceInfo: {
                     id: this.deviceId,
-                    platform: process.platform
+                    name: require('os').hostname(),
+                    platform: process.platform,
+                    appVersion: app.getVersion() || '1.0.0'
                 }
             }
         };
@@ -959,18 +965,32 @@ export class ModernWebDAVService {
      * 应用特定类型的变更
      */
     private async applyTypeChanges(type: string, items: DataItem[]): Promise<void> {
-        // 这里需要根据实际的数据库操作来实现
-        // 暂时使用占位符实现
         console.log(`应用 ${type} 类型的 ${items.length} 个变更`);
         
-        for (const item of items) {
-            if (item.metadata.deleted) {
-                console.log(`删除 ${type}: ${item.id}`);
-                // await this.deleteItemFromDatabase(type, item.id);
-            } else {
-                console.log(`更新/创建 ${type}: ${item.id}`);
-                // await this.saveItemToDatabase(type, item);
-            }
+        if (!this.dataManagementService) {
+            console.warn('数据管理服务未初始化，跳过变更应用');
+            return;
+        }
+        
+        try {
+            // 将变更转换为数据管理服务可以处理的格式
+            const changesToApply = items.map(item => ({
+                ...item.content,
+                id: item.id,
+                deleted: item.metadata.deleted,
+                updatedAt: item.metadata.updatedAt,
+                createdAt: item.metadata.createdAt
+            }));
+            
+            // 使用数据管理服务导入变更
+            await this.dataManagementService.importDataObject({
+                [type + 's']: changesToApply // 转换为复数形式
+            });
+            
+            console.log(`${type} 类型变更应用完成`);
+        } catch (error) {
+            console.error(`应用 ${type} 类型变更失败:`, error);
+            throw error;
         }
     }
 
@@ -990,8 +1010,23 @@ export class ModernWebDAVService {
      * 导出本地数据
      */
     private async exportLocalData(): Promise<any> {
-        // 这里需要实现实际的数据导出逻辑
-        // 暂时返回占位符数据
+        if (this.dataManagementService) {
+            try {
+                // 使用数据管理服务导出数据
+                const exportResult = await this.dataManagementService.generateExportData();
+                return exportResult?.data || {
+                    categories: [],
+                    prompts: [],
+                    aiConfigs: [],
+                    settings: [],
+                    exportTime: new Date().toISOString()
+                };
+            } catch (error) {
+                console.error('从数据管理服务导出数据失败:', error);
+            }
+        }
+        
+        // 降级到占位符数据
         return {
             categories: [],
             prompts: [],
@@ -1386,6 +1421,3 @@ export class ModernWebDAVService {
         console.log('现代化 WebDAV 服务清理完成');
     }
 }
-
-// 导出服务实例
-export { ModernWebDAVService };
