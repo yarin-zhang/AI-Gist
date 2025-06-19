@@ -552,11 +552,13 @@ const ensureWebdavConfigSaved = async () => {
 };
 
 // 测试 WebDAV 连接
-const testWebDAVConnection = async () => {
+const testWebDAVConnection = async (callback) => {
     // 简单验证
     if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
-        message.error("请填写完整的服务器信息");
-        return;
+        const errorResult = { success: false, message: "请填写完整的服务器信息" };
+        message.error(errorResult.message);
+        if (callback) callback(errorResult);
+        return errorResult;
     }
 
     loading.webdavTest = true;
@@ -572,11 +574,21 @@ const testWebDAVConnection = async () => {
         } else {
             message.error(result.message || "WebDAV 连接测试失败");
         }
+        
+        if (callback) callback(result);
+        return result;
     } catch (error) {
         console.error("WebDAV 连接测试失败:", error);
-        message.error("WebDAV 连接测试失败");
+        const errorResult = { 
+            success: false, 
+            message: error instanceof Error ? error.message : "WebDAV 连接测试失败" 
+        };
+        message.error(errorResult.message);
+        if (callback) callback(errorResult);
+        return errorResult;
+    } finally {
+        loading.webdavTest = false;
     }
-    loading.webdavTest = false;
 };
 
 // 立即同步

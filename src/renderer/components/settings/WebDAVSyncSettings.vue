@@ -494,36 +494,40 @@ const compareData = ref(null);
 
 // 测试连接
 const testConnection = async () => {
-  if (!props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username) {
+  if (!props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username || !props.modelValue.webdav.password) {
     message.warning('请先填写完整的服务器配置信息')
     return
   }
 
   testingConnection.value = true
+  connectionStatus.checked = false
+  connectionStatus.connected = false
+  connectionStatus.message = ''
+
   try {
-    emit("test-connection")
+    // 调用父组件的测试连接方法
+    const result = await new Promise((resolve) => {
+      // 发出事件并等待父组件处理
+      emit("test-connection", resolve)
+    })
     
-    // 模拟测试连接结果，实际应该从 emit 的回调中获取结果
-    // 这里需要与实际的测试连接逻辑配合
-    setTimeout(() => {
-      connectionStatus.checked = true
-      // 这里应该根据实际测试结果设置 connected 状态
-      // 暂时假设连接成功
+    connectionStatus.checked = true
+    
+    if (result && result.success) {
       connectionStatus.connected = true
-      connectionStatus.message = '连接成功'
-      
-      if (connectionStatus.connected) {
-        message.success('WebDAV 服务器连接正常')
-      } else {
-        message.warning('WebDAV 服务器连接失败')
-      }
-    }, 1000)
+      connectionStatus.message = result.message || '连接成功'
+      message.success('WebDAV 服务器连接正常')
+    } else {
+      connectionStatus.connected = false
+      connectionStatus.message = result?.message || '连接失败'
+      message.error(`WebDAV 服务器连接失败: ${connectionStatus.message}`)
+    }
   } catch (error) {
     console.error('测试连接失败:', error)
     connectionStatus.checked = true
     connectionStatus.connected = false
-    connectionStatus.message = '测试连接失败'
-    message.error('测试连接失败')
+    connectionStatus.message = error instanceof Error ? error.message : '测试连接失败'
+    message.error(`测试连接失败: ${connectionStatus.message}`)
   } finally {
     testingConnection.value = false
   }

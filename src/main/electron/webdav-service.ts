@@ -7,9 +7,60 @@ import { ipcMain, app } from 'electron';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import { v4 as uuidv4 } from 'uuid';
 
-// 使用动态导入来避免 ES 模块问题
-let createWebDAVClient: any = null;
+// WebDAV 客户端缓存
+let webdavCreateClient: any = null;
+
+/**
+ * 获取 WebDAV 客户端创建函数
+ */
+async function getWebDAVCreateClient() {
+    if (!webdavCreateClient) {
+        try {
+            // 使用 Function 构造函数创建动态导入，避免编译时转换问题
+            const dynamicImport = new Function('specifier', 'return import(specifier)');
+            const webdavModule = await dynamicImport('webdav');
+            
+            // 处理不同的模块导出格式
+            if (webdavModule.createClient) {
+                webdavCreateClient = webdavModule.createClient;
+            } else if (webdavModule.default && webdavModule.default.createClient) {
+                webdavCreateClient = webdavModule.default.createClient;
+            } else {
+                // 尝试直接使用 default 导出
+                webdavCreateClient = webdavModule.default || webdavModule;
+            }
+            
+            if (typeof webdavCreateClient !== 'function') {
+                throw new Error('WebDAV createClient 函数未找到');
+            }
+            
+            console.log('WebDAV 模块加载成功');
+        } catch (error) {
+            console.error('WebDAV 模块加载失败:', error);
+            
+            // 尝试备用加载方法
+            try {
+                console.log('尝试备用加载方法...');
+                // 使用 eval 来避免编译时的模块解析
+                const webdavModule = await eval('import("webdav")');
+                webdavCreateClient = webdavModule.createClient || webdavModule.default?.createClient || webdavModule.default;
+                
+                if (typeof webdavCreateClient !== 'function') {
+                    throw new Error('WebDAV createClient 函数未找到');
+                }
+                
+                console.log('WebDAV 模块备用加载成功');
+            } catch (fallbackError) {
+                console.error('WebDAV 模块备用加载也失败:', fallbackError);
+                throw new Error(`WebDAV 模块加载失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            }
+        }
+    }
+    return webdavCreateClient;
+}
 
 // 现代化数据结构接口
 interface DataItem {
@@ -112,12 +163,6 @@ export class WebDAVService {
      */
     async initialize(): Promise<void> {
         try {
-            // 动态导入 webdav 模块
-            if (!createWebDAVClient) {
-                const webdavModule = await import('webdav');
-                createWebDAVClient = webdavModule.createClient;
-            }
-
             this.config = await this.loadConfig();
             this.setupIpcHandlers();
             
@@ -137,9 +182,8 @@ export class WebDAVService {
      * 生成设备唯一ID
      */
     private generateDeviceId(): string {
-        const { v4: uuidv4 } = require('uuid');
         const platform = process.platform;
-        const hostname = require('os').hostname();
+        const hostname = os.hostname();
         const timestamp = Date.now();
         
         // 尝试从本地存储获取现有设备ID
@@ -197,25 +241,22 @@ export class WebDAVService {
             throw new Error('WebDAV 配置未加载');
         }
 
-        if (!createWebDAVClient) {
-            const webdavModule = await import('webdav');
-            createWebDAVClient = webdavModule.createClient;
+        try {
+            const createWebDAVClient = await getWebDAVCreateClient();
+            return createWebDAVClient(this.config.serverUrl, {
+                username: this.config.username,
+                password: this.config.password
+            });
+        } catch (error) {
+            console.error('创建 WebDAV 客户端失败:', error);
+            throw new Error(`WebDAV 客户端创建失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
-
-        return createWebDAVClient(this.config.serverUrl, {
-            username: this.config.username,
-            password: this.config.password,
-            timeout: 30000,
-            maxRetries: this.config.maxRetries || 3
-        });
     }
 
     /**
      * 获取本地数据快照
      */
     private async getLocalSnapshot(): Promise<SyncSnapshot> {
-        const { v4: uuidv4 } = require('uuid');
-        
         try {
             // 从数据库获取所有数据
             const localData = await this.exportLocalData();
@@ -230,7 +271,7 @@ export class WebDAVService {
                 conflictsResolved: [],
                 deviceInfo: {
                     id: this.deviceId,
-                    name: require('os').hostname(),
+                    name: os.hostname(),
                     platform: process.platform,
                     appVersion: app.getVersion() || '1.0.0'
                 }
@@ -253,7 +294,6 @@ export class WebDAVService {
      * 将传统数据格式转换为现代格式
      */
     private async convertToModernFormat(legacyData: any): Promise<DataItem[]> {
-        const { v4: uuidv4 } = require('uuid');
         const items: DataItem[] = [];
         const now = new Date().toISOString();
 
@@ -334,8 +374,6 @@ export class WebDAVService {
      * 转换其他数据类型
      */
     private convertOtherDataTypes(legacyData: any, items: DataItem[], now: string): void {
-        const { v4: uuidv4 } = require('uuid');
-
         // 可以根据需要添加更多数据类型的转换
         const dataTypes = ['settings', 'users', 'posts', 'histories'];
         
@@ -570,8 +608,6 @@ export class WebDAVService {
         itemsDeleted: number;
         conflictsResolved: ConflictResolution[];
     }> {
-        const { v4: uuidv4 } = require('uuid');
-        
         // 创建ID映射
         const localItemsMap = new Map<string, DataItem>();
         const remoteItemsMap = new Map<string, DataItem>();
@@ -646,7 +682,7 @@ export class WebDAVService {
                 conflictsResolved,
                 deviceInfo: {
                     id: this.deviceId,
-                    name: require('os').hostname(),
+                    name: os.hostname(),
                     platform: process.platform,
                     appVersion: app.getVersion() || '1.0.0'
                 }
@@ -1093,18 +1129,20 @@ export class WebDAVService {
         // 测试连接
         ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig) => {
             try {
-                if (!createWebDAVClient) {
-                    const webdavModule = await import('webdav');
-                    createWebDAVClient = webdavModule.createClient;
-                }
-
+                console.log('开始测试 WebDAV 连接...');
+                console.log('服务器地址:', config.serverUrl);
+                console.log('用户名:', config.username);
+                
+                const createWebDAVClient = await getWebDAVCreateClient();
                 const client = createWebDAVClient(config.serverUrl, {
                     username: config.username,
-                    password: config.password,
-                    timeout: 10000
+                    password: config.password
                 });
+                console.log('WebDAV 客户端创建成功');
 
+                // 测试基本连接
                 await client.getDirectoryContents('/');
+                console.log('WebDAV 连接测试成功');
                 
                 return {
                     success: true,
@@ -1115,9 +1153,30 @@ export class WebDAVService {
                     }
                 };
             } catch (error) {
+                console.error('WebDAV 连接测试失败:', error);
+                let errorMessage = '连接失败';
+                
+                if (error instanceof Error) {
+                    if (error.message.includes('WebDAV 模块加载失败')) {
+                        errorMessage = 'WebDAV 模块加载失败，请检查网络依赖';
+                    } else if (error.message.includes('ENOTFOUND')) {
+                        errorMessage = '无法找到服务器，请检查服务器地址';
+                    } else if (error.message.includes('ECONNREFUSED')) {
+                        errorMessage = '连接被拒绝，请检查服务器是否运行';
+                    } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                        errorMessage = '用户名或密码错误';
+                    } else if (error.message.includes('404')) {
+                        errorMessage = '服务器地址不存在或WebDAV未启用';
+                    } else if (error.message.includes('ETIMEDOUT')) {
+                        errorMessage = '连接超时，请检查网络连接';
+                    } else {
+                        errorMessage = error.message;
+                    }
+                }
+                
                 return {
                     success: false,
-                    message: error instanceof Error ? error.message : '连接失败'
+                    message: errorMessage
                 };
             }
         });
