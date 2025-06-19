@@ -177,21 +177,6 @@
             立即同步
           </NButton>
           
-          <NButton 
-            @click="viewSyncData" 
-            :loading="viewingData"
-            :disabled="!localConfig.enabled"
-            type="default"
-            ghost
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <Eye />
-              </NIcon>
-            </template>
-            查看同步数据
-          </NButton>
         </div>
 
 
@@ -218,24 +203,42 @@
               {{ syncStatus.isEnabled ? '已启用' : '已禁用' }}
             </span>
           </div>
-
-            <NButton 
-            @click="openSyncDirectory" 
-            :disabled="!localConfig.enabled"
-            type="default"
-            ghost
-            block
-            class="mb-4"
-            >
-            <template #icon>
-                <NIcon>
-                <Folder />
-                </NIcon>
-            </template>
-            打开同步目录
-            </NButton>
         </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-3">
+            <NButton 
+                @click="viewSyncData" 
+                :loading="viewingData"
+                :disabled="!localConfig.enabled"
+                type="default"
+                ghost
+                block
+            >
+                <template #icon>
+                <NIcon>
+                    <Eye />
+                </NIcon>
+                </template>
+                查看同步数据
+            </NButton>
+                <NButton 
+                @click="openSyncDirectory" 
+                :disabled="!localConfig.enabled"
+                type="default"
+                ghost
+                block
+                >
+                <template #icon>
+                    <NIcon>
+                    <Folder />
+                    </NIcon>
+                </template>
+                打开同步目录
+                </NButton>
+                </div>
+        
       </div>
+
     </NCard>
 
     <!-- 冲突解决对话框 -->
@@ -254,7 +257,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { 
-  NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
+  NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon, NFlex,
   useMessage, useDialog
 } from 'naive-ui'
 import { 
