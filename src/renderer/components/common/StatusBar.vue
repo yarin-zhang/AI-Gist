@@ -1,6 +1,6 @@
 <template>
   <div class="status-bar">
-    <NFlex justify="space-between" align="center" style="height: 100%; padding: 0 16px;">
+    <NFlex justify="space-between" align="center" style="height: 100%; padding: 0 12px;">
       <!-- 左侧 -->
       <NFlex align="center" :size="12">
         <NText></NText>
@@ -377,7 +377,7 @@ onUnmounted(() => {
 
 <style scoped>
 .status-bar {
-  height: 32px;
+  height: 24px;
   background-color: var(--n-color);
   border-top: 1px solid var(--n-border-color);
   font-size: 12px;

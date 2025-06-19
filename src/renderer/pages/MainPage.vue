@@ -70,7 +70,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 </script>
 
 <template>
-    <div style="height: 100vh;">
+    <div style="height: 100vh; ">
         <NLayout>
             <NLayout has-sider style="height: 100%;">
                 <NLayoutSider bordered collapse-mode="width" :collapsed-width="64"
