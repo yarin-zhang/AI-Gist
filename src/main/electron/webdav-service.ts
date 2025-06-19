@@ -754,6 +754,43 @@ export class WebDAVService {
             }
         });
         
+        // 获取 WebDAV 配置
+        ipcMain.handle('webdav:get-config', async (): Promise<WebDAVConfig> => {
+            console.log('WebDAV 获取配置 IPC 处理程序被调用');
+            try {
+                const prefs = this.preferencesManager.getPreferences();
+                const webdavConfig = prefs.webdav || {};
+                
+                // 返回配置，确保所有必需字段都有默认值
+                const config: WebDAVConfig = {
+                    enabled: webdavConfig.enabled || false,
+                    serverUrl: webdavConfig.serverUrl || '',
+                    username: webdavConfig.username || '',
+                    password: webdavConfig.password || '',
+                    autoSync: webdavConfig.autoSync || false,
+                    syncInterval: webdavConfig.syncInterval || 30
+                };
+                
+                console.log('返回 WebDAV 配置:', {
+                    ...config,
+                    password: config.password ? '[已设置]' : '[未设置]'
+                });
+                
+                return config;
+            } catch (error) {
+                console.error('获取 WebDAV 配置失败:', error);
+                // 返回默认配置
+                return {
+                    enabled: false,
+                    serverUrl: '',
+                    username: '',
+                    password: '',
+                    autoSync: false,
+                    syncInterval: 30
+                };
+            }
+        });
+        
         console.log('WebDAV IPC 处理程序设置完成，包括加密/解密处理程序');
         } catch (error) {
             console.error('WebDAV IPC 处理程序设置失败:', error);
@@ -778,6 +815,7 @@ export class WebDAVService {
         ipcMain.removeHandler('webdav:encrypt-password');
         ipcMain.removeHandler('webdav:decrypt-password');
         ipcMain.removeHandler('webdav:set-config');
+        ipcMain.removeHandler('webdav:get-config');
         
         console.log('WebDAV IPC 处理程序清理完成');
     }

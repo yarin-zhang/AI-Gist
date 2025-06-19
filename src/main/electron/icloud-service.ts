@@ -1260,37 +1260,6 @@ export class ICloudService {
                 
                 break;
                 
-            case 'download_only':
-                console.log('执行下载操作...');
-                
-                if (remoteData && this.dataManagementService) {
-                    // 分析下载的数据变更
-                    const downloadAnalysis = this.analyzeDataChanges(remoteData, localData);
-                    
-                    // 导入远程数据到本地
-                    await this.dataManagementService.importDataObject(remoteData);
-                    filesDownloaded++;
-                    
-                    // 更新本地同步时间
-                    await this.updateLocalSyncTime(remoteMetadata?.lastSyncTime || now);
-                    
-                    // 构建有意义的成功消息
-                    const successMessage = this.buildSyncSuccessMessage('download', downloadAnalysis);
-                    
-                    return {
-                        success: true,
-                        message: successMessage,
-                        timestamp: now,
-                        filesUploaded,
-                        filesDownloaded,
-                        conflictsDetected,
-                        conflictsResolved,
-                        conflictDetails
-                    };
-                }
-                
-                break;
-                
             case 'merge':
                 console.log('执行数据合并操作...');
                 
