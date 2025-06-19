@@ -211,7 +211,7 @@ class AutoSyncManager {
       const userPrefs = await window.electronAPI?.preferences?.get();
       
       // WebDAV 同步
-      if (userPrefs?.webdav?.enabled && userPrefs?.webdav?.autoSync) {
+      if (userPrefs?.webdav?.enabled) {
         try {
           const result = await WebDAVAPI.syncNow();
           results.push({
@@ -229,7 +229,7 @@ class AutoSyncManager {
       }
       
       // iCloud 同步
-      if (userPrefs?.icloud?.enabled && userPrefs?.icloud?.autoSync) {
+      if (userPrefs?.icloud?.enabled) {
         try {
           const result = await ICloudAPI.syncNow();
           results.push({
