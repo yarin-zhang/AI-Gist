@@ -7,7 +7,7 @@
       >
         <!-- 圆形进度环/状态环 -->
         <div class="status-ring" :class="statusRingClass">
-          <svg class="progress-ring" viewBox="0 0 24 24">
+          <svg v-if="isSyncing" class="progress-ring" viewBox="0 0 24 24">
             <circle
               class="progress-ring-bg"
               cx="12"
@@ -18,7 +18,6 @@
               stroke-width="2"
             />
             <circle
-              v-if="isSyncing"
               class="progress-ring-progress"
               cx="12"
               cy="12"
