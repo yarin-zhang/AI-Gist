@@ -3,6 +3,9 @@
  * 提供IndexedDB的基础操作和连接管理
  */
 
+import { generateUUID } from '../utils/uuid';
+import { autoSyncManager } from '../utils/auto-sync-manager';
+
 /**
  * IndexedDB 基础数据库服务类
  * 负责数据库的初始化、连接管理以及通用的CRUD操作
@@ -291,10 +294,15 @@ export class BaseDatabaseService {
       const request = store.add(dataWithTimestamps);
 
       request.onsuccess = () => {
-        resolve({
+        const result = {
           ...dataWithTimestamps,
           id: request.result as number,
-        } as T);
+        } as T;
+        
+        // 触发自动同步
+        this.triggerAutoSyncAfterChange('add', storeName);
+        
+        resolve(result);
       };
 
       request.onerror = () => {
@@ -417,6 +425,9 @@ export class BaseDatabaseService {
         const putRequest = store.put(updatedData);
         
         putRequest.onsuccess = () => {
+          // 触发自动同步
+          this.triggerAutoSyncAfterChange('update', storeName);
+          
           resolve(updatedData as T);
         };
 
@@ -446,6 +457,9 @@ export class BaseDatabaseService {
       const request = store.delete(id);
 
       request.onsuccess = () => {
+        // 触发自动同步
+        this.triggerAutoSyncAfterChange('delete', storeName);
+        
         resolve();
       };
 
@@ -912,5 +926,22 @@ export class BaseDatabaseService {
       await this.delete(storeName, (record as any).id);
       return true;
     }, [storeName]);
+  }
+
+  /**
+   * 在数据变更后触发自动同步
+   * @param operation 操作类型
+   * @param storeName 对象存储名称
+   */
+  private triggerAutoSyncAfterChange(operation: 'add' | 'update' | 'delete', storeName: string) {
+    try {
+      // 异步触发，不阻塞数据库操作
+      setTimeout(() => {
+        autoSyncManager.triggerAutoSync(`数据变更: ${operation} in ${storeName}`);
+      }, 0);
+    } catch (error) {
+      // 自动同步失败不应该影响数据操作
+      console.warn('触发自动同步失败:', error);
+    }
   }
 }

@@ -20,6 +20,7 @@ import {
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
+import AutoSyncStatus from '~/components/common/AutoSyncStatus.vue'
 const currentView = ref('prompts')
 
 // 组件引用
@@ -86,5 +87,8 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 <SettingsPage v-else-if="currentView === 'settings'" />
             </NLayoutContent>
         </NLayout>
+        
+        <!-- 自动同步状态显示 -->
+        <AutoSyncStatus />
     </div>
 </template>
