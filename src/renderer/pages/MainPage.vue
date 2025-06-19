@@ -21,8 +21,7 @@ import {
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
-import AutoSyncStatus from '~/components/common/AutoSyncStatus.vue'
-import WebDAVStatusBar from '~/components/common/WebDAVStatusBar.vue'
+import StatusBar from '~/components/common/StatusBar.vue'
 const currentView = ref('prompts')
 
 // 组件引用
@@ -72,38 +71,32 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 
 <template>
     <div style="height: 100vh;">
-        <NLayout has-sider style="height: 100%;">
-            <NLayoutSider bordered collapse-mode="width" :collapsed-width="64" @update:collapsed="collapseRef = $event"
-                :default-collapsed="collapseRef" :width="260" show-trigger="bar">
-                <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
-                    <NText strong style="font-size: 16px; ">
-                        AI Gist
-                    </NText>
-                </NFlex>
-                <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
-                    :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
-            </NLayoutSider>
-            
-            <NLayout>
-                <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 32px);">
-                    <PromptManagementPage 
-                        v-if="currentView === 'prompts'" 
-                        @navigate-to-ai-config="handleNavigateToAIConfig" 
-                    />
-                    <AIConfigPage 
-                        v-else-if="currentView === 'ai-config'" 
-                        ref="aiConfigPageRef" 
-                    />
-                    <SettingsPage v-else-if="currentView === 'settings'" />
-                </NLayoutContent>
-                
-                <NLayoutFooter bordered style="height: 32px; padding: 0;">
-                    <WebDAVStatusBar @open-settings="handleOpenWebDAVSettings" />
-                </NLayoutFooter>
+        <NLayout>
+            <NLayout has-sider style="height: 100%;">
+                <NLayoutSider bordered collapse-mode="width" :collapsed-width="64"
+                    @update:collapsed="collapseRef = $event" :default-collapsed="collapseRef" :width="260"
+                    show-trigger="bar">
+                    <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
+                        <NText strong style="font-size: 16px; ">
+                            AI Gist
+                        </NText>
+                    </NFlex>
+                    <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
+                        :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
+                </NLayoutSider>
+
+                <NLayout>
+                    <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 32px);">
+                        <PromptManagementPage v-if="currentView === 'prompts'"
+                            @navigate-to-ai-config="handleNavigateToAIConfig" />
+                        <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
+                        <SettingsPage v-else-if="currentView === 'settings'" />
+                    </NLayoutContent>
+                </NLayout>
             </NLayout>
+            <NLayoutFooter bordered style="height: 32px; padding: 0;">
+                <StatusBar @open-settings="handleOpenWebDAVSettings" />
+            </NLayoutFooter>
         </NLayout>
-        
-        <!-- 自动同步状态显示 -->
-        <AutoSyncStatus />
     </div>
 </template>
