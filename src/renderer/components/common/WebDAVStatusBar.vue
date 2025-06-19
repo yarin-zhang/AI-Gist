@@ -57,16 +57,6 @@
             <div class="error-time">{{ formatSyncTime(lastSyncErrorTime) }}</div>
           </div>
         </NPopover>
-        
-        <!-- 设置按钮 -->
-        <NButton size="tiny" text @click="openWebDAVSettings">
-          <template #icon>
-            <NIcon>
-              <Settings />
-            </NIcon>
-          </template>
-          WebDAV 设置
-        </NButton>
       </NFlex>
     </NFlex>
   </div>
