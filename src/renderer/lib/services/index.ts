@@ -11,6 +11,7 @@ import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
 import { DatabaseServiceManager } from './database-manager.service';
+import { DatabaseMigrationService } from './database-migration.service';
 
 // 导出所有服务类
 export { BaseDatabaseService } from './base-database.service';
@@ -20,6 +21,7 @@ export { AIConfigService } from './ai-config.service';
 export { AIGenerationHistoryService } from './ai-generation-history.service';
 export { AppSettingsService } from './app-settings.service';
 export { DatabaseServiceManager } from './database-manager.service';
+export { DatabaseMigrationService } from './database-migration.service';
 
 // 创建并导出统一的数据库服务管理器实例
 export const databaseService = DatabaseServiceManager.getInstance();

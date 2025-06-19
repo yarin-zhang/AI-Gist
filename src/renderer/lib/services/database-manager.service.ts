@@ -13,6 +13,7 @@ import { PromptService } from './prompt.service';
 import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
+import { DatabaseMigrationService } from './database-migration.service';
 
 /**
  * 统一的数据库服务管理类
@@ -27,6 +28,7 @@ export class DatabaseServiceManager {
   public readonly aiConfig: AIConfigService;
   public readonly aiGenerationHistory: AIGenerationHistoryService;
   public readonly appSettings: AppSettingsService;
+  public readonly migration: DatabaseMigrationService;
 
   private constructor() {
     // 初始化所有服务实例
@@ -35,6 +37,7 @@ export class DatabaseServiceManager {
     this.aiConfig = AIConfigService.getInstance();
     this.aiGenerationHistory = AIGenerationHistoryService.getInstance();
     this.appSettings = AppSettingsService.getInstance();
+    this.migration = DatabaseMigrationService.getInstance();
   }
 
   /**
@@ -50,12 +53,22 @@ export class DatabaseServiceManager {
 
   /**
    * 初始化所有数据库服务
-   * 确保所有服务的数据库连接已建立
+   * 确保所有服务的数据库连接已建立，并执行必要的迁移
    * @returns Promise<void> 初始化完成的Promise
    */
   async initialize(): Promise<void> {
     // 只需要初始化一个服务即可，因为它们共享同一个数据库实例
     await this.category.initialize();
+    
+    // 初始化完成后，自动检查并执行UUID迁移
+    try {
+      const migrationResult = await this.autoMigrateUUIDIfNeeded();
+      if (migrationResult.migrationExecuted) {
+        console.log('自动UUID迁移完成:', migrationResult.result);
+      }
+    } catch (error) {
+      console.warn('自动UUID迁移检查失败，但不影响正常使用:', error);
+    }
   }
 
   /**
@@ -764,6 +777,81 @@ export class DatabaseServiceManager {
       return db?.version || 0;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * 执行UUID迁移
+   * 为现有数据添加UUID支持，用于WebDAV同步
+   * @returns Promise<{ success: boolean; message: string; details: any }> 迁移结果
+   */
+  async executeUUIDMigration(): Promise<{ success: boolean; message: string; details: any }> {
+    try {
+      console.log('DatabaseServiceManager: 开始执行UUID迁移...');
+      
+      // 执行完整的UUID迁移流程
+      const result = await this.migration.executeFullUUIDMigration();
+      
+      if (result.success) {
+        console.log('DatabaseServiceManager: UUID迁移成功');
+      } else {
+        console.error('DatabaseServiceManager: UUID迁移失败:', result.message);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('DatabaseServiceManager: UUID迁移过程中发生错误:', error);
+      return {
+        success: false,
+        message: `UUID迁移失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        details: null
+      };
+    }
+  }
+
+  /**
+   * 检查是否需要UUID迁移
+   * @returns Promise<{ needsMigration: boolean; details: any }> 检查结果
+   */
+  async checkUUIDMigrationNeeded(): Promise<{ needsMigration: boolean; details: any }> {
+    return this.migration.checkUUIDMigrationNeeded();
+  }
+
+  /**
+   * 自动检查并执行UUID迁移
+   * 在数据库初始化后自动检查是否需要UUID迁移，如果需要则执行
+   * @returns Promise<{ migrationExecuted: boolean; result?: any }> 自动迁移结果
+   */
+  async autoMigrateUUIDIfNeeded(): Promise<{ migrationExecuted: boolean; result?: any }> {
+    try {
+      console.log('检查是否需要UUID迁移...');
+      
+      const migrationCheck = await this.checkUUIDMigrationNeeded();
+      
+      if (migrationCheck.needsMigration) {
+        console.log('检测到需要UUID迁移，开始执行...');
+        const migrationResult = await this.executeUUIDMigration();
+        
+        return {
+          migrationExecuted: true,
+          result: migrationResult
+        };
+      } else {
+        console.log('无需UUID迁移');
+        return {
+          migrationExecuted: false,
+          result: migrationCheck
+        };
+      }
+    } catch (error) {
+      console.error('自动UUID迁移检查失败:', error);
+      return {
+        migrationExecuted: false,
+        result: {
+          success: false,
+          message: `自动迁移检查失败: ${error instanceof Error ? error.message : '未知错误'}`
+        }
+      };
     }
   }
 }

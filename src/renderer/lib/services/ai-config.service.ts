@@ -5,6 +5,7 @@
 
 import { BaseDatabaseService } from './base-database.service';
 import { AIConfig } from '../types/database';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * AI配置数据服务类
@@ -28,11 +29,15 @@ export class AIConfigService extends BaseDatabaseService {
   /**
    * 创建新的AI配置
    * 向数据库中添加新的AI服务配置记录
-   * @param data Omit<AIConfig, 'id' | 'createdAt' | 'updatedAt'> AI配置数据（不包含自动生成的字段）
-   * @returns Promise<AIConfig> 创建成功的AI配置记录（包含生成的ID和时间戳）
+   * @param data Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'> AI配置数据（不包含自动生成的字段）
+   * @returns Promise<AIConfig> 创建成功的AI配置记录（包含生成的ID、UUID和时间戳）
    */
-  async createAIConfig(data: Omit<AIConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<AIConfig> {
-    return this.add<AIConfig>('ai_configs', data);
+  async createAIConfig(data: Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<AIConfig> {
+    const configWithUUID = {
+      ...data,
+      uuid: generateUUID()
+    };
+    return this.add<AIConfig>('ai_configs', configWithUUID);
   }
 
   /**
@@ -77,6 +82,16 @@ export class AIConfigService extends BaseDatabaseService {
   }
 
   /**
+   * 根据UUID获取AI配置
+   * 通过UUID查询特定AI配置的详细信息
+   * @param uuid string AI配置的UUID
+   * @returns Promise<AIConfig | null> AI配置记录，如果不存在则返回null
+   */
+  async getAIConfigByUUID(uuid: string): Promise<AIConfig | null> {
+    return this.getByUUID<AIConfig>('ai_configs', uuid);
+  }
+
+  /**
    * 更新AI配置信息
    * 更新指定AI配置的部分或全部信息
    * @param id number AI配置ID
@@ -103,6 +118,17 @@ export class AIConfigService extends BaseDatabaseService {
   }
 
   /**
+   * 根据UUID更新AI配置信息
+   * 通过UUID更新AI配置信息
+   * @param uuid string AI配置的UUID
+   * @param data Partial<Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>> 要更新的AI配置数据
+   * @returns Promise<AIConfig | null> 更新后的完整AI配置记录，如果不存在则返回null
+   */
+  async updateAIConfigByUUID(uuid: string, data: Partial<Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<AIConfig | null> {
+    return this.updateByUUID<AIConfig>('ai_configs', uuid, data);
+  }
+
+  /**
    * 删除AI配置
    * 从数据库中永久删除指定AI配置
    * @param id number 要删除的AI配置ID
@@ -125,6 +151,16 @@ export class AIConfigService extends BaseDatabaseService {
     }
     await this.deleteAIConfig(config.id);
     return true;
+  }
+
+  /**
+   * 根据UUID删除AI配置
+   * 通过UUID删除AI配置
+   * @param uuid string AI配置的UUID
+   * @returns Promise<boolean> 删除是否成功
+   */
+  async deleteAIConfigByUUID(uuid: string): Promise<boolean> {
+    return this.deleteByUUID('ai_configs', uuid);
   }
 
   /**
@@ -254,6 +290,17 @@ export class AIConfigService extends BaseDatabaseService {
     }
     
     return true;
+  }
+
+  /**
+   * 检查UUID是否已存在
+   * 验证UUID的唯一性
+   * @param uuid string 要检查的UUID
+   * @returns Promise<boolean> 如果UUID已存在返回true，否则返回false
+   */
+  async isUUIDExists(uuid: string): Promise<boolean> {
+    const config = await this.getAIConfigByUUID(uuid);
+    return config !== null;
   }
 
   /**

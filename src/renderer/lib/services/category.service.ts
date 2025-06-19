@@ -5,6 +5,7 @@
 
 import { BaseDatabaseService } from './base-database.service';
 import { Category, CategoryWithRelations, Prompt } from '../types/database';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * 分类数据服务类
@@ -27,11 +28,15 @@ export class CategoryService extends BaseDatabaseService {
   /**
    * 创建新分类
    * 向数据库中添加新的分类记录
-   * @param data Omit<Category, 'id' | 'createdAt' | 'updatedAt'> 分类数据（不包含自动生成的字段）
-   * @returns Promise<Category> 创建成功的分类记录（包含生成的ID和时间戳）
+   * @param data Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'> 分类数据（不包含自动生成的字段）
+   * @returns Promise<Category> 创建成功的分类记录（包含生成的ID、UUID和时间戳）
    */
-  async createCategory(data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> {
-    return this.add<Category>('categories', data);
+  async createCategory(data: Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<Category> {
+    const categoryWithUUID = {
+      ...data,
+      uuid: generateUUID()
+    };
+    return this.add<Category>('categories', categoryWithUUID);
   }
 
   /**
@@ -223,5 +228,55 @@ export class CategoryService extends BaseDatabaseService {
     });
 
     return colorStats;
+  }
+
+  /**
+   * 根据UUID获取分类
+   * 通过分类UUID查询特定分类的详细信息，包含关联数据
+   * @param uuid string 分类的UUID
+   * @returns Promise<CategoryWithRelations | null> 分类记录，如果不存在则返回null
+   */
+  async getCategoryByUUID(uuid: string): Promise<CategoryWithRelations | null> {
+    const category = await this.getByUUID<Category>('categories', uuid);
+    if (!category) return null;
+
+    const prompts = await this.getAll<Prompt>('prompts');
+    
+    return {
+      ...category,
+      prompts: prompts.filter(prompt => prompt.categoryId === category.id)
+    };
+  }
+
+  /**
+   * 根据UUID更新分类
+   * 通过UUID更新指定分类的信息
+   * @param uuid string 分类UUID
+   * @param data 更新数据
+   * @returns Promise<Category | null> 更新后的分类记录
+   */
+  async updateCategoryByUUID(uuid: string, data: Partial<Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>): Promise<Category | null> {
+    return this.updateByUUID<Category>('categories', uuid, data);
+  }
+
+  /**
+   * 根据UUID删除分类
+   * 通过UUID删除指定分类
+   * @param uuid string 要删除的分类UUID
+   * @returns Promise<boolean> 删除是否成功
+   */
+  async deleteCategoryByUUID(uuid: string): Promise<boolean> {
+    return this.deleteByUUID('categories', uuid);
+  }
+
+  /**
+   * 检查分类UUID是否已存在
+   * 验证UUID的唯一性
+   * @param uuid string 要检查的UUID
+   * @returns Promise<boolean> 如果UUID已存在返回true，否则返回false
+   */
+  async isCategoryUUIDExists(uuid: string): Promise<boolean> {
+    const category = await this.getByUUID<Category>('categories', uuid);
+    return category !== null;
   }
 }

@@ -5,6 +5,7 @@
 
 import { BaseDatabaseService } from './base-database.service';
 import { AIGenerationHistory, AIGenerationHistoryOptions, AIGenerationHistoryStats, PaginatedResult } from '../types/database';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * AI生成历史数据服务类
@@ -28,12 +29,13 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
   /**
    * 创建新的AI生成历史记录
    * 向数据库中添加新的AI生成历史记录
-   * @param data Omit<AIGenerationHistory, 'id' | 'createdAt'> 历史记录数据（不包含自动生成的字段）
-   * @returns Promise<AIGenerationHistory> 创建成功的历史记录（包含生成的ID和时间戳）
+   * @param data Omit<AIGenerationHistory, 'id' | 'uuid' | 'createdAt'> 历史记录数据（不包含自动生成的字段）
+   * @returns Promise<AIGenerationHistory> 创建成功的历史记录（包含生成的ID、UUID和时间戳）
    */
-  async createAIGenerationHistory(data: Omit<AIGenerationHistory, 'id' | 'createdAt'>): Promise<AIGenerationHistory> {
+  async createAIGenerationHistory(data: Omit<AIGenerationHistory, 'id' | 'uuid' | 'createdAt'>): Promise<AIGenerationHistory> {
     const historyData = {
       ...data,
+      uuid: generateUUID(),
       createdAt: new Date(),
     };
     return this.add<AIGenerationHistory>('ai_generation_history', historyData);
@@ -385,5 +387,47 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
     }
 
     return { success, failed };
+  }
+
+  /**
+   * 根据UUID获取AI生成历史记录
+   * 通过UUID查询特定历史记录的详细信息
+   * @param uuid string 历史记录的UUID
+   * @returns Promise<AIGenerationHistory | null> 历史记录，如果不存在则返回null
+   */
+  async getAIGenerationHistoryByUUID(uuid: string): Promise<AIGenerationHistory | null> {
+    return this.getByUUID<AIGenerationHistory>('ai_generation_history', uuid);
+  }
+
+  /**
+   * 根据UUID更新AI生成历史记录
+   * 通过UUID更新指定历史记录的信息
+   * @param uuid string 历史记录UUID
+   * @param data 更新数据
+   * @returns Promise<AIGenerationHistory | null> 更新后的历史记录
+   */
+  async updateAIGenerationHistoryByUUID(uuid: string, data: Partial<Omit<AIGenerationHistory, 'id' | 'uuid' | 'createdAt'>>): Promise<AIGenerationHistory | null> {
+    return this.updateByUUID<AIGenerationHistory>('ai_generation_history', uuid, data);
+  }
+
+  /**
+   * 根据UUID删除AI生成历史记录
+   * 通过UUID删除指定历史记录
+   * @param uuid string 要删除的历史记录UUID
+   * @returns Promise<boolean> 删除是否成功
+   */
+  async deleteAIGenerationHistoryByUUID(uuid: string): Promise<boolean> {
+    return this.deleteByUUID('ai_generation_history', uuid);
+  }
+
+  /**
+   * 检查历史记录UUID是否已存在
+   * 验证UUID的唯一性
+   * @param uuid string 要检查的UUID
+   * @returns Promise<boolean> 如果UUID已存在返回true，否则返回false
+   */
+  async isHistoryUUIDExists(uuid: string): Promise<boolean> {
+    const history = await this.getByUUID<AIGenerationHistory>('ai_generation_history', uuid);
+    return history !== null;
   }
 }
