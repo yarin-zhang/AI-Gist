@@ -236,16 +236,18 @@ export class WebDAVService {
     /**
      * 创建WebDAV客户端
      */
-    private async createClient(): Promise<any> {
-        if (!this.config) {
+    private async createClient(config?: WebDAVConfig): Promise<any> {
+        const clientConfig = config || this.config;
+        
+        if (!clientConfig) {
             throw new Error('WebDAV 配置未加载');
         }
 
         try {
             const createWebDAVClient = await getWebDAVCreateClient();
-            return createWebDAVClient(this.config.serverUrl, {
-                username: this.config.username,
-                password: this.config.password
+            return createWebDAVClient(clientConfig.serverUrl, {
+                username: clientConfig.username,
+                password: clientConfig.password
             });
         } catch (error) {
             console.error('创建 WebDAV 客户端失败:', error);
@@ -452,7 +454,7 @@ export class WebDAVService {
     /**
      * 执行智能同步
      */
-    async performIntelligentSync(): Promise<SyncResult> {
+    async performIntelligentSync(config?: WebDAVConfig): Promise<SyncResult> {
         if (this.syncInProgress) {
             throw new Error('同步正在进行中');
         }
@@ -461,7 +463,12 @@ export class WebDAVService {
         console.log('开始智能同步...');
 
         try {
-            const client = await this.createClient();
+            const syncConfig = config || this.config;
+            if (!syncConfig) {
+                throw new Error('WebDAV 配置未加载');
+            }
+
+            const client = await this.createClient(syncConfig);
             const localSnapshot = await this.getLocalSnapshot();
             const remoteSnapshot = await this.getRemoteSnapshot(client);
 
@@ -1184,13 +1191,38 @@ export class WebDAVService {
         // 立即同步
         ipcMain.handle('webdav:sync-now', async () => {
             try {
-                const result = await this.performIntelligentSync();
+                // 获取配置
+                const config = await this.loadConfig();
+                
+                console.log('同步时检查 WebDAV 配置:', {
+                    hasConfig: !!config,
+                    enabled: config?.enabled,
+                    serverUrl: config?.serverUrl,
+                    username: config?.username
+                });
+                
+                if (!config || !config.enabled) {
+                    return {
+                        success: false,
+                        error: 'WebDAV 同步未启用'
+                    };
+                }
+
+                if (!config.serverUrl || !config.username) {
+                    return {
+                        success: false,
+                        error: 'WebDAV 配置不完整，请检查服务器地址和用户名'
+                    };
+                }
+                
+                const result = await this.performIntelligentSync(config);
                 return {
                     success: result.success,
                     data: result,
                     message: result.message
                 };
             } catch (error) {
+                console.error('立即同步失败:', error);
                 return {
                     success: false,
                     error: error instanceof Error ? error.message : '同步失败'
@@ -1201,16 +1233,36 @@ export class WebDAVService {
         // 手动上传
         ipcMain.handle('webdav:manual-upload', async () => {
             try {
-                const client = await this.createClient();
+                console.log('开始手动上传数据到 WebDAV...');
+                
+                // 获取配置
+                const config = await this.loadConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        error: '未找到 WebDAV 配置'
+                    };
+                }
+
+                if (!config.enabled) {
+                    return {
+                        success: false,
+                        error: 'WebDAV 同步未启用'
+                    };
+                }
+
+                const client = await this.createClient(config);
                 const localSnapshot = await this.getLocalSnapshot();
                 const result = await this.performInitialUpload(client, localSnapshot);
                 
+                console.log('手动上传完成');
                 return {
                     success: true,
                     data: result,
-                    message: '上传成功'
+                    message: result.message || '上传成功'
                 };
             } catch (error) {
+                console.error('手动上传失败:', error);
                 return {
                     success: false,
                     error: error instanceof Error ? error.message : '上传失败'
@@ -1221,17 +1273,38 @@ export class WebDAVService {
         // 手动下载
         ipcMain.handle('webdav:manual-download', async () => {
             try {
-                const client = await this.createClient();
+                console.log('开始从 WebDAV 下载数据...');
+                
+                // 获取配置
+                const config = await this.loadConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        error: '未找到 WebDAV 配置'
+                    };
+                }
+
+                if (!config.enabled) {
+                    return {
+                        success: false,
+                        error: 'WebDAV 同步未启用'
+                    };
+                }
+
+                const client = await this.createClient(config);
                 const remoteSnapshot = await this.getRemoteSnapshot(client);
                 
                 if (!remoteSnapshot) {
                     return {
                         success: false,
-                        error: '远程没有可下载的数据'
+                        error: 'WebDAV 服务器上没有找到数据文件'
                     };
                 }
 
+                // 获取本地数据
                 const localSnapshot = await this.getLocalSnapshot();
+                
+                // 检测冲突并生成详细的差异分析
                 const mergeResult = await this.mergeSnapshots(localSnapshot, remoteSnapshot);
                 
                 return {
@@ -1241,12 +1314,25 @@ export class WebDAVService {
                         conflictDetails: mergeResult.conflictsResolved,
                         itemsToUpdate: mergeResult.localChanges.length,
                         timestamp: mergeResult.mergedSnapshot.timestamp,
-                        remoteSnapshot,
-                        localChanges: mergeResult.localChanges
+                        differences: {
+                            itemsProcessed: mergeResult.itemsProcessed,
+                            itemsUpdated: mergeResult.itemsUpdated,
+                            itemsCreated: mergeResult.itemsCreated,
+                            itemsDeleted: mergeResult.itemsDeleted,
+                            summary: {
+                                localTotal: localSnapshot.items.length,
+                                remoteTotal: remoteSnapshot.items.length,
+                                conflicts: mergeResult.conflictsResolved.length
+                            }
+                        },
+                        localChanges: mergeResult.localChanges,
+                        localSnapshot,
+                        remoteSnapshot
                     },
-                    message: '下载完成'
+                    message: '数据下载完成'
                 };
             } catch (error) {
+                console.error('手动下载失败:', error);
                 return {
                     success: false,
                     error: error instanceof Error ? error.message : '下载失败'
@@ -1280,7 +1366,23 @@ export class WebDAVService {
         // 比较数据
         ipcMain.handle('webdav:compare-data', async () => {
             try {
-                const client = await this.createClient();
+                // 获取配置
+                const config = await this.loadConfig();
+                if (!config) {
+                    return {
+                        success: false,
+                        error: '未找到 WebDAV 配置'
+                    };
+                }
+
+                if (!config.enabled) {
+                    return {
+                        success: false,
+                        error: 'WebDAV 同步未启用'
+                    };
+                }
+
+                const client = await this.createClient(config);
                 const localSnapshot = await this.getLocalSnapshot();
                 const remoteSnapshot = await this.getRemoteSnapshot(client);
                 
@@ -1293,7 +1395,9 @@ export class WebDAVService {
                                 remote: 0,
                                 conflicts: 0,
                                 summary: '远程无数据，建议执行上传'
-                            }
+                            },
+                            localSnapshot,
+                            remoteSnapshot: null
                         }
                     };
                 }
@@ -1302,12 +1406,17 @@ export class WebDAVService {
                 
                 return {
                     success: true,
-                    data: { differences }
+                    data: { 
+                        differences,
+                        localSnapshot,
+                        remoteSnapshot
+                    }
                 };
             } catch (error) {
+                console.error('比较数据失败:', error);
                 return {
                     success: false,
-                    error: error instanceof Error ? error.message : '比较数据失败'
+                    error: error instanceof Error ? error.message : '比较失败'
                 };
             }
         });
@@ -1340,14 +1449,37 @@ export class WebDAVService {
         // 设置配置
         ipcMain.handle('webdav:set-config', async (event, config: WebDAVConfig) => {
             try {
+                console.log('保存 WebDAV 配置:', {
+                    ...config,
+                    password: config.password ? '[已设置]' : '[未设置]'
+                });
+
                 const currentPrefs = this.preferencesManager.getPreferences();
-                currentPrefs.webdav = { ...currentPrefs.webdav, ...config };
+                const currentWebDAVConfig = currentPrefs.webdav || {};
+
+                // 合并配置
+                const mergedConfig = {
+                    ...currentWebDAVConfig,
+                    enabled: config.enabled !== undefined ? config.enabled : currentWebDAVConfig.enabled,
+                    serverUrl: config.serverUrl !== undefined ? config.serverUrl : currentWebDAVConfig.serverUrl,
+                    username: config.username !== undefined ? config.username : currentWebDAVConfig.username,
+                    password: config.password !== undefined ? config.password : currentWebDAVConfig.password,
+                    autoSync: config.autoSync !== undefined ? config.autoSync : currentWebDAVConfig.autoSync,
+                    syncInterval: config.syncInterval !== undefined ? config.syncInterval : currentWebDAVConfig.syncInterval,
+                    encryptData: config.encryptData !== undefined ? config.encryptData : currentWebDAVConfig.encryptData,
+                    maxRetries: config.maxRetries !== undefined ? config.maxRetries : currentWebDAVConfig.maxRetries,
+                    conflictResolution: config.conflictResolution !== undefined ? config.conflictResolution : currentWebDAVConfig.conflictResolution
+                };
+
+                this.preferencesManager.updatePreferences({
+                    webdav: mergedConfig
+                });
                 
-                this.preferencesManager.updatePreferences(currentPrefs);
-                this.config = config;
+                // 更新本地配置
+                this.config = mergedConfig;
                 
                 // 重新配置自动同步
-                if (config.enabled && config.autoSync) {
+                if (mergedConfig.enabled && mergedConfig.autoSync) {
                     this.startAutoSync();
                 } else {
                     this.stopAutoSync();
@@ -1358,6 +1490,7 @@ export class WebDAVService {
                     message: '配置已保存'
                 };
             } catch (error) {
+                console.error('保存 WebDAV 配置失败:', error);
                 return {
                     success: false,
                     error: error instanceof Error ? error.message : '保存配置失败'

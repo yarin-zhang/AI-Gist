@@ -3,6 +3,7 @@
  * 基于 iCloud Drive 文件系统的同步实现
  */
 
+
 import { ipcMain, app, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -95,6 +96,7 @@ export class ICloudService {
     private tempRemoteMetadata: any = null;
     private readonly defaultICloudPath: string;
     private readonly syncDirName = 'AI-Gist-Sync';
+    private isInitialized = false;
 
     constructor(private preferencesManager: any, private dataManagementService?: any) {
         // 默认 iCloud Drive 路径
@@ -102,6 +104,39 @@ export class ICloudService {
         console.log('iCloud 服务初始化中...');
         console.log('默认 iCloud Drive 路径:', this.defaultICloudPath);
         console.log('iCloud 服务已初始化');
+    }
+
+    /**
+     * 初始化服务
+     */
+    async initialize(): Promise<void> {
+        try {
+            this.config = await this.loadConfig();
+            this.setupIpcHandlers();
+            
+            if (this.config?.enabled && this.config.autoSync) {
+                this.startAutoSync();
+            }
+
+            this.isInitialized = true;
+            console.log('iCloud 服务初始化完成');
+        } catch (error) {
+            console.error('iCloud 服务初始化失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 加载配置
+     */
+    private async loadConfig(): Promise<ICloudConfig | null> {
+        try {
+            const prefs = this.preferencesManager.getPreferences();
+            return prefs.icloud || null;
+        } catch (error) {
+            console.error('加载iCloud配置失败:', error);
+            return null;
+        }
     }
 
     /**

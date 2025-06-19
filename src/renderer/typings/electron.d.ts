@@ -38,6 +38,32 @@ export interface AIGenerationResult {
   createdAt: Date;
 }
 
+// WebDAV 相关类型定义
+export interface WebDAVConfig {
+  enabled: boolean;
+  serverUrl: string;
+  username: string;
+  password: string;
+  autoSync: boolean;
+  syncInterval: number;
+  encryptData?: boolean;
+  maxRetries?: number;
+  conflictResolution?: 'ask' | 'local_wins' | 'remote_wins' | 'merge';
+}
+
+export interface SyncResult {
+  success: boolean;
+  message: string;
+  timestamp: string;
+  itemsProcessed: number;
+  itemsUpdated: number;
+  itemsCreated: number;
+  itemsDeleted: number;
+  conflictsResolved: number;
+  conflictDetails: any[];
+  errors: string[];
+}
+
 export default interface ElectronApi {
   sendMessage: (message: string) => void
   
@@ -81,9 +107,19 @@ export default interface ElectronApi {
     testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
-    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
-    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
+    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
+  }
+  
+  webdav: {
+    testConnection: (config: WebDAVConfig) => Promise<{ success: boolean; message: string; serverInfo?: any }>
+    syncNow: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
+    manualUpload: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
+    manualDownload: () => Promise<{ success: boolean; data?: any; error?: string }>
+    applyDownloadedData: (resolution: any) => Promise<{ success: boolean; message?: string; error?: string }>
+    compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
+    getConfig: () => Promise<WebDAVConfig>
+    setConfig: (config: WebDAVConfig) => Promise<{ success: boolean; message?: string; error?: string }>
   }
 }
 

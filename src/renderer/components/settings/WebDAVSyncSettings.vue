@@ -280,23 +280,6 @@
               {{ props.modelValue.webdav.enabled ? '已启用' : '已禁用' }}
             </span>
           </div>
-
-          
-          <NButton 
-            @click="handleGetRemotePreview" 
-            :loading="previewLoading"
-            :disabled="!props.modelValue.webdav.enabled"
-            type="default"
-            ghost
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <Eye />
-              </NIcon>
-            </template>
-            预览远程数据
-          </NButton>
         </div>
       </div>
     </NCard>

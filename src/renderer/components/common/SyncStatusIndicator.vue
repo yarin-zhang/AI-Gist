@@ -93,8 +93,14 @@ import {
   RefreshAlert,
   Home
 } from '@vicons/tabler';
-import { autoSyncManager } from '@/lib/utils/auto-sync-manager';
-import type { SyncStatus } from '@/lib/utils/auto-sync-manager';
+
+interface SyncStatus {
+  isOnline: boolean;
+  isSyncing: boolean;
+  lastSyncTime: string | null;
+  lastSyncError: string | null;
+  pendingSyncCount: number;
+}
 
 const emit = defineEmits<{
   openSettings: [targetSection?: string];
@@ -276,22 +282,62 @@ const handleStatusClick = () => {
 // 手动同步
 const triggerManualSync = async () => {
     try {
-        // 移除开始同步时的消息提示，只在结束时通过状态监听器显示
-        autoSyncManager.forceTriggerSync('手动触发');
+        syncStatus.value.isSyncing = true;
+        const result = await window.electronAPI?.webdav?.syncNow();
+        
+        if (result?.success) {
+            syncStatus.value.lastSyncTime = new Date().toISOString();
+            syncStatus.value.lastSyncError = null;
+            webdavConfig.value.lastSyncTime = syncStatus.value.lastSyncTime;
+            webdavConfig.value.lastSyncError = null;
+            message.success(result.data?.message || '同步成功');
+        } else {
+            const errorMsg = result?.error || '同步失败';
+            syncStatus.value.lastSyncError = errorMsg;
+            webdavConfig.value.lastSyncError = errorMsg;
+            webdavConfig.value.lastSyncErrorTime = new Date().toISOString();
+            message.error(errorMsg);
+        }
     } catch (error) {
         console.error('手动同步失败:', error);
-        message.error('手动同步失败');
+        const errorMsg = error instanceof Error ? error.message : '手动同步失败';
+        syncStatus.value.lastSyncError = errorMsg;
+        webdavConfig.value.lastSyncError = errorMsg;
+        webdavConfig.value.lastSyncErrorTime = new Date().toISOString();
+        message.error(errorMsg);
+    } finally {
+        syncStatus.value.isSyncing = false;
     }
 };
 
 // 重试同步
 const retrySync = async () => {
     try {
-        // 移除开始同步时的消息提示，只在结束时通过状态监听器显示
-        autoSyncManager.forceTriggerSync('手动重试');
+        syncStatus.value.isSyncing = true;
+        const result = await window.electronAPI?.webdav?.syncNow();
+        
+        if (result?.success) {
+            syncStatus.value.lastSyncTime = new Date().toISOString();
+            syncStatus.value.lastSyncError = null;
+            webdavConfig.value.lastSyncTime = syncStatus.value.lastSyncTime;
+            webdavConfig.value.lastSyncError = null;
+            message.success(result.data?.message || '重试同步成功');
+        } else {
+            const errorMsg = result?.error || '重试同步失败';
+            syncStatus.value.lastSyncError = errorMsg;
+            webdavConfig.value.lastSyncError = errorMsg;
+            webdavConfig.value.lastSyncErrorTime = new Date().toISOString();
+            message.error(errorMsg);
+        }
     } catch (error) {
         console.error('重试同步失败:', error);
-        message.error('重试同步失败');
+        const errorMsg = error instanceof Error ? error.message : '重试同步失败';
+        syncStatus.value.lastSyncError = errorMsg;
+        webdavConfig.value.lastSyncError = errorMsg;
+        webdavConfig.value.lastSyncErrorTime = new Date().toISOString();
+        message.error(errorMsg);
+    } finally {
+        syncStatus.value.isSyncing = false;
     }
 };
 
@@ -303,28 +349,30 @@ const openWebDAVSettings = () => {
 // 启用 WebDAV
 const enableWebDAV = async () => {
   try {
-    // 获取当前用户偏好设置
-    const userPrefs = await window.electronAPI?.preferences?.get();
+    // 获取当前配置
+    const currentConfig = await window.electronAPI?.webdav?.getConfig();
     
-    if (userPrefs?.webdav) {
-      // 更新 WebDAV 启用状态
-      const updatedWebDAVConfig = {
-        ...userPrefs.webdav,
+    if (currentConfig && currentConfig.serverUrl) {
+      // 更新配置启用状态
+      const updatedConfig = {
+        ...currentConfig,
         enabled: true
       };
       
       // 保存更新后的配置
-      await window.electronAPI?.preferences?.set({
-        webdav: updatedWebDAVConfig
-      });
+      const result = await window.electronAPI?.webdav?.setConfig(updatedConfig);
       
-      // 更新本地状态
-      webdavConfig.value.enabled = true;
-      
-      // 派发配置变更事件
-      window.dispatchEvent(new Event('webdav-config-changed'));
-      
-      message.success('WebDAV 同步已启用');
+      if (result?.success) {
+        // 更新本地状态
+        webdavConfig.value.enabled = true;
+        
+        message.success('WebDAV 同步已启用');
+        
+        // 重新加载配置
+        await loadWebDAVConfig();
+      } else {
+        message.error(result?.error || '启用 WebDAV 失败');
+      }
     } else {
       // 如果没有配置，引导用户到设置页面
       openWebDAVSettings();
@@ -354,27 +402,52 @@ const updateSyncStatus = (status: SyncStatus) => {
     }
 };
 
+// 定期检查同步状态
+const checkSyncStatus = async () => {
+  // 这里可以根据需要添加状态检查逻辑
+  // 目前状态主要通过手动同步操作来更新
+};
+
 // 加载 WebDAV 配置
 const loadWebDAVConfig = async () => {
   try {
-    const userPrefs = await window.electronAPI?.preferences?.get();
+    // 从新的 WebDAV 服务获取配置
+    const configResult = await window.electronAPI?.webdav?.getConfig();
     
-    if (userPrefs?.webdav) {
+    if (configResult) {
       webdavConfig.value = {
-        enabled: userPrefs.webdav.enabled || false,
-        serverUrl: userPrefs.webdav.serverUrl || '',
-        lastSyncTime: userPrefs.dataSync?.lastSyncTime || null,
-        lastSyncError: null,
-        lastSyncErrorTime: null
-      };
-    } else {
-      webdavConfig.value = {
-        enabled: false,
-        serverUrl: '',
+        enabled: configResult.enabled || false,
+        serverUrl: configResult.serverUrl || '',
         lastSyncTime: null,
         lastSyncError: null,
         lastSyncErrorTime: null
       };
+      
+      // 如果配置了 WebDAV，尝试获取最近的同步状态
+      if (configResult.enabled && configResult.serverUrl) {
+        await loadSyncStatus();
+      }
+    } else {
+      // 回退到用户偏好设置
+      const userPrefs = await window.electronAPI?.preferences?.get();
+      
+      if (userPrefs?.webdav) {
+        webdavConfig.value = {
+          enabled: userPrefs.webdav.enabled || false,
+          serverUrl: userPrefs.webdav.serverUrl || '',
+          lastSyncTime: userPrefs.dataSync?.lastSyncTime || null,
+          lastSyncError: null,
+          lastSyncErrorTime: null
+        };
+      } else {
+        webdavConfig.value = {
+          enabled: false,
+          serverUrl: '',
+          lastSyncTime: null,
+          lastSyncError: null,
+          lastSyncErrorTime: null
+        };
+      }
     }
   } catch (error) {
     console.error('加载 WebDAV 配置失败:', error);
@@ -388,15 +461,32 @@ const loadWebDAVConfig = async () => {
   }
 };
 
+// 加载同步状态
+const loadSyncStatus = async () => {
+  try {
+    // 从用户偏好设置中获取最后同步时间
+    const userPrefs = await window.electronAPI?.preferences?.get();
+    if (userPrefs?.dataSync?.lastSyncTime) {
+      webdavConfig.value.lastSyncTime = userPrefs.dataSync.lastSyncTime;
+      syncStatus.value.lastSyncTime = userPrefs.dataSync.lastSyncTime;
+    }
+  } catch (error) {
+    console.error('加载同步状态失败:', error);
+  }
+};
+
 onMounted(async () => {
   // 加载配置
   await loadWebDAVConfig();
   
-  // 监听同步状态
-  autoSyncManager.addStatusListener(updateSyncStatus);
-  
-  // 获取初始状态
-  updateSyncStatus(autoSyncManager.getStatus());
+  // 初始化同步状态
+  syncStatus.value = {
+    isOnline: navigator.onLine,
+    isSyncing: false,
+    lastSyncTime: webdavConfig.value.lastSyncTime,
+    lastSyncError: webdavConfig.value.lastSyncError,
+    pendingSyncCount: 0
+  };
   
   // 监听网络状态
   const handleOnline = () => {
@@ -410,6 +500,9 @@ onMounted(async () => {
   // 监听 WebDAV 配置变更
   const handleConfigChange = async () => {
     await loadWebDAVConfig();
+    // 更新同步状态中的时间信息
+    syncStatus.value.lastSyncTime = webdavConfig.value.lastSyncTime;
+    syncStatus.value.lastSyncError = webdavConfig.value.lastSyncError;
   };
   
   window.addEventListener('online', handleOnline);
@@ -425,7 +518,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  autoSyncManager.removeStatusListener(updateSyncStatus);
+  // 清理其他资源（如果需要）
 });
 </script>
 
