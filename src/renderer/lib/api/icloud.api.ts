@@ -40,6 +40,8 @@ const safeIpcInvoke = async (channel: string, ...args: any[]) => {
                 return await electronAPI.icloud.compareData();
             case 'apply-downloaded-data':
                 return await electronAPI.icloud.applyDownloadedData(args[0]);
+            case 'open-sync-directory':
+                return await electronAPI.icloud.openSyncDirectory();
             default:
                 throw new Error(`Unknown iCloud method: ${method}`);
         }
@@ -294,6 +296,22 @@ export class ICloudAPI {
         } catch (error) {
             console.error('检查 iCloud 可用性失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 打开 iCloud 同步目录
+     */
+    static async openSyncDirectory(): Promise<{
+        success: boolean;
+        message: string;
+        path?: string;
+    }> {
+        try {
+            return await safeIpcInvoke('icloud:open-sync-directory');
+        } catch (error) {
+            console.error('打开同步目录失败:', error);
+            throw error;
         }
     }
 

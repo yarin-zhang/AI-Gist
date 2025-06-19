@@ -3,7 +3,7 @@
  * 基于 iCloud Drive 文件系统的同步实现
  */
 
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -554,6 +554,43 @@ export class ICloudService {
                 }
             });
 
+            // 打开同步目录
+            console.log('注册 icloud:open-sync-directory 处理程序');
+            ipcMain.handle('icloud:open-sync-directory', async () => {
+                try {
+                    const iCloudPath = this.getICloudPath();
+                    const syncPath = path.join(iCloudPath, this.syncDirName);
+                    
+                    // 检查目录是否存在，如果不存在则创建
+                    try {
+                        await fs.promises.access(syncPath);
+                    } catch (error) {
+                        // 目录不存在，创建它
+                        await fs.promises.mkdir(syncPath, { recursive: true });
+                    }
+
+                    // 使用 shell.openPath 打开目录
+                    const result = await shell.openPath(syncPath);
+                    
+                    if (result) {
+                        // openPath 返回非空字符串表示有错误
+                        throw new Error(`无法打开目录: ${result}`);
+                    }
+                    
+                    return {
+                        success: true,
+                        message: '已打开同步目录',
+                        path: syncPath
+                    };
+                } catch (error) {
+                    console.error('打开同步目录失败:', error);
+                    return {
+                        success: false,
+                        error: error instanceof Error ? error.message : '打开目录失败'
+                    };
+                }
+            });
+
             console.log('iCloud IPC 处理程序设置完成');
         } catch (error) {
             console.error('设置 iCloud IPC 处理程序失败:', error);
@@ -576,6 +613,7 @@ export class ICloudService {
         ipcMain.removeAllListeners('icloud:compare-data');
         ipcMain.removeAllListeners('icloud:get-config');
         ipcMain.removeAllListeners('icloud:set-config');
+        ipcMain.removeAllListeners('icloud:open-sync-directory');
         
         console.log('iCloud 服务清理完成');
     }

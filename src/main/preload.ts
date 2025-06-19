@@ -90,6 +90,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     manualDownload: () => ipcRenderer.invoke('icloud:manual-download'),
     compareData: () => ipcRenderer.invoke('icloud:compare-data'),
     applyDownloadedData: (resolution: any) => ipcRenderer.invoke('icloud:apply-downloaded-data', resolution),
+    openSyncDirectory: () => ipcRenderer.invoke('icloud:open-sync-directory'),
   },
   // 数据管理
   data: {

@@ -65,6 +65,7 @@ declare global {
         manualDownload: () => Promise<any>;
         compareData: () => Promise<any>;
         applyDownloadedData: (resolution: any) => Promise<any>;
+        openSyncDirectory: () => Promise<any>;
       };
       data: {
         createBackup: (description?: string) => Promise<any>;
@@ -277,6 +278,8 @@ export class IpcUtils {
             return api.icloud.compareData();
           case 'apply-downloaded-data':
             return api.icloud.applyDownloadedData(data);
+          case 'open-sync-directory':
+            return api.icloud.openSyncDirectory();
         }
         break;
         

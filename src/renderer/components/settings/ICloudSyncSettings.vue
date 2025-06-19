@@ -175,7 +175,6 @@
           :disabled="!localConfig.enabled"
           type="primary"
           block
-          size="large"
         >
           <template #icon>
             <NIcon>
@@ -184,6 +183,9 @@
           </template>
           立即同步
         </NButton>
+
+
+
       </div>
 
       <!-- 同步状态 -->
@@ -206,6 +208,22 @@
               {{ syncStatus.isEnabled ? '已启用' : '已禁用' }}
             </span>
           </div>
+
+            <NButton 
+            @click="openSyncDirectory" 
+            :disabled="!localConfig.enabled"
+            type="default"
+            ghost
+            block
+            class="mb-4"
+            >
+            <template #icon>
+                <NIcon>
+                <Folder />
+                </NIcon>
+            </template>
+            打开同步目录
+            </NButton>
         </div>
       </div>
     </NCard>
@@ -230,7 +248,7 @@ import {
   useMessage, useDialog
 } from 'naive-ui'
 import { 
-  Cloud, Eye, GitCompare, Upload, Download, Refresh
+  Cloud, Eye, GitCompare, Upload, Download, Refresh, Folder
 } from '@vicons/tabler'
 import { ICloudAPI, type ICloudConfig, type ManualSyncResult, type ConflictResolution } from '../../lib/api/icloud.api'
 import ConflictResolutionDialog from './ConflictResolutionDialog.vue'
@@ -428,6 +446,22 @@ const downloadData = async () => {
     message.error('下载数据失败')
   } finally {
     downloading.value = false
+  }
+}
+
+// 打开同步目录
+const openSyncDirectory = async () => {
+  try {
+    const result = await ICloudAPI.openSyncDirectory()
+    
+    if (result.success) {
+      message.success('已打开同步目录')
+    } else {
+      message.error(`打开目录失败: ${result.message}`)
+    }
+  } catch (error) {
+    console.error('打开同步目录失败:', error)
+    message.error('打开同步目录失败')
   }
 }
 
