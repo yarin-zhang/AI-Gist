@@ -72,7 +72,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
 <template>
     <div style="height: 100vh; ">
         <NLayout>
-            <NLayout has-sider style="height: 100%;">
+            <NLayout has-sider style="height: 100%; ">
                 <NLayoutSider bordered collapse-mode="width" :collapsed-width="64"
                     @update:collapsed="collapseRef = $event" :default-collapsed="collapseRef" :width="260"
                     show-trigger="bar">
@@ -86,7 +86,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 </NLayoutSider>
 
                 <NLayout>
-                    <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 32px);">
+                    <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 24px);">
                         <PromptManagementPage v-if="currentView === 'prompts'"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
@@ -94,7 +94,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                     </NLayoutContent>
                 </NLayout>
             </NLayout>
-            <NLayoutFooter bordered style="height: 32px; padding: 0;">
+            <NLayoutFooter bordered style="height: 24px; padding: 0;">
                 <StatusBar @open-settings="handleOpenWebDAVSettings" />
             </NLayoutFooter>
         </NLayout>
