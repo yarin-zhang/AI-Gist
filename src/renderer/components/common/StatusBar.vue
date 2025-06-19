@@ -6,80 +6,73 @@
         <NText></NText>
       </NFlex>
       
-      <!-- 右侧：操作按钮和信息 -->
-      <NFlex align="center" :size="12">
-
-        <!-- 最后同步时间 -->
-        <NText v-if="showLastSyncTime" depth="3" style="font-size: 12px;">
-          {{ formatSyncTime(lastSyncTime) }}
-        </NText>
-
-        <!-- 同步进度条 -->
-        <div v-if="isSyncing" class="sync-progress-container">
-          <div class="sync-progress-bar">
-            <div class="sync-progress-fill"></div>
-          </div>
-        </div>
-
-        <!-- 手动同步按钮 -->
-        <NButton 
-          v-if="showManualSyncButton" 
-          size="tiny" 
-          text 
-          @click="triggerManualSync"
-          :loading="isSyncing"
-        >
-          <template #icon>
-            <NIcon>
-              <Refresh />
-            </NIcon>
-          </template>
-          手动同步
-        </NButton>
-        
-        
-        <!-- 状态图标 -->
+      <!-- 右侧：同步状态指示器 -->
+      <NFlex align="center" :size="8">
+        <!-- 统一的同步状态指示器 -->
         <NTooltip :show-arrow="false" placement="top">
           <template #trigger>
-            <NIcon 
-              :size="16" 
-              :color="statusIconColor"
-              class="status-icon"
-              :class="{ spinning: isSyncing }"
+            <div 
+              class="sync-status-indicator"
               @click="handleStatusClick"
-              style="cursor: pointer;"
             >
-              <component :is="statusIcon" />
-            </NIcon>
-          </template>
-          <div>{{ statusTooltip }}</div>
-        </NTooltip>
-        <!-- 状态文本 -->
-        <span class="status-text" @click="handleStatusClick" style="cursor: pointer;">
-          {{ statusText }}
-        </span>
-        
-        
-        <!-- 错误详情 -->
-        <NPopover v-if="lastSyncError" trigger="hover" placement="top">
-          <template #trigger>
-            <NButton size="tiny" type="error" text @click="retrySync">
-              <template #icon>
-                <NIcon>
-                  <AlertCircle />
+              <!-- 圆形进度环/状态环 -->
+              <div class="status-ring" :class="statusRingClass">
+                <svg class="progress-ring" viewBox="0 0 24 24">
+                  <circle
+                    class="progress-ring-bg"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    :stroke="statusRingBackgroundColor"
+                    stroke-width="2"
+                  />
+                  <circle
+                    v-if="isSyncing"
+                    class="progress-ring-progress"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    :stroke="statusIconColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    :stroke-dasharray="progressRingDashArray"
+                    :stroke-dashoffset="progressRingDashOffset"
+                  />
+                </svg>
+                
+                <!-- 中心图标 -->
+                <NIcon 
+                  :size="12" 
+                  :color="statusIconColor"
+                  class="status-icon"
+                  :class="{ spinning: isSyncing }"
+                >
+                  <component :is="statusIcon" />
                 </NIcon>
-              </template>
-              重试
-            </NButton>
+              </div>
+            </div>
           </template>
-          <div class="error-details">
-            <div class="error-title">同步错误详情</div>
-            <div class="error-message">{{ lastSyncError }}</div>
-            <div class="error-time" v-if="lastSyncErrorTime">
-              {{ formatSyncTime(lastSyncErrorTime) }}
+          <div class="status-tooltip">
+            <div class="tooltip-title">{{ statusTooltip }}</div>
+            <div v-if="showLastSyncTime" class="tooltip-time">
+              {{ formatSyncTime(lastSyncTime) }}
+            </div>
+            <div v-if="lastSyncError" class="tooltip-error">
+              {{ lastSyncError }}
+            </div>
+            <div v-if="!isWebDAVConfigured" class="tooltip-hint">
+              点击配置 WebDAV 同步
+            </div>
+            <div v-else-if="lastSyncError" class="tooltip-hint">
+              点击重试同步
+            </div>
+            <div v-else-if="showManualSyncButton && !isSyncing" class="tooltip-hint">
+              点击手动同步
             </div>
           </div>
-        </NPopover>
+        </NTooltip>
       </NFlex>
     </NFlex>
   </div>
@@ -87,13 +80,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { NFlex, NIcon, NText, NButton, NPopover, NTooltip, useMessage } from 'naive-ui';
+import { NFlex, NIcon, NText, NTooltip, useMessage } from 'naive-ui';
 import { 
   Cloud, 
   CloudOff, 
   Refresh, 
   RefreshAlert,
-  AlertCircle,
   Home
 } from '@vicons/tabler';
 import { autoSyncManager } from '@/lib/utils/auto-sync-manager';
@@ -200,39 +192,6 @@ const statusTooltip = computed(() => {
   return 'WebDAV 已配置';
 });
 
-// 状态文本
-const statusText = computed(() => {
-  if (!isWebDAVConfigured.value) {
-    return 'Local';
-  }
-  
-  if (!webdavConfig.value.enabled) {
-    return 'WebDAV 已关闭';
-  }
-  
-  if (!isOnline.value) {
-    return '离线';
-  }
-  
-  if (isSyncing.value) {
-    return '同步中';
-  }
-  
-  if (lastSyncError.value) {
-    return '同步失败';
-  }
-  
-  if (syncStatus.value.pendingSyncCount > 0) {
-    return `待同步 ${syncStatus.value.pendingSyncCount} 项`;
-  }
-  
-  if (lastSyncTime.value) {
-    return '已同步';
-  }
-  
-  return 'WebDAV';
-});
-
 // 是否显示最后同步时间
 const showLastSyncTime = computed(() => {
   return isWebDAVConfigured.value && webdavConfig.value.enabled && lastSyncTime.value;
@@ -241,6 +200,35 @@ const showLastSyncTime = computed(() => {
 // 是否显示手动同步按钮
 const showManualSyncButton = computed(() => {
   return isWebDAVConfigured.value && webdavConfig.value.enabled;
+});
+
+// 状态环样式类
+const statusRingClass = computed(() => {
+  const classes = [];
+  if (isSyncing.value) {
+    classes.push('syncing');
+  }
+  if (lastSyncError.value) {
+    classes.push('error');
+  }
+  return classes;
+});
+
+// 状态环背景颜色
+const statusRingBackgroundColor = computed(() => {
+  return 'var(--n-border-color)';
+});
+
+// 圆形进度条相关计算
+const progressRingDashArray = computed(() => {
+  const circumference = 2 * Math.PI * 10; // r=10
+  return `${circumference} ${circumference}`;
+});
+
+const progressRingDashOffset = computed(() => {
+  const circumference = 2 * Math.PI * 10;
+  // 创建一个动态的进度效果
+  return circumference * 0.75; // 显示 25% 的进度
 });
 
 // 格式化同步时间
@@ -395,21 +383,85 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.status-text {
-  font-size: 12px;
-  color: var(--n-text-color);
+/* 同步状态指示器 */
+.sync-status-indicator {
+  cursor: pointer;
+  transition: transform 0.2s ease;
   user-select: none;
 }
 
+.sync-status-indicator:hover {
+  transform: scale(1.1);
+}
+
+.sync-status-indicator:active {
+  transform: scale(0.95);
+}
+
+/* 状态环容器 */
+.status-ring {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 圆形进度环 */
+.progress-ring {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  opacity: 0.2;
+}
+
+.progress-ring-progress {
+  transition: stroke-dashoffset 0.3s ease;
+  animation: progress-rotate 2s linear infinite;
+}
+
+/* 同步中的旋转动画 */
+.status-ring.syncing .progress-ring {
+  animation: ring-rotate 2s linear infinite;
+}
+
+@keyframes ring-rotate {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+@keyframes progress-rotate {
+  0% {
+    stroke-dashoffset: 62.83; /* 完整圆周 */
+  }
+  50% {
+    stroke-dashoffset: 15.71; /* 75% 进度 */
+  }
+  100% {
+    stroke-dashoffset: 62.83;
+  }
+}
+
+/* 中心图标 */
 .status-icon {
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
+  z-index: 1;
 }
 
 .status-icon.spinning {
-  animation: spin 2s linear infinite;
+  animation: icon-spin 2s linear infinite;
 }
 
-@keyframes spin {
+@keyframes icon-spin {
   from {
     transform: rotate(0deg);
   }
@@ -418,56 +470,48 @@ onUnmounted(() => {
   }
 }
 
-.sync-progress-container {
-  width: 60px;
-  height: 4px;
-  background-color: var(--n-border-color);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-left: 8px;
+/* 错误状态的脉冲效果 */
+.status-ring.error {
+  animation: error-pulse 2s ease-in-out infinite;
 }
 
-.sync-progress-bar {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.sync-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #1890ff, #40a9ff);
-  border-radius: 2px;
-  animation: progress-slide 2s infinite;
-  width: 30%;
-}
-
-@keyframes progress-slide {
-  0% {
-    transform: translateX(-100%);
+@keyframes error-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.4);
   }
-  100% {
-    transform: translateX(300%);
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 77, 79, 0);
   }
 }
 
-.error-details {
-  max-width: 300px;
+/* Tooltip 样式 */
+.status-tooltip {
+  max-width: 200px;
+  text-align: center;
 }
 
-.error-title {
-  font-weight: bold;
-  margin-bottom: 8px;
+.tooltip-title {
+  font-weight: 500;
+  margin-bottom: 4px;
   color: var(--n-text-color);
 }
 
-.error-message {
-  margin-bottom: 8px;
-  word-break: break-word;
+.tooltip-time {
+  font-size: 11px;
   color: var(--n-text-color-2);
+  margin-bottom: 2px;
 }
 
-.error-time {
+.tooltip-error {
   font-size: 11px;
+  color: var(--n-error-color);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.tooltip-hint {
+  font-size: 10px;
   color: var(--n-text-color-3);
+  opacity: 0.8;
 }
 </style>
