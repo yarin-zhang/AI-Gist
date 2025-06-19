@@ -78,9 +78,7 @@
                             @check-database-health="checkDatabaseHealth"
                             @repair-database="repairDatabase"
                             @clear-database="clearDatabase"
-                        />
-
-                        <!-- WebDAV 同步设置 -->
+                        />                        <!-- WebDAV 同步设置 -->
                         <WebDAVSyncSettings 
                             v-show="activeSettingKey === 'webdav-sync'"
                             :model-value="{ 
@@ -88,13 +86,14 @@
                                 dataSync: { ...settings.dataSync } 
                             }"
                             @update:model-value="(val) => { 
+                                // 只更新设置数据，不自动保存
                                 Object.assign(settings.webdav, val.webdav); 
                                 Object.assign(settings.dataSync, val.dataSync); 
-                                updateNonWebDAVSetting(); 
                             }"
                             @save-webdav="saveWebDAVSettings"
                             @test-connection="testWebDAVConnection"
                             @sync-now="syncNow"
+                            @sync-time-updated="updateSyncTime"
                         />
 
                         <!-- iCloud 同步设置 -->
@@ -1049,6 +1048,19 @@ const clearDatabase = async () => {
     } finally {
         loading.clearDatabase = false;
     }
+};
+
+// 更新同步时间（避免触发完整设置保存）
+const updateSyncTime = (timestamp: string) => {
+    settings.dataSync.lastSyncTime = timestamp;
+    // 只保存同步时间，不触发完整的设置保存
+    window.electronAPI.preferences.set({
+        dataSync: { ...settings.dataSync }
+    }).then(() => {
+        console.log('同步时间已更新:', timestamp);
+    }).catch(error => {
+        console.error('更新同步时间失败:', error);
+    });
 };
 
 // 组件挂载时加载设置

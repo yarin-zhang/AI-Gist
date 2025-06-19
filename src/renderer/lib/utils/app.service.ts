@@ -90,20 +90,8 @@ export class AppService {
     }
     return { success: false, error: 'WebDAV API 不可用' };
   }
-
   async syncWebDAVNow(): Promise<IpcResult<any>> {
-    if (window.electronAPI?.webdav?.syncNow) {
-      try {
-        const result = await window.electronAPI.webdav.syncNow();
-        return { success: true, data: result };
-      } catch (error) {
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : String(error) 
-        };
-      }
-    }
-    return { success: false, error: 'WebDAV API 不可用' };
+    return await IpcUtils.safeInvoke<any>('webdav:sync-now');
   }
 
   // 手动上传数据

@@ -628,8 +628,25 @@ const notifyConfigChange = () => {
 }
 
 // 立即同步
-const syncNow = () => {
-  emit("sync-now")
+const syncNow = async () => {
+    syncLoading.value = true;
+    try {
+        const result = await appService.syncWebDAVNow();
+        if (result.success) {
+            message.success(result.data.message || '同步成功');
+            // 更新同步时间
+            if (result.data.timestamp) {
+                emit("sync-time-updated", result.data.timestamp);
+            }
+        } else {
+            message.error(result.error || '同步失败');
+        }
+    } catch (error) {
+        console.error('立即同步失败:', error);
+        message.error('同步失败: ' + error.message);
+    } finally {
+        syncLoading.value = false;
+    }
 }
 
 // 手动上传
@@ -639,17 +656,15 @@ const handleManualUpload = async () => {
         const result = await appService.manualUploadWebDAV();
         if (result.success) {
             message.success(result.data.message || '上传成功');
-            emit("update:modelValue", {
-                ...props.modelValue,
-                dataSync: {
-                    ...props.modelValue.dataSync,
-                    lastSyncTime: result.data.timestamp
-                }
-            });
+            // 更新同步时间
+            if (result.data.timestamp) {
+                emit("sync-time-updated", result.data.timestamp);
+            }
         } else {
             message.error(result.error || '上传失败');
         }
     } catch (error) {
+        console.error('手动上传失败:', error);
         message.error('上传失败: ' + error.message);
     } finally {
         uploadLoading.value = false;
@@ -674,13 +689,10 @@ const handleManualDownload = async () => {
                 });
                 if (applyResult.success) {
                     message.success('数据下载并应用成功，无差异');
-                    emit("update:modelValue", {
-                        ...props.modelValue,
-                        dataSync: {
-                            ...props.modelValue.dataSync,
-                            lastSyncTime: result.data.timestamp
-                        }
-                    });
+                    // 更新同步时间
+                    if (result.data.timestamp) {
+                        emit("sync-time-updated", result.data.timestamp);
+                    }
                 } else {
                     message.error(applyResult.error || '应用数据失败');
                 }
@@ -689,6 +701,7 @@ const handleManualDownload = async () => {
             message.error(result.error || '下载失败');
         }
     } catch (error) {
+        console.error('手动下载失败:', error);
         message.error('下载失败: ' + error.message);
     } finally {
         downloadLoading.value = false;
@@ -746,17 +759,15 @@ const handleConflictResolve = async (resolution: any) => {
             message.success('冲突解决成功');
             showConflictDialog.value = false;
             conflictData.value = null;
-            emit("update:modelValue", {
-                ...props.modelValue,
-                dataSync: {
-                    ...props.modelValue.dataSync,
-                    lastSyncTime: result.data.timestamp
-                }
-            });
+            // 更新同步时间
+            if (result.data.timestamp) {
+                emit("sync-time-updated", result.data.timestamp);
+            }
         } else {
             message.error(result.error || '应用数据失败');
         }
     } catch (error) {
+        console.error('解决冲突失败:', error);
         message.error('解决冲突失败: ' + error.message);
     } finally {
         resolveLoading.value = false;
