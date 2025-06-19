@@ -190,7 +190,7 @@ onMounted(() => {
 
 .auto-sync-status.fixed {
   position: fixed;
-  bottom: 16px;
+  bottom: 48px; /* 调整位置，避免与底部状态栏重叠 */
   right: 16px;
   background: var(--n-card-color);
   border: 1px solid var(--n-border-color);

@@ -4,6 +4,7 @@ import {
     NLayout,
     NLayoutSider,
     NLayoutContent,
+    NLayoutFooter,
     NMenu,
     MenuOption,
     NIcon,
@@ -21,6 +22,7 @@ import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
 import AutoSyncStatus from '~/components/common/AutoSyncStatus.vue'
+import WebDAVStatusBar from '~/components/common/WebDAVStatusBar.vue'
 const currentView = ref('prompts')
 
 // 组件引用
@@ -58,6 +60,11 @@ const handleNavigateToAIConfig = async () => {
     }
 }
 
+const handleOpenWebDAVSettings = () => {
+    currentView.value = 'settings'
+    // TODO: 可以在这里添加直接跳转到 WebDAV 设置的逻辑
+}
+
 const collapseRef = ref(true)
 
 window.electronAPI.sendMessage('Hello from App.vue!')
@@ -75,17 +82,25 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 </NFlex>
                 <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
                     :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
-            </NLayoutSider>            <NLayoutContent content-style="overflow-y: auto;">
-                <PromptManagementPage 
-                    v-if="currentView === 'prompts'" 
-                    @navigate-to-ai-config="handleNavigateToAIConfig" 
-                />
-                <AIConfigPage 
-                    v-else-if="currentView === 'ai-config'" 
-                    ref="aiConfigPageRef" 
-                />
-                <SettingsPage v-else-if="currentView === 'settings'" />
-            </NLayoutContent>
+            </NLayoutSider>
+            
+            <NLayout>
+                <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 32px);">
+                    <PromptManagementPage 
+                        v-if="currentView === 'prompts'" 
+                        @navigate-to-ai-config="handleNavigateToAIConfig" 
+                    />
+                    <AIConfigPage 
+                        v-else-if="currentView === 'ai-config'" 
+                        ref="aiConfigPageRef" 
+                    />
+                    <SettingsPage v-else-if="currentView === 'settings'" />
+                </NLayoutContent>
+                
+                <NLayoutFooter bordered style="height: 32px; padding: 0;">
+                    <WebDAVStatusBar @open-settings="handleOpenWebDAVSettings" />
+                </NLayoutFooter>
+            </NLayout>
         </NLayout>
         
         <!-- 自动同步状态显示 -->
