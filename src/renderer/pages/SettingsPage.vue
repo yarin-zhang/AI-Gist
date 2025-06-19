@@ -175,6 +175,15 @@ import WebDAVSyncSettings from "@/components/settings/WebDAVSyncSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
+// Props 定义
+interface Props {
+    targetSection?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    targetSection: undefined
+});
+
 // 消息提示
 const message = useMessage();
 
@@ -183,7 +192,7 @@ const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
-const activeSettingKey = ref("data-management");
+const activeSettingKey = ref(props.targetSection || 'data-management');
 
 // 组件引用
 const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
@@ -1033,6 +1042,13 @@ onMounted(async () => {
     await refreshBackupList();
     await refreshDataStats();
 });
+
+// 监听 props 变化，自动跳转到对应设置页面
+watch(() => props.targetSection, (newTargetSection) => {
+    if (newTargetSection && newTargetSection !== activeSettingKey.value) {
+        activeSettingKey.value = newTargetSection;
+    }
+}, { immediate: true });
 
 // 监听设置页面切换，当切换到数据管理页面时刷新备份列表和数据统计
 watch(activeSettingKey, async (newKey) => {

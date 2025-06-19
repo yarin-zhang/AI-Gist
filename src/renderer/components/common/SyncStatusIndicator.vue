@@ -51,8 +51,27 @@
       <div v-if="lastSyncError" class="tooltip-error">
         {{ lastSyncError }}
       </div>
-      <div v-if="!isWebDAVConfigured" class="tooltip-hint">
-        点击配置 WebDAV 同步
+      <div v-if="!isWebDAVConfigured" class="tooltip-actions">
+        <div class="tooltip-hint">点击配置 WebDAV 同步</div>
+        <NButton 
+          size="tiny" 
+          type="primary" 
+          @click.stop="openWebDAVSettings" 
+          style="margin-top: 4px;"
+        >
+          配置 WebDAV
+        </NButton>
+      </div>
+      <div v-else-if="isWebDAVConfigured && !webdavConfig.enabled" class="tooltip-actions">
+        <div class="tooltip-hint">WebDAV 已配置但未启用</div>
+        <NButton 
+          size="tiny" 
+          type="primary" 
+          @click.stop="enableWebDAV" 
+          style="margin-top: 4px;"
+        >
+          启用 WebDAV 同步
+        </NButton>
       </div>
       <div v-else-if="lastSyncError" class="tooltip-hint">
         点击重试同步
@@ -66,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { NIcon, NTooltip, useMessage } from 'naive-ui';
+import { NIcon, NTooltip, NButton, useMessage } from 'naive-ui';
 import { 
   Cloud, 
   CloudOff, 
@@ -78,7 +97,7 @@ import { autoSyncManager } from '@/lib/utils/auto-sync-manager';
 import type { SyncStatus } from '@/lib/utils/auto-sync-manager';
 
 const emit = defineEmits<{
-  openSettings: [];
+  openSettings: [targetSection?: string];
 }>();
 
 const message = useMessage();
@@ -155,7 +174,7 @@ const statusIconColor = computed(() => {
 // 状态提示文本
 const statusTooltip = computed(() => {
   if (!isWebDAVConfigured.value) {
-    return '本地模式 - 未配置 WebDAV';
+    return '本地模式';
   }
   if (!webdavConfig.value.enabled) {
     return 'WebDAV 同步已关闭';
@@ -256,34 +275,83 @@ const handleStatusClick = () => {
 
 // 手动同步
 const triggerManualSync = async () => {
-  try {
-    message.info('开始手动同步...');
-    autoSyncManager.forceTriggerSync('手动触发');
-  } catch (error) {
-    console.error('手动同步失败:', error);
-    message.error('手动同步失败');
-  }
+    try {
+        // 移除开始同步时的消息提示，只在结束时通过状态监听器显示
+        autoSyncManager.forceTriggerSync('手动触发');
+    } catch (error) {
+        console.error('手动同步失败:', error);
+        message.error('手动同步失败');
+    }
 };
 
 // 重试同步
 const retrySync = async () => {
-  try {
-    message.info('重试同步...');
-    autoSyncManager.forceTriggerSync('手动重试');
-  } catch (error) {
-    console.error('重试同步失败:', error);
-    message.error('重试同步失败');
-  }
+    try {
+        // 移除开始同步时的消息提示，只在结束时通过状态监听器显示
+        autoSyncManager.forceTriggerSync('手动重试');
+    } catch (error) {
+        console.error('重试同步失败:', error);
+        message.error('重试同步失败');
+    }
 };
 
 // 打开设置
 const openWebDAVSettings = () => {
-  emit('openSettings');
+  emit('openSettings', 'webdav-sync');
+};
+
+// 启用 WebDAV
+const enableWebDAV = async () => {
+  try {
+    // 获取当前用户偏好设置
+    const userPrefs = await window.electronAPI?.preferences?.get();
+    
+    if (userPrefs?.webdav) {
+      // 更新 WebDAV 启用状态
+      const updatedWebDAVConfig = {
+        ...userPrefs.webdav,
+        enabled: true
+      };
+      
+      // 保存更新后的配置
+      await window.electronAPI?.preferences?.set({
+        webdav: updatedWebDAVConfig
+      });
+      
+      // 更新本地状态
+      webdavConfig.value.enabled = true;
+      
+      // 派发配置变更事件
+      window.dispatchEvent(new Event('webdav-config-changed'));
+      
+      message.success('WebDAV 同步已启用');
+    } else {
+      // 如果没有配置，引导用户到设置页面
+      openWebDAVSettings();
+    }
+  } catch (error) {
+    console.error('启用 WebDAV 失败:', error);
+    message.error('启用 WebDAV 失败');
+  }
 };
 
 // 监听同步状态变化
 const updateSyncStatus = (status: SyncStatus) => {
-  syncStatus.value = { ...status };
+    const prevSyncing = syncStatus.value.isSyncing;
+    const newSyncing = status.isSyncing;
+    
+    // 更新状态
+    syncStatus.value = { ...status };
+    
+    // 检测同步结束，显示结果消息
+    if (prevSyncing && !newSyncing) {
+        // 同步刚刚结束
+        if (status.lastSyncError) {
+            message.error(`同步失败: ${status.lastSyncError}`);
+        } else {
+            message.success('同步成功');
+        }
+    }
 };
 
 // 加载 WebDAV 配置
@@ -496,5 +564,13 @@ onUnmounted(() => {
   font-size: 10px;
   color: var(--n-text-color-3);
   opacity: 0.8;
+}
+
+.tooltip-actions {
+  margin-top: 4px;
+}
+
+.tooltip-actions .tooltip-hint {
+  margin-bottom: 4px;
 }
 </style>

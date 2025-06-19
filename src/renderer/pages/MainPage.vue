@@ -23,6 +23,7 @@ import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
 import StatusBar from '~/components/common/StatusBar.vue'
 const currentView = ref('prompts')
+const settingsTargetSection = ref<string>()
 
 // 组件引用
 const aiConfigPageRef = ref()
@@ -48,6 +49,10 @@ const menuOptions: MenuOption[] = [
 
 const handleMenuSelect = (key: string) => {
     currentView.value = key
+    // 如果不是通过特定方式打开设置页面，重置目标区域
+    if (key !== 'settings') {
+        settingsTargetSection.value = undefined;
+    }
 }
 
 const handleNavigateToAIConfig = async () => {
@@ -59,9 +64,12 @@ const handleNavigateToAIConfig = async () => {
     }
 }
 
-const handleOpenWebDAVSettings = () => {
+const handleOpenWebDAVSettings = (targetSection?: string) => {
     currentView.value = 'settings'
-    // TODO: 可以在这里添加直接跳转到 WebDAV 设置的逻辑
+    // 设置目标设置区域
+    if (targetSection) {
+        settingsTargetSection.value = targetSection;
+    }
 }
 
 const collapseRef = ref(true)
@@ -90,7 +98,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                         <PromptManagementPage v-if="currentView === 'prompts'"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
-                        <SettingsPage v-else-if="currentView === 'settings'" />
+                        <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />
                     </NLayoutContent>
                 </NLayout>
             </NLayout>

@@ -21,19 +21,20 @@ import { NFlex } from 'naive-ui'
 import SyncStatusIndicator from './SyncStatusIndicator.vue';
 
 const emit = defineEmits<{
-  openSettings: [];
+  openSettings: [targetSection?: string];
 }>();
 
-const handleOpenSettings = () => {
-  emit('openSettings');
+const handleOpenSettings = (targetSection?: string) => {
+  emit('openSettings', targetSection);
 };
 </script>
 
 <style scoped>
 .status-bar {
-    height: 100%;
+  height: 100%;
   background-color: var(--n-color);
   font-size: 12px;
+  overflow: hidden;
 }
 
 .status-bar-content {
@@ -42,17 +43,20 @@ const handleOpenSettings = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  overflow: hidden;
 }
 
 .status-bar-left {
   display: flex;
   align-items: center;
   height: 100%;
+  overflow: hidden;
 }
 
 .status-bar-right {
   display: flex;
   align-items: center;
   height: 100%;
+  overflow: hidden;
 }
 </style>
