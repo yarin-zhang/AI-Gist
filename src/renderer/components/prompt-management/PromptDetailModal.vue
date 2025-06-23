@@ -80,7 +80,7 @@
                                         </NFlex>
 
                                         <!-- 调试区域 -->
-                                        <NAlert v-if="canDebug && aiConfigs.length > 0" type="info" :show-icon="false" style="margin-top: 16px;">
+                                        <NAlert v-if="canDebug" type="info" :show-icon="false" style="margin-top: 16px;">
                                             <template #header>
                                                 <NFlex align="center" size="small">
                                                     <NIcon>
@@ -93,26 +93,12 @@
                                             <!-- AI配置和模型选择 -->
                                             <NFlex vertical size="medium" style="margin-top: 12px;">
                                                 <NFlex size="medium" align="end">
-                                                    <NFormItem label="AI配置" size="small" style="margin-bottom: 0; flex: 1;">
-                                                        <NSelect
-                                                            v-model:value="selectedConfigId"
-                                                            :options="aiConfigs.map(config => ({
-                                                                label: `${config.name} (${config.type})`,
-                                                                value: config.configId
-                                                            }))"
-                                                            placeholder="选择AI配置"
-                                                            size="small"
-                                                        />
-                                                    </NFormItem>
-                                                    
-                                                    <NFormItem v-if="selectedConfig" label="模型" size="small" style="margin-bottom: 0; flex: 1;">
-                                                        <NSelect
-                                                            v-model:value="selectedModel"
-                                                            :options="getModelOptions(selectedConfig)"
-                                                            placeholder="选择模型"
-                                                            size="small"
-                                                        />
-                                                    </NFormItem>
+                                                    <AIModelSelector
+                                                        ref="modelSelectorRef"
+                                                        v-model:modelKey="selectedModelKey"
+                                                        placeholder="选择AI模型"
+                                                        :disabled="debugging"
+                                                    />
                                                 </NFlex>
                                                 
                                                 <!-- 调试按钮 -->
@@ -120,7 +106,7 @@
                                                     <NButton 
                                                         type="primary" 
                                                         :loading="debugging"
-                                                        :disabled="!canDebug || debugging"
+                                                        :disabled="!canDebug || debugging || !selectedModelKey"
                                                         @click="debugPrompt"
                                                         size="small"
                                                     >
@@ -129,7 +115,7 @@
                                                                 <Robot />
                                                             </NIcon>
                                                         </template>
-                                                        {{ debugging ? '调试中...' : '开始调试' }}
+                                                        {{ debugging ? '调试中...' : '看看效果' }}
                                                     </NButton>
                                                 </NFlex>
                                             </NFlex>
@@ -569,21 +555,13 @@
                 <div>
                     <!-- 右侧区域 - 主要操作按钮 -->
                     <NFlex size="small">
-                        <NButton @click="copyToClipboard(filledContent)">
-                            <template #icon>
-                                <NIcon>
-                                    <Copy />
-                                </NIcon>
-                            </template>
-                            复制内容
-                        </NButton>
                         <NButton type="primary" @click="usePrompt">
                             <template #icon>
                                 <NIcon>
                                     <Check />
                                 </NIcon>
                             </template>
-                            使用此提示词
+                            复制内容
                         </NButton>
                     </NFlex>
                 </div>
@@ -634,6 +612,7 @@ import {
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
 import CommonModal from "@/components/common/CommonModal.vue";
+import AIModelSelector from "@/components/common/AIModelSelector.vue";
 
 interface Props {
     show: boolean;
@@ -668,9 +647,9 @@ const debugging = ref(false);
 const debugResult = ref("");
 const debugError = ref("");
 
-// AI 配置相关
-const aiConfigs = ref([]);
-const selectedConfigId = ref("");
+// AI 配置相关 - 使用新的组件
+const modelSelectorRef = ref();
+const selectedModelKey = ref("");
 
 // 分页相关
 const currentPage = ref(1);
@@ -832,26 +811,6 @@ const copyToClipboard = async (text) => {
     }
 };
 
-// 加载AI配置列表
-const loadAIConfigs = async () => {
-    try {
-        // 使用数据库API获取AI配置
-        const allConfigs = await api.aiConfigs.getAll.query();
-        aiConfigs.value = allConfigs.filter(config => config.enabled);
-        
-        // 设置默认选择的配置（优先选择首选配置）
-        const preferredConfig = aiConfigs.value.find(config => config.isPreferred);
-        if (preferredConfig) {
-            selectedConfigId.value = preferredConfig.configId;
-        } else if (aiConfigs.value.length > 0) {
-            selectedConfigId.value = aiConfigs.value[0].configId;
-        }
-    } catch (error) {
-        console.error("加载AI配置失败:", error);
-        message.error("加载AI配置失败");
-    }
-};
-
 // 加载调试历史记录
 const loadDebugHistory = async () => {
     try {
@@ -908,14 +867,16 @@ const debugPrompt = async () => {
         return;
     }
 
-    if (aiConfigs.value.length === 0) {
+    const selectedConfig = modelSelectorRef.value?.selectedConfig;
+    const selectedModel = modelSelectorRef.value?.selectedModel;
+
+    if (!selectedConfig) {
         message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
         return;
     }
 
-    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
-    if (!selectedConfig) {
-        message.error("请选择一个AI配置");
+    if (!selectedModel) {
+        message.error("请选择一个模型");
         return;
     }
 
@@ -948,7 +909,7 @@ const debugPrompt = async () => {
             configId: String(selectedConfig.configId || ''),
             topic: String(`请直接回应以下提示词：\n\n${filledContent.value}`),
             customPrompt: String(filledContent.value), // 直接使用用户的Prompt
-            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+            model: String(selectedModel)
         };
 
         console.log("开始调试提示词:", filledContent.value);
@@ -985,14 +946,14 @@ const debugPrompt = async () => {
 
         // 保存失败记录
         try {
-            const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
+            const selectedConfig = modelSelectorRef.value?.selectedConfig;
             if (selectedConfig) {
                 await api.aiGenerationHistory.create.mutate({
                     historyId: `debug_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     configId: selectedConfig.configId,
                     topic: `提示词调试失败: ${props.prompt?.title || '未命名提示词'}`,
                     generatedPrompt: filledContent.value,
-                    model: selectedConfig.defaultModel || selectedConfig.models[0],
+                    model: selectedModel,
                     status: 'error',
                     errorMessage: error.message || "调试失败",
                     debugStatus: 'error',
@@ -1180,9 +1141,6 @@ watch(
             debugging.value = false;
             debugResult.value = "";
             debugError.value = "";
-        } else {
-            // 显示弹窗时加载AI配置
-            loadAIConfigs();
         }
     }
 );
