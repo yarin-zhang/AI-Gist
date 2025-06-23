@@ -856,37 +856,35 @@ export class BaseDatabaseService {
    * @returns Promise<T | null> 找到的记录或null
    */
   async getByUUID<T>(storeName: string, uuid: string): Promise<T | null> {
-    return this.executeWithRetry(async () => {
-      if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const transaction = this.db.transaction([storeName], 'readonly');
+    const store = transaction.objectStore(storeName);
+    
+    try {
+      const index = store.index('uuid');
+      const request = index.get(uuid);
       
-      const transaction = this.db.transaction([storeName], 'readonly');
-      const store = transaction.objectStore(storeName);
+      return new Promise<T | null>((resolve, reject) => {
+        request.onsuccess = () => {
+          resolve(request.result as T || null);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      // 如果UUID索引不存在，则遍历所有记录查找
+      console.warn(`UUID index not found for ${storeName}, falling back to full scan`);
+      const request = store.getAll();
       
-      try {
-        const index = store.index('uuid');
-        const request = index.get(uuid);
-        
-        return new Promise<T | null>((resolve, reject) => {
-          request.onsuccess = () => {
-            resolve(request.result as T || null);
-          };
-          request.onerror = () => reject(request.error);
-        });
-      } catch (error) {
-        // 如果UUID索引不存在，则遍历所有记录查找
-        console.warn(`UUID index not found for ${storeName}, falling back to full scan`);
-        const request = store.getAll();
-        
-        return new Promise<T | null>((resolve, reject) => {
-          request.onsuccess = () => {
-            const records = request.result as T[];
-            const found = records.find((record: any) => record.uuid === uuid);
-            resolve(found || null);
-          };
-          request.onerror = () => reject(request.error);
-        });
-      }
-    }, [storeName]);
+      return new Promise<T | null>((resolve, reject) => {
+        request.onsuccess = () => {
+          const records = request.result as T[];
+          const found = records.find((record: any) => record.uuid === uuid);
+          resolve(found || null);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    }
   }
 
   /**
@@ -897,18 +895,10 @@ export class BaseDatabaseService {
    * @returns Promise<T | null> 更新后的记录或null
    */
   async updateByUUID<T>(storeName: string, uuid: string, updates: Partial<T>): Promise<T | null> {
-    return this.executeWithRetry(async () => {
-      const record = await this.getByUUID<T>(storeName, uuid);
-      if (!record) return null;
-      
-      const updatedRecord = {
-        ...record,
-        ...updates,
-        updatedAt: new Date()
-      } as T;
-      
-      return this.update<T>(storeName, (record as any).id, updates);
-    }, [storeName]);
+    const record = await this.getByUUID<T>(storeName, uuid);
+    if (!record) return null;
+    
+    return this.update<T>(storeName, (record as any).id, updates);
   }
 
   /**
@@ -918,14 +908,13 @@ export class BaseDatabaseService {
    * @returns Promise<boolean> 是否成功删除
    */
   async deleteByUUID(storeName: string, uuid: string): Promise<boolean> {
-    return this.executeWithRetry(async () => {
-      const record = await this.getByUUID(storeName, uuid);
-      if (!record) return false;
-      
-      await this.delete(storeName, (record as any).id);
-      return true;
-    }, [storeName]);
+    const record = await this.getByUUID(storeName, uuid);
+    if (!record) return false;
+    
+    await this.delete(storeName, (record as any).id);
+    return true;
   }
+
   /**
    * 批量删除操作的基础方法
    * 批量删除多个记录，在所有操作完成后只触发一次同步
@@ -998,7 +987,9 @@ export class BaseDatabaseService {
         };
       });
     });
-  }  /**
+  }
+
+  /**
    * 在数据变更后触发自动同步
    * @param operation 操作类型
    * @param storeName 对象存储名称

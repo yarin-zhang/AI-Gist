@@ -438,20 +438,28 @@ export class AIConfigService extends BaseDatabaseService {
   }
 
   /**
-   * Upsert an AI config.
-   * Creates a new config if it doesn't exist, otherwise updates the existing one.
-   * @param id The ID of the config to upsert.
-   * @param data The data of the config.
+   * 更新或插入AI配置。
+   * 如果配置不存在，则创建新的配置；否则更新已有的配置。
+   * @param id 要更新或插入的配置ID。
+   * @param data 配置的数据。
    */
   async upsertAIConfig(id: string, data: Partial<AIConfig>): Promise<void> {
-    const existing = await this.get<AIConfig>('ai_configs', id);
+    const existing = await this.getById<AIConfig>('ai_configs', parseInt(id));
     if (existing) {
         // Update existing config
-        const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
-        await this.put('ai_configs', updatedData);
+        await this.update('ai_configs', existing.id!, {
+          ...data,
+          updatedAt: new Date().toISOString()
+        });
     } else {
         // Create new config
-        const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const newData = {
+          ...data,
+          id: parseInt(id),
+          uuid: generateUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
         await this.add('ai_configs', newData as AIConfig);
     }
   }
