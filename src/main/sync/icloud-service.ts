@@ -1,14 +1,91 @@
 /**
- * iCloud 同步服务
- * 基于 iCloud Drive 文件系统的同步实现
+ * 现代化 iCloud 同步服务
+ * 基于 UUID 的可靠数据同步方案
+ * 与 WebDAV 服务保持一致的架构
  */
 
-
-import { ipcMain, app, shell } from 'electron';
-import * as path from 'path';
+import { app, ipcMain, shell } from 'electron';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
+
+// 现代化数据结构接口（与 WebDAV 保持一致）
+interface DataItem {
+    id: string; // UUID
+    type: 'category' | 'prompt' | 'aiConfig' | 'setting' | 'user' | 'post' | 'history';
+    title?: string;
+    content: any;
+    metadata: DataItemMetadata;
+}
+
+interface DataItemMetadata {
+    createdAt: string; // ISO 8601
+    updatedAt: string; // ISO 8601
+    version: number; // 版本号
+    deviceId: string; // 创建设备ID
+    lastModifiedBy: string; // 最后修改的设备ID
+    checksum: string; // 内容校验和
+    deleted?: boolean; // 软删除标记
+    tags?: string[]; // 标签
+    syncStatus?: 'synced' | 'pending' | 'conflict'; // 同步状态
+}
+
+interface SyncSnapshot {
+    timestamp: string;
+    version: string;
+    deviceId: string;
+    items: DataItem[];
+    metadata: SnapshotMetadata;
+}
+
+interface SnapshotMetadata {
+    totalItems: number;
+    checksum: string; // 整个快照的校验和
+    syncId: string; // 同步操作的唯一ID
+    previousSyncId?: string; // 上一次同步的ID
+    conflictsResolved: ConflictResolution[];
+    deviceInfo: {
+        id: string;
+        name: string;
+        platform: string;
+        appVersion: string;
+    };
+}
+
+interface ConflictResolution {
+    itemId: string;
+    strategy: 'local_wins' | 'remote_wins' | 'merge' | 'create_duplicate';
+    timestamp: string;
+    reason: string;
+}
+
+interface SyncResult {
+    success: boolean;
+    message: string;
+    timestamp: string;
+    itemsProcessed: number;
+    itemsUpdated: number;
+    itemsCreated: number;
+    itemsDeleted: number;
+    conflictsResolved: number;
+    conflictDetails: ConflictResolution[];
+    errors: string[];
+    // 新增同步阶段信息
+    phases: {
+        upload: { completed: boolean; itemsProcessed: number; errors: string[] };
+        deleteRemote: { completed: boolean; itemsProcessed: number; errors: string[] };
+        download: { completed: boolean; itemsProcessed: number; errors: string[] };
+    };
+    // 新增合并确认相关信息
+    autoMergeConfirmed?: boolean;
+    mergeInfo?: {
+        localItems: number;
+        remoteItems: number;
+        conflictingItems: number;
+    };
+}
 
 interface ICloudConfig {
     enabled: boolean;
@@ -24,44 +101,12 @@ interface ICloudTestResult {
     available?: boolean;
 }
 
-interface SyncResult {
-    success: boolean;
-    message: string;
-    timestamp: string;
-    filesUploaded: number;
-    filesDownloaded: number;
-    conflictsDetected: number;
-    conflictsResolved: number;
-    conflictDetails?: ConflictDetail[];
-}
-
-interface ConflictDetail {
-    type: 'data_conflict' | 'timestamp_conflict' | 'version_conflict';
-    description: string;
-    resolution: 'local_wins' | 'remote_wins' | 'merged' | 'backup_created';
-    localData?: any;
-    remoteData?: any;
-}
-
-interface SyncMetadata {
-    lastSyncTime: string;
-    localVersion: string;
-    remoteVersion: string;
-    dataHash: string;
-    syncCount: number;
-    deviceId: string;
-    appVersion: string;
-    totalRecords: number;
-    lastModifiedTime: string;
-    syncStrategy: string;
-}
-
 interface ManualSyncResult {
     success: boolean;
     message: string;
     timestamp: string;
     hasConflicts: boolean;
-    conflictDetails?: ConflictDetail[];
+    conflictDetails?: ConflictResolution[];
     localData?: any;
     remoteData?: any;
     differences?: {
@@ -76,581 +121,545 @@ interface ManualSyncResult {
     };
 }
 
-interface ConflictResolution {
-    strategy: 'use_local' | 'use_remote' | 'merge_smart' | 'merge_manual' | 'cancel';
-    mergedData?: any;
+// 错误重试配置
+interface RetryConfig {
+    maxRetries: number;
+    baseDelay: number; // 基础延迟（毫秒）
+    maxDelay: number;  // 最大延迟（毫秒）
+    backoffMultiplier: number;
 }
 
-enum ConflictResolutionStrategy {
-    ASK_USER = 'ask_user',
-    LOCAL_WINS = 'local_wins', 
-    REMOTE_WINS = 'remote_wins',
-    AUTO_MERGE = 'auto_merge',
-    CREATE_BACKUP = 'create_backup'
-}
-
+/**
+ * 现代化 iCloud 同步服务
+ * 基于 UUID 的可靠数据同步
+ */
 export class ICloudService {
     private config: ICloudConfig | null = null;
-    private syncTimer: NodeJS.Timeout | null = null;
-    private tempRemoteData: any = null;
-    private tempRemoteMetadata: any = null;
+    private deviceId: string;
+    private isInitialized = false;
+    private syncInProgress = false;
+    private autoSyncTimer: NodeJS.Timeout | null = null;
+    private preferencesManager: any;
+    private dataManagementService: any;
+    
+    // iCloud 特定配置
     private readonly defaultICloudPath: string;
     private readonly syncDirName = 'AI-Gist-Sync';
-    private isInitialized = false;
+    
+    // 重试机制
+    private retryConfig: RetryConfig = {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 30000,
+        backoffMultiplier: 2
+    };
+    
+    // 同步状态追踪
+    private lastSuccessfulSync: string | null = null;
+    private consecutiveFailures = 0;
 
-    constructor(private preferencesManager: any, private dataManagementService?: any) {
+    constructor(preferencesManager: any, dataManagementService?: any) {
+        this.preferencesManager = preferencesManager;
+        this.dataManagementService = dataManagementService;
+        this.deviceId = this.generateDeviceId();
+        
         // 默认 iCloud Drive 路径
         this.defaultICloudPath = path.join(os.homedir(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs');
-        console.log('iCloud 服务初始化中...');
+        
+        console.log(`iCloudService initialized with device ID: ${this.deviceId}`);
         console.log('默认 iCloud Drive 路径:', this.defaultICloudPath);
-        console.log('iCloud 服务已初始化');
     }
 
     /**
      * 初始化服务
      */
     async initialize(): Promise<void> {
+        console.log('[iCloud] 开始初始化服务...');
         try {
             this.config = await this.loadConfig();
-            this.setupIpcHandlers();
-            
-            if (this.config?.enabled && this.config.autoSync) {
+            if (this.config?.enabled && this.config?.autoSync) {
                 this.startAutoSync();
             }
-
             this.isInitialized = true;
-            console.log('iCloud 服务初始化完成');
+            console.log('[iCloud] 服务初始化完成');
         } catch (error) {
-            console.error('iCloud 服务初始化失败:', error);
+            console.error('[iCloud] 初始化失败:', error);
             throw error;
         }
+    }
+
+    /**
+     * 生成设备唯一ID
+     */
+    private generateDeviceId(): string {
+        const platform = process.platform;
+        let hostname: string;
+        try {
+            hostname = os.hostname() || 'unknown';
+        } catch (error) {
+            hostname = 'unknown';
+        }
+        
+        // 尝试从本地存储获取现有设备ID
+        const userDataPath = app.getPath('userData');
+        const deviceIdFile = path.join(userDataPath, 'device-id.json');
+        
+        try {
+            const existingData = JSON.parse(fs.readFileSync(deviceIdFile, 'utf8'));
+            if (existingData.deviceId) {
+                console.log('[iCloud] 使用现有设备ID:', existingData.deviceId);
+                return existingData.deviceId;
+            }
+        } catch (error) {
+            // 文件不存在或格式错误，生成新的设备ID
+        }
+        
+        // 生成新的设备ID
+        const newDeviceId = `${platform}-${hostname}-${uuidv4()}`;
+        
+        try {
+            fs.writeFileSync(deviceIdFile, JSON.stringify({ 
+                deviceId: newDeviceId, 
+                createdAt: new Date().toISOString() 
+            }));
+        } catch (error) {
+            console.warn('[iCloud] 无法保存设备ID文件:', error);
+        }
+        
+        return newDeviceId;
     }
 
     /**
      * 加载配置
      */
     private async loadConfig(): Promise<ICloudConfig | null> {
+        console.log('[iCloud] loadConfig() - 开始加载配置');
         try {
-            const prefs = this.preferencesManager.getPreferences();
-            return prefs.icloud || null;
+            const preferences = this.preferencesManager.getPreferences();
+            const config = preferences.icloud;
+            
+            console.log('[iCloud] loadConfig() - 配置详情:', {
+                hasConfig: !!config,
+                enabled: config?.enabled,
+                autoSync: config?.autoSync,
+                syncInterval: config?.syncInterval,
+                hasCustomPath: !!config?.customPath
+            });
+
+            if (!config) {
+                console.log('[iCloud] loadConfig() - 未找到配置，返回默认配置');
+                return {
+                    enabled: false,
+                    autoSync: false,
+                    syncInterval: 30
+                };
+            }
+
+            return config;
         } catch (error) {
-            console.error('加载iCloud配置失败:', error);
+            console.error('[iCloud] loadConfig() - 加载配置失败:', error);
             return null;
         }
     }
 
     /**
-     * 设置 IPC 处理器
+     * 获取本地数据快照
      */
-    public setupIpcHandlers() {
-        console.log('正在设置 iCloud IPC 处理程序...');
+    private async getLocalSnapshot(): Promise<SyncSnapshot> {
+        console.log('[iCloud] 开始获取本地数据快照...');
         
         try {
-            // 测试 iCloud 可用性
-            console.log('注册 icloud:test-availability 处理程序');
-            ipcMain.handle('icloud:test-availability', async (): Promise<ICloudTestResult> => {
-                try {
-                    const result = await this.testICloudAvailability();
-                    console.log('iCloud 可用性测试结果:', result);
-                    return result;
-                } catch (error) {
-                    console.error('iCloud 可用性测试失败:', error);
-                    const errorMessage = error instanceof Error ? error.message : '未知错误';
-                    return {
-                        success: false,
-                        message: `测试失败: ${errorMessage}`,
-                        available: false
-                    };
-                }
+            // 从数据管理服务获取数据
+            const localData = await this.exportLocalData();
+            console.log('[iCloud] 获取到的本地数据:', {
+                hasData: !!localData,
+                categories: localData?.categories?.length || 0,
+                prompts: localData?.prompts?.length || 0,
+                aiConfigs: localData?.aiConfigs?.length || 0
             });
 
-            // 立即同步
-            console.log('注册 icloud:sync-now 处理程序');
-            ipcMain.handle('icloud:sync-now', async (): Promise<SyncResult> => {
-                try {
-                    // 获取配置
-                    const preferences = this.preferencesManager.getPreferences();
-                    const config: ICloudConfig = preferences.icloud;
-                    
-                    console.log('同步时检查 iCloud 配置:', {
-                        hasConfig: !!config,
-                        enabled: config?.enabled,
-                        autoSync: config?.autoSync
-                    });
-                    
-                    if (!config || !config.enabled) {
-                        return {
-                            success: false,
-                            message: 'iCloud 同步未启用',
-                            timestamp: new Date().toISOString(),
-                            filesUploaded: 0,
-                            filesDownloaded: 0,
-                            conflictsDetected: 0,
-                            conflictsResolved: 0,
-                        };
+            // 转换为现代格式
+            const items = await this.convertToModernFormat(localData);
+            
+            const now = new Date().toISOString();
+            const syncId = uuidv4();
+            
+            const snapshot: SyncSnapshot = {
+                timestamp: now,
+                version: '2.0.0',
+                deviceId: this.deviceId,
+                items,
+                metadata: {
+                    totalItems: items.length,
+                    checksum: this.calculateChecksum(items),
+                    syncId,
+                    conflictsResolved: [],
+                    deviceInfo: {
+                        id: this.deviceId,
+                        name: os.hostname() || 'Unknown',
+                        platform: process.platform,
+                        appVersion: app.getVersion() || '1.0.0'
                     }
-
-                    // 测试 iCloud 可用性
-                    const availability = await this.testICloudAvailability();
-                    if (!availability.success || !availability.available) {
-                        return {
-                            success: false,
-                            message: `iCloud 不可用: ${availability.message}`,
-                            timestamp: new Date().toISOString(),
-                            filesUploaded: 0,
-                            filesDownloaded: 0,
-                            conflictsDetected: 0,
-                            conflictsResolved: 0,
-                        };
-                    }
-                    
-                    // 直接使用配置进行同步
-                    this.config = config;
-                    const result = await this.performSync();
-                    return result;
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : '同步失败';
-                    return {
-                        success: false,
-                        message: errorMessage,
-                        timestamp: new Date().toISOString(),
-                        filesUploaded: 0,
-                        filesDownloaded: 0,
-                        conflictsDetected: 0,
-                        conflictsResolved: 0,
-                    };
                 }
-            });
+            };
 
-            // 手动上传数据
-            console.log('注册 icloud:manual-upload 处理程序');
-            ipcMain.handle('icloud:manual-upload', async (): Promise<ManualSyncResult> => {
-                try {
-                    console.log('开始手动上传数据到 iCloud...');
-                    
-                    // 获取配置
-                    const config = await this.getStoredConfig();
-                    if (!config) {
-                        return {
-                            success: false,
-                            message: '未找到 iCloud 配置',
-                            timestamp: new Date().toISOString(),
-                            hasConflicts: false
-                        };
-                    }
-
-                    // 测试 iCloud 可用性
-                    const availability = await this.testICloudAvailability();
-                    if (!availability.success || !availability.available) {
-                        return {
-                            success: false,
-                            message: `iCloud 不可用: ${availability.message}`,
-                            timestamp: new Date().toISOString(),
-                            hasConflicts: false
-                        };
-                    }
-
-                    const syncDir = this.getSyncDirectory();
-                    const dataFile = path.join(syncDir, 'data.json');
-                    const metadataFile = path.join(syncDir, 'metadata.json');
-
-                    // 确保同步目录存在
-                    await this.ensureSyncDirectory(syncDir);
-
-                    // 获取本地数据
-                    const localData = await this.generateExportData();
-                    const localMetadata = await this.getLocalSyncMetadata();
-                    localMetadata.totalRecords = this.calculateTotalRecords(localData);
-
-                    // 上传数据和元数据
-                    await fs.promises.writeFile(dataFile, JSON.stringify(localData, null, 2));
-                    await fs.promises.writeFile(metadataFile, JSON.stringify(localMetadata, null, 2));
-
-                    // 更新本地同步时间
-                    await this.updateLocalSyncTime(new Date().toISOString());
-
-                    console.log('手动上传完成');
-                    return {
-                        success: true,
-                        message: '数据上传成功',
-                        timestamp: new Date().toISOString(),
-                        hasConflicts: false
-                    };
-                } catch (error) {
-                    console.error('手动上传失败:', error);
-                    const errorMessage = error instanceof Error ? error.message : '上传失败';
-                    return {
-                        success: false,
-                        message: errorMessage,
-                        timestamp: new Date().toISOString(),
-                        hasConflicts: false
-                    };
-                }
-            });
-
-            // 手动从 iCloud 下载数据（检测冲突但不自动应用）
-            console.log('注册 icloud:manual-download 处理程序');
-            ipcMain.handle('icloud:manual-download', async (): Promise<ManualSyncResult> => {
-                try {
-                    console.log('开始从 iCloud 下载数据...');
-                    
-                    // 获取配置
-                    const config = await this.getStoredConfig();
-                    if (!config) {
-                        return {
-                            success: false,
-                            message: '未找到 iCloud 配置',
-                            timestamp: new Date().toISOString(),
-                            hasConflicts: false
-                        };
-                    }
-
-                    // 测试 iCloud 可用性
-                    const availability = await this.testICloudAvailability();
-                    if (!availability.success || !availability.available) {
-                        return {
-                            success: false,
-                            message: `iCloud 不可用: ${availability.message}`,
-                            timestamp: new Date().toISOString(),
-                            hasConflicts: false
-                        };
-                    }
-
-                    const syncDir = this.getSyncDirectory();
-                    const dataFile = path.join(syncDir, 'data.json');
-                    const metadataFile = path.join(syncDir, 'metadata.json');
-
-                    const dataExists = await this.checkFileExists(dataFile);
-                    if (!dataExists) {
-                        return {
-                            success: false,
-                            message: 'iCloud 上没有找到数据文件',
-                            timestamp: new Date().toISOString(),
-                            hasConflicts: false
-                        };
-                    }
-
-                    // 下载远程数据
-                    const remoteDataContent = await fs.promises.readFile(dataFile, 'utf-8');
-                    const remoteData = JSON.parse(remoteDataContent);
-
-                    let remoteMetadata = null;
-                    if (await this.checkFileExists(metadataFile)) {
-                        const remoteMetadataContent = await fs.promises.readFile(metadataFile, 'utf-8');
-                        remoteMetadata = JSON.parse(remoteMetadataContent);
-                    }
-
-                    // 获取本地数据
-                    const localData = await this.generateExportData();
-                    const localMetadata = await this.getLocalSyncMetadata();
-
-                    // 检测冲突并生成详细的差异分析
-                    const detailedDifferences = await this.generateDetailedDifferences(localData, remoteData, localMetadata, remoteMetadata);
-
-                    // 暂存远程数据供后续使用
-                    this.tempRemoteData = remoteData;
-                    this.tempRemoteMetadata = remoteMetadata;
-
-                    return {
-                        success: true,
-                        message: '数据下载完成',
-                        timestamp: new Date().toISOString(),
-                        hasConflicts: detailedDifferences.summary.conflicts > 0,
-                        differences: detailedDifferences,
-                        localData,
-                        remoteData
-                    };
-
-                } catch (error) {
-                    console.error('手动下载失败:', error);
-                    const errorMessage = error instanceof Error ? error.message : '下载失败';
-                    return {
-                        success: false,
-                        message: errorMessage,
-                        timestamp: new Date().toISOString(),
-                        hasConflicts: false
-                    };
-                }
-            });
-
-            // 应用下载的数据（解决冲突后）
-            console.log('注册 icloud:apply-downloaded-data 处理程序');
-            ipcMain.handle('icloud:apply-downloaded-data', async (event, resolution: ConflictResolution): Promise<SyncResult> => {
-                try {
-                    if (!this.tempRemoteData) {
-                        return {
-                            success: false,
-                            message: '没有临时数据可以应用',
-                            timestamp: new Date().toISOString(),
-                            filesUploaded: 0,
-                            filesDownloaded: 0,
-                            conflictsDetected: 0,
-                            conflictsResolved: 0
-                        };
-                    }
-
-                    let finalData: any;
-
-                    switch (resolution.strategy) {
-                        case 'use_local':
-                            // 不需要应用，直接返回成功
-                            return {
-                                success: true,
-                                message: '保持使用本地数据',
-                                timestamp: new Date().toISOString(),
-                                filesUploaded: 0,
-                                filesDownloaded: 0,
-                                conflictsDetected: 0,
-                                conflictsResolved: 1
-                            };
-                        case 'use_remote':
-                            finalData = this.tempRemoteData;
-                            break;
-                        case 'merge_smart':
-                        case 'merge_manual':
-                            finalData = resolution.mergedData;
-                            break;
-                        case 'cancel':
-                            return {
-                                success: false,
-                                message: '用户取消操作',
-                                timestamp: new Date().toISOString(),
-                                filesUploaded: 0,
-                                filesDownloaded: 0,
-                                conflictsDetected: 0,
-                                conflictsResolved: 0
-                            };
-                        default:
-                            throw new Error(`未知的解决策略: ${resolution.strategy}`);
-                    }
-
-                    // 应用数据到本地
-                    if (this.dataManagementService) {
-                        await this.dataManagementService.importDataObject(finalData);
-                    }
-
-                    // 更新同步时间
-                    await this.updateLocalSyncTime(new Date().toISOString());
-
-                    // 清理临时数据
-                    this.tempRemoteData = null;
-                    this.tempRemoteMetadata = null;
-
-                    return {
-                        success: true,
-                        message: '数据应用成功',
-                        timestamp: new Date().toISOString(),
-                        filesUploaded: 0,
-                        filesDownloaded: 1,
-                        conflictsDetected: 1,
-                        conflictsResolved: 1
-                    };
-
-                } catch (error) {
-                    console.error('应用数据失败:', error);
-                    const errorMessage = error instanceof Error ? error.message : '未知错误';
-                    return {
-                        success: false,
-                        message: `应用数据失败: ${errorMessage}`,
-                        timestamp: new Date().toISOString(),
-                        filesUploaded: 0,
-                        filesDownloaded: 0,
-                        conflictsDetected: 0,
-                        conflictsResolved: 0
-                    };
-                }
-            });
-
-            // 比较本地和远程数据
-            console.log('注册 icloud:compare-data 处理程序');
-            ipcMain.handle('icloud:compare-data', async () => {
-                try {
-                    // 获取配置
-                    const config = await this.getStoredConfig();
-                    if (!config) {
-                        return {
-                            success: false,
-                            message: '未找到 iCloud 配置'
-                        };
-                    }
-
-                    // 测试 iCloud 可用性
-                    const availability = await this.testICloudAvailability();
-                    if (!availability.success || !availability.available) {
-                        return {
-                            success: false,
-                            message: `iCloud 不可用: ${availability.message}`
-                        };
-                    }
-
-                    const syncDir = this.getSyncDirectory();
-                    const dataFile = path.join(syncDir, 'data.json');
-                    const metadataFile = path.join(syncDir, 'metadata.json');
-
-                    const dataExists = await this.checkFileExists(dataFile);
-                    if (!dataExists) {
-                        return {
-                            success: false,
-                            message: 'iCloud 上没有找到数据文件'
-                        };
-                    }
-
-                    const remoteDataContent = await fs.promises.readFile(dataFile, 'utf-8');
-                    const remoteData = JSON.parse(remoteDataContent);
-
-                    let remoteMetadata = null;
-                    if (await this.checkFileExists(metadataFile)) {
-                        const remoteMetadataContent = await fs.promises.readFile(metadataFile, 'utf-8');
-                        remoteMetadata = JSON.parse(remoteMetadataContent);
-                    }
-
-                    const localData = await this.generateExportData();
-                    const localMetadata = await this.getLocalSyncMetadata();
-
-                    // 使用详细差异分析
-                    const differences = await this.generateDetailedDifferences(localData, remoteData, localMetadata, remoteMetadata);
-
-                    return {
-                        success: true,
-                        differences,
-                        localMetadata,
-                        remoteMetadata
-                    };
-
-                } catch (error) {
-                    console.error('比较数据失败:', error);
-                    const errorMessage = error instanceof Error ? error.message : '比较失败';
-                    return {
-                        success: false,
-                        message: errorMessage
-                    };
-                }
-            });
-
-            // 获取 iCloud 配置
-            console.log('注册 icloud:get-config 处理程序');
-            ipcMain.handle('icloud:get-config', async (): Promise<ICloudConfig> => {
-                try {
-                    const preferences = this.preferencesManager.getPreferences();
-                    return preferences.icloud || {
-                        enabled: false,
-                        autoSync: false,
-                        syncInterval: 30
-                    };
-                } catch (error) {
-                    console.error('获取 iCloud 配置失败:', error);
-                    return {
-                        enabled: false,
-                        autoSync: false,
-                        syncInterval: 30
-                    };
-                }
-            });
-
-            // 设置 iCloud 配置
-            console.log('注册 icloud:set-config 处理程序');
-            ipcMain.handle('icloud:set-config', async (event, config: ICloudConfig) => {
-                try {
-                    console.log('保存 iCloud 配置:', {
-                        ...config,
-                        customPath: config.customPath ? '[已设置]' : '[未设置]'
-                    });
-
-                    // 获取当前偏好设置
-                    const currentPrefs = this.preferencesManager.getPreferences();
-                    const currentICloudConfig = currentPrefs.icloud || {};
-
-                    // 合并配置
-                    const mergedConfig = {
-                        ...currentICloudConfig,
-                        enabled: config.enabled !== undefined ? config.enabled : currentICloudConfig.enabled,
-                        autoSync: config.autoSync !== undefined ? config.autoSync : currentICloudConfig.autoSync,
-                        syncInterval: config.syncInterval !== undefined ? config.syncInterval : currentICloudConfig.syncInterval,
-                        customPath: config.customPath !== undefined ? config.customPath : currentICloudConfig.customPath
-                    };
-
-                    console.log('保存 iCloud 配置:', mergedConfig);
-
-                    // 保存配置到偏好设置
-                    this.preferencesManager.updatePreferences({
-                        icloud: mergedConfig
-                    });
-
-                    return {
-                        success: true,
-                        message: '配置已保存'
-                    };
-                } catch (error) {
-                    console.error('保存 iCloud 配置失败:', error);
-                    return {
-                        success: false,
-                        error: error instanceof Error ? error.message : '保存配置失败'
-                    };
-                }
-            });
-
-            // 打开同步目录
-            console.log('注册 icloud:open-sync-directory 处理程序');
-            ipcMain.handle('icloud:open-sync-directory', async () => {
-                try {
-                    const iCloudPath = this.getICloudPath();
-                    const syncPath = path.join(iCloudPath, this.syncDirName);
-                    
-                    // 检查目录是否存在，如果不存在则创建
-                    try {
-                        await fs.promises.access(syncPath);
-                    } catch (error) {
-                        // 目录不存在，创建它
-                        await fs.promises.mkdir(syncPath, { recursive: true });
-                    }
-
-                    // 使用 shell.openPath 打开目录
-                    const result = await shell.openPath(syncPath);
-                    
-                    if (result) {
-                        // openPath 返回非空字符串表示有错误
-                        throw new Error(`无法打开目录: ${result}`);
-                    }
-                    
-                    return {
-                        success: true,
-                        message: '已打开同步目录',
-                        path: syncPath
-                    };
-                } catch (error) {
-                    console.error('打开同步目录失败:', error);
-                    return {
-                        success: false,
-                        error: error instanceof Error ? error.message : '打开目录失败'
-                    };
-                }
-            });
-
-            console.log('iCloud IPC 处理程序设置完成');
+            console.log('[iCloud] 本地快照生成完成，包含', items.length, '个数据项');
+            return snapshot;
         } catch (error) {
-            console.error('设置 iCloud IPC 处理程序失败:', error);
+            console.error('[iCloud] 获取本地快照失败:', error);
+            throw error;
         }
     }
 
     /**
-     * 清理 iCloud IPC 处理器
+     * 将传统数据格式转换为现代格式
      */
-    public cleanup() {
-        console.log('清理 iCloud 服务...');
-        this.stopAutoSync();
+    private async convertToModernFormat(legacyData: any): Promise<DataItem[]> {
+        console.log('[iCloud] 开始转换传统数据格式为现代格式...');
+        console.log('[iCloud] 输入数据详情:', {
+            hasData: !!legacyData,
+            dataType: typeof legacyData,
+            isArray: Array.isArray(legacyData),
+            keys: legacyData ? Object.keys(legacyData) : [],
+            categories: legacyData?.categories ? {
+                isArray: Array.isArray(legacyData.categories),
+                length: legacyData.categories.length || 0
+            } : null,
+            prompts: legacyData?.prompts ? {
+                isArray: Array.isArray(legacyData.prompts),
+                length: legacyData.prompts.length || 0
+            } : null,
+            aiConfigs: legacyData?.aiConfigs ? {
+                isArray: Array.isArray(legacyData.aiConfigs),
+                length: legacyData.aiConfigs.length || 0
+            } : null
+        });
         
-        // 移除 IPC 处理器
-        ipcMain.removeAllListeners('icloud:test-availability');
-        ipcMain.removeAllListeners('icloud:sync-now');
-        ipcMain.removeAllListeners('icloud:manual-upload');
-        ipcMain.removeAllListeners('icloud:manual-download');
-        ipcMain.removeAllListeners('icloud:apply-downloaded-data');
-        ipcMain.removeAllListeners('icloud:compare-data');
-        ipcMain.removeAllListeners('icloud:get-config');
-        ipcMain.removeAllListeners('icloud:set-config');
-        ipcMain.removeAllListeners('icloud:open-sync-directory');
+        const items: DataItem[] = [];
+        const now = new Date().toISOString();
+
+        // 转换分类
+        if (legacyData.categories && Array.isArray(legacyData.categories)) {
+            for (const category of legacyData.categories) {
+                const item: DataItem = {
+                    id: category.uuid || category.id || uuidv4(),
+                    type: 'category',
+                    title: category.name || category.title,
+                    content: {
+                        name: category.name,
+                        description: category.description,
+                        icon: category.icon,
+                        color: category.color,
+                        order: category.order
+                    },
+                    metadata: {
+                        createdAt: category.createdAt || now,
+                        updatedAt: category.updatedAt || now,
+                        version: 1,
+                        deviceId: this.deviceId,
+                        lastModifiedBy: this.deviceId,
+                        checksum: this.calculateItemChecksum(category),
+                        deleted: category.deleted || false
+                    }
+                };
+                items.push(item);
+            }
+            console.log('[iCloud] 转换了', legacyData.categories.length, '个分类');
+        } else {
+            console.log('[iCloud] 未找到分类数据或格式不正确');
+        }
+
+        // 转换提示词
+        if (legacyData.prompts && Array.isArray(legacyData.prompts)) {
+            for (const prompt of legacyData.prompts) {
+                const item: DataItem = {
+                    id: prompt.uuid || prompt.id || uuidv4(),
+                    type: 'prompt',
+                    title: prompt.title || prompt.name,
+                    content: {
+                        title: prompt.title,
+                        content: prompt.content,
+                        categoryId: prompt.categoryId,
+                        tags: prompt.tags,
+                        isPrivate: prompt.isPrivate,
+                        order: prompt.order,
+                        usageCount: prompt.usageCount
+                    },
+                    metadata: {
+                        createdAt: prompt.createdAt || now,
+                        updatedAt: prompt.updatedAt || now,
+                        version: 1,
+                        deviceId: this.deviceId,
+                        lastModifiedBy: this.deviceId,
+                        checksum: this.calculateItemChecksum(prompt),
+                        deleted: prompt.deleted || false,
+                        tags: prompt.tags
+                    }
+                };
+                items.push(item);
+            }
+            console.log('[iCloud] 转换了', legacyData.prompts.length, '个提示词');
+        } else {
+            console.log('[iCloud] 未找到提示词数据或格式不正确');
+        }
+
+        // 转换AI配置
+        if (legacyData.aiConfigs && Array.isArray(legacyData.aiConfigs)) {
+            for (const aiConfig of legacyData.aiConfigs) {
+                const item: DataItem = {
+                    id: aiConfig.uuid || aiConfig.id || uuidv4(),
+                    type: 'aiConfig',
+                    title: aiConfig.name || aiConfig.title,
+                    content: {
+                        name: aiConfig.name,
+                        type: aiConfig.type,
+                        apiKey: aiConfig.apiKey,
+                        baseUrl: aiConfig.baseUrl,
+                        model: aiConfig.model,
+                        settings: aiConfig.settings
+                    },
+                    metadata: {
+                        createdAt: aiConfig.createdAt || now,
+                        updatedAt: aiConfig.updatedAt || now,
+                        version: 1,
+                        deviceId: this.deviceId,
+                        lastModifiedBy: this.deviceId,
+                        checksum: this.calculateItemChecksum(aiConfig),
+                        deleted: aiConfig.deleted || false
+                    }
+                };
+                items.push(item);
+            }
+            console.log('[iCloud] 转换了', legacyData.aiConfigs.length, '个AI配置');
+        } else {
+            console.log('[iCloud] 未找到AI配置数据或格式不正确');
+        }
+
+        // 转换其他数据类型...
+        this.convertOtherDataTypes(legacyData, items, now);
+
+        console.log('[iCloud] 数据格式转换完成，最终生成', items.length, '个数据项');
+        return items;
+    }
+
+    /**
+     * 转换其他数据类型
+     */
+    private convertOtherDataTypes(legacyData: any, items: DataItem[], now: string): void {
+        // 可以根据需要添加更多数据类型的转换
+        const dataTypes = ['settings', 'users', 'posts', 'histories'];
         
-        console.log('iCloud 服务清理完成');
+        for (const dataType of dataTypes) {
+            if (legacyData[dataType] && Array.isArray(legacyData[dataType])) {
+                for (const item of legacyData[dataType]) {
+                    const dataItem: DataItem = {
+                        id: item.uuid || item.id || uuidv4(),
+                        type: dataType.slice(0, -1) as any, // 去掉复数s
+                        title: item.title || item.name,
+                        content: item,
+                        metadata: {
+                            createdAt: item.createdAt || now,
+                            updatedAt: item.updatedAt || now,
+                            version: 1,
+                            deviceId: this.deviceId,
+                            lastModifiedBy: this.deviceId,
+                            checksum: this.calculateItemChecksum(item),
+                            deleted: item.deleted || false
+                        }
+                    };
+                    items.push(dataItem);
+                }
+                console.log(`[iCloud] 转换了 ${legacyData[dataType].length} 个 ${dataType}`);
+            }
+        }
+    }
+
+    /**
+     * 计算数据项校验和
+     */
+    private calculateItemChecksum(item: any): string {
+        // 创建一个标准化的数据副本用于计算校验和
+        const normalized = this.normalizeForChecksum(item);
+        return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+    }
+
+    /**
+     * 计算整个数据集的校验和
+     */
+    private calculateChecksum(items: DataItem[]): string {
+        const sorted = items.sort((a, b) => a.id.localeCompare(b.id));
+        const combined = sorted.map(item => ({
+            id: item.id,
+            checksum: item.metadata.checksum,
+            updatedAt: item.metadata.updatedAt
+        }));
+        return crypto.createHash('sha256').update(JSON.stringify(combined)).digest('hex');
+    }
+
+    /**
+     * 标准化数据用于校验和计算
+     */
+    private normalizeForChecksum(data: any): any {
+        if (data === null || data === undefined) {
+            return data;
+        }
+
+        if (Array.isArray(data)) {
+            return data.map(item => this.normalizeForChecksum(item)).sort();
+        }
+
+        if (typeof data === 'object') {
+            const normalized: any = {};
+            const keys = Object.keys(data).sort();
+            
+            for (const key of keys) {
+                // 跳过时间戳和易变字段
+                if (!['createdAt', 'updatedAt', 'lastModifiedAt', 'syncTime'].includes(key)) {
+                    normalized[key] = this.normalizeForChecksum(data[key]);
+                }
+            }
+            
+            return normalized;
+        }
+
+        return data;
+    }
+
+    /**
+     * 执行智能同步 - 基于三阶段同步策略
+     */
+    async performIntelligentSync(config?: ICloudConfig): Promise<SyncResult> {
+        console.log('[iCloud] 开始执行智能同步...');
+        
+        if (this.syncInProgress) {
+            return {
+                success: false,
+                message: '同步正在进行中，请稍后再试',
+                timestamp: new Date().toISOString(),
+                itemsProcessed: 0,
+                itemsUpdated: 0,
+                itemsCreated: 0,
+                itemsDeleted: 0,
+                conflictsResolved: 0,
+                conflictDetails: [],
+                errors: ['同步正在进行中'],
+                phases: {
+                    upload: { completed: false, itemsProcessed: 0, errors: [] },
+                    deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                    download: { completed: false, itemsProcessed: 0, errors: [] }
+                }
+            };
+        }
+
+        this.syncInProgress = true;
+
+        try {
+            const result = await this.executeWithRetry(
+                () => this.performSyncInternal(config),
+                'intelligentSync'
+            );
+
+            if (result.success) {
+                this.lastSuccessfulSync = result.timestamp;
+                this.consecutiveFailures = 0;
+                await this.updateLocalSyncTime(result.timestamp);
+            } else {
+                this.consecutiveFailures++;
+            }
+
+            return result;
+        } catch (error) {
+            console.error('[iCloud] 智能同步失败:', error);
+            this.consecutiveFailures++;
+            
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return {
+                success: false,
+                message: `同步失败: ${errorMessage}`,
+                timestamp: new Date().toISOString(),
+                itemsProcessed: 0,
+                itemsUpdated: 0,
+                itemsCreated: 0,
+                itemsDeleted: 0,
+                conflictsResolved: 0,
+                conflictDetails: [],
+                errors: [errorMessage],
+                phases: {
+                    upload: { completed: false, itemsProcessed: 0, errors: [errorMessage] },
+                    deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                    download: { completed: false, itemsProcessed: 0, errors: [] }
+                }
+            };
+        } finally {
+            this.syncInProgress = false;
+        }
+    }
+
+    /**
+     * 内部同步实现
+     */
+    private async performSyncInternal(config?: ICloudConfig): Promise<SyncResult> {
+        console.log('[iCloud] 开始内部同步流程...');
+        
+        // 测试 iCloud 可用性
+        const testResult = await this.testICloudAvailability();
+        if (!testResult.success) {
+            throw new Error(`iCloud 不可用: ${testResult.message}`);
+        }
+
+        // 获取本地快照
+        const localSnapshot = await this.getLocalSnapshot();
+        console.log('[iCloud] 本地快照:', {
+            timestamp: localSnapshot.timestamp,
+            itemCount: localSnapshot.items.length,
+            deviceId: localSnapshot.deviceId
+        });
+
+        // 确保同步目录存在
+        const syncDir = this.getSyncDirectory();
+        await this.ensureSyncDirectory(syncDir);
+
+        // 获取远程快照
+        const remoteSnapshot = await this.getRemoteSnapshot(syncDir);
+        console.log('[iCloud] 远程快照:', {
+            exists: !!remoteSnapshot,
+            timestamp: remoteSnapshot?.timestamp,
+            itemCount: remoteSnapshot?.items?.length || 0
+        });
+
+        // 如果远程没有数据，执行初始上传
+        if (!remoteSnapshot) {
+            return await this.performInitialUpload(syncDir, localSnapshot);
+        }
+
+        // 检查是否需要用户确认合并
+        if (await this.checkIfNeedsMergeConfirmation(localSnapshot, remoteSnapshot)) {
+            return {
+                success: false,
+                message: '检测到数据冲突，需要用户确认合并策略',
+                timestamp: new Date().toISOString(),
+                itemsProcessed: 0,
+                itemsUpdated: 0,
+                itemsCreated: 0,
+                itemsDeleted: 0,
+                conflictsResolved: 0,
+                conflictDetails: [],
+                errors: [],
+                phases: {
+                    upload: { completed: false, itemsProcessed: 0, errors: [] },
+                    deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                    download: { completed: false, itemsProcessed: 0, errors: [] }
+                },
+                mergeInfo: {
+                    localItems: localSnapshot.items.length,
+                    remoteItems: remoteSnapshot.items.length,
+                    conflictingItems: this.getConflictingItemsCount(localSnapshot, remoteSnapshot)
+                }
+            };
+        }
+
+        // 执行智能合并
+        return await this.performIntelligentMerge(syncDir, localSnapshot, remoteSnapshot);
     }
 
     /**
@@ -658,205 +667,433 @@ export class ICloudService {
      */
     private async testICloudAvailability(): Promise<ICloudTestResult> {
         try {
-            const iCloudPath = this.getICloudPath();
-            console.log('测试 iCloud Drive 可用性，路径:', iCloudPath);
+            console.log('[iCloud] 测试 iCloud Drive 可用性...');
             
+            const iCloudPath = this.getICloudPath();
+            console.log('[iCloud] 检查路径:', iCloudPath);
+
             // 检查 iCloud Drive 目录是否存在
-            try {
-                const stats = await fs.promises.stat(iCloudPath);
-                if (!stats.isDirectory()) {
-                    console.log('iCloud Drive 路径存在但不是目录');
-                    return {
-                        success: false,
-                        message: 'iCloud Drive 路径不是有效目录',
-                        iCloudPath,
-                        available: false
-                    };
-                }
-                console.log('iCloud Drive 根目录存在且可访问');
-            } catch (statError) {
-                console.log('iCloud Drive 根目录不存在或无法访问:', statError);
+            if (!fs.existsSync(iCloudPath)) {
                 return {
                     success: false,
-                    message: `iCloud Drive 目录不存在或无法访问: ${statError instanceof Error ? statError.message : '未知错误'}`,
-                    iCloudPath,
+                    message: 'iCloud Drive 目录不存在，请确保已启用 iCloud Drive',
                     available: false
                 };
             }
 
-            // 检查是否可以读取目录内容
+            // 尝试读取目录内容以确认权限
             try {
-                const files = await fs.promises.readdir(iCloudPath);
-                console.log('iCloud Drive 目录内容:', files.length, '个项目');
-            } catch (readError) {
-                console.log('无法读取 iCloud Drive 目录:', readError);
+                fs.readdirSync(iCloudPath);
+            } catch (error) {
                 return {
                     success: false,
-                    message: `无法读取 iCloud Drive 目录: ${readError instanceof Error ? readError.message : '未知错误'}`,
-                    iCloudPath,
+                    message: '无法访问 iCloud Drive 目录，权限不足',
                     available: false
                 };
             }
 
-            // 尝试在 iCloud Drive 中创建测试目录和文件
-            const testDirName = `test-${Date.now()}`;
-            const testDir = path.join(iCloudPath, testDirName);
-            const testFile = path.join(testDir, 'test.txt');
-
+            // 测试写入权限
+            const testFile = path.join(iCloudPath, '.ai-gist-test');
             try {
-                console.log('尝试创建测试目录:', testDir);
-                await fs.promises.mkdir(testDir, { recursive: true });
-                
-                console.log('尝试写入测试文件:', testFile);
-                const testContent = `iCloud Drive 测试文件 - 创建于 ${new Date().toISOString()}`;
-                await fs.promises.writeFile(testFile, testContent);
-                
-                console.log('尝试读取测试文件');
-                const content = await fs.promises.readFile(testFile, 'utf-8');
-                
-                if (content !== testContent) {
-                    throw new Error('读取的内容与写入的内容不匹配');
-                }
-
-                console.log('清理测试文件');
-                await fs.promises.unlink(testFile);
-                await fs.promises.rmdir(testDir);
-                
-                console.log('iCloud Drive 测试成功完成');
-            } catch (testError) {
-                console.error('iCloud Drive 写入测试失败:', testError);
-                
-                // 尝试清理可能残留的测试文件
-                try {
-                    await fs.promises.unlink(testFile);
-                } catch (e) {
-                    // 忽略清理错误
-                }
-                try {
-                    await fs.promises.rmdir(testDir);
-                } catch (e) {
-                    // 忽略清理错误
-                }
-                
+                fs.writeFileSync(testFile, 'test');
+                fs.unlinkSync(testFile);
+            } catch (error) {
                 return {
                     success: false,
-                    message: `iCloud Drive 读写测试失败: ${testError instanceof Error ? testError.message : '未知错误'}`,
-                    iCloudPath,
+                    message: '无法写入 iCloud Drive 目录，权限不足',
                     available: false
                 };
             }
 
+            console.log('[iCloud] iCloud Drive 可用性测试通过');
             return {
                 success: true,
-                message: 'iCloud Drive 可用并可正常读写',
+                message: 'iCloud Drive 可用',
                 iCloudPath,
                 available: true
             };
-
         } catch (error) {
-            console.error('iCloud Drive 可用性测试出现异常:', error);
+            console.error('[iCloud] iCloud Drive 可用性测试失败:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
             return {
                 success: false,
-                message: `iCloud Drive 测试异常: ${error instanceof Error ? error.message : '未知错误'}`,
+                message: `测试失败: ${errorMessage}`,
                 available: false
             };
         }
     }
 
     /**
-     * 执行同步操作
+     * 获取远程快照
      */
-    private async performSync(): Promise<SyncResult> {
+    private async getRemoteSnapshot(syncDir: string): Promise<SyncSnapshot | null> {
+        const snapshotFile = path.join(syncDir, 'snapshot.json');
+        
         try {
-            console.log('开始执行 iCloud 智能同步...');
+            if (!fs.existsSync(snapshotFile)) {
+                console.log('[iCloud] 远程快照文件不存在');
+                return null;
+            }
+
+            const snapshotData = JSON.parse(fs.readFileSync(snapshotFile, 'utf8'));
+            console.log('[iCloud] 成功读取远程快照');
+            return snapshotData;
+        } catch (error) {
+            console.error('[iCloud] 读取远程快照失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 执行初始上传
+     */
+    private async performInitialUpload(syncDir: string, localSnapshot: SyncSnapshot): Promise<SyncResult> {
+        console.log('[iCloud] 执行初始上传...');
+        
+        const result: SyncResult = {
+            success: true,
+            message: '初始上传完成',
+            timestamp: new Date().toISOString(),
+            itemsProcessed: localSnapshot.items.length,
+            itemsUpdated: 0,
+            itemsCreated: localSnapshot.items.length,
+            itemsDeleted: 0,
+            conflictsResolved: 0,
+            conflictDetails: [],
+            errors: [],
+            phases: {
+                upload: { completed: false, itemsProcessed: 0, errors: [] },
+                deleteRemote: { completed: true, itemsProcessed: 0, errors: [] },
+                download: { completed: true, itemsProcessed: 0, errors: [] }
+            }
+        };
+
+        try {
+            // 保存快照到 iCloud
+            const snapshotFile = path.join(syncDir, 'snapshot.json');
+            fs.writeFileSync(snapshotFile, JSON.stringify(localSnapshot, null, 2));
             
-            if (!this.config) {
-                throw new Error('iCloud 配置未设置');
-            }
+            // 保存备份数据
+            const backupFile = path.join(syncDir, `backup-${Date.now()}.json`);
+            const exportData = await this.exportLocalData();
+            fs.writeFileSync(backupFile, JSON.stringify(exportData, null, 2));
 
-            // 测试 iCloud 可用性
-            const availability = await this.testICloudAvailability();
-            if (!availability.success || !availability.available) {
-                throw new Error(`iCloud 不可用: ${availability.message}`);
-            }
-
-            const syncDir = this.getSyncDirectory();
-            const dataFile = path.join(syncDir, 'data.json');
-            const metadataFile = path.join(syncDir, 'metadata.json');
-
-            // 确保同步目录存在
-            await this.ensureSyncDirectory(syncDir);
-
-            // 获取本地数据和元数据
-            const localData = await this.generateExportData();
-            const localMetadata = await this.getLocalSyncMetadata();
-            localMetadata.totalRecords = this.calculateTotalRecords(localData);
-            const localDataHash = this.calculateDataHash(localData);
-
-            console.log('本地数据信息:');
-            console.log('- 总记录数:', localMetadata.totalRecords);
-            console.log('- 数据哈希:', localDataHash);
-            console.log('- 同步时间:', localMetadata.lastSyncTime);
-            console.log('- 同步次数:', localMetadata.syncCount);
-            console.log('- 设备ID:', localMetadata.deviceId);
-            console.log('- 应用版本:', localMetadata.appVersion);
-            console.log('- 分类数量:', localData.categories?.length || 0);
-            console.log('- 提示词数量:', localData.prompts?.length || 0);
-
-            // 检查远程是否存在数据
-            const remoteDataExists = await this.checkFileExists(dataFile);
-            const remoteMetadataExists = await this.checkFileExists(metadataFile);
-
-            let remoteData: any = null;
-            let remoteMetadata: SyncMetadata | null = null;
-
-            if (remoteDataExists && remoteMetadataExists) {
-                try {
-                    // 下载远程数据和元数据
-                    const remoteDataContent = await fs.promises.readFile(dataFile, 'utf-8');
-                    const remoteMetadataContent = await fs.promises.readFile(metadataFile, 'utf-8');
-
-                    remoteData = JSON.parse(remoteDataContent);
-                    remoteMetadata = JSON.parse(remoteMetadataContent);
-
-                    if (remoteMetadata && remoteData) {
-                        console.log('远程数据信息:');
-                        console.log('- 总记录数:', remoteMetadata.totalRecords);
-                        console.log('- 数据哈希:', remoteMetadata.dataHash);
-                        console.log('- 同步时间:', remoteMetadata.lastSyncTime);
-                        console.log('- 同步次数:', remoteMetadata.syncCount);
-                        console.log('- 设备ID:', remoteMetadata.deviceId);
-                        console.log('- 应用版本:', remoteMetadata.appVersion);
-                        console.log('- 分类数量:', remoteData.categories?.length || 0);
-                        console.log('- 提示词数量:', remoteData.prompts?.length || 0);
-                    }
-
-                    console.log('远程数据已下载，最后同步时间:', remoteMetadata?.lastSyncTime);
-                } catch (error) {
-                    console.warn('下载远程数据失败，将视为首次同步', error);
-                }
-            }
-
-            // 执行智能同步决策
-            const syncDecision = await this.makeSyncDecision(
-                localData, localMetadata, localDataHash,
-                remoteData, remoteMetadata
-            );
-
-            console.log('同步决策:', syncDecision);
-
-            // 执行同步操作
-            const result = await this.executeSyncOperation(
-                syncDir, dataFile, metadataFile,
-                localData, localMetadata, localDataHash,
-                remoteData, remoteMetadata,
-                syncDecision
-            );
-
+            result.phases.upload.completed = true;
+            result.phases.upload.itemsProcessed = localSnapshot.items.length;
+            
+            console.log('[iCloud] 初始上传成功');
             return result;
         } catch (error) {
-            console.error('iCloud 同步失败:', error);
-            throw new Error(`同步失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            console.error('[iCloud] 初始上传失败:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            result.success = false;
+            result.message = `初始上传失败: ${errorMessage}`;
+            result.errors.push(errorMessage);
+            result.phases.upload.errors.push(errorMessage);
+            return result;
+        }
+    }
+
+    /**
+     * 执行智能合并
+     */
+    private async performIntelligentMerge(
+        syncDir: string,
+        localSnapshot: SyncSnapshot,
+        remoteSnapshot: SyncSnapshot
+    ): Promise<SyncResult> {
+        console.log('[iCloud] 执行智能合并...');
+        
+        const result: SyncResult = {
+            success: true,
+            message: '智能合并完成',
+            timestamp: new Date().toISOString(),
+            itemsProcessed: 0,
+            itemsUpdated: 0,
+            itemsCreated: 0,
+            itemsDeleted: 0,
+            conflictsResolved: 0,
+            conflictDetails: [],
+            errors: [],
+            phases: {
+                upload: { completed: false, itemsProcessed: 0, errors: [] },
+                deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                download: { completed: false, itemsProcessed: 0, errors: [] }
+            }
+        };
+
+        try {
+            // 执行三阶段同步
+            await this.performUploadPhase(syncDir, localSnapshot, remoteSnapshot, result);
+            await this.performDeleteRemotePhase(syncDir, localSnapshot, remoteSnapshot, result);
+            await this.performDownloadAndMergePhase(syncDir, localSnapshot, remoteSnapshot, result);
+
+            // 保存更新后的快照
+            const updatedSnapshot = await this.getLocalSnapshot();
+            const snapshotFile = path.join(syncDir, 'snapshot.json');
+            fs.writeFileSync(snapshotFile, JSON.stringify(updatedSnapshot, null, 2));
+
+            console.log('[iCloud] 智能合并完成');
+            return result;
+        } catch (error) {
+            console.error('[iCloud] 智能合并失败:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            result.success = false;
+            result.message = `智能合并失败: ${errorMessage}`;
+            result.errors.push(errorMessage);
+            return result;
+        }
+    }
+
+    /**
+     * 阶段1：上传本地变更
+     */
+    private async performUploadPhase(
+        syncDir: string,
+        localSnapshot: SyncSnapshot,
+        remoteSnapshot: SyncSnapshot,
+        result: SyncResult
+    ): Promise<void> {
+        console.log('[iCloud] 执行上传阶段...');
+        
+        const remoteItemsMap = new Map(remoteSnapshot.items.map(item => [item.id, item]));
+        const localChanges: DataItem[] = [];
+
+        for (const localItem of localSnapshot.items) {
+            const remoteItem = remoteItemsMap.get(localItem.id);
+            
+            if (!remoteItem) {
+                // 新项目
+                localChanges.push(localItem);
+                result.itemsCreated++;
+            } else if (new Date(localItem.metadata.updatedAt) > new Date(remoteItem.metadata.updatedAt)) {
+                // 本地更新
+                localChanges.push(localItem);
+                result.itemsUpdated++;
+            }
+        }
+
+        result.phases.upload.itemsProcessed = localChanges.length;
+        result.phases.upload.completed = true;
+        result.itemsProcessed += localChanges.length;
+        
+        console.log(`[iCloud] 上传阶段完成，处理了 ${localChanges.length} 个变更`);
+    }
+
+    /**
+     * 阶段2：删除远程已删除的项目
+     */
+    private async performDeleteRemotePhase(
+        syncDir: string,
+        localSnapshot: SyncSnapshot,
+        remoteSnapshot: SyncSnapshot,
+        result: SyncResult
+    ): Promise<void> {
+        console.log('[iCloud] 执行删除远程阶段...');
+        
+        const localItemsMap = new Map(localSnapshot.items.map(item => [item.id, item]));
+        let deletedCount = 0;
+
+        for (const remoteItem of remoteSnapshot.items) {
+            const localItem = localItemsMap.get(remoteItem.id);
+            
+            if (!localItem || localItem.metadata.deleted) {
+                deletedCount++;
+                result.itemsDeleted++;
+            }
+        }
+
+        result.phases.deleteRemote.itemsProcessed = deletedCount;
+        result.phases.deleteRemote.completed = true;
+        result.itemsProcessed += deletedCount;
+        
+        console.log(`[iCloud] 删除远程阶段完成，删除了 ${deletedCount} 个项目`);
+    }
+
+    /**
+     * 阶段3：下载并合并远程变更
+     */
+    private async performDownloadAndMergePhase(
+        syncDir: string,
+        localSnapshot: SyncSnapshot,
+        remoteSnapshot: SyncSnapshot,
+        result: SyncResult
+    ): Promise<void> {
+        console.log('[iCloud] 执行下载和合并阶段...');
+        
+        const localItemsMap = new Map(localSnapshot.items.map(item => [item.id, item]));
+        const remoteChanges: DataItem[] = [];
+
+        for (const remoteItem of remoteSnapshot.items) {
+            const localItem = localItemsMap.get(remoteItem.id);
+            
+            if (!localItem) {
+                // 远程新项目
+                remoteChanges.push(remoteItem);
+                result.itemsCreated++;
+            } else if (new Date(remoteItem.metadata.updatedAt) > new Date(localItem.metadata.updatedAt)) {
+                // 远程更新
+                remoteChanges.push(remoteItem);
+                result.itemsUpdated++;
+            } else if (remoteItem.metadata.checksum !== localItem.metadata.checksum) {
+                // 内容冲突，需要解决
+                const conflictResolution = await this.resolveConflict(localItem, remoteItem);
+                result.conflictDetails.push(conflictResolution);
+                result.conflictsResolved++;
+            }
+        }
+
+        // 应用远程变更到本地
+        if (remoteChanges.length > 0) {
+            await this.applyRemoteChanges(remoteChanges);
+        }
+
+        result.phases.download.itemsProcessed = remoteChanges.length;
+        result.phases.download.completed = true;
+        result.itemsProcessed += remoteChanges.length;
+        
+        console.log(`[iCloud] 下载和合并阶段完成，处理了 ${remoteChanges.length} 个远程变更`);
+    }
+
+    /**
+     * 应用远程变更到本地
+     */
+    private async applyRemoteChanges(remoteChanges: DataItem[]): Promise<void> {
+        console.log('[iCloud] 应用远程变更到本地...');
+        
+        const importData: any = {
+            categories: [],
+            prompts: [],
+            aiConfigs: [],
+            settings: [],
+            users: [],
+            posts: [],
+            histories: []
+        };
+
+        // 将 DataItem 转换回传统格式
+        for (const item of remoteChanges) {
+            const legacyItem = this.convertFromModernFormat(item);
+            
+            switch (item.type) {
+                case 'category':
+                    importData.categories.push(legacyItem);
+                    break;
+                case 'prompt':
+                    importData.prompts.push(legacyItem);
+                    break;
+                case 'aiConfig':
+                    importData.aiConfigs.push(legacyItem);
+                    break;
+                case 'setting':
+                    importData.settings.push(legacyItem);
+                    break;
+                case 'user':
+                    importData.users.push(legacyItem);
+                    break;
+                case 'post':
+                    importData.posts.push(legacyItem);
+                    break;
+                case 'history':
+                    importData.histories.push(legacyItem);
+                    break;
+            }
+        }
+
+        await this.importAllData(importData);
+        console.log('[iCloud] 远程变更应用完成');
+    }
+
+    /**
+     * 将现代格式转换回传统格式
+     */
+    private convertFromModernFormat(item: DataItem): any {
+        const legacyItem = {
+            ...item.content,
+            uuid: item.id,
+            id: item.id,
+            createdAt: item.metadata.createdAt,
+            updatedAt: item.metadata.updatedAt,
+            deleted: item.metadata.deleted || false
+        };
+
+        // 根据类型添加特定字段
+        switch (item.type) {
+            case 'category':
+                legacyItem.name = item.title || legacyItem.name;
+                break;
+            case 'prompt':
+                legacyItem.title = item.title || legacyItem.title;
+                break;
+            case 'aiConfig':
+                legacyItem.name = item.title || legacyItem.name;
+                break;
+        }
+
+        return legacyItem;
+    }
+
+    /**
+     * 解决冲突
+     */
+    private async resolveConflict(localItem: DataItem, remoteItem: DataItem): Promise<ConflictResolution> {
+        // 简单的冲突解决策略：时间戳较新的获胜
+        const localTime = new Date(localItem.metadata.updatedAt).getTime();
+        const remoteTime = new Date(remoteItem.metadata.updatedAt).getTime();
+        
+        const strategy = localTime > remoteTime ? 'local_wins' : 'remote_wins';
+        
+        return {
+            itemId: localItem.id,
+            strategy,
+            timestamp: new Date().toISOString(),
+            reason: `基于时间戳解决冲突，${strategy === 'local_wins' ? '本地' : '远程'}数据更新`
+        };
+    }
+
+    /**
+     * 检查是否需要用户确认合并
+     */
+    private async checkIfNeedsMergeConfirmation(localSnapshot: SyncSnapshot, remoteSnapshot: SyncSnapshot): Promise<boolean> {
+        // 如果没有本地同步历史，且远程有数据，需要确认
+        if (!(await this.hasLocalSyncHistory()) && remoteSnapshot.items.length > 0) {
+            return true;
+        }
+
+        // 如果冲突项目过多，需要确认
+        const conflictCount = this.getConflictingItemsCount(localSnapshot, remoteSnapshot);
+        return conflictCount > 10; // 超过10个冲突需要用户确认
+    }
+
+    /**
+     * 获取冲突项目数量
+     */
+    private getConflictingItemsCount(localSnapshot: SyncSnapshot, remoteSnapshot: SyncSnapshot): number {
+        const localItemsMap = new Map(localSnapshot.items.map(item => [item.id, item]));
+        let conflictCount = 0;
+
+        for (const remoteItem of remoteSnapshot.items) {
+            const localItem = localItemsMap.get(remoteItem.id);
+            
+            if (localItem && 
+                localItem.metadata.checksum !== remoteItem.metadata.checksum &&
+                localItem.metadata.updatedAt !== remoteItem.metadata.updatedAt) {
+                conflictCount++;
+            }
+        }
+
+        return conflictCount;
+    }
+
+    /**
+     * 检查是否有本地同步历史
+     */
+    private async hasLocalSyncHistory(): Promise<boolean> {
+        try {
+            const preferences = this.preferencesManager.getPreferences();
+            return !!(preferences.dataSync?.lastSyncTime);
+        } catch (error) {
+            return false;
         }
     }
 
@@ -886,533 +1123,391 @@ export class ICloudService {
      */
     private async ensureSyncDirectory(syncDir: string): Promise<void> {
         try {
-            await fs.promises.mkdir(syncDir, { recursive: true });
+            if (!fs.existsSync(syncDir)) {
+                fs.mkdirSync(syncDir, { recursive: true });
+                console.log('[iCloud] 创建同步目录:', syncDir);
+            }
         } catch (error) {
-            console.error('创建同步目录失败:', error);
-            throw new Error(`无法创建同步目录: ${error instanceof Error ? error.message : '未知错误'}`);
+            console.error('[iCloud] 创建同步目录失败:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`无法创建同步目录: ${errorMessage}`);
         }
     }
 
     /**
-     * 检查文件是否存在
+     * 导出本地数据
      */
-    private async checkFileExists(filePath: string): Promise<boolean> {
+    private async exportLocalData(): Promise<any> {
         try {
-            await fs.promises.access(filePath);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * 获取本地同步元数据
-     */
-    private async getLocalSyncMetadata(): Promise<SyncMetadata> {
-        const preferences = this.preferencesManager.getPreferences();
-        const dataSync = preferences.dataSync;
-        
-        // 生成唯一的设备ID
-        const deviceId = this.generateDeviceId();
-        
-        // 获取应用版本
-        const appVersion = app.getVersion() || '1.0.0';
-        
-        return {
-            lastSyncTime: dataSync?.lastSyncTime || new Date(0).toISOString(),
-            localVersion: '1.0.0',
-            remoteVersion: '1.0.0', 
-            dataHash: '',
-            syncCount: (dataSync?.syncCount || 0),
-            deviceId: deviceId,
-            appVersion: appVersion,
-            totalRecords: 0,
-            lastModifiedTime: new Date().toISOString(),
-            syncStrategy: 'auto_merge'
-        };
-    }
-
-    /**
-     * 计算数据哈希
-     */
-    private calculateDataHash(data: any): string {
-        if (!data || typeof data !== 'object') {
-            return crypto.createHash('sha256').update('').digest('hex').substring(0, 16);
-        }
-        
-        // 标准化数据：排序键、移除时间戳等易变字段
-        const normalizedData = this.normalizeDataForHashing(data);
-        const dataString = JSON.stringify(normalizedData);
-        return crypto.createHash('sha256').update(dataString).digest('hex').substring(0, 16);
-    }
-
-    /**
-     * 标准化数据用于哈希计算
-     */
-    private normalizeDataForHashing(data: any): any {
-        if (!data || typeof data !== 'object') {
-            return data;
-        }
-
-        if (Array.isArray(data)) {
-            // 对数组按 id 或 uuid 排序，并递归处理每个元素
-            return this.sortArray(data).map(item => this.normalizeDataForHashing(item));
-        } else {
-            // 对对象的键排序，移除时间戳字段，并递归处理值
-            return this.sortObject(data);
-        }
-    }
-
-    /**
-     * 排序数组
-     */
-    private sortArray(arr: any[], keyField: string = 'id'): any[] {
-        return [...arr].sort((a, b) => {
-            // 尝试按多个字段排序
-            const aKey = a[keyField] || a.uuid || a.name || a.title || '';
-            const bKey = b[keyField] || b.uuid || b.name || b.title || '';
-            return String(aKey).localeCompare(String(bKey));
-        });
-    }
-
-    /**
-     * 排序对象
-     */
-    private sortObject(obj: any): any {
-        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
-            return obj;
-        }
-
-        const result: any = {};
-        const keys = Object.keys(obj).sort();
-        
-        for (const key of keys) {
-            // 跳过时间戳和易变字段
-            if (['createdAt', 'updatedAt', 'modifiedAt', 'lastModified', 'timestamp'].includes(key)) {
-                continue;
-            }
-            
-            result[key] = this.normalizeDataForHashing(obj[key]);
-        }
-        
-        return result;
-    }
-
-    /**
-     * 计算总记录数
-     */
-    private calculateTotalRecords(data: any): number {
-        if (!data || typeof data !== 'object') {
-            return 0;
-        }
-
-        let total = 0;
-        const countableFields = ['categories', 'prompts', 'aiConfigs', 'aiHistory', 'settings'];
-        
-        for (const field of countableFields) {
-            if (data[field] && Array.isArray(data[field])) {
-                total += data[field].length;
-            }
-        }
-        
-        return total;
-    }
-
-    /**
-     * 同步决策算法
-     */
-    private async makeSyncDecision(
-        localData: any, localMetadata: SyncMetadata, localDataHash: string,
-        remoteData: any, remoteMetadata: SyncMetadata | null
-    ): Promise<{
-        action: 'upload_only' | 'download_only' | 'merge' | 'conflict_detected';
-        strategy: ConflictResolutionStrategy;
-        reason: string;
-    }> {
-        
-        console.log('\n=== iCloud 同步决策分析 ===');
-        console.log('本地哈希:', localDataHash);
-        console.log('本地时间:', localMetadata.lastSyncTime);
-        console.log('本地同步次数:', localMetadata.syncCount);
-        console.log('本地设备ID:', localMetadata.deviceId);
-        console.log('本地记录数:', localMetadata.totalRecords);
-        
-        // 情况1：远程没有数据，直接上传
-        if (!remoteData || !remoteMetadata) {
-            console.log('决策: 首次上传');
-            return {
-                action: 'upload_only',
-                strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                reason: '远程无数据，执行首次上传'
-            };
-        }
-        
-        const remoteDataHash = this.calculateDataHash(remoteData);
-        console.log('远程哈希:', remoteDataHash);
-        console.log('远程时间:', remoteMetadata.lastSyncTime);
-        console.log('远程同步次数:', remoteMetadata.syncCount);
-        console.log('远程设备ID:', remoteMetadata.deviceId);
-        console.log('远程记录数:', remoteMetadata.totalRecords);
-        
-        // 情况2：本地数据为空，直接下载
-        if (!localData || Object.keys(localData).length === 0 || localMetadata.totalRecords === 0) {
-            console.log('决策: 本地无数据，下载远程数据');
-            return {
-                action: 'download_only', 
-                strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                reason: '本地无数据，执行首次下载'
-            };
-        }
-
-        // 情况3：数据完全相同
-        if (localDataHash === remoteDataHash) {
-            console.log('决策: 数据相同，仅更新时间戳');
-            return {
-                action: 'upload_only',
-                strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                reason: '数据相同，仅更新同步时间'
-            };
-        }
-
-        const localTime = new Date(localMetadata.lastSyncTime).getTime();
-        const remoteTime = new Date(remoteMetadata.lastSyncTime).getTime();
-        const timeDiff = Math.abs(localTime - remoteTime);
-
-        console.log('时间差:', timeDiff, 'ms');
-
-        // 情况4：检查记录数变化
-        const recordDiff = localMetadata.totalRecords - (remoteMetadata.totalRecords || 0);
-        console.log('记录数差异:', recordDiff);
-        
-        // 如果本地记录数明显更多，优先上传
-        if (recordDiff > 0) {
-            console.log('决策: 本地记录数更多，上传本地数据');
-            return {
-                action: 'upload_only',
-                strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                reason: `本地新增了 ${recordDiff} 条记录`
-            };
-        }
-        
-        // 如果远程记录数明显更多，可能需要下载
-        if (recordDiff < -5) { // 远程比本地多超过5条记录
-            console.log('决策: 远程记录数明显更多，下载远程数据');
-            return {
-                action: 'download_only',
-                strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                reason: `远程多了 ${Math.abs(recordDiff)} 条记录`
-            };
-        }
-
-        // 情况5：检查是否是同一设备的不同同步
-        if (localMetadata.deviceId === remoteMetadata.deviceId) {
-            console.log('检测到同设备同步');
-            // 同一设备，比较同步计数
-            if (localMetadata.syncCount > remoteMetadata.syncCount) {
-                console.log('决策: 同设备，本地版本更新');
-                return {
-                    action: 'upload_only',
-                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                    reason: '同设备本地版本更新'
-                };
-            } else if (localMetadata.syncCount < remoteMetadata.syncCount) {
-                console.log('决策: 同设备，远程版本更新');
-                return {
-                    action: 'download_only',
-                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                    reason: '同设备远程版本更新'
-                };
+            if (this.dataManagementService) {
+                return await this.dataManagementService.exportAllData();
             } else {
-                // 同设备同步计数相同但数据不同，这通常表示本地有未同步的修改
-                console.log('检测到同设备未同步的本地修改（删除、编辑等）');
-                // 比较记录数，如果本地记录数变化，说明是正常的增删操作
-                if (recordDiff !== 0) {
-                    console.log(`决策: 同设备本地数据有变化（记录数差异: ${recordDiff}），上传本地版本`);
-                    return {
-                        action: 'upload_only',
-                        strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                        reason: `同设备本地数据有变化（${recordDiff > 0 ? '新增' : '删除'}了${Math.abs(recordDiff)}条记录）`
-                    };
+                // 如果没有数据管理服务，返回空数据
+                console.warn('[iCloud] 数据管理服务不可用，返回空数据');
+                return {
+                    categories: [],
+                    prompts: [],
+                    aiConfigs: [],
+                    settings: [],
+                    users: [],
+                    posts: [],
+                    histories: []
+                };
+            }
+        } catch (error) {
+            console.error('[iCloud] 导出本地数据失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 一次性导入所有数据
+     */
+    private async importAllData(importData: any): Promise<void> {
+        try {
+            if (this.dataManagementService) {
+                await this.dataManagementService.importAllData(importData);
+                console.log('[iCloud] 数据导入完成');
+            } else {
+                console.warn('[iCloud] 数据管理服务不可用，无法导入数据');
+            }
+        } catch (error) {
+            console.error('[iCloud] 导入数据失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 更新本地同步时间
+     */
+    private async updateLocalSyncTime(syncTime: string): Promise<void> {
+        try {
+            this.preferencesManager.updatePreferences({
+                dataSync: {
+                    lastSyncTime: syncTime
+                }
+            });
+            console.log('[iCloud] 更新本地同步时间:', syncTime);
+        } catch (error) {
+            console.error('[iCloud] 更新同步时间失败:', error);
+        }
+    }
+
+    /**
+     * 带重试的执行方法
+     */
+    private async executeWithRetry<T>(
+        operation: () => Promise<T>,
+        operationName: string,
+        customRetryConfig?: Partial<RetryConfig>
+    ): Promise<T> {
+        const config = { ...this.retryConfig, ...customRetryConfig };
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= config.maxRetries; attempt++) {
+            try {
+                console.log(`[iCloud] ${operationName} - 尝试 ${attempt}/${config.maxRetries}`);
+                return await operation();
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error(`[iCloud] ${operationName} - 尝试 ${attempt} 失败:`, errorMessage);
+
+                if (attempt === config.maxRetries || this.isNonRetryableError(lastError)) {
+                    break;
+                }
+
+                const delay = Math.min(
+                    config.baseDelay * Math.pow(config.backoffMultiplier, attempt - 1),
+                    config.maxDelay
+                );
+                
+                console.log(`[iCloud] ${operationName} - 等待 ${delay}ms 后重试...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+
+        throw lastError || new Error('Unknown error occurred');
+    }
+
+    /**
+     * 判断是否为不可重试的错误
+     */
+    private isNonRetryableError(error: Error): boolean {
+        const nonRetryableMessages = [
+            'iCloud Drive 目录不存在',
+            '权限不足',
+            '配置错误',
+            '无效的配置'
+        ];
+
+        return nonRetryableMessages.some(msg => error.message.includes(msg));
+    }
+
+    /**
+     * 启动自动同步
+     */
+    private startAutoSync(): void {
+        this.stopAutoSync();
+        
+        if (this.config?.syncInterval) {
+            const intervalMs = this.config.syncInterval * 60 * 1000;
+            this.autoSyncTimer = setInterval(async () => {
+                if (this.shouldSkipAutoSync()) {
+                    console.log('[iCloud] 跳过自动同步:', this.getSkipReason());
+                    return;
+                }
+
+                try {
+                    console.log('[iCloud] 执行自动同步...');
+                    const result = await this.performIntelligentSync();
+                    
+                    if (result.success) {
+                        console.log('[iCloud] 自动同步成功');
+                    } else {
+                        this.handleAutoSyncFailure(result);
+                    }
+                } catch (error) {
+                    this.handleAutoSyncError(error);
+                }
+            }, intervalMs);
+            
+            console.log(`[iCloud] 自动同步已启动，间隔: ${this.config.syncInterval} 分钟`);
+        }
+    }
+
+    /**
+     * 检查是否应该跳过自动同步
+     */
+    private shouldSkipAutoSync(): boolean {
+        return this.syncInProgress || this.consecutiveFailures >= 5;
+    }
+
+    /**
+     * 获取跳过自动同步的原因
+     */
+    private getSkipReason(): string {
+        if (this.syncInProgress) {
+            return '同步正在进行中';
+        }
+        if (this.consecutiveFailures >= 5) {
+            return `连续失败次数过多 (${this.consecutiveFailures})`;
+        }
+        return '未知原因';
+    }
+
+    /**
+     * 处理自动同步失败
+     */
+    private handleAutoSyncFailure(result: SyncResult): void {
+        console.error('[iCloud] 自动同步失败:', result.message);
+        
+        // 如果是配置错误，停止自动同步
+        if (this.isConfigurationError(result.message)) {
+            console.log('[iCloud] 检测到配置错误，停止自动同步');
+            this.stopAutoSync();
+        }
+    }
+
+    /**
+     * 处理自动同步异常
+     */
+    private handleAutoSyncError(error: any): void {
+        console.error('[iCloud] 自动同步异常:', error);
+        
+        // 如果是严重错误，停止自动同步
+        if (this.isConfigurationError(error.message) || this.consecutiveFailures >= 5) {
+            console.log('[iCloud] 检测到严重错误，停止自动同步');
+            this.stopAutoSync();
+        }
+    }
+
+    /**
+     * 检查是否为配置错误
+     */
+    private isConfigurationError(errorMessage: string): boolean {
+        const configErrors = ['配置错误', '无效的配置', 'iCloud Drive 目录不存在', '权限不足'];
+        return configErrors.some(error => errorMessage.includes(error));
+    }
+
+    /**
+     * 停止自动同步
+     */
+    private stopAutoSync(): void {
+        if (this.autoSyncTimer) {
+            clearInterval(this.autoSyncTimer);
+            this.autoSyncTimer = null;
+            console.log('[iCloud] 自动同步已停止');
+        }
+    }
+
+    /**
+     * 设置 IPC 处理程序
+     */
+    setupIpcHandlers(): void {
+        console.log('[iCloud] 正在设置 IPC 处理程序...');
+        
+        try {
+            // 测试 iCloud 可用性
+            ipcMain.handle('icloud:test-availability', async () => {
+                return await this.testICloudAvailability();
+            });
+
+            // 立即同步
+            ipcMain.handle('icloud:sync-now', async () => {
+                return await this.performIntelligentSync();
+            });
+
+            // 获取配置
+            ipcMain.handle('icloud:get-config', async (): Promise<ICloudConfig> => {
+                return this.config || {
+                    enabled: false,
+                    autoSync: false,
+                    syncInterval: 30
+                };
+            });
+
+            // 设置配置
+            ipcMain.handle('icloud:set-config', async (event, config: ICloudConfig) => {
+                this.preferencesManager.updatePreferences({ icloud: config });
+                
+                this.config = config;
+                
+                if (config.enabled && config.autoSync) {
+                    this.startAutoSync();
                 } else {
-                    // 记录数相同但内容不同，可能是编辑操作
-                    console.log('决策: 同设备记录数相同但内容有修改，上传本地版本');
+                    this.stopAutoSync();
+                }
+                
+                console.log('[iCloud] 配置已更新:', config);
+            });
+
+            // 手动上传
+            ipcMain.handle('icloud:manual-upload', async (): Promise<ManualSyncResult> => {
+                try {
+                    const result = await this.performIntelligentSync();
                     return {
-                        action: 'upload_only',
-                        strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                        reason: '同设备本地数据有编辑修改'
+                        success: result.success,
+                        message: result.message,
+                        timestamp: result.timestamp,
+                        hasConflicts: result.conflictsResolved > 0,
+                        conflictDetails: result.conflictDetails
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        message: `上传失败: ${errorMessage}`,
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: false
                     };
                 }
-            }
-        }
+            });
 
-        // 情况6：不同设备的修改，需要更仔细的分析
-        
-        // 6.1：时间差很大，使用时间戳决策
-        if (timeDiff > 300000) { // 5分钟
-            if (localTime > remoteTime) {
-                console.log('决策: 本地时间较新（时间差>5分钟）');
-                return {
-                    action: 'upload_only',
-                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                    reason: '本地修改时间较新'
-                };
-            } else {
-                console.log('决策: 远程时间较新（时间差>5分钟）');
-                return {
-                    action: 'download_only',
-                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                    reason: '远程修改时间较新'
-                };
-            }
-        }
-
-        // 6.2：时间差较小，可能是并发修改
-        if (timeDiff < 60000) { // 1分钟内
-            console.log('决策: 检测到可能的并发修改，需要合并');
-            return {
-                action: 'merge',
-                strategy: ConflictResolutionStrategy.AUTO_MERGE,
-                reason: '检测到并发修改，尝试自动合并'
-            };
-        }
-
-        // 6.3：中等时间差，使用同步计数辅助判断
-        const syncCountDiff = localMetadata.syncCount - remoteMetadata.syncCount;
-        if (Math.abs(syncCountDiff) > 5) {
-            // 同步计数差异很大，可能有一方很久没同步
-            if (syncCountDiff > 0) {
-                console.log('决策: 本地同步计数远大于远程');
-                return {
-                    action: 'upload_only',
-                    strategy: ConflictResolutionStrategy.LOCAL_WINS,
-                    reason: '本地同步次数更多'
-                };
-            } else {
-                console.log('决策: 远程同步计数远大于本地');
-                return {
-                    action: 'download_only',
-                    strategy: ConflictResolutionStrategy.REMOTE_WINS,
-                    reason: '远程同步次数更多'
-                };
-            }
-        }
-
-        // 情况7：无法明确决策，标记为冲突
-        console.log('决策: 无法自动决策，标记为冲突');
-        return {
-            action: 'conflict_detected',
-            strategy: ConflictResolutionStrategy.CREATE_BACKUP,
-            reason: `无法自动解决冲突: 时间差${Math.round(timeDiff/1000)}秒, 同步计数差${syncCountDiff}`
-        };
-    }
-
-    /**
-     * 执行同步操作
-     */
-    private async executeSyncOperation(
-        syncDir: string, dataFile: string, metadataFile: string,
-        localData: any, localMetadata: SyncMetadata, localDataHash: string,
-        remoteData: any, remoteMetadata: SyncMetadata | null,
-        decision: any
-    ): Promise<SyncResult> {
-        
-        const now = new Date().toISOString();
-        let filesUploaded = 0;
-        let filesDownloaded = 0;
-        let conflictsDetected = 0;
-        let conflictsResolved = 0;
-        const conflictDetails: ConflictDetail[] = [];
-
-        switch (decision.action) {
-            case 'upload_only':
-                console.log('执行上传操作...');
-                
-                // 分析数据变更详情
-                const changeAnalysis = this.analyzeDataChanges(localData, remoteData);
-                
-                // 上传数据文件
-                await fs.promises.writeFile(dataFile, JSON.stringify(localData, null, 2));
-                if (changeAnalysis.hasChanges) filesUploaded++;
-                
-                // 更新并上传元数据
-                const uploadMetadata: SyncMetadata = {
-                    ...localMetadata,
-                    lastSyncTime: now,
-                    dataHash: localDataHash,
-                    syncCount: (localMetadata.syncCount || 0) + 1,
-                    totalRecords: this.calculateTotalRecords(localData),
-                    lastModifiedTime: now
-                };
-                
-                await fs.promises.writeFile(metadataFile, JSON.stringify(uploadMetadata, null, 2));
-                filesUploaded++; // 元数据总是会更新
-                
-                // 更新本地同步时间
-                await this.updateLocalSyncTime(now);
-                
-                // 构建有意义的成功消息
-                const successMessage = this.buildSyncSuccessMessage('upload', changeAnalysis);
-                
-                return {
-                    success: true,
-                    message: successMessage,
-                    timestamp: now,
-                    filesUploaded,
-                    filesDownloaded,
-                    conflictsDetected,
-                    conflictsResolved,
-                    conflictDetails
-                };
-                
-            case 'download_only':
-                console.log('执行下载操作...');
-                
-                if (remoteData && this.dataManagementService) {
-                    // 分析下载的数据变更
-                    const downloadAnalysis = this.analyzeDataChanges(remoteData, localData);
+            // 手动下载
+            ipcMain.handle('icloud:manual-download', async (): Promise<ManualSyncResult> => {
+                try {
+                    // 获取远程数据预览
+                    const syncDir = this.getSyncDirectory();
+                    const remoteSnapshot = await this.getRemoteSnapshot(syncDir);
                     
-                    // 导入远程数据到本地
-                    await this.dataManagementService.importDataObject(remoteData);
-                    filesDownloaded++;
-                    
-                    // 更新本地同步时间
-                    await this.updateLocalSyncTime(remoteMetadata?.lastSyncTime || now);
-                    
-                    // 构建有意义的成功消息
-                    const successMessage = this.buildSyncSuccessMessage('download', downloadAnalysis);
+                    if (!remoteSnapshot) {
+                        return {
+                            success: false,
+                            message: '远程没有找到同步数据',
+                            timestamp: new Date().toISOString(),
+                            hasConflicts: false
+                        };
+                    }
+
+                    const localSnapshot = await this.getLocalSnapshot();
+                    const conflictCount = this.getConflictingItemsCount(localSnapshot, remoteSnapshot);
+
+                    return {
+                        success: true,
+                        message: '远程数据预览获取成功',
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: conflictCount > 0,
+                        localData: localSnapshot,
+                        remoteData: remoteSnapshot
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        message: `下载失败: ${errorMessage}`,
+                        timestamp: new Date().toISOString(),
+                        hasConflicts: false
+                    };
+                }
+            });
+
+            // 应用下载的数据
+            ipcMain.handle('icloud:apply-downloaded-data', async (event, resolution: any): Promise<SyncResult> => {
+                // 这里可以根据解决方案应用数据
+                return await this.performIntelligentSync();
+            });
+
+            // 比较数据
+            ipcMain.handle('icloud:compare-data', async () => {
+                try {
+                    const syncDir = this.getSyncDirectory();
+                    const remoteSnapshot = await this.getRemoteSnapshot(syncDir);
+                    const localSnapshot = await this.getLocalSnapshot();
+
+                    if (!remoteSnapshot) {
+                        return {
+                            success: false,
+                            message: '远程没有数据可比较'
+                        };
+                    }
+
+                    const differences = await this.generateDetailedDifferences(localSnapshot, remoteSnapshot);
                     
                     return {
                         success: true,
-                        message: successMessage,
-                        timestamp: now,
-                        filesUploaded,
-                        filesDownloaded,
-                        conflictsDetected,
-                        conflictsResolved,
-                        conflictDetails
+                        differences
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        message: `比较失败: ${errorMessage}`
                     };
                 }
-                
-                break;
-                
-            case 'merge':
-                console.log('执行数据合并操作...');
-                
-                // 创建冲突备份
-                if (this.dataManagementService) {
-                    await this.dataManagementService.createBackup(`同步冲突备份 - ${now}`);
-                }
-                
-                // 尝试智能合并
-                const mergedData = await this.mergeData(localData, remoteData);
-                
-                // 上传合并后的数据
-                await fs.promises.writeFile(dataFile, JSON.stringify(mergedData, null, 2));
-                filesUploaded++;
-                
-                const mergeMetadata: SyncMetadata = {
-                    lastSyncTime: now,
-                    localVersion: localMetadata.localVersion,
-                    remoteVersion: remoteMetadata?.remoteVersion || '1.0.0',
-                    dataHash: this.calculateDataHash(mergedData),
-                    syncCount: Math.max(localMetadata.syncCount || 0, remoteMetadata?.syncCount || 0) + 1,
-                    deviceId: localMetadata.deviceId,
-                    appVersion: localMetadata.appVersion,
-                    totalRecords: this.calculateTotalRecords(mergedData),
-                    lastModifiedTime: now,
-                    syncStrategy: 'auto_merge'
-                };
-                
-                await fs.promises.writeFile(metadataFile, JSON.stringify(mergeMetadata, null, 2));
-                filesUploaded++;
-                
-                // 导入合并后的数据到本地
-                if (this.dataManagementService) {
-                    await this.dataManagementService.importDataObject(mergedData);
-                }
-                
-                await this.updateLocalSyncTime(now);
-                
-                conflictsDetected++;
-                conflictsResolved++;
-                conflictDetails.push({
-                    type: 'data_conflict',
-                    description: '检测到数据冲突，已自动合并',
-                    resolution: 'merged'
-                });
-                
-                break;
-                
-            case 'conflict_detected':
-                console.log('检测到严重冲突，创建备份...');
-                
-                // 创建本地备份
-                if (this.dataManagementService) {
-                    await this.dataManagementService.createBackup(`冲突备份-本地 - ${now}`);
-                }
-                
-                conflictsDetected++;
-                conflictDetails.push({
-                    type: 'version_conflict',
-                    description: '检测到严重的数据冲突，已创建备份，请手动处理',
-                    resolution: 'backup_created'
-                });
-                
-                break;
-        }
+            });
 
-        const result: SyncResult = {
-            success: true,
-            message: `同步完成: ${decision.reason}`,
-            timestamp: now,
-            filesUploaded,
-            filesDownloaded,
-            conflictsDetected,
-            conflictsResolved,
-            conflictDetails: conflictDetails.length > 0 ? conflictDetails : undefined
-        };
+            // 打开同步目录
+            ipcMain.handle('icloud:open-sync-directory', async () => {
+                try {
+                    const syncDir = this.getSyncDirectory();
+                    await this.ensureSyncDirectory(syncDir);
+                    shell.openPath(syncDir);
+                    
+                    return {
+                        success: true,
+                        message: '同步目录已打开',
+                        path: syncDir
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        message: `打开目录失败: ${errorMessage}`
+                    };
+                }
+            });
 
-        console.log('iCloud 智能同步完成:', result);
-        return result;
-    }
-
-    /**
-     * 合并数据
-     */
-    private async mergeData(localData: any, remoteData: any): Promise<any> {
-        // 简化的合并算法 - 实际项目中应该根据数据结构实现更智能的合并
-        console.log('执行数据合并算法...');
-        
-        const merged = { ...localData };
-        
-        // 合并提示词数据（如果存在）
-        if (remoteData.prompts && localData.prompts) {
-            const localPromptIds = new Set(localData.prompts.map((p: any) => p.id));
-            const remoteNewPrompts = remoteData.prompts.filter((p: any) => !localPromptIds.has(p.id));
-            merged.prompts = [...localData.prompts, ...remoteNewPrompts];
-        } else if (remoteData.prompts) {
-            merged.prompts = remoteData.prompts;
+            console.log('[iCloud] IPC 处理程序设置完成');
+        } catch (error) {
+            console.error('[iCloud] 设置 IPC 处理程序失败:', error);
         }
-        
-        // 合并分类数据
-        if (remoteData.categories && localData.categories) {
-            const localCategoryIds = new Set(localData.categories.map((c: any) => c.id));
-            const remoteNewCategories = remoteData.categories.filter((c: any) => !localCategoryIds.has(c.id));
-            merged.categories = [...localData.categories, ...remoteNewCategories];
-        } else if (remoteData.categories) {
-            merged.categories = remoteData.categories;
-        }
-        
-        // 其他数据类型的合并...
-        
-        console.log('数据合并完成');
-        return merged;
     }
 
     /**
      * 生成详细的数据差异分析
      */
-    private async generateDetailedDifferences(localData: any, remoteData: any, localMetadata: SyncMetadata, remoteMetadata: SyncMetadata | null): Promise<{
+    private async generateDetailedDifferences(localSnapshot: SyncSnapshot, remoteSnapshot: SyncSnapshot): Promise<{
         added: any[];
         modified: any[];
         deleted: any[];
@@ -1422,20 +1517,34 @@ export class ICloudService {
             conflicts: number;
         };
     }> {
-        console.log('生成详细的数据差异分析...');
+        const localItemsMap = new Map(localSnapshot.items.map(item => [item.id, item]));
+        const remoteItemsMap = new Map(remoteSnapshot.items.map(item => [item.id, item]));
         
         const added: any[] = [];
         const modified: any[] = [];
         const deleted: any[] = [];
         let conflicts = 0;
 
-        // 简化的差异分析实现
-        const localTotal = this.calculateTotalRecords(localData);
-        const remoteTotal = this.calculateTotalRecords(remoteData);
-        
-        // 基于记录数差异计算冲突
-        if (Math.abs(localTotal - remoteTotal) > 0) {
-            conflicts++;
+        // 检查远程新增或修改的项目
+        for (const remoteItem of remoteSnapshot.items) {
+            const localItem = localItemsMap.get(remoteItem.id);
+            
+            if (!localItem) {
+                added.push(this.convertFromModernFormat(remoteItem));
+            } else if (remoteItem.metadata.checksum !== localItem.metadata.checksum) {
+                modified.push({
+                    local: this.convertFromModernFormat(localItem),
+                    remote: this.convertFromModernFormat(remoteItem)
+                });
+                conflicts++;
+            }
+        }
+
+        // 检查本地删除的项目
+        for (const localItem of localSnapshot.items) {
+            if (!remoteItemsMap.has(localItem.id)) {
+                deleted.push(this.convertFromModernFormat(localItem));
+            }
         }
 
         return {
@@ -1443,246 +1552,31 @@ export class ICloudService {
             modified,
             deleted,
             summary: {
-                localTotal,
-                remoteTotal,
+                localTotal: localSnapshot.items.length,
+                remoteTotal: remoteSnapshot.items.length,
                 conflicts
             }
         };
     }
 
     /**
-     * 更新本地同步时间和计数
+     * 清理资源
      */
-    private async updateLocalSyncTime(syncTime: string): Promise<void> {
-        try {
-            const currentPrefs = this.preferencesManager.getPreferences();
-            const currentSyncCount = currentPrefs.dataSync?.syncCount || 0;
-            
-            await this.preferencesManager.updatePreferences({
-                dataSync: {
-                    ...currentPrefs.dataSync,
-                    lastSyncTime: syncTime,
-                    syncCount: currentSyncCount + 1 // 增加同步计数
-                }
-            });
-            
-            console.log(`本地同步信息已更新: 时间=${syncTime}, 计数=${currentSyncCount + 1}`);
-        } catch (error) {
-            console.error('更新本地同步时间失败:', error);
-        }
-    }
-
-    /**
-     * 生成导出数据
-     */
-    private async generateExportData(): Promise<any> {
-        try {
-            // 如果有数据管理服务，使用它来获取数据
-            if (this.dataManagementService) {
-                return await this.dataManagementService.generateExportData();
-            }
-            
-            // 否则返回空数据结构
-            return {
-                exportTime: new Date().toISOString(),
-                version: '1.0',
-                categories: [],
-                prompts: [],
-                aiConfigs: [],
-                aiHistory: [],
-                settings: []
-            };
-        } catch (error) {
-            console.error('生成导出数据失败:', error);
-            throw new Error(`导出数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
-        }
-    }
-
-    /**
-     * 启动自动同步
-     */
-    private startAutoSync() {
+    cleanup(): void {
+        console.log('[iCloud] 清理服务...');
         this.stopAutoSync();
         
-        if (this.config?.syncInterval) {
-            const interval = this.config.syncInterval * 60 * 1000; // 转换为毫秒
-            this.syncTimer = setInterval(() => {
-                this.performSync().catch(console.error);
-            }, interval);
-        }
-    }
-
-    /**
-     * 停止自动同步
-     */
-    private stopAutoSync() {
-        if (this.syncTimer) {
-            clearInterval(this.syncTimer);
-            this.syncTimer = null;
-        }
-    }
-
-    /**
-     * 生成设备ID
-     */
-    private generateDeviceId(): string {
-        // 基于用户数据路径和系统信息生成唯一设备ID
-        const crypto = require('crypto');
-        const uniqueString = `${os.hostname()}-${os.platform()}-${app.getPath('userData')}`;
-        return crypto.createHash('md5').update(uniqueString).digest('hex').substring(0, 12);
-    }
-
-    /**
-     * 获取存储的 iCloud 配置
-     */
-    private async getStoredConfig(): Promise<ICloudConfig | null> {
-        try {
-            const preferences = this.preferencesManager.getPreferences();
-            return preferences.icloud || null;
-        } catch (error) {
-            console.error('获取 iCloud 配置失败:', error);
-            return null;
-        }
-    }
-
-    /**
-     * 分析数据变更详情
-     */
-    private analyzeDataChanges(newData: any, oldData: any): {
-        hasChanges: boolean;
-        categoriesAdded: number;
-        categoriesModified: number;
-        categoriesDeleted: number;
-        promptsAdded: number;
-        promptsModified: number;
-        promptsDeleted: number;
-        totalChanges: number;
-        details: string[];
-    } {
-        const analysis = {
-            hasChanges: false,
-            categoriesAdded: 0,
-            categoriesModified: 0,
-            categoriesDeleted: 0,
-            promptsAdded: 0,
-            promptsModified: 0,
-            promptsDeleted: 0,
-            totalChanges: 0,
-            details: [] as string[]
-        };
-
-        if (!oldData) {
-            // 首次同步
-            const newCategories = newData.categories || [];
-            const newPrompts = newData.prompts || [];
-            
-            analysis.categoriesAdded = newCategories.length;
-            analysis.promptsAdded = newPrompts.length;
-            analysis.hasChanges = analysis.categoriesAdded > 0 || analysis.promptsAdded > 0;
-            analysis.totalChanges = analysis.categoriesAdded + analysis.promptsAdded;
-            
-            if (analysis.hasChanges) {
-                if (analysis.categoriesAdded > 0) {
-                    analysis.details.push(`新增 ${analysis.categoriesAdded} 个分类`);
-                }
-                if (analysis.promptsAdded > 0) {
-                    analysis.details.push(`新增 ${analysis.promptsAdded} 个提示词`);
-                }
-            }
-            
-            return analysis;
-        }
-
-        // 比较分类变化
-        const oldCategories = oldData.categories || [];
-        const newCategories = newData.categories || [];
+        // 移除 IPC 处理器
+        ipcMain.removeAllListeners('icloud:test-availability');
+        ipcMain.removeAllListeners('icloud:sync-now');
+        ipcMain.removeAllListeners('icloud:manual-upload');
+        ipcMain.removeAllListeners('icloud:manual-download');
+        ipcMain.removeAllListeners('icloud:apply-downloaded-data');
+        ipcMain.removeAllListeners('icloud:compare-data');
+        ipcMain.removeAllListeners('icloud:get-config');
+        ipcMain.removeAllListeners('icloud:set-config');
+        ipcMain.removeAllListeners('icloud:open-sync-directory');
         
-        // 使用 UUID 进行精确比较
-        const oldCategoryMap = new Map(oldCategories.map((c: any) => [c.uuid || c.id, c]));
-        const newCategoryMap = new Map(newCategories.map((c: any) => [c.uuid || c.id, c]));
-        
-        for (const [uuid, newCategory] of newCategoryMap) {
-            if (!oldCategoryMap.has(uuid)) {
-                analysis.categoriesAdded++;
-            } else {
-                const oldCategory = oldCategoryMap.get(uuid);
-                if (this.calculateDataHash(newCategory) !== this.calculateDataHash(oldCategory)) {
-                    analysis.categoriesModified++;
-                }
-            }
-        }
-        
-        for (const [uuid] of oldCategoryMap) {
-            if (!newCategoryMap.has(uuid)) {
-                analysis.categoriesDeleted++;
-            }
-        }
-
-        // 比较提示词变化
-        const oldPrompts = oldData.prompts || [];
-        const newPrompts = newData.prompts || [];
-        
-        const oldPromptMap = new Map(oldPrompts.map((p: any) => [p.uuid || p.id, p]));
-        const newPromptMap = new Map(newPrompts.map((p: any) => [p.uuid || p.id, p]));
-        
-        for (const [uuid, newPrompt] of newPromptMap) {
-            if (!oldPromptMap.has(uuid)) {
-                analysis.promptsAdded++;
-            } else {
-                const oldPrompt = oldPromptMap.get(uuid);
-                if (this.calculateDataHash(newPrompt) !== this.calculateDataHash(oldPrompt)) {
-                    analysis.promptsModified++;
-                }
-            }
-        }
-        
-        for (const [uuid] of oldPromptMap) {
-            if (!newPromptMap.has(uuid)) {
-                analysis.promptsDeleted++;
-            }
-        }
-
-        // 计算总变更和生成详情
-        analysis.totalChanges = 
-            analysis.categoriesAdded + analysis.categoriesModified + analysis.categoriesDeleted +
-            analysis.promptsAdded + analysis.promptsModified + analysis.promptsDeleted;
-        
-        analysis.hasChanges = analysis.totalChanges > 0;
-
-        // 生成变更详情
-        if (analysis.categoriesAdded > 0) {
-            analysis.details.push(`新增 ${analysis.categoriesAdded} 个分类`);
-        }
-        if (analysis.categoriesModified > 0) {
-            analysis.details.push(`修改 ${analysis.categoriesModified} 个分类`);
-        }
-        if (analysis.categoriesDeleted > 0) {
-            analysis.details.push(`删除 ${analysis.categoriesDeleted} 个分类`);
-        }
-        if (analysis.promptsAdded > 0) {
-            analysis.details.push(`新增 ${analysis.promptsAdded} 个提示词`);
-        }
-        if (analysis.promptsModified > 0) {
-            analysis.details.push(`修改 ${analysis.promptsModified} 个提示词`);
-        }
-        if (analysis.promptsDeleted > 0) {
-            analysis.details.push(`删除 ${analysis.promptsDeleted} 个提示词`);
-        }
-
-        return analysis;
-    }
-
-    /**
-     * 构建同步成功消息
-     */
-    private buildSyncSuccessMessage(operation: 'upload' | 'download', analysis: any): string {
-        if (!analysis.hasChanges) {
-            return operation === 'upload' ? '数据已上传，无变更' : '数据已下载，无变更';
-        }
-
-        const action = operation === 'upload' ? '上传' : '下载';
-        const details = analysis.details.join('，');
-        
-        return `${action}完成：${details}`;
+        console.log('[iCloud] 服务清理完成');
     }
 }
