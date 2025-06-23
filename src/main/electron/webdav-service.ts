@@ -797,6 +797,113 @@ export class WebDAVService {
     }
 
     /**
+     * 执行用户确认后的智能合并同步
+     */
+    private async performIntelligentSyncWithMergeConfirmed(config?: WebDAVConfig): Promise<SyncResult> {
+        console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 开始执行确认后的智能同步');
+        
+        const result: SyncResult = {
+            success: false,
+            message: '',
+            timestamp: new Date().toISOString(),
+            itemsProcessed: 0,
+            itemsUpdated: 0,
+            itemsCreated: 0,
+            itemsDeleted: 0,
+            conflictsResolved: 0,
+            conflictDetails: [],
+            errors: [],
+            phases: {
+                upload: { completed: false, itemsProcessed: 0, errors: [] },
+                deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                download: { completed: false, itemsProcessed: 0, errors: [] }
+            },
+            autoMergeConfirmed: true
+        };
+
+        let client: any = null;
+
+        try {
+            const syncConfig = config || this.config;
+            if (!syncConfig) {
+                throw new Error('WebDAV 配置未加载');
+            }
+
+            if (!syncConfig.enabled) {
+                throw new Error('WebDAV 同步未启用');
+            }
+
+            console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 创建WebDAV客户端...');
+            client = await this.createClient(syncConfig);
+
+            // 获取同步锁
+            await this.acquireSyncLock(client);
+
+            console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 获取本地快照...');
+            const localSnapshot = await this.getLocalSnapshot();
+
+            console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 检查远程快照...');
+            const remoteSnapshot = await this.getRemoteSnapshot(client);
+
+            if (!remoteSnapshot) {
+                // 如果远程没有数据，执行初始上传
+                console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 远程无数据，执行初始上传');
+                const uploadResult = await this.performInitialUpload(client, localSnapshot);
+                result.success = true;
+                result.message = uploadResult.message;
+                result.itemsCreated = uploadResult.itemsCreated;
+                result.itemsProcessed = uploadResult.itemsProcessed;
+                result.phases.upload.completed = true;
+                result.phases.upload.itemsProcessed = uploadResult.itemsProcessed;
+            } else {
+                // 执行智能合并
+                console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 执行智能合并');
+                const mergeResult = await this.performIntelligentMerge(client, localSnapshot, remoteSnapshot);
+                
+                // 复制合并结果
+                result.success = mergeResult.success;
+                result.message = mergeResult.message;
+                result.itemsProcessed = mergeResult.itemsProcessed;
+                result.itemsUpdated = mergeResult.itemsUpdated;
+                result.itemsCreated = mergeResult.itemsCreated;
+                result.itemsDeleted = mergeResult.itemsDeleted;
+                result.conflictsResolved = mergeResult.conflictsResolved;
+                result.conflictDetails = mergeResult.conflictDetails;
+                result.errors = mergeResult.errors;
+                result.phases = mergeResult.phases;
+            }
+
+            // 更新本地同步时间
+            await this.updateLocalSyncTime(result.timestamp);
+            this.lastSuccessfulSync = result.timestamp;
+            this.consecutiveFailures = 0;
+
+            console.log('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 同步完成:', result);
+            return result;
+
+        } catch (error) {
+            this.consecutiveFailures++;
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            
+            console.error('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 同步失败:', error);
+            result.success = false;
+            result.message = errorMessage;
+            result.errors.push(errorMessage);
+            
+            return result;
+        } finally {
+            // 释放同步锁
+            if (client) {
+                try {
+                    await this.releaseSyncLock(client);
+                } catch (error) {
+                    console.warn('[WebDAV] performIntelligentSyncWithMergeConfirmed() - 释放同步锁失败:', error);
+                }
+            }
+        }
+    }
+
+    /**
      * 获取远程快照
      */
     private async getRemoteSnapshot(client: any): Promise<SyncSnapshot | null> {
@@ -910,9 +1017,9 @@ export class WebDAVService {
     }
 
     /**
-     * 智能合并两个数据项
+     * 智能合并两个数据项 - 返回简化的DataItem（重命名以避免冲突）
      */
-    private async mergeItems(localItem: DataItem, remoteItem: DataItem): Promise<DataItem> {
+    private async mergeItemsCompact(localItem: DataItem, remoteItem: DataItem): Promise<DataItem> {
         console.log(`[WebDAV] 智能合并项目: ${localItem.id}`);
         
         // 基础合并策略：选择版本号更高的，如果版本号相同则选择更新时间晚的
@@ -934,7 +1041,7 @@ export class WebDAVService {
         finalItem.metadata = {
             ...finalItem.metadata,
             lastModifiedBy: this.deviceId,
-            checksum: this.calculateChecksum(finalItem.content),
+            checksum: this.calculateItemChecksum(finalItem.content),
             syncStatus: 'synced'
         };
         
@@ -1859,26 +1966,8 @@ export class WebDAVService {
                 
                 // 执行带确认的同步
                 const result = await this.executeWithRetry(
-                    () => {
-                        const syncResult: SyncResult = {
-                            success: false,
-                            message: '',
-                            timestamp: new Date().toISOString(),
-                            itemsProcessed: 0,
-                            itemsUpdated: 0,
-                            itemsCreated: 0,
-                            itemsDeleted: 0,
-                            conflictsResolved: 0,
-                            conflictDetails: [],
-                            errors: [],
-                            phases: {
-                                upload: { completed: false, itemsProcessed: 0, errors: [] },
-                                deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
-                                download: { completed: false, itemsProcessed: 0, errors: [] }
-                            },
-                            autoMergeConfirmed: true
-                        };
-                        return this.performIntelligentSyncWithMergeConfirmed(config);
+                    async () => {
+                        return await this.performIntelligentSyncWithMergeConfirmed(config);
                     },
                     '确认合并同步',
                     { maxRetries: 2, baseDelay: 1000 }
@@ -2082,6 +2171,8 @@ export class WebDAVService {
                 };
             }
         });
+
+
 
         // 比较数据
         ipcMain.handle('webdav:compare-data', async () => {
@@ -2785,6 +2876,56 @@ export class WebDAVService {
         } catch (error) {
             console.warn('检查同步历史失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 记录同步历史
+     */
+    private async recordSyncHistory(result: SyncResult): Promise<void> {
+        try {
+            const userDataPath = app.getPath('userData');
+            const syncHistoryFile = path.join(userDataPath, 'webdav-sync-history.json');
+            
+            let history: any[] = [];
+            
+            // 读取现有历史
+            if (fs.existsSync(syncHistoryFile)) {
+                try {
+                    const historyData = fs.readFileSync(syncHistoryFile, 'utf8');
+                    history = JSON.parse(historyData);
+                } catch (error) {
+                    console.warn('读取同步历史失败:', error);
+                    history = [];
+                }
+            }
+            
+            // 添加新记录
+            const newRecord = {
+                timestamp: result.timestamp,
+                success: result.success,
+                message: result.message,
+                itemsProcessed: result.itemsProcessed,
+                itemsUpdated: result.itemsUpdated,
+                itemsCreated: result.itemsCreated,
+                itemsDeleted: result.itemsDeleted,
+                conflictsResolved: result.conflictsResolved,
+                deviceId: this.deviceId
+            };
+            
+            history.unshift(newRecord);
+            
+            // 保留最近50条记录
+            if (history.length > 50) {
+                history = history.slice(0, 50);
+            }
+            
+            // 保存到文件
+            fs.writeFileSync(syncHistoryFile, JSON.stringify(history, null, 2));
+            
+            console.log('[WebDAV] 同步历史已记录');
+        } catch (error) {
+            console.warn('[WebDAV] 记录同步历史失败:', error);
         }
     }
 }
