@@ -1,4 +1,5 @@
 import { ipcInvoke } from '../ipc';
+import { databaseServiceManager } from '../services';
 
 export interface WebDAVConfig {
     enabled: boolean;
@@ -112,7 +113,6 @@ export class WebDAVAPI {
     static async safeSyncNow(): Promise<SyncResult> {
         try {
             // 检查数据库健康状态
-            const { databaseServiceManager } = await import('../services');
             const checkResult = await databaseServiceManager.checkAndRepairDatabase();
             
             if (!checkResult.healthy) {

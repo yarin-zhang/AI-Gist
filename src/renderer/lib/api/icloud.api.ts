@@ -3,6 +3,8 @@
  * 渲染进程中的 iCloud 同步接口封装
  */
 
+import { databaseServiceManager } from '../services';
+
 // 安全获取 electronAPI
 const getElectronAPI = () => {
     // @ts-ignore
@@ -143,7 +145,6 @@ export class ICloudAPI {
     static async safeSyncNow(): Promise<SyncResult> {
         try {
             // 检查数据库健康状态
-            const { databaseServiceManager } = await import('../services');
             const checkResult = await databaseServiceManager.checkAndRepairDatabase();
             
             if (!checkResult.healthy) {
