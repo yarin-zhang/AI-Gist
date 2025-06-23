@@ -130,7 +130,7 @@
                     </NFlex>
                     <NFlex justify="space-between">
                         <NText depth="2">许可证</NText>
-                        <NText>MIT License</NText>
+                        <NText>AGPL License</NText>
                     </NFlex>
                 </NFlex>
             </NFlex>
