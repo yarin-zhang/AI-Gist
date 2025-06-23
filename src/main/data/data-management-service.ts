@@ -16,7 +16,7 @@ import {
   ImportResult,
   ExportResult,
   DataStats 
-} from '../../shared/types/data-management';
+} from '@shared/types/data-management';
 
 export class DataManagementService {
     private backupDir: string;

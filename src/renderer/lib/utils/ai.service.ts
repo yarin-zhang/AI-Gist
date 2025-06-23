@@ -9,7 +9,7 @@ import type {
   AIGenerationRequest, 
   AIGenerationResult,
   AIConfigTestResult 
-} from '../../../shared/types/ai';
+} from '@shared/types/ai';
 
 export class AIService {
   private static instance: AIService;

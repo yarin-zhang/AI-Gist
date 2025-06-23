@@ -4,7 +4,7 @@
  */
 
 // 导出所有类型定义
-export * from '../../shared/types/database';
+export * from '@shared/types/database';
 
 // 导出所有服务类和服务管理器
 export * from './services';

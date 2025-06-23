@@ -5,7 +5,7 @@ import type {
   WebDAVTestResult, 
   WebDAVSyncResult,
   WebDAVConflictDetail 
-} from '../../../shared/types/webdav';
+} from '@shared/types/webdav';
 
 // 特定于 API 层的类型
 export interface ManualSyncResult {

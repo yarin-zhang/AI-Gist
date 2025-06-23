@@ -6,7 +6,7 @@ import type {
   ImportResult,
   ExportResult,
   DataStats 
-} from '../../../shared/types/data-management';
+} from '@shared/types/data-management';
 
 /**
  * 数据管理 API

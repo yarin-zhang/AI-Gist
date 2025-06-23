@@ -4,7 +4,7 @@
  */
 
 import { IpcUtils, type IpcResult } from '../ipc.ts';
-import type { WebDAVConfig } from '../../../shared/types/webdav';
+import type { WebDAVConfig } from '@shared/types/webdav';
 
 export interface AppPreferences {
   theme?: string;

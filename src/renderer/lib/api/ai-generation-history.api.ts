@@ -4,12 +4,12 @@
  */
 
 import { AIGenerationHistoryService } from '../services/ai-generation-history.service';
-import { AIGenerationHistory } from '../../../shared/types/ai';
+import { AIGenerationHistory } from '@shared/types/ai';
 import { 
   AIGenerationHistoryOptions, 
   AIGenerationHistoryStats, 
   PaginatedResult 
-} from '../../../shared/types/database';
+} from '@shared/types/database';
 
 /**
  * AI生成历史API客户端类

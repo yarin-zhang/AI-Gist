@@ -6,7 +6,7 @@
 import type { 
   DataExportResult, 
   DataImportResult 
-} from '../../shared/types/ipc.types';
+} from '@shared/types/ipc.types';
 import { BaseDatabaseService } from './base-database.service';
 import { CategoryService } from './category.service';
 import { PromptService } from './prompt.service';

@@ -16,7 +16,7 @@ import {
   WebDAVSyncStatus,
   WebDAVFileInfo,
   WebDAVConflictDetail 
-} from '../../shared/types/webdav';
+} from '@shared/types/webdav';
 
 // WebDAV 客户端缓存
 let webdavCreateClient: any = null;

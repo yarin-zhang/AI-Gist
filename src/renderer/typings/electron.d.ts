@@ -8,7 +8,7 @@ import type {
   AIGenerationRequest, 
   AIGenerationResult, 
   AIConfigTestResult 
-} from '../../shared/types/ai';
+} from '@shared/types/ai';
 
 // 重新导出以保持向后兼容
 export type { 
@@ -23,7 +23,7 @@ import type {
   WebDAVConfig, 
   WebDAVTestResult, 
   WebDAVSyncResult 
-} from '../../shared/types/webdav';
+} from '@shared/types/webdav';
 
 // 重新导出以保持向后兼容
 export type { 

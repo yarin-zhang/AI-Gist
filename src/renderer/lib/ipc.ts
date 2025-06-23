@@ -3,7 +3,7 @@
  * 整合原来分散在多个地方的 IPC 逻辑
  */
 
-import { IpcChannels, IpcResult, IpcError, IpcInvokeOptions } from '../../shared/types';
+import { IpcChannels, IpcResult, IpcError, IpcInvokeOptions } from '@shared/types';
 
 declare global {
   interface Window {

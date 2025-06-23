@@ -8,7 +8,7 @@ import {
   AIGenerationResult, 
   AIConfig,
   AIConfigTestResult
-} from '../../shared/types/ai';
+} from '@shared/types/ai';
 
 // 使用共享的 AIConfig 类型，添加一个别名用于处理后的配置
 type ProcessedAIConfig = AIConfig;
