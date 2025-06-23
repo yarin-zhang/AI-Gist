@@ -103,12 +103,33 @@
             style="width: 120px"
           />
         </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <NButton 
+            @click="syncNow" 
+            :loading="syncing"
+            :disabled="!localConfig.enabled"
+            type="primary"
+            block
+          >
+            <template #icon>
+              <NIcon>
+                <Refresh />
+              </NIcon>
+            </template>
+            立即同步
+          </NButton>
+          
+        </div>
+
       </div>
 
       <!-- 同步操作 -->
       <NDivider />
       
       <div class="space-y-4">
+  <n-collapse>
+
+    <n-collapse-item title="高级操作" name="1">
         <div class="font-medium mb-2">手动同步操作</div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -161,24 +182,8 @@
           </NButton>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-          <NButton 
-            @click="syncNow" 
-            :loading="syncing"
-            :disabled="!localConfig.enabled"
-            type="primary"
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <Refresh />
-              </NIcon>
-            </template>
-            立即同步
-          </NButton>
-          
-        </div>
-
+    </n-collapse-item>
+  </n-collapse>
 
 
       </div>
@@ -257,7 +262,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { 
-  NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon, NFlex,
+  NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon, NFlex, NCollapse, NCollapseItem,
   useMessage, useDialog
 } from 'naive-ui'
 import { 

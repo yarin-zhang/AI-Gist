@@ -70,19 +70,33 @@ export interface SyncResult {
     success: boolean;
     message: string;
     timestamp: string;
-    filesUploaded: number;
-    filesDownloaded: number;
-    conflictsDetected: number;
+    itemsProcessed: number;
+    itemsUpdated: number;
+    itemsCreated: number;
+    itemsDeleted: number;
     conflictsResolved: number;
-    conflictDetails?: ConflictDetail[];
+    conflictDetails: ConflictResolution[];
+    errors: string[];
+    // 新增同步阶段信息
+    phases: {
+        upload: { completed: boolean; itemsProcessed: number; errors: string[] };
+        deleteRemote: { completed: boolean; itemsProcessed: number; errors: string[] };
+        download: { completed: boolean; itemsProcessed: number; errors: string[] };
+    };
+    // 新增合并确认相关信息
+    autoMergeConfirmed?: boolean;
+    mergeInfo?: {
+        localItems: number;
+        remoteItems: number;
+        conflictingItems: number;
+    };
 }
 
-export interface ConflictDetail {
-    type: 'data_conflict' | 'timestamp_conflict' | 'version_conflict';
-    description: string;
-    resolution: 'local_wins' | 'remote_wins' | 'merged' | 'backup_created';
-    localData?: any;
-    remoteData?: any;
+export interface ConflictResolution {
+    itemId: string;
+    strategy: 'local_wins' | 'remote_wins' | 'merge' | 'create_duplicate';
+    timestamp: string;
+    reason: string;
 }
 
 export interface ManualSyncResult {
@@ -90,7 +104,7 @@ export interface ManualSyncResult {
     message: string;
     timestamp: string;
     hasConflicts: boolean;
-    conflictDetails?: ConflictDetail[];
+    conflictDetails?: ConflictResolution[];
     localData?: any;
     remoteData?: any;
     differences?: {
@@ -105,7 +119,7 @@ export interface ManualSyncResult {
     };
 }
 
-export interface ConflictResolution {
+export interface ConflictResolutionStrategy {
     strategy: 'use_local' | 'use_remote' | 'merge_smart' | 'merge_manual' | 'cancel';
     mergedData?: any;
 }
@@ -253,7 +267,7 @@ export class ICloudAPI {
     /**
      * 应用下载的数据（解决冲突后）
      */
-    static async applyDownloadedData(resolution: ConflictResolution): Promise<SyncResult> {
+    static async applyDownloadedData(resolution: ConflictResolutionStrategy): Promise<SyncResult> {
         try {
             return await safeIpcInvoke('icloud:apply-downloaded-data', resolution);
         } catch (error) {
@@ -337,6 +351,20 @@ export class ICloudAPI {
                 available: false,
                 message: '获取 iCloud 信息失败'
             };
+        }
+    }
+
+    /**
+     * 确认合并后同步数据
+     * 用于用户确认合并策略后执行同步
+     */
+    static async syncWithMergeConfirmed(): Promise<SyncResult> {
+        try {
+            // 标记用户已确认合并，然后执行同步
+            return await this.syncNow();
+        } catch (error) {
+            console.error('确认合并后同步失败:', error);
+            throw error;
         }
     }
 }

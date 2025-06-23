@@ -242,7 +242,13 @@ export class WebDAVService {
      */
     private generateDeviceId(): string {
         const platform = process.platform;
-        const hostname = os.hostname();
+        let hostname: string;
+        try {
+            hostname = os.hostname();
+        } catch (error) {
+            console.warn('获取hostname失败，使用默认值:', error);
+            hostname = 'unknown-host';
+        }
         const timestamp = Date.now();
         
         // 尝试从本地存储获取现有设备ID
