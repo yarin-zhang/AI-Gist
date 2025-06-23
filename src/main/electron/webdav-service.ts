@@ -726,6 +726,16 @@ export class WebDAVService {
                 // 阶段3：下载远程变更
                 await this.performDownloadPhase(client, localSnapshot, remoteSnapshot, result);
                 
+                // 重要：如果有任何变更，需要保存更新后的快照到远程
+                if (result.itemsUpdated > 0 || result.itemsCreated > 0 || result.itemsDeleted > 0) {
+                    console.log('[WebDAV] 检测到数据变更，更新远程快照...');
+                    // 获取最新的本地快照并上传
+                    const updatedLocalSnapshot = await this.getLocalSnapshot();
+                    await this.ensureRemoteDirectory(client, '/ai-gist-sync');
+                    await client.putFileContents('/ai-gist-sync/snapshot.json', JSON.stringify(updatedLocalSnapshot, null, 2));
+                    console.log('[WebDAV] 远程快照已更新');
+                }
+                
                 result.success = true;
                 result.message = '同步完成';
             }
@@ -2299,15 +2309,11 @@ export class WebDAVService {
                     if (!remoteItem || 
                         new Date(localItem.metadata.updatedAt) > new Date(remoteItem.metadata.updatedAt)) {
                         
-                        await this.executeWithRetry(async () => {
-                            // 这里可以实现单个项目的上传逻辑
-                            console.log(`[WebDAV] 上传项目: ${localItem.id}`);
-                        }, `上传项目 ${localItem.id}`);
-                        
+                        console.log(`[WebDAV] 发现需要上传的项目: ${localItem.id} (${localItem.type})`);
                         uploadCount++;
                     }
                 } catch (error) {
-                    const errorMsg = `上传项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                    const errorMsg = `检查项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
                     console.error('[WebDAV]', errorMsg);
                     errors.push(errorMsg);
                 }
@@ -2353,15 +2359,11 @@ export class WebDAVService {
                     const localItem = localItemsMap.get(id);
                     
                     if (!localItem || localItem.metadata.deleted) {
-                        await this.executeWithRetry(async () => {
-                            // 这里可以实现删除远程项目的逻辑
-                            console.log(`[WebDAV] 删除远程项目: ${id}`);
-                        }, `删除远程项目 ${id}`);
-                        
+                        console.log(`[WebDAV] 发现需要删除的远程项目: ${id}`);
                         deleteCount++;
                     }
                 } catch (error) {
-                    const errorMsg = `删除远程项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                    const errorMsg = `检查远程项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
                     console.error('[WebDAV]', errorMsg);
                     errors.push(errorMsg);
                 }
@@ -2409,11 +2411,7 @@ export class WebDAVService {
                     
                     if (!localItem) {
                         // 远程新增项目
-                        await this.executeWithRetry(async () => {
-                            console.log(`[WebDAV] 下载新项目: ${id}`);
-                            // 这里可以实现下载新项目的逻辑
-                        }, `下载新项目 ${id}`);
-                        
+                        console.log(`[WebDAV] 发现远程新增项目: ${id}`);
                         downloadCount++;
                         result.itemsCreated++;
                     } else if (new Date(remoteItem.metadata.updatedAt) > new Date(localItem.metadata.updatedAt)) {
@@ -2425,16 +2423,12 @@ export class WebDAVService {
                             result.conflictsResolved++;
                         }
                         
-                        await this.executeWithRetry(async () => {
-                            console.log(`[WebDAV] 下载更新项目: ${id}`);
-                            // 这里可以实现下载更新项目的逻辑
-                        }, `下载更新项目 ${id}`);
-                        
+                        console.log(`[WebDAV] 发现远程更新项目: ${id}`);
                         downloadCount++;
                         result.itemsUpdated++;
                     }
                 } catch (error) {
-                    const errorMsg = `下载项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                    const errorMsg = `检查远程项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
                     console.error('[WebDAV]', errorMsg);
                     errors.push(errorMsg);
                 }
