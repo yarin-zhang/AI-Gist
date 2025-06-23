@@ -800,7 +800,12 @@ export class WebDAVService {
                 itemsDeleted: 0,
                 conflictsResolved: 0,
                 conflictDetails: [],
-                errors: []
+                errors: [],
+                phases: {
+                    upload: { completed: true, itemsProcessed: localSnapshot.items.length, errors: [] },
+                    deleteRemote: { completed: true, itemsProcessed: 0, errors: [] },
+                    download: { completed: true, itemsProcessed: 0, errors: [] }
+                }
             };
         } catch (error) {
             console.error('初始上传失败:', error);
@@ -837,7 +842,12 @@ export class WebDAVService {
             itemsDeleted: mergeResult.itemsDeleted,
             conflictsResolved: mergeResult.conflictsResolved.length,
             conflictDetails: mergeResult.conflictsResolved,
-            errors: []
+            errors: [],
+            phases: {
+                upload: { completed: true, itemsProcessed: mergeResult.itemsUpdated, errors: [] },
+                deleteRemote: { completed: true, itemsProcessed: mergeResult.itemsDeleted, errors: [] },
+                download: { completed: true, itemsProcessed: mergeResult.itemsCreated, errors: [] }
+            }
         };
     }
 
@@ -1631,7 +1641,7 @@ export class WebDAVService {
                 // 生成详细的同步报告
                 let message = result.message;
                 if (result.success && result.phases) {
-                    const details = [];
+                    const details: string[] = [];
                     if (result.itemsCreated > 0) details.push(`新增 ${result.itemsCreated} 项`);
                     if (result.itemsUpdated > 0) details.push(`更新 ${result.itemsUpdated} 项`);
                     if (result.itemsDeleted > 0) details.push(`删除 ${result.itemsDeleted} 项`);
@@ -1691,7 +1701,7 @@ export class WebDAVService {
                 // 提供详细的结果信息
                 let message = '上传成功';
                 if (result.phases) {
-                    const details = [];
+                    const details: string[] = [];
                     if (result.phases.upload.itemsProcessed > 0) {
                         details.push(`上传 ${result.phases.upload.itemsProcessed} 项`);
                     }
@@ -2161,7 +2171,7 @@ export class WebDAVService {
         customRetryConfig?: Partial<RetryConfig>
     ): Promise<T> {
         const config = { ...this.retryConfig, ...customRetryConfig };
-        let lastError: Error;
+        let lastError: Error = new Error('未知错误');
         
         for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
             try {
