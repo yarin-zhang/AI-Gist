@@ -10,12 +10,24 @@ import type {
   WebDAVSyncResult 
 } from './webdav';
 
+// 导入数据管理相关类型
+import type {
+  BackupInfo,
+  ExportOptions,
+  ImportOptions,
+  ImportResult
+} from './data-management';
+
 // 重新导出以保持向后兼容
 export type { 
   WebDAVConfig, 
   WebDAVTestResult, 
   WebDAVSyncStatus, 
-  WebDAVSyncResult 
+  WebDAVSyncResult,
+  BackupInfo,
+  ExportOptions,
+  ImportOptions,
+  ImportResult
 };
 
 // 导入并重新导出 AI 相关类型，保持向后兼容
@@ -92,50 +104,4 @@ export interface ThemeInfo {
   shouldUseInvertedColorScheme: boolean;
 }
 
-/**
- * 数据备份信息
- */
-export interface BackupInfo {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  size: number;
-  data?: any;
-}
 
-/**
- * 导出选项
- */
-export interface ExportOptions {
-  format: 'json' | 'csv';
-  includeUsers?: boolean;
-  includePosts?: boolean;
-  includeCategories?: boolean;
-  includePrompts?: boolean;
-  includeAIConfigs?: boolean;
-  includeAIHistory?: boolean;
-  includeSettings?: boolean;
-}
-
-/**
- * 导入选项
- */
-export interface ImportOptions {
-  format: 'json' | 'csv';
-  replaceExisting?: boolean;
-  skipDuplicates?: boolean;
-  createCategories?: boolean;
-}
-
-/**
- * 导入结果
- */
-export interface ImportResult {
-  success: boolean;
-  message?: string;
-  error?: string;
-  totalImported?: number;
-  totalErrors?: number;
-  details?: Record<string, number>;
-}

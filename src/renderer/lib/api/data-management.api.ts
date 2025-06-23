@@ -1,64 +1,12 @@
 import { ipcInvoke } from '../ipc';
-
-export interface BackupInfo {
-    id: string;
-    name: string;
-    size: number;
-    createdAt: string;
-    description?: string;
-}
-
-export interface ExportOptions {
-    format: 'json' | 'csv';
-    includeCategories?: boolean;
-    includePrompts?: boolean;
-    includeAIConfigs?: boolean;
-    includeSettings?: boolean;
-    includeHistory?: boolean;
-}
-
-export interface ImportOptions {
-    format: 'json' | 'csv';
-    overwrite?: boolean;
-    mergeStrategy?: 'skip' | 'replace' | 'merge';
-}
-
-export interface ImportResult {
-    success: boolean;
-    message: string;
-    imported: {
-        categories: number;
-        prompts: number;
-        settings: number;
-        history: number;
-    };
-    errors: string[];
-}
-
-export interface ExportResult {
-    success: boolean;
-    message?: string;
-    filePath?: string;
-    error?: string;
-}
-
-export interface DataStats {
-    categories: number;
-    prompts: number;
-    history: number;
-    aiConfigs: number;
-    settings: number;
-    posts: number;
-    users: number;
-    totalRecords: number;
-}
-
-export interface ExportResult {
-    success: boolean;
-    filePath?: string;
-    size?: number;
-    message: string;
-}
+import type { 
+  BackupInfo, 
+  ExportOptions, 
+  ImportOptions, 
+  ImportResult,
+  ExportResult,
+  DataStats 
+} from '../../../shared/types/data-management';
 
 /**
  * 数据管理 API
