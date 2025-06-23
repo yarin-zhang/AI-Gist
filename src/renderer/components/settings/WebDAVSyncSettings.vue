@@ -297,6 +297,47 @@
       </div>
     </NCard>
 
+    <!-- 合并确认对话框 -->
+    <NModal v-model:show="showMergeConfirmDialog" preset="card" title="数据合并确认" style="width: 80%; max-width: 600px;">
+      <div v-if="mergeConfirmData">
+        <div class="space-y-4">
+          <NAlert type="info" :show-icon="true">
+            <template #header>检测到云端已存在数据</template>
+            <div class="text-sm space-y-1">
+              <p>云端已存在一个数据库，我们将进行智能合并以保持两端的数据完整性。</p>
+              <div class="mt-3">
+                <div>• 本地数据项: {{ mergeConfirmData.localItems || 0 }} 个</div>
+                <div>• 云端数据项: {{ mergeConfirmData.remoteItems || 0 }} 个</div>
+                <div>• 可能的冲突项: {{ mergeConfirmData.conflictingItems || 0 }} 个</div>
+              </div>
+            </div>
+          </NAlert>
+          
+          <NAlert type="warning" :show-icon="true">
+            <template #header>合并策略说明</template>
+            <div class="text-sm space-y-1">
+              <p><strong>智能合并规则：</strong></p>
+              <div class="mt-2">
+                <div>• 相同UUID的条目：保留更新时间较新的版本</div>
+                <div>• 不同UUID的条目：两端都保留，实现数据并集</div>
+                <div>• 删除的条目：按时间戳智能处理恢复或删除</div>
+              </div>
+              <p class="mt-3"><strong>如需完全覆盖，请使用高级操作中的"用本地覆盖服务器"或"用服务器覆盖本地"。</strong></p>
+            </div>
+          </NAlert>
+          
+          <div class="flex justify-end gap-3 mt-6">
+            <NButton @click="handleMergeCancel" type="default">
+              取消
+            </NButton>
+            <NButton @click="handleMergeConfirm" type="primary" :loading="syncLoading">
+              确认合并
+            </NButton>
+          </div>
+        </div>
+      </div>
+    </NModal>
+
     <!-- 冲突解决对话框 -->
     <ConflictResolutionDialog
       v-if="showConflictDialog"
@@ -555,11 +596,13 @@ const originalServerConfig = ref({
 const showConflictDialog = ref(false);
 const showPreviewDialog = ref(false);
 const showCompareDialog = ref(false);
+const showMergeConfirmDialog = ref(false);
 
 // 数据状态
 const conflictData = ref(null);
 const remotePreviewData = ref(null);
 const compareData = ref(null);
+const mergeConfirmData = ref(null);
 
 // 计算属性：配置是否完整
 const isConfigComplete = computed(() => {
@@ -810,14 +853,31 @@ const syncNow = async () => {
     syncLoading.value = true;
     try {
         const result = await appService.syncWebDAVNow();
-        if (result.success) {
+        console.log("立即同步结果:", result);
+        
+        if (result.success && result.data?.success) {
             message.success(result.data.message || '同步成功');
             // 更新同步时间
             if (result.data.timestamp) {
                 emit("sync-time-updated", result.data.timestamp);
             }
+        } else if (result.success && result.data?.needsMergeConfirmation) {
+            // 检查是否需要合并确认 - 数据在result.data中
+            console.log("显示合并确认对话框，数据:", result.data.mergeInfo);
+            mergeConfirmData.value = result.data.mergeInfo || {};
+            showMergeConfirmDialog.value = true;
+            message.info(result.data.message || '检测到云端已有数据，请确认合并策略');
         } else {
-            message.error(result.error || '同步失败');
+            console.log("同步失败，检查原因:", {
+                resultSuccess: result.success,
+                dataSuccess: result.data?.success,
+                needsMergeConfirmation: result.data?.needsMergeConfirmation,
+                mergeInfo: result.data?.mergeInfo,
+                error: result.error,
+                message: result.data?.message || result.message
+            });
+            
+            message.error(result.error || result.data?.message || result.message || '同步失败');
         }
     } catch (error) {
         console.error('立即同步失败:', error);
@@ -959,6 +1019,38 @@ const handleConflictResolve = async (resolution: any) => {
 const handleConflictCancel = () => {
     showConflictDialog.value = false;
     conflictData.value = null;
+};
+
+// 处理合并确认
+const handleMergeConfirm = async () => {
+    console.log("用户确认合并，开始执行合并同步...");
+    syncLoading.value = true;
+    try {
+        const result = await appService.syncWithMergeConfirmed();
+        if (result.success) {
+            message.success(result.data.message || '合并同步成功');
+            showMergeConfirmDialog.value = false;
+            mergeConfirmData.value = null;
+            // 更新同步时间
+            if (result.data.timestamp) {
+                emit("sync-time-updated", result.data.timestamp);
+            }
+        } else {
+            message.error(result.error || '合并同步失败');
+        }
+    } catch (error) {
+        console.error('合并同步失败:', error);
+        message.error('合并同步失败: ' + error.message);
+    } finally {
+        syncLoading.value = false;
+    }
+};
+
+// 处理合并取消
+const handleMergeCancel = () => {
+    showMergeConfirmDialog.value = false;
+    mergeConfirmData.value = null;
+    message.info('已取消合并同步');
 };
 
 // 格式化同步时间

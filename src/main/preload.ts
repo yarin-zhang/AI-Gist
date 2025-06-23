@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   webdav: {
     testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
     syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
+    syncWithMergeConfirmed: () => ipcRenderer.invoke('webdav:sync-with-merge-confirmed'),
     setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
     getConfig: () => ipcRenderer.invoke('webdav:get-config'),
     manualUpload: () => ipcRenderer.invoke('webdav:manual-upload'),

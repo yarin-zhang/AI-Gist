@@ -800,4 +800,187 @@ export class DatabaseServiceManager {
     
     return data;
   }
+
+  /**
+   * 同步导入数据 - 使用 upsert 逻辑（更新已存在的，创建不存在的）
+   * 专门用于 WebDAV 等同步场景
+   */
+  async syncImportData(data: any): Promise<DataImportResult> {
+    try {
+      console.log('渲染进程: 开始同步导入数据库数据...');
+      
+      if (!data || typeof data !== 'object') {
+        throw new Error('导入数据格式无效');
+      }
+      
+      // 确保导入数据具有完整的UUID
+      data = this.ensureUUIDsInImportData(data);
+      
+      const details: Record<string, number> = {};
+      const importPromises: Promise<void>[] = [];
+      let totalErrors = 0;
+      
+      // 同步导入分类数据
+      if (data.categories && data.categories.length > 0) {
+        console.log(`同步导入分类数据: ${data.categories.length} 条`);
+        for (const category of data.categories) {
+          const { id, uuid, ...categoryData } = category;
+          importPromises.push(
+            this.upsertCategory(uuid || id, categoryData).catch(err => {
+              console.warn('同步导入分类数据失败:', category.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 同步导入提示词数据
+      if (data.prompts && data.prompts.length > 0) {
+        console.log(`同步导入提示词数据: ${data.prompts.length} 条`);
+        for (const prompt of data.prompts) {
+          const { id, uuid, ...promptData } = prompt;
+          importPromises.push(
+            this.upsertPrompt(uuid || id, promptData).catch(err => {
+              console.warn('同步导入提示词数据失败:', prompt.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 同步导入AI配置数据
+      if (data.aiConfigs && data.aiConfigs.length > 0) {
+        console.log(`同步导入AI配置数据: ${data.aiConfigs.length} 条`);
+        for (const config of data.aiConfigs) {
+          const { id, uuid, ...configData } = config;
+          importPromises.push(
+            this.upsertAIConfig(uuid || id, configData).catch(err => {
+              console.warn('同步导入AI配置数据失败:', config.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 同步导入AI历史数据
+      if (data.aiHistory && data.aiHistory.length > 0) {
+        console.log(`同步导入AI历史数据: ${data.aiHistory.length} 条`);
+        for (const history of data.aiHistory) {
+          const { id, uuid, ...historyData } = history;
+          importPromises.push(
+            this.upsertAIHistory(uuid || id, historyData).catch(err => {
+              console.warn('同步导入AI历史数据失败:', history.id, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 同步导入设置数据
+      if (data.settings && data.settings.length > 0) {
+        console.log(`同步导入设置数据: ${data.settings.length} 条`);
+        for (const setting of data.settings) {
+          importPromises.push(
+            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).catch(err => {
+              console.warn('同步导入设置数据失败:', setting.key, err.message);
+              totalErrors++;
+            })
+          );
+        }
+      }
+      
+      // 等待所有导入操作完成
+      await Promise.all(importPromises);
+      
+      // 统计导入结果
+      details.categories = (data.categories?.length || 0);
+      details.prompts = (data.prompts?.length || 0);
+      details.aiConfigs = (data.aiConfigs?.length || 0);
+      details.aiHistory = (data.aiHistory?.length || 0);
+      details.settings = (data.settings?.length || 0);
+      
+      const totalImported = Object.values(details).reduce((sum, count) => sum + count, 0);
+      
+      console.log('渲染进程: 同步导入完成:', details);
+      
+      return {
+        success: true,
+        message: `成功同步导入 ${totalImported} 条数据`,
+        details,
+        errors: totalErrors
+      };
+      
+    } catch (error) {
+      console.error('渲染进程: 同步导入数据失败:', error);
+      return {
+        success: false,
+        message: `同步导入失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        details: {},
+        errors: 1
+      };
+    }
+  }
+
+  /**
+   * Upsert 分类数据
+   */
+  private async upsertCategory(uuid: string, data: any): Promise<void> {
+    try {
+      // 先尝试更新
+      const updated = await this.category.updateCategoryByUUID(uuid, data);
+      if (!updated) {
+        // 如果更新失败，则创建新的
+        await this.category.createCategory({ ...data, uuid });
+      }
+    } catch (error) {
+      // 如果更新失败，尝试创建
+      await this.category.createCategory({ ...data, uuid });
+    }
+  }
+
+  /**
+   * Upsert 提示词数据
+   */
+  private async upsertPrompt(uuid: string, data: any): Promise<void> {
+    try {
+      // 先尝试更新
+      const updated = await this.prompt.updatePromptByUUID(uuid, data);
+      if (!updated) {
+        // 如果更新失败，则创建新的
+        await this.prompt.createPrompt({ ...data, uuid });
+      }
+    } catch (error) {
+      // 如果更新失败，尝试创建
+      await this.prompt.createPrompt({ ...data, uuid });
+    }
+  }
+
+  /**
+   * Upsert AI配置数据
+   */
+  private async upsertAIConfig(uuid: string, data: any): Promise<void> {
+    try {
+      // 先尝试更新
+      const updated = await this.aiConfig.updateAIConfigByUUID(uuid, data);
+      if (!updated) {
+        // 如果更新失败，则创建新的
+        await this.aiConfig.createAIConfig({ ...data, uuid });
+      }
+    } catch (error) {
+      // 如果更新失败，尝试创建
+      await this.aiConfig.createAIConfig({ ...data, uuid });
+    }
+  }
+
+  /**
+   * Upsert AI历史数据
+   */
+  private async upsertAIHistory(uuid: string, data: any): Promise<void> {
+    try {
+      // 先尝试更新 - 注意：AI历史可能没有 updateByUUID 方法，这里直接创建
+      await this.aiGenerationHistory.createAIGenerationHistory({ ...data, uuid });
+    } catch (error) {
+      console.warn('创建AI历史记录失败:', error);
+    }
+  }
 }

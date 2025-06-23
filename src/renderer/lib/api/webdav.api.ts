@@ -282,4 +282,13 @@ export class WebDAVAPI {
             throw error;
         }
     }
+
+    static async syncWithMergeConfirmed(): Promise<SyncResult> {
+        try {
+            return await ipcInvoke('webdav:sync-with-merge-confirmed');
+        } catch (error) {
+            console.error('确认合并后同步失败:', error);
+            throw error;
+        }
+    }
 }

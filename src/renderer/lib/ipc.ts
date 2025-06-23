@@ -44,6 +44,7 @@ declare global {
       webdav: {
         testConnection: (config: any) => Promise<any>;
         syncNow: () => Promise<any>;
+        syncWithMergeConfirmed: () => Promise<any>;
         setConfig: (config: any) => Promise<any>;
         getConfig: () => Promise<any>;
         manualUpload: () => Promise<any>;
@@ -231,6 +232,8 @@ export class IpcUtils {
             return api.webdav.testConnection(data);
           case 'sync-now':
             return api.webdav.syncNow();
+          case 'sync-with-merge-confirmed':
+            return api.webdav.syncWithMergeConfirmed();
           case 'set-config':
             return api.webdav.setConfig(data);
           case 'get-config':

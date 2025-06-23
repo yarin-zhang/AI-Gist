@@ -97,8 +97,15 @@ export class AppService {
     }
     return { success: false, error: 'WebDAV API 不可用' };
   }
+  
+  // 立即同步
   async syncWebDAVNow(): Promise<IpcResult<any>> {
     return await IpcUtils.safeInvoke<any>('webdav:sync-now');
+  }
+
+  // 用户确认合并后执行同步
+  async syncWithMergeConfirmed(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:sync-with-merge-confirmed');
   }
 
   // 手动上传数据

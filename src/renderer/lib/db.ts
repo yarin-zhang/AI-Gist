@@ -146,6 +146,7 @@ export function createDatabaseAPI() {
     restoreData: (backupData: any) => databaseManager.serviceManager.restoreData(backupData),
     replaceAllData: (backupData: any) => databaseManager.serviceManager.replaceAllData(backupData),
     importDataObject: (data: any) => databaseManager.serviceManager.importData(data),
+    syncImportDataObject: (data: any) => databaseManager.serviceManager.syncImportData(data),
     getDataStatistics: () => databaseManager.serviceManager.getDataStatistics(),
     checkAndRepairDatabase: () => databaseManager.serviceManager.checkAndRepairDatabase(),
     backupData: () => databaseManager.backupData(),

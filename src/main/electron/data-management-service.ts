@@ -1058,6 +1058,92 @@ export class DataManagementService {
     }
 
     /**
+     * 同步导入数据对象 - 使用 upsert 逻辑供 WebDAV 同步使用
+     */
+    async syncImportDataObject(data: any): Promise<{
+        success: boolean;
+        message: string;
+        imported: {
+            categories: number;
+            prompts: number;
+            settings: number;
+            history: number;
+        };
+        errors: string[];
+    }> {
+        try {
+            console.log('开始同步导入数据对象...');
+            
+            // 通过 executeJavaScript 调用渲染进程暴露的方法
+            const mainWindow = BrowserWindow.getAllWindows()[0];
+            if (!mainWindow) {
+                throw new Error('没有找到主窗口，无法访问数据库');
+            }
+
+            // 调用渲染进程中暴露的同步导入方法
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async () => {
+                    try {
+                        if (!window.databaseAPI || !window.databaseAPI.syncImportDataObject) {
+                            throw new Error('数据库API未初始化或同步导入方法不存在');
+                        }
+                        const data = ${JSON.stringify(data)};
+                        return await window.databaseAPI.syncImportDataObject(data);
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error.message || '未知错误'
+                        };
+                    }
+                })()
+            `);
+            
+            if (!result.success) {
+                console.error('同步导入数据对象失败:', result.error);
+                return {
+                    success: false,
+                    message: `同步导入失败: ${result.error}`,
+                    imported: {
+                        categories: 0,
+                        prompts: 0,
+                        settings: 0,
+                        history: 0,
+                    },
+                    errors: [result.error],
+                };
+            }
+            
+            console.log('数据对象同步导入成功:', result.details);
+            
+            return {
+                success: true,
+                message: '同步导入成功',
+                imported: {
+                    categories: result.details?.categories || 0,
+                    prompts: result.details?.prompts || 0,
+                    settings: result.details?.settings || 0,
+                    history: result.details?.aiHistory || 0,
+                },
+                errors: [],
+            };
+            
+        } catch (error) {
+            console.error('同步导入数据对象失败:', error);
+            return {
+                success: false,
+                message: `同步导入失败: ${error instanceof Error ? error.message : '未知错误'}`,
+                imported: {
+                    categories: 0,
+                    prompts: 0,
+                    settings: 0,
+                    history: 0,
+                },
+                errors: [error instanceof Error ? error.message : '未知错误'],
+            };
+        }
+    }
+
+    /**
      * 确保导出数据中所有需要同步的条目都有 UUID
      */
     private ensureUUIDsInExportData(data: any): any {
