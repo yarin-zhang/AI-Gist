@@ -158,6 +158,12 @@ interface WebDAVConfig {
     encryptData?: boolean;
     maxRetries?: number;
     conflictResolution?: 'ask' | 'local_wins' | 'remote_wins' | 'merge';
+    // 连接验证状态
+    connectionTested?: boolean;
+    connectionValid?: boolean;
+    connectionMessage?: string;
+    connectionTestedAt?: string;
+    configHash?: string;
 }
 
 /**
@@ -1967,7 +1973,13 @@ export class WebDAVService {
                     syncInterval: config.syncInterval !== undefined ? config.syncInterval : currentWebDAVConfig.syncInterval,
                     encryptData: config.encryptData !== undefined ? config.encryptData : currentWebDAVConfig.encryptData,
                     maxRetries: config.maxRetries !== undefined ? config.maxRetries : currentWebDAVConfig.maxRetries,
-                    conflictResolution: config.conflictResolution !== undefined ? config.conflictResolution : currentWebDAVConfig.conflictResolution
+                    conflictResolution: config.conflictResolution !== undefined ? config.conflictResolution : currentWebDAVConfig.conflictResolution,
+                    // 连接验证状态
+                    connectionTested: config.connectionTested !== undefined ? config.connectionTested : currentWebDAVConfig.connectionTested,
+                    connectionValid: config.connectionValid !== undefined ? config.connectionValid : currentWebDAVConfig.connectionValid,
+                    connectionMessage: config.connectionMessage !== undefined ? config.connectionMessage : currentWebDAVConfig.connectionMessage,
+                    connectionTestedAt: config.connectionTestedAt !== undefined ? config.connectionTestedAt : currentWebDAVConfig.connectionTestedAt,
+                    configHash: config.configHash !== undefined ? config.configHash : currentWebDAVConfig.configHash,
                 };
 
                 this.preferencesManager.updatePreferences({

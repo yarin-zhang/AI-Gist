@@ -530,6 +530,9 @@ const restoreConnectionStatus = () => {
   }
 }
 
+// 立即恢复连接状态（在组件初始化时）
+restoreConnectionStatus()
+
 // 加载状态
 const testingConnection = ref(false)
 const uploadLoading = ref(false)
@@ -997,8 +1000,11 @@ onMounted(() => {
 
 // 监听props变化，当WebDAV配置更新时恢复连接状态
 watch(() => props.modelValue.webdav, (newConfig, oldConfig) => {
-    // 只有在配置真正发生变化时才恢复状态，避免无限循环
-    if (newConfig && (!oldConfig || 
+    // 跳过初始调用，因为已经在组件初始化时调用了
+    if (!oldConfig) return
+    
+    // 只有在配置真正发生变化时才恢复状态
+    if (newConfig && (
         newConfig.serverUrl !== oldConfig.serverUrl ||
         newConfig.username !== oldConfig.username ||
         newConfig.password !== oldConfig.password ||
@@ -1007,7 +1013,7 @@ watch(() => props.modelValue.webdav, (newConfig, oldConfig) => {
         console.log('WebDAV配置已更新，恢复连接状态...')
         restoreConnectionStatus()
     }
-}, { deep: true, immediate: false });
+}, { deep: true, immediate: true });
 </script>
 
 <style scoped>
