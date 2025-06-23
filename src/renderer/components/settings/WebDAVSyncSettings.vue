@@ -186,6 +186,22 @@
             测试连接
           </NButton>
         </div>
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-3 mt-3">
+          <NButton 
+            @click="syncNow" 
+            :loading="syncLoading"
+            :disabled="!isWebDAVReady"
+            type="primary"
+            block
+          >
+            <template #icon>
+              <NIcon>
+                <BrandSoundcloud />
+              </NIcon>
+            </template>
+            立即同步
+          </NButton>
+        </div>
       </div>
       </div>
 
@@ -194,7 +210,10 @@
       <NDivider />
       
       <div class="space-y-4">
-        <div class="font-medium mb-2">手动同步操作</div>
+  <n-collapse>
+
+    <n-collapse-item title="高级操作" name="1">
+        <div class="font-medium mb-2">高级操作</div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NButton 
@@ -226,7 +245,7 @@
                 <Upload />
               </NIcon>
             </template>
-            上传到服务器
+            用本地覆盖服务器
           </NButton>
 
           <NButton 
@@ -242,26 +261,12 @@
                 <Download />
               </NIcon>
             </template>
-            从服务器下载
+            用服务器覆盖本地
           </NButton>
         </div>
+    </n-collapse-item>
+  </n-collapse>
         
-        <div class="grid grid-cols-2 md:grid-cols-2 gap-3 mt-3">
-          <NButton 
-            @click="syncNow" 
-            :loading="syncLoading"
-            :disabled="!isWebDAVReady"
-            type="primary"
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <BrandSoundcloud />
-              </NIcon>
-            </template>
-            立即同步
-          </NButton>
-        </div>
       </div>
 
       <!-- 同步状态 -->
@@ -401,7 +406,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import {
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
-  NInput, NModal, NTabs, NTabPane, NTag, NEmpty,
+  NInput, NModal, NTabs, NTabPane, NTag, NEmpty, NCollapse, NCollapseItem,
   useMessage
 } from 'naive-ui'
 import {
@@ -409,7 +414,7 @@ import {
 } from '@vicons/tabler'
 import ConflictResolutionDialog from './ConflictResolutionDialog.vue'
 import { AppService } from '../../lib/utils/app.service'
-
+    
 interface WebDAVSettings {
     webdav: {
         enabled: boolean;
