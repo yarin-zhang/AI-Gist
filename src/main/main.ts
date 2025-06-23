@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
   preferencesManager.applyAllSettings();
   // 初始化主题管理器
   themeManager.initialize();
-  
+
   // 初始化新的服务（在 IPC 处理器之前）
   dataManagementService = new DataManagementService(app.getPath('userData'));
   webdavService = new WebDAVService(preferencesManager, dataManagementService);
@@ -43,7 +43,7 @@ app.whenReady().then(async () => {
   // 设置 WebDAV 和 iCloud IPC 处理器
   webdavService.setupIpcHandlers();
   icloudService.setupIpcHandlers();
-
+  
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
   

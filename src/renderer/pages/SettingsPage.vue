@@ -231,6 +231,12 @@ const settings = reactive({
         password: "",
         autoSync: false,
         syncInterval: 30, // 分钟
+        // 连接验证状态
+        connectionTested: false,
+        connectionValid: false,
+        connectionMessage: '',
+        connectionTestedAt: '',
+        configHash: '',
     },
     // 数据同步设置
     dataSync: {
@@ -313,7 +319,7 @@ const currentSectionInfo = computed(() => {
         "icloud-sync": {
             title: "iCloud 同步",
             icon: Cloud,
-            description: "配置 iCloud Drive 数据同步设置"
+            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端"
         },
         "data-management": {
             title: "数据管理",
@@ -359,6 +365,12 @@ const loadSettings = async () => {
                 password: webdavConfig.password || "",
                 autoSync: webdavConfig.autoSync || false,
                 syncInterval: webdavConfig.syncInterval || 30,
+                // 连接验证状态
+                connectionTested: webdavConfig.connectionTested || false,
+                connectionValid: webdavConfig.connectionValid || false,
+                connectionMessage: webdavConfig.connectionMessage || '',
+                connectionTestedAt: webdavConfig.connectionTestedAt || '',
+                configHash: webdavConfig.configHash || '',
             };
         } catch (error) {
             console.error('从 WebDAV API 获取配置失败，使用 preferences:', error);
@@ -373,6 +385,12 @@ const loadSettings = async () => {
                 password: webdavConfig.password || "",
                 autoSync: webdavConfig.autoSync || false,
                 syncInterval: webdavConfig.syncInterval || 30,
+                // 连接验证状态
+                connectionTested: webdavConfig.connectionTested || false,
+                connectionValid: webdavConfig.connectionValid || false,
+                connectionMessage: webdavConfig.connectionMessage || '',
+                connectionTestedAt: webdavConfig.connectionTestedAt || '',
+                configHash: webdavConfig.configHash || '',
             };
         }
         
@@ -552,11 +570,13 @@ const ensureWebdavConfigSaved = async () => {
 };
 
 // 测试 WebDAV 连接
-const testWebDAVConnection = async () => {
+const testWebDAVConnection = async (callback) => {
     // 简单验证
     if (!settings.webdav.serverUrl || !settings.webdav.username || !settings.webdav.password) {
-        message.error("请填写完整的服务器信息");
-        return;
+        const errorResult = { success: false, message: "请填写完整的服务器信息" };
+        message.error(errorResult.message);
+        if (callback) callback(errorResult);
+        return errorResult;
     }
 
     loading.webdavTest = true;
@@ -568,15 +588,25 @@ const testWebDAVConnection = async () => {
         });
         
         if (result.success) {
-            message.success(`WebDAV 连接测试成功${result.serverInfo ? ` - ${result.serverInfo.name}` : ''}`);
+            message.success(`WebDAV 连接测试成功${result.serverInfo?.name ? ` - ${result.serverInfo.name}` : ''}`);
         } else {
             message.error(result.message || "WebDAV 连接测试失败");
         }
+        
+        if (callback) callback(result);
+        return result;
     } catch (error) {
         console.error("WebDAV 连接测试失败:", error);
-        message.error("WebDAV 连接测试失败");
+        const errorResult = { 
+            success: false, 
+            message: error instanceof Error ? error.message : "WebDAV 连接测试失败" 
+        };
+        message.error(errorResult.message);
+        if (callback) callback(errorResult);
+        return errorResult;
+    } finally {
+        loading.webdavTest = false;
     }
-    loading.webdavTest = false;
 };
 
 // 立即同步
@@ -958,7 +988,13 @@ const saveWebDAVSettings = async () => {
             username: settings.webdav.username,
             password: settings.webdav.password,
             autoSync: settings.webdav.autoSync,
-            syncInterval: settings.webdav.syncInterval
+            syncInterval: settings.webdav.syncInterval,
+            // 连接验证状态
+            connectionTested: settings.webdav.connectionTested,
+            connectionValid: settings.webdav.connectionValid,
+            connectionMessage: settings.webdav.connectionMessage,
+            connectionTestedAt: settings.webdav.connectionTestedAt,
+            configHash: settings.webdav.configHash,
         }));
         
         // 直接保存配置

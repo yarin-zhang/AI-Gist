@@ -24,3 +24,6 @@ build
 
 # 测试相关
 coverage/
+
+# 参考
+docs/reference/

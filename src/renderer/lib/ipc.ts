@@ -44,17 +44,12 @@ declare global {
       webdav: {
         testConnection: (config: any) => Promise<any>;
         syncNow: () => Promise<any>;
-        getSyncStatus: () => Promise<any>;
-        setConfig: (config: any) => Promise<void>;
+        setConfig: (config: any) => Promise<any>;
         getConfig: () => Promise<any>;
-        encryptPassword: (password: string) => Promise<any>;
-        decryptPassword: (encryptedPassword: any) => Promise<any>;
         manualUpload: () => Promise<any>;
         manualDownload: () => Promise<any>;
-        getRemotePreview: () => Promise<any>;
         compareData: () => Promise<any>;
         applyDownloadedData: (resolution: any) => Promise<any>;
-        decryptPassword: (encryptedPassword: any) => Promise<string>;
       };
       icloud: {
         testAvailability: () => Promise<any>;
@@ -230,29 +225,20 @@ export class IpcUtils {
             return api.ai.debugPrompt(data.prompt, data.config);
         }
         break;
-        
-      case 'webdav':
+          case 'webdav':
         switch (method) {
           case 'test-connection':
             return api.webdav.testConnection(data);
           case 'sync-now':
             return api.webdav.syncNow();
-          case 'get-sync-status':
-            return api.webdav.getSyncStatus();
           case 'set-config':
             return api.webdav.setConfig(data);
           case 'get-config':
             return api.webdav.getConfig();
-          case 'encrypt-password':
-            return api.webdav.encryptPassword(data);
-          case 'decrypt-password':
-            return api.webdav.decryptPassword(data);
           case 'manual-upload':
             return api.webdav.manualUpload();
           case 'manual-download':
             return api.webdav.manualDownload();
-          case 'get-remote-preview':
-            return api.webdav.getRemotePreview();
           case 'compare-data':
             return api.webdav.compareData();
           case 'apply-downloaded-data':

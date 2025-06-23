@@ -147,6 +147,10 @@
           <small class="text-gray-500">
             请检查服务器地址、用户名和密码是否正确。
           </small>
+          <br>
+          <small class="text-gray-500" v-if="props.modelValue.webdav.connectionTestedAt">
+            最后验证时间: {{ formatSyncTime(props.modelValue.webdav.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <NAlert 
@@ -157,6 +161,10 @@
         >
           <template #header>WebDAV 服务器连接正常</template>
           服务器地址: {{ props.modelValue.webdav.serverUrl }}
+          <br>
+          <small class="text-gray-500" v-if="props.modelValue.webdav.connectionTestedAt">
+            最后验证时间: {{ formatSyncTime(props.modelValue.webdav.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <NAlert 
@@ -173,7 +181,7 @@
           <NButton 
             @click="testConnection" 
             :loading="testingConnection"
-            :disabled="!props.modelValue.webdav.enabled || !props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username"
+            :disabled="!props.modelValue.webdav.enabled || !isConfigComplete"
             type="primary"
             ghost
             size="small"
@@ -186,6 +194,22 @@
             测试连接
           </NButton>
         </div>
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-3 mt-3">
+          <NButton 
+            @click="syncNow" 
+            :loading="syncLoading"
+            :disabled="!isWebDAVReady"
+            type="primary"
+            block
+          >
+            <template #icon>
+              <NIcon>
+                <BrandSoundcloud />
+              </NIcon>
+            </template>
+            立即同步
+          </NButton>
+        </div>
       </div>
       </div>
 
@@ -194,13 +218,16 @@
       <NDivider />
       
       <div class="space-y-4">
-        <div class="font-medium mb-2">手动同步操作</div>
+  <n-collapse>
+
+    <n-collapse-item title="高级操作" name="1">
+        <div class="font-medium mb-2">高级操作</div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NButton 
             @click="handleCompareData" 
             :loading="compareLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="primary"
             ghost
             block
@@ -216,7 +243,7 @@
           <NButton 
             @click="handleManualUpload" 
             :loading="uploadLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="success"
             ghost
             block
@@ -226,13 +253,13 @@
                 <Upload />
               </NIcon>
             </template>
-            上传到服务器
+            用本地覆盖服务器
           </NButton>
 
           <NButton 
             @click="handleManualDownload" 
             :loading="downloadLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="info"
             ghost
             block
@@ -242,26 +269,12 @@
                 <Download />
               </NIcon>
             </template>
-            从服务器下载
+            用服务器覆盖本地
           </NButton>
         </div>
+    </n-collapse-item>
+  </n-collapse>
         
-        <div class="grid grid-cols-2 md:grid-cols-2 gap-3 mt-3">
-          <NButton 
-            @click="syncNow" 
-            :loading="syncLoading"
-            :disabled="!props.modelValue.webdav.enabled"
-            type="primary"
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <BrandSoundcloud />
-              </NIcon>
-            </template>
-            立即同步
-          </NButton>
-        </div>
       </div>
 
       <!-- 同步状态 -->
@@ -276,27 +289,10 @@
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">同步状态:</span>
-            <span :class="props.modelValue.webdav.enabled ? 'text-green-600' : 'text-gray-500'">
-              {{ props.modelValue.webdav.enabled ? '已启用' : '已禁用' }}
+            <span :class="syncStatusInfo.class">
+              {{ syncStatusInfo.text }}
             </span>
           </div>
-
-          
-          <NButton 
-            @click="handleGetRemotePreview" 
-            :loading="previewLoading"
-            :disabled="!props.modelValue.webdav.enabled"
-            type="default"
-            ghost
-            block
-          >
-            <template #icon>
-              <NIcon>
-                <Eye />
-              </NIcon>
-            </template>
-            预览远程数据
-          </NButton>
         </div>
       </div>
     </NCard>
@@ -415,10 +411,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
-  NInput, NModal, NTabs, NTabPane, NTag, NEmpty,
+  NInput, NModal, NTabs, NTabPane, NTag, NEmpty, NCollapse, NCollapseItem,
   useMessage
 } from 'naive-ui'
 import {
@@ -426,7 +422,7 @@ import {
 } from '@vicons/tabler'
 import ConflictResolutionDialog from './ConflictResolutionDialog.vue'
 import { AppService } from '../../lib/utils/app.service'
-
+    
 interface WebDAVSettings {
     webdav: {
         enabled: boolean;
@@ -435,6 +431,12 @@ interface WebDAVSettings {
         password: string;
         autoSync: boolean;
         syncInterval: number;
+        // 连接验证状态
+        connectionTested?: boolean;
+        connectionValid?: boolean;
+        connectionMessage?: string;
+        connectionTestedAt?: string;
+        configHash?: string;
     };
     dataSync: {
         lastSyncTime: string | null;
@@ -464,6 +466,73 @@ const connectionStatus = reactive({
   message: ''
 })
 
+// 计算配置哈希值，用于检测配置是否发生变更
+const computeConfigHash = (config: { serverUrl: string; username: string; password: string }) => {
+  const configStr = `${config.serverUrl}|${config.username}|${config.password}`
+  // 简单的哈希函数
+  let hash = 0
+  for (let i = 0; i < configStr.length; i++) {
+    const char = configStr.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // 转为32位整数
+  }
+  return hash.toString()
+}
+
+// 从持久化配置中恢复连接状态
+const restoreConnectionStatus = () => {
+  const config = props.modelValue.webdav
+  console.log('开始恢复连接状态，当前配置:', {
+    serverUrl: config.serverUrl || '',
+    username: config.username || '',
+    hasPassword: !!(config.password || ''),
+    connectionTested: config.connectionTested,
+    connectionValid: config.connectionValid,
+    connectionMessage: config.connectionMessage,
+    connectionTestedAt: config.connectionTestedAt,
+    configHash: config.configHash
+  })
+  
+  const currentHash = computeConfigHash({
+    serverUrl: config.serverUrl || '',
+    username: config.username || '',
+    password: config.password || ''
+  })
+  
+  console.log('配置哈希比较:', {
+    currentHash,
+    storedHash: config.configHash,
+    hashMatches: config.configHash === currentHash,
+    connectionTested: config.connectionTested
+  })
+  
+  // 如果配置哈希值匹配且有连接测试记录，则恢复状态
+  if (config.configHash === currentHash && config.connectionTested) {
+    connectionStatus.checked = true
+    connectionStatus.connected = config.connectionValid || false
+    connectionStatus.message = config.connectionMessage || ''
+    
+    console.log('✅ 已成功恢复连接状态:', {
+      tested: connectionStatus.checked,
+      connected: connectionStatus.connected,
+      message: connectionStatus.message,
+      testedAt: config.connectionTestedAt
+    })
+  } else {
+    // 配置已变更或没有测试记录，重置状态
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+    
+    console.log('❌ 连接状态已重置 - 原因:', 
+      !config.connectionTested ? '没有测试记录' : 
+      config.configHash !== currentHash ? '配置已变更' : '未知原因')
+  }
+}
+
+// 立即恢复连接状态（在组件初始化时）
+restoreConnectionStatus()
+
 // 加载状态
 const testingConnection = ref(false)
 const uploadLoading = ref(false)
@@ -492,38 +561,132 @@ const conflictData = ref(null);
 const remotePreviewData = ref(null);
 const compareData = ref(null);
 
+// 计算属性：配置是否完整
+const isConfigComplete = computed(() => {
+  const config = props.modelValue.webdav
+  return !!(config.serverUrl && config.username && config.password)
+})
+
+// 计算属性：WebDAV是否真正可用
+const isWebDAVReady = computed(() => {
+  return props.modelValue.webdav.enabled && 
+         isConfigComplete.value && 
+         connectionStatus.connected
+})
+
+// 计算属性：同步状态文本和样式
+const syncStatusInfo = computed(() => {
+  if (!props.modelValue.webdav.enabled) {
+    return { text: '已禁用', class: 'text-gray-500' }
+  }
+  if (!isConfigComplete.value) {
+    return { text: '配置不完整', class: 'text-orange-600' }
+  }
+  if (!connectionStatus.checked) {
+    return { text: '未验证连接', class: 'text-orange-600' }
+  }
+  if (!connectionStatus.connected) {
+    return { text: '连接失败', class: 'text-red-600' }
+  }
+  return { text: '就绪', class: 'text-green-600' }
+})
+
 // 测试连接
 const testConnection = async () => {
-  if (!props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username) {
+  if (!props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username || !props.modelValue.webdav.password) {
     message.warning('请先填写完整的服务器配置信息')
     return
   }
 
   testingConnection.value = true
+  connectionStatus.checked = false
+  connectionStatus.connected = false
+  connectionStatus.message = ''
+
   try {
-    emit("test-connection")
+    // 调用父组件的测试连接方法
+    const result = await new Promise((resolve) => {
+      // 发出事件并等待父组件处理
+      emit("test-connection", resolve)
+    })
     
-    // 模拟测试连接结果，实际应该从 emit 的回调中获取结果
-    // 这里需要与实际的测试连接逻辑配合
-    setTimeout(() => {
-      connectionStatus.checked = true
-      // 这里应该根据实际测试结果设置 connected 状态
-      // 暂时假设连接成功
+    connectionStatus.checked = true
+    
+    if (result && result.success) {
       connectionStatus.connected = true
-      connectionStatus.message = '连接成功'
+      connectionStatus.message = result.message || '连接成功'
+      message.success('WebDAV 服务器连接正常')
       
-      if (connectionStatus.connected) {
-        message.success('WebDAV 服务器连接正常')
-      } else {
-        message.warning('WebDAV 服务器连接失败')
-      }
-    }, 1000)
+      // 保存连接验证状态到配置
+      const currentConfig = props.modelValue.webdav
+      const configHash = computeConfigHash({
+        serverUrl: currentConfig.serverUrl || '',
+        username: currentConfig.username || '',
+        password: currentConfig.password || ''
+      })
+      
+      // 更新配置中的连接验证状态
+      Object.assign(currentConfig, {
+        connectionTested: true,
+        connectionValid: true,
+        connectionMessage: connectionStatus.message,
+        connectionTestedAt: new Date().toISOString(),
+        configHash: configHash
+      })
+      
+      emit("update:modelValue", props.modelValue)
+      emit("save-webdav")
+      
+      console.log('连接验证状态已保存')
+    } else {
+      connectionStatus.connected = false
+      connectionStatus.message = result?.message || '连接失败'
+      message.error(`WebDAV 服务器连接失败: ${connectionStatus.message}`)
+      
+      // 保存失败状态
+      const currentConfig = props.modelValue.webdav
+      const configHash = computeConfigHash({
+        serverUrl: currentConfig.serverUrl || '',
+        username: currentConfig.username || '',
+        password: currentConfig.password || ''
+      })
+      
+      Object.assign(currentConfig, {
+        connectionTested: true,
+        connectionValid: false,
+        connectionMessage: connectionStatus.message,
+        connectionTestedAt: new Date().toISOString(),
+        configHash: configHash
+      })
+      
+      emit("update:modelValue", props.modelValue)
+      emit("save-webdav")
+    }
   } catch (error) {
     console.error('测试连接失败:', error)
     connectionStatus.checked = true
     connectionStatus.connected = false
-    connectionStatus.message = '测试连接失败'
-    message.error('测试连接失败')
+    connectionStatus.message = error instanceof Error ? error.message : '测试连接失败'
+    message.error(`测试连接失败: ${connectionStatus.message}`)
+    
+    // 保存错误状态
+    const currentConfig = props.modelValue.webdav
+    const configHash = computeConfigHash({
+      serverUrl: currentConfig.serverUrl || '',
+      username: currentConfig.username || '',
+      password: currentConfig.password || ''
+    })
+    
+    Object.assign(currentConfig, {
+      connectionTested: true,
+      connectionValid: false,
+      connectionMessage: connectionStatus.message,
+      connectionTestedAt: new Date().toISOString(),
+      configHash: configHash
+    })
+    
+    emit("update:modelValue", props.modelValue)
+    emit("save-webdav")
   } finally {
     testingConnection.value = false
   }
@@ -589,6 +752,22 @@ const handleServerConfigChange = () => {
     current.password !== original.password
   )
   
+  // 如果服务器配置发生变更，重置连接验证状态
+  if (hasUnsavedServerConfig.value) {
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+    
+    // 清除配置中的连接验证状态
+    Object.assign(current, {
+      connectionTested: false,
+      connectionValid: false,
+      connectionMessage: '',
+      connectionTestedAt: '',
+      configHash: ''
+    })
+  }
+  
   emit("update:modelValue", props.modelValue)
 }
 
@@ -607,10 +786,8 @@ const saveServerConfig = async () => {
     
     hasUnsavedServerConfig.value = false
     
-    // 重置连接状态，需要重新测试连接
-    connectionStatus.checked = false
-    connectionStatus.connected = false
-    connectionStatus.message = ''
+    // 保存配置后，不重置连接状态，保持当前验证状态
+    // 但如果用户修改了配置，已经在 handleServerConfigChange 中重置了状态
     
     message.success('服务器配置已保存')
     notifyConfigChange()
@@ -629,6 +806,7 @@ const notifyConfigChange = () => {
 
 // 立即同步
 const syncNow = async () => {
+    console.log("开始立即同步...");
     syncLoading.value = true;
     try {
         const result = await appService.syncWebDAVNow();
@@ -651,6 +829,7 @@ const syncNow = async () => {
 
 // 手动上传
 const handleManualUpload = async () => {
+    console.log("开始手动上传...");
     uploadLoading.value = true;
     try {
         const result = await appService.manualUploadWebDAV();
@@ -673,6 +852,7 @@ const handleManualUpload = async () => {
 
 // 手动下载
 const handleManualDownload = async () => {
+    console.log("开始手动下载...");
     downloadLoading.value = true;
     try {
         const result = await appService.manualDownloadWebDAV();
@@ -710,6 +890,7 @@ const handleManualDownload = async () => {
 
 // 比较数据
 const handleCompareData = async () => {
+    console.log("开始比较数据...");
     compareLoading.value = true;
     try {
         const result = await appService.compareWebDAVData();
@@ -812,7 +993,27 @@ onMounted(() => {
         password: props.modelValue.webdav.password
     }
     hasUnsavedServerConfig.value = false
+    
+    // 恢复连接状态
+    restoreConnectionStatus()
 });
+
+// 监听props变化，当WebDAV配置更新时恢复连接状态
+watch(() => props.modelValue.webdav, (newConfig, oldConfig) => {
+    // 跳过初始调用，因为已经在组件初始化时调用了
+    if (!oldConfig) return
+    
+    // 只有在配置真正发生变化时才恢复状态
+    if (newConfig && (
+        newConfig.serverUrl !== oldConfig.serverUrl ||
+        newConfig.username !== oldConfig.username ||
+        newConfig.password !== oldConfig.password ||
+        newConfig.connectionTested !== oldConfig.connectionTested ||
+        newConfig.connectionValid !== oldConfig.connectionValid)) {
+        console.log('WebDAV配置已更新，恢复连接状态...')
+        restoreConnectionStatus()
+    }
+}, { deep: true, immediate: true });
 </script>
 
 <style scoped>
@@ -869,6 +1070,14 @@ onMounted(() => {
 
 .text-green-600 {
   color: #059669;
+}
+
+.text-red-600 {
+  color: #dc2626;
+}
+
+.text-orange-600 {
+  color: #ea580c;
 }
 
 .flex {
@@ -935,10 +1144,6 @@ onMounted(() => {
 
 .compare-item:hover {
   background-color: var(--hover-color);
-}
-
-.text-orange-600 {
-  color: #ea580c;
 }
 
 .mr-1 {
