@@ -3,7 +3,7 @@
  * 统一管理应用级别的功能，如偏好设置、主题、WebDAV等
  */
 
-import { IpcUtils, type IpcResult } from './ipc.utils';
+import { IpcUtils, type IpcResult } from '../ipc.ts';
 
 export interface AppPreferences {
   theme?: string;

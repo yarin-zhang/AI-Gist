@@ -3,7 +3,7 @@
  * 统一管理 AI 相关的功能调用
  */
 
-import { IpcUtils, type IpcResult } from './ipc.utils';
+import { IpcUtils, type IpcResult } from '../ipc.ts';
 
 export interface AIConfig {
   id?: string;
