@@ -186,6 +186,7 @@ import ICloudSyncSettings from "@/components/settings/ICloudSyncSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
+import { databaseServiceManager } from "@/lib/services";
 
 // Props 定义
 interface Props {
@@ -326,12 +327,12 @@ const currentSectionInfo = computed(() => {
         "webdav-sync": {
             title: "WebDAV 同步",
             icon: Cloud,
-            description: "配置 WebDAV 服务器连接和数据同步设置"
+            description: "配置 WebDAV 服务器连接和数据同步设置。(Beta 功能，注意备份)"
         },
         "icloud-sync": {
             title: "iCloud 同步",
             icon: Cloud,
-            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端"
+            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端。(Beta 功能，注意备份)"
         },
         "data-management": {
             title: "数据管理",
@@ -1030,7 +1031,6 @@ const saveWebDAVSettings = async () => {
 const repairDatabase = async () => {
     loading.repair = true;
     try {
-        const { databaseServiceManager } = await import("@/lib/services");
         const result = await databaseServiceManager.checkAndRepairDatabase();
         
         if (result.healthy) {
@@ -1056,7 +1056,6 @@ const repairDatabase = async () => {
 const checkDatabaseHealth = async () => {
     loading.healthCheck = true;
     try {
-        const { databaseServiceManager } = await import("@/lib/services");
         const result = await databaseServiceManager.getHealthStatus();
         
         if (result.healthy) {
@@ -1084,7 +1083,6 @@ const clearDatabase = async () => {
         
         // 步骤2: 清空数据库
         message.info("正在清空数据库...");
-        const { databaseServiceManager } = await import("@/lib/services");
         
         // 使用强制清空方法
         await databaseServiceManager.forceCleanAllTables();

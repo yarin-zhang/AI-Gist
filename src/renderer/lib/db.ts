@@ -4,13 +4,16 @@
  */
 
 // 导出所有类型定义
-export * from '../../shared/types/database';
+export * from '@shared/types/database';
 
 // 导出所有服务类和服务管理器
 export * from './services';
 
 // 为了保持向后兼容，导出传统的数据库服务实例
 export { databaseService, initDatabase } from './services';
+
+// 直接导入服务以供内部使用
+import { databaseService } from './services';
 
 // 数据库服务管理器，提供数据导入导出等高级功能
 export class DatabaseManager {
@@ -29,8 +32,6 @@ export class DatabaseManager {
    * 导出所有数据
    */
   async exportAllData(): Promise<any> {
-    const { databaseService } = await import('./services');
-    
     return await databaseService.exportAllData();
   }
 
@@ -38,8 +39,6 @@ export class DatabaseManager {
    * 导入数据
    */
   async importData(data: any): Promise<void> {
-    const { databaseService } = await import('./services');
-    
     await databaseService.importData(data);
   }
 
@@ -68,8 +67,6 @@ export class DatabaseManager {
    * 获取数据库健康状态
    */
   async getHealthStatus(): Promise<any> {
-    const { databaseService } = await import('./services');
-    
     try {
       const stats = await databaseService.getDataStats();
       
@@ -91,7 +88,6 @@ export class DatabaseManager {
    * 等待数据库初始化完成
    */
   async waitForInitialization(): Promise<void> {
-    const { databaseService } = await import('./services');
     await databaseService.waitForInitialization();
   }
 }

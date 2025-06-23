@@ -2,6 +2,38 @@
  * Electron 相关类型定义
  */
 
+// 导入 WebDAV 相关类型
+import type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncStatus, 
+  WebDAVSyncResult 
+} from './webdav';
+
+// 导入数据管理相关类型
+import type {
+  BackupInfo,
+  ExportOptions,
+  ImportOptions,
+  ImportResult
+} from './data-management';
+
+// 重新导出以保持向后兼容
+export type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncStatus, 
+  WebDAVSyncResult,
+  BackupInfo,
+  ExportOptions,
+  ImportOptions,
+  ImportResult
+};
+
+// 导入并重新导出 AI 相关类型，保持向后兼容
+import type { AIGenerationRequest, AIGenerationResult } from './ai';
+export type { AIGenerationRequest, AIGenerationResult };
+
 /**
  * 用户偏好设置
  */
@@ -72,108 +104,4 @@ export interface ThemeInfo {
   shouldUseInvertedColorScheme: boolean;
 }
 
-/**
- * AI 生成请求
- */
-export interface AIGenerationRequest {
-  configId: string;
-  model?: string;
-  topic: string;
-  customPrompt?: string;
-  systemPrompt?: string;
-}
 
-/**
- * AI 生成结果
- */
-export interface AIGenerationResult {
-  id: string;
-  configId: string;
-  topic: string;
-  generatedPrompt: string;
-  model: string;
-  customPrompt?: string;
-  createdAt: Date;
-}
-
-/**
- * WebDAV 配置
- */
-export interface WebDAVConfig {
-  serverUrl: string;
-  username: string;
-  password: string;
-  enabled: boolean;
-  syncInterval: number;
-  autoSync: boolean;
-}
-
-/**
- * WebDAV 测试结果
- */
-export interface WebDAVTestResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-}
-
-/**
- * WebDAV 同步状态
- */
-export interface WebDAVSyncStatus {
-  isOnline: boolean;
-  lastSync?: Date;
-  nextSync?: Date;
-  totalItems?: number;
-  syncedItems?: number;
-  errors?: string[];
-  inProgress: boolean;
-}
-
-/**
- * 数据备份信息
- */
-export interface BackupInfo {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  size: number;
-  data?: any;
-}
-
-/**
- * 导出选项
- */
-export interface ExportOptions {
-  format: 'json' | 'csv';
-  includeUsers?: boolean;
-  includePosts?: boolean;
-  includeCategories?: boolean;
-  includePrompts?: boolean;
-  includeAIConfigs?: boolean;
-  includeAIHistory?: boolean;
-  includeSettings?: boolean;
-}
-
-/**
- * 导入选项
- */
-export interface ImportOptions {
-  format: 'json' | 'csv';
-  replaceExisting?: boolean;
-  skipDuplicates?: boolean;
-  createCategories?: boolean;
-}
-
-/**
- * 导入结果
- */
-export interface ImportResult {
-  success: boolean;
-  message?: string;
-  error?: string;
-  totalImported?: number;
-  totalErrors?: number;
-  details?: Record<string, number>;
-}

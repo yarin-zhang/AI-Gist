@@ -3,31 +3,13 @@
  * 统一管理 AI 相关的功能调用
  */
 
-import { IpcUtils, type IpcResult } from './ipc.utils';
-
-export interface AIConfig {
-  id?: string;
-  name: string;
-  provider: string;
-  apiKey: string;
-  baseUrl?: string;
-  models: string[];
-  defaultModel?: string;
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-  enabled: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export interface AIGenerationRequest {
-  prompt: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-}
+import { IpcUtils, type IpcResult } from '../ipc.ts';
+import type { 
+  AIConfig, 
+  AIGenerationRequest, 
+  AIGenerationResult,
+  AIConfigTestResult 
+} from '@shared/types/ai';
 
 export class AIService {
   private static instance: AIService;

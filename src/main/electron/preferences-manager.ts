@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { UserPreferences } from '../../shared/types';
+import { UserPreferences } from '@shared/types';
 
 /**
  * 用户偏好设置管理器

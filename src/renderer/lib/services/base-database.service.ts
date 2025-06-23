@@ -794,7 +794,6 @@ export class BaseDatabaseService {
         for (const record of records) {
           if (!record.uuid) {
             // 生成UUID
-            const { generateUUID } = await import('../utils/uuid');
             record.uuid = generateUUID();
             
             try {

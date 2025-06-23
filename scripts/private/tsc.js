@@ -39,9 +39,38 @@ function compile(directory) {
                 // 如果退出代码大于 0，表示编译失败
                 reject(new Error(`TypeScript 编译失败，退出代码: ${exitCode}，目录: ${directory}`));
             } else {
-                // 编译成功
+                // 编译成功，现在运行 tsc-alias 来转换路径别名
                 console.log(Chalk.greenBright(`TypeScript 编译成功完成，目录: ${directory}`));
-                resolve(undefined);
+                console.log(Chalk.blueBright(`正在转换路径别名...`));
+                
+                const tscAliasProcess = ChildProcess.exec('npx tsc-alias', {
+                    cwd: directory,
+                });
+
+                if (tscAliasProcess.stdout) {
+                    tscAliasProcess.stdout.on('data', data =>
+                        process.stdout.write(Chalk.yellowBright(`[tsc-alias] `) + Chalk.white(data.toString()))
+                    );
+                }
+
+                if (tscAliasProcess.stderr) {
+                    tscAliasProcess.stderr.on('data', data =>
+                        process.stderr.write(Chalk.redBright(`[tsc-alias error] `) + Chalk.white(data.toString()))
+                    );
+                }
+
+                tscAliasProcess.on('exit', aliasExitCode => {
+                    if (aliasExitCode && aliasExitCode > 0) {
+                        reject(new Error(`路径别名转换失败，退出代码: ${aliasExitCode}，目录: ${directory}`));
+                    } else {
+                        console.log(Chalk.greenBright(`路径别名转换完成，目录: ${directory}`));
+                        resolve(undefined);
+                    }
+                });
+
+                tscAliasProcess.on('error', (error) => {
+                    reject(new Error(`启动 tsc-alias 失败: ${error.message}`));
+                });
             }
         });
 

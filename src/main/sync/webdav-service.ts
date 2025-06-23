@@ -9,6 +9,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncResult, 
+  WebDAVSyncStatus,
+  WebDAVFileInfo,
+  WebDAVConflictDetail 
+} from '@shared/types/webdav';
 
 // WebDAV 客户端缓存
 let webdavCreateClient: any = null;
@@ -155,24 +163,6 @@ interface RetryConfig {
     backoffMultiplier: number;
 }
 
-interface WebDAVConfig {
-    enabled: boolean;
-    serverUrl: string;
-    username: string;
-    password: string;
-    autoSync: boolean;
-    syncInterval: number;
-    encryptData?: boolean;
-    maxRetries?: number;
-    conflictResolution?: 'ask' | 'local_wins' | 'remote_wins' | 'merge';
-    // 连接验证状态
-    connectionTested?: boolean;
-    connectionValid?: boolean;
-    connectionMessage?: string;
-    connectionTestedAt?: string;
-    configHash?: string;
-}
-
 /**
  * 现代化 WebDAV 同步服务
  * 基于 UUID 的可靠数据同步
@@ -252,7 +242,13 @@ export class WebDAVService {
      */
     private generateDeviceId(): string {
         const platform = process.platform;
-        const hostname = os.hostname();
+        let hostname: string;
+        try {
+            hostname = os.hostname();
+        } catch (error) {
+            console.warn('获取hostname失败，使用默认值:', error);
+            hostname = 'unknown-host';
+        }
         const timestamp = Date.now();
         
         // 尝试从本地存储获取现有设备ID

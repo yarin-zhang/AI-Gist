@@ -463,6 +463,7 @@ import {
 } from '@vicons/tabler'
 import ConflictResolutionDialog from './ConflictResolutionDialog.vue'
 import { AppService } from '../../lib/utils/app.service'
+import { autoSyncManager } from '../../lib/utils/auto-sync-manager'
     
 interface WebDAVSettings {
     webdav: {
@@ -773,7 +774,6 @@ const handleAutoSyncChange = async () => {
   
   setTimeout(async () => {
     try {
-      const { autoSyncManager } = await import('@/lib/utils/auto-sync-manager')
       await autoSyncManager.reinitializeFromSettings()
       console.log('自动同步管理器配置已更新')
     } catch (error) {

@@ -6,10 +6,15 @@ import {
   themeManager,
   preferencesManager,
   singleInstanceManager,
+} from './electron';
+import { 
   WebDAVService,
   ICloudService,
+} from './sync';
+import { 
   DataManagementService
-} from './electron';
+} from './data';
+
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
