@@ -687,11 +687,19 @@ const handleBatchDelete = async () => {
     if (selectedRows.value.length === 0) return
 
     try {
-        // 批量删除所有选中的提示词
-        for (const prompt of selectedRows.value) {
-            await api.prompts.delete.mutate(prompt.id)
+        // 使用批量删除API，只触发一次同步
+        const ids = selectedRows.value.map(prompt => prompt.id)
+        const result = await api.prompts.batchDelete.mutate(ids)
+        
+        if (result.success > 0) {
+            message.success(`成功删除 ${result.success} 个提示词`)
         }
-        message.success(`成功删除 ${selectedRows.value.length} 个提示词`)
+        
+        if (result.failed > 0) {
+            console.error('批量删除部分失败:', result.errors)
+            message.warning(`删除失败 ${result.failed} 个提示词，请检查控制台日志`)
+        }
+        
         clearSelection()
         if (viewMode.value === 'table') {
             await loadPromptsForTable()

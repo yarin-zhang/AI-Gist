@@ -110,8 +110,7 @@ export default interface ElectronApi {
     generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
   }
-  
-  webdav: {
+    webdav: {
     testConnection: (config: WebDAVConfig) => Promise<{ success: boolean; message: string; serverInfo?: any }>
     syncNow: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
     manualUpload: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
@@ -120,6 +119,7 @@ export default interface ElectronApi {
     compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
     getConfig: () => Promise<WebDAVConfig>
     setConfig: (config: WebDAVConfig) => Promise<{ success: boolean; message?: string; error?: string }>
+    recordDeletedItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
   }
 }
 

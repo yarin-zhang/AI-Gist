@@ -64,8 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
-  },
-  // WebDAV 同步管理
+  },  // WebDAV 同步管理
   webdav: {
     testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
     syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
@@ -76,6 +75,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     manualDownload: () => ipcRenderer.invoke('webdav:manual-download'),
     compareData: () => ipcRenderer.invoke('webdav:compare-data'),
     applyDownloadedData: (resolution: any) => ipcRenderer.invoke('webdav:apply-downloaded-data', resolution),
+    recordDeletedItems: (uuids: string[]) => ipcRenderer.invoke('webdav:record-deleted-items', uuids),
   },
   // iCloud 同步管理
   icloud: {

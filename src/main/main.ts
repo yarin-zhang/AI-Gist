@@ -30,9 +30,7 @@ app.whenReady().then(async () => {
   // 应用偏好设置（在创建窗口之前）
   preferencesManager.applyAllSettings();
   // 初始化主题管理器
-  themeManager.initialize();
-
-  // 初始化新的服务（在 IPC 处理器之前）
+  themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
   dataManagementService = new DataManagementService(app.getPath('userData'));
   webdavService = new WebDAVService(preferencesManager, dataManagementService);
   icloudService = new ICloudService(preferencesManager, dataManagementService);
