@@ -601,7 +601,11 @@ export class WebDAVService {
      * 计算整个数据集的校验和
      */
     private calculateChecksum(items: DataItem[]): string {
-        const sorted = items.sort((a, b) => a.id.localeCompare(b.id));
+        const sorted = items.sort((a, b) => {
+            const idA = String(a.id);
+            const idB = String(b.id);
+            return idA < idB ? -1 : idA > idB ? 1 : 0;
+        });
         const combined = sorted.map(item => ({
             id: item.id,
             checksum: item.metadata.checksum,
