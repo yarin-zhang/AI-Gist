@@ -1,6 +1,6 @@
 {
     "name": "ai-gist",
-    "version": "0.12.4",
+    "version": "0.12.5",
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
     "scripts": {
@@ -34,6 +34,7 @@
         "electron": "^32.1.2",
         "electron-builder": "^25.1.6",
         "jsdom": "^24.1.0",
+        "tsc-alias": "^1.8.16",
         "typescript": "^5.2.2",
         "vite": "^6.3.5",
         "vitest": "^3.2.3"

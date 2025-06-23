@@ -2,9 +2,9 @@ import { ipcMain } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
-import { aiServiceManager } from './ai-service-manager';
+import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateService } from './update-service';
-import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '../../shared/types';
+import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
  * IPC 处理器管理器

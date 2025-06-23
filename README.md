@@ -100,7 +100,7 @@ yarn build:linux    # 构建 Linux 安装包
 
 详细的开发指南请参阅 [docs](./docs) 目录：
 
-- [IndexedDB 架构指南](./docs/indexeddb-architecture.md)
+- [项目架构指南](./docs/project-architecture.md)
 - [GitHub Actions 自动构建与发布](./docs/github-actions.md)
 
 ## 应用截图

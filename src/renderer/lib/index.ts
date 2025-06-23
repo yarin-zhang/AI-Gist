@@ -19,4 +19,4 @@ export * from './ipc';
 export * from './utils';
 
 // 类型定义 - 从共享模块导出
-export * from '../../shared/types';
+export * from '@shared/types';

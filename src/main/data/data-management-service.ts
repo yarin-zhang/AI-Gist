@@ -9,34 +9,14 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import * as archiver from 'archiver';
 import * as unzipper from 'unzipper';
-
-interface BackupInfo {
-    id: string;
-    name: string;
-    description?: string;
-    createdAt: string;
-    size: number;
-    data?: any;
-}
-
-interface ExportOptions {
-    includePrompts?: boolean;
-    includeCategories?: boolean;
-    includeAIConfigs?: boolean;
-    includeHistory?: boolean;
-    includeSettings?: boolean;
-}
-
-interface DataStats {
-    categories: number;
-    prompts: number;
-    history: number;
-    aiConfigs: number;
-    settings: number;
-    posts: number;
-    users: number;
-    totalRecords: number;
-}
+import { 
+  BackupInfo, 
+  ExportOptions, 
+  ImportOptions, 
+  ImportResult,
+  ExportResult,
+  DataStats 
+} from '@shared/types/data-management';
 
 export class DataManagementService {
     private backupDir: string;

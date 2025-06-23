@@ -3,7 +3,8 @@
  * 统一管理应用级别的功能，如偏好设置、主题、WebDAV等
  */
 
-import { IpcUtils, type IpcResult } from './ipc.utils';
+import { IpcUtils, type IpcResult } from '../ipc.ts';
+import type { WebDAVConfig } from '@shared/types/webdav';
 
 export interface AppPreferences {
   theme?: string;
@@ -13,22 +14,6 @@ export interface AppPreferences {
   themeSource?: 'system' | 'light' | 'dark';
   webdav?: WebDAVConfig;
   [key: string]: any;
-}
-
-export interface WebDAVConfig {
-  server?: string;
-  username?: string;
-  password?: string;
-  enabled?: boolean;
-  autoSync?: boolean;
-  syncInterval?: number;
-  // 连接验证状态
-  connectionTested?: boolean;
-  connectionValid?: boolean;
-  connectionMessage?: string;
-  connectionTestedAt?: string; // ISO 时间戳
-  // 用于检测配置是否变更的哈希值
-  configHash?: string;
 }
 
 export class AppService {

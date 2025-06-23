@@ -10,7 +10,14 @@
     "outDir": "../../build",
     "allowJs": true,
     "noImplicitAny": false,
-    "rootDir": ".."
+    "rootDir": "..",
+    "baseUrl": "..",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@main/*": ["main/*"],
+      "@renderer/*": ["renderer/*"],
+      "@root/*": ["./*"]
+    }
   },
   "include": ["**/*"],
   "exclude": ["static"]
