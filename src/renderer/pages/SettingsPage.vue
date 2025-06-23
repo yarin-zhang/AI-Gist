@@ -327,12 +327,12 @@ const currentSectionInfo = computed(() => {
         "webdav-sync": {
             title: "WebDAV 同步",
             icon: Cloud,
-            description: "配置 WebDAV 服务器连接和数据同步设置"
+            description: "配置 WebDAV 服务器连接和数据同步设置。(Beta 功能，注意备份)"
         },
         "icloud-sync": {
             title: "iCloud 同步",
             icon: Cloud,
-            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端"
+            description: "配置 iCloud Drive 数据同步设置，Windows 用户可手动安装 iCloud 客户端。(Beta 功能，注意备份)"
         },
         "data-management": {
             title: "数据管理",
