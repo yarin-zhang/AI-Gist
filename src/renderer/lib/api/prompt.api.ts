@@ -73,6 +73,23 @@ export class PromptApiClient {
     },
 
     /**
+     * 获取提示词统计信息
+     */
+    getStatistics: {
+      /**
+       * 获取提示词统计信息，包括总数、分类统计、热门标签等
+       * @returns Promise<{totalCount: number, categoryStats: Array, popularTags: Array}> 统计信息
+       */
+      query: async (): Promise<{
+        totalCount: number,
+        categoryStats: Array<{id: string | null, name: string, count: number}>,
+        popularTags: Array<{name: string, count: number}>
+      }> => {
+        return this.promptService.getPromptStatistics();
+      }
+    },
+
+    /**
      * 根据ID查询提示词
      */
     getById: {
@@ -118,6 +135,20 @@ export class PromptApiClient {
       mutate: async (id: number): Promise<{ id: number }> => {
         await this.promptService.deletePrompt(id);
         return { id };
+      }
+    },
+
+    /**
+     * 批量删除提示词
+     */
+    batchDelete: {
+      /**
+       * 批量删除多个提示词及其关联数据
+       * @param ids 提示词ID数组
+       * @returns Promise<{ success: number; failed: number }> 删除结果统计
+       */
+      mutate: async (ids: number[]): Promise<{ success: number; failed: number }> => {
+        return this.promptService.batchDeletePrompts(ids);
       }
     },
 

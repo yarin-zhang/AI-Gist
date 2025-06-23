@@ -21,6 +21,13 @@ export interface SyncStatus {
   pendingSyncCount: number;
 }
 
+// 新增：同步元数据接口
+export interface SyncMetadata {
+  deletedUUIDs?: string[]; // 被删除的项目UUID列表
+  reason?: string; // 同步原因
+  source?: 'manual' | 'auto' | 'batch-delete' | 'network-recovery'; // 同步来源
+}
+
 class AutoSyncManager {
   private static instance: AutoSyncManager;
   private config: AutoSyncConfig = {
@@ -42,6 +49,9 @@ class AutoSyncManager {
   private retryTimer: NodeJS.Timeout | null = null;
   private retryCount = 0;
   private statusListeners: Array<(status: SyncStatus) => void> = [];
+  
+  // 新增：待处理的同步元数据
+  private pendingSyncMetadata: SyncMetadata | null = null;
 
   private constructor() {
     this.initNetworkStatusMonitoring();
@@ -76,7 +86,7 @@ class AutoSyncManager {
     this.notifyStatusChange();
     
     // 网络恢复时立即执行一次同步
-    this.triggerImmediateSync('网络恢复自动同步');
+    this.triggerImmediateSync('网络恢复自动同步', { source: 'network-recovery' });
   }
 
   /**
@@ -98,7 +108,7 @@ class AutoSyncManager {
    * 触发数据变更后的自动同步
    * 使用防抖机制，避免频繁同步
    */
-  triggerAutoSync(reason = '数据变更自动同步') {
+  triggerAutoSync(reason = '数据变更自动同步', metadata?: SyncMetadata) {
     if (!this.config.enabled || !this.status.isOnline) {
       console.log('自动同步跳过:', !this.config.enabled ? '未启用' : '网络离线');
       return;
@@ -109,19 +119,39 @@ class AutoSyncManager {
       clearTimeout(this.debounceTimer);
     }
 
+    // 合并同步元数据
+    this.mergeSyncMetadata(metadata);
+
     this.status.pendingSyncCount++;
     this.notifyStatusChange();
 
     // 设置新的防抖定时器
     this.debounceTimer = setTimeout(() => {
-      this.performSync(reason);
+      this.performSync(reason, this.pendingSyncMetadata || undefined);
+      // 清除已处理的元数据
+      this.pendingSyncMetadata = null;
     }, this.config.debounceMs);
+  }
+
+  /**
+   * 专门用于批量删除后的同步触发
+   */
+  triggerAutoSyncAfterBatchDelete(deletedUUIDs: string[], reason = '批量删除后自动同步') {
+    console.log(`自动同步管理器: 触发批量删除后同步，删除项目数: ${deletedUUIDs.length}`);
+    
+    const metadata: SyncMetadata = {
+      deletedUUIDs,
+      source: 'batch-delete',
+      reason
+    };
+    
+    this.triggerAutoSync(reason, metadata);
   }
 
   /**
    * 强制触发同步（不检查是否启用，用于手动同步）
    */
-  forceTriggerSync(reason = '强制同步') {
+  forceTriggerSync(reason = '强制同步', metadata?: SyncMetadata) {
     if (!this.status.isOnline) {
       console.log('强制同步跳过: 网络离线');
       return;
@@ -133,13 +163,13 @@ class AutoSyncManager {
       this.debounceTimer = null;
     }
 
-    this.performSync(reason);
+    this.performSync(reason, metadata);
   }
 
   /**
    * 立即触发同步（无防抖）
    */
-  triggerImmediateSync(reason = '立即同步') {
+  triggerImmediateSync(reason = '立即同步', metadata?: SyncMetadata) {
     if (!this.config.enabled) {
       console.log('自动同步已禁用，跳过立即同步');
       return;
@@ -151,13 +181,42 @@ class AutoSyncManager {
       this.debounceTimer = null;
     }
 
-    this.performSync(reason);
+    this.performSync(reason, metadata);
+  }
+
+  /**
+   * 合并同步元数据
+   */
+  private mergeSyncMetadata(newMetadata?: SyncMetadata) {
+    if (!newMetadata) return;
+
+    if (!this.pendingSyncMetadata) {
+      this.pendingSyncMetadata = { ...newMetadata };
+    } else {
+      // 合并删除的 UUID
+      if (newMetadata.deletedUUIDs && newMetadata.deletedUUIDs.length > 0) {
+        if (!this.pendingSyncMetadata.deletedUUIDs) {
+          this.pendingSyncMetadata.deletedUUIDs = [];
+        }
+        // 去重合并
+        const existingUUIDs = new Set(this.pendingSyncMetadata.deletedUUIDs);
+        newMetadata.deletedUUIDs.forEach(uuid => {
+          if (!existingUUIDs.has(uuid)) {
+            this.pendingSyncMetadata.deletedUUIDs!.push(uuid);
+          }
+        });
+      }
+      
+      // 更新原因和来源
+      this.pendingSyncMetadata.reason = newMetadata.reason || this.pendingSyncMetadata.reason;
+      this.pendingSyncMetadata.source = newMetadata.source || this.pendingSyncMetadata.source;
+    }
   }
 
   /**
    * 执行实际的同步操作
    */
-  private async performSync(reason: string) {
+  private async performSync(reason: string, metadata?: SyncMetadata) {
     if (this.status.isSyncing) {
       console.log('正在同步中，跳过本次同步请求');
       return;
@@ -168,7 +227,24 @@ class AutoSyncManager {
     this.notifyStatusChange();
 
     try {
-      console.log(`自动同步管理器: 开始执行同步 - ${reason}`);
+      console.log(`自动同步管理器: 开始执行同步 - ${reason}`, metadata);
+      
+      // 如果有删除的 UUID，立即调用新的远程删除接口
+      if (metadata?.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
+        console.log(`调用即时远程删除接口，处理 ${metadata.deletedUUIDs.length} 个项目...`);
+        try {
+          // 调用新的、重构后的接口
+          const deleteResult = await WebDAVAPI.deleteRemoteItems(metadata.deletedUUIDs);
+          if (!deleteResult.success) {
+            // 即时删除失败通常意味着网络问题或锁冲突，完整同步会处理，这里只记录警告
+            console.warn('即时远程删除未完全成功 (将在完整同步中重试):', deleteResult.error);
+          } else {
+            console.log('即时远程删除请求成功');
+          }
+        } catch (error) {
+          console.error('调用即时远程删除接口时发生错误:', error);
+        }
+      }
       
       // 尝试同步到所有启用的服务
       const results = await this.performAllSyncs();
@@ -181,6 +257,11 @@ class AutoSyncManager {
         this.status.lastSyncTime = new Date().toISOString();
         this.status.lastSyncError = null;
         this.retryCount = 0; // 重置重试计数
+        
+        // 如果是批量删除操作，记录成功同步的删除项目
+        if (metadata?.source === 'batch-delete' && metadata.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
+          console.log(`批量删除同步成功，已删除 ${metadata.deletedUUIDs.length} 个项目`);
+        }
       } else {
         const errorMessages = results.map(r => r.service + ': ' + r.message).join(', ');
         throw new Error('所有同步服务都失败: ' + errorMessages);
@@ -192,7 +273,7 @@ class AutoSyncManager {
       
       // 如果是网络相关错误，尝试重试
       if (this.shouldRetry(errorMessage)) {
-        this.scheduleRetry(reason);
+        this.scheduleRetry(reason, metadata);
       }
     } finally {
       this.status.isSyncing = false;
@@ -292,14 +373,14 @@ class AutoSyncManager {
   /**
    * 安排重试
    */
-  private scheduleRetry(reason: string) {
+  private scheduleRetry(reason: string, metadata?: SyncMetadata) {
     this.retryCount++;
     const delay = this.config.retryDelayMs * this.retryCount; // 递增延迟
 
     console.log(`自动同步管理器: 安排第 ${this.retryCount} 次重试，${delay}ms 后执行`);
 
     this.retryTimer = setTimeout(() => {
-      this.performSync(`${reason} (重试 ${this.retryCount})`);
+      this.performSync(`${reason} (重试 ${this.retryCount})`, metadata);
     }, delay);
   }
 
@@ -308,6 +389,13 @@ class AutoSyncManager {
    */
   getStatus(): SyncStatus {
     return { ...this.status };
+  }
+
+  /**
+   * 获取当前配置状态
+   */
+  getConfig(): AutoSyncConfig {
+    return { ...this.config };
   }
 
   /**

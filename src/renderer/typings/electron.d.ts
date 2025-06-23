@@ -88,6 +88,7 @@ export default interface ElectronApi {
     compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
     getConfig: () => Promise<WebDAVConfig>
     setConfig: (config: WebDAVConfig) => Promise<{ success: boolean; message?: string; error?: string }>
+    deleteRemoteItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
   }
 }
 

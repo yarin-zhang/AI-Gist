@@ -254,4 +254,16 @@ export class WebDAVAPI {
             throw error;
         }
     }
+
+    /**
+     * 记录删除的项目UUID（用于WebDAV同步）
+     */
+    static async recordDeletedItems(uuids: string[]): Promise<{ success: boolean; error?: string }> {
+        try {
+            return await ipcInvoke('webdav:record-deleted-items', uuids);
+        } catch (error) {
+            console.error('记录删除项目失败:', error);
+            return { success: false, error: error instanceof Error ? error.message : '记录删除失败' };
+        }
+    }
 }

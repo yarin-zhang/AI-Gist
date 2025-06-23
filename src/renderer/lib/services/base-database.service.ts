@@ -926,17 +926,100 @@ export class BaseDatabaseService {
       return true;
     }, [storeName]);
   }
-
   /**
+   * 批量删除操作的基础方法
+   * 批量删除多个记录，在所有操作完成后只触发一次同步
+   * @param storeName string 对象存储名称
+   * @param ids number[] 要删除的记录ID数组
+   * @returns Promise<{ success: number; failed: number; errors: string[] }> 批量删除结果
+   */
+  protected async batchDelete(storeName: string, ids: number[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    const db = await this.ensureDB();
+
+    // 首先获取要删除的记录的UUID（用于WebDAV同步）
+    const deletedUuids: string[] = [];
+    try {
+      for (const id of ids) {
+        const record = await this.getById<any>(storeName, id);
+        if (record && record.uuid) {
+          deletedUuids.push(record.uuid);
+        }
+      }
+    } catch (error) {
+      console.warn('获取删除记录的UUID时出错:', error);
+    }
+
+    // 使用事务进行批量操作
+    return new Promise((resolve) => {
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      
+      let completed = 0;
+      const total = ids.length;
+
+      if (total === 0) {
+        resolve({ success: 0, failed: 0, errors: [] });
+        return;
+      }
+
+      // 批量删除所有记录
+      ids.forEach(id => {
+        const request = store.delete(id);
+        
+        request.onsuccess = () => {
+          success++;
+          completed++;
+          
+          if (completed === total) {
+            // 所有操作完成后，只触发一次同步，并传递删除的UUID
+            if (success > 0) {
+              this.triggerAutoSyncAfterChange('batch_delete', storeName, { deletedUuids });
+            }
+            resolve({ success, failed, errors });
+          }
+        };
+
+        request.onerror = () => {
+          failed++;
+          errors.push(`删除记录 ${id} 失败: ${request.error?.message || '未知错误'}`);
+          completed++;
+          
+          if (completed === total) {
+            // 所有操作完成后，只触发一次同步（如果有成功的）
+            if (success > 0) {
+              this.triggerAutoSyncAfterChange('batch_delete', storeName, { deletedUuids });
+            }
+            resolve({ success, failed, errors });
+          }
+        };
+      });
+    });
+  }  /**
    * 在数据变更后触发自动同步
    * @param operation 操作类型
    * @param storeName 对象存储名称
+   * @param metadata 元数据，包含删除的UUID等信息
    */
-  private triggerAutoSyncAfterChange(operation: 'add' | 'update' | 'delete', storeName: string) {
+  protected triggerAutoSyncAfterChange(operation: 'add' | 'update' | 'delete' | 'batch_delete', storeName: string, metadata?: any) {
     try {
       // 异步触发，不阻塞数据库操作
-      setTimeout(() => {
-        autoSyncManager.triggerAutoSync(`数据变更: ${operation} in ${storeName}`);
+      setTimeout(async () => {
+        // 如果是批量删除操作，使用专门的批量删除同步方法
+        if (operation === 'batch_delete' && metadata?.deletedUuids?.length > 0) {
+          console.log(`批量删除操作: 触发同步，包含 ${metadata.deletedUuids.length} 个删除的UUID`);
+          // 直接使用批量删除的同步方法，传递删除的UUID
+          autoSyncManager.triggerAutoSyncAfterBatchDelete(
+            metadata.deletedUuids, 
+            `批量删除 ${storeName} 数据后自动同步`
+          );
+        } else {
+          // 普通操作使用常规同步
+          autoSyncManager.triggerAutoSync(`数据变更: ${operation} in ${storeName}`);
+        }
       }, 0);
     } catch (error) {
       // 自动同步失败不应该影响数据操作

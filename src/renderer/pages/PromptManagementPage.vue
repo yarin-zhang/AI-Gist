@@ -151,9 +151,10 @@ const handleEditFromDetail = (prompt) => {
 
 const handlePromptSaved = () => {
     // 刷新 PromptList 组件的数据
-    if (promptListRef.value?.loadPrompts && promptListRef.value?.loadCategories) {
+    if (promptListRef.value?.loadPrompts && promptListRef.value?.loadCategories && promptListRef.value?.loadStatistics) {
         promptListRef.value.loadPrompts()
         promptListRef.value.loadCategories()
+        promptListRef.value.loadStatistics() // 刷新统计信息
     }
     // 同时刷新页面统计数据
     loadStatistics()
@@ -179,8 +180,9 @@ const handleNavigateToAIConfig = () => {
 
 const handleListRefresh = () => {
     // 刷新 PromptList 组件的数据
-    if (promptListRef.value?.loadPrompts) {
+    if (promptListRef.value?.loadPrompts && promptListRef.value?.loadStatistics) {
         promptListRef.value.loadPrompts()
+        promptListRef.value.loadStatistics() // 刷新统计信息
     }
     // 同时刷新页面统计数据
     loadStatistics()

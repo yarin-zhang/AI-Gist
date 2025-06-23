@@ -15,6 +15,7 @@ import {
   PromptFillResult 
 } from '../types/database';
 import { generateUUID } from '../utils/uuid';
+import { autoSyncManager } from '../utils/auto-sync-manager';
 
 /**
  * 提示词数据服务类
@@ -109,12 +110,10 @@ export class PromptService extends BaseDatabaseService {
           prompt.content.toLowerCase().includes(searchQuery) ||
           (prompt.description && prompt.description.toLowerCase().includes(searchQuery))
         );
-      }
-
-      if (filters.tags) {
+      }      if (filters.tags) {
         const searchTags = filters.tags.toLowerCase().split(',').map(tag => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
-          if (!prompt.tags) return false;
+          if (!prompt.tags || typeof prompt.tags !== 'string') return false;
           const promptTags = prompt.tags.toLowerCase().split(',').map(tag => tag.trim());
           return searchTags.some(searchTag => 
             promptTags.some(promptTag => promptTag.includes(searchTag))
@@ -183,10 +182,18 @@ export class PromptService extends BaseDatabaseService {
         }
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
-    }
-
-    // 计算总数
+    }    // 计算总数
     const total = filteredPrompts.length;
+    
+    // 调试信息
+    console.log('getAllPrompts debug:', {
+      filters,
+      totalPrompts: prompts.length,
+      filteredPromptsLength: filteredPrompts.length,
+      total,
+      page: filters?.page,
+      limit: filters?.limit
+    });
 
     // 应用分页
     let paginatedPrompts = filteredPrompts;
@@ -717,5 +724,230 @@ export class PromptService extends BaseDatabaseService {
       tagDistribution,
       recentPrompts
     };
+  }
+
+  /**
+   * 获取提示词统计信息
+   * 返回总数、分类统计、热门标签等信息，用于前端显示
+   * @returns Promise<{totalCount: number, categoryStats: Array, popularTags: Array}> 统计信息
+   */
+  async getPromptStatistics(): Promise<{
+    totalCount: number,
+    categoryStats: Array<{id: string | null, name: string, count: number}>,
+    popularTags: Array<{name: string, count: number}>
+  }> {
+    const prompts = await this.getAll<Prompt>('prompts');
+    const categories = await this.getAll<Category>('categories');
+
+    // 计算分类统计
+    const categoryStats = [];
+    
+    // 未分类数量
+    const uncategorizedCount = prompts.filter(p => !p.categoryId).length;
+    if (uncategorizedCount > 0) {
+      categoryStats.push({
+        id: null,
+        name: '未分类',
+        count: uncategorizedCount
+      });
+    }
+
+    // 各分类数量
+    categories.forEach(category => {
+      const count = prompts.filter(p => p.categoryId === category.id).length;
+      if (count > 0) {
+        categoryStats.push({
+          id: category.id,
+          name: category.name,
+          count
+        });
+      }
+    });    // 计算热门标签
+    const tagCounts = new Map<string, number>();
+    prompts.forEach(prompt => {
+      if (prompt.tags && typeof prompt.tags === 'string') {
+        const tags = prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+        tags.forEach(tag => {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        });
+      }
+    });
+
+    const popularTags = Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20); // 只返回前20个热门标签
+
+    return {
+      totalCount: prompts.length,
+      categoryStats,
+      popularTags
+    };
+  }
+  
+  
+  /**
+   * 批量删除提示词
+   * 批量删除多个提示词及其关联的变量和历史记录，最后统一触发一次同步
+   * @param ids number[] 要删除的提示词ID数组
+   * @returns Promise<{ success: number; failed: number; errors: string[] }> 批量删除结果
+   */
+  async batchDeletePrompts(ids: number[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    if (!ids || ids.length === 0) {
+      return { success: 0, failed: 0, errors: [] };
+    }
+
+    let totalSuccess = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
+
+    // 首先收集所有需要同步的UUID（包括提示词和关联数据）
+    const allDeletedUuids: string[] = [];
+    const promptUuids: string[] = [];
+    const variableUuids: string[] = [];
+    const historyUuids: string[] = [];
+
+    try {
+      // 收集提示词的UUID
+      for (const id of ids) {
+        const prompt = await this.getById<Prompt>('prompts', id);
+        if (prompt && prompt.uuid) {
+          promptUuids.push(prompt.uuid);
+          allDeletedUuids.push(prompt.uuid);
+        }
+      }
+
+      // 收集关联变量的UUID
+      for (const id of ids) {
+        const variables = await this.getByIndex<PromptVariable>('promptVariables', 'promptId', id);
+        for (const variable of variables) {
+          if (variable.uuid) {
+            variableUuids.push(variable.uuid);
+            allDeletedUuids.push(variable.uuid);
+          }
+        }
+      }
+
+      // 收集历史记录的UUID
+      for (const id of ids) {
+        const histories = await this.getPromptHistoryByPromptId(id);
+        for (const history of histories) {
+          if (history.uuid) {
+            historyUuids.push(history.uuid);
+            allDeletedUuids.push(history.uuid);
+          }
+        }
+      }
+
+      console.log(`批量删除准备: 提示词 ${promptUuids.length} 个, 变量 ${variableUuids.length} 个, 历史记录 ${historyUuids.length} 个`);
+    } catch (error) {
+      console.warn('收集删除UUID时出错:', error);
+    }
+
+    // 禁用自动同步，避免多次触发
+    const originalAutoSyncEnabled = autoSyncManager.getConfig().enabled;
+    if (originalAutoSyncEnabled) {
+      autoSyncManager.disable();
+    }
+
+    try {
+      // 首先删除所有关联的变量和历史记录
+      for (const id of ids) {
+        try {
+          // 删除关联的 variables
+          const variables = await this.getByIndex<PromptVariable>('promptVariables', 'promptId', id);
+          const variableIds = variables.map(v => v.id).filter((id): id is number => id !== undefined);
+          if (variableIds.length > 0) {
+            // 使用不触发同步的删除方法
+            await this.batchDeleteWithoutSync('promptVariables', variableIds);
+          }
+          
+          // 删除关联的历史记录
+          await this.deletePromptHistoriesByPromptId(id);
+          
+        } catch (error) {
+          totalFailed++;
+          allErrors.push(`删除提示词 ${id} 的关联数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
+          console.error(`删除提示词 ${id} 的关联数据失败:`, error);
+        }
+      }
+
+      // 然后批量删除提示词本身
+      const promptDeleteResult = await this.batchDeleteWithoutSync('prompts', ids);
+      
+      totalSuccess += promptDeleteResult.success;
+      totalFailed += promptDeleteResult.failed;
+      allErrors.push(...promptDeleteResult.errors);
+
+      // 所有删除操作完成后，手动触发一次同步，传递所有删除的UUID
+      if (totalSuccess > 0 && allDeletedUuids.length > 0) {
+        console.log(`批量删除完成，触发同步: ${allDeletedUuids.length} 个UUID`);
+        autoSyncManager.triggerAutoSyncAfterBatchDelete(
+          allDeletedUuids,
+          `批量删除提示词后自动同步 (${totalSuccess} 个成功)`
+        );
+      }
+
+    } finally {
+      // 恢复自动同步状态
+      if (originalAutoSyncEnabled) {
+        autoSyncManager.enable();
+      }
+    }
+
+    return { 
+      success: totalSuccess, 
+      failed: totalFailed, 
+      errors: allErrors 
+    };
+  }
+
+  /**
+   * 不触发同步的批量删除方法（内部使用）
+   */
+  private async batchDeleteWithoutSync(storeName: string, ids: number[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    const db = await this.ensureDB();
+
+    // 使用事务进行批量操作
+    return new Promise((resolve) => {
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      
+      let completed = 0;
+      const total = ids.length;
+
+      if (total === 0) {
+        resolve({ success: 0, failed: 0, errors: [] });
+        return;
+      }
+
+      // 批量删除所有记录
+      ids.forEach(id => {
+        const request = store.delete(id);
+        
+        request.onsuccess = () => {
+          success++;
+          completed++;
+          
+          if (completed === total) {
+            resolve({ success, failed, errors });
+          }
+        };
+
+        request.onerror = () => {
+          failed++;
+          errors.push(`删除记录 ${id} 失败: ${request.error?.message || '未知错误'}`);
+          completed++;
+          
+          if (completed === total) {
+            resolve({ success, failed, errors });
+          }
+        };
+      });
+    });
   }
 }
