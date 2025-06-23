@@ -662,8 +662,11 @@ export class WebDAVService {
             }
         };
 
+        let client: any = null;
+        let syncConfig: WebDAVConfig | null = null;
+
         try {
-            const syncConfig = config || this.config;
+            syncConfig = config || this.config;
             console.log('[WebDAV] performIntelligentSync() - 使用的同步配置:', {
                 hasConfig: !!syncConfig,
                 enabled: syncConfig?.enabled,
@@ -681,10 +684,10 @@ export class WebDAVService {
             }
 
             console.log('[WebDAV] performIntelligentSync() - 创建WebDAV客户端...');
-            const client = await this.createClient(syncConfig);
+            client = await this.createClient(syncConfig);
 
             // 获取同步锁
-            await this.acquireSyncLock();
+            await this.acquireSyncLock(client);
 
             console.log('[WebDAV] performIntelligentSync() - 获取本地快照...');
             const localSnapshot = await this.getLocalSnapshot();
@@ -736,8 +739,14 @@ export class WebDAVService {
             
             return result;
         } finally {
-            // 释放同步锁
-            await this.releaseSyncLock();
+            // 释放同步锁 - 使用相同的客户端实例
+            if (client) {
+                try {
+                    await this.releaseSyncLock(client);
+                } catch (error) {
+                    console.warn('[WebDAV] performIntelligentSync() - 释放同步锁失败:', error);
+                }
+            }
             this.syncInProgress = false;
             console.log('[WebDAV] performIntelligentSync() - 清理同步状态');
         }
@@ -1403,7 +1412,16 @@ export class WebDAVService {
             
             try {
                 console.log('[WebDAV] 执行自动同步...');
-                const result = await this.performIntelligentSync();
+                
+                // 获取最新配置
+                const config = await this.loadConfig();
+                if (!config || !config.enabled) {
+                    console.log('[WebDAV] 自动同步已禁用，停止自动同步');
+                    this.stopAutoSync();
+                    return;
+                }
+                
+                const result = await this.performIntelligentSync(config);
                 
                 if (result.success) {
                     console.log('[WebDAV] 自动同步成功:', {
@@ -2085,7 +2103,7 @@ export class WebDAVService {
     /**
      * 获取同步锁 - 防止并发同步
      */
-    private async acquireSyncLock(): Promise<void> {
+    private async acquireSyncLock(client?: any): Promise<void> {
         const lockPath = '/ai-gist-sync/locks/sync.lock';
         const lockData: SyncLock = {
             id: uuidv4(),
@@ -2096,12 +2114,14 @@ export class WebDAVService {
         };
 
         try {
-            if (!this.client) {
-                this.client = await this.createClient();
+            // 使用传入的客户端或者缓存的客户端
+            const lockClient = client || this.client;
+            if (!lockClient) {
+                throw new Error('WebDAV 客户端未初始化，无法获取同步锁');
             }
 
             // 检查是否已有锁
-            const existingLock = await this.getCurrentLock();
+            const existingLock = await this.getCurrentLock(lockClient);
             if (existingLock && this.isLockValid(existingLock)) {
                 if (existingLock.deviceId !== this.deviceId) {
                     throw new Error(`同步已被其他设备锁定: ${existingLock.deviceId}`);
@@ -2110,8 +2130,8 @@ export class WebDAVService {
                 lockData.id = existingLock.id;
             }
 
-            await this.ensureRemoteDirectory(this.client, '/ai-gist-sync/locks');
-            await this.client.putFileContents(lockPath, JSON.stringify(lockData));
+            await this.ensureRemoteDirectory(lockClient, '/ai-gist-sync/locks');
+            await lockClient.putFileContents(lockPath, JSON.stringify(lockData));
             this.currentSyncLock = lockData;
             
             console.log('[WebDAV] 获取同步锁成功:', lockData.id);
@@ -2124,15 +2144,18 @@ export class WebDAVService {
     /**
      * 释放同步锁
      */
-    private async releaseSyncLock(): Promise<void> {
-        if (!this.currentSyncLock || !this.client) {
+    private async releaseSyncLock(client?: any): Promise<void> {
+        if (!this.currentSyncLock) {
             return;
         }
 
         try {
             const lockPath = '/ai-gist-sync/locks/sync.lock';
-            await this.client.deleteFile(lockPath);
-            console.log('[WebDAV] 同步锁已释放:', this.currentSyncLock.id);
+            const lockClient = client || this.client;
+            if (lockClient) {
+                await lockClient.deleteFile(lockPath);
+                console.log('[WebDAV] 同步锁已释放:', this.currentSyncLock.id);
+            }
         } catch (error) {
             console.warn('[WebDAV] 释放同步锁失败:', error);
         } finally {
@@ -2143,10 +2166,14 @@ export class WebDAVService {
     /**
      * 获取当前同步锁
      */
-    private async getCurrentLock(): Promise<SyncLock | null> {
+    private async getCurrentLock(client?: any): Promise<SyncLock | null> {
         try {
             const lockPath = '/ai-gist-sync/locks/sync.lock';
-            const content = await this.client.getFileContents(lockPath, { format: 'text' });
+            const lockClient = client || this.client;
+            if (!lockClient) {
+                return null;
+            }
+            const content = await lockClient.getFileContents(lockPath, { format: 'text' });
             return JSON.parse(content);
         } catch (error) {
             return null;
