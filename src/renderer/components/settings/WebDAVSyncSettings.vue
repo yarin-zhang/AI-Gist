@@ -147,6 +147,10 @@
           <small class="text-gray-500">
             请检查服务器地址、用户名和密码是否正确。
           </small>
+          <br>
+          <small class="text-gray-500" v-if="props.modelValue.webdav.connectionTestedAt">
+            最后验证时间: {{ formatSyncTime(props.modelValue.webdav.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <NAlert 
@@ -157,6 +161,10 @@
         >
           <template #header>WebDAV 服务器连接正常</template>
           服务器地址: {{ props.modelValue.webdav.serverUrl }}
+          <br>
+          <small class="text-gray-500" v-if="props.modelValue.webdav.connectionTestedAt">
+            最后验证时间: {{ formatSyncTime(props.modelValue.webdav.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <NAlert 
@@ -403,7 +411,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
   NInput, NModal, NTabs, NTabPane, NTag, NEmpty, NCollapse, NCollapseItem,
@@ -423,6 +431,12 @@ interface WebDAVSettings {
         password: string;
         autoSync: boolean;
         syncInterval: number;
+        // 连接验证状态
+        connectionTested?: boolean;
+        connectionValid?: boolean;
+        connectionMessage?: string;
+        connectionTestedAt?: string;
+        configHash?: string;
     };
     dataSync: {
         lastSyncTime: string | null;
@@ -451,6 +465,70 @@ const connectionStatus = reactive({
   connected: false,
   message: ''
 })
+
+// 计算配置哈希值，用于检测配置是否发生变更
+const computeConfigHash = (config: { serverUrl: string; username: string; password: string }) => {
+  const configStr = `${config.serverUrl}|${config.username}|${config.password}`
+  // 简单的哈希函数
+  let hash = 0
+  for (let i = 0; i < configStr.length; i++) {
+    const char = configStr.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // 转为32位整数
+  }
+  return hash.toString()
+}
+
+// 从持久化配置中恢复连接状态
+const restoreConnectionStatus = () => {
+  const config = props.modelValue.webdav
+  console.log('开始恢复连接状态，当前配置:', {
+    serverUrl: config.serverUrl || '',
+    username: config.username || '',
+    hasPassword: !!(config.password || ''),
+    connectionTested: config.connectionTested,
+    connectionValid: config.connectionValid,
+    connectionMessage: config.connectionMessage,
+    connectionTestedAt: config.connectionTestedAt,
+    configHash: config.configHash
+  })
+  
+  const currentHash = computeConfigHash({
+    serverUrl: config.serverUrl || '',
+    username: config.username || '',
+    password: config.password || ''
+  })
+  
+  console.log('配置哈希比较:', {
+    currentHash,
+    storedHash: config.configHash,
+    hashMatches: config.configHash === currentHash,
+    connectionTested: config.connectionTested
+  })
+  
+  // 如果配置哈希值匹配且有连接测试记录，则恢复状态
+  if (config.configHash === currentHash && config.connectionTested) {
+    connectionStatus.checked = true
+    connectionStatus.connected = config.connectionValid || false
+    connectionStatus.message = config.connectionMessage || ''
+    
+    console.log('✅ 已成功恢复连接状态:', {
+      tested: connectionStatus.checked,
+      connected: connectionStatus.connected,
+      message: connectionStatus.message,
+      testedAt: config.connectionTestedAt
+    })
+  } else {
+    // 配置已变更或没有测试记录，重置状态
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+    
+    console.log('❌ 连接状态已重置 - 原因:', 
+      !config.connectionTested ? '没有测试记录' : 
+      config.configHash !== currentHash ? '配置已变更' : '未知原因')
+  }
+}
 
 // 加载状态
 const testingConnection = ref(false)
@@ -535,10 +613,51 @@ const testConnection = async () => {
       connectionStatus.connected = true
       connectionStatus.message = result.message || '连接成功'
       message.success('WebDAV 服务器连接正常')
+      
+      // 保存连接验证状态到配置
+      const currentConfig = props.modelValue.webdav
+      const configHash = computeConfigHash({
+        serverUrl: currentConfig.serverUrl || '',
+        username: currentConfig.username || '',
+        password: currentConfig.password || ''
+      })
+      
+      // 更新配置中的连接验证状态
+      Object.assign(currentConfig, {
+        connectionTested: true,
+        connectionValid: true,
+        connectionMessage: connectionStatus.message,
+        connectionTestedAt: new Date().toISOString(),
+        configHash: configHash
+      })
+      
+      emit("update:modelValue", props.modelValue)
+      emit("save-webdav")
+      
+      console.log('连接验证状态已保存')
     } else {
       connectionStatus.connected = false
       connectionStatus.message = result?.message || '连接失败'
       message.error(`WebDAV 服务器连接失败: ${connectionStatus.message}`)
+      
+      // 保存失败状态
+      const currentConfig = props.modelValue.webdav
+      const configHash = computeConfigHash({
+        serverUrl: currentConfig.serverUrl || '',
+        username: currentConfig.username || '',
+        password: currentConfig.password || ''
+      })
+      
+      Object.assign(currentConfig, {
+        connectionTested: true,
+        connectionValid: false,
+        connectionMessage: connectionStatus.message,
+        connectionTestedAt: new Date().toISOString(),
+        configHash: configHash
+      })
+      
+      emit("update:modelValue", props.modelValue)
+      emit("save-webdav")
     }
   } catch (error) {
     console.error('测试连接失败:', error)
@@ -546,6 +665,25 @@ const testConnection = async () => {
     connectionStatus.connected = false
     connectionStatus.message = error instanceof Error ? error.message : '测试连接失败'
     message.error(`测试连接失败: ${connectionStatus.message}`)
+    
+    // 保存错误状态
+    const currentConfig = props.modelValue.webdav
+    const configHash = computeConfigHash({
+      serverUrl: currentConfig.serverUrl || '',
+      username: currentConfig.username || '',
+      password: currentConfig.password || ''
+    })
+    
+    Object.assign(currentConfig, {
+      connectionTested: true,
+      connectionValid: false,
+      connectionMessage: connectionStatus.message,
+      connectionTestedAt: new Date().toISOString(),
+      configHash: configHash
+    })
+    
+    emit("update:modelValue", props.modelValue)
+    emit("save-webdav")
   } finally {
     testingConnection.value = false
   }
@@ -611,6 +749,22 @@ const handleServerConfigChange = () => {
     current.password !== original.password
   )
   
+  // 如果服务器配置发生变更，重置连接验证状态
+  if (hasUnsavedServerConfig.value) {
+    connectionStatus.checked = false
+    connectionStatus.connected = false
+    connectionStatus.message = ''
+    
+    // 清除配置中的连接验证状态
+    Object.assign(current, {
+      connectionTested: false,
+      connectionValid: false,
+      connectionMessage: '',
+      connectionTestedAt: '',
+      configHash: ''
+    })
+  }
+  
   emit("update:modelValue", props.modelValue)
 }
 
@@ -629,10 +783,8 @@ const saveServerConfig = async () => {
     
     hasUnsavedServerConfig.value = false
     
-    // 重置连接状态，需要重新测试连接
-    connectionStatus.checked = false
-    connectionStatus.connected = false
-    connectionStatus.message = ''
+    // 保存配置后，不重置连接状态，保持当前验证状态
+    // 但如果用户修改了配置，已经在 handleServerConfigChange 中重置了状态
     
     message.success('服务器配置已保存')
     notifyConfigChange()
@@ -838,7 +990,24 @@ onMounted(() => {
         password: props.modelValue.webdav.password
     }
     hasUnsavedServerConfig.value = false
+    
+    // 恢复连接状态
+    restoreConnectionStatus()
 });
+
+// 监听props变化，当WebDAV配置更新时恢复连接状态
+watch(() => props.modelValue.webdav, (newConfig, oldConfig) => {
+    // 只有在配置真正发生变化时才恢复状态，避免无限循环
+    if (newConfig && (!oldConfig || 
+        newConfig.serverUrl !== oldConfig.serverUrl ||
+        newConfig.username !== oldConfig.username ||
+        newConfig.password !== oldConfig.password ||
+        newConfig.connectionTested !== oldConfig.connectionTested ||
+        newConfig.connectionValid !== oldConfig.connectionValid)) {
+        console.log('WebDAV配置已更新，恢复连接状态...')
+        restoreConnectionStatus()
+    }
+}, { deep: true, immediate: false });
 </script>
 
 <style scoped>

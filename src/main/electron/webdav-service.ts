@@ -1918,7 +1918,13 @@ export class WebDAVService {
                     username: '',
                     password: '',
                     autoSync: false,
-                    syncInterval: 30
+                    syncInterval: 30,
+                    // 连接验证状态
+                    connectionTested: false,
+                    connectionValid: false,
+                    connectionMessage: '',
+                    connectionTestedAt: '',
+                    configHash: ''
                 };
             } catch (error) {
                 console.error('获取 WebDAV 配置失败:', error);
@@ -1928,7 +1934,13 @@ export class WebDAVService {
                     username: '',
                     password: '',
                     autoSync: false,
-                    syncInterval: 30
+                    syncInterval: 30,
+                    // 连接验证状态
+                    connectionTested: false,
+                    connectionValid: false,
+                    connectionMessage: '',
+                    connectionTestedAt: '',
+                    configHash: ''
                 };
             }
         });

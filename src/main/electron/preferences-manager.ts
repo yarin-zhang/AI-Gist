@@ -38,6 +38,12 @@ class PreferencesManager {
       encryptedPassword: '',
       autoSync: false,
       syncInterval: 30,
+      // 连接验证状态
+      connectionTested: false,
+      connectionValid: false,
+      connectionMessage: '',
+      connectionTestedAt: '',
+      configHash: '',
     },
     icloud: {
       enabled: false,
@@ -116,6 +122,12 @@ class PreferencesManager {
             encryptedPassword: loadedPrefs.webdav?.encryptedPassword ?? this.defaultPreferences.webdav!.encryptedPassword,
             autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
             syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
+            // 连接验证状态
+            connectionTested: loadedPrefs.webdav?.connectionTested ?? this.defaultPreferences.webdav!.connectionTested,
+            connectionValid: loadedPrefs.webdav?.connectionValid ?? this.defaultPreferences.webdav!.connectionValid,
+            connectionMessage: loadedPrefs.webdav?.connectionMessage ?? this.defaultPreferences.webdav!.connectionMessage,
+            connectionTestedAt: loadedPrefs.webdav?.connectionTestedAt ?? this.defaultPreferences.webdav!.connectionTestedAt,
+            configHash: loadedPrefs.webdav?.configHash ?? this.defaultPreferences.webdav!.configHash,
           },
           icloud: {
             enabled: loadedPrefs.icloud?.enabled ?? this.defaultPreferences.icloud!.enabled,

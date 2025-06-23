@@ -7,6 +7,13 @@ export interface WebDAVConfig {
     password: string;
     autoSync: boolean;
     syncInterval: number;
+    // 连接验证状态
+    connectionTested?: boolean;
+    connectionValid?: boolean;
+    connectionMessage?: string;
+    connectionTestedAt?: string; // ISO 时间戳
+    // 用于检测配置是否变更的哈希值
+    configHash?: string;
 }
 
 export interface WebDAVTestResult {

@@ -34,6 +34,12 @@ export interface UserPreferences {
     encryptedPassword?: string; // 加密后的密码
     syncInterval: number;
     autoSync: boolean;
+    // 连接验证状态
+    connectionTested?: boolean;
+    connectionValid?: boolean;
+    connectionMessage?: string;
+    connectionTestedAt?: string;
+    configHash?: string;
   };
   icloud?: {
     enabled: boolean;
