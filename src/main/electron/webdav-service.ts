@@ -2734,7 +2734,8 @@ export class WebDAVService {
                                 finalItem = localItem;
                             } else {
                                 // 智能合并
-                                finalItem = await this.mergeItems(localItem, remoteItem);
+                                const itemMergeResult = await this.mergeItems(localItem, remoteItem);
+                                finalItem = itemMergeResult.mergedItem;
                             }
                             
                             itemsToApply.push(finalItem);
