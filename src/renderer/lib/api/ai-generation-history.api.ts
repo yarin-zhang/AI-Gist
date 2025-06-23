@@ -312,6 +312,20 @@ export class AIGenerationHistoryApiClient {
       query: async (limit: number = 10): Promise<Array<{ model: string; count: number }>> => {
         return this.aiGenerationHistoryService.getMostUsedModels(limit);
       }
+    },
+
+    /**
+     * 根据提示词ID获取调试历史记录
+     */
+    getDebugHistoryByPromptId: {
+      /**
+       * 根据提示词ID获取调试历史记录
+       * @param promptId 提示词ID
+       * @returns Promise<AIGenerationHistory[]> 调试历史记录列表
+       */
+      query: async (promptId: number): Promise<AIGenerationHistory[]> => {
+        return this.aiGenerationHistoryService.getDebugHistoryByPromptId(promptId);
+      }
     }
   };
 }

@@ -951,25 +951,31 @@ export class PromptService extends BaseDatabaseService {
     });
   }
 
-  async getPromptById(id: string): Promise<Prompt | undefined> {
-    return this.get('prompts', id);
-  }
-
   /**
-   * Upsert a prompt.
-   * Creates a new prompt if it doesn't exist, otherwise updates the existing one.
-   * @param id The ID of the prompt to upsert.
-   * @param data The data of the prompt.
+   * 更新或插入提示词。
+   * 如果提示词不存在，则创建新的提示词；否则更新已有的提示词。
+   * @param id 要更新或插入的提示词的ID。
+   * @param data 提示词的数据。
    */
   async upsertPrompt(id: string, data: Partial<Prompt>): Promise<void> {
-    const existing = await this.get<Prompt>('prompts', id);
+    const existing = await this.getById<Prompt>('prompts', parseInt(id));
     if (existing) {
-      // Update existing prompt
-      const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
-      await this.put('prompts', updatedData);
+      // Update existing prompt - only pass the fields that need to be updated
+      await this.update('prompts', existing.id!, {
+        ...data,
+        updatedAt: new Date().toISOString()
+      });
     } else {
-      // Create new prompt
-      const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      // Create new prompt - ensure all required fields are present
+      const newData = {
+        ...data,
+        id: parseInt(id),
+        uuid: generateUUID(),
+        isFavorite: data.isFavorite || false,
+        useCount: data.useCount || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
       await this.add('prompts', newData as Prompt);
     }
   }

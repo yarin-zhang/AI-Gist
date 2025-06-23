@@ -281,20 +281,28 @@ export class CategoryService extends BaseDatabaseService {
   }
 
   /**
-   * Upsert a category.
-   * Creates a new category if it doesn't exist, otherwise updates the existing one.
-   * @param id The ID of the category to upsert.
-   * @param data The data of the category.
+   * 更新或插入分类。
+   * 如果分类不存在，则创建新的分类；否则更新已有的分类。
+   * @param id 要更新或插入的分类的ID。
+   * @param data 分类的数据。
    */
   async upsertCategory(id: string, data: Partial<Category>): Promise<void> {
-    const existing = await this.get<Category>('categories', id);
+    const existing = await this.getById<Category>('categories', parseInt(id));
     if (existing) {
         // Update existing category
-        const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
-        await this.put('categories', updatedData);
+        await this.update('categories', existing.id!, {
+          ...data,
+          updatedAt: new Date().toISOString()
+        });
     } else {
         // Create new category
-        const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const newData = {
+          ...data,
+          id: parseInt(id),
+          uuid: generateUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
         await this.add('categories', newData as Category);
     }
   }

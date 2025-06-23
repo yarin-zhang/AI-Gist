@@ -70,14 +70,13 @@
                                         停止
                                     </n-button>
                                     <!-- 模型选择器 -->
-                                    <n-select
-                                        v-if="configs.length > 0"
-                                        v-model:value="selectedModelKey"
-                                        :options="modelDropdownOptions"
+                                    <AIModelSelector 
+                                        ref="modelSelectorRef"
+                                        v-model:modelKey="selectedModelKey"
                                         placeholder="选择模型"
+                                        :disabled="generating"
                                         style="min-width: 300px;"
-                                        filterable
-                                        @update:value="onModelSelect"
+                                        @configChange="onModelSelect"
                                     />
                                     <n-button @click="toggleHistory" quaternary>
                                         <template #icon>
@@ -231,6 +230,7 @@ import {
 import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
+import AIModelSelector from '~/components/common/AIModelSelector.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 import { useDatabase } from '~/composables/useDatabase'
@@ -254,6 +254,7 @@ const history = ref<AIGenerationHistory[]>([])
 const defaultConfig = ref<AIConfig | null>(null)
 const currentModel = ref<string>('')
 const currentConfigId = ref<string>('')
+const modelSelectorRef = ref()
 const selectedModelKey = ref<string>('') // 选中的模型key，格式为 "configId:model"
 const generating = ref(false)
 const loading = ref(true)
@@ -307,71 +308,6 @@ const formRules = {
 
 // 表单引用
 const formRef = ref()
-
-// 计算属性
-const modelDropdownOptions = computed(() => {
-    if (!configs.value || configs.value.length === 0) return []
-
-    const preferredOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
-    const regularOptions: Array<{ label: string; value: string; configId: string; configName: string; isPreferred: boolean }> = []
-
-    // 遍历所有启用的配置，分别处理首选和普通配置
-    configs.value.forEach(config => {
-        const models = Array.isArray(config.models) ? config.models : []
-        const isPreferred = config.isPreferred || false
-        const targetArray = isPreferred ? preferredOptions : regularOptions
-
-        // 添加默认模型
-        if (config.defaultModel) {
-            const label = isPreferred 
-                ? `★ ${config.defaultModel} (${config.name} - 默认)`
-                : `${config.defaultModel} (${config.name} - 默认)`
-            
-            targetArray.push({
-                label,
-                value: `${config.configId}:${config.defaultModel}`,
-                configId: config.configId,
-                configName: config.name,
-                isPreferred
-            })
-        }
-
-        // 添加其他模型
-        models.forEach(model => {
-            if (model !== config.defaultModel) { // 避免重复添加默认模型
-                const label = isPreferred 
-                    ? `★ ${model} (${config.name})`
-                    : `${model} (${config.name})`
-                
-                targetArray.push({
-                    label,
-                    value: `${config.configId}:${model}`,
-                    configId: config.configId,
-                    configName: config.name,
-                    isPreferred
-                })
-            }
-        })
-
-        // 添加自定义模型
-        if (config.customModel && !models.includes(config.customModel) && config.customModel !== config.defaultModel) {
-            const label = isPreferred 
-                ? `★ ${config.customModel} (${config.name} - 自定义)`
-                : `${config.customModel} (${config.name} - 自定义)`
-                
-            targetArray.push({
-                label,
-                value: `${config.configId}:${config.customModel}`,
-                configId: config.configId,
-                configName: config.name,
-                isPreferred
-            })
-        }
-    })
-
-    // 首选配置的模型排在前面，然后是普通配置的模型
-    return [...preferredOptions, ...regularOptions]
-})
 
 // 加载 AI 配置
 const loadConfigs = async () => {
@@ -444,21 +380,15 @@ const toggleHistory = () => {
     }
 }
 
-// 模型选择处理
-const onModelSelect = (modelKey: string) => {
-    if (!modelKey) return
+// 模型选择处理 - 更新为使用AIModelSelector的事件
+const onModelSelect = (config: AIConfig | null) => {
+    if (!config) return
     
-    // 解析选择的模型key，格式为 "configId:model"
-    const [configId, model] = modelKey.split(':')
-    currentModel.value = model
-    currentConfigId.value = configId
-    selectedModelKey.value = modelKey
-
     // 更新当前使用的配置
-    const selectedConfig = configs.value.find(c => c.configId === configId)
-    if (selectedConfig) {
-        console.log('切换到配置:', selectedConfig.name, '模型:', model)
-    }
+    currentConfigId.value = config.configId
+    currentModel.value = config.defaultModel || ''
+    
+    console.log('切换到配置:', config.name, '模型:', currentModel.value)
 }
 
 // 停止生成
@@ -553,18 +483,21 @@ const generatePrompt = async () => {
         // 立即开始分隔动画，让用户看到右侧面板
         animateSplit(1, 0.5)
 
-        // 获取当前选中的配置
-        const selectedConfig = currentConfigId.value
-            ? configs.value.find(c => c.configId === currentConfigId.value)
-            : defaultConfig.value
+        // 获取当前选中的配置 - 使用AIModelSelector组件
+        const selectedConfig = modelSelectorRef.value?.selectedConfig
+        const selectedModel = modelSelectorRef.value?.selectedModel
 
         if (!selectedConfig) {
             throw new Error('没有可用的 AI 配置')
         }
 
+        if (!selectedModel) {
+            throw new Error('请选择一个模型')
+        }
+
         const request = {
             configId: selectedConfig.configId,
-            model: currentModel.value || selectedConfig.defaultModel,
+            model: selectedModel,
             topic: formData.topic
         }
 
@@ -745,11 +678,14 @@ const generatePrompt = async () => {
 
         // 保存错误记录
         try {
+            const selectedConfig = modelSelectorRef.value?.selectedConfig
+            const selectedModel = modelSelectorRef.value?.selectedModel
             await api.aiGenerationHistory.create.mutate({
                 historyId: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                configId: currentConfigId.value || defaultConfig.value?.configId || 'unknown',
+                configId: selectedConfig?.configId || 'unknown',
                 topic: formData.topic,
-                generatedPrompt: '', model: currentModel.value || 'unknown',
+                generatedPrompt: '', 
+                model: selectedModel || 'unknown',
                 status: 'error',
                 errorMessage: (error as Error).message
             })

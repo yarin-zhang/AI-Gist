@@ -110,6 +110,16 @@
                                             </NFlex>
                                         </NAlert>
                                         
+                                        <!-- AI模型选择器 -->
+                                        <div style="margin-top: 8px;">
+                                            <AIModelSelector
+                                                ref="modelSelectorRef"
+                                                v-model:modelKey="selectedModelKey"
+                                                placeholder="选择AI模型进行优化"
+                                                :disabled="isStreaming || optimizing !== null"
+                                            />
+                                        </div>
+                                        
                                         <!-- 手动调整输入框 -->
                                         <div v-if="showManualInput" style="margin-top: 8px;">
                                             <NCard size="small" title="手动调整指令">
@@ -582,6 +592,7 @@ import { Plus, Trash, Eye, ArrowBackUp, History } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
+import AIModelSelector from "@/components/common/AIModelSelector.vue";
 import type { PromptHistory } from "@/lib/db";
 
 interface Variable {
@@ -620,8 +631,8 @@ const previewHistory = ref<PromptHistory | null>(null);
 
 // 优化相关状态
 const optimizing = ref<string | null>(null);
-const aiConfigs = ref([]);
-const selectedConfigId = ref("");
+const modelSelectorRef = ref();
+const selectedModelKey = ref("");
 
 // 手动调整状态
 const showManualInput = ref(false);
@@ -835,26 +846,6 @@ const createHistoryRecord = async (currentPrompt: any) => {
     }
 };
 
-// 加载AI配置列表
-const loadAIConfigs = async () => {
-    try {
-        // 使用数据库API获取AI配置
-        const allConfigs = await api.aiConfigs.getAll.query();
-        aiConfigs.value = allConfigs.filter(config => config.enabled);
-        
-        // 设置默认选择的配置（优先选择首选配置）
-        const preferredConfig = aiConfigs.value.find(config => config.isPreferred);
-        if (preferredConfig) {
-            selectedConfigId.value = preferredConfig.configId;
-        } else if (aiConfigs.value.length > 0) {
-            selectedConfigId.value = aiConfigs.value[0].configId;
-        }
-    } catch (error) {
-        console.error("加载AI配置失败:", error);
-        message.error("加载AI配置失败");
-    }
-};
-
 // 停止优化生成
 const stopOptimization = async () => {
     console.log('用户请求停止优化生成');
@@ -1003,14 +994,16 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         return;
     }
 
-    if (aiConfigs.value.length === 0) {
+    const selectedConfig = modelSelectorRef.value?.selectedConfig;
+    const selectedModel = modelSelectorRef.value?.selectedModel;
+
+    if (!selectedConfig) {
         message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
         return;
     }
 
-    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
-    if (!selectedConfig) {
-        message.error("请选择一个AI配置");
+    if (!selectedModel) {
+        message.error("请选择一个模型");
         return;
     }
 
@@ -1076,7 +1069,7 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
             configId: String(selectedConfig.configId || ''),
             topic: String(optimizationPrompt),
             customPrompt: String(optimizationPrompt),
-            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+            model: String(selectedModel)
         };
 
         console.log("流式优化请求参数:", request);
@@ -1147,14 +1140,16 @@ const applyManualAdjustment = async () => {
         return;
     }
 
-    if (aiConfigs.value.length === 0) {
+    const selectedConfig = modelSelectorRef.value?.selectedConfig;
+    const selectedModel = modelSelectorRef.value?.selectedModel;
+
+    if (!selectedConfig) {
         message.warning("没有可用的AI配置，请先在AI配置页面添加配置");
         return;
     }
 
-    const selectedConfig = aiConfigs.value.find(config => config.configId === selectedConfigId.value);
-    if (!selectedConfig) {
-        message.error("请选择一个AI配置");
+    if (!selectedModel) {
+        message.error("请选择一个模型");
         return;
     }
 
@@ -1217,7 +1212,7 @@ ${manualInstruction.value.trim()}
             configId: String(selectedConfig.configId || ''),
             topic: String(adjustmentPrompt),
             customPrompt: String(adjustmentPrompt),
-            model: String(selectedConfig.defaultModel || selectedConfig.models?.[0] || '')
+            model: String(selectedModel)
         };
 
         console.log("手动调整请求参数:", request);
@@ -1472,9 +1467,6 @@ watch(
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
             
-            // 加载AI配置
-            loadAIConfigs();
-
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
                 // 只有在确实没有 prompt 且不是编辑模式时才重置表单
