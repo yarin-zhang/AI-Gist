@@ -103,5 +103,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
     getStats: () => ipcRenderer.invoke('data:get-stats'),
+  },
+  // 应用信息和更新
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:get-version'),
+    checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
+    openDownloadPage: (url: string) => ipcRenderer.invoke('app:open-download-page', url),
+    onUpdateAvailable: (callback: (updateInfo: any) => void) => {
+      const listener = (_: any, updateInfo: any) => callback(updateInfo);
+      ipcRenderer.on('update-available', listener);
+      // 返回移除监听器的函数
+      return () => ipcRenderer.removeListener('update-available', listener);
+    }
   }
 });

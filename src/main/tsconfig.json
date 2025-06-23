@@ -6,6 +6,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "outDir": "../../build",
     "allowJs": true,
     "noImplicitAny": false,

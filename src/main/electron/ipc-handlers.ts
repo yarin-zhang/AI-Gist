@@ -3,6 +3,7 @@ import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
 import { aiServiceManager } from './ai-service-manager';
+import { updateService } from './update-service';
 import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '../../shared/types';
 
 /**
@@ -20,6 +21,7 @@ class IpcHandlers {
     this.setupWindowHandlers();
     this.setupThemeHandlers();
     this.setupAIHandlers();
+    this.setupUpdateHandlers();
   }
 
   /**
@@ -319,6 +321,46 @@ class IpcHandlers {
   }
 
   /**
+   * 设置更新检查处理器
+   */
+  private setupUpdateHandlers() {
+    // 获取当前版本
+    ipcMain.handle('app:get-version', () => {
+      return updateService.getCurrentVersion();
+    });
+
+    // 检查更新
+    ipcMain.handle('app:check-updates', async () => {
+      try {
+        const updateInfo = await updateService.checkForUpdates();
+        return {
+          success: true,
+          data: updateInfo,
+          error: null
+        };
+      } catch (error: any) {
+        console.error('检查更新失败:', error);
+        return {
+          success: false,
+          data: null,
+          error: error.message || '检查更新失败'
+        };
+      }
+    });
+
+    // 打开下载页面
+    ipcMain.handle('app:open-download-page', async (_, url: string) => {
+      try {
+        await updateService.openDownloadPage(url);
+        return { success: true, error: null };
+      } catch (error: any) {
+        console.error('打开下载页面失败:', error);
+        return { success: false, error: error.message || '打开下载页面失败' };
+      }
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -349,6 +391,11 @@ class IpcHandlers {
     ipcMain.removeHandler('ai:intelligent-test');
     ipcMain.removeHandler('ai:generate-prompt-stream');
     ipcMain.removeHandler('ai:stop-generation');
+    
+    // 清理更新处理器
+    ipcMain.removeHandler('app:get-version');
+    ipcMain.removeHandler('app:check-updates');
+    ipcMain.removeHandler('app:open-download-page');
     
     // 清理活跃的生成请求
     for (const abortController of this.activeGenerations.values()) {
