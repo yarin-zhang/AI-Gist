@@ -155,14 +155,6 @@
                         </template>
                         功能建议
                     </NButton>
-                    <NButton @click="openDiscussions" secondary>
-                        <template #icon>
-                            <NIcon>
-                                <MessageCircle />
-                            </NIcon>
-                        </template>
-                        社区讨论
-                    </NButton>
                 </NFlex>
             </NFlex>
         </NFlex>
@@ -266,15 +258,6 @@ const openIssues = async () => {
 const openFeatureRequest = async () => {
     try {
         await window.electronAPI.app.openDownloadPage('https://github.com/yarin-zhang/AI-Gist/issues/new?template=feature_request.md');
-    } catch (error) {
-        message.error('打开页面失败');
-    }
-};
-
-// 打开讨论页面
-const openDiscussions = async () => {
-    try {
-        await window.electronAPI.app.openDownloadPage('https://github.com/yarin-zhang/AI-Gist/discussions');
     } catch (error) {
         message.error('打开页面失败');
     }
