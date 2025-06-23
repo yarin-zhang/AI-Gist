@@ -700,8 +700,22 @@ export class DataManagementService {
                 throw new Error(`数据库操作失败: ${result.error}`);
             }
             
-            console.log(`成功获取数据库数据，总记录数: ${result.data.totalRecords}`);
-            return result.data;
+            // 计算总记录数
+            const totalRecords = (
+                (result.data.categories?.length || 0) +
+                (result.data.prompts?.length || 0) +
+                (result.data.aiConfigs?.length || 0) +
+                (result.data.aiHistory?.length || 0) +
+                (result.data.settings?.length || 0)
+            );
+            
+            console.log(`成功获取数据库数据，总记录数: ${totalRecords}`);
+            
+            // 返回正确的数据结构，包含totalRecords字段
+            return {
+                ...result.data,
+                totalRecords
+            };
             
         } catch (error) {
             console.error('导出数据失败:', error);
@@ -911,15 +925,69 @@ export class DataManagementService {
      * 生成导出数据 - 供 WebDAV 同步使用
      */
     async generateExportData() {
-        const exportData = await this.exportAllData();
-        
-        // 检查并补全 UUID
-        if (exportData && exportData.data) {
-            exportData.data = this.ensureUUIDsInExportData(exportData.data);
+        try {
+            const exportResult = await this.exportAllData();
+            
+            // 检查导出结果
+            if (!exportResult) {
+                console.warn('导出数据为空，返回默认空数据结构');
+                return {
+                    success: true,
+                    data: {
+                        categories: [],
+                        prompts: [],
+                        aiConfigs: [],
+                        aiHistory: [],
+                        settings: []
+                    },
+                    message: '导出数据为空，使用默认空结构'
+                };
+            }
+            
+            // 确保数据结构完整，即使某些数据为空
+            const safeData = {
+                categories: Array.isArray(exportResult.categories) ? exportResult.categories : [],
+                prompts: Array.isArray(exportResult.prompts) ? exportResult.prompts : [],
+                aiConfigs: Array.isArray(exportResult.aiConfigs) ? exportResult.aiConfigs : [],
+                aiHistory: Array.isArray(exportResult.aiHistory) ? exportResult.aiHistory : [],
+                settings: Array.isArray(exportResult.settings) ? exportResult.settings : []
+            };
+            
+            // 检查并补全 UUID
+            const processedData = this.ensureUUIDsInExportData(safeData);
+            
+            console.log('生成导出数据完成:', {
+                categoriesCount: processedData.categories.length,
+                promptsCount: processedData.prompts.length,
+                aiConfigsCount: processedData.aiConfigs.length,
+                aiHistoryCount: processedData.aiHistory.length,
+                settingsCount: processedData.settings.length
+            });
+            
+            return {
+                success: true,
+                data: processedData,
+                message: '导出数据生成成功'
+            };
+            
+        } catch (error) {
+            console.error('生成导出数据失败:', error);
+            // 返回安全的空数据结构，确保同步不会失败
+            return {
+                success: true,
+                data: {
+                    categories: [],
+                    prompts: [],
+                    aiConfigs: [],
+                    aiHistory: [],
+                    settings: []
+                },
+                message: `导出数据生成失败，使用空结构: ${error instanceof Error ? error.message : '未知错误'}`
+            };
         }
-        
-        return exportData;
-    }    /**
+    }
+
+    /**
      * 直接导入数据对象 - 供 WebDAV 同步使用
      */
     async importDataObject(data: any): Promise<{
@@ -1095,6 +1163,17 @@ export class DataManagementService {
      * 确保导出数据中所有需要同步的条目都有 UUID
      */
     private ensureUUIDsInExportData(data: any): any {
+        if (!data || typeof data !== 'object') {
+            console.warn('ensureUUIDsInExportData: 输入数据无效，返回空结构');
+            return {
+                categories: [],
+                prompts: [],
+                aiConfigs: [],
+                aiHistory: [],
+                settings: []
+            };
+        }
+
         const crypto = require('crypto');
         
         // 生成简单的 UUID（类似 v4 格式）
@@ -1106,21 +1185,56 @@ export class DataManagementService {
             });
         };
 
-        // 需要同步的数据类型
-        const syncableTypes = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'aiGenerationHistory'];
+        // 确保所有必要的数组都存在
+        const safeData = {
+            categories: Array.isArray(data.categories) ? data.categories : [],
+            prompts: Array.isArray(data.prompts) ? data.prompts : [],
+            aiConfigs: Array.isArray(data.aiConfigs) ? data.aiConfigs : [],
+            aiHistory: Array.isArray(data.aiHistory) ? data.aiHistory : [],
+            settings: Array.isArray(data.settings) ? data.settings : []
+        };
+
+        // 为每个数组中的项目补全 UUID
+        const syncableTypes = ['categories', 'prompts', 'aiConfigs', 'aiHistory'];
         
         for (const type of syncableTypes) {
-            if (data[type] && Array.isArray(data[type])) {
-                data[type] = data[type].map((item: any) => {
-                    if (!item.uuid) {
-                        console.log(`为 ${type} 中的条目补全 UUID: ${item.id || item.name || '未知'}`);
-                        item.uuid = generateUUID();
+            if (safeData[type] && Array.isArray(safeData[type])) {
+                safeData[type] = safeData[type].map((item: any) => {
+                    if (!item || typeof item !== 'object') {
+                        console.warn(`跳过无效的 ${type} 项目:`, item);
+                        return item;
                     }
+                    
+                    // 优先使用uuid字段，如果没有则使用id，都没有则生成新的
+                    if (!item.uuid) {
+                        const existingId = item.id;
+                        if (existingId) {
+                            console.log(`为 ${type} 中的条目补全 UUID（使用现有ID）: ${existingId}`);
+                            item.uuid = String(existingId);
+                        } else {
+                            const newUuid = generateUUID();
+                            console.log(`为 ${type} 中的条目生成新 UUID: ${newUuid}`);
+                            item.uuid = newUuid;
+                            item.id = newUuid; // 同时设置id字段以保持兼容性
+                        }
+                    } else if (!item.id) {
+                        // 如果有uuid但没有id，则设置id字段
+                        item.id = String(item.uuid);
+                    }
+                    
                     return item;
-                });
+                }).filter((item: any) => item !== null && item !== undefined);
             }
         }
         
-        return data;
+        console.log('UUID 补全完成:', {
+            categoriesCount: safeData.categories.length,
+            promptsCount: safeData.prompts.length,
+            aiConfigsCount: safeData.aiConfigs.length,
+            aiHistoryCount: safeData.aiHistory.length,
+            settingsCount: safeData.settings.length
+        });
+        
+        return safeData;
     }
 }

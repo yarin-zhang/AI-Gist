@@ -892,9 +892,9 @@ const handleManualUpload = async () => {
     console.log("开始手动上传...");
     uploadLoading.value = true;
     try {
-        const result = await appService.manualUploadWebDAV();
+        const result = await appService.forceUpload();
         if (result.success) {
-            message.success(result.data.message || '上传成功');
+            message.success('上传成功', { duration: 5000 });
             // 更新同步时间
             if (result.data.timestamp) {
                 emit("sync-time-updated", result.data.timestamp);
@@ -915,7 +915,7 @@ const handleManualDownload = async () => {
     console.log("开始手动下载...");
     downloadLoading.value = true;
     try {
-        const result = await appService.manualDownloadWebDAV();
+        const result = await appService.forceDownload();
         if (result.success) {
             if (result.data.hasConflicts) {
                 // 显示专业的冲突解决对话框
@@ -924,7 +924,7 @@ const handleManualDownload = async () => {
                 message.warning('检测到数据差异，请选择处理方式');
             } else {
                 // 无冲突，直接应用远程数据
-                const applyResult = await appService.applyDownloadedData({
+                const applyResult = await appService.forceDownload({
                     strategy: 'use_remote'
                 });
                 if (applyResult.success) {

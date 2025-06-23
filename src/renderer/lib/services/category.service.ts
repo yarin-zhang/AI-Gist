@@ -279,4 +279,23 @@ export class CategoryService extends BaseDatabaseService {
     const category = await this.getByUUID<Category>('categories', uuid);
     return category !== null;
   }
+
+  /**
+   * Upsert a category.
+   * Creates a new category if it doesn't exist, otherwise updates the existing one.
+   * @param id The ID of the category to upsert.
+   * @param data The data of the category.
+   */
+  async upsertCategory(id: string, data: Partial<Category>): Promise<void> {
+    const existing = await this.get<Category>('categories', id);
+    if (existing) {
+        // Update existing category
+        const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
+        await this.put('categories', updatedData);
+    } else {
+        // Create new category
+        const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        await this.add('categories', newData as Category);
+    }
+  }
 }

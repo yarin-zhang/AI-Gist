@@ -950,4 +950,27 @@ export class PromptService extends BaseDatabaseService {
       });
     });
   }
+
+  async getPromptById(id: string): Promise<Prompt | undefined> {
+    return this.get('prompts', id);
+  }
+
+  /**
+   * Upsert a prompt.
+   * Creates a new prompt if it doesn't exist, otherwise updates the existing one.
+   * @param id The ID of the prompt to upsert.
+   * @param data The data of the prompt.
+   */
+  async upsertPrompt(id: string, data: Partial<Prompt>): Promise<void> {
+    const existing = await this.get<Prompt>('prompts', id);
+    if (existing) {
+      // Update existing prompt
+      const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
+      await this.put('prompts', updatedData);
+    } else {
+      // Create new prompt
+      const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      await this.add('prompts', newData as Prompt);
+    }
+  }
 }
