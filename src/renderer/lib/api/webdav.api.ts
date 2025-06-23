@@ -1,56 +1,19 @@
 import { ipcInvoke } from '../ipc';
 import { databaseServiceManager } from '../services';
+import type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncResult,
+  WebDAVConflictDetail 
+} from '../../../shared/types/webdav';
 
-export interface WebDAVConfig {
-    enabled: boolean;
-    serverUrl: string;
-    username: string;
-    password: string;
-    autoSync: boolean;
-    syncInterval: number;
-    // 连接验证状态
-    connectionTested?: boolean;
-    connectionValid?: boolean;
-    connectionMessage?: string;
-    connectionTestedAt?: string; // ISO 时间戳
-    // 用于检测配置是否变更的哈希值
-    configHash?: string;
-}
-
-export interface WebDAVTestResult {
-    success: boolean;
-    message: string;
-    serverInfo?: {
-        name: string;
-        version: string;
-    };
-}
-
-export interface SyncResult {
-    success: boolean;
-    message: string;
-    timestamp: string;
-    filesUploaded: number;
-    filesDownloaded: number;
-    conflictsDetected: number;
-    conflictsResolved: number;
-    conflictDetails?: ConflictDetail[];
-}
-
-export interface ConflictDetail {
-    type: 'data_conflict' | 'timestamp_conflict' | 'version_conflict';
-    description: string;
-    resolution: 'local_wins' | 'remote_wins' | 'merged' | 'backup_created';
-    localData?: any;
-    remoteData?: any;
-}
-
+// 特定于 API 层的类型
 export interface ManualSyncResult {
     success: boolean;
     message: string;
     timestamp: string;
     hasConflicts: boolean;
-    conflictDetails?: ConflictDetail[];
+    conflictDetails?: WebDAVConflictDetail[];
     localData?: any;
     remoteData?: any;
 }

@@ -18,31 +18,19 @@ export type {
   AIConfigTestResult 
 };
 
-// WebDAV 相关类型定义
-export interface WebDAVConfig {
-  enabled: boolean;
-  serverUrl: string;
-  username: string;
-  password: string;
-  autoSync: boolean;
-  syncInterval: number;
-  encryptData?: boolean;
-  maxRetries?: number;
-  conflictResolution?: 'ask' | 'local_wins' | 'remote_wins' | 'merge';
-}
+// 导入共享的 WebDAV 类型
+import type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncResult 
+} from '../../shared/types/webdav';
 
-export interface SyncResult {
-  success: boolean;
-  message: string;
-  timestamp: string;
-  itemsProcessed: number;
-  itemsUpdated: number;
-  itemsCreated: number;
-  itemsDeleted: number;
-  conflictsResolved: number;
-  conflictDetails: any[];
-  errors: string[];
-}
+// 重新导出以保持向后兼容
+export type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncResult 
+};
 
 export default interface ElectronApi {
   sendMessage: (message: string) => void
@@ -92,9 +80,9 @@ export default interface ElectronApi {
   }
   
   webdav: {
-    testConnection: (config: WebDAVConfig) => Promise<{ success: boolean; message: string; serverInfo?: any }>
-    syncNow: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
-    manualUpload: () => Promise<{ success: boolean; data?: SyncResult; error?: string }>
+    testConnection: (config: WebDAVConfig) => Promise<WebDAVTestResult>
+    syncNow: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
+    manualUpload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
     manualDownload: () => Promise<{ success: boolean; data?: any; error?: string }>
     applyDownloadedData: (resolution: any) => Promise<{ success: boolean; message?: string; error?: string }>
     compareData: () => Promise<{ success: boolean; data?: any; error?: string }>

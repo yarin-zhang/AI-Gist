@@ -2,6 +2,22 @@
  * Electron 相关类型定义
  */
 
+// 导入 WebDAV 相关类型
+import type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncStatus, 
+  WebDAVSyncResult 
+} from './webdav';
+
+// 重新导出以保持向后兼容
+export type { 
+  WebDAVConfig, 
+  WebDAVTestResult, 
+  WebDAVSyncStatus, 
+  WebDAVSyncResult 
+};
+
 // 导入并重新导出 AI 相关类型，保持向后兼容
 import type { AIGenerationRequest, AIGenerationResult } from './ai';
 export type { AIGenerationRequest, AIGenerationResult };
@@ -74,40 +90,6 @@ export interface ThemeInfo {
   shouldUseDarkColors: boolean;
   shouldUseHighContrastColors: boolean;
   shouldUseInvertedColorScheme: boolean;
-}
-
-/**
- * WebDAV 配置
- */
-export interface WebDAVConfig {
-  serverUrl: string;
-  username: string;
-  password: string;
-  enabled: boolean;
-  syncInterval: number;
-  autoSync: boolean;
-}
-
-/**
- * WebDAV 测试结果
- */
-export interface WebDAVTestResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-}
-
-/**
- * WebDAV 同步状态
- */
-export interface WebDAVSyncStatus {
-  isOnline: boolean;
-  lastSync?: Date;
-  nextSync?: Date;
-  totalItems?: number;
-  syncedItems?: number;
-  errors?: string[];
-  inProgress: boolean;
 }
 
 /**
