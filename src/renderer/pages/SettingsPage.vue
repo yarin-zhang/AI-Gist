@@ -123,6 +123,11 @@
                         />
                         
                         
+                        <!-- 关于 -->
+                        <AboutSettings 
+                            v-show="activeSettingKey === 'about'"
+                        />
+                        
                         <!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
@@ -170,6 +175,7 @@ import {
     Flask,
     Cloud,
     Database,
+    InfoCircle,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -178,6 +184,7 @@ import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettin
 import WebDAVSyncSettings from "@/components/settings/WebDAVSyncSettings.vue";
 import ICloudSyncSettings from "@/components/settings/ICloudSyncSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
+import AboutSettings from "@/components/settings/AboutSettings.vue";
 import { WebDAVAPI, DataManagementAPI } from "@/lib/api";
 
 // Props 定义
@@ -279,6 +286,11 @@ const menuOptions = computed(() => {
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
         },
+        {
+            label: "关于",
+            key: "about",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(InfoCircle) }),
+        },
     ];
 
     // 仅在开发环境中添加实验室菜单
@@ -325,6 +337,11 @@ const currentSectionInfo = computed(() => {
             title: "数据管理",
             icon: Database,
             description: "数据备份、恢复、导入导出功能"
+        },
+        about: {
+            title: "关于",
+            icon: InfoCircle,
+            description: "查看应用版本信息和检查更新"
         },
         laboratory: {
             title: "实验室",
