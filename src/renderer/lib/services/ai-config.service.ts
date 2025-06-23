@@ -436,4 +436,23 @@ export class AIConfigService extends BaseDatabaseService {
       (config.baseURL && config.baseURL.toLowerCase().includes(searchQuery))
     );
   }
+
+  /**
+   * Upsert an AI config.
+   * Creates a new config if it doesn't exist, otherwise updates the existing one.
+   * @param id The ID of the config to upsert.
+   * @param data The data of the config.
+   */
+  async upsertAIConfig(id: string, data: Partial<AIConfig>): Promise<void> {
+    const existing = await this.get<AIConfig>('ai_configs', id);
+    if (existing) {
+        // Update existing config
+        const updatedData = { ...existing, ...data, updatedAt: new Date().toISOString() };
+        await this.put('ai_configs', updatedData);
+    } else {
+        // Create new config
+        const newData = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        await this.add('ai_configs', newData as AIConfig);
+    }
+  }
 }

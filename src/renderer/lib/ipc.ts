@@ -44,13 +44,11 @@ declare global {
       webdav: {
         testConnection: (config: any) => Promise<any>;
         syncNow: () => Promise<any>;
-        syncWithMergeConfirmed: () => Promise<any>;
         setConfig: (config: any) => Promise<any>;
         getConfig: () => Promise<any>;
-        manualUpload: () => Promise<any>;
-        manualDownload: () => Promise<any>;
+        forceUpload: () => Promise<any>;
+        forceDownload: () => Promise<any>;
         compareData: () => Promise<any>;
-        applyDownloadedData: (resolution: any) => Promise<any>;
       };
       icloud: {
         testAvailability: () => Promise<any>;
@@ -232,20 +230,16 @@ export class IpcUtils {
             return api.webdav.testConnection(data);
           case 'sync-now':
             return api.webdav.syncNow();
-          case 'sync-with-merge-confirmed':
-            return api.webdav.syncWithMergeConfirmed();
           case 'set-config':
             return api.webdav.setConfig(data);
           case 'get-config':
             return api.webdav.getConfig();
-          case 'manual-upload':
-            return api.webdav.manualUpload();
-          case 'manual-download':
-            return api.webdav.manualDownload();
+          case 'force-upload':
+            return api.webdav.forceUpload();
+          case 'force-download':
+            return api.webdav.forceDownload();
           case 'compare-data':
             return api.webdav.compareData();
-          case 'apply-downloaded-data':
-            return api.webdav.applyDownloadedData(data);
         }
         break;
         

@@ -17,7 +17,7 @@ import {
   WebDAVFileInfo,
   WebDAVConflictDetail 
 } from '@shared/types/webdav';
-import { WebDAVSyncCore, SyncResult } from './webdav-sync-core';
+import { WebDAVSyncCore, SyncResult, SyncItem } from './webdav-sync-core';
 
 // WebDAV 客户端缓存
 let webdavCreateClient: any = null;
@@ -49,7 +49,7 @@ async function getWebDAVCreateClient() {
             console.log('WebDAV 模块加载成功');
         } catch (error) {
             console.error('WebDAV 模块加载失败:', error);
-            throw new Error(`WebDAV 模块加载失败: ${error instanceof Error ? error.message : '未知错误'}`);
+                throw new Error(`WebDAV 模块加载失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
     }
     return webdavCreateClient;
@@ -86,6 +86,7 @@ export class WebDAVService {
     private preferencesManager: any;
     private dataManagementService: any;
     private syncCore: WebDAVSyncCore;
+    private logger: any;
     
     // 同步锁和重试机制
     private currentSyncLock: SyncLock | null = null;
@@ -104,7 +105,8 @@ export class WebDAVService {
         this.preferencesManager = preferencesManager;
         this.dataManagementService = dataManagementService;
         this.deviceId = this.generateDeviceId();
-        this.syncCore = new WebDAVSyncCore(this.deviceId, dataManagementService);
+        this.logger = console;
+        this.syncCore = new WebDAVSyncCore(this.deviceId, dataManagementService, this.logger);
         console.log(`WebDAVService initialized with device ID: ${this.deviceId}`);
     }
 
@@ -205,7 +207,7 @@ export class WebDAVService {
             timeout: 30000, // 30秒超时
         });
 
-        return client;
+            return client;
     }
 
     /**
@@ -235,7 +237,7 @@ export class WebDAVService {
             if (result.success) {
                 this.lastSuccessfulSync = result.timestamp;
                 this.consecutiveFailures = 0;
-            } else {
+                    } else {
                 this.consecutiveFailures++;
             }
 
@@ -245,24 +247,24 @@ export class WebDAVService {
             this.consecutiveFailures++;
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             console.error('[WebDAV] 同步失败:', error);
-            
+
             return {
-                success: false,
+            success: false,
                 message: errorMessage,
-                timestamp: new Date().toISOString(),
-                itemsProcessed: 0,
-                itemsUpdated: 0,
-                itemsCreated: 0,
-                itemsDeleted: 0,
-                conflictsResolved: 0,
-                conflictDetails: [],
+            timestamp: new Date().toISOString(),
+            itemsProcessed: 0,
+            itemsUpdated: 0,
+            itemsCreated: 0,
+            itemsDeleted: 0,
+            conflictsResolved: 0,
+            conflictDetails: [],
                 errors: [errorMessage],
-                phases: {
+            phases: {
                     upload: { completed: false, itemsProcessed: 0, errors: [errorMessage] },
-                    deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
-                    download: { completed: false, itemsProcessed: 0, errors: [] }
-                }
-            };
+                deleteRemote: { completed: false, itemsProcessed: 0, errors: [] },
+                download: { completed: false, itemsProcessed: 0, errors: [] }
+            }
+        };
         } finally {
             if (client) {
                 await this.releaseSyncLock(client);
@@ -281,7 +283,7 @@ export class WebDAVService {
         try {
             const testConfig = config || await this.loadConfig();
             if (!testConfig) {
-                return {
+        return {
                     success: false,
                     message: 'WebDAV 配置未找到',
                     error: '请先配置 WebDAV 服务器信息'
@@ -314,12 +316,12 @@ export class WebDAVService {
                     capabilities: ['read', 'write', 'delete']
                 }
             };
-
+            
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             console.error('[WebDAV] 连接测试失败:', error);
             
-            return {
+                    return {
                 success: false,
                 message: '连接测试失败',
                 error: errorMessage
@@ -334,16 +336,16 @@ export class WebDAVService {
         if (this.autoSyncTimer) {
             clearInterval(this.autoSyncTimer);
         }
-
+        
         const interval = (this.config?.syncInterval || 30) * 60 * 1000; // 转换为毫秒
         console.log(`[WebDAV] 启动自动同步，间隔: ${interval / 1000 / 60} 分钟`);
-
+        
         this.autoSyncTimer = setInterval(async () => {
             if (this.shouldSkipAutoSync()) {
                 console.log(`[WebDAV] 跳过自动同步: ${this.getSkipReason()}`);
                 return;
             }
-
+            
             try {
                 console.log('[WebDAV] 执行自动同步...');
                 const result = await this.performIntelligentSync();
@@ -468,100 +470,67 @@ export class WebDAVService {
      * 设置IPC处理程序
      */
     setupIpcHandlers(): void {
-        console.log('[WebDAV] 设置IPC处理程序...');
+        console.log('[WebDAV] setupIpcHandlers() - 开始注册IPC处理程序');
 
-        // 测试连接
-        ipcMain.handle('webdav:test-connection', async (event, config?: WebDAVConfig) => {
+        // 更新/设置WebDAV配置
+        ipcMain.handle('webdav:set-config', async (event, newConfig: WebDAVConfig) => {
+            console.log('[WebDAV] IPC webdav:set-config - 接收到配置更新请求');
             try {
-                return await this.testConnection(config);
+                this.config = { ...(this.config || {}), ...newConfig };
+                await this.preferencesManager.updatePreferences({ webdav: this.config });
+                console.log('[WebDAV] IPC webdav:set-config - 配置已更新并保存');
+
+                if (this.config.enabled && this.config.autoSync) {
+                    this.stopAutoSync();
+                    this.startAutoSync();
+                    } else {
+                    this.stopAutoSync();
+                }
+                return { success: true, message: '配置更新成功' };
             } catch (error) {
-                console.error('[WebDAV] 测试连接失败:', error);
-                return {
-                    success: false,
-                    message: '测试连接失败',
-                    error: error instanceof Error ? error.message : '未知错误'
-                };
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                console.error('[WebDAV] IPC webdav:set-config - 配置更新失败:', errorMessage);
+                throw new Error(`配置更新失败: ${errorMessage}`);
             }
+        });
+
+        // 获取WebDAV配置
+        ipcMain.handle('webdav:get-config', async () => this.config || {});
+
+        // 测试WebDAV连接
+        ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig) => {
+            return this.testConnection(config);
         });
 
         // 立即同步
-        ipcMain.handle('webdav:sync-now', async (event, options?: { autoMergeConfirmed?: boolean }) => {
-            try {
-                console.log('[WebDAV] 收到立即同步请求');
-                
-                if (this.syncInProgress) {
-                    return {
-                        success: false,
-                        message: '同步正在进行中，请稍后再试'
-                    };
-                }
+        ipcMain.handle('webdav:sync-now', async () => {
+             console.log('[WebDAV] IPC webdav:sync-now - 接收到立即同步请求');
+             return this.performIntelligentSync();
+        });
 
-                const result = await this.performIntelligentSync();
-                
-                // 生成详细的同步报告
-                let message = result.message;
-                if (result.success) {
-                    const details: string[] = [];
-                    if (result.itemsCreated > 0) details.push(`新增 ${result.itemsCreated} 项`);
-                    if (result.itemsUpdated > 0) details.push(`更新 ${result.itemsUpdated} 项`);
-                    if (result.itemsDeleted > 0) details.push(`删除 ${result.itemsDeleted} 项`);
-                    if (result.conflictsResolved > 0) details.push(`解决 ${result.conflictsResolved} 个冲突`);
-                    
-                    if (details.length > 0) {
-                        message = `同步完成: ${details.join(', ')}`;
-                    } else {
-                        message = '同步完成，数据已是最新';
-                    }
-                }
-                
+        // 获取同步状态
+        ipcMain.handle('webdav:get-sync-status', async () => {
                 return {
-                    success: result.success,
-                    data: result,
-                    message
-                };
-            } catch (error) {
-                console.error('[WebDAV] 立即同步失败:', error);
-                return {
-                    success: false,
-                    message: error instanceof Error ? error.message : '同步失败'
-                };
-            }
+                isSyncing: this.syncInProgress,
+                lastSync: this.lastSuccessfulSync,
+                consecutiveFailures: this.consecutiveFailures,
+                autoSyncEnabled: !!this.autoSyncTimer
+            };
         });
 
-        // 获取配置
-        ipcMain.handle('webdav:get-config', async () => {
-            return this.config;
-        });
+        // 比较数据
+        ipcMain.handle('webdav:compare-data', async () => this.compareData());
 
-        // 设置配置
-        ipcMain.handle('webdav:set-config', async (event, config: WebDAVConfig) => {
-            try {
-                const prefs = this.preferencesManager.getPreferences();
-                await this.preferencesManager.updatePreferences({
-                    ...prefs,
-                    webdav: config
-                });
-                
-                this.config = config;
-                
-                // 如果启用了自动同步，重启自动同步
-                if (config.enabled && config.autoSync) {
-                    this.startAutoSync();
-                } else {
-                    this.stopAutoSync();
-                }
-                
-                return { success: true };
-            } catch (error) {
-                console.error('[WebDAV] 设置配置失败:', error);
-                return { 
-                    success: false, 
-                    error: error instanceof Error ? error.message : '未知错误' 
-                };
-            }
-        });
+        // 强制上传 (本地覆盖远端)
+        ipcMain.handle('webdav:force-upload', async () => this.forceUpload());
 
-        console.log('[WebDAV] IPC处理程序设置完成');
+        // 强制下载 (远端覆盖本地)
+        ipcMain.handle('webdav:force-download', async () => this.forceDownload());
+        
+        // 应用下载的数据
+        ipcMain.handle('webdav:apply-downloaded-data', async (event, items: any[]) => {
+            return this.applyDownloadedData(items);
+        });
     }
 
     /**
@@ -591,6 +560,165 @@ export class WebDAVService {
         if (this.currentSyncLock) {
             console.log('[WebDAV] 释放同步锁:', this.currentSyncLock.id);
             this.currentSyncLock = null;
+        }
+    }
+
+    /**
+     * 新增：比较本地和远程数据
+     */
+    async compareData(): Promise<{ local: any; remote: any }> {
+        if (!this.config?.enabled) throw new Error('WebDAV 同步未启用');
+        const client = await this.createClient();
+        
+        const localSnapshot = await this.syncCore.getLocalSnapshot();
+        const remoteSnapshot = await this.syncCore.getRemoteSnapshot(client);
+
+        return {
+            local: {
+                items: localSnapshot.items.length,
+                timestamp: localSnapshot.timestamp,
+                checksum: localSnapshot.metadata.checksum,
+            },
+            remote: remoteSnapshot ? {
+                items: remoteSnapshot.items.length,
+                timestamp: remoteSnapshot.timestamp,
+                checksum: remoteSnapshot.metadata.checksum,
+            } : null,
+        };
+    }
+    
+    /**
+     * 新增：强制上传（本地覆盖远端）
+     */
+    async forceUpload(): Promise<SyncResult> {
+        if (this.syncInProgress) throw new Error('同步正在进行中');
+        if (!this.config?.enabled) throw new Error('WebDAV 同步未启用');
+        
+        this.syncInProgress = true;
+        try {
+            const client = await this.createClient();
+            await this.acquireSyncLock(client);
+
+            const localSnapshot = await this.syncCore.getLocalSnapshot();
+            const result = await this.syncCore.performInitialUpload(client, localSnapshot);
+
+            this.lastSuccessfulSync = result.timestamp;
+            this.consecutiveFailures = 0;
+            return result;
+        } catch (error) {
+            this.consecutiveFailures++;
+            console.error('[WebDAV] 强制上传失败:', error);
+            throw error;
+        } finally {
+            await this.releaseSyncLock();
+            this.syncInProgress = false;
+        }
+    }
+
+    /**
+     * 新增：强制下载（远端覆盖本地）
+     * 这个方法现在将完整执行下载和覆盖操作。
+     */
+    async forceDownload(): Promise<SyncResult> {
+        if (this.syncInProgress) throw new Error('同步正在进行中');
+        if (!this.config?.enabled) throw new Error('WebDAV 同步未启用');
+
+        this.syncInProgress = true;
+        try {
+            const client = await this.createClient();
+            await this.acquireSyncLock(client);
+
+            const remoteSnapshot = await this.syncCore.getRemoteSnapshot(client);
+            if (!remoteSnapshot || !Array.isArray(remoteSnapshot.items)) {
+                throw new Error('远程没有数据或数据格式不正确');
+            }
+            
+            // 直接应用下载的数据
+            await this.syncCore.applyLocalChanges(remoteSnapshot.items);
+            
+            console.log(`[WebDAV] 强制下载：成功应用 ${remoteSnapshot.items.length} 个远程项目`);
+
+            const result: SyncResult = {
+                success: true,
+                message: '强制下载成功，数据已从远端覆盖本地。',
+                timestamp: new Date().toISOString(),
+                itemsProcessed: remoteSnapshot.items.length,
+                itemsCreated: 0, // 在强制覆盖模式下，这些统计数据意义不大
+                itemsUpdated: remoteSnapshot.items.length,
+                itemsDeleted: 0,
+                conflictsResolved: 0,
+                conflictDetails: [],
+                errors: [],
+                phases: {
+                    upload: { completed: true, itemsProcessed: 0, errors: [] },
+                    deleteRemote: { completed: true, itemsProcessed: 0, errors: [] },
+                    download: { completed: true, itemsProcessed: remoteSnapshot.items.length, errors: [] },
+                },
+            };
+
+            this.lastSuccessfulSync = result.timestamp;
+            this.consecutiveFailures = 0;
+            return result;
+
+        } catch (error) {
+            this.consecutiveFailures++;
+            console.error('[WebDAV] 强制下载失败:', error);
+            throw error;
+        } finally {
+            await this.releaseSyncLock();
+            this.syncInProgress = false;
+        }
+    }
+    
+    /**
+     * 应用从渲染进程发送过来的下载数据
+     * @param items 从渲染进程接收的普通对象数组
+     */
+    private async applyDownloadedData(items: any[]): Promise<{ success: boolean; message: string; }> {
+        console.log('[WebDAV] applyDownloadedData - 接收到应用下载数据的请求');
+        if (!items || !Array.isArray(items)) {
+            throw new Error('无效的数据格式');
+        }
+
+        try {
+            // 将从渲染器接收的普通对象转换为 SyncItem[] 类型
+            const syncItems: SyncItem[] = items.map((item: any): SyncItem | null => {
+                if (!item || !item.type || !item.content) {
+                    this.logger.warn('[WebDAV] applyDownloadedData - 跳过无效项目:', item);
+                    return null;
+                }
+                const now = new Date().toISOString();
+                // 显式创建符合 SyncItem 接口的对象
+                const syncItem: SyncItem = {
+                    id: String(item.id || item.content.id || uuidv4()),
+                    type: item.type as SyncItem['type'], // 信任并转换来自渲染器的 type
+                    title: item.title,
+                    content: item.content,
+                    metadata: {
+                        createdAt: item.metadata?.createdAt || now,
+                        updatedAt: item.metadata?.updatedAt || now,
+                        version: item.metadata?.version || 1,
+                        deviceId: item.metadata?.deviceId || this.deviceId,
+                        lastModifiedBy: item.metadata?.lastModifiedBy || this.deviceId,
+                        checksum: item.metadata?.checksum || '', 
+                        deleted: item.metadata?.deleted || false,
+                    },
+                };
+                return syncItem;
+            }).filter((item): item is SyncItem => item !== null); // 使用类型保护来过滤 null
+
+            if (syncItems.length === 0 && items.length > 0) {
+                return { success: false, message: '所有项目都无效，无法应用数据' };
+            }
+
+            await this.syncCore.applyLocalChanges(syncItems);
+            console.log(`[WebDAV] applyDownloadedData - 成功应用 ${syncItems.length} 个项目`);
+            return { success: true, message: '数据应用成功' };
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            console.error('[WebDAV] applyDownloadedData - 应用下载数据失败:', errorMessage);
+            throw new Error(`应用下载数据失败: ${errorMessage}`);
         }
     }
 

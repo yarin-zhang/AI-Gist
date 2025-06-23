@@ -181,7 +181,7 @@ export class WebDAVSyncCore {
   /**
    * 获取本地快照
    */
-  private async getLocalSnapshot(): Promise<SyncSnapshot> {
+  public async getLocalSnapshot(): Promise<SyncSnapshot> {
     this.logger.info('[WebDAV Sync] 获取本地数据快照');
     
     const exportResult = await this.dataManagementService.generateExportData();
@@ -234,7 +234,7 @@ export class WebDAVSyncCore {
   /**
    * 获取远程快照
    */
-  private async getRemoteSnapshot(client: any): Promise<SyncSnapshot | null> {
+  public async getRemoteSnapshot(client: any): Promise<SyncSnapshot | null> {
     try {
       const exists = await this.remoteFileExists(client, '/ai-gist-sync/snapshot.json');
       if (!exists) {
@@ -252,7 +252,7 @@ export class WebDAVSyncCore {
   /**
    * 执行初始上传
    */
-  private async performInitialUpload(client: any, localSnapshot: SyncSnapshot): Promise<SyncResult> {
+  public async performInitialUpload(client: any, localSnapshot: SyncSnapshot): Promise<SyncResult> {
     this.logger.info('[WebDAV Sync] 执行初始上传');
     
     await this.ensureRemoteDirectory(client, '/ai-gist-sync');
@@ -570,7 +570,7 @@ export class WebDAVSyncCore {
   /**
    * 应用本地变更
    */
-  private async applyLocalChanges(items: SyncItem[]): Promise<void> {
+  public async applyLocalChanges(items: SyncItem[]): Promise<void> {
     if (items.length === 0) return;
 
     const importData = this.convertFromSyncItems(items);

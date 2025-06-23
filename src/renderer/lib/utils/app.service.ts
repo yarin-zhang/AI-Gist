@@ -93,14 +93,14 @@ export class AppService {
     return await IpcUtils.safeInvoke<any>('webdav:sync-with-merge-confirmed');
   }
 
-  // 手动上传数据
-  async manualUploadWebDAV(): Promise<IpcResult<any>> {
-    return await IpcUtils.safeInvoke<any>('webdav:manual-upload');
+  // 强制上传 (本地覆盖远端)
+  async forceUpload(): Promise<any> {
+    return await IpcUtils.safeInvoke<any>('webdav:force-upload');
   }
 
-  // 手动下载数据（检测冲突）
-  async manualDownloadWebDAV(): Promise<IpcResult<any>> {
-    return await IpcUtils.safeInvoke<any>('webdav:manual-download');
+  // 强制下载 (远端覆盖本地)
+  async forceDownload(): Promise<any> {
+    return await IpcUtils.safeInvoke<any>('webdav:force-download');
   }
 
   // 应用下载的数据

@@ -169,42 +169,6 @@ export class WebDAVAPI {
     }
 
     /**
-     * 手动上传数据到 WebDAV 服务器
-     */
-    static async manualUpload(): Promise<ManualSyncResult> {
-        try {
-            return await ipcInvoke('webdav:manual-upload');
-        } catch (error) {
-            console.error('手动上传失败:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 手动从 WebDAV 服务器下载数据（检测冲突但不自动应用）
-     */
-    static async manualDownload(): Promise<ManualSyncResult> {
-        try {
-            return await ipcInvoke('webdav:manual-download');
-        } catch (error) {
-            console.error('手动下载失败:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 应用下载的数据（解决冲突后）
-     */
-    static async applyDownloadedData(resolution: ConflictResolution): Promise<SyncResult> {
-        try {
-            return await ipcInvoke('webdav:apply-downloaded-data', resolution);
-        } catch (error) {
-            console.error('应用下载数据失败:', error);
-            throw error;
-        }
-    }
-
-    /**
      * 获取服务器上的数据预览（不下载）
      */
     static async getRemoteDataPreview(): Promise<{
@@ -265,5 +229,19 @@ export class WebDAVAPI {
             console.error('记录删除项目失败:', error);
             return { success: false, error: error instanceof Error ? error.message : '记录删除失败' };
         }
+    }
+
+    /**
+     * 强制上传 (本地覆盖远端)
+     */
+    async forceUpload(): Promise<WebDAVSyncResult> {
+        return await ipcInvoke('webdav:force-upload');
+    }
+
+    /**
+     * 强制下载 (远端覆盖本地)
+     */
+    async forceDownload(): Promise<WebDAVSyncResult> {
+        return await ipcInvoke('webdav:force-download');
     }
 }

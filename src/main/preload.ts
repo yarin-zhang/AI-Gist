@@ -68,14 +68,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   webdav: {
     testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
     syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
-    syncWithMergeConfirmed: () => ipcRenderer.invoke('webdav:sync-with-merge-confirmed'),
     setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
     getConfig: () => ipcRenderer.invoke('webdav:get-config'),
-    manualUpload: () => ipcRenderer.invoke('webdav:manual-upload'),
-    manualDownload: () => ipcRenderer.invoke('webdav:manual-download'),
+    forceUpload: () => ipcRenderer.invoke('webdav:force-upload'),
+    forceDownload: () => ipcRenderer.invoke('webdav:force-download'),
     compareData: () => ipcRenderer.invoke('webdav:compare-data'),
-    applyDownloadedData: (resolution: any) => ipcRenderer.invoke('webdav:apply-downloaded-data', resolution),
-    recordDeletedItems: (uuids: string[]) => ipcRenderer.invoke('webdav:record-deleted-items', uuids),
   },
   // iCloud 同步管理
   icloud: {
