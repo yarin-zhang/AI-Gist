@@ -173,7 +173,7 @@
           <NButton 
             @click="testConnection" 
             :loading="testingConnection"
-            :disabled="!props.modelValue.webdav.enabled || !props.modelValue.webdav.serverUrl || !props.modelValue.webdav.username"
+            :disabled="!props.modelValue.webdav.enabled || !isConfigComplete"
             type="primary"
             ghost
             size="small"
@@ -200,7 +200,7 @@
           <NButton 
             @click="handleCompareData" 
             :loading="compareLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="primary"
             ghost
             block
@@ -216,7 +216,7 @@
           <NButton 
             @click="handleManualUpload" 
             :loading="uploadLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="success"
             ghost
             block
@@ -232,7 +232,7 @@
           <NButton 
             @click="handleManualDownload" 
             :loading="downloadLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="info"
             ghost
             block
@@ -250,7 +250,7 @@
           <NButton 
             @click="syncNow" 
             :loading="syncLoading"
-            :disabled="!props.modelValue.webdav.enabled"
+            :disabled="!isWebDAVReady"
             type="primary"
             block
           >
@@ -276,8 +276,8 @@
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">同步状态:</span>
-            <span :class="props.modelValue.webdav.enabled ? 'text-green-600' : 'text-gray-500'">
-              {{ props.modelValue.webdav.enabled ? '已启用' : '已禁用' }}
+            <span :class="syncStatusInfo.class">
+              {{ syncStatusInfo.text }}
             </span>
           </div>
         </div>
@@ -398,7 +398,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import {
   NCard, NAlert, NButton, NSwitch, NInputNumber, NDivider, NIcon,
   NInput, NModal, NTabs, NTabPane, NTag, NEmpty,
@@ -474,6 +474,36 @@ const showCompareDialog = ref(false);
 const conflictData = ref(null);
 const remotePreviewData = ref(null);
 const compareData = ref(null);
+
+// 计算属性：配置是否完整
+const isConfigComplete = computed(() => {
+  const config = props.modelValue.webdav
+  return !!(config.serverUrl && config.username && config.password)
+})
+
+// 计算属性：WebDAV是否真正可用
+const isWebDAVReady = computed(() => {
+  return props.modelValue.webdav.enabled && 
+         isConfigComplete.value && 
+         connectionStatus.connected
+})
+
+// 计算属性：同步状态文本和样式
+const syncStatusInfo = computed(() => {
+  if (!props.modelValue.webdav.enabled) {
+    return { text: '已禁用', class: 'text-gray-500' }
+  }
+  if (!isConfigComplete.value) {
+    return { text: '配置不完整', class: 'text-orange-600' }
+  }
+  if (!connectionStatus.checked) {
+    return { text: '未验证连接', class: 'text-orange-600' }
+  }
+  if (!connectionStatus.connected) {
+    return { text: '连接失败', class: 'text-red-600' }
+  }
+  return { text: '就绪', class: 'text-green-600' }
+})
 
 // 测试连接
 const testConnection = async () => {
@@ -616,6 +646,7 @@ const notifyConfigChange = () => {
 
 // 立即同步
 const syncNow = async () => {
+    console.log("开始立即同步...");
     syncLoading.value = true;
     try {
         const result = await appService.syncWebDAVNow();
@@ -638,6 +669,7 @@ const syncNow = async () => {
 
 // 手动上传
 const handleManualUpload = async () => {
+    console.log("开始手动上传...");
     uploadLoading.value = true;
     try {
         const result = await appService.manualUploadWebDAV();
@@ -660,6 +692,7 @@ const handleManualUpload = async () => {
 
 // 手动下载
 const handleManualDownload = async () => {
+    console.log("开始手动下载...");
     downloadLoading.value = true;
     try {
         const result = await appService.manualDownloadWebDAV();
@@ -697,6 +730,7 @@ const handleManualDownload = async () => {
 
 // 比较数据
 const handleCompareData = async () => {
+    console.log("开始比较数据...");
     compareLoading.value = true;
     try {
         const result = await appService.compareWebDAVData();
@@ -858,6 +892,14 @@ onMounted(() => {
   color: #059669;
 }
 
+.text-red-600 {
+  color: #dc2626;
+}
+
+.text-orange-600 {
+  color: #ea580c;
+}
+
 .flex {
   display: flex;
 }
@@ -922,10 +964,6 @@ onMounted(() => {
 
 .compare-item:hover {
   background-color: var(--hover-color);
-}
-
-.text-orange-600 {
-  color: #ea580c;
 }
 
 .mr-1 {
