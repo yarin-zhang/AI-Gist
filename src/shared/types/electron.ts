@@ -2,6 +2,10 @@
  * Electron 相关类型定义
  */
 
+// 导入并重新导出 AI 相关类型，保持向后兼容
+import type { AIGenerationRequest, AIGenerationResult } from './ai';
+export type { AIGenerationRequest, AIGenerationResult };
+
 /**
  * 用户偏好设置
  */
@@ -70,30 +74,6 @@ export interface ThemeInfo {
   shouldUseDarkColors: boolean;
   shouldUseHighContrastColors: boolean;
   shouldUseInvertedColorScheme: boolean;
-}
-
-/**
- * AI 生成请求
- */
-export interface AIGenerationRequest {
-  configId: string;
-  model?: string;
-  topic: string;
-  customPrompt?: string;
-  systemPrompt?: string;
-}
-
-/**
- * AI 生成结果
- */
-export interface AIGenerationResult {
-  id: string;
-  configId: string;
-  topic: string;
-  generatedPrompt: string;
-  model: string;
-  customPrompt?: string;
-  createdAt: Date;
 }
 
 /**

@@ -4,7 +4,8 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { AIGenerationHistory, AIGenerationHistoryOptions, AIGenerationHistoryStats, PaginatedResult } from '../types/database';
+import { AIGenerationHistory } from '../../../shared/types/ai';
+import { AIGenerationHistoryOptions, AIGenerationHistoryStats, PaginatedResult } from '../../../shared/types/database';
 import { generateUUID } from '../utils/uuid';
 
 /**

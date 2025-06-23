@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { AIConfig } from '../types/database';
+import { AIConfig } from '../../../shared/types/ai';
 import { generateUUID } from '../utils/uuid';
 
 /**

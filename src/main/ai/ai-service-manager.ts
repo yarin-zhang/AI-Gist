@@ -3,25 +3,15 @@ import { Ollama } from '@langchain/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { CohereClient } from 'cohere-ai';
-import { AIGenerationRequest, AIGenerationResult } from '../../shared/types';
+import { 
+  AIGenerationRequest, 
+  AIGenerationResult, 
+  AIConfig,
+  AIConfigTestResult
+} from '../../shared/types/ai';
 
-// 定义配置接口，适配前端数据库的结构
-interface ProcessedAIConfig {
-  id?: number;
-  configId: string;
-  name: string;
-  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
-  baseURL: string;
-  apiKey?: string;
-  secretKey?: string;
-  models: string[];
-  defaultModel?: string;
-  customModel?: string;
-  enabled: boolean;
-  systemPrompt?: string; // 自定义的生成提示词的系统提示词
-  createdAt: Date;
-  updatedAt: Date;
-}
+// 使用共享的 AIConfig 类型，添加一个别名用于处理后的配置
+type ProcessedAIConfig = AIConfig;
 
 /**
  * AI 服务管理器

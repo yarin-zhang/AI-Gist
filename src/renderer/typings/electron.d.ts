@@ -2,41 +2,21 @@
  * Should match main/preload.ts for typescript support in renderer
  */
 
-// AI 相关类型定义
-export interface AIConfig {
-  id?: number;
-  configId: string; // 唯一标识符
-  name: string;
-  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
-  baseURL: string;
-  apiKey?: string;
-  secretKey?: string;
-  models: string[];
-  defaultModel?: string;
-  customModel?: string;
-  enabled: boolean;
-  systemPrompt?: string; // 自定义的生成提示词的系统提示词
-  createdAt: Date;
-  updatedAt: Date;
-}
+// 导入共享的 AI 类型
+import type { 
+  AIConfig, 
+  AIGenerationRequest, 
+  AIGenerationResult, 
+  AIConfigTestResult 
+} from '../../shared/types/ai';
 
-export interface AIGenerationRequest {
-  configId: string;
-  model?: string;
-  topic: string;
-  customPrompt?: string;
-  systemPrompt?: string;
-}
-
-export interface AIGenerationResult {
-  id: string;
-  configId: string;
-  topic: string;
-  generatedPrompt: string;
-  model: string;
-  customPrompt?: string;
-  createdAt: Date;
-}
+// 重新导出以保持向后兼容
+export type { 
+  AIConfig, 
+  AIGenerationRequest, 
+  AIGenerationResult, 
+  AIConfigTestResult 
+};
 
 // WebDAV 相关类型定义
 export interface WebDAVConfig {
@@ -104,10 +84,10 @@ export default interface ElectronApi {
     addConfig: (config: AIConfig) => Promise<AIConfig>
     updateConfig: (id: string, config: Partial<AIConfig>) => Promise<AIConfig | null>
     removeConfig: (id: string) => Promise<boolean>
-    testConfig: (config: AIConfig) => Promise<{ success: boolean; error?: string; models?: string[] }>
+    testConfig: (config: AIConfig) => Promise<AIConfigTestResult>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
-    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>    intelligentTest: (config: AIConfig) => Promise<{ success: boolean; response?: string; error?: string }>
+    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>    intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
   }
   

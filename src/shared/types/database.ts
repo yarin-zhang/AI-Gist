@@ -3,31 +3,11 @@
  * 从各个分散的类型定义文件整合而来
  */
 
-/**
- * 用户数据模型
- * @deprecated 不再使用，保留仅为了向后兼容
- */
-export interface User {
-  id?: number;
-  email: string;
-  name?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// 导入 AI 相关类型
+import type { AIConfig, AIGenerationHistory } from './ai';
 
-/**
- * 文章数据模型
- * @deprecated 不再使用，保留仅为了向后兼容
- */
-export interface Post {
-  id?: number;
-  title: string;
-  content?: string;
-  published: boolean;
-  authorId: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// 重新导出 AI 类型，保持向后兼容
+export type { AIConfig, AIGenerationHistory };
 
 /**
  * 分类数据模型
@@ -91,48 +71,6 @@ export interface PromptVariable {
   sortOrder?: number;
   createdAt: Date;
   updatedAt: Date;
-}
-
-/**
- * AI配置数据模型
- */
-export interface AIConfig {
-  id?: number;
-  uuid: string; // 全局唯一标识符，用于WebDAV同步
-  configId: string;
-  name: string;
-  type: 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
-  baseURL: string;
-  apiKey?: string;
-  secretKey?: string;
-  models: string[];
-  defaultModel?: string;
-  customModel?: string;
-  enabled: boolean;
-  isPreferred?: boolean; // 是否为首选配置
-  systemPrompt?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
- * AI生成历史记录数据模型
- */
-export interface AIGenerationHistory {
-  id?: number;
-  uuid: string; // 全局唯一标识符，用于WebDAV同步
-  historyId: string; // 历史记录的业务ID
-  configId: string;
-  topic: string;
-  generatedPrompt: string;
-  model: string;
-  customPrompt?: string;
-  status: 'success' | 'error';
-  errorMessage?: string;
-  debugResult?: string;
-  debugStatus?: 'success' | 'error' | 'pending';
-  debugErrorMessage?: string;
-  createdAt: Date;
 }
 
 /**
@@ -267,4 +205,59 @@ export interface PromptFillResult {
   filledContent: string;
   variables: Record<string, string>;
   promptVariables: PromptVariable[];
+}
+
+/**
+ * AI生成历史查询选项
+ */
+export interface AIGenerationHistoryOptions {
+  configId?: string;
+  topic?: string;
+  status?: 'success' | 'error' | 'pending';
+  sortBy?: 'createdAt' | 'topic' | 'status';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+/**
+ * AI生成历史统计信息
+ */
+export interface AIGenerationHistoryStats {
+  total: number;
+  successful: number;
+  failed: number;
+  pending: number;
+  totalByConfig: Record<string, number>;
+  mostUsedConfigs: Array<{
+    configId: string;
+    count: number;
+  }>;
+}
+
+/**
+ * 用户数据模型
+ * @deprecated 不再使用，保留仅为了向后兼容
+ */
+export interface User {
+  id?: number;
+  email: string;
+  name?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 文章数据模型
+ * @deprecated 不再使用，保留仅为了向后兼容
+ */
+export interface Post {
+  id?: number;
+  title: string;
+  content?: string;
+  published: boolean;
+  authorId: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
