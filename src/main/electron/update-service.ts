@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { windowManager } from './window-manager';
-import packageJson from '../../../package.json';
+import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * 更新信息接口
@@ -39,7 +40,35 @@ class UpdateService {
    * 获取当前应用版本
    */
   getCurrentVersion(): string {
-    return packageJson.version;
+    try {
+      // 在开发环境中使用相对路径
+      if (process.env.NODE_ENV === 'development') {
+        const packageJsonPath = path.join(__dirname, '../../../package.json');
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+        return packageJson.version;
+      }
+      
+      // 在生产环境中，先尝试使用 app.getVersion()
+      const appVersion = app.getVersion();
+      if (appVersion) {
+        return appVersion;
+      }
+      
+      // 如果 app.getVersion() 不可用，尝试从应用根目录读取 package.json
+      const appPath = app.getAppPath();
+      const packageJsonPath = path.join(appPath, 'package.json');
+      
+      if (fs.existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+        return packageJson.version;
+      }
+      
+      // 最后的备选方案，使用 process.env.npm_package_version
+      return process.env.npm_package_version || '0.0.0';
+    } catch (error) {
+      console.error('Error getting app version:', error);
+      return '0.0.0';
+    }
   }
 
   /**
