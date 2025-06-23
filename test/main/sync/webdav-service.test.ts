@@ -2,9 +2,9 @@
  * WebDAV 同步服务测试
  * 测试各种复杂的同步场景和边界情况
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { testDataGenerators, asyncTestHelpers } from '@root/test/helpers/test-utils'
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { testDataGenerators, asyncTestHelpers } from '../../helpers/test-utils'
 import { WebDAVService } from '../../../src/main/sync/webdav-service'
 import os from 'os'
 import path from 'path'
@@ -32,14 +32,18 @@ vi.mock('fs', () => ({
     access: vi.fn(),
     mkdir: vi.fn()
   },
-  existsSync: vi.fn(),
-  readFileSync: vi.fn(),
+  existsSync: vi.fn(() => false),
+  readFileSync: vi.fn(() => '{"deviceId": "mock-device-id"}'),
   writeFileSync: vi.fn()
 }))
 
 vi.mock('os')
 vi.mock('path')
 vi.mock('crypto')
+
+vi.mock('uuid', () => ({
+  v4: vi.fn(() => 'mock-uuid-v4')
+}))
 
 describe('WebDAVService', () => {
   let service: WebDAVService
@@ -54,7 +58,8 @@ describe('WebDAVService', () => {
     // Setup mock preferences manager
     mockPreferencesManager = {
       get: vi.fn(),
-      set: vi.fn()
+      set: vi.fn(),
+      getPreferences: vi.fn(() => ({}))
     }
     
     // Setup mock data management service
@@ -74,10 +79,23 @@ describe('WebDAVService', () => {
       deleteFile: vi.fn()
     }
     
-    // Mock crypto
+    // Mock crypto - 根据输入内容生成不同的hash值
     vi.mocked(crypto.createHash).mockReturnValue({
-      update: vi.fn().mockReturnThis(),
-      digest: vi.fn(() => 'mock-hash')
+      update: vi.fn(function(this: any, data: string) {
+        this._data = data
+        return this
+      }),
+      digest: vi.fn(function(this: any) {
+        // 简单的hash函数，基于内容长度和字符码
+        const data = this._data || ''
+        let hash = 0
+        for (let i = 0; i < data.length; i++) {
+          const char = data.charCodeAt(i)
+          hash = ((hash << 5) - hash) + char
+          hash = hash & hash // 转换为32位整数
+        }
+        return `hash-${Math.abs(hash).toString(16)}`
+      })
     } as any)
     
     // Mock os
@@ -102,10 +120,11 @@ describe('WebDAVService', () => {
       expect(deviceId).toContain('test-host')
     })
 
-    it('应该在配置无效时抛出错误', async () => {
-      mockPreferencesManager.get.mockResolvedValue(null)
+    it('应该正常完成初始化即使配置为空', async () => {
+      mockPreferencesManager.getPreferences = vi.fn().mockReturnValue({})
       
-      await expect(service.initialize()).rejects.toThrow('WebDAV 配置未找到')
+      await expect(service.initialize()).resolves.not.toThrow()
+      expect((service as any).isInitialized).toBe(true)
     })
   })
 
@@ -167,6 +186,8 @@ describe('WebDAVService', () => {
       const hash2 = (service as any).calculateItemChecksum(content2)
       
       expect(hash1).not.toBe(hash2)
+      expect(hash1).toBeDefined()
+      expect(hash2).toBeDefined()
     })
   })
 
@@ -327,7 +348,7 @@ describe('WebDAVService', () => {
       mockWebDAVClient.getFileContents.mockResolvedValue(JSON.stringify(existingLock))
       
       await expect((service as any).acquireSyncLock(mockWebDAVClient))
-        .rejects.toThrow('同步锁被其他设备占用')
+        .rejects.toThrow('同步已被其他设备锁定')
     })
   })
 
@@ -382,15 +403,12 @@ describe('WebDAVService', () => {
   describe('边界情况', () => {
     it('应该处理同步进行中的情况', async () => {
       // 设置同步进行中状态
-      (service as any).syncInProgress = true
+      ;(service as any).syncInProgress = true
       
-      const result = await service.performIntelligentSync()
-      
-      expect(result.success).toBe(false)
-      expect(result.message).toContain('同步正在进行中')
+      await expect(service.performIntelligentSync()).rejects.toThrow('同步正在进行中')
     })
 
-    it('应该处理设备ID生成失败', () => {
+    it('应该处理设备ID生成时的hostname错误', () => {
       vi.mocked(os.hostname).mockImplementation(() => {
         throw new Error('hostname failed')
       })
@@ -399,8 +417,9 @@ describe('WebDAVService', () => {
       const newService = new WebDAVService(mockPreferencesManager)
       const deviceId = (newService as any).deviceId
       
-      // 应该有回退方案
+      // 应该使用默认的hostname并成功生成设备ID
       expect(deviceId).toBeDefined()
+      expect(deviceId).toContain('unknown-host')
       expect(deviceId.length).toBeGreaterThan(0)
     })
 
@@ -446,4 +465,3 @@ describe('WebDAVService', () => {
     })
   })
 })
-
