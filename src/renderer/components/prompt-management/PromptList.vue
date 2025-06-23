@@ -28,8 +28,7 @@
                             </NIcon>
                         </template>
                         收藏
-                    </NButton>
-                    <NButton @click="$emit('manage-categories')">
+                    </NButton>                    <NButton @click="$emit('manage-categories')">
                         <template #icon>
                             <NIcon>
                                 <Folder />
@@ -37,6 +36,22 @@
                         </template>
                         分类
                     </NButton>
+                    <NButtonGroup>
+                        <NButton :type="viewMode === 'grid' ? 'primary' : 'default'" @click="setViewMode('grid')">
+                            <template #icon>
+                                <NIcon>
+                                    <GridDots />
+                                </NIcon>
+                            </template>
+                        </NButton>
+                        <NButton :type="viewMode === 'table' ? 'primary' : 'default'" @click="setViewMode('table')">
+                            <template #icon>
+                                <NIcon>
+                                    <List />
+                                </NIcon>
+                            </template>
+                        </NButton>
+                    </NButtonGroup>
                 </NFlex>
                 <!-- 搜索提示信息 -->
                 <div v-if="searchText.trim() || selectedCategory || showFavoritesOnly"
@@ -132,116 +147,164 @@
         </div>
         <div v-else-if="prompts.length === 0 && !hasNextPage" style="text-align: center; padding: 40px;">
             <NEmpty description="暂无提示词，快来创建第一个吧！" />
-        </div>
-
-        <div v-else>
-            <!-- 无限滚动容器 -->
-            <NInfiniteScroll 
-                :distance="10" 
-                @load="handleLoadMore"
-                :style="{ minHeight: '400px' }"
-            >
-                <div class="prompt-grid">
-                    <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
-                        @click="$emit('view', prompt)">
-                        <template #header>
-                            <NText strong>{{ prompt.title }}</NText>
-                        </template>
-
-                        <template #header-extra>
-                            <NFlex size="small">
-                                <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
-                                    :type="prompt.isFavorite ? 'error' : 'default'">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Heart />
-                                        </NIcon>
-                                    </template>
-                                </NButton>
-                                <NDropdown :options="getPromptActions(prompt)"
-                                    @select="(key) => handlePromptAction(key, prompt)">
-                                    <NButton size="small" text @click.stop>
+        </div>        <div v-else>
+            <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
+            <div v-if="viewMode === 'table' && selectedRows.length > 0" style="margin-bottom: 16px;">
+                <NCard>
+                    <NFlex justify="space-between" align="center">
+                        <NText>已选择 {{ selectedRows.length }} 个提示词</NText>
+                        <NFlex size="small">
+                            <NPopconfirm @positive-click="handleBatchDelete">
+                                <template #trigger>
+                                    <NButton type="error" size="small">
                                         <template #icon>
                                             <NIcon>
-                                                <DotsVertical />
+                                                <Trash />
+                                            </NIcon>
+                                        </template>
+                                        批量删除
+                                    </NButton>
+                                </template>
+                                确定要删除这 {{ selectedRows.length }} 个提示词吗？此操作不可撤销。
+                            </NPopconfirm>
+                            <NButton size="small" @click="clearSelection">取消选择</NButton>
+                        </NFlex>
+                    </NFlex>
+                </NCard>
+            </div>            <!-- 表格视图 -->
+            <div v-if="viewMode === 'table'" style="margin-top: 16px;">
+                <NDataTable
+                    :columns="tableColumns"
+                    :data="prompts"
+                    :loading="initialLoading"
+                    :row-key="(row: any) => row.id"
+                    v-model:checked-row-keys="selectedRowKeys"
+                    :pagination="false"
+                    :max-height="600"
+                    :scroll-x="1200"
+                />
+                
+                <!-- 表格视图的加载更多 -->
+                <div v-if="hasNextPage" style="text-align: center; padding: 20px;">
+                    <NButton @click="handleLoadMore" :loading="loadingMore">
+                        加载更多
+                    </NButton>
+                </div>
+                <div v-else-if="prompts.length > 0" style="text-align: center; padding: 20px;">
+                    <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
+                </div>
+            </div>
+
+            <!-- 网格视图 (原有的无限滚动) -->
+            <div v-else>
+                <!-- 无限滚动容器 -->
+                <NInfiniteScroll 
+                    :distance="10" 
+                    @load="handleLoadMore"
+                    :style="{ minHeight: '400px' }"
+                >
+                    <div class="prompt-grid">
+                        <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
+                            @click="$emit('view', prompt)">
+                            <template #header>
+                                <NText strong>{{ prompt.title }}</NText>
+                            </template>
+
+                            <template #header-extra>
+                                <NFlex size="small">
+                                    <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
+                                        :type="prompt.isFavorite ? 'error' : 'default'">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Heart />
                                             </NIcon>
                                         </template>
                                     </NButton>
-                                </NDropdown>
-                            </NFlex>
-                        </template>
-
-                        <NFlex vertical size="small">
-                            <!-- 更新时间 -->
-                            <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
-                                {{ new Date(prompt.updatedAt).toLocaleDateString() }}
-                            </NText> -->
-                            <!-- 描述或内容预览 -->
-                            <NText 
-                                depth="3" 
-                                v-if="prompt.description" 
-                                class="description-text"
-                            >
-                                {{ prompt.description }}
-                            </NText>
-                            <NText 
-                                depth="3" 
-                                v-if="!prompt.description" 
-                                style="font-size: 12px;" 
-                                class="content-preview-text"
-                            >
-                                {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
-                            </NText>
-
-                        </NFlex>
-
-                        <template #footer>
-                            <NFlex justify="space-between" align="center">
-                                <!-- 标签区域 -->
-                                <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
-                                    <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
-                                        {{ prompt.variables.length }} 个变量
-                                    </NTag>
-                                    <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Box />
-                                            </NIcon>
-                                        </template>
-                                        {{ prompt.category.name }}
-                                    </NTag>
-                                    <template v-if="prompt.tags">
-                                        <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                            :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
+                                    <NDropdown :options="getPromptActions(prompt)"
+                                        @select="(key) => handlePromptAction(key, prompt)">
+                                        <NButton size="small" text @click.stop>
                                             <template #icon>
                                                 <NIcon>
-                                                    <Tag />
+                                                    <DotsVertical />
                                                 </NIcon>
                                             </template>
-                                            {{ tag }}
-                                        </NTag>
-                                    </template>
+                                        </NButton>
+                                    </NDropdown>
                                 </NFlex>
-                                <!-- 使用次数区域 -->
-                                <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
-                                    使用 {{ prompt.useCount }} 次
-                                </NText>
-                            </NFlex>
-                        </template>
-                    </NCard>
-                </div>
+                            </template>
 
-                <!-- 加载更多状态 -->
-                <template #footer>
-                    <div v-if="loadingMore" style="text-align: center; padding: 20px;">
-                        <NSpin size="medium" />
-                        <NText depth="3" style="margin-left: 12px;">加载更多中...</NText>
+                            <NFlex vertical size="small">
+                                <!-- 更新时间 -->
+                                <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
+                                    {{ new Date(prompt.updatedAt).toLocaleDateString() }}
+                                </NText> -->
+                                <!-- 描述或内容预览 -->
+                                <NText 
+                                    depth="3" 
+                                    v-if="prompt.description" 
+                                    class="description-text"
+                                >
+                                    {{ prompt.description }}
+                                </NText>
+                                <NText 
+                                    depth="3" 
+                                    v-if="!prompt.description" 
+                                    style="font-size: 12px;" 
+                                    class="content-preview-text"
+                                >
+                                    {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
+                                </NText>
+
+                            </NFlex>
+
+                            <template #footer>
+                                <NFlex justify="space-between" align="center">
+                                    <!-- 标签区域 -->
+                                    <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
+                                        <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
+                                            {{ prompt.variables.length }} 个变量
+                                        </NTag>
+                                        <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
+                                            <template #icon>
+                                                <NIcon>
+                                                    <Box />
+                                                </NIcon>
+                                            </template>
+                                            {{ prompt.category.name }}
+                                        </NTag>
+                                        <template v-if="prompt.tags">
+                                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
+                                                :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Tag />
+                                                    </NIcon>
+                                                </template>
+                                                {{ tag }}
+                                            </NTag>
+                                        </template>
+                                    </NFlex>
+                                    <!-- 使用次数区域 -->
+                                    <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
+                                        使用 {{ prompt.useCount }} 次
+                                    </NText>
+                                </NFlex>
+                            </template>
+                        </NCard>
                     </div>
-                    <div v-else-if="!hasNextPage && prompts.length > 0" style="text-align: center; padding: 20px;">
-                        <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
-                    </div>
-                </template>
-            </NInfiniteScroll>
+
+                    <!-- 加载更多状态 -->
+                    <template #footer>
+                        <div v-if="loadingMore" style="text-align: center; padding: 20px;">
+                            <NSpin size="medium" />
+                            <NText depth="3" style="margin-left: 12px;">加载更多中...</NText>
+                        </div>
+                        <div v-else-if="!hasNextPage && prompts.length > 0" style="text-align: center; padding: 20px;">
+                            <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
+                        </div>
+                    </template>
+                </NInfiniteScroll>
+            </div>
         </div>
     </div>
 </template>
@@ -261,6 +324,9 @@ import {
     NEmpty,
     NDropdown,
     NInfiniteScroll,
+    NDataTable,
+    NPopconfirm,
+    NButtonGroup,
     useMessage
 } from 'naive-ui'
 import {
@@ -274,7 +340,9 @@ import {
     Box,
     ChevronDown,
     ChevronUp,
-    Folder
+    Folder,
+    List,
+    GridDots
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
@@ -326,6 +394,15 @@ const showAdvancedFilter = ref(false)
 const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
 const tagsExpanded = ref(true) // 高级筛选开启时默认展开
 
+// 视图模式状态
+const viewMode = ref('grid') // 'grid' | 'table'
+
+// 表格多选相关状态
+const selectedRowKeys = ref([])
+const selectedRows = computed(() => {
+    return prompts.value.filter(prompt => selectedRowKeys.value.includes(prompt.id))
+})
+
 // 计算属性
 const categoryOptions = computed(() => [
     { label: '全部分类', value: null },
@@ -374,9 +451,177 @@ const popularTags = computed(() => {
     })
 
     return Array.from(tagCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count)
+        .map(([name, count]) => ({ name, count }))        .sort((a, b) => b.count - a.count)
 })
+
+// 表格列定义
+const tableColumns = computed(() => [
+    {
+        type: 'selection'
+    },
+    {
+        title: '标题',
+        key: 'title',
+        width: 200,
+        ellipsis: {
+            tooltip: true
+        },
+        render: (row: any) => {
+            return h(
+                NButton,
+                {
+                    text: true,
+                    type: 'primary',
+                    onClick: () => emit('view', row)
+                },
+                { default: () => row.title }
+            )
+        }
+    },
+    {
+        title: '描述',
+        key: 'description',
+        width: 300,
+        ellipsis: {
+            tooltip: true
+        },
+        render: (row: any) => {
+            if (row.description) {
+                return row.description
+            }
+            const preview = row.content?.substring(0, 100) || ''
+            return preview + (row.content?.length > 100 ? '...' : '')
+        }
+    },
+    {
+        title: '分类',
+        key: 'category',
+        width: 120,
+        render: (row: any) => {
+            if (!row.category) return '-'
+            return h(
+                NTag,
+                {
+                    size: 'small',
+                    color: getCategoryTagColor(row.category)
+                },
+                {
+                    default: () => row.category.name,
+                    icon: () => h(NIcon, null, { default: () => h(Box) })
+                }
+            )
+        }
+    },
+    {
+        title: '标签',
+        key: 'tags',
+        width: 200,
+        render: (row: any) => {
+            if (!row.tags) return '-'
+            const tags = getTagsArray(row.tags)
+            if (tags.length === 0) return '-'
+            return h(
+                NFlex,
+                { size: 'small', wrap: true },
+                {
+                    default: () => tags.slice(0, 3).map(tag => 
+                        h(
+                            NTag,
+                            {
+                                size: 'small',
+                                bordered: false,
+                                color: getTagColor(tag),
+                                class: isTagMatched(tag) ? 'highlighted-tag' : ''
+                            },
+                            {
+                                default: () => tag,
+                                icon: () => h(NIcon, null, { default: () => h(Tag) })
+                            }
+                        )
+                    ).concat(
+                        tags.length > 3 ? [h(NText, { depth:3, style: { fontSize: '12px' } }, { default: () => `+${tags.length - 3}` })] : []
+                    )
+                }
+            )
+        }
+    },
+    {
+        title: '变量',
+        key: 'variables',
+        width: 80,
+        render: (row: any) => {
+            const count = row.variables?.length || 0
+            return count > 0 ? h(
+                NTag,
+                { size: 'small', type: 'info' },
+                { default: () => `${count}个` }
+            ) : '-'
+        }
+    },
+    {
+        title: '收藏',
+        key: 'isFavorite',
+        width: 80,
+        render: (row: any) => {
+            return h(
+                NButton,
+                {
+                    size: 'small',
+                    text: true,
+                    type: row.isFavorite ? 'error' : 'default',
+                    onClick: (e: Event) => {
+                        e.stopPropagation()
+                        toggleFavorite(row.id)
+                    }
+                },
+                {
+                    icon: () => h(NIcon, null, { default: () => h(Heart) })
+                }
+            )
+        }
+    },
+    {
+        title: '使用次数',
+        key: 'useCount',
+        width: 100,
+        sorter: true,
+        render: (row: any) => `${row.useCount || 0} 次`
+    },
+    {
+        title: '更新时间',
+        key: 'updatedAt',
+        width: 120,
+        sorter: true,
+        render: (row: any) => new Date(row.updatedAt).toLocaleDateString()
+    },
+    {
+        title: '操作',
+        key: 'actions',
+        width: 120,
+        render: (row: any) => {
+            return h(
+                NDropdown,
+                {
+                    options: getPromptActions(row),
+                    onSelect: (key: string) => handlePromptAction(key, row)
+                },
+                {
+                    default: () => h(
+                        NButton,
+                        {
+                            size: 'small',
+                            text: true,
+                            onClick: (e: Event) => e.stopPropagation()
+                        },
+                        {
+                            icon: () => h(NIcon, null, { default: () => h(DotsVertical) })
+                        }
+                    )
+                }
+            )
+        }
+    }
+])
 
 // 加载数据
 const loadPrompts = async (reset = true) => {
@@ -419,10 +664,43 @@ const loadPrompts = async (reset = true) => {
         
     } catch (error) {
         message.error('加载提示词失败')
-        console.error(error)
-    } finally {
+        console.error(error)    } finally {
         initialLoading.value = false
         loadingMore.value = false
+    }
+}
+
+// 切换视图模式
+const setViewMode = (mode: 'grid' | 'table') => {
+    viewMode.value = mode
+    // 切换到表格视图时清除选择
+    if (mode === 'table') {
+        clearSelection()
+    }
+}
+
+// 清除选择
+const clearSelection = () => {
+    selectedRowKeys.value = []
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+    if (selectedRows.value.length === 0) return
+    
+    try {
+        // 批量删除所有选中的提示词
+        for (const prompt of selectedRows.value) {
+            await api.prompts.delete.mutate(prompt.id)
+        }
+        
+        message.success(`成功删除 ${selectedRows.value.length} 个提示词`)
+        clearSelection()
+        await loadPrompts(true) // 重新加载数据
+        emit('refresh')
+    } catch (error) {
+        message.error('批量删除失败')
+        console.error(error)
     }
 }
 
@@ -624,6 +902,7 @@ defineExpose({
 .content-preview-text {
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
