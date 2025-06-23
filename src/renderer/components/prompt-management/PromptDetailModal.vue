@@ -319,9 +319,6 @@
                                             <template #header>
                                                 <NFlex justify="space-between" align="center">
                                                     <NText depth="3" style="font-size: 12px;">{{ record.date }}</NText>
-                                                    <NButton size="tiny" text type="primary" @click.stop="loadHistoryRecord(record)">
-                                                        重新加载
-                                                    </NButton>
                                                 </NFlex>
                                             </template>
 
@@ -341,6 +338,14 @@
                                                     </NText>
                                                 </NFlex>
                                             </NFlex>
+
+                                            <template #action>
+                                                <NFlex justify="end">
+                                                    <NButton size="tiny" text type="primary" @click.stop="loadHistoryRecord(record)">
+                                                        重新加载
+                                                    </NButton>
+                                                </NFlex>
+                                            </template>
                                         </NCard>
                                     </NFlex>
                                 </NScrollbar>
