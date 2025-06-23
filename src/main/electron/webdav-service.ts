@@ -1904,6 +1904,7 @@ export class WebDAVService {
                 
                 // 检查是否需要合并确认
                 if (!result.success && result.message === 'MERGE_CONFIRMATION_NEEDED') {
+                    console.log('[WebDAV] 需要合并确认，返回确认数据:', result.mergeInfo);
                     return {
                         success: false,
                         needsMergeConfirmation: true,
@@ -2819,24 +2820,41 @@ export class WebDAVService {
      * 检查是否需要用户确认合并
      */
     private async checkIfNeedsMergeConfirmation(localSnapshot: SyncSnapshot, remoteSnapshot: SyncSnapshot): Promise<boolean> {
+        console.log('[WebDAV] 检查是否需要合并确认:', {
+            localItems: localSnapshot.items.length,
+            remoteItems: remoteSnapshot.items.length,
+            localDeviceId: localSnapshot.deviceId,
+            remoteDeviceId: remoteSnapshot.deviceId
+        });
+        
         // 如果本地或远程任一为空，不需要确认
         if (localSnapshot.items.length === 0 || remoteSnapshot.items.length === 0) {
+            console.log('[WebDAV] 无需确认 - 一端无数据');
             return false;
         }
         
-        // 检查设备ID，如果是不同设备的首次同步，需要确认
+        // 检查设备ID，如果是不同设备或首次同步，需要确认
         const localDeviceId = localSnapshot.deviceId;
         const remoteDeviceId = remoteSnapshot.deviceId;
         
+        console.log('[WebDAV] 设备ID比较:', { localDeviceId, remoteDeviceId, 相同: localDeviceId === remoteDeviceId });
+        
         if (localDeviceId !== remoteDeviceId) {
-            // 检查是否已经有过同步记录
-            const hasLocalSyncHistory = await this.hasLocalSyncHistory();
-            if (!hasLocalSyncHistory) {
-                console.log('[WebDAV] 检测到不同设备的首次同步，需要用户确认合并');
-                return true;
-            }
+            // 不同设备，需要确认
+            console.log('[WebDAV] 检测到不同设备，需要用户确认合并');
+            return true;
         }
         
+        // 同一设备，检查是否有过同步记录
+        const hasLocalSyncHistory = await this.hasLocalSyncHistory();
+        console.log('[WebDAV] 本地同步历史检查结果:', hasLocalSyncHistory);
+        
+        if (!hasLocalSyncHistory) {
+            console.log('[WebDAV] 无同步历史，需要用户确认合并');
+            return true;
+        }
+        
+        console.log('[WebDAV] 无需确认 - 同设备且有同步历史');
         return false;
     }
 

@@ -101,6 +101,11 @@ export class AppService {
     return await IpcUtils.safeInvoke<any>('webdav:sync-now');
   }
 
+  // 用户确认合并后执行同步
+  async syncWebDAVWithMergeConfirmed(): Promise<IpcResult<any>> {
+    return await IpcUtils.safeInvoke<any>('webdav:sync-with-merge-confirmed');
+  }
+
   // 手动上传数据
   async manualUploadWebDAV(): Promise<IpcResult<any>> {
     return await IpcUtils.safeInvoke<any>('webdav:manual-upload');
