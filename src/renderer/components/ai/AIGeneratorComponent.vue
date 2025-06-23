@@ -175,8 +175,14 @@
                             </n-thing>
 
                             <template #suffix>
-                                <n-space v-if="item.status === 'success'">
-                                    <n-button size="small" @click="copyHistoryItem(item)">复制</n-button>
+                               <n-space vertical>
+                                    <n-space v-if="item.status === 'success'">
+                                        <n-button size="small" @click="copyHistoryItem(item)">复制</n-button>
+
+                                        <n-button size="small" @click="rewriteRequirement(item)" >
+                                            重写
+                                        </n-button>
+                                    </n-space>
                                 </n-space>
                             </template>
                         </n-list-item>
@@ -840,6 +846,20 @@ const copyHistoryItem = async (item: AIGenerationHistory) => {
     } catch (error) {
         message.error('复制失败')
     }
+}
+//重写历史要求
+const rewriteRequirement = (item: AIGenerationHistory) => {
+    //将之前的要求写入表单
+    formData.topic = item.topic || ''
+    //清空之前生成的prompt
+    generatedResult.value = ''
+    message.success('要求已填充到输入框，请修改后重新生成')
+    setTimeout(() => {
+        const input = document.querySelector('.ai-generator .n-input textarea')
+        if (input) {
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+    }, 100)
 }
 
 // 分隔动画函数
