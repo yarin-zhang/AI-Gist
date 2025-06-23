@@ -431,4 +431,30 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
     const history = await this.getByUUID<AIGenerationHistory>('ai_generation_history', uuid);
     return history !== null;
   }
+
+  /**
+   * 根据提示词ID获取调试历史记录
+   * 查询指定提示词的所有调试历史记录
+   * @param promptId number 提示词ID
+   * @returns Promise<AIGenerationHistory[]> 该提示词的调试历史记录列表，按创建时间降序排列
+   */
+  async getDebugHistoryByPromptId(promptId: number): Promise<AIGenerationHistory[]> {
+    const allHistories = await this.getAll<AIGenerationHistory>('ai_generation_history');
+    
+    // 过滤出与指定提示词相关的调试记录
+    const debugHistories = allHistories.filter(record => {
+      // 检查是否是调试记录（包含debugResult或debugStatus字段）
+      const isDebugRecord = record.debugResult || record.debugStatus;
+      
+      // 检查是否与指定提示词相关（通过topic或generatedPrompt内容匹配）
+      const isRelatedToPrompt = record.topic.includes(`提示词调试`) || 
+                                record.topic.includes(`调试`) ||
+                                record.historyId?.startsWith('debug_');
+      
+      return isDebugRecord && isRelatedToPrompt;
+    });
+    
+    // 按创建时间降序排列
+    return debugHistories.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
 }

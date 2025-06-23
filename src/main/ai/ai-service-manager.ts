@@ -832,12 +832,27 @@ class AIServiceManager {
       throw new Error('未指定模型');
     }
 
-    // 构建系统提示词 - 优先使用配置中的自定义系统提示词
+    // 检测是否是调试请求（通过topic或customPrompt判断）
+    const isDebugRequest = request.topic.includes('请直接回应') || 
+                          request.topic.includes('调试') ||
+                          request.customPrompt;
+
+    // 构建系统提示词 - 如果是调试请求，使用简单的系统提示词
     console.log('生成提示词 - 配置中的 systemPrompt:', config.systemPrompt);
     console.log('生成提示词 - 请求中的 systemPrompt:', request.systemPrompt);
+    console.log('生成提示词 - 是否是调试请求:', isDebugRequest);
     
-    const systemPrompt = config.systemPrompt || request.systemPrompt || 
-      `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (isDebugRequest) {
+      // 调试请求：直接使用用户的Prompt，系统提示词简单化
+      systemPrompt = config.systemPrompt || '你是一个有用的AI助手。请直接回应用户的请求。';
+      userPrompt = request.customPrompt || request.topic;
+    } else {
+      // 正常请求：使用原有的提示词生成逻辑
+      systemPrompt = config.systemPrompt || request.systemPrompt || 
+        `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
 
 要求：
 1. 提示词应该清晰、具体、可操作
@@ -848,18 +863,18 @@ class AIServiceManager {
 
 请直接返回优化后的提示词内容，不需要额外的解释。`;
 
-    console.log('生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
-
-    // 构建用户提示词
-    // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
-    const userPrompt = request.customPrompt || (config.systemPrompt ? 
-      `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
-      `请为以下主题生成一个专业的 AI 提示词：
+      // 构建用户提示词
+      // 如果用户自定义了系统提示词，则用户提示词应该简化，避免与系统提示词冲突
+      userPrompt = request.customPrompt || (config.systemPrompt ? 
+        `主题：${request.topic}` : // 如果有自定义系统提示词，只传递主题
+        `请为以下主题生成一个专业的 AI 提示词：
 
 主题：${request.topic}
 
 请生成一个完整、可直接使用的提示词。`);
+    }
 
+    console.log('生成提示词 - 最终使用的 systemPrompt:', systemPrompt);
     console.log('生成提示词 - 用户提示词内容:', userPrompt);
     console.log('生成提示词 - 请求主题:', request.topic);
 
@@ -878,7 +893,8 @@ class AIServiceManager {
         llm = new Ollama({
           baseUrl: config.baseURL,
           model: model
-        });      } else if (config.type === 'lmstudio') {
+        });
+      } else if (config.type === 'lmstudio') {
         // LM Studio 使用 ChatOpenAI，因为它是 OpenAI 兼容的
         const baseUrl = config.baseURL || 'http://localhost:1234';
         const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
@@ -903,7 +919,7 @@ class AIServiceManager {
         const cohere = new CohereClient({
           token: config.apiKey,
         });
-          // Cohere 使用不同的API格式，添加超时
+        // Cohere 使用不同的API格式，添加超时
         const prompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
         const response = await this.withSmartTimeout(
           cohere.generate({
@@ -954,7 +970,9 @@ class AIServiceManager {
       const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ];      const response = await this.withSmartTimeout(
+      ];
+      
+      const response = await this.withSmartTimeout(
         llm.invoke(messages), 
         90000, // 90秒总超时
         5000,  // 每5秒检查一次
