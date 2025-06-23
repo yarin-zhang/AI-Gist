@@ -255,6 +255,11 @@ class AutoSyncManager {
         this.status.lastSyncTime = new Date().toISOString();
         this.status.lastSyncError = null;
         this.retryCount = 0; // 重置重试计数
+        
+        // 如果是批量删除操作，记录成功同步的删除项目
+        if (metadata?.source === 'batch-delete' && metadata.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
+          console.log(`批量删除同步成功，已删除 ${metadata.deletedUUIDs.length} 个项目`);
+        }
       } else {
         const errorMessages = results.map(r => r.service + ': ' + r.message).join(', ');
         throw new Error('所有同步服务都失败: ' + errorMessages);

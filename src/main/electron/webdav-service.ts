@@ -378,11 +378,18 @@ export class WebDAVService {
             console.log('[WebDAV] 正在转换为现代化数据结构...');
             const items = await this.convertToModernFormat(localData);
             
-            // 添加删除记录作为软删除标记
+            // 获取删除记录，用于过滤已删除的项目
             const deletedItems = await this.getDeletedItems();
+            const deletedUUIDs = new Set(deletedItems.map(item => item.uuid));
+            
             console.log(`[WebDAV] 获取到 ${deletedItems.length} 个删除记录`);
             
-            // 为删除记录创建软删除项目
+            // 过滤掉已删除的项目，确保它们不会出现在本地快照中
+            const activeItems = items.filter(item => !deletedUUIDs.has(item.id));
+            
+            console.log(`[WebDAV] 过滤删除记录后: ${items.length} -> ${activeItems.length} 个活跃项目`);
+            
+            // 为删除记录创建软删除项目（用于同步删除操作）
             const deletedDataItems: DataItem[] = deletedItems.map(deletedItem => ({
                 id: deletedItem.uuid,
                 type: 'prompt', // 假设大部分是提示词，如果需要可以扩展
@@ -400,9 +407,10 @@ export class WebDAVService {
                 }
             }));
             
-            // 合并实际数据和删除记录
-            const allItems = [...items, ...deletedDataItems];
+            // 合并活跃数据和删除记录
+            const allItems = [...activeItems, ...deletedDataItems];
             console.log('[WebDAV] 数据结构转换完成，共生成', allItems.length, '个数据项 (包含', deletedDataItems.length, '个删除记录)');            
+            
             const metadata: SnapshotMetadata = {
                 totalItems: allItems.length,
                 checksum: this.calculateChecksum(allItems),
@@ -423,7 +431,9 @@ export class WebDAVService {
                 deviceId: metadata.deviceInfo.id,
                 platform: metadata.deviceInfo.platform,
                 appVersion: metadata.deviceInfo.appVersion
-            });            const snapshot: SyncSnapshot = {
+            });            
+            
+            const snapshot: SyncSnapshot = {
                 timestamp: new Date().toISOString(),
                 version: '2.0.0',
                 deviceId: this.deviceId,
@@ -442,10 +452,6 @@ export class WebDAVService {
             return snapshot;
         } catch (error) {
             console.error('[WebDAV] 获取本地快照失败:', error);
-            console.error('[WebDAV] 错误详情:', {
-                message: error instanceof Error ? error.message : '未知错误',
-                stack: error instanceof Error ? error.stack : undefined
-            });
             throw error;
         }
     }
@@ -2808,7 +2814,8 @@ export class WebDAVService {
 
     /**
      * 阶段2：删除远程已删除的项目
-     */    private async performDeleteRemotePhase(
+     */
+    private async performDeleteRemotePhase(
         client: any,
         localSnapshot: SyncSnapshot,
         remoteSnapshot: SyncSnapshot,
@@ -2824,13 +2831,24 @@ export class WebDAVService {
             const errors: string[] = [];
             const itemsToDelete: DataItem[] = [];
             
+            // 获取删除记录，用于识别本地已删除的项目
+            const deletedItems = await this.getDeletedItems();
+            const deletedUUIDs = new Set(deletedItems.map(item => item.uuid));
+            
+            console.log(`[WebDAV] 删除阶段检查: 本地项目 ${localItemsMap.size} 个, 远程项目 ${remoteItemsMap.size} 个, 删除记录 ${deletedItems.length} 个`);
+            
             // 找出在远程存在但本地已删除或标记为删除的项目
             for (const [id, remoteItem] of remoteItemsMap) {
                 try {
                     const localItem = localItemsMap.get(id);
                     
-                    if (!localItem || localItem.metadata.deleted) {
-                        console.log(`[WebDAV] 发现需要删除的远程项目: ${id}`);
+                    // 检查是否应该删除远程项目
+                    const shouldDelete = !localItem || // 本地不存在
+                                       localItem.metadata.deleted || // 本地标记为删除
+                                       deletedUUIDs.has(id); // 在删除记录中
+                    
+                    if (shouldDelete) {
+                        console.log(`[WebDAV] 发现需要删除的远程项目: ${id} (原因: ${!localItem ? '本地不存在' : localItem.metadata.deleted ? '本地标记删除' : '删除记录'})`);
                         itemsToDelete.push(remoteItem);
                     }
                 } catch (error) {
@@ -2871,7 +2889,8 @@ export class WebDAVService {
                         JSON.stringify(updatedRemoteSnapshot, null, 2),
                         { format: 'text' }
                     );
-                      deleteCount = itemsToDelete.length;
+                    
+                    deleteCount = itemsToDelete.length;
                     console.log(`[WebDAV] 成功从远程删除 ${deleteCount} 个项目`);
                     
                     // 清理已成功删除的项目的删除记录
@@ -2890,6 +2909,8 @@ export class WebDAVService {
                     console.error('[WebDAV]', errorMsg);
                     errors.push(errorMsg);
                 }
+            } else {
+                console.log('[WebDAV] 没有需要删除的远程项目');
             }
             
             result.phases.deleteRemote.completed = true;
@@ -2926,11 +2947,14 @@ export class WebDAVService {
             let downloadCount = 0;
             const errors: string[] = [];
             const conflictsResolved: ConflictResolution[] = [];
-            const itemsToApply: DataItem[] = [];            // 获取删除记录，用于判断本地缺失的项目是否是已删除的
+            const itemsToApply: DataItem[] = [];
+            
+            // 获取删除记录，用于判断本地缺失的项目是否是已删除的
             const deletedItems = await this.getDeletedItems();
             const deletedUUIDs = new Set(deletedItems.map(item => item.uuid));
             
-            console.log(`[WebDAV] 当前删除记录数量: ${deletedItems.length}, UUIDs: [${Array.from(deletedUUIDs).slice(0, 5).join(', ')}${deletedUUIDs.size > 5 ? '...' : ''}]`);
+            console.log(`[WebDAV] 下载阶段检查: 本地项目 ${localItemsMap.size} 个, 远程项目 ${remoteItemsMap.size} 个, 删除记录 ${deletedItems.length} 个`);
+            console.log(`[WebDAV] 删除记录UUIDs: [${Array.from(deletedUUIDs).slice(0, 5).join(', ')}${deletedUUIDs.size > 5 ? '...' : ''}]`);
             
             // 找出需要下载的项目（远程新增或修改）
             for (const [id, remoteItem] of remoteItemsMap) {
@@ -2940,7 +2964,7 @@ export class WebDAVService {
                     if (!localItem) {
                         // 检查这个项目是否是本地已删除的
                         if (deletedUUIDs.has(id)) {
-                            console.log(`[WebDAV] 跳过已删除的项目: ${id}`);
+                            console.log(`[WebDAV] 跳过已删除的项目: ${id} (在删除记录中)`);
                             continue; // 跳过已删除的项目，不下载
                         }
                         
@@ -2949,57 +2973,61 @@ export class WebDAVService {
                         itemsToApply.push(remoteItem);
                         downloadCount++;
                         result.itemsCreated++;
-                    } else {
-                        // 检查是否需要合并
-                        const mergeResult = await this.shouldMergeItem(localItem, remoteItem);
                         
-                        if (mergeResult.needsMerge) {
-                            console.log(`[WebDAV] 合并项目: ${id}, 策略: ${mergeResult.strategy}`);
-                            
-                            let finalItem: DataItem;
-                            if (mergeResult.strategy === 'remote_wins') {
-                                finalItem = remoteItem;
-                            } else if (mergeResult.strategy === 'local_wins') {
-                                finalItem = localItem;
-                            } else {
-                                // 智能合并
-                                const itemMergeResult = await this.mergeItems(localItem, remoteItem);
-                                finalItem = itemMergeResult.mergedItem;
+                    } else {
+                        // 本地存在，检查是否需要更新
+                        const localTime = new Date(localItem.metadata.updatedAt);
+                        const remoteTime = new Date(remoteItem.metadata.updatedAt);
+                        
+                        if (remoteTime > localTime) {
+                            // 检查远程项目是否被标记为删除
+                            if (remoteItem.metadata.deleted) {
+                                console.log(`[WebDAV] 跳过远程删除的项目: ${id} (远程标记为删除)`);
+                                continue; // 跳过远程删除的项目
                             }
                             
-                            itemsToApply.push(finalItem);
+                            // 远程版本更新 - 更新本地
+                            console.log(`[WebDAV] 发现远程更新项目: ${id} (远程: ${remoteTime.toISOString()}, 本地: ${localTime.toISOString()})`);
+                            itemsToApply.push(remoteItem);
                             downloadCount++;
                             result.itemsUpdated++;
                             
-                            const resolution: ConflictResolution = {
+                            conflictsResolved.push({
                                 itemId: id,
-                                strategy: mergeResult.strategy,
+                                strategy: 'remote_wins',
                                 timestamp: new Date().toISOString(),
-                                reason: mergeResult.reason
-                            };
-                            conflictsResolved.push(resolution);
-                            result.conflictsResolved++;
+                                reason: '远程版本更新，采用远程版本'
+                            });
+                        } else if (localTime > remoteTime) {
+                            // 本地版本更新，但远程项目被标记为删除
+                            if (remoteItem.metadata.deleted) {
+                                console.log(`[WebDAV] 本地版本更新但远程已删除: ${id}，保持本地版本`);
+                                // 保持本地版本，不下载远程删除标记
+                            }
                         }
                     }
                 } catch (error) {
-                    const errorMsg = `处理远程项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                    const errorMsg = `检查远程项目 ${id} 失败: ${error instanceof Error ? error.message : '未知错误'}`;
                     console.error('[WebDAV]', errorMsg);
                     errors.push(errorMsg);
                 }
             }
             
-            // 实际应用变更到本地数据库
+            // 应用下载的项目到本地
             if (itemsToApply.length > 0) {
-                console.log(`[WebDAV] 应用 ${itemsToApply.length} 个变更到本地数据库...`);
+                console.log(`[WebDAV] 正在应用 ${itemsToApply.length} 个远程项目到本地...`);
                 await this.applyLocalChanges(itemsToApply);
-                console.log('[WebDAV] 本地数据库更新完成');
+                console.log(`[WebDAV] 成功应用 ${itemsToApply.length} 个远程项目到本地`);
+            } else {
+                console.log('[WebDAV] 没有需要下载的远程项目');
             }
             
             result.phases.download.completed = true;
             result.phases.download.itemsProcessed = downloadCount;
             result.phases.download.errors = errors;
             result.itemsProcessed += downloadCount;
-            result.conflictDetails = conflictsResolved;
+            result.conflictsResolved += conflictsResolved.length;
+            result.conflictDetails.push(...conflictsResolved);
             
             console.log(`[WebDAV] 下载并合并阶段完成，处理了 ${downloadCount} 个项目`);
             
@@ -3233,25 +3261,34 @@ export class WebDAVService {
 
     /**
      * 清理已完成同步的删除记录
+     * 只有在确认远程服务器也删除了这些项目后才清理
      */
     private async cleanupDeletedItems(syncedUuids: string[]): Promise<void> {
         try {
             const preferences = this.preferencesManager.getPreferences();
             const deletedItems = preferences.webdav?.deletedItems || [];
             
-            // 移除已同步的删除记录
+            // 只清理已确认在远程删除的项目
             const remainingDeletedItems = deletedItems.filter(item => 
                 !syncedUuids.includes(item.uuid)
             );
             
-            await this.preferencesManager.updatePreferences({
-                webdav: {
-                    ...preferences.webdav,
-                    deletedItems: remainingDeletedItems
-                }
-            });
+            // 检查是否有项目被清理
+            const cleanedCount = deletedItems.length - remainingDeletedItems.length;
             
-            console.log(`[WebDAV] 清理了 ${syncedUuids.length} 个已同步的删除记录`);
+            if (cleanedCount > 0) {
+                await this.preferencesManager.updatePreferences({
+                    webdav: {
+                        ...preferences.webdav,
+                        deletedItems: remainingDeletedItems
+                    }
+                });
+                
+                console.log(`[WebDAV] 清理了 ${cleanedCount} 个已确认远程删除的记录`);
+                console.log(`[WebDAV] 剩余删除记录: ${remainingDeletedItems.length} 个`);
+            } else {
+                console.log('[WebDAV] 没有需要清理的删除记录');
+            }
         } catch (error) {
             console.error('[WebDAV] 清理删除记录失败:', error);
         }
