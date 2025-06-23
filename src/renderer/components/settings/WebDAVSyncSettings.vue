@@ -1026,7 +1026,7 @@ const handleMergeConfirm = async () => {
     console.log("用户确认合并，开始执行合并同步...");
     syncLoading.value = true;
     try {
-        const result = await appService.syncWebDAVWithMergeConfirmed();
+        const result = await appService.syncWithMergeConfirmed();
         if (result.success) {
             message.success(result.data.message || '合并同步成功');
             showMergeConfirmDialog.value = false;
