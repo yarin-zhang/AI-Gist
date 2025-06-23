@@ -229,18 +229,20 @@ class AutoSyncManager {
     try {
       console.log(`自动同步管理器: 开始执行同步 - ${reason}`, metadata);
       
-      // 如果有删除的 UUID，先记录到 WebDAV 服务
+      // 如果有删除的 UUID，立即调用新的远程删除接口
       if (metadata?.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
-        console.log(`记录 ${metadata.deletedUUIDs.length} 个删除的项目到 WebDAV 服务`);
+        console.log(`调用即时远程删除接口，处理 ${metadata.deletedUUIDs.length} 个项目...`);
         try {
-          const recordResult = await WebDAVAPI.recordDeletedItems(metadata.deletedUUIDs);
-          if (!recordResult.success) {
-            console.warn('记录删除项目失败:', recordResult.error);
+          // 调用新的、重构后的接口
+          const deleteResult = await WebDAVAPI.deleteRemoteItems(metadata.deletedUUIDs);
+          if (!deleteResult.success) {
+            // 即时删除失败通常意味着网络问题或锁冲突，完整同步会处理，这里只记录警告
+            console.warn('即时远程删除未完全成功 (将在完整同步中重试):', deleteResult.error);
           } else {
-            console.log('删除项目记录成功');
+            console.log('即时远程删除请求成功');
           }
         } catch (error) {
-          console.error('记录删除项目时发生错误:', error);
+          console.error('调用即时远程删除接口时发生错误:', error);
         }
       }
       
