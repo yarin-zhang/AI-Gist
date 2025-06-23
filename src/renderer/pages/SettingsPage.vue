@@ -570,7 +570,7 @@ const testWebDAVConnection = async (callback) => {
         });
         
         if (result.success) {
-            message.success(`WebDAV 连接测试成功${result.serverInfo ? ` - ${result.serverInfo.name}` : ''}`);
+            message.success(`WebDAV 连接测试成功${result.serverInfo?.name ? ` - ${result.serverInfo.name}` : ''}`);
         } else {
             message.error(result.message || "WebDAV 连接测试失败");
         }
