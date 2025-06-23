@@ -308,11 +308,11 @@
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                     <NFlex vertical size="small" style="padding: 12px;">
                                         <NCard v-for="(record, index) in paginatedHistory"
-                                            :key="(currentPage - 1) * pageSize + index" size="small"
+                                            :key="(currentPage - 1) * pageSize + index" size="small" hoverable
                                             :style="{ 
                                                 cursor: 'pointer',
-                                                backgroundColor: selectedHistoryIndex === (currentPage - 1) * pageSize + index 
-                                                    ? 'var(--color-hover)' 
+                                                borderColor: selectedHistoryIndex === (currentPage - 1) * pageSize + index 
+                                                    ? 'var(--info-color)' 
                                                     : undefined
                                             }"
                                             @click="selectHistoryRecord((currentPage - 1) * pageSize + index)">
@@ -391,7 +391,6 @@
                                             <NText strong style="margin-bottom: 8px; display: block;">调试配置：</NText>
                                             <NFlex size="small">
                                                 <NTag size="small" type="primary" :bordered="false">{{ selectedDebugHistory.model }}</NTag>
-                                                <NTag size="small" type="default" :bordered="false">{{ selectedDebugHistory.configId }}</NTag>
                                             </NFlex>
                                         </div>
 
@@ -482,11 +481,11 @@
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                     <NFlex vertical size="small" style="padding: 12px;">
                                         <NCard v-for="(record, index) in paginatedDebugHistory"
-                                            :key="(debugCurrentPage - 1) * debugPageSize + index" size="small"
+                                            :key="(debugCurrentPage - 1) * debugPageSize + index" size="small" hoverable
                                             :style="{ 
                                                 cursor: 'pointer',
-                                                backgroundColor: selectedDebugIndex === (debugCurrentPage - 1) * debugPageSize + index 
-                                                    ? 'var(--color-hover)' 
+                                                borderColor: selectedDebugIndex === (debugCurrentPage - 1) * debugPageSize + index 
+                                                    ? 'var(--success-color)' 
                                                     : undefined
                                             }"
                                             @click="selectDebugRecord((debugCurrentPage - 1) * debugPageSize + index)">
@@ -503,7 +502,6 @@
                                                 <NText style="font-size: 12px;">{{ record.topic }}</NText>
                                                 <NFlex size="small">
                                                     <NTag size="tiny" type="primary" :bordered="false">{{ record.model }}</NTag>
-                                                    <NTag size="tiny" type="default" :bordered="false">{{ record.configId }}</NTag>
                                                 </NFlex>
                                             </NFlex>
                                         </NCard>
