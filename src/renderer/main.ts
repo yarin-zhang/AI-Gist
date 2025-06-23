@@ -54,6 +54,11 @@ async function startApp() {
         return await databaseService.importData(data);
       },
       
+      // 同步数据导入方法（用于WebDAV同步）
+      syncImportDataObject: async (data: any) => {
+        return await databaseService.syncImportData(data);
+      },
+      
       // 数据备份方法
       backupData: async () => {
         return await databaseService.backupData();

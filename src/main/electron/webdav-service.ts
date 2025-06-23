@@ -1087,7 +1087,9 @@ export class WebDAVService {
     }
 
     /**
-     * 合并快照 - 核心智能合并逻辑
+     * 合并快照 - 简化的智能合并逻辑
+     * 实现数据并集：本地1,2,3 + 云端4,5,6 = 结果1,2,3,4,5,6
+     * 相同UUID的条目以updatedAt为准
      */
     private async mergeSnapshots(localSnapshot: SyncSnapshot, remoteSnapshot: SyncSnapshot): Promise<{
         mergedSnapshot: SyncSnapshot;
@@ -1099,6 +1101,8 @@ export class WebDAVService {
         itemsDeleted: number;
         conflictsResolved: ConflictResolution[];
     }> {
+        console.log('[WebDAV] 开始执行简化合并逻辑');
+        
         // 创建ID映射
         const localItemsMap = new Map<string, DataItem>();
         const remoteItemsMap = new Map<string, DataItem>();
@@ -1107,7 +1111,7 @@ export class WebDAVService {
         remoteSnapshot.items.forEach(item => remoteItemsMap.set(item.id, item));
         
         const mergedItems: DataItem[] = [];
-        const localChanges: DataItem[] = [];
+        const localChanges: DataItem[] = []; // 需要应用到本地数据库的变更
         const conflictsResolved: ConflictResolution[] = [];
         
         let itemsProcessed = 0;
@@ -1117,6 +1121,7 @@ export class WebDAVService {
         
         // 获取所有唯一ID
         const allIds = new Set([...localItemsMap.keys(), ...remoteItemsMap.keys()]);
+        console.log(`[WebDAV] 合并处理 ${allIds.size} 个唯一项目`);
         
         for (const id of allIds) {
             itemsProcessed++;
@@ -1125,39 +1130,78 @@ export class WebDAVService {
             const remoteItem = remoteItemsMap.get(id);
             
             if (!localItem && remoteItem) {
-                // 仅存在于远程 - 添加到本地
+                // 只在远程存在 - 直接添加到本地
+                console.log(`[WebDAV] 新增远程项目: ${id}`);
                 mergedItems.push(remoteItem);
-                localChanges.push(remoteItem);
+                localChanges.push(remoteItem); // 需要添加到本地数据库
                 itemsCreated++;
                 
             } else if (localItem && !remoteItem) {
-                // 仅存在于本地 - 保留
+                // 只在本地存在 - 保留本地项目
+                console.log(`[WebDAV] 保留本地项目: ${id}`);
                 mergedItems.push(localItem);
+                // 不需要本地变更，因为本地已经有了
                 
             } else if (localItem && remoteItem) {
-                // 两边都存在 - 需要合并
-                const mergeResult = await this.mergeItems(localItem, remoteItem);
-                mergedItems.push(mergeResult.mergedItem);
+                // 两边都存在 - 按时间戳选择更新的版本
+                const localTime = new Date(localItem.metadata.updatedAt);
+                const remoteTime = new Date(remoteItem.metadata.updatedAt);
                 
-                if (mergeResult.hasChanges) {
-                    if (mergeResult.type === 'update') {
-                        itemsUpdated++;
-                    }
+                if (localItem.metadata.checksum === remoteItem.metadata.checksum) {
+                    // 内容完全相同
+                    console.log(`[WebDAV] 项目内容相同: ${id}`);
+                    mergedItems.push(localItem);
+                    // 无需本地变更
+                } else if (remoteTime > localTime) {
+                    // 远程版本更新
+                    console.log(`[WebDAV] 采用远程版本: ${id} (远程: ${remoteTime.toISOString()}, 本地: ${localTime.toISOString()})`);
+                    mergedItems.push(remoteItem);
+                    localChanges.push(remoteItem); // 需要更新本地数据库
+                    itemsUpdated++;
                     
-                    if (mergeResult.needsLocalUpdate) {
-                        localChanges.push(mergeResult.mergedItem);
-                    }
+                    conflictsResolved.push({
+                        itemId: id,
+                        strategy: 'remote_wins',
+                        timestamp: new Date().toISOString(),
+                        reason: '远程版本更新，采用远程版本'
+                    });
+                } else if (localTime > remoteTime) {
+                    // 本地版本更新
+                    console.log(`[WebDAV] 采用本地版本: ${id} (本地: ${localTime.toISOString()}, 远程: ${remoteTime.toISOString()})`);
+                    mergedItems.push(localItem);
+                    // 本地已经是最新的，无需变更
                     
-                    if (mergeResult.conflictResolution) {
-                        conflictsResolved.push(mergeResult.conflictResolution);
-                    }
-                }
-                
-                if (mergeResult.mergedItem.metadata.deleted) {
-                    itemsDeleted++;
+                    conflictsResolved.push({
+                        itemId: id,
+                        strategy: 'local_wins',
+                        timestamp: new Date().toISOString(),
+                        reason: '本地版本更新，保持本地版本'
+                    });
+                } else {
+                    // 时间相同但内容不同，选择远程版本
+                    console.log(`[WebDAV] 时间相同但内容不同，采用远程版本: ${id}`);
+                    mergedItems.push(remoteItem);
+                    localChanges.push(remoteItem);
+                    itemsUpdated++;
+                    
+                    conflictsResolved.push({
+                        itemId: id,
+                        strategy: 'remote_wins',
+                        timestamp: new Date().toISOString(),
+                        reason: '时间相同但内容不同，采用远程版本'
+                    });
                 }
             }
         }
+        
+        console.log(`[WebDAV] 合并完成统计:`, {
+            总项目: mergedItems.length,
+            新增: itemsCreated,
+            更新: itemsUpdated,
+            删除: itemsDeleted,
+            冲突解决: conflictsResolved.length,
+            本地变更: localChanges.length
+        });
         
         // 创建合并后的快照
         const mergedSnapshot: SyncSnapshot = {
@@ -1180,7 +1224,7 @@ export class WebDAVService {
             }
         };
         
-        const hasChanges = itemsCreated > 0 || itemsUpdated > 0 || itemsDeleted > 0 || conflictsResolved.length > 0;
+        const hasChanges = itemsCreated > 0 || itemsUpdated > 0 || itemsDeleted > 0;
         
         return {
             mergedSnapshot,
@@ -1466,7 +1510,7 @@ export class WebDAVService {
     private async applyLocalChanges(changes: DataItem[]): Promise<void> {
         if (changes.length === 0) return;
         
-        console.log(`应用 ${changes.length} 个本地变更...`);
+        console.log(`[WebDAV] 开始应用 ${changes.length} 个本地变更...`);
         
         try {
             // 按类型分组变更
@@ -1476,20 +1520,107 @@ export class WebDAVService {
                 return acc;
             }, {} as Record<string, DataItem[]>);
             
-            // 应用每种类型的变更
+            console.log('[WebDAV] 变更按类型分组:', Object.keys(changesByType).map(type => `${type}: ${changesByType[type].length}`));
+            
+            // 将所有变更转换为前端期望的格式
+            const importData: any = {};
+            
             for (const [type, items] of Object.entries(changesByType)) {
-                await this.applyTypeChanges(type, items);
+                const convertedItems = items.map(item => {
+                    // 转换为前端期望的格式
+                    const converted = {
+                        ...item.content,
+                        id: item.id,
+                        // 确保有必要的时间戳字段
+                        updatedAt: item.metadata.updatedAt,
+                        createdAt: item.metadata.createdAt || item.metadata.updatedAt
+                    };
+                    
+                    // 移除删除的项目
+                    if (item.metadata.deleted) {
+                        return null;
+                    }
+                    
+                    return converted;
+                }).filter(item => item !== null);
+                
+                // 转换类型名称为复数形式
+                const pluralType = this.getPlural(type);
+                importData[pluralType] = convertedItems;
+                
+                console.log(`[WebDAV] 转换 ${type} -> ${pluralType}: ${convertedItems.length} 项`);
             }
             
-            console.log('本地变更应用完成');
+            console.log('[WebDAV] 最终导入数据结构:', Object.keys(importData).map(key => `${key}: ${importData[key].length}`));
+            
+            // 一次性导入所有数据
+            if (Object.keys(importData).length > 0) {
+                await this.importAllData(importData);
+            }
+            
+            console.log('[WebDAV] 本地变更应用完成');
         } catch (error) {
-            console.error('应用本地变更失败:', error);
+            console.error('[WebDAV] 应用本地变更失败:', error);
             throw error;
         }
     }
 
     /**
-     * 应用特定类型的变更
+     * 获取类型的复数形式
+     */
+    private getPlural(type: string): string {
+        const pluralMap: Record<string, string> = {
+            'category': 'categories',
+            'prompt': 'prompts',
+            'aiConfig': 'aiConfigs',
+            'setting': 'settings',
+            'user': 'users',
+            'post': 'posts',
+            'history': 'histories'
+        };
+        
+        return pluralMap[type] || (type + 's');
+    }
+    
+    /**
+     * 一次性导入所有数据
+     */
+    private async importAllData(importData: any): Promise<void> {
+        console.log('[WebDAV] 开始一次性导入所有数据...');
+        
+        if (!this.dataManagementService) {
+            console.warn('[WebDAV] 数据管理服务未初始化，跳过数据导入');
+            return;
+        }
+        
+        try {
+            console.log('[WebDAV] 调用数据管理服务同步导入数据:', JSON.stringify(importData, null, 2));
+            
+            // 使用专门的同步导入方法
+            const result = await this.dataManagementService.syncImportDataObject(importData);
+            
+            console.log('[WebDAV] 数据同步导入结果:', result);
+            
+            if (!result.success) {
+                throw new Error(`数据同步导入失败: ${result.message}`);
+            }
+            
+            console.log('[WebDAV] 数据同步导入成功:', {
+                categories: result.imported.categories,
+                prompts: result.imported.prompts,
+                settings: result.imported.settings,
+                history: result.imported.history,
+                errors: result.errors
+            });
+            
+        } catch (error) {
+            console.error('[WebDAV] 数据同步导入失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 应用特定类型的变更 - 已弃用，保留为备用
      */
     private async applyTypeChanges(type: string, items: DataItem[]): Promise<void> {
         console.log(`应用 ${type} 类型的 ${items.length} 个变更`);
