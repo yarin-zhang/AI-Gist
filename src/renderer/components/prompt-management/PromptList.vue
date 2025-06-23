@@ -60,12 +60,12 @@
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
                     <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
                         <Search />
-                    </NIcon>                    <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
+                    </NIcon> <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
                     <span v-if="selectedCategory"> 分类: {{ getCategoryName(selectedCategory) }}</span>
                     <span v-if="showFavoritesOnly">仅显示收藏</span>
                     <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        (找到 {{ totalCount }} 个结果{{ hasNextPage || prompts.length < totalCount ? `，已显示 ${prompts.length} 个` : '' }})
-                    </span>
+                        (找到 {{ totalCount }} 个结果{{ hasNextPage || prompts.length < totalCount ? `，已显示 ${prompts.length}
+                            个` : '' }}) </span>
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
@@ -177,11 +177,11 @@
             <div v-if="viewMode === 'table'" style="margin-top: 16px;">
                 <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: any) => row.id" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" :max-height="600" :scroll-x="1200" />
+                    :pagination="tablePagination"  :max-height="600" :scroll-x="1200" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
-            <div v-else>                <!-- 无限滚动容器 -->
+            <div v-else> <!-- 无限滚动容器 -->
                 <NInfiniteScroll :distance="100" @load="handleLoadMore" :style="{ minHeight: '400px' }">
                     <div class="prompt-grid">
                         <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
@@ -361,7 +361,7 @@ const sortOptions = [
 
 // 分页相关状态
 const currentPage = ref(1)
-const pageSize = ref(20) // 表格视图每页显示数量
+const pageSize = ref(10) // 表格视图每页显示数量
 const gridPageSize = ref(18) // 网格视图每次加载数量（增加到18，确保充足的内容）
 const hasNextPage = ref(true)
 const totalCount = ref(0)
@@ -390,12 +390,15 @@ const tablePagination = computed(() => ({
     showSizePicker: true,
     pageSizes: [10, 20, 50, 100],
     showQuickJumper: true,
+    pageSlot: 7,
     prefix: ({ itemCount }) => `共 ${itemCount} 项`,
     onUpdatePage: (page: number) => {
+        console.log('Table pagination page changed to:', page)
         currentPage.value = page
         loadPromptsForTable()
     },
     onUpdatePageSize: (size: number) => {
+        console.log('Table pagination page size changed to:', size)
         pageSize.value = size
         currentPage.value = 1
         loadPromptsForTable()
@@ -630,7 +633,7 @@ const loadPrompts = async (reset = true) => {
         }
 
         const result = await api.prompts.getAll.query(filters)
-        
+
         // 调试信息
         console.log('loadPrompts result:', {
             filters,
@@ -645,7 +648,7 @@ const loadPrompts = async (reset = true) => {
         } else {
             prompts.value = [...prompts.value, ...(result.data || [])]
         }
-        
+
         // 始终更新总数和分页状态（因为过滤条件可能导致总数变化）
         totalCount.value = result.total || 0
         hasNextPage.value = result.hasMore || false
@@ -662,9 +665,15 @@ const loadPrompts = async (reset = true) => {
 // 切换视图模式
 const setViewMode = (mode: 'grid' | 'table') => {
     viewMode.value = mode
-    // 切换到表格视图时清除选择
+    // 切换到表格视图时清除选择并重新加载数据
     if (mode === 'table') {
         clearSelection()
+        // 重置页码并加载表格数据
+        currentPage.value = 1
+        loadPromptsForTable()
+    } else {
+        // 切换到网格视图时重新加载数据
+        loadPrompts(true)
     }
 }
 
@@ -685,7 +694,8 @@ const handleBatchDelete = async () => {
         message.success(`成功删除 ${selectedRows.value.length} 个提示词`)
         clearSelection()
         if (viewMode.value === 'table') {
-            await loadPromptsForTable()        } else {
+            await loadPromptsForTable()
+        } else {
             await loadPrompts(true) // 重新加载数据
         }
         await loadStatistics() // 重新加载统计信息
@@ -730,6 +740,14 @@ const loadPromptsForTable = async () => {
         // 清除选择状态
         clearSelection()
 
+        console.log('Table view loaded:', {
+            page: currentPage.value,
+            pageSize: pageSize.value,
+            dataLength: prompts.value.length,
+            totalCount: totalCount.value,
+            filters
+        })
+
     } catch (error) {
         message.error('加载提示词失败')
         console.error(error)
@@ -749,6 +767,8 @@ const loadCategories = async () => {
 
 // 事件处理
 const handleSearch = () => {
+    // 重置页码
+    currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else {
@@ -758,6 +778,8 @@ const handleSearch = () => {
 
 // 监听排序方式变化
 watch(sortType, () => {
+    // 重置页码
+    currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else {
@@ -766,6 +788,8 @@ watch(sortType, () => {
 })
 
 const handleCategoryFilter = () => {
+    // 重置页码
+    currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else {
@@ -775,6 +799,8 @@ const handleCategoryFilter = () => {
 
 const handleCategoryQuickFilter = (categoryId: string | null) => {
     selectedCategory.value = categoryId
+    // 重置页码
+    currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else {
@@ -792,6 +818,8 @@ const toggleTagsExpanded = () => {
 
 const toggleFavoritesFilter = () => {
     showFavoritesOnly.value = !showFavoritesOnly.value
+    // 重置页码
+    currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else {
@@ -888,7 +916,8 @@ const handleDeletePrompt = async (prompt) => {
         try {
             await api.prompts.delete.mutate(prompt.id)
             if (viewMode.value === 'table') {
-                await loadPromptsForTable()            } else {
+                await loadPromptsForTable()
+            } else {
                 await loadPrompts(true) // 重置加载
             }
             await loadStatistics() // 重新加载统计信息
@@ -905,6 +934,14 @@ const handleDeletePrompt = async (prompt) => {
 const loadStatistics = async () => {
     try {
         statistics.value = await api.prompts.getStatistics.query()
+        // 同时更新总数，确保表格分页显示正确
+        if (!totalCount.value) {
+            totalCount.value = statistics.value.totalCount || 0
+        }
+        console.log('Statistics loaded:', {
+            totalCount: statistics.value.totalCount,
+            currentTotalCount: totalCount.value
+        })
     } catch (error) {
         message.error('加载统计信息失败')
         console.error(error)
@@ -914,14 +951,21 @@ const loadStatistics = async () => {
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()
-    loadPrompts(true) // 初始加载
-    loadCategories()
-    loadStatistics() // 加载统计信息
+    // 先加载统计信息和分类，确保 totalCount 有正确值
+    await loadStatistics()
+    await loadCategories()
+    // 然后根据初始视图模式选择正确的加载方法
+    if (viewMode.value === 'table') {
+        await loadPromptsForTable()
+    } else {
+        await loadPrompts(true) // 初始加载
+    }
 })
 
 // 暴露方法给父组件
 defineExpose({
     loadPrompts: () => {
+        currentPage.value = 1 // 重置页码
         if (viewMode.value === 'table') {
             loadPromptsForTable()
         } else {
