@@ -476,9 +476,13 @@ export class WebDAVService {
         ipcMain.handle('webdav:set-config', async (event, newConfig: WebDAVConfig) => {
             console.log('[WebDAV] IPC webdav:set-config - 接收到配置更新请求');
             try {
+                // 先保存到偏好设置
+                await this.preferencesManager.updatePreferences({ webdav: newConfig });
+                console.log('[WebDAV] IPC webdav:set-config - 配置已保存到偏好设置');
+                
+                // 然后更新本地配置
                 this.config = { ...(this.config || {}), ...newConfig };
-                await this.preferencesManager.updatePreferences({ webdav: this.config });
-                console.log('[WebDAV] IPC webdav:set-config - 配置已更新并保存');
+                console.log('[WebDAV] IPC webdav:set-config - 本地配置已更新');
 
                 if (this.config.enabled && this.config.autoSync) {
                     this.stopAutoSync();
@@ -495,7 +499,40 @@ export class WebDAVService {
         });
 
         // 获取WebDAV配置
-        ipcMain.handle('webdav:get-config', async () => this.config || {});
+        ipcMain.handle('webdav:get-config', async () => {
+            console.log('[WebDAV] IPC webdav:get-config - 接收到获取配置请求');
+            try {
+                // 优先返回本地配置，如果为空则从偏好设置中重新加载
+                if (this.config) {
+                    console.log('[WebDAV] IPC webdav:get-config - 返回本地配置:', {
+                        hasConfig: !!this.config,
+                        enabled: this.config?.enabled,
+                        serverUrl: this.config?.serverUrl,
+                        username: this.config?.username,
+                        hasPassword: !!this.config?.password,
+                        autoSync: this.config?.autoSync,
+                        syncInterval: this.config?.syncInterval
+                    });
+                    return this.config;
+                } else {
+                    // 本地配置为空，从偏好设置中重新加载
+                    const config = await this.loadConfig();
+                    console.log('[WebDAV] IPC webdav:get-config - 从偏好设置加载配置:', {
+                        hasConfig: !!config,
+                        enabled: config?.enabled,
+                        serverUrl: config?.serverUrl,
+                        username: config?.username,
+                        hasPassword: !!config?.password,
+                        autoSync: config?.autoSync,
+                        syncInterval: config?.syncInterval
+                    });
+                    return config || {};
+                }
+            } catch (error) {
+                console.error('[WebDAV] IPC webdav:get-config - 获取配置失败:', error);
+                return {};
+            }
+        });
 
         // 测试WebDAV连接
         ipcMain.handle('webdav:test-connection', async (event, config: WebDAVConfig) => {
