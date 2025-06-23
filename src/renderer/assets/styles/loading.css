@@ -1,0 +1,76 @@
+/* 初始加载屏幕样式 */
+#initial-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  transition: opacity 0.3s ease-out;
+  
+  /* 浅色主题 */
+  background: #ffffff;
+  color: #333333;
+}
+
+/* 根据html元素的主题类设置样式 */
+html.dark #initial-loading,
+body.dark #initial-loading {
+  background: #101014;
+  color: #e5e5e5;
+}
+
+html.dark #initial-loading .spinner,
+body.dark #initial-loading .spinner {
+  border-top-color: #ffffff !important;
+}
+
+/* 默认暗色主题媒体查询（作为后备） */
+@media (prefers-color-scheme: dark) {
+  #initial-loading {
+    background: #101014;
+    color: #e5e5e5;
+  }
+  
+  #initial-loading .spinner {
+    border-top-color: #ffffff !important;
+  }
+}
+
+#initial-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid #409eff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  #initial-loading .spinner {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: #409eff;
+  }
+}
+
+#initial-loading .text {
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  opacity: 0.7;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 隐藏加载屏幕的类 */
+.loading-hidden {
+  opacity: 0;
+  pointer-events: none;
+}

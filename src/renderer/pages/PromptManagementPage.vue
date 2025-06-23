@@ -10,6 +10,15 @@
                     </NText>
                 </div>
                 <NFlex>
+                    <NButton @click="showAIGenerator = !showAIGenerator"
+                        :type="showAIGenerator ? 'primary' : 'default'">
+                        <template #icon>
+                            <NIcon>
+                                <Robot />
+                            </NIcon>
+                        </template>
+                        AI 生成
+                    </NButton>
                     <NButton type="primary" @click="handleCreatePrompt">
                         <template #icon>
                             <NIcon>
@@ -18,19 +27,14 @@
                         </template>
                         新建提示词
                     </NButton>
-                    <NButton @click="showCategoryManagement = true">
-                        <template #icon>
-                            <NIcon>
-                                <Folder />
-                            </NIcon>
-                        </template>
-                        分类管理
-                    </NButton>
+
                 </NFlex>
-            </NFlex>
+            </NFlex> <!-- AI 生成器组件 -->
+            <AIGeneratorComponent v-if="showAIGenerator" @prompt-generated="handlePromptGenerated"
+                @prompt-saved="handleListRefresh" @navigate-to-ai-config="handleNavigateToAIConfig" />
             <!-- 提示词列表组件 -->
             <PromptList ref="promptListRef" @edit="handleEditPrompt" @view="handleViewPrompt"
-                @refresh="loadStatistics" />
+                @refresh="handleListRefresh" @manage-categories="showCategoryManagement = true" />
         </NFlex>
 
         <!-- 模态框 -->
@@ -53,20 +57,29 @@ import {
     NIcon,
     NCard,
     NScrollbar,
+    NEmpty,
     useMessage
 } from 'naive-ui'
-import { Plus, Folder, FileText, Heart } from '@vicons/tabler'
+import { Plus, Folder, FileText, Heart, Robot } from '@vicons/tabler'
 
 // 组件导入
 import PromptList from '@/components/prompt-management/PromptList.vue'
 import PromptEditModal from '@/components/prompt-management/PromptEditModal.vue'
 import PromptDetailModal from '@/components/prompt-management/PromptDetailModal.vue'
 import CategoryManageModal from '@/components/prompt-management/CategoryManageModal.vue'
+import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
 
 // API 导入
 import { api } from '@/lib/api'
+import { useDatabase } from '@/composables/useDatabase'
+
+// 定义事件
+const emit = defineEmits<{
+    'navigate-to-ai-config': []
+}>()
 
 const message = useMessage()
+const { safeDbOperation, waitForDatabase } = useDatabase()
 
 // 组件引用
 const promptListRef = ref()
@@ -78,6 +91,7 @@ const selectedPrompt = ref(null)
 const showEditModal = ref(false)
 const showDetailModal = ref(false)
 const showCategoryManagement = ref(false)
+const showAIGenerator = ref(false)
 
 // 统计数据
 const totalPrompts = computed(() => prompts.value.length)
@@ -86,25 +100,26 @@ const totalCategories = computed(() => categories.value.length)
 
 // 方法
 const loadPrompts = async () => {
-    try {
-        const result = await api.prompts.getAllForTags.query()
+    const result = await safeDbOperation(
+        () => api.prompts.getAllForTags.query(),
+        []
+    )
+    if (result) {
         prompts.value = result
-    } catch (error) {
-        message.error('加载 Prompts 失败')
-        console.error(error)
     }
 }
 
 const loadCategories = async () => {
-    try {
-        categories.value = await api.categories.getAll.query()
+    const result = await safeDbOperation(
+        () => api.categories.getAll.query(),
+        []
+    )
+    if (result) {
+        categories.value = result
         // 同时刷新 PromptList 的分类数据
         if (promptListRef.value?.loadCategories) {
             promptListRef.value.loadCategories()
         }
-    } catch (error) {
-        message.error('加载分类失败')
-        console.error(error)
     }
 }
 
@@ -144,8 +159,37 @@ const handlePromptSaved = () => {
     loadStatistics()
 }
 
+const handlePromptGenerated = (generatedPrompt: any) => {
+    // 当 AI 生成提示词后，自动创建新的提示词
+    selectedPrompt.value = {
+        title: generatedPrompt.title || `AI生成: ${generatedPrompt.topic}`,
+        content: generatedPrompt.content || generatedPrompt.generatedPrompt,
+        description: generatedPrompt.description || `由 AI 生成的提示词，主题：${generatedPrompt.topic}`,
+        tags: 'AI生成',
+        isFavorite: false,
+        useCount: 0
+    }
+    showEditModal.value = true
+}
+
+const handleNavigateToAIConfig = () => {
+    // 向上传递导航事件到 MainPage
+    emit('navigate-to-ai-config')
+}
+
+const handleListRefresh = () => {
+    // 刷新 PromptList 组件的数据
+    if (promptListRef.value?.loadPrompts) {
+        promptListRef.value.loadPrompts()
+    }
+    // 同时刷新页面统计数据
+    loadStatistics()
+}
+
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+    // 等待数据库就绪后再加载数据
+    await waitForDatabase()
     loadStatistics()
 })
 </script>

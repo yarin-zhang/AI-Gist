@@ -25,6 +25,13 @@
             ]
         },
         {
+            "from": "build/shared",
+            "to": "./shared",
+            "filter": [
+                "**/*"
+            ]
+        },
+        {
             "from": "src/main/static",
             "to": "./static",
             "filter": [

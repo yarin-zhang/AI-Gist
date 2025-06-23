@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { UserPreferences } from './types';
+import { UserPreferences } from '../../shared/types';
 
 /**
  * 用户偏好设置管理器
@@ -9,11 +9,53 @@ import { UserPreferences } from './types';
 class PreferencesManager {
   private userPrefs: UserPreferences;
   private configPath: string;  private readonly defaultPreferences: UserPreferences = {
+    // 旧属性
     closeBehaviorMode: 'ask',
     closeAction: 'quit',
     startMinimized: false,
     autoLaunch: false,
-    themeSource: 'system'
+    themeSource: 'system',
+    // 新属性
+    theme: 'system',
+    language: 'zh-CN',
+    autoStartup: false,
+    minimizeToTray: true,
+    showNotifications: true,
+    checkUpdates: true,
+    windowSize: {
+      width: 1200,
+      height: 800,
+    },
+    windowPosition: {
+      x: -1,
+      y: -1,
+    },
+    webdav: {
+      enabled: false,
+      serverUrl: '',
+      username: '',
+      password: '',
+      encryptedPassword: '',
+      autoSync: false,
+      syncInterval: 30,
+      // 连接验证状态
+      connectionTested: false,
+      connectionValid: false,
+      connectionMessage: '',
+      connectionTestedAt: '',
+      configHash: '',
+    },
+    icloud: {
+      enabled: false,
+      autoSync: false,
+      syncInterval: 30,
+      customPath: '',
+    },
+    dataSync: {
+      lastSyncTime: null,
+      autoBackup: true,
+      backupInterval: 24,
+    },
   };
 
   constructor() {
@@ -49,14 +91,55 @@ class PreferencesManager {
       if (fs.existsSync(this.configPath)) {
         const data = fs.readFileSync(this.configPath, 'utf8');
         const loadedPrefs = JSON.parse(data);
-        
-        // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
+          // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
         const cleanedPrefs: UserPreferences = {
+          // 旧属性
           closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
           closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
           startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
           autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,
-          themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource
+          themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource,
+          // 新属性
+          theme: loadedPrefs.theme ?? this.defaultPreferences.theme,
+          language: loadedPrefs.language ?? this.defaultPreferences.language,
+          autoStartup: loadedPrefs.autoStartup ?? this.defaultPreferences.autoStartup,
+          minimizeToTray: loadedPrefs.minimizeToTray ?? this.defaultPreferences.minimizeToTray,
+          showNotifications: loadedPrefs.showNotifications ?? this.defaultPreferences.showNotifications,
+          checkUpdates: loadedPrefs.checkUpdates ?? this.defaultPreferences.checkUpdates,
+          windowSize: {
+            width: loadedPrefs.windowSize?.width ?? this.defaultPreferences.windowSize.width,
+            height: loadedPrefs.windowSize?.height ?? this.defaultPreferences.windowSize.height,
+          },
+          windowPosition: {
+            x: loadedPrefs.windowPosition?.x ?? this.defaultPreferences.windowPosition.x,
+            y: loadedPrefs.windowPosition?.y ?? this.defaultPreferences.windowPosition.y,
+          },
+          webdav: {
+            enabled: loadedPrefs.webdav?.enabled ?? this.defaultPreferences.webdav!.enabled,
+            serverUrl: loadedPrefs.webdav?.serverUrl ?? this.defaultPreferences.webdav!.serverUrl,
+            username: loadedPrefs.webdav?.username ?? this.defaultPreferences.webdav!.username,
+            password: loadedPrefs.webdav?.password ?? this.defaultPreferences.webdav!.password,
+            encryptedPassword: loadedPrefs.webdav?.encryptedPassword ?? this.defaultPreferences.webdav!.encryptedPassword,
+            autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
+            syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
+            // 连接验证状态
+            connectionTested: loadedPrefs.webdav?.connectionTested ?? this.defaultPreferences.webdav!.connectionTested,
+            connectionValid: loadedPrefs.webdav?.connectionValid ?? this.defaultPreferences.webdav!.connectionValid,
+            connectionMessage: loadedPrefs.webdav?.connectionMessage ?? this.defaultPreferences.webdav!.connectionMessage,
+            connectionTestedAt: loadedPrefs.webdav?.connectionTestedAt ?? this.defaultPreferences.webdav!.connectionTestedAt,
+            configHash: loadedPrefs.webdav?.configHash ?? this.defaultPreferences.webdav!.configHash,
+          },
+          icloud: {
+            enabled: loadedPrefs.icloud?.enabled ?? this.defaultPreferences.icloud!.enabled,
+            autoSync: loadedPrefs.icloud?.autoSync ?? this.defaultPreferences.icloud!.autoSync,
+            syncInterval: loadedPrefs.icloud?.syncInterval ?? this.defaultPreferences.icloud!.syncInterval,
+            customPath: loadedPrefs.icloud?.customPath ?? this.defaultPreferences.icloud!.customPath,
+          },
+          dataSync: {
+            lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
+            autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
+            backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
+          },
         };
         
         // 如果配置发生了变化（比如删除了字段），重新保存清理后的配置
@@ -100,13 +183,30 @@ class PreferencesManager {
   getPreferences(): UserPreferences {
     return { ...this.userPrefs };
   }
-
   /**
    * 更新用户偏好设置
    */
   updatePreferences(newPrefs: Partial<UserPreferences>): UserPreferences {
     const oldAutoLaunch = this.userPrefs.autoLaunch;
-    this.userPrefs = { ...this.userPrefs, ...newPrefs };
+    
+    // 深度合并嵌套对象
+    if (newPrefs.webdav) {
+      this.userPrefs.webdav = { ...this.userPrefs.webdav, ...newPrefs.webdav };
+    }
+    if (newPrefs.icloud) {
+      this.userPrefs.icloud = { ...this.userPrefs.icloud, ...newPrefs.icloud };
+    }
+    if (newPrefs.dataSync) {
+      this.userPrefs.dataSync = { ...this.userPrefs.dataSync, ...newPrefs.dataSync };
+    }
+    
+    // 合并其他属性
+    for (const key in newPrefs) {
+      if (key !== 'webdav' && key !== 'icloud' && key !== 'dataSync') {
+        (this.userPrefs as any)[key] = (newPrefs as any)[key];
+      }
+    }
+    
     this.savePreferences(); // 立即保存到文件
     
     // 如果自启动设置发生变化，立即应用

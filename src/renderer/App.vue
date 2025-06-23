@@ -4,11 +4,14 @@ import {
     NLayout,
     NConfigProvider,
     NMessageProvider,
+    NDialogProvider,
     zhCN,
     dateZhCN
 } from 'naive-ui'
-import { useTheme } from './composables/useTheme'
-import MainPage from './pages/MainPage.vue'
+import { useTheme } from '~/composables/useTheme'
+import MainPage from '~/pages/MainPage.vue'
+import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
+import AppInitializer from '~/components/common/AppInitializer.vue'
 
 // 使用主题管理
 const { naiveTheme, initTheme } = useTheme()
@@ -22,7 +25,13 @@ onMounted(async () => {
 <template>
     <NConfigProvider :theme="naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
         <NMessageProvider>
-            <MainPage />
+            <NDialogProvider>
+                <AppInitializer>
+                    <!-- 数据库状态横幅 -->
+                    <DatabaseStatusBanner />
+                    <MainPage />
+                </AppInitializer>
+            </NDialogProvider>
         </NMessageProvider>
     </NConfigProvider>
 </template>

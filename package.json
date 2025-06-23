@@ -1,38 +1,61 @@
 {
-  "name": "ai-gist",
-  "version": "0.6.1",
-  "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
-  "main": "./main/main.js",
-  "scripts": {
-    "dev": "node scripts/dev-server.js",
-    "build": "node scripts/build.js && electron-builder",
-    "build:win": "node scripts/build.js && electron-builder --win",
-    "build:mac": "node scripts/build.js && electron-builder --mac",
-    "build:linux": "node scripts/build.js && electron-builder --linux",
-    "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
-    "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
-    "build:ci:linux": "node scripts/build.js && yarn electron-builder --linux",
-    "version": "git add -A",
-    "postversion": "git push && git push --tags"
-  },
-  "repository": "https://github.com/yarin-zhang/ai-gist",
-  "author": {
-    "name": "Yarin Zhang",
-    "url": "https://github.com/yarin-zhang"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^4.4.1",
-    "chalk": "^4.1.2",
-    "chokidar": "^3.5.3",
-    "electron": "^32.1.2",
-    "electron-builder": "^25.1.6",
-    "typescript": "^5.2.2",
-    "vite": "^4.5.0"
-  },
-  "dependencies": {
-    "@vicons/tabler": "^0.13.0",
-    "naive-ui": "^2.41.0",
-    "vue": "^3.3.8",
-    "zod": "^3.25.40"
-  }
+    "name": "ai-gist",
+    "version": "0.12.3",
+    "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
+    "main": "./main/main.js",
+    "scripts": {
+        "dev": "node scripts/dev-server.js",
+        "build": "node scripts/build.js && electron-builder",
+        "build:win": "node scripts/build.js && electron-builder --win",
+        "build:mac": "node scripts/build.js && electron-builder --mac",
+        "build:linux": "node scripts/build.js && electron-builder --linux",
+        "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
+        "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
+        "build:ci:linux": "node scripts/build.js && yarn electron-builder --linux",
+        "test": "vitest",
+        "test:run": "vitest run",
+        "test:ui": "vitest --ui",
+        "test:coverage": "vitest run --coverage",
+        "version": "git add -A",
+        "postversion": "git push && git push --tags"
+    },
+    "repository": "https://github.com/yarin-zhang/ai-gist",
+    "author": {
+        "name": "Yarin Zhang",
+        "url": "https://github.com/yarin-zhang"
+    },
+    "devDependencies": {
+        "@types/uuid": "^10.0.0",
+        "@vitejs/plugin-vue": "^4.4.1",
+        "@vitest/coverage-v8": "^3.2.3",
+        "@vitest/ui": "^1.6.0",
+        "chalk": "^4.1.2",
+        "chokidar": "^3.5.3",
+        "electron": "^32.1.2",
+        "electron-builder": "^25.1.6",
+        "jsdom": "^24.1.0",
+        "typescript": "^5.2.2",
+        "vite": "^6.3.5",
+        "vitest": "^3.2.3"
+    },
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.53.0",
+        "@google/generative-ai": "^0.24.1",
+        "@langchain/anthropic": "^0.3.21",
+        "@langchain/core": "^0.3.57",
+        "@langchain/google-genai": "^0.2.10",
+        "@langchain/ollama": "^0.2.1",
+        "@langchain/openai": "^0.5.12",
+        "@vicons/tabler": "^0.13.0",
+        "archiver": "^7.0.1",
+        "cohere-ai": "^7.17.1",
+        "langchain": "^0.3.27",
+        "naive-ui": "^2.41.0",
+        "unzipper": "^0.12.3",
+        "uuid": "^11.1.0",
+        "vue": "^3.3.8",
+        "webdav": "^5.8.0",
+        "zod": "^3.25.40"
+    },
+    "packageManager": "yarn@4.9.2"
 }

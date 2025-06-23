@@ -4,8 +4,15 @@
     <meta charset="utf-8">
     <title>AI Gist</title>
     <link rel="stylesheet" href="./assets/styles/global.css">
+    <link rel="stylesheet" href="./assets/styles/loading.css">
   </head>
   <body>
+    <!-- 初始加载屏幕 -->
+    <div id="initial-loading">
+      <div class="spinner"></div>
+      <div class="text">正在启动应用...</div>
+    </div>
+    
     <div id="app"></div>
     <script type="module" src="./main.ts"></script>
   </body>

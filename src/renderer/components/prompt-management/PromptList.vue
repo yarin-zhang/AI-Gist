@@ -12,6 +12,7 @@
                             </NIcon>
                         </template>
                     </NInput>
+                    <NSelect v-model:value="sortType" :options="sortOptions" placeholder="排序方式" style="width: 160px; margin-right: 8px" />
                     <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
                             <NIcon>
@@ -27,6 +28,14 @@
                             </NIcon>
                         </template>
                         收藏
+                    </NButton>
+                    <NButton @click="$emit('manage-categories')">
+                        <template #icon>
+                            <NIcon>
+                                <Folder />
+                            </NIcon>
+                        </template>
+                        分类
                     </NButton>
                 </NFlex>
                 <!-- 搜索提示信息 -->
@@ -163,8 +172,24 @@
                         </template>
 
                         <NFlex vertical size="small">
-                            <NText depth="3" v-if="prompt.description">{{ prompt.description }}</NText>
-                            <NText depth="3" v-if="!prompt.description" style="font-size: 12px;">
+                            <!-- 更新时间 -->
+                            <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
+                                {{ new Date(prompt.updatedAt).toLocaleDateString() }}
+                            </NText> -->
+                            <!-- 描述或内容预览 -->
+                            <NText 
+                                depth="3" 
+                                v-if="prompt.description" 
+                                class="description-text"
+                            >
+                                {{ prompt.description }}
+                            </NText>
+                            <NText 
+                                depth="3" 
+                                v-if="!prompt.description" 
+                                style="font-size: 12px;" 
+                                class="content-preview-text"
+                            >
                                 {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                             </NText>
 
@@ -222,7 +247,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h, watch } from 'vue'
 import {
     NCard,
     NFlex,
@@ -248,19 +273,23 @@ import {
     Tag,
     Box,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Folder
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
+import { useDatabase } from '@/composables/useDatabase'
 
 interface Emits {
     (e: 'edit', prompt: any): void
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
+    (e: 'manage-categories'): void
 }
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
+const { waitForDatabase } = useDatabase()
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
@@ -274,6 +303,15 @@ const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
 const selectedCategory = ref(null)
 const showFavoritesOnly = ref(false)
+
+// 排序相关状态
+const sortType = ref('timeDesc') // 默认按时间倒序排序
+const sortOptions = [
+    { label: '最新优先', value: 'timeDesc' },
+    { label: '最早优先', value: 'timeAsc' },
+    { label: '使用次数', value: 'useCount' },
+    { label: '收藏优先', value: 'favorite' }
+]
 
 // 分页相关状态
 const currentPage = ref(1)
@@ -362,7 +400,8 @@ const loadPrompts = async (reset = true) => {
             search: searchText.value || undefined,
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
-            limit: pageSize.value
+            limit: pageSize.value,
+            sortBy: sortType.value // 添加排序参数
         }
         
         const result = await api.prompts.getAll.query(filters)
@@ -410,6 +449,11 @@ const loadCategories = async () => {
 const handleSearch = () => {
     loadPrompts(true) // 重置加载
 }
+
+// 监听排序方式变化
+watch(sortType, () => {
+    loadPrompts(true) // 排序方式变化时重新加载数据
+})
 
 const handleCategoryFilter = () => {
     loadPrompts(true) // 重置加载
@@ -531,16 +575,17 @@ const handleDeletePrompt = async (prompt) => {
     }
 }
 
-// 暴露方法给父组件
-defineExpose({
-    loadPrompts,
-    loadCategories
-})
-
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+    await waitForDatabase()
     loadPrompts(true) // 初始加载
     loadCategories()
+})
+
+// 暴露方法给父组件
+defineExpose({
+    loadPrompts: () => loadPrompts(true),
+    loadCategories
 })
 </script>
 
@@ -548,7 +593,6 @@ onMounted(() => {
 .prompt-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
 }
 
 .prompt-grid {
@@ -573,5 +617,18 @@ onMounted(() => {
     border: 1px solid var(--n-color-primary) !important;
     transform: scale(1.02);
     transition: all 0.3s ease;
+}
+
+/* 描述文本和内容预览的多行截断样式 */
+.description-text,
+.content-preview-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    max-height: calc(1.4em * 3); /* 限制最大高度为3行 */
+    word-break: break-word;
 }
 </style>
