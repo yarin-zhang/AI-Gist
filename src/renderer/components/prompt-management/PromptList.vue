@@ -12,7 +12,8 @@
                             </NIcon>
                         </template>
                     </NInput>
-                    <NSelect v-model:value="sortType" :options="sortOptions" placeholder="排序方式" style="width: 160px; margin-right: 8px" />
+                    <NSelect v-model:value="sortType" :options="sortOptions" placeholder="排序方式"
+                        style="width: 160px; margin-right: 8px" />
                     <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
                             <NIcon>
@@ -28,7 +29,8 @@
                             </NIcon>
                         </template>
                         收藏
-                    </NButton>                    <NButton @click="$emit('manage-categories')">
+                    </NButton>
+                    <NButton @click="$emit('manage-categories')">
                         <template #icon>
                             <NIcon>
                                 <Folder />
@@ -58,12 +60,11 @@
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
                     <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
                         <Search />
-                    </NIcon>
-                    <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
+                    </NIcon>                    <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
                     <span v-if="selectedCategory"> 分类: {{ getCategoryName(selectedCategory) }}</span>
                     <span v-if="showFavoritesOnly">仅显示收藏</span>
-                    <span v-if="!isLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        (找到 {{ prompts.length }} 个结果)
+                    <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
+                        (找到 {{ totalCount }} 个结果{{ hasNextPage || prompts.length < totalCount ? `，已显示 ${prompts.length} 个` : '' }})
                     </span>
                 </div>
 
@@ -92,7 +93,7 @@
                                             <Box />
                                         </NIcon>
                                     </template>
-                                    全部分类 ({{ allPrompts.length }})
+                                    全部分类 ({{ statistics.totalCount }})
                                 </NTag>
                                 <NTag v-for="category in categories" :key="category.id" size="small" :bordered="false"
                                     :checked="selectedCategory === category.id" checkable
@@ -141,13 +142,14 @@
                     </div>
                 </div>
             </NFlex>
-        </NCard>        <!-- 提示词列表 -->
+        </NCard> <!-- 提示词列表 -->
         <div v-if="initialLoading" style="text-align: center; padding: 40px;">
             <NSpin size="large" />
         </div>
         <div v-else-if="prompts.length === 0 && !hasNextPage" style="text-align: center; padding: 40px;">
             <NEmpty description="暂无提示词，快来创建第一个吧！" />
-        </div>        <div v-else>
+        </div>
+        <div v-else>
             <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
             <div v-if="viewMode === 'table' && selectedRows.length > 0" style="margin-bottom: 16px;">
                 <NCard>
@@ -171,38 +173,16 @@
                         </NFlex>
                     </NFlex>
                 </NCard>
-            </div>            <!-- 表格视图 -->
+            </div> <!-- 表格视图 -->
             <div v-if="viewMode === 'table'" style="margin-top: 16px;">
-                <NDataTable
-                    :columns="tableColumns"
-                    :data="prompts"
-                    :loading="initialLoading"
-                    :row-key="(row: any) => row.id"
-                    v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="false"
-                    :max-height="600"
-                    :scroll-x="1200"
-                />
-                
-                <!-- 表格视图的加载更多 -->
-                <div v-if="hasNextPage" style="text-align: center; padding: 20px;">
-                    <NButton @click="handleLoadMore" :loading="loadingMore">
-                        加载更多
-                    </NButton>
-                </div>
-                <div v-else-if="prompts.length > 0" style="text-align: center; padding: 20px;">
-                    <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
-                </div>
+                <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
+                    :row-key="(row: any) => row.id" v-model:checked-row-keys="selectedRowKeys"
+                    :pagination="tablePagination" :max-height="600" :scroll-x="1200" />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
-            <div v-else>
-                <!-- 无限滚动容器 -->
-                <NInfiniteScroll 
-                    :distance="10" 
-                    @load="handleLoadMore"
-                    :style="{ minHeight: '400px' }"
-                >
+            <div v-else>                <!-- 无限滚动容器 -->
+                <NInfiniteScroll :distance="100" @load="handleLoadMore" :style="{ minHeight: '400px' }">
                     <div class="prompt-grid">
                         <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
                             @click="$emit('view', prompt)">
@@ -239,19 +219,11 @@
                                     {{ new Date(prompt.updatedAt).toLocaleDateString() }}
                                 </NText> -->
                                 <!-- 描述或内容预览 -->
-                                <NText 
-                                    depth="3" 
-                                    v-if="prompt.description" 
-                                    class="description-text"
-                                >
+                                <NText depth="3" v-if="prompt.description" class="description-text">
                                     {{ prompt.description }}
                                 </NText>
-                                <NText 
-                                    depth="3" 
-                                    v-if="!prompt.description" 
-                                    style="font-size: 12px;" 
-                                    class="content-preview-text"
-                                >
+                                <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
+                                    class="content-preview-text">
                                     {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                                 </NText>
 
@@ -264,7 +236,8 @@
                                         <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
                                             {{ prompt.variables.length }} 个变量
                                         </NTag>
-                                        <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
+                                        <NTag v-if="prompt.category" size="small"
+                                            :color="getCategoryTagColor(prompt.category)">
                                             <template #icon>
                                                 <NIcon>
                                                     <Box />
@@ -273,8 +246,9 @@
                                             {{ prompt.category.name }}
                                         </NTag>
                                         <template v-if="prompt.tags">
-                                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small" :bordered="false"
-                                                :color="getTagColor(tag)" :class="{ 'highlighted-tag': isTagMatched(tag) }">
+                                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small"
+                                                :bordered="false" :color="getTagColor(tag)"
+                                                :class="{ 'highlighted-tag': isTagMatched(tag) }">
                                                 <template #icon>
                                                     <NIcon>
                                                         <Tag />
@@ -365,7 +339,11 @@ const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 // 响应式数据
 const prompts = ref([])
 const categories = ref([])
-const allPrompts = ref([]) // 保存所有提示词，用于计算热门标签
+const statistics = ref({
+    totalCount: 0,
+    categoryStats: [],
+    popularTags: []
+}) // 统计信息
 const initialLoading = ref(false) // 首次加载状态
 const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
@@ -383,7 +361,8 @@ const sortOptions = [
 
 // 分页相关状态
 const currentPage = ref(1)
-const pageSize = ref(12) // 每页加载12个
+const pageSize = ref(20) // 表格视图每页显示数量
+const gridPageSize = ref(18) // 网格视图每次加载数量（增加到18，确保充足的内容）
 const hasNextPage = ref(true)
 const totalCount = ref(0)
 
@@ -403,6 +382,26 @@ const selectedRows = computed(() => {
     return prompts.value.filter(prompt => selectedRowKeys.value.includes(prompt.id))
 })
 
+// 表格分页配置
+const tablePagination = computed(() => ({
+    page: currentPage.value,
+    pageSize: pageSize.value,
+    itemCount: totalCount.value,
+    showSizePicker: true,
+    pageSizes: [10, 20, 50, 100],
+    showQuickJumper: true,
+    prefix: ({ itemCount }) => `共 ${itemCount} 项`,
+    onUpdatePage: (page: number) => {
+        currentPage.value = page
+        loadPromptsForTable()
+    },
+    onUpdatePageSize: (size: number) => {
+        pageSize.value = size
+        currentPage.value = 1
+        loadPromptsForTable()
+    }
+}))
+
 // 计算属性
 const categoryOptions = computed(() => [
     { label: '全部分类', value: null },
@@ -421,8 +420,8 @@ const getCategoryName = (categoryId: string | null) => {
 
 // 获取分类下的提示词数量
 const getCategoryPromptCount = (categoryId: string | null) => {
-    if (!categoryId) return allPrompts.value.length
-    return allPrompts.value.filter(prompt => prompt.categoryId === categoryId).length
+    const categoryStats = statistics.value.categoryStats.find(stat => stat.id === categoryId)
+    return categoryStats ? categoryStats.count : 0
 }
 
 // 计算卡片间距 - 根据展开状态动态调整
@@ -436,22 +435,7 @@ const getCardSpacing = () => {
 
 // 计算热门标签
 const popularTags = computed(() => {
-    const tagCounts = new Map()
-
-    allPrompts.value.forEach(prompt => {
-        if (prompt.tags) {
-            const tags = getTagsArray(prompt.tags)
-            tags.forEach(tag => {
-                const trimmedTag = tag.trim()
-                if (trimmedTag) {
-                    tagCounts.set(trimmedTag, (tagCounts.get(trimmedTag) || 0) + 1)
-                }
-            })
-        }
-    })
-
-    return Array.from(tagCounts.entries())
-        .map(([name, count]) => ({ name, count }))        .sort((a, b) => b.count - a.count)
+    return statistics.value.popularTags || []
 })
 
 // 表格列定义
@@ -524,7 +508,7 @@ const tableColumns = computed(() => [
                 NFlex,
                 { size: 'small', wrap: true },
                 {
-                    default: () => tags.slice(0, 3).map(tag => 
+                    default: () => tags.slice(0, 3).map(tag =>
                         h(
                             NTag,
                             {
@@ -539,7 +523,7 @@ const tableColumns = computed(() => [
                             }
                         )
                     ).concat(
-                        tags.length > 3 ? [h(NText, { depth:3, style: { fontSize: '12px' } }, { default: () => `+${tags.length - 3}` })] : []
+                        tags.length > 3 ? [h(NText, { depth: 3, style: { fontSize: '12px' } }, { default: () => `+${tags.length - 3}` })] : []
                     )
                 }
             )
@@ -632,39 +616,44 @@ const loadPrompts = async (reset = true) => {
             prompts.value = []
         } else {
             loadingMore.value = true
-        }
-
-        // 加载所有提示词用于计算热门标签（仅在首次加载时）
+        }        // 加载统计信息（仅在首次加载时）
         if (reset) {
-            allPrompts.value = await api.prompts.getAllForTags.query()
-        }
-
-        // 根据过滤条件加载显示的提示词（分页）
+            statistics.value = await api.prompts.getStatistics.query()
+        }// 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
             search: searchText.value || undefined,
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
-            limit: pageSize.value,
+            limit: gridPageSize.value, // 网格视图使用专门的页面大小
             sortBy: sortType.value // 添加排序参数
         }
-        
+
         const result = await api.prompts.getAll.query(filters)
         
-        // 如果是重置加载，直接替换数据；否则追加数据
+        // 调试信息
+        console.log('loadPrompts result:', {
+            filters,
+            dataLength: result.data?.length || 0,
+            total: result.total,
+            hasMore: result.hasMore,
+            currentPage: currentPage.value,
+            reset
+        })        // 如果是重置加载，直接替换数据；否则追加数据
         if (reset) {
             prompts.value = result.data || []
-            totalCount.value = result.total || 0
         } else {
             prompts.value = [...prompts.value, ...(result.data || [])]
         }
         
-        // 更新分页状态
+        // 始终更新总数和分页状态（因为过滤条件可能导致总数变化）
+        totalCount.value = result.total || 0
         hasNextPage.value = result.hasMore || false
-        
+
     } catch (error) {
         message.error('加载提示词失败')
-        console.error(error)    } finally {
+        console.error(error)
+    } finally {
         initialLoading.value = false
         loadingMore.value = false
     }
@@ -687,16 +676,19 @@ const clearSelection = () => {
 // 批量删除
 const handleBatchDelete = async () => {
     if (selectedRows.value.length === 0) return
-    
+
     try {
         // 批量删除所有选中的提示词
         for (const prompt of selectedRows.value) {
             await api.prompts.delete.mutate(prompt.id)
         }
-        
         message.success(`成功删除 ${selectedRows.value.length} 个提示词`)
         clearSelection()
-        await loadPrompts(true) // 重新加载数据
+        if (viewMode.value === 'table') {
+            await loadPromptsForTable()        } else {
+            await loadPrompts(true) // 重新加载数据
+        }
+        await loadStatistics() // 重新加载统计信息
         emit('refresh')
     } catch (error) {
         message.error('批量删除失败')
@@ -709,9 +701,41 @@ const handleLoadMore = () => {
     if (!hasNextPage.value || loadingMore.value) {
         return Promise.resolve()
     }
-    
+
     currentPage.value++
     return loadPrompts(false)
+}
+
+// 专门为表格视图加载数据的函数
+const loadPromptsForTable = async () => {
+    try {
+        loadingMore.value = true
+
+        // 根据过滤条件加载显示的提示词（分页）
+        const filters = {
+            categoryId: selectedCategory.value || undefined,
+            search: searchText.value || undefined,
+            isFavorite: showFavoritesOnly.value || undefined,
+            page: currentPage.value,
+            limit: pageSize.value,
+            sortBy: sortType.value
+        }
+
+        const result = await api.prompts.getAll.query(filters)
+
+        // 直接替换数据（表格视图不需要追加）
+        prompts.value = result.data || []
+        totalCount.value = result.total || 0
+
+        // 清除选择状态
+        clearSelection()
+
+    } catch (error) {
+        message.error('加载提示词失败')
+        console.error(error)
+    } finally {
+        loadingMore.value = false
+    }
 }
 
 const loadCategories = async () => {
@@ -725,21 +749,37 @@ const loadCategories = async () => {
 
 // 事件处理
 const handleSearch = () => {
-    loadPrompts(true) // 重置加载
+    if (viewMode.value === 'table') {
+        loadPromptsForTable()
+    } else {
+        loadPrompts(true) // 重置加载
+    }
 }
 
 // 监听排序方式变化
 watch(sortType, () => {
-    loadPrompts(true) // 排序方式变化时重新加载数据
+    if (viewMode.value === 'table') {
+        loadPromptsForTable()
+    } else {
+        loadPrompts(true) // 排序方式变化时重新加载数据
+    }
 })
 
 const handleCategoryFilter = () => {
-    loadPrompts(true) // 重置加载
+    if (viewMode.value === 'table') {
+        loadPromptsForTable()
+    } else {
+        loadPrompts(true) // 重置加载
+    }
 }
 
 const handleCategoryQuickFilter = (categoryId: string | null) => {
     selectedCategory.value = categoryId
-    loadPrompts(true) // 重置加载
+    if (viewMode.value === 'table') {
+        loadPromptsForTable()
+    } else {
+        loadPrompts(true) // 重置加载
+    }
 }
 
 const toggleCategoriesExpanded = () => {
@@ -752,7 +792,11 @@ const toggleTagsExpanded = () => {
 
 const toggleFavoritesFilter = () => {
     showFavoritesOnly.value = !showFavoritesOnly.value
-    loadPrompts(true) // 重置加载
+    if (viewMode.value === 'table') {
+        loadPromptsForTable()
+    } else {
+        loadPrompts(true) // 重置加载
+    }
 }
 
 const toggleAdvancedFilter = () => {
@@ -843,7 +887,11 @@ const handleDeletePrompt = async (prompt) => {
     if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
         try {
             await api.prompts.delete.mutate(prompt.id)
-            await loadPrompts(true) // 重置加载
+            if (viewMode.value === 'table') {
+                await loadPromptsForTable()            } else {
+                await loadPrompts(true) // 重置加载
+            }
+            await loadStatistics() // 重新加载统计信息
             message.success('提示词已删除')
             emit('refresh')
         } catch (error) {
@@ -853,17 +901,35 @@ const handleDeletePrompt = async (prompt) => {
     }
 }
 
+// 加载统计信息
+const loadStatistics = async () => {
+    try {
+        statistics.value = await api.prompts.getStatistics.query()
+    } catch (error) {
+        message.error('加载统计信息失败')
+        console.error(error)
+    }
+}
+
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()
     loadPrompts(true) // 初始加载
     loadCategories()
+    loadStatistics() // 加载统计信息
 })
 
 // 暴露方法给父组件
 defineExpose({
-    loadPrompts: () => loadPrompts(true),
-    loadCategories
+    loadPrompts: () => {
+        if (viewMode.value === 'table') {
+            loadPromptsForTable()
+        } else {
+            loadPrompts(true)
+        }
+    },
+    loadCategories,
+    loadStatistics
 })
 </script>
 
@@ -907,7 +973,8 @@ defineExpose({
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.4;
-    max-height: calc(1.4em * 3); /* 限制最大高度为3行 */
+    max-height: calc(1.4em * 3);
+    /* 限制最大高度为3行 */
     word-break: break-word;
 }
 </style>

@@ -109,12 +109,10 @@ export class PromptService extends BaseDatabaseService {
           prompt.content.toLowerCase().includes(searchQuery) ||
           (prompt.description && prompt.description.toLowerCase().includes(searchQuery))
         );
-      }
-
-      if (filters.tags) {
+      }      if (filters.tags) {
         const searchTags = filters.tags.toLowerCase().split(',').map(tag => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
-          if (!prompt.tags) return false;
+          if (!prompt.tags || typeof prompt.tags !== 'string') return false;
           const promptTags = prompt.tags.toLowerCase().split(',').map(tag => tag.trim());
           return searchTags.some(searchTag => 
             promptTags.some(promptTag => promptTag.includes(searchTag))
@@ -183,10 +181,18 @@ export class PromptService extends BaseDatabaseService {
         }
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
-    }
-
-    // 计算总数
+    }    // 计算总数
     const total = filteredPrompts.length;
+    
+    // 调试信息
+    console.log('getAllPrompts debug:', {
+      filters,
+      totalPrompts: prompts.length,
+      filteredPromptsLength: filteredPrompts.length,
+      total,
+      page: filters?.page,
+      limit: filters?.limit
+    });
 
     // 应用分页
     let paginatedPrompts = filteredPrompts;
@@ -716,6 +722,65 @@ export class PromptService extends BaseDatabaseService {
       categoryDistribution,
       tagDistribution,
       recentPrompts
+    };
+  }
+
+  /**
+   * 获取提示词统计信息
+   * 返回总数、分类统计、热门标签等信息，用于前端显示
+   * @returns Promise<{totalCount: number, categoryStats: Array, popularTags: Array}> 统计信息
+   */
+  async getPromptStatistics(): Promise<{
+    totalCount: number,
+    categoryStats: Array<{id: string | null, name: string, count: number}>,
+    popularTags: Array<{name: string, count: number}>
+  }> {
+    const prompts = await this.getAll<Prompt>('prompts');
+    const categories = await this.getAll<Category>('categories');
+
+    // 计算分类统计
+    const categoryStats = [];
+    
+    // 未分类数量
+    const uncategorizedCount = prompts.filter(p => !p.categoryId).length;
+    if (uncategorizedCount > 0) {
+      categoryStats.push({
+        id: null,
+        name: '未分类',
+        count: uncategorizedCount
+      });
+    }
+
+    // 各分类数量
+    categories.forEach(category => {
+      const count = prompts.filter(p => p.categoryId === category.id).length;
+      if (count > 0) {
+        categoryStats.push({
+          id: category.id,
+          name: category.name,
+          count
+        });
+      }
+    });    // 计算热门标签
+    const tagCounts = new Map<string, number>();
+    prompts.forEach(prompt => {
+      if (prompt.tags && typeof prompt.tags === 'string') {
+        const tags = prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+        tags.forEach(tag => {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        });
+      }
+    });
+
+    const popularTags = Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20); // 只返回前20个热门标签
+
+    return {
+      totalCount: prompts.length,
+      categoryStats,
+      popularTags
     };
   }
 }

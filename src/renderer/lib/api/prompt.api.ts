@@ -73,6 +73,23 @@ export class PromptApiClient {
     },
 
     /**
+     * 获取提示词统计信息
+     */
+    getStatistics: {
+      /**
+       * 获取提示词统计信息，包括总数、分类统计、热门标签等
+       * @returns Promise<{totalCount: number, categoryStats: Array, popularTags: Array}> 统计信息
+       */
+      query: async (): Promise<{
+        totalCount: number,
+        categoryStats: Array<{id: string | null, name: string, count: number}>,
+        popularTags: Array<{name: string, count: number}>
+      }> => {
+        return this.promptService.getPromptStatistics();
+      }
+    },
+
+    /**
      * 根据ID查询提示词
      */
     getById: {
