@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import { windowManager } from './window-manager';
+import packageJson from '../../../package.json';
 
 /**
  * 更新信息接口
@@ -38,7 +39,7 @@ class UpdateService {
    * 获取当前应用版本
    */
   getCurrentVersion(): string {
-    return app.getVersion();
+    return packageJson.version;
   }
 
   /**

@@ -188,7 +188,7 @@ import {
 import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
 
 // 应用图标
-const appIcon = new URL('/src/assets/icon.png', import.meta.url).href;
+const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href;
 
 // 状态管理
 const message = useMessage();
