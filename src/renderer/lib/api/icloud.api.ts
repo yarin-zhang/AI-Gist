@@ -43,6 +43,8 @@ const safeIpcInvoke = async (channel: string, ...args: any[]) => {
                 return await electronAPI.icloud.applyDownloadedData(args[0]);
             case 'open-sync-directory':
                 return await electronAPI.icloud.openSyncDirectory();
+            case 'get-sync-status':
+                return await electronAPI.icloud.getSyncStatus();
             default:
                 throw new Error(`Unknown iCloud method: ${method}`);
         }
@@ -56,6 +58,13 @@ export interface ICloudConfig {
     autoSync: boolean;
     syncInterval: number;
     customPath?: string;
+    // 连接验证状态
+    connectionTested?: boolean;
+    connectionValid?: boolean;
+    connectionMessage?: string;
+    connectionTestedAt?: string; // ISO 时间戳
+    // 用于检测配置是否变更的哈希值
+    configHash?: string;
 }
 
 export interface ICloudTestResult {
@@ -186,33 +195,11 @@ export class ICloudAPI {
         isSyncing: boolean;
     }> {
         try {
-            // iCloud 同步状态基于配置计算
-            const config = await this.getConfig();
-            const userPrefs = await window.electronAPI?.preferences?.get();
-            
-            return {
-                isEnabled: config.enabled && config.autoSync,
-                lastSyncTime: userPrefs?.dataSync?.lastSyncTime || null,
-                nextSyncTime: this.calculateNextSyncTime(config),
-                isSyncing: false // 这个需要从状态管理器获取
-            };
+            return await safeIpcInvoke('icloud:get-sync-status');
         } catch (error) {
             console.error('获取同步状态失败:', error);
             throw error;
         }
-    }
-
-    /**
-     * 计算下次同步时间
-     */
-    private static calculateNextSyncTime(config: ICloudConfig): string | null {
-        if (!config.enabled || !config.autoSync || !config.syncInterval) {
-            return null;
-        }
-        
-        const now = new Date();
-        const nextSync = new Date(now.getTime() + config.syncInterval * 60 * 1000);
-        return nextSync.toISOString();
     }
 
     /**
