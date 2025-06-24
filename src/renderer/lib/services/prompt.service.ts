@@ -718,13 +718,21 @@ export class PromptService extends BaseDatabaseService {
     // 标签分布统计
     const tagDistribution: Record<string, number> = {};
     allPrompts.forEach(prompt => {
-      if (prompt.tags && Array.isArray(prompt.tags)) {
-        prompt.tags.forEach(tag => {
-          if (tag) {
-            tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
-          }
-        });
+      // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+      let promptTags: string[] = [];
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          promptTags = prompt.tags;
+        } else if (typeof prompt.tags === 'string') {
+          promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+        }
       }
+      
+      promptTags.forEach(tag => {
+        if (tag) {
+          tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
+        }
+      });
     });
 
     // 最近的提示词
