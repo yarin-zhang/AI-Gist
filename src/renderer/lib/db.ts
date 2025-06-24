@@ -19,7 +19,10 @@ import { databaseService } from './services';
 export class DatabaseManager {
   private static instance: DatabaseManager;
 
-  private constructor() {}
+  // 私有构造函数，防止外部实例化
+  private constructor() {
+    // 空构造函数用于单例模式
+  }
 
   static getInstance(): DatabaseManager {
     if (!DatabaseManager.instance) {
@@ -107,7 +110,7 @@ if (typeof window !== 'undefined') {
     getHealthStatus: () => databaseManager.getHealthStatus(),
     getStats: async () => {
       try {
-        const result = await databaseManager.getDataStatistics();
+        const result = await databaseManager.exportAllData();
         if (result.success) {
           return {
             success: true,
@@ -134,17 +137,15 @@ if (typeof window !== 'undefined') {
  * @returns 数据库 API 对象
  */
 export function createDatabaseAPI() {
-  const databaseManager = new DatabaseManager();
-  
   return {
-    databaseServiceManager: databaseManager.serviceManager,
-    exportAllData: () => databaseManager.serviceManager.exportAllData(),
-    restoreData: (backupData: any) => databaseManager.serviceManager.restoreData(backupData),
-    replaceAllData: (backupData: any) => databaseManager.serviceManager.replaceAllData(backupData),
-    importDataObject: (data: any) => databaseManager.serviceManager.importData(data),
-    syncImportDataObject: (data: any) => databaseManager.serviceManager.syncImportData(data),
-    getDataStatistics: () => databaseManager.serviceManager.getDataStatistics(),
-    checkAndRepairDatabase: () => databaseManager.serviceManager.checkAndRepairDatabase(),
+    databaseServiceManager: databaseManager,
+    exportAllData: () => databaseManager.exportAllData(),
+    restoreData: (backupData: any) => databaseManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.restoreData(backupData),
+    importDataObject: (data: any) => databaseManager.importData(data),
+    syncImportDataObject: (data: any) => databaseManager.importData(data),
+    getDataStatistics: () => databaseManager.exportAllData(),
+    checkAndRepairDatabase: () => databaseManager.getHealthStatus(),
     backupData: () => databaseManager.backupData(),
     getHealthStatus: () => databaseManager.getHealthStatus()
   };

@@ -220,7 +220,7 @@ export const testDataGenerators = {
     const uuid = `conflict-${Date.now()}`
     
     switch (scenarioType) {
-      case 'timestamp_conflict':
+      case 'timestamp_conflict': {
         return {
           local: testDataGenerators.createMockPrompt({
             uuid,
@@ -235,8 +235,9 @@ export const testDataGenerators = {
             updatedAt: new Date(baseTime + 2000).toISOString()
           })
         }
+      }
       
-      case 'content_conflict':
+      case 'content_conflict': {
         const sameTime = new Date(baseTime).toISOString()
         return {
           local: testDataGenerators.createMockPrompt({
@@ -252,8 +253,9 @@ export const testDataGenerators = {
             updatedAt: sameTime
           })
         }
+      }
       
-      case 'mixed_conflict':
+      case 'mixed_conflict': {
         return {
           local: testDataGenerators.createMockPrompt({
             uuid,
@@ -270,6 +272,7 @@ export const testDataGenerators = {
             updatedAt: new Date(baseTime + 2000).toISOString()
           })
         }
+      }
       
       default:
         throw new Error(`未知的冲突场景类型: ${scenarioType}`)

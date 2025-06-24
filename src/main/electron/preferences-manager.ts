@@ -1,7 +1,8 @@
 import { app } from 'electron';
 import * as fs from 'fs';
-import * as path from 'path';
+import path from 'path';
 import { UserPreferences } from '@shared/types';
+import { themeManager } from './theme-manager';
 
 /**
  * 用户偏好设置管理器
@@ -278,8 +279,6 @@ class PreferencesManager {
    */
   applyThemeSettings(): void {
     try {
-      // 动态导入主题管理器以避免循环依赖
-      const { themeManager } = require('./theme-manager');
       themeManager.setThemeSource(this.userPrefs.themeSource);
       console.log(`已应用主题设置: ${this.userPrefs.themeSource}`);
     } catch (error) {

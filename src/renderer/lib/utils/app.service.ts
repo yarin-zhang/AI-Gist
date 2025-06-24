@@ -3,7 +3,8 @@
  * 统一管理应用级别的功能，如偏好设置、主题、WebDAV等
  */
 
-import { IpcUtils, type IpcResult } from '../ipc.ts';
+import { IpcUtils } from '../ipc';
+import type { IpcResult } from '@shared/types';
 import type { WebDAVConfig } from '@shared/types/webdav';
 
 export interface AppPreferences {
@@ -19,7 +20,10 @@ export interface AppPreferences {
 export class AppService {
   private static instance: AppService;
 
-  private constructor() {}
+  // 私有构造函数，防止外部实例化
+  private constructor() {
+    // 空构造函数用于单例模式
+  }
 
   static getInstance(): AppService {
     if (!AppService.instance) {

@@ -1,4 +1,4 @@
-import { Tray, Menu, nativeImage, BrowserWindow } from 'electron';
+import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
 import { getAppIconPath } from './utils';
 
 /**
@@ -118,7 +118,6 @@ class TrayManager {
         // 确保应用获得焦点
         this.mainWindow.focus();
         // 在 macOS 下，确保应用出现在前台
-        const { app } = require('electron');
         app.focus({ steal: true });
       } else {
         // 其他平台的处理
@@ -140,7 +139,6 @@ class TrayManager {
       this.onQuitCallback();
     } else {
       // 备用方案：直接退出
-      const { app } = require('electron');
       app.quit();
     }
   }

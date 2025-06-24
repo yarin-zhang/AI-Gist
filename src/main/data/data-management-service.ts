@@ -17,6 +17,7 @@ import {
   ExportResult,
   DataStats 
 } from '@shared/types/data-management';
+import { createHash } from 'crypto';
 
 export class DataManagementService {
     private backupDir: string;
@@ -1190,8 +1191,6 @@ export class DataManagementService {
             };
         }
 
-        const crypto = require('crypto');
-        
         // 生成简单的 UUID（类似 v4 格式）
         const generateUUID = () => {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
