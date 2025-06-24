@@ -1,9 +1,13 @@
 // eslint.config.js
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
+import vue from "eslint-plugin-vue";
+
+// 用于解析 .vue 文件的 parser
+const vueParser = await import("vue-eslint-parser");
 
 export default await tseslint.config(
-  // 用于所有 TypeScript 文件
+  // 通用 TypeScript 设置
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
@@ -12,12 +16,12 @@ export default await tseslint.config(
       ...tseslint.configs.stylistic,
     ],
     rules: {
-      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      // 更多规则
     },
   },
-  // 为不同的 TypeScript 配置创建单独的配置
+
+  // 针对 src/renderer 的 tsconfig
   {
     files: ["src/renderer/**/*.{ts,tsx}"],
     languageOptions: {
@@ -26,6 +30,8 @@ export default await tseslint.config(
       },
     },
   },
+
+  // 针对 src/main 的 tsconfig
   {
     files: ["src/main/**/*.{ts,tsx}"],
     languageOptions: {
@@ -33,5 +39,24 @@ export default await tseslint.config(
         project: "./src/main/tsconfig.json",
       },
     },
+  },
+
+  // 支持 Vue 文件（全局范围）
+  {
+    files: ["**/*.vue"],
+    languageOptions: {
+      parser: vueParser.default,
+      parserOptions: {
+        parser: {
+          ts: "@typescript-eslint/parser",
+        },
+        ecmaVersion: "latest",
+        sourceType: "module",
+        extraFileExtensions: [".vue"],
+      },
+    },
+    plugins: {
+      vue,
+    }
   }
 );
