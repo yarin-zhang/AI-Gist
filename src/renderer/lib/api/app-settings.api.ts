@@ -4,7 +4,7 @@
  */
 
 import { AppSettingsService } from '../services/app-settings.service';
-import { AppSettings } from '../types/database';
+import { AppSettings } from '@shared/types/database';
 
 /**
  * 应用设置API客户端类

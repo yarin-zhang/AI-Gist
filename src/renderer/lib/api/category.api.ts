@@ -4,7 +4,7 @@
  */
 
 import { CategoryService } from '../services/category.service';
-import { Category, CategoryWithRelations } from '../types/database';
+import { Category, CategoryWithRelations } from '@shared/types/database';
 
 /**
  * 分类API客户端类

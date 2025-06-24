@@ -60,7 +60,7 @@ export class WebDAVAPI {
     /**
      * 立即同步数据
      */
-    static async syncNow(): Promise<SyncResult> {
+    static async syncNow(): Promise<WebDAVSyncResult> {
         try {
             return await ipcInvoke('webdav:sync-now');
         } catch (error) {
@@ -73,7 +73,7 @@ export class WebDAVAPI {
      * 安全同步数据
      * 在同步前检查数据库健康状态，必要时修复
      */
-    static async safeSyncNow(): Promise<SyncResult> {
+    static async safeSyncNow(): Promise<WebDAVSyncResult> {
         try {
             // 检查数据库健康状态
             const checkResult = await databaseServiceManager.checkAndRepairDatabase();
@@ -210,7 +210,7 @@ export class WebDAVAPI {
         }
     }
 
-    static async syncWithMergeConfirmed(): Promise<SyncResult> {
+    static async syncWithMergeConfirmed(): Promise<WebDAVSyncResult> {
         try {
             return await ipcInvoke('webdav:sync-with-merge-confirmed');
         } catch (error) {

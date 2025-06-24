@@ -12,7 +12,7 @@ import {
   PromptFilters, 
   PaginatedResult, 
   PromptFillResult 
-} from '../types/database';
+} from '@shared/types/database';
 
 /**
  * 提示词API客户端类
