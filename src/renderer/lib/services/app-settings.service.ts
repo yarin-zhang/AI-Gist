@@ -115,7 +115,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue string 默认值
    * @returns Promise<string> 设置值或默认值
    */
-  async getStringValue(key: string, defaultValue: string = ''): Promise<string> {
+  async getStringValue(key: string, defaultValue = ''): Promise<string> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'string') {
       return defaultValue;
@@ -142,7 +142,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue number 默认值
    * @returns Promise<number> 设置值或默认值
    */
-  async getNumberValue(key: string, defaultValue: number = 0): Promise<number> {
+  async getNumberValue(key: string, defaultValue = 0): Promise<number> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'number') {
       return defaultValue;
@@ -170,7 +170,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue boolean 默认值
    * @returns Promise<boolean> 设置值或默认值
    */
-  async getBooleanValue(key: string, defaultValue: boolean = false): Promise<boolean> {
+  async getBooleanValue(key: string, defaultValue = false): Promise<boolean> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'boolean') {
       return defaultValue;
@@ -367,7 +367,7 @@ export class AppSettingsService extends BaseDatabaseService {
    */
   async importSettings(
     settingsData: Record<string, any>, 
-    overwrite: boolean = false
+    overwrite = false
   ): Promise<{ imported: number; skipped: number; failed: number }> {
     let imported = 0;
     let skipped = 0;

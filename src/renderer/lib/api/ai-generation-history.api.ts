@@ -132,7 +132,7 @@ export class AIGenerationHistoryApiClient {
        * @param limit 返回记录数量
        * @returns Promise<AIGenerationHistory[]> 最近的历史记录列表
        */
-      query: async (limit: number = 10): Promise<AIGenerationHistory[]> => {
+      query: async (limit = 10): Promise<AIGenerationHistory[]> => {
         return this.aiGenerationHistoryService.getRecentAIGenerationHistory(limit);
       }
     },
@@ -291,7 +291,7 @@ export class AIGenerationHistoryApiClient {
        * @param days 统计天数
        * @returns Promise<Record<string, { total: number; success: number; error: number }>> 按日期分组的统计
        */
-      query: async (days: number = 30): Promise<Record<string, { 
+      query: async (days = 30): Promise<Record<string, { 
         total: number; 
         success: number; 
         error: number 
@@ -309,7 +309,7 @@ export class AIGenerationHistoryApiClient {
        * @param limit 返回模型数量
        * @returns Promise<Array<{ model: string; count: number }>> 模型使用统计
        */
-      query: async (limit: number = 10): Promise<Array<{ model: string; count: number }>> => {
+      query: async (limit = 10): Promise<{ model: string; count: number }[]> => {
         return this.aiGenerationHistoryService.getMostUsedModels(limit);
       }
     },

@@ -174,7 +174,7 @@ export class CategoryApiClient {
        * @param input 分类数据数组
        * @returns Promise<{ created: Category[], skipped: string[] }> 创建结果
        */
-      mutate: async (input: Array<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>): Promise<{ 
+      mutate: async (input: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<{ 
         created: Category[], 
         skipped: string[] 
       }> => {
@@ -190,11 +190,11 @@ export class CategoryApiClient {
        * 获取每个分类下的提示词数量统计
        * @returns Promise<Array<{ categoryId: number; categoryName: string; promptCount: number }>> 使用统计
        */
-      query: async (): Promise<Array<{
+      query: async (): Promise<{
         categoryId: number;
         categoryName: string;
         promptCount: number;
-      }>> => {
+      }[]> => {
         return this.categoryService.getCategoryUsageStats();
       }
     },

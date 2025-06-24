@@ -150,11 +150,11 @@ export class CategoryService extends BaseDatabaseService {
    * 返回每个分类下的提示词数量统计
    * @returns Promise<{ categoryId: number; categoryName: string; promptCount: number }[]> 分类使用统计列表
    */
-  async getCategoryUsageStats(): Promise<Array<{
+  async getCategoryUsageStats(): Promise<{
     categoryId: number;
     categoryName: string;
     promptCount: number;
-  }>> {
+  }[]> {
     const categoriesWithPrompts = await this.getAllCategories();
     
     return categoriesWithPrompts.map(category => ({
@@ -196,7 +196,7 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<{ created: Category[], skipped: string[] }> 创建结果，包含成功创建的分类和跳过的分类名称
    */
   async batchCreateCategories(
-    categories: Array<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>
+    categories: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[]
   ): Promise<{ created: Category[], skipped: string[] }> {
     const created: Category[] = [];
     const skipped: string[] = [];

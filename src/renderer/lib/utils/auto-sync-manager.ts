@@ -56,7 +56,7 @@ class AutoSyncManager {
   private debounceTimer: number | null = null;
   private retryTimer: number | null = null;
   private retryCount = 0;
-  private statusListeners: Array<(status: SyncStatus) => void> = [];
+  private statusListeners: ((status: SyncStatus) => void)[] = [];
   
   // 新增：待处理的同步元数据
   private pendingSyncMetadata: SyncMetadata | null = null;
@@ -320,8 +320,8 @@ class AutoSyncManager {
   /**
    * 执行所有启用的同步服务
    */
-  private async performAllSyncs(): Promise<Array<{service: string, success: boolean, message: string}>> {
-    const results: Array<{service: string, success: boolean, message: string}> = [];
+  private async performAllSyncs(): Promise<{service: string, success: boolean, message: string}[]> {
+    const results: {service: string, success: boolean, message: string}[] = [];
     
     try {
       // WebDAV 同步

@@ -15,8 +15,8 @@ export class BaseDatabaseService {
   protected readonly dbName = 'AIGistDB';
   protected readonly dbVersion = 6; // 增加版本号以支持UUID索引
   protected initializationPromise: Promise<void> | null = null;
-  protected isInitialized: boolean = false;
-  private currentDbVersion: number = 6; // 添加一个可变的版本号变量
+  protected isInitialized = false;
+  private currentDbVersion = 6; // 添加一个可变的版本号变量
 
   /**
    * 初始化数据库连接
@@ -804,7 +804,7 @@ export class BaseDatabaseService {
    * 批量为所有需要同步的表添加UUID
    * @returns Promise<{ [storeName: string]: number }> 每个表添加UUID的记录数量
    */
-  async migrateAllRecordsToUUID(): Promise<{ [storeName: string]: number }> {
+  async migrateAllRecordsToUUID(): Promise<Record<string, number>> {
     const syncStores = [
       'categories',
       'prompts', 
@@ -814,7 +814,7 @@ export class BaseDatabaseService {
       'ai_generation_history'
     ];
     
-    const results: { [storeName: string]: number } = {};
+    const results: Record<string, number> = {};
     
     for (const storeName of syncStores) {
       try {

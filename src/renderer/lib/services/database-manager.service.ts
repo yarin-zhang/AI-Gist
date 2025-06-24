@@ -189,7 +189,7 @@ export class DatabaseServiceManager {
       
       // 首先尝试普通修复
       console.log('尝试修复数据库...');
-      let repairResult = await this.repairDatabase();
+      const repairResult = await this.repairDatabase();
       
       if (repairResult.success) {
         return {

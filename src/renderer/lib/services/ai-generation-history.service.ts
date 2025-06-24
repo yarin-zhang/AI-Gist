@@ -254,7 +254,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param limit number 返回的记录数量，默认为10
    * @returns Promise<AIGenerationHistory[]> 最近的历史记录列表
    */
-  async getRecentAIGenerationHistory(limit: number = 10): Promise<AIGenerationHistory[]> {
+  async getRecentAIGenerationHistory(limit = 10): Promise<AIGenerationHistory[]> {
     const histories = await this.getAllAIGenerationHistory();
     return histories.slice(0, limit);
   }
@@ -324,7 +324,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param days number 统计的天数，默认为30天
    * @returns Promise<Record<string, { total: number; success: number; error: number }>> 按日期分组的统计
    */
-  async getHistoryStatsByDate(days: number = 30): Promise<Record<string, { total: number; success: number; error: number }>> {
+  async getHistoryStatsByDate(days = 30): Promise<Record<string, { total: number; success: number; error: number }>> {
     const histories = await this.getAllAIGenerationHistory();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -356,7 +356,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param limit number 返回的模型数量，默认为10
    * @returns Promise<Array<{ model: string; count: number }>> 模型使用统计
    */
-  async getMostUsedModels(limit: number = 10): Promise<Array<{ model: string; count: number }>> {
+  async getMostUsedModels(limit = 10): Promise<{ model: string; count: number }[]> {
     const histories = await this.getAllAIGenerationHistory();
     const modelStats: Record<string, number> = {};
 

@@ -58,7 +58,7 @@ export class PromptService extends BaseDatabaseService {
     });
 
     // 创建 variables，每个变量也生成UUID
-    let createdVariables: PromptVariable[] = [];
+    const createdVariables: PromptVariable[] = [];
     if (variables && variables.length > 0) {
       for (const variable of variables) {
         const createdVariable = await this.add<PromptVariable>('promptVariables', {
@@ -738,8 +738,8 @@ export class PromptService extends BaseDatabaseService {
    */
   async getPromptStatistics(): Promise<{
     totalCount: number,
-    categoryStats: Array<{id: string | null, name: string, count: number}>,
-    popularTags: Array<{name: string, count: number}>
+    categoryStats: {id: string | null, name: string, count: number}[],
+    popularTags: {name: string, count: number}[]
   }> {
     const prompts = await this.getAll<Prompt>('prompts');
     const categories = await this.getAll<Category>('categories');
