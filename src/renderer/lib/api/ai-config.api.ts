@@ -4,7 +4,7 @@
  */
 
 import { AIConfigService } from '../services/ai-config.service';
-import { AIConfig } from '../types/database';
+import { AIConfig } from '@shared/types/database';
 
 /**
  * AI配置API客户端类

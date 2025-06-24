@@ -12,7 +12,7 @@ import {
   PromptFilters, 
   PaginatedResult, 
   PromptFillResult 
-} from '../types/database';
+} from '@shared/types/database';
 
 /**
  * 提示词API客户端类
@@ -82,8 +82,8 @@ export class PromptApiClient {
        */
       query: async (): Promise<{
         totalCount: number,
-        categoryStats: Array<{id: string | null, name: string, count: number}>,
-        popularTags: Array<{name: string, count: number}>
+        categoryStats: {id: string | null, name: string, count: number}[],
+        popularTags: {name: string, count: number}[]
       }> => {
         return this.promptService.getPromptStatistics();
       }

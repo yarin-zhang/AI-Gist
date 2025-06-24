@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     forceUpload: () => ipcRenderer.invoke('webdav:force-upload'),
     forceDownload: () => ipcRenderer.invoke('webdav:force-download'),
     compareData: () => ipcRenderer.invoke('webdav:compare-data'),
+    recordDeletedItems: (uuids: string[]) => ipcRenderer.invoke('webdav:record-deleted-items', uuids),
+    deleteRemoteItems: (uuids: string[]) => ipcRenderer.invoke('webdav:delete-remote-items', uuids),
   },
   // iCloud 同步管理
   icloud: {

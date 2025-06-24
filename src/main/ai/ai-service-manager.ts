@@ -22,7 +22,7 @@ class AIServiceManager {
   /**
    * 创建带超时的 fetch 请求
    */
-  private createTimeoutFetch(timeoutMs: number = 15000) {
+  private createTimeoutFetch(timeoutMs = 15000) {
     return (url: string, options: any = {}) => {
       return Promise.race([
         fetch(url, options),
@@ -36,7 +36,7 @@ class AIServiceManager {
   /**
    * 创建带超时的 LangChain 调用
    */
-  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> {
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
     return Promise.race([
       promise,
       new Promise<never>((_, reject) => 
@@ -51,8 +51,8 @@ class AIServiceManager {
    */
   private async withSmartTimeout<T>(
     promise: Promise<T>, 
-    timeoutMs: number = 60000,
-    activityCheckMs: number = 5000, // 检查活动的间隔
+    timeoutMs = 60000,
+    activityCheckMs = 5000, // 检查活动的间隔
     onActivityCheck?: () => boolean // 返回true表示有活动，false表示无活动
   ): Promise<T> {
     let isActive = true;

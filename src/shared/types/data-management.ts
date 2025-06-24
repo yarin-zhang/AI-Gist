@@ -85,6 +85,13 @@ export interface ExportResult {
   format?: string;
   compressed?: boolean;
   encrypted?: boolean;
+  data?: {
+    categories: any[];
+    prompts: any[];
+    aiConfigs: any[];
+    aiHistory: any[];
+    settings: any[];
+  };
 }
 
 /**

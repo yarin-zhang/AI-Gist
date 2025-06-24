@@ -230,10 +230,10 @@ export interface AIGenerationHistoryStats {
   failed: number;
   pending: number;
   totalByConfig: Record<string, number>;
-  mostUsedConfigs: Array<{
+  mostUsedConfigs: {
     configId: string;
     count: number;
-  }>;
+  }[];
 }
 
 /**

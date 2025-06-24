@@ -35,7 +35,9 @@ export class AIConfigService extends BaseDatabaseService {
   async createAIConfig(data: Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<AIConfig> {
     const configWithUUID = {
       ...data,
-      uuid: generateUUID()
+      uuid: generateUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     return this.add<AIConfig>('ai_configs', configWithUUID);
   }
@@ -449,7 +451,7 @@ export class AIConfigService extends BaseDatabaseService {
         // Update existing config
         await this.update('ai_configs', existing.id!, {
           ...data,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date()
         });
     } else {
         // Create new config
@@ -457,10 +459,10 @@ export class AIConfigService extends BaseDatabaseService {
           ...data,
           id: parseInt(id),
           uuid: generateUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
-        await this.add('ai_configs', newData as AIConfig);
+        await this.add('ai_configs', newData as unknown as AIConfig);
     }
   }
 }

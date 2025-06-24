@@ -150,7 +150,7 @@ export class WebDAVSyncCore {
     try {
       // 1. 获取本地和远程快照
       const localSnapshot = await this.getLocalSnapshot();
-      let remoteSnapshot = await this.getRemoteSnapshot(client);
+      const remoteSnapshot = await this.getRemoteSnapshot(client);
 
       // 2. 如果是首次同步，执行初始上传
       if (!remoteSnapshot) {

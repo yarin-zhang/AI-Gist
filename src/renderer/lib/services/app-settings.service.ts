@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { AppSettings } from '../types/database';
+import { AppSettings } from '@shared/types/database';
 
 /**
  * 应用设置数据服务类
@@ -31,7 +31,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param data Omit<AppSettings, 'id' | 'createdAt' | 'updatedAt'> 设置数据（不包含自动生成的字段）
    * @returns Promise<AppSettings> 创建成功的设置记录（包含生成的ID和时间戳）
    */
-  async createSetting(data: Omit<AppSettings, 'id' | 'createdAt' | 'updatedAt'>): Promise<AppSettings> {
+  async createSetting(data: Omit<AppSettings, 'id'>): Promise<AppSettings> {
     return this.add<AppSettings>('settings', data);
   }
 
@@ -60,14 +60,14 @@ export class AppSettingsService extends BaseDatabaseService {
    * 更新指定键名的设置值，如果设置不存在则创建新设置
    * @param key string 设置键名
    * @param value string 设置值
-   * @param type 'string' | 'number' | 'boolean' | 'json' 值类型，默认为'string'
+   * @param type 'string' | 'number' | 'boolean' | 'object' | 'array' 值类型，默认为'string'
    * @param description string 设置描述
    * @returns Promise<AppSettings> 更新或创建后的设置记录
    */
   async updateSettingByKey(
     key: string, 
     value: string, 
-    type: 'string' | 'number' | 'boolean' | 'json' = 'string',
+    type: 'string' | 'number' | 'boolean' | 'object' | 'array' = 'string',
     description?: string
   ): Promise<AppSettings> {
     const existingSetting = await this.getSettingByKey(key);
@@ -86,6 +86,7 @@ export class AppSettingsService extends BaseDatabaseService {
         value,
         type,
         description,
+        isSystem: false,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -114,7 +115,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue string 默认值
    * @returns Promise<string> 设置值或默认值
    */
-  async getStringValue(key: string, defaultValue: string = ''): Promise<string> {
+  async getStringValue(key: string, defaultValue = ''): Promise<string> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'string') {
       return defaultValue;
@@ -141,7 +142,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue number 默认值
    * @returns Promise<number> 设置值或默认值
    */
-  async getNumberValue(key: string, defaultValue: number = 0): Promise<number> {
+  async getNumberValue(key: string, defaultValue = 0): Promise<number> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'number') {
       return defaultValue;
@@ -169,7 +170,7 @@ export class AppSettingsService extends BaseDatabaseService {
    * @param defaultValue boolean 默认值
    * @returns Promise<boolean> 设置值或默认值
    */
-  async getBooleanValue(key: string, defaultValue: boolean = false): Promise<boolean> {
+  async getBooleanValue(key: string, defaultValue = false): Promise<boolean> {
     const setting = await this.getSettingByKey(key);
     if (!setting || setting.type !== 'boolean') {
       return defaultValue;
@@ -198,7 +199,7 @@ export class AppSettingsService extends BaseDatabaseService {
    */
   async getJsonValue<T = any>(key: string, defaultValue: T = {} as T): Promise<T> {
     const setting = await this.getSettingByKey(key);
-    if (!setting || setting.type !== 'json') {
+    if (!setting || setting.type !== 'object') {
       return defaultValue;
     }
     
@@ -220,7 +221,7 @@ export class AppSettingsService extends BaseDatabaseService {
    */
   async setJsonValue(key: string, value: any, description?: string): Promise<AppSettings> {
     const jsonString = JSON.stringify(value);
-    return this.updateSettingByKey(key, jsonString, 'json', description);
+    return this.updateSettingByKey(key, jsonString, 'object', description);
   }
 
   /**
@@ -254,12 +255,12 @@ export class AppSettingsService extends BaseDatabaseService {
   /**
    * 批量设置值
    * 一次性更新多个设置的值
-   * @param settings Record<string, { value: string; type?: 'string' | 'number' | 'boolean' | 'json'; description?: string }> 设置数据
+   * @param settings Record<string, { value: string; type?: 'string' | 'number' | 'boolean' | 'object' | 'array'; description?: string }> 设置数据
    * @returns Promise<{ success: number; failed: number }> 操作结果统计
    */
   async setBatchSettings(settings: Record<string, {
     value: string;
-    type?: 'string' | 'number' | 'boolean' | 'json';
+    type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
     description?: string;
   }>): Promise<{ success: number; failed: number }> {
     let success = 0;
@@ -334,7 +335,7 @@ export class AppSettingsService extends BaseDatabaseService {
         case 'boolean':
           value = setting.value === 'true';
           break;
-        case 'json':
+        case 'object':
           try {
             value = JSON.parse(setting.value);
           } catch {
@@ -366,7 +367,7 @@ export class AppSettingsService extends BaseDatabaseService {
    */
   async importSettings(
     settingsData: Record<string, any>, 
-    overwrite: boolean = false
+    overwrite = false
   ): Promise<{ imported: number; skipped: number; failed: number }> {
     let imported = 0;
     let skipped = 0;
@@ -386,7 +387,7 @@ export class AppSettingsService extends BaseDatabaseService {
         
         // 根据类型转换值为字符串
         switch (type) {
-          case 'json':
+          case 'object':
             value = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
             break;
           default:

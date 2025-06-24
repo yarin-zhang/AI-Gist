@@ -15,7 +15,8 @@ export class BaseDatabaseService {
   protected readonly dbName = 'AIGistDB';
   protected readonly dbVersion = 6; // 增加版本号以支持UUID索引
   protected initializationPromise: Promise<void> | null = null;
-  protected isInitialized: boolean = false;
+  protected isInitialized = false;
+  private currentDbVersion = 6; // 添加一个可变的版本号变量
 
   /**
    * 初始化数据库连接
@@ -35,7 +36,7 @@ export class BaseDatabaseService {
 
     // 创建初始化 Promise
     this.initializationPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.dbVersion);
+      const request = indexedDB.open(this.dbName, this.currentDbVersion);
 
       request.onerror = () => {
         console.error('Failed to open database:', request.error);
@@ -95,6 +96,9 @@ export class BaseDatabaseService {
         categoryStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('categories 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const categoryStore = db.transaction(['categories'], 'readwrite').objectStore('categories');
+        this.ensureIndexExists(categoryStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 prompts 表
@@ -111,6 +115,9 @@ export class BaseDatabaseService {
         promptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('prompts 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const promptStore = db.transaction(['prompts'], 'readwrite').objectStore('prompts');
+        this.ensureIndexExists(promptStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 promptVariables 表
@@ -122,6 +129,9 @@ export class BaseDatabaseService {
         variableStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptVariables 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const variableStore = db.transaction(['promptVariables'], 'readwrite').objectStore('promptVariables');
+        this.ensureIndexExists(variableStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 promptHistories 表
@@ -133,6 +143,9 @@ export class BaseDatabaseService {
         historyStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptHistories 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const historyStore = db.transaction(['promptHistories'], 'readwrite').objectStore('promptHistories');
+        this.ensureIndexExists(historyStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 ai_configs 表
@@ -146,6 +159,9 @@ export class BaseDatabaseService {
         configStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_configs 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const configStore = db.transaction(['ai_configs'], 'readwrite').objectStore('ai_configs');
+        this.ensureIndexExists(configStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 ai_generation_history 表
@@ -159,6 +175,9 @@ export class BaseDatabaseService {
         generationStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_generation_history 对象存储已存在');
+        // 为已存在的对象存储添加缺失的索引
+        const generationStore = db.transaction(['ai_generation_history'], 'readwrite').objectStore('ai_generation_history');
+        this.ensureIndexExists(generationStore, 'uuid', 'uuid', { unique: true });
       }
 
       // 创建 settings 表
@@ -171,9 +190,6 @@ export class BaseDatabaseService {
       }
       
       console.log('对象存储创建完成，最终对象存储列表:', Array.from(db.objectStoreNames));
-      
-      // 为现有的对象存储添加缺失的UUID索引
-      this.upgradeExistingStoresIndexes(db);
     } catch (error) {
       console.error('创建对象存储时出错:', error);
       throw error;
@@ -181,55 +197,22 @@ export class BaseDatabaseService {
   }
 
   /**
-   * 升级现有对象存储的索引
-   * 为已存在的对象存储添加缺失的UUID索引
-   * @param db IDBDatabase 数据库实例
+   * 确保索引存在，如果不存在则创建
+   * @param store IDBObjectStore 对象存储
+   * @param indexName string 索引名称
+   * @param keyPath string 索引键路径
+   * @param options IDBIndexParameters 索引选项
    */
-  private upgradeExistingStoresIndexes(db: IDBDatabase): void {
-    console.log('开始升级现有对象存储的索引...');
-    
+  private ensureIndexExists(store: IDBObjectStore, indexName: string, keyPath: string, options: IDBIndexParameters): void {
     try {
-      const storeIndexMapping = {
-        'categories': ['uuid'],
-        'prompts': ['uuid'],
-        'promptVariables': ['uuid'],
-        'promptHistories': ['uuid'],
-        'ai_configs': ['uuid'],
-        'ai_generation_history': ['uuid']
-      };
-      
-      // 获取当前事务
-      const transaction = db.transaction ? db.transaction : null;
-      
-      for (const [storeName, requiredIndexes] of Object.entries(storeIndexMapping)) {
-        if (db.objectStoreNames.contains(storeName)) {
-          try {
-            // 只有在有活动事务时才能修改索引
-            if (transaction) {
-              const store = transaction.objectStore(storeName);
-              
-              for (const indexName of requiredIndexes) {
-                if (!Array.from(store.indexNames).includes(indexName)) {
-                  console.log(`为 ${storeName} 添加 ${indexName} 索引`);
-                  try {
-                    store.createIndex(indexName, indexName, { unique: true });
-                  } catch (indexError) {
-                    console.warn(`添加索引 ${storeName}.${indexName} 失败:`, indexError);
-                  }
-                } else {
-                  console.log(`索引 ${storeName}.${indexName} 已存在`);
-                }
-              }
-            }
-          } catch (storeError) {
-            console.warn(`升级存储 ${storeName} 索引时出错:`, storeError);
-          }
-        }
+      if (!Array.from(store.indexNames).includes(indexName)) {
+        console.log(`为对象存储 ${store.name} 添加 ${indexName} 索引`);
+        store.createIndex(indexName, keyPath, options);
+      } else {
+        console.log(`索引 ${store.name}.${indexName} 已存在`);
       }
-      
-      console.log('索引升级完成');
     } catch (error) {
-      console.error('升级索引时出错:', error);
+      console.warn(`添加索引 ${store.name}.${indexName} 失败:`, error);
     }
   }
 
@@ -571,13 +554,13 @@ export class BaseDatabaseService {
       }
 
       const healthy = missingStores.length === 0;
-      const needsRepair = !healthy || this.db.version < this.dbVersion;
+      const needsRepair = !healthy || this.db.version < this.currentDbVersion;
 
       console.log('数据库健康检查结果:', {
         healthy,
         missingStores,
         currentVersion: this.db.version,
-        expectedVersion: this.dbVersion,
+        expectedVersion: this.currentDbVersion,
         needsRepair,
         existingStores
       });
@@ -622,7 +605,7 @@ export class BaseDatabaseService {
         healthy: healthStatus.healthy,
         missingStores: healthStatus.missingStores,
         currentVersion: healthStatus.currentVersion,
-        expectedVersion: this.dbVersion,
+        expectedVersion: this.currentDbVersion,
         needsRepair: healthStatus.needsRepair
       });
 
@@ -644,11 +627,11 @@ export class BaseDatabaseService {
         console.log('尝试通过版本升级修复...');
         
         // 强制升级到更高版本
-        this.dbVersion = this.dbVersion + 1;
+        this.currentDbVersion = this.currentDbVersion + 1;
         await this.initialize();
         
         // 恢复原版本号
-        this.dbVersion = this.dbVersion - 1;
+        this.currentDbVersion = this.currentDbVersion - 1;
       }
 
       // 再次检查健康状态
@@ -821,7 +804,7 @@ export class BaseDatabaseService {
    * 批量为所有需要同步的表添加UUID
    * @returns Promise<{ [storeName: string]: number }> 每个表添加UUID的记录数量
    */
-  async migrateAllRecordsToUUID(): Promise<{ [storeName: string]: number }> {
+  async migrateAllRecordsToUUID(): Promise<Record<string, number>> {
     const syncStores = [
       'categories',
       'prompts', 
@@ -831,7 +814,7 @@ export class BaseDatabaseService {
       'ai_generation_history'
     ];
     
-    const results: { [storeName: string]: number } = {};
+    const results: Record<string, number> = {};
     
     for (const storeName of syncStores) {
       try {

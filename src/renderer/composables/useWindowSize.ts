@@ -130,7 +130,7 @@ export function useModalLayout(
   const updateActualHeights = async (
     headerRef?: any,
     footerRef?: any,
-    hasFooterValue: boolean = false
+    hasFooterValue = false
   ) => {
     await nextTick()
 

@@ -209,40 +209,43 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    */
   async getAIGenerationHistoryStats(): Promise<AIGenerationHistoryStats> {
     const histories = await this.getAllAIGenerationHistory();
-    
-    const stats: AIGenerationHistoryStats = {
-      total: histories.length,
-      success: 0,
-      error: 0,
-      byConfig: {}
-    };
+    // 统计字段初始化
+    let successful = 0;
+    let failed = 0;
+    let pending = 0;
+    const totalByConfig: Record<string, number> = {};
+    const configUsage: Record<string, number> = {};
 
     histories.forEach(history => {
       // 统计总体状态
       if (history.status === 'success') {
-        stats.success++;
+        successful++;
       } else if (history.status === 'error') {
-        stats.error++;
+        failed++;
+      } else if (history.status === 'pending') {
+        pending++;
       }
-
       // 按配置ID统计
-      if (!stats.byConfig[history.configId]) {
-        stats.byConfig[history.configId] = {
-          total: 0,
-          success: 0,
-          error: 0
-        };
-      }
-      
-      stats.byConfig[history.configId].total++;
-      if (history.status === 'success') {
-        stats.byConfig[history.configId].success++;
-      } else if (history.status === 'error') {
-        stats.byConfig[history.configId].error++;
+      if (history.configId) {
+        totalByConfig[history.configId] = (totalByConfig[history.configId] || 0) + 1;
+        configUsage[history.configId] = (configUsage[history.configId] || 0) + 1;
       }
     });
 
-    return stats;
+    // 统计最常用配置
+    const mostUsedConfigs = Object.entries(configUsage)
+      .map(([configId, count]) => ({ configId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      total: histories.length,
+      successful,
+      failed,
+      pending,
+      totalByConfig,
+      mostUsedConfigs
+    };
   }
 
   /**
@@ -251,7 +254,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param limit number 返回的记录数量，默认为10
    * @returns Promise<AIGenerationHistory[]> 最近的历史记录列表
    */
-  async getRecentAIGenerationHistory(limit: number = 10): Promise<AIGenerationHistory[]> {
+  async getRecentAIGenerationHistory(limit = 10): Promise<AIGenerationHistory[]> {
     const histories = await this.getAllAIGenerationHistory();
     return histories.slice(0, limit);
   }
@@ -321,7 +324,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param days number 统计的天数，默认为30天
    * @returns Promise<Record<string, { total: number; success: number; error: number }>> 按日期分组的统计
    */
-  async getHistoryStatsByDate(days: number = 30): Promise<Record<string, { total: number; success: number; error: number }>> {
+  async getHistoryStatsByDate(days = 30): Promise<Record<string, { total: number; success: number; error: number }>> {
     const histories = await this.getAllAIGenerationHistory();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -353,7 +356,7 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    * @param limit number 返回的模型数量，默认为10
    * @returns Promise<Array<{ model: string; count: number }>> 模型使用统计
    */
-  async getMostUsedModels(limit: number = 10): Promise<Array<{ model: string; count: number }>> {
+  async getMostUsedModels(limit = 10): Promise<{ model: string; count: number }[]> {
     const histories = await this.getAllAIGenerationHistory();
     const modelStats: Record<string, number> = {};
 

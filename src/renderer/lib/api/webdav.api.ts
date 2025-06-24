@@ -60,7 +60,7 @@ export class WebDAVAPI {
     /**
      * 立即同步数据
      */
-    static async syncNow(): Promise<SyncResult> {
+    static async syncNow(): Promise<WebDAVSyncResult> {
         try {
             return await ipcInvoke('webdav:sync-now');
         } catch (error) {
@@ -73,7 +73,7 @@ export class WebDAVAPI {
      * 安全同步数据
      * 在同步前检查数据库健康状态，必要时修复
      */
-    static async safeSyncNow(): Promise<SyncResult> {
+    static async safeSyncNow(): Promise<WebDAVSyncResult> {
         try {
             // 检查数据库健康状态
             const checkResult = await databaseServiceManager.checkAndRepairDatabase();
@@ -84,10 +84,13 @@ export class WebDAVAPI {
                     success: false,
                     message: `同步失败: 数据库异常 - ${checkResult.message}`,
                     timestamp: new Date().toISOString(),
-                    filesUploaded: 0,
-                    filesDownloaded: 0,
-                    conflictsDetected: 0,
+                    itemsProcessed: 0,
+                    itemsUpdated: 0,
+                    itemsCreated: 0,
+                    itemsDeleted: 0,
                     conflictsResolved: 0,
+                    conflictDetails: [],
+                    errors: [checkResult.message]
                 };
             }
             
@@ -210,7 +213,7 @@ export class WebDAVAPI {
         }
     }
 
-    static async syncWithMergeConfirmed(): Promise<SyncResult> {
+    static async syncWithMergeConfirmed(): Promise<WebDAVSyncResult> {
         try {
             return await ipcInvoke('webdav:sync-with-merge-confirmed');
         } catch (error) {
@@ -228,6 +231,18 @@ export class WebDAVAPI {
         } catch (error) {
             console.error('记录删除项目失败:', error);
             return { success: false, error: error instanceof Error ? error.message : '记录删除失败' };
+        }
+    }
+
+    /**
+     * 删除远程项目（即时删除）
+     */
+    static async deleteRemoteItems(uuids: string[]): Promise<{ success: boolean; error?: string }> {
+        try {
+            return await ipcInvoke('webdav:delete-remote-items', uuids);
+        } catch (error) {
+            console.error('删除远程项目失败:', error);
+            return { success: false, error: error instanceof Error ? error.message : '删除远程项目失败' };
         }
     }
 

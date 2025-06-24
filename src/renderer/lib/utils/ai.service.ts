@@ -3,7 +3,8 @@
  * 统一管理 AI 相关的功能调用
  */
 
-import { IpcUtils, type IpcResult } from '../ipc.ts';
+import { IpcUtils } from '../ipc';
+import type { IpcResult } from '@shared/types';
 import type { 
   AIConfig, 
   AIGenerationRequest, 
@@ -14,7 +15,10 @@ import type {
 export class AIService {
   private static instance: AIService;
 
-  private constructor() {}
+  // 私有构造函数，防止外部实例化
+  private constructor() {
+    // 空构造函数用于单例模式
+  }
 
   static getInstance(): AIService {
     if (!AIService.instance) {
@@ -41,7 +45,7 @@ export class AIService {
    * 生成提示词
    */
   async generatePrompt(request: AIGenerationRequest, config: AIConfig): Promise<IpcResult<string>> {
-    return await IpcUtils.safeInvoke<string>('ai:generate-prompt', request, config);
+    return await IpcUtils.safeInvoke<string>('ai:generate-prompt', { request, config });
   }
 
   /**
@@ -64,7 +68,7 @@ export class AIService {
     try {
       // 由于流式调用的复杂性，这里使用标准的IPC调用
       // 如果需要真正的流式处理，需要在主进程中实现事件监听
-      const result = await IpcUtils.invoke('ai:generate-prompt-stream', request, config);
+      const result = await IpcUtils.invoke('ai:generate-prompt-stream', { request, config });
       
       if (onComplete) {
         onComplete();
@@ -94,7 +98,7 @@ export class AIService {
    * 调试提示词 - 使用提示词获取AI响应
    */
   async debugPrompt(prompt: string, config: AIConfig): Promise<IpcResult<any>> {
-    return await IpcUtils.safeInvoke('ai:debug-prompt', prompt, config);
+    return await IpcUtils.safeInvoke('ai:debug-prompt', { prompt, config });
   }
 
   /**

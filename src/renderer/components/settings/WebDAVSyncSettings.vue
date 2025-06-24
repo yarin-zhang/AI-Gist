@@ -1,6 +1,6 @@
 <template>
   <div class="webdav-sync-settings">
-    <NCard :bordered="false">
+    <NCard >
 
 
       <!-- 基本设置 -->
@@ -221,7 +221,6 @@
   <n-collapse>
 
     <n-collapse-item title="高级操作" name="1">
-        <div class="font-medium mb-2">高级操作</div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NButton 

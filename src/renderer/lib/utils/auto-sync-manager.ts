@@ -28,6 +28,14 @@ export interface SyncMetadata {
   source?: 'manual' | 'auto' | 'batch-delete' | 'network-recovery'; // 同步来源
 }
 
+// 同步服务配置
+interface SyncServiceConfig {
+  enabled: boolean;
+  autoSync: boolean;
+  syncInterval: number; // 分钟
+  lastSyncTime?: string;
+}
+
 class AutoSyncManager {
   private static instance: AutoSyncManager;
   private config: AutoSyncConfig = {
@@ -45,13 +53,31 @@ class AutoSyncManager {
     pendingSyncCount: 0
   };
   
-  private debounceTimer: NodeJS.Timeout | null = null;
-  private retryTimer: NodeJS.Timeout | null = null;
+  private debounceTimer: number | null = null;
+  private retryTimer: number | null = null;
   private retryCount = 0;
-  private statusListeners: Array<(status: SyncStatus) => void> = [];
+  private statusListeners: ((status: SyncStatus) => void)[] = [];
   
   // 新增：待处理的同步元数据
   private pendingSyncMetadata: SyncMetadata | null = null;
+
+  // 新增：同步服务配置
+  private syncServices: {
+    webdav: SyncServiceConfig;
+    icloud: SyncServiceConfig;
+  } = {
+    webdav: { enabled: false, autoSync: false, syncInterval: 30 },
+    icloud: { enabled: false, autoSync: false, syncInterval: 30 }
+  };
+
+  // 新增：定时同步定时器
+  private scheduledSyncTimers: {
+    webdav: number | null;
+    icloud: number | null;
+  } = {
+    webdav: null,
+    icloud: null
+  };
 
   private constructor() {
     this.initNetworkStatusMonitoring();
@@ -109,8 +135,15 @@ class AutoSyncManager {
    * 使用防抖机制，避免频繁同步
    */
   triggerAutoSync(reason = '数据变更自动同步', metadata?: SyncMetadata) {
-    if (!this.config.enabled || !this.status.isOnline) {
-      console.log('自动同步跳过:', !this.config.enabled ? '未启用' : '网络离线');
+    if (!this.status.isOnline) {
+      console.log('自动同步跳过: 网络离线');
+      return;
+    }
+
+    // 检查是否有启用的自动同步服务
+    const hasAutoSyncEnabled = this.syncServices.webdav.autoSync || this.syncServices.icloud.autoSync;
+    if (!hasAutoSyncEnabled) {
+      console.log('自动同步跳过: 没有启用的自动同步服务');
       return;
     }
 
@@ -126,7 +159,7 @@ class AutoSyncManager {
     this.notifyStatusChange();
 
     // 设置新的防抖定时器
-    this.debounceTimer = setTimeout(() => {
+    this.debounceTimer = window.setTimeout(() => {
       this.performSync(reason, this.pendingSyncMetadata || undefined);
       // 清除已处理的元数据
       this.pendingSyncMetadata = null;
@@ -170,8 +203,10 @@ class AutoSyncManager {
    * 立即触发同步（无防抖）
    */
   triggerImmediateSync(reason = '立即同步', metadata?: SyncMetadata) {
-    if (!this.config.enabled) {
-      console.log('自动同步已禁用，跳过立即同步');
+    // 检查是否有启用的同步服务
+    const hasSyncEnabled = this.syncServices.webdav.enabled || this.syncServices.icloud.enabled;
+    if (!hasSyncEnabled) {
+      console.log('立即同步跳过: 没有启用的同步服务');
       return;
     }
 
@@ -202,7 +237,7 @@ class AutoSyncManager {
         const existingUUIDs = new Set(this.pendingSyncMetadata.deletedUUIDs);
         newMetadata.deletedUUIDs.forEach(uuid => {
           if (!existingUUIDs.has(uuid)) {
-            this.pendingSyncMetadata.deletedUUIDs!.push(uuid);
+            this.pendingSyncMetadata!.deletedUUIDs!.push(uuid);
           }
         });
       }
@@ -229,20 +264,18 @@ class AutoSyncManager {
     try {
       console.log(`自动同步管理器: 开始执行同步 - ${reason}`, metadata);
       
-      // 如果有删除的 UUID，立即调用新的远程删除接口
+      // 如果有删除的 UUID，记录删除项目（WebDAV 使用）
       if (metadata?.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
-        console.log(`调用即时远程删除接口，处理 ${metadata.deletedUUIDs.length} 个项目...`);
+        console.log(`记录删除项目，处理 ${metadata.deletedUUIDs.length} 个项目...`);
         try {
-          // 调用新的、重构后的接口
-          const deleteResult = await WebDAVAPI.deleteRemoteItems(metadata.deletedUUIDs);
-          if (!deleteResult.success) {
-            // 即时删除失败通常意味着网络问题或锁冲突，完整同步会处理，这里只记录警告
-            console.warn('即时远程删除未完全成功 (将在完整同步中重试):', deleteResult.error);
+          const recordResult = await WebDAVAPI.recordDeletedItems(metadata.deletedUUIDs);
+          if (!recordResult.success) {
+            console.warn('记录删除项目失败:', recordResult.error);
           } else {
-            console.log('即时远程删除请求成功');
+            console.log('删除项目记录成功');
           }
         } catch (error) {
-          console.error('调用即时远程删除接口时发生错误:', error);
+          console.error('记录删除项目时发生错误:', error);
         }
       }
       
@@ -257,6 +290,9 @@ class AutoSyncManager {
         this.status.lastSyncTime = new Date().toISOString();
         this.status.lastSyncError = null;
         this.retryCount = 0; // 重置重试计数
+        
+        // 更新各服务的最后同步时间
+        this.updateServiceSyncTimes();
         
         // 如果是批量删除操作，记录成功同步的删除项目
         if (metadata?.source === 'batch-delete' && metadata.deletedUUIDs && metadata.deletedUUIDs.length > 0) {
@@ -284,21 +320,18 @@ class AutoSyncManager {
   /**
    * 执行所有启用的同步服务
    */
-  private async performAllSyncs(): Promise<Array<{service: string, success: boolean, message: string}>> {
-    const results: Array<{service: string, success: boolean, message: string}> = [];
+  private async performAllSyncs(): Promise<{service: string, success: boolean, message: string}[]> {
+    const results: {service: string, success: boolean, message: string}[] = [];
     
     try {
-      // 获取用户设置
-      const userPrefs = await window.electronAPI?.preferences?.get();
-      
       // WebDAV 同步
-      if (userPrefs?.webdav?.enabled) {
+      if (this.syncServices.webdav.enabled) {
         try {
           const result = await WebDAVAPI.syncNow();
           results.push({
             service: 'WebDAV',
             success: result.success,
-            message: result.message
+            message: result.message || '同步完成'
           });
         } catch (error) {
           results.push({
@@ -310,13 +343,13 @@ class AutoSyncManager {
       }
       
       // iCloud 同步
-      if (userPrefs?.icloud?.enabled) {
+      if (this.syncServices.icloud.enabled) {
         try {
           const result = await ICloudAPI.syncNow();
           results.push({
             service: 'iCloud',
             success: result.success,
-            message: result.message
+            message: result.message || '同步完成'
           });
         } catch (error) {
           results.push({
@@ -346,6 +379,19 @@ class AutoSyncManager {
     }
     
     return results;
+  }
+
+  /**
+   * 更新各服务的最后同步时间
+   */
+  private updateServiceSyncTimes() {
+    const now = new Date().toISOString();
+    if (this.syncServices.webdav.enabled) {
+      this.syncServices.webdav.lastSyncTime = now;
+    }
+    if (this.syncServices.icloud.enabled) {
+      this.syncServices.icloud.lastSyncTime = now;
+    }
   }
 
   /**
@@ -379,7 +425,7 @@ class AutoSyncManager {
 
     console.log(`自动同步管理器: 安排第 ${this.retryCount} 次重试，${delay}ms 后执行`);
 
-    this.retryTimer = setTimeout(() => {
+    this.retryTimer = window.setTimeout(() => {
       this.performSync(`${reason} (重试 ${this.retryCount})`, metadata);
     }, delay);
   }
@@ -473,10 +519,27 @@ class AutoSyncManager {
       this.retryTimer = null;
     }
     
+    // 清除定时同步定时器
+    this.clearScheduledSyncTimers();
+    
     this.status.pendingSyncCount = 0;
     this.notifyStatusChange();
     
     console.log('自动同步已禁用');
+  }
+
+  /**
+   * 清除定时同步定时器
+   */
+  private clearScheduledSyncTimers() {
+    if (this.scheduledSyncTimers.webdav) {
+      clearTimeout(this.scheduledSyncTimers.webdav);
+      this.scheduledSyncTimers.webdav = null;
+    }
+    if (this.scheduledSyncTimers.icloud) {
+      clearTimeout(this.scheduledSyncTimers.icloud);
+      this.scheduledSyncTimers.icloud = null;
+    }
   }
 
   /**
@@ -487,30 +550,50 @@ class AutoSyncManager {
       // 获取用户设置中的同步配置
       const userPrefs = await window.electronAPI?.preferences?.get();
       if (userPrefs) {
+        // 更新同步服务配置
+        this.syncServices.webdav = {
+          enabled: userPrefs.webdav?.enabled || false,
+          autoSync: userPrefs.webdav?.autoSync || false,
+          syncInterval: userPrefs.webdav?.syncInterval || 30,
+          lastSyncTime: userPrefs.dataSync?.lastSyncTime || undefined
+        };
+
+        this.syncServices.icloud = {
+          enabled: userPrefs.icloud?.enabled || false,
+          autoSync: userPrefs.icloud?.autoSync || false,
+          syncInterval: userPrefs.icloud?.syncInterval || 30,
+          lastSyncTime: userPrefs.dataSync?.lastSyncTime || undefined
+        };
+
+        // 检查是否有任何同步服务启用了自动同步
+        const hasAutoSyncEnabled = this.syncServices.webdav.autoSync || this.syncServices.icloud.autoSync;
         const wasEnabled = this.config.enabled;
         
-        // 检查是否有任何同步服务启用了自动同步
-        const webdavAutoSync = userPrefs.webdav?.enabled && userPrefs.webdav?.autoSync;
-        const icloudAutoSync = userPrefs.icloud?.enabled && userPrefs.icloud?.autoSync;
-        
-        this.config.enabled = webdavAutoSync || icloudAutoSync;
+        this.config.enabled = hasAutoSyncEnabled;
         
         console.log('自动同步配置已从用户设置更新:', {
           enabled: this.config.enabled,
-          webdavEnabled: userPrefs.webdav?.enabled,
-          webdavAutoSync: userPrefs.webdav?.autoSync,
-          icloudEnabled: userPrefs.icloud?.enabled,
-          icloudAutoSync: userPrefs.icloud?.autoSync,
-          webdavSyncInterval: userPrefs.webdav?.syncInterval,
-          icloudSyncInterval: userPrefs.icloud?.syncInterval
+          webdav: {
+            enabled: this.syncServices.webdav.enabled,
+            autoSync: this.syncServices.webdav.autoSync,
+            syncInterval: this.syncServices.webdav.syncInterval
+          },
+          icloud: {
+            enabled: this.syncServices.icloud.enabled,
+            autoSync: this.syncServices.icloud.autoSync,
+            syncInterval: this.syncServices.icloud.syncInterval
+          }
         });
         
         // 如果状态发生变化，通知监听器
         if (wasEnabled !== this.config.enabled) {
           this.notifyStatusChange();
         }
+
+        // 设置定时同步
+        this.setupScheduledSync();
       } else {
-        console.log('未找到 WebDAV 配置，禁用自动同步');
+        console.log('未找到用户设置，禁用自动同步');
         this.config.enabled = false;
       }
     } catch (error) {
@@ -520,10 +603,69 @@ class AutoSyncManager {
   }
 
   /**
+   * 设置定时同步
+   */
+  private setupScheduledSync() {
+    // 清除现有的定时器
+    this.clearScheduledSyncTimers();
+
+    // 设置 WebDAV 定时同步
+    if (this.syncServices.webdav.enabled && this.syncServices.webdav.autoSync) {
+      this.scheduleNextSync('webdav');
+    }
+
+    // 设置 iCloud 定时同步
+    if (this.syncServices.icloud.enabled && this.syncServices.icloud.autoSync) {
+      this.scheduleNextSync('icloud');
+    }
+  }
+
+  /**
+   * 安排下次同步
+   */
+  private scheduleNextSync(service: 'webdav' | 'icloud') {
+    const serviceConfig = this.syncServices[service];
+    if (!serviceConfig.enabled || !serviceConfig.autoSync) {
+      return;
+    }
+
+    // 计算下次同步时间
+    const now = new Date();
+    const lastSync = serviceConfig.lastSyncTime ? new Date(serviceConfig.lastSyncTime) : null;
+    const intervalMs = serviceConfig.syncInterval * 60 * 1000; // 转换为毫秒
+
+    let nextSyncTime: Date;
+    if (lastSync) {
+      nextSyncTime = new Date(lastSync.getTime() + intervalMs);
+      // 如果下次同步时间已过，立即同步
+      if (nextSyncTime <= now) {
+        this.triggerImmediateSync(`${service} 定时同步`);
+        nextSyncTime = new Date(now.getTime() + intervalMs);
+      }
+    } else {
+      // 首次同步，立即执行
+      this.triggerImmediateSync(`${service} 首次定时同步`);
+      nextSyncTime = new Date(now.getTime() + intervalMs);
+    }
+
+    const delayMs = nextSyncTime.getTime() - now.getTime();
+    
+    console.log(`${service} 下次同步时间: ${nextSyncTime.toLocaleString()}, 延迟: ${delayMs}ms`);
+
+    // 设置定时器
+    this.scheduledSyncTimers[service] = window.setTimeout(() => {
+      this.triggerImmediateSync(`${service} 定时同步`);
+      // 递归设置下次同步
+      this.scheduleNextSync(service);
+    }, delayMs);
+  }
+
+  /**
    * 启用自动同步
    */
   enable() {
     this.config.enabled = true;
+    this.setupScheduledSync();
     this.notifyStatusChange();
     console.log('自动同步已启用');
   }

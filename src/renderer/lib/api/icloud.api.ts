@@ -7,8 +7,7 @@ import { databaseServiceManager } from '../services';
 
 // 安全获取 electronAPI
 const getElectronAPI = () => {
-    // @ts-ignore
-    return window.electronAPI;
+    return (window as any).electronAPI;
 };
 
 const safeIpcInvoke = async (channel: string, ...args: any[]) => {

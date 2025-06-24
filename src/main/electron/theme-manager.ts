@@ -12,7 +12,7 @@ export type ThemeChangeCallback = (theme: SystemTheme) => void;
  */
 class ThemeManager {
   private mainWindow: BrowserWindow | null = null;
-  private themeChangeCallbacks: Set<ThemeChangeCallback> = new Set();
+  private themeChangeCallbacks = new Set<ThemeChangeCallback>();
 
   /**
    * 初始化主题管理器

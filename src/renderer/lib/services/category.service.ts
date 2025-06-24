@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { Category, CategoryWithRelations, Prompt } from '../types/database';
+import { Category, CategoryWithRelations, Prompt } from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
 
 /**
@@ -34,7 +34,9 @@ export class CategoryService extends BaseDatabaseService {
   async createCategory(data: Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<Category> {
     const categoryWithUUID = {
       ...data,
-      uuid: generateUUID()
+      uuid: generateUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     return this.add<Category>('categories', categoryWithUUID);
   }
@@ -148,11 +150,11 @@ export class CategoryService extends BaseDatabaseService {
    * 返回每个分类下的提示词数量统计
    * @returns Promise<{ categoryId: number; categoryName: string; promptCount: number }[]> 分类使用统计列表
    */
-  async getCategoryUsageStats(): Promise<Array<{
+  async getCategoryUsageStats(): Promise<{
     categoryId: number;
     categoryName: string;
     promptCount: number;
-  }>> {
+  }[]> {
     const categoriesWithPrompts = await this.getAllCategories();
     
     return categoriesWithPrompts.map(category => ({
@@ -194,7 +196,7 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<{ created: Category[], skipped: string[] }> 创建结果，包含成功创建的分类和跳过的分类名称
    */
   async batchCreateCategories(
-    categories: Array<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>
+    categories: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[]
   ): Promise<{ created: Category[], skipped: string[] }> {
     const created: Category[] = [];
     const skipped: string[] = [];
@@ -292,7 +294,7 @@ export class CategoryService extends BaseDatabaseService {
         // Update existing category
         await this.update('categories', existing.id!, {
           ...data,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date()
         });
     } else {
         // Create new category
@@ -300,8 +302,8 @@ export class CategoryService extends BaseDatabaseService {
           ...data,
           id: parseInt(id),
           uuid: generateUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
         await this.add('categories', newData as Category);
     }

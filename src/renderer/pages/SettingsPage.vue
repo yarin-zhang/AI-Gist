@@ -10,6 +10,17 @@
                     </NText>
                 </div>
                 <NFlex>
+                <!-- 操作状态提示 -->
+                <NFlex :size="12">
+                    <NButton ghost :loading="saving" secondary>
+                        <template #icon>
+                            <NIcon v-if="!saving" color="#18a058">
+                                <Check />
+                            </NIcon>
+                        </template>
+                        设置会自动保存
+                    </NButton>
+                </NFlex>
                     <NButton type="error" @click="resetSettings" :loading="loading.reset" secondary>
                         <template #icon>
                             <NIcon>
@@ -19,6 +30,7 @@
                         恢复默认设置
                     </NButton>
                 </NFlex>
+
             </NFlex>
 
             <NFlex :size="24">
@@ -62,89 +74,52 @@
 
 
                         <!-- 数据管理设置 -->
-                        <DataManagementSettings 
-                            ref="dataManagementRef"
-                            v-show="activeSettingKey === 'data-management'"
-                            :loading="loading"
-                            @export-data="exportData"
-                            @import-data="importData"
-                            @export-selected-data="exportSelectedData"
-                            @export-full-backup="exportFullBackup"
-                            @import-full-backup="importFullBackup"
-                            @create-backup="createBackup"
-                            @restore-backup="restoreSpecificBackup"
-                            @delete-backup="deleteBackup"
-                            @refresh-backup-list="refreshBackupList"
-                            @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase"
-                            @clear-database="clearDatabase"
-                        />                        <!-- WebDAV 同步设置 -->
-                        <WebDAVSyncSettings 
-                            v-show="activeSettingKey === 'webdav-sync'"
-                            :model-value="{ 
-                                webdav: { ...settings.webdav }, 
-                                dataSync: { ...settings.dataSync } 
-                            }"
-                            @update:model-value="(val) => { 
-                                // 只更新设置数据，不自动保存
-                                Object.assign(settings.webdav, val.webdav); 
-                                Object.assign(settings.dataSync, val.dataSync); 
-                            }"
-                            @save-webdav="saveWebDAVSettings"
-                            @test-connection="testWebDAVConnection"
-                            @sync-now="syncNow"
-                            @sync-time-updated="updateSyncTime"
-                        />
+                        <DataManagementSettings ref="dataManagementRef" v-show="activeSettingKey === 'data-management'"
+                            :loading="loading" @export-data="exportData" @import-data="importData"
+                            @export-selected-data="exportSelectedData" @export-full-backup="exportFullBackup"
+                            @import-full-backup="importFullBackup" @create-backup="createBackup"
+                            @restore-backup="restoreSpecificBackup" @delete-backup="deleteBackup"
+                            @refresh-backup-list="refreshBackupList" @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase" @clear-database="clearDatabase" /> 
+                            
+                        <!-- WebDAV 同步设置 -->
+                        <WebDAVSyncSettings v-show="activeSettingKey === 'webdav-sync'" :model-value="{
+                            webdav: { ...settings.webdav },
+                            dataSync: { ...settings.dataSync }
+                        }" @update:model-value="(val) => {
+                            // 只更新设置数据，不自动保存
+                            Object.assign(settings.webdav, val.webdav);
+                            Object.assign(settings.dataSync, val.dataSync);
+                        }" @save-webdav="saveWebDAVSettings" @test-connection="testWebDAVConnection"
+                            @sync-now="syncNow" @sync-time-updated="updateSyncTime" />
 
                         <!-- iCloud 同步设置 -->
-                        <ICloudSyncSettings 
-                            v-show="activeSettingKey === 'icloud-sync'"
-                        />
+                        <ICloudSyncSettings v-show="activeSettingKey === 'icloud-sync'" />
 
                         <!-- 外观设置 -->
-                        <AppearanceSettings 
-                            v-show="activeSettingKey === 'appearance'"
+                        <AppearanceSettings v-show="activeSettingKey === 'appearance'"
                             :model-value="{ themeSource: settings.themeSource }"
-                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }"
-                        />
+                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
 
                         <!-- 关闭行为设置 -->
-                        <CloseBehaviorSettings 
-                            v-show="activeSettingKey === 'close-behavior'"
+                        <CloseBehaviorSettings v-show="activeSettingKey === 'close-behavior'"
                             :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
-                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }"
-                        />
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
 
                         <!-- 启动行为设置 -->
-                        <StartupBehaviorSettings 
-                            v-show="activeSettingKey === 'startup-behavior'"
+                        <StartupBehaviorSettings v-show="activeSettingKey === 'startup-behavior'"
                             :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
-                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }"
-                        />
-                        
-                        
+                            @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }" />
+
+
                         <!-- 关于 -->
-                        <AboutSettings 
-                            v-show="activeSettingKey === 'about'"
-                        />
-                        
+                        <AboutSettings v-show="activeSettingKey === 'about'" />
+
                         <!-- 实验室 (仅开发环境) -->
                         <NCard v-show="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
 
-                        <!-- 操作状态提示 -->
-                        <NCard>
-                            <NFlex justify="space-between" align="center">
-                                <NFlex :size="12">
-                                    <NText depth="3">设置会自动保存</NText>
-                                    <NIcon v-if="!saving" color="#18a058">
-                                        <Check />
-                                    </NIcon>
-                                    <NSpin v-else size="small" />
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
                     </NFlex>
                 </div>
             </NFlex>
@@ -161,7 +136,6 @@ import {
     NIcon,
     NButton,
     NText,
-    NSpin,
     NMenu,
     useMessage,
 } from "naive-ui";
@@ -370,12 +344,12 @@ const loadSettings = async () => {
         console.log('开始加载设置...');
         const prefs = await window.electronAPI.preferences.get();
         console.log('获取到的原始配置:', prefs);
-        
+
         // 直接从 WebDAV API 获取配置
         try {
             const webdavConfig = await WebDAVAPI.getConfig();
             console.log('从 WebDAV API 获取的配置:', webdavConfig);
-            
+
             settings.webdav = {
                 enabled: webdavConfig.enabled || false,
                 serverUrl: webdavConfig.serverUrl || "",
@@ -395,7 +369,7 @@ const loadSettings = async () => {
             // 回退到使用 preferences
             const webdavConfig = prefs.webdav || {};
             console.log('WebDAV 配置:', webdavConfig);
-            
+
             settings.webdav = {
                 enabled: webdavConfig.enabled || false,
                 serverUrl: webdavConfig.serverUrl || "",
@@ -411,9 +385,9 @@ const loadSettings = async () => {
                 configHash: webdavConfig.configHash || '',
             };
         }
-        
+
         console.log('最终设置的 WebDAV 配置:', settings.webdav);
-        
+
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
         settings.dataSync = {
@@ -421,14 +395,14 @@ const loadSettings = async () => {
             autoBackup: dataSyncConfig.autoBackup !== undefined ? dataSyncConfig.autoBackup : true,
             backupInterval: dataSyncConfig.backupInterval || 24,
         };
-        
+
         // 其他配置
         settings.closeBehaviorMode = prefs.closeBehaviorMode || "ask";
         settings.closeAction = prefs.closeAction || "quit";
         settings.startMinimized = prefs.startMinimized || false;
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
-        
+
         console.log("设置加载成功:", {
             ...settings,
             webdav: {
@@ -577,7 +551,7 @@ const updateNonWebDAVSetting = async () => {
 const ensureWebdavConfigSaved = async () => {
     try {
         console.log('确保WebDAV配置已保存到后端...');
-        
+
         // 直接保存 WebDAV 配置，不需要复杂的密码状态管理
         await saveWebDAVSettings();
         console.log('WebDAV配置已确保保存');
@@ -604,20 +578,20 @@ const testWebDAVConnection = async (callback) => {
             username: settings.webdav.username,
             password: settings.webdav.password
         });
-        
+
         if (result.success) {
             message.success(`WebDAV 连接测试成功${result.serverInfo?.name ? ` - ${result.serverInfo.name}` : ''}`);
         } else {
             message.error(result.message || "WebDAV 连接测试失败");
         }
-        
+
         if (callback) callback(result);
         return result;
     } catch (error) {
         console.error("WebDAV 连接测试失败:", error);
-        const errorResult = { 
-            success: false, 
-            message: error instanceof Error ? error.message : "WebDAV 连接测试失败" 
+        const errorResult = {
+            success: false,
+            message: error instanceof Error ? error.message : "WebDAV 连接测试失败"
         };
         message.error(errorResult.message);
         if (callback) callback(errorResult);
@@ -644,16 +618,16 @@ const syncNow = async () => {
     try {
         // 使用安全同步方法，包含数据库健康检查
         const result = await WebDAVAPI.safeSyncNow();
-        
+
         if (result.success) {
             settings.dataSync.lastSyncTime = result.timestamp;
-            
+
             // 只更新 dataSync 配置，避免重复加密 WebDAV 密码
             await updateSettingsSmart(['dataSync']);
-            
+
             // 优先显示后端返回的消息，如果没有则显示默认消息
             let successMessage = result.message || "数据同步成功";
-            
+
             // 如果有冲突信息，简洁地显示
             if (result.conflictsDetected > 0) {
                 if (result.conflictsResolved > 0) {
@@ -661,13 +635,13 @@ const syncNow = async () => {
                 } else {
                     successMessage += ` (检测到 ${result.conflictsDetected} 个冲突)`;
                 }
-                
+
                 // 在控制台显示详细的冲突信息，前端只显示简洁消息
                 if (result.conflictDetails && result.conflictDetails.length > 0) {
                     console.log('同步冲突详情:', result.conflictDetails);
                 }
             }
-            
+
             message.success(successMessage);
         } else {
             message.error(result.message || "数据同步失败");
@@ -686,7 +660,7 @@ const createBackup = async () => {
         const timestamp = new Date().toLocaleString('zh-CN');
         const backup = await DataManagementAPI.createBackup(`手动备份 - ${timestamp}`);
         message.success(`备份创建成功: ${backup.name} (大小: ${(backup.size / 1024).toFixed(2)} KB)`);
-        
+
         // 创建成功后立即刷新备份列表
         await refreshBackupList();
     } catch (error) {
@@ -705,14 +679,14 @@ const restoreBackup = async () => {
             message.warning("没有可用的备份文件");
             return;
         }
-        
+
         // 显示备份选择提示
         message.info(`找到 ${backups.length} 个备份文件，将恢复最新的备份: ${backups[0].name}`);
-        
+
         // 使用最新的备份
         const latestBackup = backups[0];
         const result = await DataManagementAPI.restoreBackup(latestBackup.id);
-        
+
         // 显示恢复结果
         if (result.success) {
             const successMessage = result.message || `备份恢复成功: ${latestBackup.name}`;
@@ -735,11 +709,11 @@ const restoreSpecificBackup = async (backupId: string) => {
         const timestamp = new Date().toLocaleString('zh-CN');
         const autoBackup = await DataManagementAPI.createBackup(`恢复前自动备份 - ${timestamp}`);
         console.log(`自动备份创建成功: ${autoBackup.name}`);
-        
+
         // 步骤2: 执行恢复操作
         message.info("正在恢复备份数据...");
         const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
-        
+
         if (result.success) {
             const successMessage = result.message || "备份恢复成功";
             message.success(`${successMessage}。已自动备份原数据: ${autoBackup.name}`);
@@ -769,7 +743,7 @@ const deleteBackup = async (backupId: string) => {
         console.error("删除备份失败:", error);
         const errorMessage = error instanceof Error ? error.message : '删除备份失败';
         message.error(`删除备份失败: ${errorMessage}`);
-        
+
         // 删除失败后也刷新备份列表，以确保UI状态正确
         try {
             await refreshBackupList();
@@ -783,7 +757,7 @@ const deleteBackup = async (backupId: string) => {
 const refreshBackupList = async () => {
     try {
         const backups = await DataManagementAPI.getBackupList();
-        
+
         // 转换备份数据格式以匹配组件期望的格式
         const formattedBackups = backups.map(backup => ({
             id: backup.id,
@@ -792,7 +766,7 @@ const refreshBackupList = async () => {
             size: `${(backup.size / 1024).toFixed(2)} KB`,
             version: backup.description || 'v1.0'
         }));
-        
+
         // 更新子组件的备份列表
         if (dataManagementRef.value) {
             dataManagementRef.value.updateBackupList(formattedBackups);
@@ -809,7 +783,7 @@ const exportData = async (format: 'json' | 'csv') => {
     try {
         const defaultName = `ai-gist-sync-${new Date().toISOString().split('T')[0]}.${format}`;
         const exportPath = await DataManagementAPI.selectExportPath(defaultName);
-        
+
         if (exportPath) {
             const result = await DataManagementAPI.exportData({
                 format,
@@ -818,7 +792,7 @@ const exportData = async (format: 'json' | 'csv') => {
                 includeSettings: true,
                 includeHistory: true,
             }, exportPath);
-              if (result.success) {
+            if (result.success) {
                 // 优先显示后端返回的消息，如果没有则显示默认成功消息
                 const successMessage = result.message || `数据已导出为 ${format.toUpperCase()} 格式`;
                 message.success(successMessage);
@@ -838,18 +812,18 @@ const importData = async (format: 'json' | 'csv') => {
     loading.import = true;
     try {
         const filePath = await DataManagementAPI.selectImportFile(format);
-        
+
         if (filePath) {
             const result = await DataManagementAPI.importData(filePath, {
                 format,
                 overwrite: false,
                 mergeStrategy: 'merge',
             });
-              if (result.success) {
+            if (result.success) {
                 // 优先显示后端返回的消息，如果没有则显示默认成功消息
                 const successMessage = result.message || `${format.toUpperCase()} 数据导入成功`;
                 message.success(successMessage);
-                
+
                 if (result.errors.length > 0) {
                     console.warn("导入过程中的警告:", result.errors);
                 }
@@ -869,16 +843,16 @@ const exportSelectedData = async (format: 'json' | 'csv', options: any) => {
     loading.export = true;
     try {
         console.log('开始选择性数据导出:', { format, options });
-        
+
         const result = await DataManagementAPI.exportSelectedData({
             format,
             ...options
         });
-        
+
         if (result.success) {
             const sizeText = result.size ? ` (${(result.size / 1024).toFixed(2)} KB)` : '';
             message.success(result.message || `选择性数据导出成功${sizeText}`);
-            
+
             // 如果包含AI配置，显示安全提醒
             if (options.includeAIConfigs) {
                 message.warning('导出文件包含AI配置信息，请妥善保管避免泄露', {
@@ -900,13 +874,13 @@ const exportFullBackup = async () => {
     loading.export = true;
     try {
         console.log('开始完整备份导出...');
-        
+
         const result = await DataManagementAPI.exportFullBackup();
-        
+
         if (result.success) {
             const sizeText = result.size ? ` (${(result.size / 1024 / 1024).toFixed(2)} MB)` : '';
             message.success(result.message || `完整备份导出成功${sizeText}`);
-            
+
             // 提醒用户备份包含敏感信息
             message.warning('完整备份包含所有数据和配置信息，请妥善保管', {
                 duration: 5000
@@ -926,9 +900,9 @@ const importFullBackup = async () => {
     loading.import = true;
     try {
         console.log('开始完整备份导入...');
-        
+
         const result = await DataManagementAPI.importFullBackup();
-        
+
         if (result.success) {
             message.success(result.message || '完整备份导入成功');
             // 导入成功后刷新备份列表和数据统计
@@ -948,7 +922,7 @@ const importFullBackup = async () => {
 const refreshDataStats = async () => {
     try {
         const stats = await DataManagementAPI.getDataStats();
-        
+
         // 更新子组件的数据统计
         if (dataManagementRef.value) {
             dataManagementRef.value.updateDataStats(stats);
@@ -994,11 +968,11 @@ const resetSettings = async () => {
 // 保存 WebDAV 设置（专门处理密码加密）
 const saveWebDAVSettings = async () => {
     if (saving.value) return;
-    
+
     saving.value = true;
     try {
         console.log('保存 WebDAV 设置...');
-        
+
         // 创建纯对象副本，避免Vue响应式对象问题
         const cleanConfig = JSON.parse(JSON.stringify({
             enabled: settings.webdav.enabled,
@@ -1014,10 +988,10 @@ const saveWebDAVSettings = async () => {
             connectionTestedAt: settings.webdav.connectionTestedAt,
             configHash: settings.webdav.configHash,
         }));
-        
+
         // 直接保存配置
         await WebDAVAPI.setConfig(cleanConfig);
-        
+
         console.log('WebDAV 设置保存成功');
         message.success('WebDAV 设置保存成功');
     } catch (error) {
@@ -1032,7 +1006,7 @@ const repairDatabase = async () => {
     loading.repair = true;
     try {
         const result = await databaseServiceManager.checkAndRepairDatabase();
-        
+
         if (result.healthy) {
             if (result.repaired) {
                 message.success(`数据库修复成功：${result.message}`);
@@ -1057,7 +1031,7 @@ const checkDatabaseHealth = async () => {
     loading.healthCheck = true;
     try {
         const result = await databaseServiceManager.getHealthStatus();
-        
+
         if (result.healthy) {
             message.success("数据库状态正常");
         } else {
@@ -1080,18 +1054,18 @@ const clearDatabase = async () => {
         const timestamp = new Date().toLocaleString('zh-CN');
         const autoBackup = await DataManagementAPI.createBackup(`清空前自动备份 - ${timestamp}`);
         console.log(`自动备份创建成功: ${autoBackup.name}`);
-        
+
         // 步骤2: 清空数据库
         message.info("正在清空数据库...");
-        
+
         // 使用强制清空方法
         await databaseServiceManager.forceCleanAllTables();
-        
+
         message.success(`数据库清空成功！已自动备份原数据: ${autoBackup.name}`);
-        
+
         // 刷新备份列表
         await refreshBackupList();
-        
+
     } catch (error) {
         console.error("清空数据库失败:", error);
         const errorMessage = error instanceof Error ? error.message : '清空数据库失败';

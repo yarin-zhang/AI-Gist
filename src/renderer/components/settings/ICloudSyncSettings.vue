@@ -1,6 +1,6 @@
 <template>
   <div class="icloud-sync-settings">
-    <NCard :bordered="false">
+    <NCard>
 
       <!-- iCloud 状态检查 -->
       <div class="mb-6">
@@ -130,7 +130,6 @@
   <n-collapse>
 
     <n-collapse-item title="高级操作" name="1">
-        <div class="font-medium mb-2">手动同步操作</div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <NButton 
