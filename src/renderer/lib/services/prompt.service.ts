@@ -789,13 +789,21 @@ export class PromptService extends BaseDatabaseService {
     });    // 计算热门标签
     const tagCounts = new Map<string, number>();
     prompts.forEach(prompt => {
-      if (prompt.tags && Array.isArray(prompt.tags)) {
-        prompt.tags.forEach(tag => {
-          if (tag) {
-            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-          }
-        });
+      // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+      let promptTags: string[] = [];
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          promptTags = prompt.tags;
+        } else if (typeof prompt.tags === 'string') {
+          promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+        }
       }
+      
+      promptTags.forEach(tag => {
+        if (tag) {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        }
+      });
     });
 
     const popularTags = Array.from(tagCounts.entries())
