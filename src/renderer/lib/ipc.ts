@@ -215,12 +215,20 @@ export class IpcUtils {
             return api.data.getBackupList() as T;
           case 'restore-backup':
             return api.data.restoreBackup(data) as T;
+          case 'restore-backup-replace':
+            return api.data.restoreBackupWithReplace(data) as T;
           case 'delete-backup':
             return api.data.deleteBackup(data) as T;
           case 'export':
             return api.data.export(data.options, data.exportPath) as T;
           case 'import':
             return api.data.import(data.filePath, data.options) as T;
+          case 'export-selected':
+            return api.data.exportSelected(data.options, data.exportPath) as T;
+          case 'export-full-backup':
+            return api.data.exportFullBackup() as T;
+          case 'import-full-backup':
+            return api.data.importFullBackup() as T;
           case 'select-import-file':
             return api.data.selectImportFile(data) as T;
           case 'select-export-path':

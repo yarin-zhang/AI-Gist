@@ -36,7 +36,7 @@ export interface Prompt {
   content: string;
   description?: string;
   categoryId?: number;
-  tags: string[];
+  tags: string[] | string; // 支持数组或字符串格式
   variables?: PromptVariable[];
   isFavorite: boolean;
   useCount: number;

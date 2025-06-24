@@ -115,12 +115,23 @@ export class PromptService extends BaseDatabaseService {
           (prompt.description && prompt.description.toLowerCase().includes(searchQuery))
         );
       }      if (filters.tags) {
-        const searchTags = filters.tags.toLowerCase().split(',').map(tag => tag.trim());
+        const searchTags = filters.tags.toLowerCase().split(',').map((tag: string) => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
-          if (!prompt.tags || !Array.isArray(prompt.tags)) return false;
-          const promptTags = prompt.tags.map(tag => tag.toLowerCase().trim());
+          // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+          let promptTags: string[] = [];
+          if (prompt.tags) {
+            if (Array.isArray(prompt.tags)) {
+              promptTags = prompt.tags;
+            } else if (typeof prompt.tags === 'string') {
+              promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+            }
+          }
+          
+          if (promptTags.length === 0) return false;
+          
+          const normalizedPromptTags = promptTags.map((tag: string) => tag.toLowerCase().trim());
           return searchTags.some(searchTag => 
-            promptTags.some(promptTag => promptTag.includes(searchTag))
+            normalizedPromptTags.some(promptTag => promptTag.includes(searchTag))
           );
         });
       }
@@ -707,13 +718,21 @@ export class PromptService extends BaseDatabaseService {
     // 标签分布统计
     const tagDistribution: Record<string, number> = {};
     allPrompts.forEach(prompt => {
-      if (prompt.tags && Array.isArray(prompt.tags)) {
-        prompt.tags.forEach(tag => {
-          if (tag) {
-            tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
-          }
-        });
+      // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+      let promptTags: string[] = [];
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          promptTags = prompt.tags;
+        } else if (typeof prompt.tags === 'string') {
+          promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+        }
       }
+      
+      promptTags.forEach(tag => {
+        if (tag) {
+          tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
+        }
+      });
     });
 
     // 最近的提示词
@@ -770,13 +789,21 @@ export class PromptService extends BaseDatabaseService {
     });    // 计算热门标签
     const tagCounts = new Map<string, number>();
     prompts.forEach(prompt => {
-      if (prompt.tags && Array.isArray(prompt.tags)) {
-        prompt.tags.forEach(tag => {
-          if (tag) {
-            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-          }
-        });
+      // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+      let promptTags: string[] = [];
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          promptTags = prompt.tags;
+        } else if (typeof prompt.tags === 'string') {
+          promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+        }
       }
+      
+      promptTags.forEach(tag => {
+        if (tag) {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        }
+      });
     });
 
     const popularTags = Array.from(tagCounts.entries())
