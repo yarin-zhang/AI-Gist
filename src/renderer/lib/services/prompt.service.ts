@@ -53,6 +53,8 @@ export class PromptService extends BaseDatabaseService {
       uuid: generateUUID(),
       isFavorite: promptData.isFavorite || false,
       useCount: promptData.useCount || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     // 创建 variables，每个变量也生成UUID
@@ -63,6 +65,8 @@ export class PromptService extends BaseDatabaseService {
           ...variable,
           uuid: generateUUID(),
           promptId: prompt.id!,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
         createdVariables.push(createdVariable);
       }
@@ -113,8 +117,8 @@ export class PromptService extends BaseDatabaseService {
       }      if (filters.tags) {
         const searchTags = filters.tags.toLowerCase().split(',').map(tag => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
-          if (!prompt.tags || typeof prompt.tags !== 'string') return false;
-          const promptTags = prompt.tags.toLowerCase().split(',').map(tag => tag.trim());
+          if (!prompt.tags || !Array.isArray(prompt.tags)) return false;
+          const promptTags = prompt.tags.map(tag => tag.toLowerCase().trim());
           return searchTags.some(searchTag => 
             promptTags.some(promptTag => promptTag.includes(searchTag))
           );
@@ -518,7 +522,9 @@ export class PromptService extends BaseDatabaseService {
   async createPromptVariable(data: Omit<PromptVariable, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<PromptVariable> {
     const variableWithUUID = {
       ...data,
-      uuid: generateUUID()
+      uuid: generateUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     return this.add<PromptVariable>('promptVariables', variableWithUUID);
   }
@@ -701,9 +707,8 @@ export class PromptService extends BaseDatabaseService {
     // 标签分布统计
     const tagDistribution: Record<string, number> = {};
     allPrompts.forEach(prompt => {
-      if (prompt.tags) {
-        const tags = prompt.tags.split(',').map(tag => tag.trim());
-        tags.forEach(tag => {
+      if (prompt.tags && Array.isArray(prompt.tags)) {
+        prompt.tags.forEach(tag => {
           if (tag) {
             tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
           }
@@ -765,10 +770,11 @@ export class PromptService extends BaseDatabaseService {
     });    // 计算热门标签
     const tagCounts = new Map<string, number>();
     prompts.forEach(prompt => {
-      if (prompt.tags && typeof prompt.tags === 'string') {
-        const tags = prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-        tags.forEach(tag => {
-          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      if (prompt.tags && Array.isArray(prompt.tags)) {
+        prompt.tags.forEach(tag => {
+          if (tag) {
+            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+          }
         });
       }
     });
@@ -963,7 +969,7 @@ export class PromptService extends BaseDatabaseService {
       // Update existing prompt - only pass the fields that need to be updated
       await this.update('prompts', existing.id!, {
         ...data,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date()
       });
     } else {
       // Create new prompt - ensure all required fields are present
@@ -973,10 +979,10 @@ export class PromptService extends BaseDatabaseService {
         uuid: generateUUID(),
         isFavorite: data.isFavorite || false,
         useCount: data.useCount || 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
-      await this.add('prompts', newData as Prompt);
+      await this.add('prompts', newData as unknown as Prompt);
     }
   }
 }

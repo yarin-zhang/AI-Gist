@@ -34,7 +34,9 @@ export class CategoryService extends BaseDatabaseService {
   async createCategory(data: Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<Category> {
     const categoryWithUUID = {
       ...data,
-      uuid: generateUUID()
+      uuid: generateUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     return this.add<Category>('categories', categoryWithUUID);
   }
@@ -292,7 +294,7 @@ export class CategoryService extends BaseDatabaseService {
         // Update existing category
         await this.update('categories', existing.id!, {
           ...data,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date()
         });
     } else {
         // Create new category
@@ -300,8 +302,8 @@ export class CategoryService extends BaseDatabaseService {
           ...data,
           id: parseInt(id),
           uuid: generateUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
         await this.add('categories', newData as Category);
     }

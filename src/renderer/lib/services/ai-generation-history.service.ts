@@ -209,40 +209,43 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
    */
   async getAIGenerationHistoryStats(): Promise<AIGenerationHistoryStats> {
     const histories = await this.getAllAIGenerationHistory();
-    
-    const stats: AIGenerationHistoryStats = {
-      total: histories.length,
-      success: 0,
-      error: 0,
-      byConfig: {}
-    };
+    // 统计字段初始化
+    let successful = 0;
+    let failed = 0;
+    let pending = 0;
+    const totalByConfig: Record<string, number> = {};
+    const configUsage: Record<string, number> = {};
 
     histories.forEach(history => {
       // 统计总体状态
       if (history.status === 'success') {
-        stats.success++;
+        successful++;
       } else if (history.status === 'error') {
-        stats.error++;
+        failed++;
+      } else if (history.status === 'pending') {
+        pending++;
       }
-
       // 按配置ID统计
-      if (!stats.byConfig[history.configId]) {
-        stats.byConfig[history.configId] = {
-          total: 0,
-          success: 0,
-          error: 0
-        };
-      }
-      
-      stats.byConfig[history.configId].total++;
-      if (history.status === 'success') {
-        stats.byConfig[history.configId].success++;
-      } else if (history.status === 'error') {
-        stats.byConfig[history.configId].error++;
+      if (history.configId) {
+        totalByConfig[history.configId] = (totalByConfig[history.configId] || 0) + 1;
+        configUsage[history.configId] = (configUsage[history.configId] || 0) + 1;
       }
     });
 
-    return stats;
+    // 统计最常用配置
+    const mostUsedConfigs = Object.entries(configUsage)
+      .map(([configId, count]) => ({ configId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      total: histories.length,
+      successful,
+      failed,
+      pending,
+      totalByConfig,
+      mostUsedConfigs
+    };
   }
 
   /**

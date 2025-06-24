@@ -4,9 +4,9 @@
  */
 
 import type { 
-  DataExportResult, 
-  DataImportResult 
-} from '@shared/types/ipc.types';
+  ExportResult as DataExportResult, 
+  ImportResult as DataImportResult 
+} from '@shared/types/data-management';
 import { BaseDatabaseService } from './base-database.service';
 import { CategoryService } from './category.service';
 import { PromptService } from './prompt.service';
@@ -285,8 +285,9 @@ export class DatabaseServiceManager {
       
       return {
         success: true,
-        data: exportData,
-        message: '数据导出成功'
+        message: '数据导出成功',
+        recordCount: Object.values(exportData).reduce((sum, arr) => sum + arr.length, 0),
+        size: JSON.stringify(exportData).length
       };
       
     } catch (error) {
@@ -323,7 +324,7 @@ export class DatabaseServiceManager {
         for (const category of data.categories) {
           const { id, ...categoryDataWithoutId } = category;
           importPromises.push(
-            this.category.createCategory(categoryDataWithoutId).catch(err => {
+            this.category.createCategory(categoryDataWithoutId).then(() => {}).catch(err => {
               console.warn('导入分类数据失败:', category.id, err.message);
               totalErrors++;
             })
@@ -337,7 +338,7 @@ export class DatabaseServiceManager {
         for (const prompt of data.prompts) {
           const { id, ...promptDataWithoutId } = prompt;
           importPromises.push(
-            this.prompt.createPrompt(promptDataWithoutId).catch(err => {
+            this.prompt.createPrompt(promptDataWithoutId).then(() => {}).catch(err => {
               console.warn('导入提示词数据失败:', prompt.id, err.message);
               totalErrors++;
             })
@@ -351,7 +352,7 @@ export class DatabaseServiceManager {
         for (const config of data.aiConfigs) {
           const { id, ...configDataWithoutId } = config;
           importPromises.push(
-            this.aiConfig.createAIConfig(configDataWithoutId).catch(err => {
+            this.aiConfig.createAIConfig(configDataWithoutId).then(() => {}).catch(err => {
               console.warn('导入AI配置数据失败:', config.id, err.message);
               totalErrors++;
             })
@@ -365,7 +366,7 @@ export class DatabaseServiceManager {
         for (const history of data.aiHistory) {
           const { id, ...historyDataWithoutId } = history;
           importPromises.push(
-            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).catch(err => {
+            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).then(() => {}).catch(err => {
               console.warn('导入AI历史数据失败:', history.id, err.message);
               totalErrors++;
             })
@@ -378,7 +379,7 @@ export class DatabaseServiceManager {
         console.log(`导入设置数据: ${data.settings.length} 条`);
         for (const setting of data.settings) {
           importPromises.push(
-            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).catch(err => {
+            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).then(() => {}).catch(err => {
               console.warn('导入设置数据失败:', setting.key, err.message);
               totalErrors++;
             })
@@ -403,7 +404,16 @@ export class DatabaseServiceManager {
       return {
         success: true,
         message: `数据导入成功，共导入 ${totalImported} 条记录${totalErrors > 0 ? `，失败 ${totalErrors} 条` : ''}`,
-        details
+        totalImported,
+        totalErrors,
+        details,
+        imported: {
+          categories: details.categories,
+          prompts: details.prompts,
+          settings: details.settings,
+          history: details.aiHistory,
+          aiConfigs: details.aiConfigs
+        }
       };
       
     } catch (error) {
@@ -454,7 +464,7 @@ export class DatabaseServiceManager {
         for (const category of backupData.categories) {
           const { id, ...categoryDataWithoutId } = category;
           restorePromises.push(
-            this.category.createCategory(categoryDataWithoutId).catch(err => {
+            this.category.createCategory(categoryDataWithoutId).then(() => {}).catch(err => {
               console.warn('恢复分类数据失败:', category.id, err.message);
               totalErrors++;
             })
@@ -468,7 +478,7 @@ export class DatabaseServiceManager {
         for (const prompt of backupData.prompts) {
           const { id, ...promptDataWithoutId } = prompt;
           restorePromises.push(
-            this.prompt.createPrompt(promptDataWithoutId).catch(err => {
+            this.prompt.createPrompt(promptDataWithoutId).then(() => {}).catch(err => {
               console.warn('恢复提示词数据失败:', prompt.id, err.message);
               totalErrors++;
             })
@@ -482,7 +492,7 @@ export class DatabaseServiceManager {
         for (const config of backupData.aiConfigs) {
           const { id, ...configDataWithoutId } = config;
           restorePromises.push(
-            this.aiConfig.createAIConfig(configDataWithoutId).catch(err => {
+            this.aiConfig.createAIConfig(configDataWithoutId).then(() => {}).catch(err => {
               console.warn('恢复AI配置数据失败:', config.id, err.message);
               totalErrors++;
             })
@@ -496,7 +506,7 @@ export class DatabaseServiceManager {
         for (const history of backupData.aiHistory) {
           const { id, ...historyDataWithoutId } = history;
           restorePromises.push(
-            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).catch(err => {
+            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).then(() => {}).catch(err => {
               console.warn('恢复AI历史数据失败:', history.id, err.message);
               totalErrors++;
             })
@@ -509,7 +519,7 @@ export class DatabaseServiceManager {
         console.log(`恢复设置数据: ${backupData.settings.length} 条`);
         for (const setting of backupData.settings) {
           restorePromises.push(
-            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).catch(err => {
+            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).then(() => {}).catch(err => {
               console.warn('恢复设置数据失败:', setting.key, err.message);
               totalErrors++;
             })
@@ -534,7 +544,16 @@ export class DatabaseServiceManager {
       return {
         success: true,
         message: `数据恢复成功，共恢复 ${totalRestored} 条记录${totalErrors > 0 ? `，失败 ${totalErrors} 条` : ''}`,
-        details
+        totalImported: totalRestored,
+        totalErrors,
+        details,
+        imported: {
+          categories: details.categories,
+          prompts: details.prompts,
+          settings: details.settings,
+          history: details.aiHistory,
+          aiConfigs: details.aiConfigs
+        }
       };
       
     } catch (error) {
@@ -705,7 +724,7 @@ export class DatabaseServiceManager {
       ).length;
 
       const sensitiveAIConfigs = aiConfigs.filter(config =>
-        config.apiKey || config.baseUrl
+        config.apiKey || config.baseURL
       ).length;
 
       const stats = {
