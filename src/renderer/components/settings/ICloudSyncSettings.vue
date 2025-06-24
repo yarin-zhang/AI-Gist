@@ -203,29 +203,14 @@
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">同步状态:</span>
-            <span :class="syncStatus.isEnabled ? 'text-green-600' : 'text-gray-500'">
-              {{ syncStatus.isEnabled ? '已启用' : '已禁用' }}
+            <span :class="localConfig.enabled ? 'text-green-600' : 'text-gray-500'">
+              {{ localConfig.enabled ? '已启用' : '已禁用' }}
             </span>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-3">
             <NButton 
-                @click="viewSyncData" 
-                :loading="viewingData"
-                :disabled="!localConfig.enabled"
-                type="default"
-                ghost
-                block
-            >
-                <template #icon>
-                <NIcon>
-                    <Eye />
-                </NIcon>
-                </template>
-                查看同步数据
-            </NButton>
-                <NButton 
                 @click="openSyncDirectory" 
                 :disabled="!localConfig.enabled"
                 type="default"
