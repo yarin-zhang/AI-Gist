@@ -13,7 +13,7 @@ import {
   PromptFilters, 
   PaginatedResult, 
   PromptFillResult 
-} from '../types/database';
+} from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
 import { autoSyncManager } from '../utils/auto-sync-manager';
 

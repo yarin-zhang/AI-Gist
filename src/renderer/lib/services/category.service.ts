@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { Category, CategoryWithRelations, Prompt } from '../types/database';
+import { Category, CategoryWithRelations, Prompt } from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
 
 /**

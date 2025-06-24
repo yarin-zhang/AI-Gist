@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { AppSettings } from '../types/database';
+import { AppSettings } from '@shared/types/database';
 
 /**
  * 应用设置数据服务类
