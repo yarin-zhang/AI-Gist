@@ -1,6 +1,6 @@
 <template>
   <div class="webdav-sync-settings">
-    <NCard :bordered="false">
+    <NCard >
 
 
       <!-- 基本设置 -->

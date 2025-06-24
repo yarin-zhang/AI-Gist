@@ -1,6 +1,6 @@
 <template>
   <div class="icloud-sync-settings">
-    <NCard :bordered="false">
+    <NCard>
 
       <!-- iCloud 状态检查 -->
       <div class="mb-6">
