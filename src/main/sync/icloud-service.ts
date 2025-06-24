@@ -1166,8 +1166,12 @@ export class ICloudService {
     private async importAllData(importData: any): Promise<void> {
         try {
             if (this.dataManagementService) {
-                await this.dataManagementService.importAllData(importData);
-                console.log('[iCloud] 数据导入完成');
+                // 使用 syncImportDataObject 方法进行同步导入
+                const result = await this.dataManagementService.syncImportDataObject(importData);
+                if (!result.success) {
+                    throw new Error(`数据导入失败: ${result.message}`);
+                }
+                console.log('[iCloud] 数据导入完成:', result.message);
             } else {
                 console.warn('[iCloud] 数据管理服务不可用，无法导入数据');
             }

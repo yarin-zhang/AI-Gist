@@ -286,6 +286,7 @@ export class DatabaseServiceManager {
       return {
         success: true,
         message: '数据导出成功',
+        data: exportData,
         recordCount: Object.values(exportData).reduce((sum, arr) => sum + arr.length, 0),
         size: JSON.stringify(exportData).length
       };

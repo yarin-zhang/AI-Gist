@@ -700,6 +700,22 @@ export class DataManagementService {
                 throw new Error(`数据库操作失败: ${result.error}`);
             }
             
+            // 确保 result.data 存在
+            if (!result.data) {
+                console.warn('导出结果中缺少 data 字段，使用默认空数据结构');
+                const defaultData = {
+                    categories: [],
+                    prompts: [],
+                    aiConfigs: [],
+                    aiHistory: [],
+                    settings: []
+                };
+                return {
+                    ...defaultData,
+                    totalRecords: 0
+                };
+            }
+            
             // 计算总记录数
             const totalRecords = (
                 (result.data.categories?.length || 0) +
