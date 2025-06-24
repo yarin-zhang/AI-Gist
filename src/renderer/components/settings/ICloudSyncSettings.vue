@@ -286,7 +286,6 @@ const comparing = ref(false)
 const uploading = ref(false)
 const downloading = ref(false)
 const syncing = ref(false)
-const viewingData = ref(false)
 
 // 冲突解决
 const showConflictDialog = ref(false)
@@ -595,62 +594,6 @@ const openSyncDirectory = async () => {
   }
 }
 
-// 查看同步数据
-const viewSyncData = async () => {
-  viewingData.value = true
-  try {
-    // 先获取本地数据用于演示
-    const localData = await window.electronAPI?.dataManagement?.generateExportData()
-    
-    if (!localData || !localData.data) {
-      message.warning('暂无同步数据')
-      return
-    }
-
-    // 分析数据中的 UUID 字段
-    const data = localData.data
-    let uuidStats = {
-      categories: 0,
-      prompts: 0,
-      categoriesWithUuid: 0,
-      promptsWithUuid: 0
-    }
-
-    if (data.categories) {
-      uuidStats.categories = data.categories.length
-      uuidStats.categoriesWithUuid = data.categories.filter((c: any) => c.uuid).length
-    }
-
-    if (data.prompts) {
-      uuidStats.prompts = data.prompts.length
-      uuidStats.promptsWithUuid = data.prompts.filter((p: any) => p.uuid).length
-    }
-
-    const statsMessage = `
-数据统计：
-• 分类：${uuidStats.categories} 个，其中 ${uuidStats.categoriesWithUuid} 个包含 UUID
-• 提示词：${uuidStats.prompts} 个，其中 ${uuidStats.promptsWithUuid} 个包含 UUID
-
-${uuidStats.categoriesWithUuid === uuidStats.categories && uuidStats.promptsWithUuid === uuidStats.prompts 
-  ? '✅ 所有数据都包含 UUID，可以进行精确同步校验' 
-  : '⚠️ 部分数据缺少 UUID，可能影响同步校验准确性'
-}`.trim()
-
-    dialog.success({
-      title: '同步数据预览',
-      content: statsMessage,
-      positiveText: '确定',
-      style: {
-        width: '500px'
-      }
-    })
-  } catch (error) {
-    console.error('查看同步数据失败:', error)
-    message.error('查看同步数据失败')
-  } finally {
-    viewingData.value = false
-  }
-}
 const syncNow = async () => {
   syncing.value = true
   try {

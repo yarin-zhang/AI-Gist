@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   icloud: {
     testAvailability: () => ipcRenderer.invoke('icloud:test-availability'),
     syncNow: () => ipcRenderer.invoke('icloud:sync-now'),
+    getSyncStatus: () => ipcRenderer.invoke('icloud:get-sync-status'),
     getConfig: () => ipcRenderer.invoke('icloud:get-config'),
     setConfig: (config: any) => ipcRenderer.invoke('icloud:set-config', config),
     manualUpload: () => ipcRenderer.invoke('icloud:manual-upload'),
