@@ -434,7 +434,7 @@ export class DataManagementService {
                                 prompt.id || '',
                                 `"${(prompt.title || '').replace(/"/g, '""')}"`,
                                 `"${(prompt.content || '').replace(/"/g, '""')}"`,
-                                `"${(prompt.tags || []).join(';')}"`,
+                                `"${this.normalizeTags(prompt.tags)}"`,
                                 prompt.createdAt || ''
                             ];
                             csvRows.push(row.join(','));
@@ -640,7 +640,9 @@ export class DataManagementService {
             }
         });
         console.log('DataManagementService: 所有IPC处理程序注册完成');
-    }    private async exportAllData() {
+    }
+
+    private async exportAllData() {
         try {
             console.log('正在从渲染进程获取数据库数据...');
             
@@ -738,7 +740,9 @@ export class DataManagementService {
             console.error('导出数据失败:', error);
             throw new Error(`数据导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
         }
-    }    private async restoreAllData(data: any) {
+    }
+
+    private async restoreAllData(data: any) {
         try {
             console.log('正在恢复数据到数据库...');
             
@@ -861,6 +865,26 @@ export class DataManagementService {
         }
     }
 
+    /**
+     * 统一处理 tags 字段转换
+     * 将字符串或数组格式的 tags 转换为字符串
+     * @param tags 标签数据（可能是字符串或数组）
+     * @param separator 分隔符，默认为分号
+     * @returns 转换后的标签字符串
+     */
+    private normalizeTags(tags: any, separator = ';'): string {
+        if (!tags) return '';
+        
+        if (Array.isArray(tags)) {
+            return tags.join(separator);
+        } else if (typeof tags === 'string') {
+            // 如果是字符串，先按逗号分割，再用指定分隔符连接
+            return tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag).join(separator);
+        }
+        
+        return '';
+    }
+
     private convertToCSV(data: any): string {
         // 简单的 CSV 转换实现
         let csv = '';
@@ -880,8 +904,7 @@ export class DataManagementService {
             csv += '--- 提示词数据 ---\n';
             csv += 'ID,标题,内容,分类ID,标签,创建时间\n';
             data.prompts.forEach((prompt: any) => {
-                const tags = Array.isArray(prompt.tags) ? prompt.tags.join(';') : '';
-                csv += `${prompt.id},"${prompt.title}","${prompt.content}","${prompt.categoryId}","${tags}","${prompt.createdAt}"\n`;
+                csv += `${prompt.id},"${prompt.title}","${prompt.content}","${prompt.categoryId}","${this.normalizeTags(prompt.tags)}","${prompt.createdAt}"\n`;
             });
             csv += '\n';
         }

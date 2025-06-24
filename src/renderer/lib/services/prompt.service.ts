@@ -115,12 +115,23 @@ export class PromptService extends BaseDatabaseService {
           (prompt.description && prompt.description.toLowerCase().includes(searchQuery))
         );
       }      if (filters.tags) {
-        const searchTags = filters.tags.toLowerCase().split(',').map(tag => tag.trim());
+        const searchTags = filters.tags.toLowerCase().split(',').map((tag: string) => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
-          if (!prompt.tags || !Array.isArray(prompt.tags)) return false;
-          const promptTags = prompt.tags.map(tag => tag.toLowerCase().trim());
+          // 处理 tags 字段，确保能正确处理字符串和数组两种格式
+          let promptTags: string[] = [];
+          if (prompt.tags) {
+            if (Array.isArray(prompt.tags)) {
+              promptTags = prompt.tags;
+            } else if (typeof prompt.tags === 'string') {
+              promptTags = prompt.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+            }
+          }
+          
+          if (promptTags.length === 0) return false;
+          
+          const normalizedPromptTags = promptTags.map((tag: string) => tag.toLowerCase().trim());
           return searchTags.some(searchTag => 
-            promptTags.some(promptTag => promptTag.includes(searchTag))
+            normalizedPromptTags.some(promptTag => promptTag.includes(searchTag))
           );
         });
       }

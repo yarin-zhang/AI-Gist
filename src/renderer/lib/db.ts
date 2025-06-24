@@ -107,6 +107,8 @@ if (typeof window !== 'undefined') {
     importData: (data: any) => databaseManager.importData(data),
     backupData: () => databaseManager.backupData(),
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.restoreData(backupData),
+    syncImportDataObject: (data: any) => databaseManager.importData(data),
     getHealthStatus: () => databaseManager.getHealthStatus(),
     getStats: async () => {
       try {
@@ -140,10 +142,11 @@ export function createDatabaseAPI() {
   return {
     databaseServiceManager: databaseManager,
     exportAllData: () => databaseManager.exportAllData(),
+    importData: (data: any) => databaseManager.importData(data),
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
     replaceAllData: (backupData: any) => databaseManager.restoreData(backupData),
-    importDataObject: (data: any) => databaseManager.importData(data),
     syncImportDataObject: (data: any) => databaseManager.importData(data),
+    importDataObject: (data: any) => databaseManager.importData(data),
     getDataStatistics: () => databaseManager.exportAllData(),
     checkAndRepairDatabase: () => databaseManager.getHealthStatus(),
     backupData: () => databaseManager.backupData(),

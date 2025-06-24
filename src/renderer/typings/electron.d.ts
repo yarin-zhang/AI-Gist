@@ -113,9 +113,13 @@ export default interface ElectronApi {
     createBackup: (description?: string) => Promise<{ success: boolean; backupId?: string; error?: string }>
     getBackupList: () => Promise<{ success: boolean; backups?: any[]; error?: string }>
     restoreBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
+    restoreBackupWithReplace: (backupId: string) => Promise<{ success: boolean; error?: string }>
     deleteBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
     export: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string }>
     import: (filePath: string, options: any) => Promise<{ success: boolean; error?: string }>
+    exportSelected: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string }>
+    exportFullBackup: () => Promise<{ success: boolean; error?: string }>
+    importFullBackup: () => Promise<{ success: boolean; error?: string }>
     selectImportFile: (format: string) => Promise<string | null>
     selectExportPath: (defaultName: string) => Promise<string | null>
     getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
