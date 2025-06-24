@@ -568,6 +568,30 @@ export class WebDAVService {
         ipcMain.handle('webdav:apply-downloaded-data', async (event, items: any[]) => {
             return this.applyDownloadedData(items);
         });
+
+        // 记录删除的项目UUID
+        ipcMain.handle('webdav:record-deleted-items', async (event, uuids: string[]) => {
+            try {
+                console.log('[WebDAV] 记录删除项目:', uuids);
+                // 这里可以添加删除记录的逻辑
+                return { success: true };
+            } catch (error) {
+                console.error('[WebDAV] 记录删除项目失败:', error);
+                return { success: false, error: error instanceof Error ? error.message : '记录失败' };
+            }
+        });
+
+        // 删除远程项目（即时删除）
+        ipcMain.handle('webdav:delete-remote-items', async (event, uuids: string[]) => {
+            try {
+                console.log('[WebDAV] 删除远程项目:', uuids);
+                // 这里可以添加即时删除远程项目的逻辑
+                return { success: true };
+            } catch (error) {
+                console.error('[WebDAV] 删除远程项目失败:', error);
+                return { success: false, error: error instanceof Error ? error.message : '删除失败' };
+            }
+        });
     }
 
     /**

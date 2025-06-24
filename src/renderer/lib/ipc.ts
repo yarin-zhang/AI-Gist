@@ -4,75 +4,11 @@
  */
 
 import { IpcChannels, IpcResult, IpcError, IpcInvokeOptions } from '@shared/types';
+import type ElectronApi from '../typings/electron';
 
 declare global {
   interface Window {
-    electronAPI: {
-      sendMessage: (message: string) => void;
-      preferences: {
-        get: () => Promise<any>;
-        set: (prefs: any) => Promise<any>;
-        reset: () => Promise<any>;
-      };
-      window: {
-        show: () => Promise<void>;
-        hideToTray: () => Promise<void>;
-        getSize: () => Promise<{ width: number; height: number } | null>;
-        getContentSize: () => Promise<{ width: number; height: number } | null>;
-      };
-      theme: {
-        getCurrent: () => Promise<'light' | 'dark' | 'system'>;
-        getInfo: () => Promise<any>;
-        setSource: (source: 'system' | 'light' | 'dark') => Promise<'light' | 'dark' | 'system'>;
-        isDark: () => Promise<boolean>;
-        onThemeChanged: (callback: (data: any) => void) => () => void;
-      };
-      ai: {
-        getConfigs: () => Promise<any[]>;
-        getEnabledConfigs: () => Promise<any[]>;
-        addConfig: (config: any) => Promise<any>;
-        updateConfig: (id: string, config: any) => Promise<any>;
-        removeConfig: (id: string) => Promise<boolean>;
-        testConfig: (config: any) => Promise<any>;
-        getModels: (config: any) => Promise<string[]>;
-        generatePrompt: (request: any, config: any) => Promise<any>;
-        generatePromptStream: (request: any, config: any, onProgress: any) => Promise<any>;
-        intelligentTest: (config: any) => Promise<any>;
-        stopGeneration: () => Promise<any>;
-        debugPrompt: (prompt: string, config: any) => Promise<any>;
-      };
-      webdav: {
-        testConnection: (config: any) => Promise<any>;
-        syncNow: () => Promise<any>;
-        setConfig: (config: any) => Promise<any>;
-        getConfig: () => Promise<any>;
-        forceUpload: () => Promise<any>;
-        forceDownload: () => Promise<any>;
-        compareData: () => Promise<any>;
-      };
-      icloud: {
-        testAvailability: () => Promise<any>;
-        syncNow: () => Promise<any>;
-        getConfig: () => Promise<any>;
-        setConfig: (config: any) => Promise<void>;
-        manualUpload: () => Promise<any>;
-        manualDownload: () => Promise<any>;
-        compareData: () => Promise<any>;
-        applyDownloadedData: (resolution: any) => Promise<any>;
-        openSyncDirectory: () => Promise<any>;
-      };
-      data: {
-        createBackup: (description?: string) => Promise<any>;
-        getBackupList: () => Promise<any>;
-        restoreBackup: (backupId: string) => Promise<any>;
-        deleteBackup: (backupId: string) => Promise<any>;
-        export: (options: any, exportPath?: string) => Promise<any>;
-        import: (filePath: string, options: any) => Promise<any>;
-        selectImportFile: (format: string) => Promise<string | null>;
-        selectExportPath: (defaultName: string) => Promise<string | null>;
-        getStats: () => Promise<any>;
-      };
-    };
+    electronAPI: ElectronApi;
   }
 }
 
@@ -168,137 +104,140 @@ export class IpcUtils {
     switch (namespace) {
       case 'preferences':
       case 'get-user-preferences':
-        return api.preferences.get();
+        return api.preferences.get() as T;
       case 'set-user-preferences':
-        return api.preferences.set(data);
+        return api.preferences.set(data) as T;
       case 'reset-user-preferences':
-        return api.preferences.reset();
+        return api.preferences.reset() as T;
         
       case 'show-window':
-        return api.window.show();
+        return api.window.show() as T;
       case 'hide-to-tray':
-        return api.window.hideToTray();
+        return api.window.hideToTray() as T;
       case 'get-window-size':
-        return api.window.getSize();
+        return api.window.getSize() as T;
       case 'get-content-size':
-        return api.window.getContentSize();
+        return api.window.getContentSize() as T;
         
       case 'theme':
         switch (method) {
           case 'get-current':
-            return api.theme.getCurrent();
+            return api.theme.getCurrent() as T;
           case 'get-info':
-            return api.theme.getInfo();
+            return api.theme.getInfo() as T;
           case 'set-source':
-            return api.theme.setSource(data);
+            return api.theme.setSource(data) as T;
           case 'is-dark':
-            return api.theme.isDark();
+            return api.theme.isDark() as T;
         }
         break;
         
       case 'ai':
         switch (method) {
           case 'get-configs':
-            return api.ai.getConfigs();
+            return api.ai.getConfigs() as T;
           case 'get-enabled-configs':
-            return api.ai.getEnabledConfigs();
+            return api.ai.getEnabledConfigs() as T;
           case 'add-config':
-            return api.ai.addConfig(data);
+            return api.ai.addConfig(data) as T;
           case 'update-config':
-            return api.ai.updateConfig(data.id, data.config);
+            return api.ai.updateConfig(data.id, data.config) as T;
           case 'remove-config':
-            return api.ai.removeConfig(data);
+            return api.ai.removeConfig(data) as T;
           case 'test-config':
-            return api.ai.testConfig(data);
+            return api.ai.testConfig(data) as T;
           case 'get-models':
-            return api.ai.getModels(data);
+            return api.ai.getModels(data) as T;
           case 'generate-prompt':
-            return api.ai.generatePrompt(data.request, data.config);
+            return api.ai.generatePrompt(data.request, data.config) as T;
           case 'generate-prompt-stream':
-            return api.ai.generatePromptStream(data.request, data.config, data.onProgress);
+            return api.ai.generatePromptStream(data.request, data.config, data.onProgress) as T;
           case 'intelligent-test':
-            return api.ai.intelligentTest(data);
+            return api.ai.intelligentTest(data) as T;
           case 'stop-generation':
-            return api.ai.stopGeneration();
+            return api.ai.stopGeneration() as T;
           case 'debug-prompt':
-            return api.ai.debugPrompt(data.prompt, data.config);
+            return api.ai.debugPrompt(data.prompt, data.config) as T;
         }
         break;
-          case 'webdav':
+        
+      case 'webdav':
         switch (method) {
           case 'test-connection':
-            return api.webdav.testConnection(data);
+            return api.webdav.testConnection(data) as T;
           case 'sync-now':
-            return api.webdav.syncNow();
+            return api.webdav.syncNow() as T;
           case 'set-config':
-            return api.webdav.setConfig(data);
+            return api.webdav.setConfig(data) as T;
           case 'get-config':
-            return api.webdav.getConfig();
+            return api.webdav.getConfig() as T;
           case 'force-upload':
-            return api.webdav.forceUpload();
+            return api.webdav.forceUpload() as T;
           case 'force-download':
-            return api.webdav.forceDownload();
+            return api.webdav.forceDownload() as T;
           case 'compare-data':
-            return api.webdav.compareData();
+            return api.webdav.compareData() as T;
+          case 'record-deleted-items':
+            return api.webdav.recordDeletedItems(data) as T;
+          case 'delete-remote-items':
+            return api.webdav.deleteRemoteItems(data) as T;
         }
         break;
         
       case 'icloud':
         switch (method) {
           case 'test-availability':
-            return api.icloud.testAvailability();
+            return api.icloud.testAvailability() as T;
           case 'sync-now':
-            return api.icloud.syncNow();
+            return api.icloud.syncNow() as T;
           case 'get-config':
-            return api.icloud.getConfig();
+            return api.icloud.getConfig() as T;
           case 'set-config':
-            return api.icloud.setConfig(data);
+            return api.icloud.setConfig(data) as T;
           case 'manual-upload':
-            return api.icloud.manualUpload();
+            return api.icloud.manualUpload() as T;
           case 'manual-download':
-            return api.icloud.manualDownload();
+            return api.icloud.manualDownload() as T;
           case 'compare-data':
-            return api.icloud.compareData();
+            return api.icloud.compareData() as T;
           case 'apply-downloaded-data':
-            return api.icloud.applyDownloadedData(data);
+            return api.icloud.applyDownloadedData(data) as T;
           case 'open-sync-directory':
-            return api.icloud.openSyncDirectory();
+            return api.icloud.openSyncDirectory() as T;
         }
         break;
         
       case 'data':
         switch (method) {
           case 'create-backup':
-            return api.data.createBackup(data?.description);
+            return api.data.createBackup(data) as T;
           case 'get-backup-list':
-            return api.data.getBackupList();
+            return api.data.getBackupList() as T;
           case 'restore-backup':
-            return api.data.restoreBackup(data.backupId);
-          case 'restore-backup-replace':
-            return api.data.restoreBackupWithReplace(data.backupId);
+            return api.data.restoreBackup(data) as T;
           case 'delete-backup':
-            return api.data.deleteBackup(data.backupId);
+            return api.data.deleteBackup(data) as T;
           case 'export':
-            return api.data.export(data.options, data.exportPath);
+            return api.data.export(data.options, data.exportPath) as T;
           case 'import':
-            return api.data.import(data.filePath, data.options);
-          case 'export-selected':
-            return api.data.exportSelected(data.options, data.exportPath);
-          case 'export-full-backup':
-            return api.data.exportFullBackup();
-          case 'import-full-backup':
-            return api.data.importFullBackup();
+            return api.data.import(data.filePath, data.options) as T;
           case 'select-import-file':
-            return api.data.selectImportFile(data?.format);
+            return api.data.selectImportFile(data) as T;
           case 'select-export-path':
-            return api.data.selectExportPath(data?.defaultName);
+            return api.data.selectExportPath(data) as T;
           case 'get-stats':
-            return api.data.getStats();
+            return api.data.getStats() as T;
         }
         break;
     }
     
-    throw new Error(`Unknown IPC channel: ${channel}`);
+    // 如果没有匹配的路由，直接调用 ipcRenderer.invoke
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      // 这里需要直接调用 ipcRenderer.invoke，但我们需要一个更通用的方法
+      throw new Error(`Unsupported IPC channel: ${channel}`);
+    }
+    
+    throw new Error(`IPC not available for channel: ${channel}`);
   }
 }
 

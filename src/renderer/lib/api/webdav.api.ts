@@ -84,10 +84,13 @@ export class WebDAVAPI {
                     success: false,
                     message: `同步失败: 数据库异常 - ${checkResult.message}`,
                     timestamp: new Date().toISOString(),
-                    filesUploaded: 0,
-                    filesDownloaded: 0,
-                    conflictsDetected: 0,
+                    itemsProcessed: 0,
+                    itemsUpdated: 0,
+                    itemsCreated: 0,
+                    itemsDeleted: 0,
                     conflictsResolved: 0,
+                    conflictDetails: [],
+                    errors: [checkResult.message]
                 };
             }
             
@@ -228,6 +231,18 @@ export class WebDAVAPI {
         } catch (error) {
             console.error('记录删除项目失败:', error);
             return { success: false, error: error instanceof Error ? error.message : '记录删除失败' };
+        }
+    }
+
+    /**
+     * 删除远程项目（即时删除）
+     */
+    static async deleteRemoteItems(uuids: string[]): Promise<{ success: boolean; error?: string }> {
+        try {
+            return await ipcInvoke('webdav:delete-remote-items', uuids);
+        } catch (error) {
+            console.error('删除远程项目失败:', error);
+            return { success: false, error: error instanceof Error ? error.message : '删除远程项目失败' };
         }
     }
 

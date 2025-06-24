@@ -75,8 +75,10 @@ export default interface ElectronApi {
     testConfig: (config: AIConfig) => Promise<AIConfigTestResult>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
-    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>    intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
+    generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
+    intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
+    debugPrompt: (prompt: string, config: AIConfig) => Promise<AIGenerationResult>
   }
   
   webdav: {
@@ -88,7 +90,34 @@ export default interface ElectronApi {
     compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
     getConfig: () => Promise<WebDAVConfig>
     setConfig: (config: WebDAVConfig) => Promise<{ success: boolean; message?: string; error?: string }>
+    forceUpload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
+    forceDownload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
+    recordDeletedItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
     deleteRemoteItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
+  }
+
+  icloud: {
+    testAvailability: () => Promise<{ success: boolean; available?: boolean; iCloudPath?: string; message?: string }>
+    syncNow: () => Promise<{ success: boolean; message?: string; error?: string }>
+    getConfig: () => Promise<{ enabled: boolean; autoSync: boolean; syncInterval: number; customPath?: string }>
+    setConfig: (config: any) => Promise<void>
+    manualUpload: () => Promise<{ success: boolean; message?: string; error?: string }>
+    manualDownload: () => Promise<{ success: boolean; message?: string; error?: string }>
+    compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
+    applyDownloadedData: (resolution: any) => Promise<{ success: boolean; message?: string; error?: string }>
+    openSyncDirectory: () => Promise<{ success: boolean; error?: string }>
+  }
+
+  data: {
+    createBackup: (description?: string) => Promise<{ success: boolean; backupId?: string; error?: string }>
+    getBackupList: () => Promise<{ success: boolean; backups?: any[]; error?: string }>
+    restoreBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
+    deleteBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
+    export: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string }>
+    import: (filePath: string, options: any) => Promise<{ success: boolean; error?: string }>
+    selectImportFile: (format: string) => Promise<string | null>
+    selectExportPath: (defaultName: string) => Promise<string | null>
+    getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
   }
 }
 
