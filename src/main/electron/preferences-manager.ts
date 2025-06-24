@@ -51,6 +51,12 @@ class PreferencesManager {
       autoSync: false,
       syncInterval: 30,
       customPath: '',
+      // 连接验证状态
+      connectionTested: false,
+      connectionValid: false,
+      connectionMessage: '',
+      connectionTestedAt: '',
+      configHash: '',
     },
     dataSync: {
       lastSyncTime: null,
@@ -135,6 +141,12 @@ class PreferencesManager {
             autoSync: loadedPrefs.icloud?.autoSync ?? this.defaultPreferences.icloud!.autoSync,
             syncInterval: loadedPrefs.icloud?.syncInterval ?? this.defaultPreferences.icloud!.syncInterval,
             customPath: loadedPrefs.icloud?.customPath ?? this.defaultPreferences.icloud!.customPath,
+            // 连接验证状态
+            connectionTested: loadedPrefs.icloud?.connectionTested ?? this.defaultPreferences.icloud!.connectionTested,
+            connectionValid: loadedPrefs.icloud?.connectionValid ?? this.defaultPreferences.icloud!.connectionValid,
+            connectionMessage: loadedPrefs.icloud?.connectionMessage ?? this.defaultPreferences.icloud!.connectionMessage,
+            connectionTestedAt: loadedPrefs.icloud?.connectionTestedAt ?? this.defaultPreferences.icloud!.connectionTestedAt,
+            configHash: loadedPrefs.icloud?.configHash ?? this.defaultPreferences.icloud!.configHash,
           },
           dataSync: {
             lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,

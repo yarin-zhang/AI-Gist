@@ -40,6 +40,9 @@ app.whenReady().then(async () => {
   webdavService = new WebDAVService(preferencesManager, dataManagementService);
   icloudService = new ICloudService(preferencesManager, dataManagementService);
   
+  // 初始化 iCloud 服务
+  await icloudService.initialize();
+  
   // 初始化 IPC 处理器（放在服务初始化之后）
   ipcHandlers.initialize();
   
