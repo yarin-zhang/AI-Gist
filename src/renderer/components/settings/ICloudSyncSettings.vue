@@ -318,6 +318,69 @@ const formatTime = (timeString: string | null) => {
   return date.toLocaleString('zh-CN')
 }
 
+// 计算配置哈希值，用于检测配置是否发生变更
+const computeConfigHash = (config: { customPath?: string }) => {
+  const configStr = `${config.customPath || ''}`
+  // 简单的哈希函数
+  let hash = 0
+  for (let i = 0; i < configStr.length; i++) {
+    const char = configStr.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // 转为32位整数
+  }
+  return hash.toString()
+}
+
+// 从持久化配置中恢复连接状态
+const restoreConnectionStatus = () => {
+  console.log('开始恢复 iCloud 连接状态，当前配置:', {
+    customPath: localConfig.customPath || '',
+    connectionTested: localConfig.connectionTested,
+    connectionValid: localConfig.connectionValid,
+    connectionMessage: localConfig.connectionMessage,
+    connectionTestedAt: localConfig.connectionTestedAt,
+    configHash: localConfig.configHash
+  })
+  
+  const currentHash = computeConfigHash({
+    customPath: localConfig.customPath || ''
+  })
+  
+  console.log('配置哈希比较:', {
+    currentHash,
+    storedHash: localConfig.configHash,
+    hashMatches: localConfig.configHash === currentHash,
+    connectionTested: localConfig.connectionTested
+  })
+  
+  // 如果配置哈希值匹配且有连接测试记录，则恢复状态
+  if (localConfig.configHash === currentHash && localConfig.connectionTested) {
+    iCloudStatus.checked = true
+    iCloudStatus.available = localConfig.connectionValid || false
+    iCloudStatus.message = localConfig.connectionMessage || ''
+    // 从配置中获取路径信息
+    iCloudStatus.path = localConfig.customPath || ''
+    
+    console.log('✅ 已成功恢复 iCloud 连接状态:', {
+      tested: iCloudStatus.checked,
+      available: iCloudStatus.available,
+      message: iCloudStatus.message,
+      path: iCloudStatus.path,
+      testedAt: localConfig.connectionTestedAt
+    })
+  } else {
+    // 配置已变更或没有测试记录，重置状态
+    iCloudStatus.checked = false
+    iCloudStatus.available = false
+    iCloudStatus.message = ''
+    iCloudStatus.path = ''
+    
+    console.log('❌ iCloud 连接状态已重置 - 原因:', 
+      !localConfig.connectionTested ? '没有测试记录' : 
+      localConfig.configHash !== currentHash ? '配置已变更' : '未知原因')
+  }
+}
+
 // 检查 iCloud 状态
 const checkICloudStatus = async () => {
   statusChecking.value = true
@@ -333,12 +396,48 @@ const checkICloudStatus = async () => {
     } else {
       message.success('iCloud Drive 连接正常')
     }
+    
+    // 更新配置中的连接验证状态
+    const configHash = computeConfigHash({
+      customPath: localConfig.customPath || ''
+    })
+    
+    Object.assign(localConfig, {
+      connectionTested: true,
+      connectionValid: iCloudStatus.available,
+      connectionMessage: iCloudStatus.message,
+      connectionTestedAt: new Date().toISOString(),
+      configHash: configHash,
+      // 如果检测成功且有路径信息，更新路径
+      ...(result.iCloudPath && { customPath: result.iCloudPath })
+    })
+    
+    // 保存更新后的配置
+    await handleConfigChange()
+    
+    console.log('iCloud 连接验证状态已保存')
   } catch (error) {
     console.error('检查 iCloud 状态失败:', error)
     message.error('检查 iCloud 状态失败')
     iCloudStatus.checked = true
     iCloudStatus.available = false
     iCloudStatus.message = '检查失败'
+    
+    // 保存失败状态
+    const configHash = computeConfigHash({
+      customPath: localConfig.customPath || ''
+    })
+    
+    Object.assign(localConfig, {
+      connectionTested: true,
+      connectionValid: false,
+      connectionMessage: '检查失败',
+      connectionTestedAt: new Date().toISOString(),
+      configHash: configHash
+    })
+    
+    // 保存更新后的配置
+    await handleConfigChange()
   } finally {
     statusChecking.value = false
   }
@@ -347,12 +446,40 @@ const checkICloudStatus = async () => {
 // 处理配置变更
 const handleConfigChange = async () => {
   try {
+    // 检查配置是否发生变更
+    const currentHash = computeConfigHash({
+      customPath: localConfig.customPath || ''
+    })
+    
+    // 如果配置哈希值不匹配，重置连接验证状态
+    if (localConfig.configHash && localConfig.configHash !== currentHash) {
+      console.log('iCloud 配置已变更，重置连接验证状态')
+      Object.assign(localConfig, {
+        connectionTested: false,
+        connectionValid: false,
+        connectionMessage: '',
+        connectionTestedAt: '',
+        configHash: currentHash
+      })
+      
+      // 重置 UI 状态
+      iCloudStatus.checked = false
+      iCloudStatus.available = false
+      iCloudStatus.message = ''
+      iCloudStatus.path = ''
+    }
+    
     // 将 reactive 对象转换为普通对象，避免 IPC 传递时的克隆错误
     const plainConfig: ICloudConfig = {
       enabled: localConfig.enabled,
       autoSync: localConfig.autoSync,
       syncInterval: localConfig.syncInterval,
-      customPath: localConfig.customPath
+      customPath: localConfig.customPath,
+      connectionTested: localConfig.connectionTested,
+      connectionValid: localConfig.connectionValid,
+      connectionMessage: localConfig.connectionMessage,
+      connectionTestedAt: localConfig.connectionTestedAt,
+      configHash: localConfig.configHash
     }
     
     await ICloudAPI.setConfig(plainConfig)
@@ -601,6 +728,9 @@ const initializeSettings = async () => {
     try {
       const config = await ICloudAPI.getConfig()
       Object.assign(localConfig, config)
+      
+      // 从配置中恢复连接状态
+      restoreConnectionStatus()
     } catch (configError) {
       console.warn('加载 iCloud 配置失败，使用默认配置:', configError)
       // 使用默认配置

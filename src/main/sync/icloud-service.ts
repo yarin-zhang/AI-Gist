@@ -92,6 +92,13 @@ interface ICloudConfig {
     autoSync: boolean;
     syncInterval: number; // 分钟
     customPath?: string; // 可选的自定义同步路径
+    // 连接验证状态
+    connectionTested?: boolean;
+    connectionValid?: boolean;
+    connectionMessage?: string;
+    connectionTestedAt?: string; // ISO 时间戳
+    // 用于检测配置是否变更的哈希值
+    configHash?: string;
 }
 
 interface ICloudTestResult {
@@ -200,33 +207,27 @@ export class ICloudService {
             hostname = 'unknown';
         }
         
-        // 尝试从本地存储获取现有设备ID
-        const userDataPath = app.getPath('userData');
-        const deviceIdFile = path.join(userDataPath, 'device-id.json');
-        
-        try {
-            const existingData = JSON.parse(fs.readFileSync(deviceIdFile, 'utf8'));
-            if (existingData.deviceId) {
-                console.log('[iCloud] 使用现有设备ID:', existingData.deviceId);
-                return existingData.deviceId;
-            }
-        } catch (error) {
-            // 文件不存在或格式错误，生成新的设备ID
+        const machineId = crypto.createHash('sha256')
+            .update(`${platform}-${hostname}-${app.getPath('userData')}`)
+            .digest('hex')
+            .substring(0, 16);
+            
+        return machineId;
+    }
+
+    /**
+     * 计算配置哈希值，用于检测配置是否发生变更
+     */
+    private computeConfigHash(config: { customPath?: string }): string {
+        const configStr = `${config.customPath || ''}`
+        // 简单的哈希函数
+        let hash = 0
+        for (let i = 0; i < configStr.length; i++) {
+            const char = configStr.charCodeAt(i)
+            hash = ((hash << 5) - hash) + char
+            hash = hash & hash // 转为32位整数
         }
-        
-        // 生成新的设备ID
-        const newDeviceId = `${platform}-${hostname}-${uuidv4()}`;
-        
-        try {
-            fs.writeFileSync(deviceIdFile, JSON.stringify({ 
-                deviceId: newDeviceId, 
-                createdAt: new Date().toISOString() 
-            }));
-        } catch (error) {
-            console.warn('[iCloud] 无法保存设备ID文件:', error);
-        }
-        
-        return newDeviceId;
+        return hash.toString()
     }
 
     /**
@@ -674,22 +675,30 @@ export class ICloudService {
 
             // 检查 iCloud Drive 目录是否存在
             if (!fs.existsSync(iCloudPath)) {
-                return {
+                const result = {
                     success: false,
                     message: 'iCloud Drive 目录不存在，请确保已启用 iCloud Drive',
                     available: false
                 };
+                
+                // 保存失败状态到配置
+                await this.saveConnectionStatus(result, false);
+                return result;
             }
 
             // 尝试读取目录内容以确认权限
             try {
                 fs.readdirSync(iCloudPath);
             } catch (error) {
-                return {
+                const result = {
                     success: false,
                     message: '无法访问 iCloud Drive 目录，权限不足',
                     available: false
                 };
+                
+                // 保存失败状态到配置
+                await this.saveConnectionStatus(result, false);
+                return result;
             }
 
             // 测试写入权限
@@ -698,28 +707,80 @@ export class ICloudService {
                 fs.writeFileSync(testFile, 'test');
                 fs.unlinkSync(testFile);
             } catch (error) {
-                return {
+                const result = {
                     success: false,
                     message: '无法写入 iCloud Drive 目录，权限不足',
                     available: false
                 };
+                
+                // 保存失败状态到配置
+                await this.saveConnectionStatus(result, false);
+                return result;
             }
 
             console.log('[iCloud] iCloud Drive 可用性测试通过');
-            return {
+            const result = {
                 success: true,
                 message: 'iCloud Drive 可用',
                 iCloudPath,
                 available: true
             };
+            
+            // 保存成功状态到配置
+            await this.saveConnectionStatus(result, true);
+            return result;
         } catch (error) {
             console.error('[iCloud] iCloud Drive 可用性测试失败:', error);
             const errorMessage = error instanceof Error ? error.message : String(error);
-            return {
+            const result = {
                 success: false,
                 message: `测试失败: ${errorMessage}`,
                 available: false
             };
+            
+            // 保存失败状态到配置
+            await this.saveConnectionStatus(result, false);
+            return result;
+        }
+    }
+
+    /**
+     * 保存连接状态到配置
+     */
+    private async saveConnectionStatus(testResult: ICloudTestResult, isValid: boolean): Promise<void> {
+        try {
+            const currentConfig = this.config || {
+                enabled: false,
+                autoSync: false,
+                syncInterval: 30
+            };
+            
+            const configHash = this.computeConfigHash(currentConfig);
+            
+            // 更新配置中的连接验证状态
+            Object.assign(currentConfig, {
+                connectionTested: true,
+                connectionValid: isValid,
+                connectionMessage: testResult.message,
+                connectionTestedAt: new Date().toISOString(),
+                configHash: configHash,
+                // 如果测试成功且有路径信息，保存路径
+                ...(testResult.iCloudPath && { customPath: testResult.iCloudPath })
+            });
+            
+            // 保存到偏好设置
+            this.preferencesManager.updatePreferences({ icloud: currentConfig });
+            this.config = currentConfig;
+            
+            console.log('[iCloud] 连接状态已保存到配置:', {
+                tested: true,
+                valid: isValid,
+                message: testResult.message,
+                testedAt: currentConfig.connectionTestedAt,
+                path: testResult.iCloudPath
+            });
+        } catch (error) {
+            console.error('[iCloud] 保存连接状态失败:', error);
         }
     }
 
@@ -1362,6 +1423,16 @@ export class ICloudService {
                 return await this.performIntelligentSync();
             });
 
+            // 获取同步状态
+            ipcMain.handle('icloud:get-sync-status', async () => {
+                return {
+                    isEnabled: this.config?.enabled || false,
+                    lastSyncTime: this.lastSuccessfulSync,
+                    nextSyncTime: this.autoSyncTimer ? new Date(Date.now() + this.config!.syncInterval * 60 * 1000).toISOString() : null,
+                    isSyncing: this.syncInProgress
+                };
+            });
+
             // 获取配置
             ipcMain.handle('icloud:get-config', async (): Promise<ICloudConfig> => {
                 return this.config || {
@@ -1373,8 +1444,38 @@ export class ICloudService {
 
             // 设置配置
             ipcMain.handle('icloud:set-config', async (event, config: ICloudConfig) => {
-                this.preferencesManager.updatePreferences({ icloud: config });
+                const currentConfig = this.config || {
+                    enabled: false,
+                    autoSync: false,
+                    syncInterval: 30
+                };
                 
+                // 检查配置是否发生变更
+                const currentHash = this.computeConfigHash(currentConfig);
+                const newHash = this.computeConfigHash(config);
+                
+                // 如果配置发生变更，重置连接验证状态
+                if (currentHash !== newHash) {
+                    console.log('[iCloud] 配置已变更，重置连接验证状态');
+                    Object.assign(config, {
+                        connectionTested: false,
+                        connectionValid: false,
+                        connectionMessage: '',
+                        connectionTestedAt: '',
+                        configHash: newHash
+                    });
+                } else {
+                    // 保持现有的连接验证状态
+                    Object.assign(config, {
+                        connectionTested: currentConfig.connectionTested,
+                        connectionValid: currentConfig.connectionValid,
+                        connectionMessage: currentConfig.connectionMessage,
+                        connectionTestedAt: currentConfig.connectionTestedAt,
+                        configHash: newHash
+                    });
+                }
+                
+                this.preferencesManager.updatePreferences({ icloud: config });
                 this.config = config;
                 
                 if (config.enabled && config.autoSync) {
