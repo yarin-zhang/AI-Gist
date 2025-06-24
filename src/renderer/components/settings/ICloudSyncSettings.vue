@@ -26,6 +26,10 @@
           <small class="text-gray-500">
             请确保已登录 iCloud 账户并启用了 iCloud Drive 功能。
           </small>
+          <br>
+          <small class="text-gray-500" v-if="localConfig.connectionTestedAt">
+            最后验证时间: {{ formatTime(localConfig.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <NAlert 
@@ -36,6 +40,10 @@
         >
           <template #header>iCloud Drive 连接正常</template>
           同步路径: {{ iCloudStatus.path }}
+          <br>
+          <small class="text-gray-500" v-if="localConfig.connectionTestedAt">
+            最后验证时间: {{ formatTime(localConfig.connectionTestedAt) }}
+          </small>
         </NAlert>
 
         <div class="flex gap-2">
@@ -233,10 +241,9 @@
     <!-- 冲突解决对话框 -->
     <ConflictResolutionDialog
       v-if="showConflictDialog"
-      :visible="showConflictDialog"
-      :local-data="conflictData.localData"
-      :remote-data="conflictData.remoteData"
-      :differences="conflictData.differences"
+      :show="showConflictDialog"
+      :conflict-data="conflictDialogData"
+      @update:show="(value) => showConflictDialog = value"
       @resolve="handleConflictResolution"
       @cancel="handleConflictCancel"
     />
@@ -252,8 +259,17 @@ import {
 import { 
   Cloud, Eye, GitCompare, Upload, Download, Refresh, Folder
 } from '@vicons/tabler'
-import { ICloudAPI, type ICloudConfig, type ManualSyncResult, type ConflictResolution } from '../../lib/api/icloud.api'
+import { ICloudAPI, type ICloudConfig, type ManualSyncResult } from '../../lib/api/icloud.api'
 import ConflictResolutionDialog from './ConflictResolutionDialog.vue'
+
+// 扩展 Window 接口以支持 autoSyncManager
+declare global {
+  interface Window {
+    autoSyncManager?: {
+      reinitializeFromSettings?: () => Promise<void>
+    }
+  }
+}
 
 // 响应式数据
 const message = useMessage()
@@ -286,15 +302,15 @@ const comparing = ref(false)
 const uploading = ref(false)
 const downloading = ref(false)
 const syncing = ref(false)
-const viewingData = ref(false)
 
 // 冲突解决
 const showConflictDialog = ref(false)
-const conflictData = reactive({
-  localData: null as any,
-  remoteData: null as any,
-  differences: null as any
-})
+const conflictDialogData = ref<{
+  hasConflicts: boolean;
+  localData: any;
+  remoteData: any;
+  differences: any;
+} | null>(null)
 
 // 格式化时间
 const formatTime = (timeString: string | null) => {
@@ -382,7 +398,12 @@ const checkICloudStatus = async () => {
       message.success('iCloud Drive 连接正常')
     }
     
-    // 更新配置中的连接验证状态
+    // 如果检测成功且有路径信息，更新路径
+    if (result.iCloudPath) {
+      localConfig.customPath = result.iCloudPath
+    }
+    
+    // 更新配置中的连接验证状态（使用最新的配置计算哈希）
     const configHash = computeConfigHash({
       customPath: localConfig.customPath || ''
     })
@@ -392,13 +413,23 @@ const checkICloudStatus = async () => {
       connectionValid: iCloudStatus.available,
       connectionMessage: iCloudStatus.message,
       connectionTestedAt: new Date().toISOString(),
-      configHash: configHash,
-      // 如果检测成功且有路径信息，更新路径
-      ...(result.iCloudPath && { customPath: result.iCloudPath })
+      configHash: configHash
     })
     
-    // 保存更新后的配置
-    await handleConfigChange()
+    // 直接保存配置，不调用 handleConfigChange 避免重置状态
+    const plainConfig: ICloudConfig = {
+      enabled: localConfig.enabled,
+      autoSync: localConfig.autoSync,
+      syncInterval: localConfig.syncInterval,
+      customPath: localConfig.customPath,
+      connectionTested: localConfig.connectionTested,
+      connectionValid: localConfig.connectionValid,
+      connectionMessage: localConfig.connectionMessage,
+      connectionTestedAt: localConfig.connectionTestedAt,
+      configHash: localConfig.configHash
+    }
+    
+    await ICloudAPI.setConfig(plainConfig)
     
     console.log('iCloud 连接验证状态已保存')
   } catch (error) {
@@ -421,8 +452,20 @@ const checkICloudStatus = async () => {
       configHash: configHash
     })
     
-    // 保存更新后的配置
-    await handleConfigChange()
+    // 直接保存配置，不调用 handleConfigChange 避免重置状态
+    const plainConfig: ICloudConfig = {
+      enabled: localConfig.enabled,
+      autoSync: localConfig.autoSync,
+      syncInterval: localConfig.syncInterval,
+      customPath: localConfig.customPath,
+      connectionTested: localConfig.connectionTested,
+      connectionValid: localConfig.connectionValid,
+      connectionMessage: localConfig.connectionMessage,
+      connectionTestedAt: localConfig.connectionTestedAt,
+      configHash: localConfig.configHash
+    }
+    
+    await ICloudAPI.setConfig(plainConfig)
   } finally {
     statusChecking.value = false
   }
@@ -468,7 +511,10 @@ const handleConfigChange = async () => {
     }
     
     await ICloudAPI.setConfig(plainConfig)
-    message.success('配置已保存')
+    // 只在非检测连接的配置变更时显示成功消息
+    if (!statusChecking.value) {
+      message.success('配置已保存')
+    }
     
     // 更新同步状态
     try {
@@ -566,9 +612,12 @@ const downloadData = async () => {
     }
 
     // 存在冲突，显示冲突解决对话框
-    conflictData.localData = result.localData
-    conflictData.remoteData = result.remoteData
-    conflictData.differences = result.differences
+    conflictDialogData.value = {
+      hasConflicts: true,
+      localData: result.localData,
+      remoteData: result.remoteData,
+      differences: result.differences
+    }
     showConflictDialog.value = true
     
   } catch (error) {
@@ -595,62 +644,6 @@ const openSyncDirectory = async () => {
   }
 }
 
-// 查看同步数据
-const viewSyncData = async () => {
-  viewingData.value = true
-  try {
-    // 先获取本地数据用于演示
-    const localData = await window.electronAPI?.dataManagement?.generateExportData()
-    
-    if (!localData || !localData.data) {
-      message.warning('暂无同步数据')
-      return
-    }
-
-    // 分析数据中的 UUID 字段
-    const data = localData.data
-    let uuidStats = {
-      categories: 0,
-      prompts: 0,
-      categoriesWithUuid: 0,
-      promptsWithUuid: 0
-    }
-
-    if (data.categories) {
-      uuidStats.categories = data.categories.length
-      uuidStats.categoriesWithUuid = data.categories.filter((c: any) => c.uuid).length
-    }
-
-    if (data.prompts) {
-      uuidStats.prompts = data.prompts.length
-      uuidStats.promptsWithUuid = data.prompts.filter((p: any) => p.uuid).length
-    }
-
-    const statsMessage = `
-数据统计：
-• 分类：${uuidStats.categories} 个，其中 ${uuidStats.categoriesWithUuid} 个包含 UUID
-• 提示词：${uuidStats.prompts} 个，其中 ${uuidStats.promptsWithUuid} 个包含 UUID
-
-${uuidStats.categoriesWithUuid === uuidStats.categories && uuidStats.promptsWithUuid === uuidStats.prompts 
-  ? '✅ 所有数据都包含 UUID，可以进行精确同步校验' 
-  : '⚠️ 部分数据缺少 UUID，可能影响同步校验准确性'
-}`.trim()
-
-    dialog.success({
-      title: '同步数据预览',
-      content: statsMessage,
-      positiveText: '确定',
-      style: {
-        width: '500px'
-      }
-    })
-  } catch (error) {
-    console.error('查看同步数据失败:', error)
-    message.error('查看同步数据失败')
-  } finally {
-    viewingData.value = false
-  }
-}
 const syncNow = async () => {
   syncing.value = true
   try {
@@ -672,9 +665,22 @@ const syncNow = async () => {
 }
 
 // 处理冲突解决
-const handleConflictResolution = async (resolution: ConflictResolution) => {
+const handleConflictResolution = async (resolution: any) => {
   try {
-    const result = await ICloudAPI.applyDownloadedData(resolution)
+    // 转换解决策略到 API 期望的格式
+    const strategyMapping: Record<string, string> = {
+      'local_wins': 'use_local',
+      'remote_wins': 'use_remote',
+      'merge': 'merge_smart',
+      'create_duplicate': 'merge_manual'
+    }
+    
+    const apiResolution = {
+      strategy: strategyMapping[resolution.strategy] || resolution.strategy,
+      mergedData: resolution.mergedData
+    }
+    
+    const result = await ICloudAPI.applyDownloadedData(apiResolution)
     
     if (result.success) {
       message.success('冲突已解决，数据已应用')
@@ -687,12 +693,14 @@ const handleConflictResolution = async (resolution: ConflictResolution) => {
     message.error('解决冲突失败')
   } finally {
     showConflictDialog.value = false
+    conflictDialogData.value = null
   }
 }
 
 // 取消冲突解决
 const handleConflictCancel = () => {
   showConflictDialog.value = false
+  conflictDialogData.value = null
   message.info('已取消冲突解决')
 }
 

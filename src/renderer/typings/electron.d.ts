@@ -99,6 +99,7 @@ export default interface ElectronApi {
   icloud: {
     testAvailability: () => Promise<{ success: boolean; available?: boolean; iCloudPath?: string; message?: string }>
     syncNow: () => Promise<{ success: boolean; message?: string; error?: string }>
+    getSyncStatus: () => Promise<{ isEnabled: boolean; lastSyncTime: string | null; nextSyncTime: string | null; isSyncing: boolean }>
     getConfig: () => Promise<{ enabled: boolean; autoSync: boolean; syncInterval: number; customPath?: string }>
     setConfig: (config: any) => Promise<void>
     manualUpload: () => Promise<{ success: boolean; message?: string; error?: string }>
