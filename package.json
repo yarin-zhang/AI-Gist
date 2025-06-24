@@ -12,6 +12,8 @@
         "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
         "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
         "build:ci:linux": "node scripts/build.js && yarn electron-builder --linux",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
         "test": "vitest",
         "test:run": "vitest run",
         "test:ui": "vitest --ui",
