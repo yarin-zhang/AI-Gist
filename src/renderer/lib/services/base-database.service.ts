@@ -4,7 +4,6 @@
  */
 
 import { generateUUID } from '../utils/uuid';
-import { autoSyncManager } from '../utils/auto-sync-manager';
 
 /**
  * IndexedDB 基础数据库服务类
@@ -282,9 +281,6 @@ export class BaseDatabaseService {
           id: request.result as number,
         } as T;
         
-        // 触发自动同步
-        this.triggerAutoSyncAfterChange('add', storeName);
-        
         resolve(result);
       };
 
@@ -408,9 +404,6 @@ export class BaseDatabaseService {
         const putRequest = store.put(updatedData);
         
         putRequest.onsuccess = () => {
-          // 触发自动同步
-          this.triggerAutoSyncAfterChange('update', storeName);
-          
           resolve(updatedData as T);
         };
 
@@ -440,9 +433,6 @@ export class BaseDatabaseService {
       const request = store.delete(id);
 
       request.onsuccess = () => {
-        // 触发自动同步
-        this.triggerAutoSyncAfterChange('delete', storeName);
-        
         resolve();
       };
 
@@ -947,10 +937,7 @@ export class BaseDatabaseService {
           completed++;
           
           if (completed === total) {
-            // 所有操作完成后，只触发一次同步，并传递删除的UUID
-            if (success > 0) {
-              this.triggerAutoSyncAfterChange('batch_delete', storeName, { deletedUuids });
-            }
+            // 所有操作完成后，直接返回结果
             resolve({ success, failed, errors });
           }
         };
@@ -961,43 +948,11 @@ export class BaseDatabaseService {
           completed++;
           
           if (completed === total) {
-            // 所有操作完成后，只触发一次同步（如果有成功的）
-            if (success > 0) {
-              this.triggerAutoSyncAfterChange('batch_delete', storeName, { deletedUuids });
-            }
+            // 所有操作完成后，直接返回结果
             resolve({ success, failed, errors });
           }
         };
       });
     });
-  }
-
-  /**
-   * 在数据变更后触发自动同步
-   * @param operation 操作类型
-   * @param storeName 对象存储名称
-   * @param metadata 元数据，包含删除的UUID等信息
-   */
-  protected triggerAutoSyncAfterChange(operation: 'add' | 'update' | 'delete' | 'batch_delete', storeName: string, metadata?: any) {
-    try {
-      // 异步触发，不阻塞数据库操作
-      setTimeout(async () => {
-        // 如果是批量删除操作，使用专门的批量删除同步方法
-        if (operation === 'batch_delete' && metadata?.deletedUuids?.length > 0) {
-          console.log(`批量删除操作: 触发同步，包含 ${metadata.deletedUuids.length} 个删除的UUID`);
-          // 直接使用批量删除的同步方法，传递删除的UUID
-          autoSyncManager.triggerAutoSyncAfterBatchDelete(
-            metadata.deletedUuids, 
-            `批量删除 ${storeName} 数据后自动同步`
-          );
-        } else {
-          // 普通操作使用常规同步
-          autoSyncManager.triggerAutoSync(`数据变更: ${operation} in ${storeName}`);
-        }
-      }, 0);
-    } catch (error) {
-      // 自动同步失败不应该影响数据操作
-      console.warn('触发自动同步失败:', error);
-    }
   }
 }

@@ -31,33 +31,6 @@ class PreferencesManager {
       x: -1,
       y: -1,
     },
-    webdav: {
-      enabled: false,
-      serverUrl: '',
-      username: '',
-      password: '',
-      encryptedPassword: '',
-      autoSync: false,
-      syncInterval: 30,
-      // 连接验证状态
-      connectionTested: false,
-      connectionValid: false,
-      connectionMessage: '',
-      connectionTestedAt: '',
-      configHash: '',
-    },
-    icloud: {
-      enabled: false,
-      autoSync: false,
-      syncInterval: 30,
-      customPath: '',
-      // 连接验证状态
-      connectionTested: false,
-      connectionValid: false,
-      connectionMessage: '',
-      connectionTestedAt: '',
-      configHash: '',
-    },
     dataSync: {
       lastSyncTime: null,
       autoBackup: true,
@@ -121,33 +94,6 @@ class PreferencesManager {
             x: loadedPrefs.windowPosition?.x ?? this.defaultPreferences.windowPosition.x,
             y: loadedPrefs.windowPosition?.y ?? this.defaultPreferences.windowPosition.y,
           },
-          webdav: {
-            enabled: loadedPrefs.webdav?.enabled ?? this.defaultPreferences.webdav!.enabled,
-            serverUrl: loadedPrefs.webdav?.serverUrl ?? this.defaultPreferences.webdav!.serverUrl,
-            username: loadedPrefs.webdav?.username ?? this.defaultPreferences.webdav!.username,
-            password: loadedPrefs.webdav?.password ?? this.defaultPreferences.webdav!.password,
-            encryptedPassword: loadedPrefs.webdav?.encryptedPassword ?? this.defaultPreferences.webdav!.encryptedPassword,
-            autoSync: loadedPrefs.webdav?.autoSync ?? this.defaultPreferences.webdav!.autoSync,
-            syncInterval: loadedPrefs.webdav?.syncInterval ?? this.defaultPreferences.webdav!.syncInterval,
-            // 连接验证状态
-            connectionTested: loadedPrefs.webdav?.connectionTested ?? this.defaultPreferences.webdav!.connectionTested,
-            connectionValid: loadedPrefs.webdav?.connectionValid ?? this.defaultPreferences.webdav!.connectionValid,
-            connectionMessage: loadedPrefs.webdav?.connectionMessage ?? this.defaultPreferences.webdav!.connectionMessage,
-            connectionTestedAt: loadedPrefs.webdav?.connectionTestedAt ?? this.defaultPreferences.webdav!.connectionTestedAt,
-            configHash: loadedPrefs.webdav?.configHash ?? this.defaultPreferences.webdav!.configHash,
-          },
-          icloud: {
-            enabled: loadedPrefs.icloud?.enabled ?? this.defaultPreferences.icloud!.enabled,
-            autoSync: loadedPrefs.icloud?.autoSync ?? this.defaultPreferences.icloud!.autoSync,
-            syncInterval: loadedPrefs.icloud?.syncInterval ?? this.defaultPreferences.icloud!.syncInterval,
-            customPath: loadedPrefs.icloud?.customPath ?? this.defaultPreferences.icloud!.customPath,
-            // 连接验证状态
-            connectionTested: loadedPrefs.icloud?.connectionTested ?? this.defaultPreferences.icloud!.connectionTested,
-            connectionValid: loadedPrefs.icloud?.connectionValid ?? this.defaultPreferences.icloud!.connectionValid,
-            connectionMessage: loadedPrefs.icloud?.connectionMessage ?? this.defaultPreferences.icloud!.connectionMessage,
-            connectionTestedAt: loadedPrefs.icloud?.connectionTestedAt ?? this.defaultPreferences.icloud!.connectionTestedAt,
-            configHash: loadedPrefs.icloud?.configHash ?? this.defaultPreferences.icloud!.configHash,
-          },
           dataSync: {
             lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
             autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
@@ -203,19 +149,13 @@ class PreferencesManager {
     const oldAutoLaunch = this.userPrefs.autoLaunch;
     
     // 深度合并嵌套对象
-    if (newPrefs.webdav) {
-      this.userPrefs.webdav = { ...this.userPrefs.webdav, ...newPrefs.webdav };
-    }
-    if (newPrefs.icloud) {
-      this.userPrefs.icloud = { ...this.userPrefs.icloud, ...newPrefs.icloud };
-    }
     if (newPrefs.dataSync) {
       this.userPrefs.dataSync = { ...this.userPrefs.dataSync, ...newPrefs.dataSync };
     }
     
     // 合并其他属性
     for (const key in newPrefs) {
-      if (key !== 'webdav' && key !== 'icloud' && key !== 'dataSync') {
+      if (key !== 'dataSync') {
         (this.userPrefs as any)[key] = (newPrefs as any)[key];
       }
     }

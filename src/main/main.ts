@@ -8,18 +8,12 @@ import {
   singleInstanceManager,
 } from './electron';
 import { 
-  WebDAVService,
-  ICloudService,
-} from './sync';
-import { 
   DataManagementService
 } from './data';
 
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
-let webdavService: WebDAVService;
-let icloudService: ICloudService;
 let dataManagementService: DataManagementService;
 
 // 防止多重启动 - 初始化单实例管理器
@@ -37,18 +31,9 @@ app.whenReady().then(async () => {
   // 初始化主题管理器
   themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
   dataManagementService = new DataManagementService(app.getPath('userData'));
-  webdavService = new WebDAVService(preferencesManager, dataManagementService);
-  icloudService = new ICloudService(preferencesManager, dataManagementService);
-  
-  // 初始化 iCloud 服务
-  await icloudService.initialize();
   
   // 初始化 IPC 处理器（放在服务初始化之后）
   ipcHandlers.initialize();
-  
-  // 设置 WebDAV 和 iCloud IPC 处理器
-  webdavService.setupIpcHandlers();
-  icloudService.setupIpcHandlers();
   
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
@@ -123,8 +108,6 @@ app.on('before-quit', () => {
   
   // 清理资源
   ipcHandlers.cleanup();
-  webdavService.cleanup();
-  icloudService.cleanup();
   trayManager.destroy();
   themeManager.cleanup();
   

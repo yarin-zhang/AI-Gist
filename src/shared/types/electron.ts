@@ -2,14 +2,6 @@
  * Electron 相关类型定义
  */
 
-// 导入 WebDAV 相关类型
-import type { 
-  WebDAVConfig, 
-  WebDAVTestResult, 
-  WebDAVSyncStatus, 
-  WebDAVSyncResult 
-} from './webdav';
-
 // 导入数据管理相关类型
 import type {
   BackupInfo,
@@ -20,10 +12,6 @@ import type {
 
 // 重新导出以保持向后兼容
 export type { 
-  WebDAVConfig, 
-  WebDAVTestResult, 
-  WebDAVSyncStatus, 
-  WebDAVSyncResult,
   BackupInfo,
   ExportOptions,
   ImportOptions,
@@ -58,33 +46,6 @@ export interface UserPreferences {
   startMinimized: boolean; // 启动时是否最小化到托盘
   autoLaunch: boolean; // 是否开机自启动
   themeSource: 'system' | 'light' | 'dark'; // 主题设置
-  webdav?: {
-    enabled: boolean;
-    serverUrl: string;
-    username: string;
-    password: string; // 原始密码字段
-    encryptedPassword?: string; // 加密后的密码
-    syncInterval: number;
-    autoSync: boolean;
-    // 连接验证状态
-    connectionTested?: boolean;
-    connectionValid?: boolean;
-    connectionMessage?: string;
-    connectionTestedAt?: string;
-    configHash?: string;
-  };
-  icloud?: {
-    enabled: boolean;
-    autoSync: boolean;
-    syncInterval: number; // 分钟
-    customPath?: string; // 可选的自定义同步路径
-    // 连接验证状态
-    connectionTested?: boolean;
-    connectionValid?: boolean;
-    connectionMessage?: string;
-    connectionTestedAt?: string; // ISO 时间戳
-    configHash?: string; // 用于检测配置是否变更的哈希值
-  };
   dataSync?: {
     lastSyncTime: string | null;
     autoBackup: boolean;

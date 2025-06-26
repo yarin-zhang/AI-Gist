@@ -161,52 +161,6 @@ export class IpcUtils {
         }
         break;
         
-      case 'webdav':
-        switch (method) {
-          case 'test-connection':
-            return api.webdav.testConnection(data) as T;
-          case 'sync-now':
-            return api.webdav.syncNow() as T;
-          case 'set-config':
-            return api.webdav.setConfig(data) as T;
-          case 'get-config':
-            return api.webdav.getConfig() as T;
-          case 'force-upload':
-            return api.webdav.forceUpload() as T;
-          case 'force-download':
-            return api.webdav.forceDownload() as T;
-          case 'compare-data':
-            return api.webdav.compareData() as T;
-          case 'record-deleted-items':
-            return api.webdav.recordDeletedItems(data) as T;
-          case 'delete-remote-items':
-            return api.webdav.deleteRemoteItems(data) as T;
-        }
-        break;
-        
-      case 'icloud':
-        switch (method) {
-          case 'test-availability':
-            return api.icloud.testAvailability() as T;
-          case 'sync-now':
-            return api.icloud.syncNow() as T;
-          case 'get-config':
-            return api.icloud.getConfig() as T;
-          case 'set-config':
-            return api.icloud.setConfig(data) as T;
-          case 'manual-upload':
-            return api.icloud.manualUpload() as T;
-          case 'manual-download':
-            return api.icloud.manualDownload() as T;
-          case 'compare-data':
-            return api.icloud.compareData() as T;
-          case 'apply-downloaded-data':
-            return api.icloud.applyDownloadedData(data) as T;
-          case 'open-sync-directory':
-            return api.icloud.openSyncDirectory() as T;
-        }
-        break;
-        
       case 'data':
         switch (method) {
           case 'create-backup':

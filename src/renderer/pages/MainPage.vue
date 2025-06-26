@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, nextTick } from 'vue'
+import { ref, h, nextTick, computed } from 'vue'
 import {
     NLayout,
     NLayoutSider,
@@ -22,6 +22,7 @@ import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
 import StatusBar from '~/components/common/StatusBar.vue'
+
 const currentView = ref('prompts')
 const settingsTargetSection = ref<string>()
 
@@ -64,13 +65,13 @@ const handleNavigateToAIConfig = async () => {
     }
 }
 
-const handleOpenWebDAVSettings = (targetSection?: string) => {
+const handleOpenSettings = (targetSection?: string) => {
     currentView.value = 'settings'
     // 设置目标设置区域
     if (targetSection) {
         settingsTargetSection.value = targetSection;
     }
-}
+};
 
 const collapseRef = ref(true)
 
@@ -103,7 +104,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                 </NLayout>
             </NLayout>
             <NLayoutFooter bordered style="height: 24px; padding: 0;">
-                <StatusBar @open-settings="handleOpenWebDAVSettings" />
+                <StatusBar @open-settings="handleOpenSettings" />
             </NLayoutFooter>
         </NLayout>
     </div>

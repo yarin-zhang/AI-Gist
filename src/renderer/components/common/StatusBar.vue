@@ -7,8 +7,6 @@
 
       <!-- 右侧：状态指示器组 -->
       <NFlex class="status-bar-right" align="center" gap="8px">
-        <!-- 同步状态 -->
-        <SyncStatusIndicator @open-settings="handleOpenSettings" />
         <!-- 未来可以在这里添加其他指示器 -->
       </NFlex>
     </NFlex>
@@ -17,7 +15,6 @@
 
 <script setup lang="ts">
 import { NFlex } from 'naive-ui'
-import SyncStatusIndicator from './SyncStatusIndicator.vue';
 
 const emit = defineEmits<{
   openSettings: [targetSection?: string];

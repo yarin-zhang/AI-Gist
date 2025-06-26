@@ -64,30 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
-  },  // WebDAV 同步管理
-  webdav: {
-    testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
-    syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
-    setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
-    getConfig: () => ipcRenderer.invoke('webdav:get-config'),
-    forceUpload: () => ipcRenderer.invoke('webdav:force-upload'),
-    forceDownload: () => ipcRenderer.invoke('webdav:force-download'),
-    compareData: () => ipcRenderer.invoke('webdav:compare-data'),
-    recordDeletedItems: (uuids: string[]) => ipcRenderer.invoke('webdav:record-deleted-items', uuids),
-    deleteRemoteItems: (uuids: string[]) => ipcRenderer.invoke('webdav:delete-remote-items', uuids),
-  },
-  // iCloud 同步管理
-  icloud: {
-    testAvailability: () => ipcRenderer.invoke('icloud:test-availability'),
-    syncNow: () => ipcRenderer.invoke('icloud:sync-now'),
-    getSyncStatus: () => ipcRenderer.invoke('icloud:get-sync-status'),
-    getConfig: () => ipcRenderer.invoke('icloud:get-config'),
-    setConfig: (config: any) => ipcRenderer.invoke('icloud:set-config', config),
-    manualUpload: () => ipcRenderer.invoke('icloud:manual-upload'),
-    manualDownload: () => ipcRenderer.invoke('icloud:manual-download'),
-    compareData: () => ipcRenderer.invoke('icloud:compare-data'),
-    applyDownloadedData: (resolution: any) => ipcRenderer.invoke('icloud:apply-downloaded-data', resolution),
-    openSyncDirectory: () => ipcRenderer.invoke('icloud:open-sync-directory'),
   },
   // 数据管理
   data: {

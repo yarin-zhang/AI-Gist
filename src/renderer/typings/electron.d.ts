@@ -18,20 +18,6 @@ export type {
   AIConfigTestResult 
 };
 
-// 导入共享的 WebDAV 类型
-import type { 
-  WebDAVConfig, 
-  WebDAVTestResult, 
-  WebDAVSyncResult 
-} from '@shared/types/webdav';
-
-// 重新导出以保持向后兼容
-export type { 
-  WebDAVConfig, 
-  WebDAVTestResult, 
-  WebDAVSyncResult 
-};
-
 export default interface ElectronApi {
   sendMessage: (message: string) => void
   
@@ -79,34 +65,6 @@ export default interface ElectronApi {
     intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
     debugPrompt: (prompt: string, config: AIConfig) => Promise<AIGenerationResult>
-  }
-  
-  webdav: {
-    testConnection: (config: WebDAVConfig) => Promise<WebDAVTestResult>
-    syncNow: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
-    manualUpload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
-    manualDownload: () => Promise<{ success: boolean; data?: any; error?: string }>
-    applyDownloadedData: (resolution: any) => Promise<{ success: boolean; message?: string; error?: string }>
-    compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
-    getConfig: () => Promise<WebDAVConfig>
-    setConfig: (config: WebDAVConfig) => Promise<{ success: boolean; message?: string; error?: string }>
-    forceUpload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
-    forceDownload: () => Promise<{ success: boolean; data?: WebDAVSyncResult; error?: string }>
-    recordDeletedItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
-    deleteRemoteItems: (uuids: string[]) => Promise<{ success: boolean; error?: string }>
-  }
-
-  icloud: {
-    testAvailability: () => Promise<{ success: boolean; available?: boolean; iCloudPath?: string; message?: string }>
-    syncNow: () => Promise<{ success: boolean; message?: string; error?: string }>
-    getSyncStatus: () => Promise<{ isEnabled: boolean; lastSyncTime: string | null; nextSyncTime: string | null; isSyncing: boolean }>
-    getConfig: () => Promise<{ enabled: boolean; autoSync: boolean; syncInterval: number; customPath?: string }>
-    setConfig: (config: any) => Promise<void>
-    manualUpload: () => Promise<{ success: boolean; message?: string; error?: string }>
-    manualDownload: () => Promise<{ success: boolean; message?: string; error?: string }>
-    compareData: () => Promise<{ success: boolean; data?: any; error?: string }>
-    applyDownloadedData: (resolution: any) => Promise<{ success: boolean; message?: string; error?: string }>
-    openSyncDirectory: () => Promise<{ success: boolean; error?: string }>
   }
 
   data: {
