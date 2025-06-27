@@ -3,12 +3,6 @@
  * 直接使用 Electron API，不再依赖 IPC 工具类
  */
 
-declare global {
-  interface Window {
-    electronAPI: any;
-  }
-}
-
 /**
  * 数据管理 API 类
  */

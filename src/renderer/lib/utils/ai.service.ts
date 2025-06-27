@@ -5,12 +5,6 @@
 
 import type { AIConfig, AIGenerationRequest, AIGenerationResult, AIConfigTestResult } from '@shared/types/ai';
 
-declare global {
-  interface Window {
-    electronAPI: any;
-  }
-}
-
 /**
  * 检查 Electron API 是否可用
  */
@@ -61,7 +55,7 @@ export async function generateAIContent(request: AIGenerationRequest, config: AI
   
   try {
     const result = await window.electronAPI.ai.generatePrompt(request, config);
-    return result.content || '';
+    return result.generatedPrompt || '';
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : String(error));
   }
@@ -91,7 +85,7 @@ export async function intelligentTest(config: AIConfig): Promise<AIConfigTestRes
 export async function generateAIContentStream(
   request: AIGenerationRequest, 
   config: AIConfig,
-  onProgress: (charCount: number, partialContent?: string) => void
+  onProgress: (charCount: number, partialContent?: string) => boolean
 ): Promise<AIGenerationResult> {
   if (!isElectronAvailable()) {
     throw new Error('Electron API not available');
