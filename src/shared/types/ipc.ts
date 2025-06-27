@@ -2,15 +2,13 @@
  * IPC 通信相关类型定义
  */
 
+// 导入通用类型
+import type { BaseResponse } from './common';
+
 /**
- * IPC 调用结果基础接口
+ * IPC 调用结果基础接口 - 使用统一的 BaseResponse 类型
  */
-export interface IpcResult<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
+export type IpcResult<T = any> = BaseResponse<T>;
 
 /**
  * IPC 频道枚举

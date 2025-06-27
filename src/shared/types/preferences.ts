@@ -1,26 +1,6 @@
 /**
- * Electron 相关类型定义
+ * Preferences 相关类型定义
  */
-
-// 导入数据管理相关类型
-import type {
-  BackupInfo,
-  ExportOptions,
-  ImportOptions,
-  ImportResult
-} from './data-management';
-
-// 重新导出以保持向后兼容
-export type { 
-  BackupInfo,
-  ExportOptions,
-  ImportOptions,
-  ImportResult
-};
-
-// 导入并重新导出 AI 相关类型，保持向后兼容
-import type { AIGenerationRequest, AIGenerationResult } from './ai';
-export type { AIGenerationRequest, AIGenerationResult };
 
 /**
  * 用户偏好设置

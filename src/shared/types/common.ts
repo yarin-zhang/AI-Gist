@@ -54,13 +54,9 @@ export interface SearchParams {
 }
 
 /**
- * 操作结果
+ * 操作结果 - 扩展 BaseResponse，添加错误代码
  */
-export interface OperationResult<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+export interface OperationResult<T = any> extends BaseResponse<T> {
   code?: string;
 }
 
