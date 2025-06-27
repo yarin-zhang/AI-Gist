@@ -181,6 +181,14 @@
                                         <n-button size="small" @click="rewriteRequirement(item)" >
                                             重写
                                         </n-button>
+                                        <n-popconfirm @positive-click="deleteHistoryItem(item.id)">
+                                            <template #trigger>
+                                                <n-button size="small">
+                                                    删除
+                                                </n-button>
+                                            </template>
+                                            确定删除这条生成记录吗？
+                                        </n-popconfirm>
                                     </n-space>
                                 </n-space>
                             </template>
@@ -225,7 +233,8 @@ import {
     NSplit,
     NCheckbox,
     NPagination,
-    useMessage
+    useMessage,
+    NPopconfirm
 } from 'naive-ui'
 import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
@@ -798,6 +807,17 @@ const rewriteRequirement = (item: AIGenerationHistory) => {
     }, 100)
 }
 
+const deleteHistoryItem = async (id: string) => {
+    try {
+        const result = await api.aiGenerationHistory.delete.mutate(Number(id));
+        console.log('删除结果:', result); // 添加日志输出
+        message.success('删除成功');
+        loadHistory(); // 刷新历史记录
+    } catch (error) {
+        console.error('删除失败详情:', error); // 打印详细错误
+        message.error('删除失败: ' + (error as Error).message);
+    }
+};
 // 分隔动画函数
 const animateSplit = async (from: number, to: number) => {
     const duration = 600 // 动画持续时间
