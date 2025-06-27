@@ -77,8 +77,8 @@
                         <DataManagementSettings ref="dataManagementRef" v-show="activeSettingKey === 'data-management'"
                             :model-value="{ dataSync: { ...settings.dataSync } }"
                             @update:model-value="(val: any) => { Object.assign(settings.dataSync, val.dataSync); }"
-                            @export-data="exportData" @import-data="importData" @export-selected="exportSelected"
-                            @import-full-backup="importFullBackup" @create-backup="createBackup"
+                            @export-data="exportData" @import-data="importData" @export-selected-data="exportSelected"
+                            @export-full-backup="exportFullBackup" @import-full-backup="importFullBackup" @create-backup="createBackup"
                             @restore-backup="restoreSpecificBackup" @delete-backup="deleteBackup"
                             @refresh-backup-list="refreshBackupList" @check-database-health="checkDatabaseHealth"
                             @repair-database="repairDatabase" @clear-database="clearDatabase" 
@@ -522,6 +522,39 @@ const importFullBackup = async () => {
     loading.import = false;
 };
 
+// 完整备份导出
+const exportFullBackup = async () => {
+    loading.export = true;
+    try {
+        const result = await DataManagementAPI.exportFullBackup();
+        
+        if (result.success) {
+            message.success(result.message || '完整备份导出成功');
+        } else {
+            message.error(result.message || '完整备份导出失败');
+        }
+    } catch (error) {
+        console.error('完整备份导出失败:', error);
+        message.error('完整备份导出失败');
+    }
+    loading.export = false;
+};
+
+// 加载数据统计
+const loadDataStats = async () => {
+    try {
+        const stats = await DataManagementAPI.getDataStats();
+        
+        // 更新子组件的数据统计
+        if (dataManagementRef.value) {
+            dataManagementRef.value.updateDataStats(stats);
+        }
+    } catch (error) {
+        console.error("获取数据统计失败:", error);
+        // 不显示错误消息，因为这不是关键功能
+    }
+};
+
 // 刷新备份列表
 const refreshBackupList = async () => {
     try {
@@ -701,6 +734,7 @@ onMounted(async () => {
     await loadSettings();
     // 加载备份列表
     await refreshBackupList();
+    await loadDataStats();
 });
 
 // 监听 props 变化，自动跳转到对应设置页面
@@ -714,6 +748,7 @@ watch(() => props.targetSection, (newTargetSection) => {
 watch(activeSettingKey, async (newKey) => {
     if (newKey === 'data-management') {
         await refreshBackupList();
+        await loadDataStats();
     }
 });
 </script>
