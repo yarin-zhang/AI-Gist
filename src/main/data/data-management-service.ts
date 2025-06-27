@@ -122,25 +122,48 @@ export class DataManagementService {
         // 恢复备份
         ipcMain.handle('data:restore-backup', async (event, { backupId }) => {
             try {
+                console.log(`开始恢复备份: ${backupId}`);
+                console.log(`备份目录: ${this.backupDir}`);
+                
+                // 检查备份目录是否存在
+                try {
+                    await fs.access(this.backupDir);
+                } catch (error) {
+                    console.error('备份目录不存在:', this.backupDir);
+                    throw new Error('备份目录不存在');
+                }
+                
                 const backups = await fs.readdir(this.backupDir);
+                console.log(`找到 ${backups.length} 个文件:`, backups);
+                
                 let backupFile: BackupInfo | null = null;
 
                 for (const file of backups) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        if (backup.id === backupId) {
-                            backupFile = backup;
-                            break;
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
+                            
+                            if (backup.id === backupId) {
+                                backupFile = backup;
+                                console.log(`找到匹配的备份文件: ${file}`);
+                                break;
+                            }
+                        } catch (fileError) {
+                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
+                            // 继续处理其他文件，不抛出错误
                         }
                     }
                 }
 
                 if (!backupFile) {
-                    throw new Error('备份文件不存在');
+                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
+                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
                 }
 
+                console.log(`开始恢复备份数据: ${backupFile.name}`);
                 // 恢复数据到数据库
                 await this.restoreAllData(backupFile.data);
                 
@@ -149,6 +172,7 @@ export class DataManagementService {
                     message: `数据恢复成功: ${backupFile.name}`
                 };
             } catch (error) {
+                console.error('恢复备份失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 return {
                     success: false,
@@ -160,25 +184,48 @@ export class DataManagementService {
         // 恢复备份（完全替换现有数据）
         ipcMain.handle('data:restore-backup-replace', async (event, { backupId }) => {
             try {
+                console.log(`开始完全替换恢复备份: ${backupId}`);
+                console.log(`备份目录: ${this.backupDir}`);
+                
+                // 检查备份目录是否存在
+                try {
+                    await fs.access(this.backupDir);
+                } catch (error) {
+                    console.error('备份目录不存在:', this.backupDir);
+                    throw new Error('备份目录不存在');
+                }
+                
                 const backups = await fs.readdir(this.backupDir);
+                console.log(`找到 ${backups.length} 个文件:`, backups);
+                
                 let backupFile: BackupInfo | null = null;
 
                 for (const file of backups) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        if (backup.id === backupId) {
-                            backupFile = backup;
-                            break;
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
+                            
+                            if (backup.id === backupId) {
+                                backupFile = backup;
+                                console.log(`找到匹配的备份文件: ${file}`);
+                                break;
+                            }
+                        } catch (fileError) {
+                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
+                            // 继续处理其他文件，不抛出错误
                         }
                     }
                 }
 
                 if (!backupFile) {
-                    throw new Error('备份文件不存在');
+                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
+                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
                 }
 
+                console.log(`开始完全替换恢复备份数据: ${backupFile.name}`);
                 // 使用替换模式恢复数据到数据库
                 await this.restoreAllDataWithReplace(backupFile.data);
                 
@@ -187,6 +234,7 @@ export class DataManagementService {
                     message: `数据完全恢复成功: ${backupFile.name}`
                 };
             } catch (error) {
+                console.error('完全替换恢复备份失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 return {
                     success: false,
@@ -793,7 +841,7 @@ export class DataManagementService {
                 throw new Error(`数据恢复失败: ${result.error}`);
             }
             
-            console.log(`数据恢复成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log(`数据恢复成功，总计恢复记录数: ${result.totalImported}`);
             console.log('恢复详情:', result.details);
             
         } catch (error) {
@@ -834,7 +882,7 @@ export class DataManagementService {
                 throw new Error(`数据替换失败: ${result.error}`);
             }
             
-            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalImported}`);
             console.log('替换详情:', result.details);
             
         } catch (error) {
