@@ -3,6 +3,9 @@
  * 用于 Main 进程和 Renderer 进程之间的类型共享
  */
 
+// 导入通用类型
+import type { ValidationResult, BaseResponse } from './common';
+
 /**
  * 数据备份信息
  */
@@ -48,12 +51,9 @@ export interface ImportOptions {
 }
 
 /**
- * 导入结果
+ * 导入结果 - 扩展 BaseResponse
  */
-export interface ImportResult {
-  success: boolean;
-  message?: string;
-  error?: string;
+export interface ImportResult extends BaseResponse {
   totalImported?: number;
   totalErrors?: number;
   details?: Record<string, number>;
@@ -73,13 +73,10 @@ export interface ImportResult {
 }
 
 /**
- * 导出结果
+ * 导出结果 - 扩展 BaseResponse
  */
-export interface ExportResult {
-  success: boolean;
-  message?: string;
+export interface ExportResult extends BaseResponse {
   filePath?: string;
-  error?: string;
   size?: number;
   recordCount?: number;
   format?: string;
@@ -113,12 +110,9 @@ export interface DataStats {
 }
 
 /**
- * 数据验证结果
+ * 数据验证结果 - 扩展通用的验证类型
  */
-export interface DataValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
+export interface DataValidationResult extends ValidationResult {
   stats?: DataStats;
   missingReferences?: {
     type: string;
@@ -142,12 +136,9 @@ export interface DataMigrationOptions {
 }
 
 /**
- * 数据迁移结果
+ * 数据迁移结果 - 扩展 BaseResponse
  */
-export interface DataMigrationResult {
-  success: boolean;
-  message?: string;
-  error?: string;
+export interface DataMigrationResult extends BaseResponse {
   fromVersion: string;
   toVersion: string;
   migratedRecords: number;
@@ -169,12 +160,9 @@ export interface DataCleanupOptions {
 }
 
 /**
- * 数据清理结果
+ * 数据清理结果 - 扩展 BaseResponse
  */
-export interface DataCleanupResult {
-  success: boolean;
-  message?: string;
-  error?: string;
+export interface DataCleanupResult extends BaseResponse {
   cleanedRecords: {
     orphaned: number;
     duplicates: number;
@@ -211,12 +199,9 @@ export interface DataRepairOptions {
 }
 
 /**
- * 数据修复结果
+ * 数据修复结果 - 扩展 BaseResponse
  */
-export interface DataRepairResult {
-  success: boolean;
-  message?: string;
-  error?: string;
+export interface DataRepairResult extends BaseResponse {
   repaired: {
     missingUUIDs: number;
     brokenReferences: number;

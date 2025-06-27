@@ -9,7 +9,6 @@ import { PromptApiClient, createPromptApiClient } from './prompt.api';
 import { AIConfigApiClient, createAIConfigApiClient } from './ai-config.api';
 import { AIGenerationHistoryApiClient, createAIGenerationHistoryApiClient } from './ai-generation-history.api';
 import { AppSettingsApiClient, createAppSettingsApiClient } from './app-settings.api';
-import { WebDAVAPI } from './webdav.api';
 import { DataManagementAPI } from './data-management.api';
 
 // 导出所有API客户端类
@@ -19,7 +18,6 @@ export {
   AIConfigApiClient,
   AIGenerationHistoryApiClient,
   AppSettingsApiClient,
-  WebDAVAPI,
   DataManagementAPI
 };
 

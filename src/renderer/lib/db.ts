@@ -67,6 +67,17 @@ export class DatabaseManager {
   }
 
   /**
+   * 完全替换数据（先清空，再恢复）
+   */
+  async replaceAllData(backupData: any): Promise<void> {
+    if (backupData.data) {
+      // 先清空所有数据，然后导入新数据
+      await databaseService.forceCleanAllTables();
+      await this.importData(backupData.data);
+    }
+  }
+
+  /**
    * 获取数据库健康状态
    */
   async getHealthStatus(): Promise<any> {
@@ -107,7 +118,7 @@ if (typeof window !== 'undefined') {
     importData: (data: any) => databaseManager.importData(data),
     backupData: () => databaseManager.backupData(),
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
-    replaceAllData: (backupData: any) => databaseManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.replaceAllData(backupData),
     syncImportDataObject: (data: any) => databaseManager.importData(data),
     getHealthStatus: () => databaseManager.getHealthStatus(),
     getStats: async () => {
@@ -144,7 +155,7 @@ export function createDatabaseAPI() {
     exportAllData: () => databaseManager.exportAllData(),
     importData: (data: any) => databaseManager.importData(data),
     restoreData: (backupData: any) => databaseManager.restoreData(backupData),
-    replaceAllData: (backupData: any) => databaseManager.restoreData(backupData),
+    replaceAllData: (backupData: any) => databaseManager.replaceAllData(backupData),
     syncImportDataObject: (data: any) => databaseManager.importData(data),
     importDataObject: (data: any) => databaseManager.importData(data),
     getDataStatistics: () => databaseManager.exportAllData(),

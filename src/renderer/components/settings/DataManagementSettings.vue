@@ -24,6 +24,14 @@
                                 </template>
                                 刷新备份列表
                             </NButton>
+                            <NButton @click="openBackupDirectory">
+                                <template #icon>
+                                    <NIcon>
+                                        <Folder />
+                                    </NIcon>
+                                </template>
+                                打开备份目录
+                            </NButton>
                         </NFlex>
                     </NFlex>
 
@@ -31,64 +39,73 @@
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
                             <NText depth="2">备份版本列表</NText>
-                            <div v-for="backup in paginatedBackups" :key="backup.id" class="backup-item">
-                                <NCard size="small">
-                                    <NFlex justify="space-between" align="center">
+                            <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
+                                <NGridItem v-for="backup in paginatedBackups" :key="backup.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                    <NCard size="small" :title="backup.version" >
                                         <NFlex vertical :size="4">
                                             <NFlex align="center" :size="8">
                                                 <NText strong>{{ backup.name }}</NText>
-                                                <NTag type="info" size="small">{{ backup.version }}</NTag>
                                             </NFlex>
                                         </NFlex>
-                                        <NFlex :size="8">
-                                            <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
-                                                negative-text="取消" positive-text="确定恢复" placement="top"
-                                                :show-icon="false">
-                                                <template #trigger>
-                                                    <NButton type="primary" size="small"
-                                                        :loading="props.loading?.backup"
-                                                        :disabled="props.loading?.backup">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Recharging />
-                                                            </NIcon>
-                                                        </template>
-                                                        恢复
-                                                    </NButton>
-                                                </template>
-                                                <div style="max-width: 300px;">
-                                                    <p>恢复备份将会：</p>
-                                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                                        <li>自动备份当前数据</li>
-                                                        <li>完全覆盖现有数据库</li>
-                                                        <li>此操作不可撤销</li>
-                                                    </ul>
-                                                </div>
-                                            </NPopconfirm>
-                                            <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
-                                                positive-text="确定">
-                                                <template #trigger>
-                                                    <NButton type="error" size="small">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Trash />
-                                                            </NIcon>
-                                                        </template>
-                                                        删除
-                                                    </NButton>
-                                                </template>
-                                                确定要删除这个备份吗？
-                                            </NPopconfirm>
+                                        <template #header-extra>
+
+                                            <NFlex vertical :size="4">
+                                            <NFlex align="center" :size="8">
+                                                <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
+                                            </NFlex>
                                         </NFlex>
-                                    </NFlex>
-                                </NCard>
-                            </div>
+                                        </template>
+                                        
+                                        <template #action>
+                                            <NFlex justify="space-between" align="center" style="width: 100%;">
+                                                <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
+                                                    negative-text="取消" positive-text="确定恢复" placement="top"
+                                                    :show-icon="false">
+                                                    <template #trigger>
+                                                        <NButton type="primary" size="small"
+                                                            :loading="props.loading?.backup"
+                                                            :disabled="props.loading?.backup">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Recharging />
+                                                                </NIcon>
+                                                            </template>
+                                                            恢复
+                                                        </NButton>
+                                                    </template>
+                                                    <div style="max-width: 300px;">
+                                                        <p>注意！恢复备份将会：</p>
+                                                        <ul style="margin: 8px 0; padding-left: 20px;">
+                                                            <li>自动备份当前数据</li>
+                                                            <li>完全覆盖现有数据库</li>
+                                                        </ul>
+                                                    </div>
+                                                </NPopconfirm>
+                                                <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
+                                                    positive-text="确定">
+                                                    <template #trigger>
+                                                        <NButton type="error" secondary size="small">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            删除
+                                                        </NButton>
+                                                    </template>
+                                                    确定要删除这个备份吗？
+                                                </NPopconfirm>
+                                            </NFlex>
+                                        </template>
+                                    </NCard>
+                                </NGridItem>
+                            </NGrid>
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
                                 <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
-                                    :page-sizes="[5, 10, 20]" />
+                                    :page-sizes="[6, 12, 18]" />
                             </div>
                         </NFlex>
                     </div>
@@ -98,92 +115,6 @@
                             暂无备份版本，请先创建备份
                         </NText>
                     </div>
-                </NFlex>
-            </div>
-
-            <NDivider />
-            
-            <!-- 选择性数据导出 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">选择性数据导出</NText>
-                        <NText depth="3" style="font-size: 12px; ">
-                            从备份中选择特定数据类型进行导出，便于数据分享。但无法恢复到应用中。
-                        </NText>
-                        
-                        <!-- 数据类型选择 -->
-                        <NCard size="small" >
-                            <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型（单选）：</NText>
-                                <NFlex vertical :size="8">
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'prompts'" 
-                                        value="prompts"
-                                        @update:checked="handleTypeSelection('prompts', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>描述词库</NText>
-                                            <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'categories'" 
-                                        value="categories"
-                                        @update:checked="handleTypeSelection('categories', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>分类管理</NText>
-                                            <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'aiConfigs'" 
-                                        value="aiConfigs"
-                                        @update:checked="handleTypeSelection('aiConfigs', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>AI 配置</NText>
-                                            <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
-                                            <NTag size="small" type="warning">包含敏感信息</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
-                        
-                        <NFlex :size="12">
-                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" 
-                                     type="primary" 
-                                     @click="exportSelectedData('csv')" 
-                                     :disabled="!hasSelectedData" 
-                                     :loading="props.loading?.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 CSV
-                            </NButton>
-                            <NButton @click="exportSelectedData('json')" 
-                                     :disabled="!hasSelectedData" 
-                                     :loading="props.loading?.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                导出为 JSON
-                            </NButton>
-                        </NFlex>
-                        
-                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
-                            <template #header>⚠️ 安全提示</template>
-                            您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
-                        </NAlert>
-                        
-                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
-                            <template #header>💡 格式说明</template>
-                            AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。
-                        </NAlert>
-                    </NFlex>
                 </NFlex>
             </div>
 
@@ -225,6 +156,93 @@
             </div>
 
             <NDivider />
+            
+            <!-- 选择性数据导出 -->
+            <div>
+                <NFlex vertical :size="16">
+                    <NFlex vertical :size="12">
+                        <NText depth="2">选择性数据导出</NText>
+                        <NText depth="3" style="font-size: 12px; ">
+                            选择部分数据进行可读格式导出，暂时无法恢复到应用中。
+                        </NText>
+                        
+                        <!-- 数据类型选择 -->
+                        <NCard size="small" >
+                            <NFlex vertical :size="12">
+                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型：</NText>
+                                <NFlex vertical :size="8">
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'prompts'" 
+                                        value="prompts"
+                                        @update:checked="handleTypeSelection('prompts', $event)">
+                                        <NFlex align="center" :size="8">
+                                            <NText>描述词库</NText>
+                                            <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
+                                        </NFlex>
+                                    </NRadio>
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'categories'" 
+                                        value="categories"
+                                        @update:checked="handleTypeSelection('categories', $event)">
+                                        <NFlex align="center" :size="8">
+                                            <NText>分类管理</NText>
+                                            <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
+                                        </NFlex>
+                                    </NRadio>
+                                    <NRadio 
+                                        :checked="exportOptions.selectedType === 'aiConfigs'" 
+                                        value="aiConfigs"
+                                        @update:checked="handleTypeSelection('aiConfigs', $event)">
+                                        <NFlex align="center" :size="8">
+                                            <NText>AI 配置</NText>
+                                            <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
+                                            <NTag size="small" type="warning">包含敏感信息</NTag>
+                                        </NFlex>
+                                    </NRadio>
+                                </NFlex>
+                            </NFlex>
+                        </NCard>
+                        
+                        <NFlex :size="12">
+                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" 
+                                     type="primary" 
+                                     @click="exportSelectedData('csv')" 
+                                     :disabled="!hasSelectedData || !isCSVSupported" 
+                                     :loading="props.loading?.export">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 CSV
+                            </NButton>
+                            <NButton @click="exportSelectedData('json')" 
+                                     :disabled="!hasSelectedData" 
+                                     :loading="props.loading?.export">
+                                <template #icon>
+                                    <NIcon>
+                                        <FileExport />
+                                    </NIcon>
+                                </template>
+                                导出为 JSON
+                            </NButton>
+                        </NFlex>
+                        
+                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
+                            <template #header>安全提示</template>
+                            您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                        </NAlert>
+                        
+                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
+                            <template #header>格式说明</template>
+                            AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。
+                        </NAlert>
+                    </NFlex>
+                </NFlex>
+            </div>
+
+
+            <NDivider />
 
             <!-- 数据库维护 -->
             <div>
@@ -232,7 +250,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">数据库维护</NText>
                         <NText depth="3" style="font-size: 12px">
-                            当遇到同步错误或数据异常时，可尝试修复数据库
+                            当遇到数据异常时，可尝试修复数据库
                         </NText>
                         <NFlex :size="12">
                             <NButton type="primary" @click="checkDatabaseHealth">
@@ -298,6 +316,8 @@ import {
     NPagination,
     NCheckbox,
     NRadio,
+    NGrid,
+    NGridItem,
 } from "naive-ui";
 import {
     FileExport,
@@ -314,6 +334,7 @@ import {
     Folder,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
+import { useWindowSize } from "@/composables/useWindowSize";
 
 // Props
 const props = defineProps<{
@@ -340,6 +361,7 @@ const emit = defineEmits<{
     "check-database-health": [];
     "repair-database": [];
     "clear-database": [];
+    "open-backup-directory": [];
 }>();
 
 // 备份列表数据
@@ -375,6 +397,11 @@ const hasSelectedData = computed(() => {
     return exportOptions.value.selectedType !== '';
 });
 
+// 计算是否支持CSV导出（支持提示词和分类数据）
+const isCSVSupported = computed(() => {
+    return exportOptions.value.selectedType === 'prompts' || exportOptions.value.selectedType === 'categories';
+});
+
 // 处理类型选择
 const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', checked: boolean) => {
     if (checked) {
@@ -386,7 +413,7 @@ const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', check
 
 // 分页相关状态
 const currentPage = ref(1);
-const pageSize = 5;
+const pageSize = 6;
 
 // 计算分页数据
 const paginatedBackups = computed(() => {
@@ -455,6 +482,11 @@ const importFullBackup = () => {
     emit("import-full-backup");
 };
 
+// 打开备份目录
+const openBackupDirectory = () => {
+    emit("open-backup-directory");
+};
+
 // 更新备份列表
 const updateBackupList = (backups: BackupItem[]) => {
     backupList.value = backups;
@@ -482,14 +514,6 @@ defineExpose({
 </script>
 
 <style scoped>
-.backup-item {
-    margin-bottom: 8px;
-}
-
-.backup-item:last-child {
-    margin-bottom: 0;
-}
-
 .pagination-container {
     display: flex;
     justify-content: center;

@@ -2,15 +2,13 @@
  * IPC 通信相关类型定义
  */
 
+// 导入通用类型
+import type { BaseResponse } from './common';
+
 /**
- * IPC 调用结果基础接口
+ * IPC 调用结果基础接口 - 使用统一的 BaseResponse 类型
  */
-export interface IpcResult<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
+export type IpcResult<T = any> = BaseResponse<T>;
 
 /**
  * IPC 频道枚举
@@ -47,15 +45,6 @@ export enum IpcChannels {
   AI_STOP_GENERATION = 'ai:stop-generation',
   AI_DEBUG_PROMPT = 'ai:debug-prompt',
 
-  // WebDAV
-  WEBDAV_TEST_CONNECTION = 'webdav:test-connection',
-  WEBDAV_SYNC_NOW = 'webdav:sync-now',
-  WEBDAV_GET_SYNC_STATUS = 'webdav:get-sync-status',
-  WEBDAV_SET_CONFIG = 'webdav:set-config',
-  WEBDAV_GET_CONFIG = 'webdav:get-config',
-  WEBDAV_ENCRYPT_PASSWORD = 'webdav:encrypt-password',
-  WEBDAV_DECRYPT_PASSWORD = 'webdav:decrypt-password',
-
   // 数据管理
   DATA_CREATE_BACKUP = 'data:create-backup',
   DATA_GET_BACKUP_LIST = 'data:get-backup-list',
@@ -77,9 +66,6 @@ export enum IpcEvents {
   
   // 主题变化
   THEME_CHANGED = 'theme-changed',
-  
-  // WebDAV 同步状态变化
-  WEBDAV_SYNC_STATUS_CHANGED = 'webdav:sync-status-changed',
 }
 
 /**

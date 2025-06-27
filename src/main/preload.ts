@@ -64,30 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
-  },  // WebDAV 同步管理
-  webdav: {
-    testConnection: (config: any) => ipcRenderer.invoke('webdav:test-connection', config),
-    syncNow: () => ipcRenderer.invoke('webdav:sync-now'),
-    setConfig: (config: any) => ipcRenderer.invoke('webdav:set-config', config),
-    getConfig: () => ipcRenderer.invoke('webdav:get-config'),
-    forceUpload: () => ipcRenderer.invoke('webdav:force-upload'),
-    forceDownload: () => ipcRenderer.invoke('webdav:force-download'),
-    compareData: () => ipcRenderer.invoke('webdav:compare-data'),
-    recordDeletedItems: (uuids: string[]) => ipcRenderer.invoke('webdav:record-deleted-items', uuids),
-    deleteRemoteItems: (uuids: string[]) => ipcRenderer.invoke('webdav:delete-remote-items', uuids),
-  },
-  // iCloud 同步管理
-  icloud: {
-    testAvailability: () => ipcRenderer.invoke('icloud:test-availability'),
-    syncNow: () => ipcRenderer.invoke('icloud:sync-now'),
-    getSyncStatus: () => ipcRenderer.invoke('icloud:get-sync-status'),
-    getConfig: () => ipcRenderer.invoke('icloud:get-config'),
-    setConfig: (config: any) => ipcRenderer.invoke('icloud:set-config', config),
-    manualUpload: () => ipcRenderer.invoke('icloud:manual-upload'),
-    manualDownload: () => ipcRenderer.invoke('icloud:manual-download'),
-    compareData: () => ipcRenderer.invoke('icloud:compare-data'),
-    applyDownloadedData: (resolution: any) => ipcRenderer.invoke('icloud:apply-downloaded-data', resolution),
-    openSyncDirectory: () => ipcRenderer.invoke('icloud:open-sync-directory'),
   },
   // 数据管理
   data: {
@@ -104,6 +80,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
     getStats: () => ipcRenderer.invoke('data:get-stats'),
+    getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
+  },
+  // 云端备份功能
+  cloud: {
+    checkICloudAvailability: () => ipcRenderer.invoke('cloud:check-icloud-availability'),
+    getStorageConfigs: () => ipcRenderer.invoke('cloud:get-storage-configs'),
+    addStorageConfig: (config: any) => ipcRenderer.invoke('cloud:add-storage-config', config),
+    updateStorageConfig: (id: string, config: any) => ipcRenderer.invoke('cloud:update-storage-config', id, config),
+    deleteStorageConfig: (id: string) => ipcRenderer.invoke('cloud:delete-storage-config', id),
+    testStorageConnection: (config: any) => ipcRenderer.invoke('cloud:test-storage-connection', config),
+    getBackupList: (storageId: string) => ipcRenderer.invoke('cloud:get-backup-list', storageId),
+    createBackup: (storageId: string, description?: string) => ipcRenderer.invoke('cloud:create-backup', storageId, description),
+    restoreBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:restore-backup', storageId, backupId),
+    deleteBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:delete-backup', storageId, backupId),
   },
   // 应用信息和更新
   app: {
@@ -116,5 +106,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       // 返回移除监听器的函数
       return () => ipcRenderer.removeListener('update-available', listener);
     }
+  },
+  // Shell 功能
+  shell: {
+    openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
   }
 });

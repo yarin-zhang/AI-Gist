@@ -105,11 +105,66 @@ export const mockApi = {
   }
 }
 
-// Mock IPC 工具
-export const mockIpcUtils = {
-  invoke: vi.fn(),
-  safeInvoke: vi.fn(),
-  isElectronAvailable: vi.fn(() => true)
+// Mock Electron API
+export const mockElectronAPI = {
+  preferences: {
+    get: vi.fn(),
+    set: vi.fn(),
+    reset: vi.fn()
+  },
+  window: {
+    show: vi.fn(),
+    hideToTray: vi.fn(),
+    getSize: vi.fn(),
+    getContentSize: vi.fn()
+  },
+  theme: {
+    getCurrent: vi.fn(),
+    getInfo: vi.fn(),
+    setSource: vi.fn(),
+    isDark: vi.fn(),
+    onThemeChanged: vi.fn()
+  },
+  ai: {
+    getConfigs: vi.fn(),
+    getEnabledConfigs: vi.fn(),
+    addConfig: vi.fn(),
+    updateConfig: vi.fn(),
+    removeConfig: vi.fn(),
+    testConfig: vi.fn(),
+    getModels: vi.fn(),
+    generatePrompt: vi.fn(),
+    generatePromptStream: vi.fn(),
+    intelligentTest: vi.fn(),
+    stopGeneration: vi.fn(),
+    debugPrompt: vi.fn()
+  },
+  data: {
+    createBackup: vi.fn(),
+    getBackupList: vi.fn(),
+    restoreBackup: vi.fn(),
+    restoreBackupWithReplace: vi.fn(),
+    deleteBackup: vi.fn(),
+    export: vi.fn(),
+    import: vi.fn(),
+    exportSelected: vi.fn(),
+    exportFullBackup: vi.fn(),
+    importFullBackup: vi.fn(),
+    selectImportFile: vi.fn(),
+    selectExportPath: vi.fn(),
+    getStats: vi.fn(),
+    getBackupDirectory: vi.fn()
+  },
+  app: {
+    getVersion: vi.fn(),
+    checkUpdates: vi.fn(),
+    openDownloadPage: vi.fn(),
+    onUpdateAvailable: vi.fn()
+  },
+  shell: {
+    openPath: vi.fn(),
+    openExternal: vi.fn()
+  }
 }
 
 // 测试数据生成器

@@ -22,6 +22,7 @@ class IpcHandlers {
     this.setupThemeHandlers();
     this.setupAIHandlers();
     this.setupUpdateHandlers();
+    this.setupShellHandlers();
   }
 
   /**
@@ -361,6 +362,35 @@ class IpcHandlers {
   }
 
   /**
+   * 设置 Shell 功能处理器
+   */
+  private setupShellHandlers() {
+    // 打开文件夹
+    ipcMain.handle('shell:open-path', async (_, path: string) => {
+      try {
+        const { shell } = await import('electron');
+        await shell.openPath(path);
+        return { success: true, error: null };
+      } catch (error: any) {
+        console.error('打开文件夹失败:', error);
+        return { success: false, error: error.message || '打开文件夹失败' };
+      }
+    });
+
+    // 打开外部链接
+    ipcMain.handle('shell:open-external', async (_, url: string) => {
+      try {
+        const { shell } = await import('electron');
+        await shell.openExternal(url);
+        return { success: true, error: null };
+      } catch (error: any) {
+        console.error('打开外部链接失败:', error);
+        return { success: false, error: error.message || '打开外部链接失败' };
+      }
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -396,6 +426,10 @@ class IpcHandlers {
     ipcMain.removeHandler('app:get-version');
     ipcMain.removeHandler('app:check-updates');
     ipcMain.removeHandler('app:open-download-page');
+    
+    // 清理 Shell 处理器
+    ipcMain.removeHandler('shell:open-path');
+    ipcMain.removeHandler('shell:open-external');
     
     // 清理活跃的生成请求
     for (const abortController of this.activeGenerations.values()) {

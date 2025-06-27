@@ -3,6 +3,9 @@
  * 用于 Main 进程和 Renderer 进程之间的类型共享
  */
 
+// 导入通用类型
+import type { ValidationResult, ValidationError } from './common';
+
 /**
  * AI 服务提供商类型
  */
@@ -134,16 +137,8 @@ export interface AIServiceStatus {
 }
 
 /**
- * AI 配置验证结果
+ * AI 配置验证结果 - 使用通用的验证类型
  */
-export interface AIConfigValidation {
-  valid: boolean;
-  errors: {
-    field: string;
-    message: string;
-  }[];
-  warnings?: {
-    field: string;
-    message: string;
-  }[];
+export interface AIConfigValidation extends ValidationResult {
+  warnings?: ValidationError[];
 }

@@ -5,9 +5,10 @@
 
 // 导入 AI 相关类型
 import type { AIConfig, AIGenerationHistory } from './ai';
-
-// 重新导出 AI 类型，保持向后兼容
-export type { AIConfig, AIGenerationHistory };
+// 导入数据管理相关类型
+import type { ExportResult, ImportResult } from './data-management';
+// 导入通用类型
+import type { PaginationResult } from './common';
 
 /**
  * 分类数据模型
@@ -121,16 +122,9 @@ export interface PromptFilters {
 }
 
 /**
- * 分页查询结果
+ * 分页查询结果 - 使用统一的 PaginationResult 类型
  */
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  hasMore: boolean;
-  page?: number;
-  pageSize?: number;
-  totalPages?: number;
-}
+export type PaginatedResult<T> = PaginationResult<T>;
 
 /**
  * 数据库健康检查结果
@@ -143,43 +137,14 @@ export interface DatabaseHealthStatus {
 }
 
 /**
- * 数据导出结果
+ * 数据导出结果 - 使用统一的 ExportResult 类型
  */
-export interface DatabaseExportResult {
-  success: boolean;
-  data?: {
-    categories: Category[];
-    prompts: Prompt[];
-    aiConfigs: AIConfig[];
-    aiHistory: AIGenerationHistory[];
-    settings: AppSettings[];
-    metadata: {
-      exportTime: string;
-      version: string;
-      totalRecords: number;
-    };
-  };
-  error?: string;
-  message?: string;
-}
+export type DatabaseExportResult = ExportResult;
 
 /**
- * 数据导入结果
+ * 数据导入结果 - 使用统一的 ImportResult 类型
  */
-export interface DatabaseImportResult {
-  success: boolean;
-  message?: string;
-  error?: string;
-  totalImported?: number;
-  totalErrors?: number;
-  details?: {
-    categories?: number;
-    prompts?: number;
-    aiConfigs?: number;
-    aiHistory?: number;
-    settings?: number;
-  };
-}
+export type DatabaseImportResult = ImportResult;
 
 /**
  * 提示词历史记录数据模型

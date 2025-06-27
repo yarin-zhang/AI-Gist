@@ -122,25 +122,48 @@ export class DataManagementService {
         // 恢复备份
         ipcMain.handle('data:restore-backup', async (event, { backupId }) => {
             try {
+                console.log(`开始恢复备份: ${backupId}`);
+                console.log(`备份目录: ${this.backupDir}`);
+                
+                // 检查备份目录是否存在
+                try {
+                    await fs.access(this.backupDir);
+                } catch (error) {
+                    console.error('备份目录不存在:', this.backupDir);
+                    throw new Error('备份目录不存在');
+                }
+                
                 const backups = await fs.readdir(this.backupDir);
+                console.log(`找到 ${backups.length} 个文件:`, backups);
+                
                 let backupFile: BackupInfo | null = null;
 
                 for (const file of backups) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        if (backup.id === backupId) {
-                            backupFile = backup;
-                            break;
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
+                            
+                            if (backup.id === backupId) {
+                                backupFile = backup;
+                                console.log(`找到匹配的备份文件: ${file}`);
+                                break;
+                            }
+                        } catch (fileError) {
+                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
+                            // 继续处理其他文件，不抛出错误
                         }
                     }
                 }
 
                 if (!backupFile) {
-                    throw new Error('备份文件不存在');
+                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
+                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
                 }
 
+                console.log(`开始恢复备份数据: ${backupFile.name}`);
                 // 恢复数据到数据库
                 await this.restoreAllData(backupFile.data);
                 
@@ -149,6 +172,7 @@ export class DataManagementService {
                     message: `数据恢复成功: ${backupFile.name}`
                 };
             } catch (error) {
+                console.error('恢复备份失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 return {
                     success: false,
@@ -160,25 +184,48 @@ export class DataManagementService {
         // 恢复备份（完全替换现有数据）
         ipcMain.handle('data:restore-backup-replace', async (event, { backupId }) => {
             try {
+                console.log(`开始完全替换恢复备份: ${backupId}`);
+                console.log(`备份目录: ${this.backupDir}`);
+                
+                // 检查备份目录是否存在
+                try {
+                    await fs.access(this.backupDir);
+                } catch (error) {
+                    console.error('备份目录不存在:', this.backupDir);
+                    throw new Error('备份目录不存在');
+                }
+                
                 const backups = await fs.readdir(this.backupDir);
+                console.log(`找到 ${backups.length} 个文件:`, backups);
+                
                 let backupFile: BackupInfo | null = null;
 
                 for (const file of backups) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
-                        const content = await fs.readFile(filePath, 'utf-8');
-                        const backup: BackupInfo = JSON.parse(content);
-                        if (backup.id === backupId) {
-                            backupFile = backup;
-                            break;
+                        try {
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const backup: BackupInfo = JSON.parse(content);
+                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
+                            
+                            if (backup.id === backupId) {
+                                backupFile = backup;
+                                console.log(`找到匹配的备份文件: ${file}`);
+                                break;
+                            }
+                        } catch (fileError) {
+                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
+                            // 继续处理其他文件，不抛出错误
                         }
                     }
                 }
 
                 if (!backupFile) {
-                    throw new Error('备份文件不存在');
+                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
+                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
                 }
 
+                console.log(`开始完全替换恢复备份数据: ${backupFile.name}`);
                 // 使用替换模式恢复数据到数据库
                 await this.restoreAllDataWithReplace(backupFile.data);
                 
@@ -187,6 +234,7 @@ export class DataManagementService {
                     message: `数据完全恢复成功: ${backupFile.name}`
                 };
             } catch (error) {
+                console.error('完全替换恢复备份失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 return {
                     success: false,
@@ -294,16 +342,40 @@ export class DataManagementService {
 
         // 选择导出路径
         ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
+            // 根据文件名扩展名动态设置过滤器
+            const fileExtension = defaultName.split('.').pop()?.toLowerCase();
+            let filters;
+            
+            console.log('selectExportPath 调用，默认文件名:', defaultName, '检测到的扩展名:', fileExtension);
+            
+            if (fileExtension === 'csv') {
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else if (fileExtension === 'json') {
+                filters = [
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else {
+                // 默认过滤器，包含所有支持的类型
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            }
+            
+            console.log('设置的文件过滤器:', filters);
+            
             const result = await dialog.showSaveDialog({
                 title: '选择导出路径',
                 defaultPath: defaultName,
-                filters: [
-                    { name: 'JSON 文件', extensions: ['json'] },
-                    { name: 'CSV 文件', extensions: ['csv'] },
-                    { name: '所有文件', extensions: ['*'] },
-                ],
+                filters: filters,
             });
 
+            console.log('保存对话框结果:', result.canceled ? '已取消' : result.filePath);
             return result.canceled ? null : result.filePath;
         });        // 获取数据统计
         ipcMain.handle('data:get-stats', async () => {
@@ -397,11 +469,13 @@ export class DataManagementService {
                 if (options.includeAIConfigs) selectedTypes.push('AI配置');
                 
                 const fileName = `AI-Gist-选择性导出-${selectedTypes.join('_')}-${timestamp}.${options.format}`;
+                console.log('生成的文件名:', fileName, '格式:', options.format);
                 
                 // 如果没有提供导出路径，则显示保存对话框
                 let finalExportPath = exportPath;
                 if (!finalExportPath) {
                     const { dialog } = await import('electron');
+                    console.log('显示保存对话框，默认路径:', fileName);
                     const result = await dialog.showSaveDialog({
                         title: '选择导出位置',
                         defaultPath: fileName,
@@ -416,6 +490,7 @@ export class DataManagementService {
                     }
                     
                     finalExportPath = result.filePath;
+                    console.log('用户选择的保存路径:', finalExportPath);
                 }
 
                 // 根据格式导出数据
@@ -423,8 +498,9 @@ export class DataManagementService {
                 if (options.format === 'json') {
                     exportContent = JSON.stringify(filteredData, null, 2);
                 } else if (options.format === 'csv') {
-                    // 简单的CSV导出（仅支持提示词数据）
+                    // CSV导出支持提示词和分类数据
                     if (options.includePrompts && filteredData.prompts) {
+                        // 导出提示词数据
                         const prompts = filteredData.prompts;
                         const csvHeaders = ['ID', '标题', '内容', '标签', '创建时间'];
                         const csvRows = [csvHeaders.join(',')];
@@ -441,8 +517,25 @@ export class DataManagementService {
                         });
                         
                         exportContent = csvRows.join('\n');
+                    } else if (options.includeCategories && filteredData.categories) {
+                        // 导出分类数据
+                        const categories = filteredData.categories;
+                        const csvHeaders = ['ID', '名称', '描述', '创建时间'];
+                        const csvRows = [csvHeaders.join(',')];
+                        
+                        categories.forEach((cat: any) => {
+                            const row = [
+                                cat.id || '',
+                                `"${(cat.name || '').replace(/"/g, '""')}"`,
+                                `"${(cat.description || '').replace(/"/g, '""')}"`,
+                                cat.createdAt || ''
+                            ];
+                            csvRows.push(row.join(','));
+                        });
+                        
+                        exportContent = csvRows.join('\n');
                     } else {
-                        throw new Error('CSV 格式目前仅支持导出提示词数据');
+                        throw new Error('CSV 格式目前仅支持导出提示词和分类数据');
                     }
                 } else {
                     throw new Error(`不支持的导出格式: ${options.format}`);
@@ -570,13 +663,13 @@ export class DataManagementService {
                     ],
                     properties: ['openFile']
                 });
-                
+
                 if (result.canceled || !result.filePaths.length) {
                     return { success: false, message: '用户取消了导入操作' };
                 }
 
                 const filePath = result.filePaths[0];
-                
+
                 // 读取文件
                 const fs = await import('fs').then(m => m.promises);
                 const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -639,6 +732,25 @@ export class DataManagementService {
                 };
             }
         });
+
+        // 获取备份目录路径
+        ipcMain.handle('data:get-backup-directory', async () => {
+            try {
+                return {
+                    success: true,
+                    path: this.backupDir
+                };
+            } catch (error) {
+                console.error('获取备份目录路径失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    error: errorMessage,
+                    message: `获取备份目录路径失败: ${errorMessage}`
+                };
+            }
+        });
+
         console.log('DataManagementService: 所有IPC处理程序注册完成');
     }
 
@@ -774,7 +886,7 @@ export class DataManagementService {
                 throw new Error(`数据恢复失败: ${result.error}`);
             }
             
-            console.log(`数据恢复成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log(`数据恢复成功，总计恢复记录数: ${result.totalImported}`);
             console.log('恢复详情:', result.details);
             
         } catch (error) {
@@ -815,7 +927,7 @@ export class DataManagementService {
                 throw new Error(`数据替换失败: ${result.error}`);
             }
             
-            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalRestored}`);
+            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalImported}`);
             console.log('替换详情:', result.details);
             
         } catch (error) {
