@@ -11,6 +11,12 @@ import type {
   AIConfigTestResult 
 } from './ai';
 
+// 导入云端备份类型
+import type {
+  CloudStorageConfig,
+  CloudBackupInfo
+} from './cloud-backup';
+
 /**
  * Electron API 接口定义
  */
@@ -79,6 +85,19 @@ export default interface ElectronApi {
     selectExportPath: (defaultName: string) => Promise<string | null>
     getStats: () => Promise<{ categories: number; prompts: number; history: number; aiConfigs: number; settings: number; posts: number; users: number; totalRecords: number }>
     getBackupDirectory: () => Promise<{ success: boolean; path?: string; error?: string; message?: string }>
+  }
+
+  // 云端备份功能
+  cloud: {
+    getStorageConfigs: () => Promise<CloudStorageConfig[]>
+    addStorageConfig: (config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
+    updateStorageConfig: (id: string, config: Partial<CloudStorageConfig>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
+    deleteStorageConfig: (id: string) => Promise<{ success: boolean; error?: string }>
+    testStorageConnection: (config: CloudStorageConfig) => Promise<{ success: boolean; error?: string }>
+    getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>
+    createBackup: (storageId: string, description?: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
+    restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
+    deleteBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message?: string; error?: string }>
   }
 
   // 应用信息和更新

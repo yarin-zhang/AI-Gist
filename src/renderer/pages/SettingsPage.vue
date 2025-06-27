@@ -84,6 +84,9 @@
                             @repair-database="repairDatabase" @clear-database="clearDatabase" 
                             @open-backup-directory="openBackupDirectory" /> 
                             
+                        <!-- 云端备份设置 -->
+                        <CloudBackupSettings v-show="activeSettingKey === 'cloud-backup'" />
+                            
                         <!-- 外观设置 -->
                         <AppearanceSettings v-show="activeSettingKey === 'appearance'"
                             :model-value="{ themeSource: settings.themeSource }"
@@ -137,12 +140,14 @@ import {
     Flask,
     Database,
     InfoCircle,
+    Cloud,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
 import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
+import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import { DataManagementAPI } from "@/lib/api";
 import { databaseServiceManager } from "@/lib/services";
@@ -205,6 +210,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
         },
         {
+            label: "云端备份",
+            key: "cloud-backup",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
+        },
+        {
             label: "外观设置",
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
@@ -260,6 +270,11 @@ const currentSectionInfo = computed(() => {
             title: "数据管理",
             icon: Database,
             description: "数据备份、恢复、导入导出功能"
+        },
+        "cloud-backup": {
+            title: "云端备份",
+            icon: Cloud,
+            description: "配置 WebDAV 和 iCloud Drive 云端备份功能"
         },
         about: {
             title: "关于",
@@ -563,7 +578,7 @@ const refreshBackupList = async () => {
         const backups = await DataManagementAPI.getBackupList();
 
         // 转换备份数据格式以匹配组件期望的格式
-        const formattedBackups = backups.map(backup => ({
+        const formattedBackups = backups.map((backup: any) => ({
             id: backup.id,
             name: backup.name,
             createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),

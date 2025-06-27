@@ -82,6 +82,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStats: () => ipcRenderer.invoke('data:get-stats'),
     getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
   },
+  // 云端备份功能
+  cloud: {
+    getStorageConfigs: () => ipcRenderer.invoke('cloud:get-storage-configs'),
+    addStorageConfig: (config: any) => ipcRenderer.invoke('cloud:add-storage-config', config),
+    updateStorageConfig: (id: string, config: any) => ipcRenderer.invoke('cloud:update-storage-config', id, config),
+    deleteStorageConfig: (id: string) => ipcRenderer.invoke('cloud:delete-storage-config', id),
+    testStorageConnection: (config: any) => ipcRenderer.invoke('cloud:test-storage-connection', config),
+    getBackupList: (storageId: string) => ipcRenderer.invoke('cloud:get-backup-list', storageId),
+    createBackup: (storageId: string, description?: string) => ipcRenderer.invoke('cloud:create-backup', storageId, description),
+    restoreBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:restore-backup', storageId, backupId),
+    deleteBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:delete-backup', storageId, backupId),
+  },
   // 应用信息和更新
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),

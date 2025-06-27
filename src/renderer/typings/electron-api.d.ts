@@ -1,11 +1,4 @@
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
-
-  const component: DefineComponent<object, object, any>
-  export default component
-}
-
-// 扩展 Window 接口以包含 electronAPI
+// Electron API 类型声明
 declare global {
   interface Window {
     electronAPI: {
@@ -24,4 +17,4 @@ declare global {
   }
 }
 
-export {};
+export {}; 
