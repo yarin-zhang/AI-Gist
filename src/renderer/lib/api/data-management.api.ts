@@ -176,4 +176,21 @@ export class DataManagementAPI {
             throw error;
         }
     }
+
+    /**
+     * 获取备份目录路径
+     */
+    static async getBackupDirectory(): Promise<{
+        success: boolean;
+        path?: string;
+        error?: string;
+        message?: string;
+    }> {
+        try {
+            return await ipcInvoke('data:get-backup-directory');
+        } catch (error) {
+            console.error('获取备份目录路径失败:', error);
+            throw error;
+        }
+    }
 }

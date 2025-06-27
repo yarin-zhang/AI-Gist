@@ -24,6 +24,14 @@
                                 </template>
                                 刷新备份列表
                             </NButton>
+                            <NButton @click="openBackupDirectory">
+                                <template #icon>
+                                    <NIcon>
+                                        <Folder />
+                                    </NIcon>
+                                </template>
+                                打开备份目录
+                            </NButton>
                         </NFlex>
                     </NFlex>
 
@@ -340,6 +348,7 @@ const emit = defineEmits<{
     "check-database-health": [];
     "repair-database": [];
     "clear-database": [];
+    "open-backup-directory": [];
 }>();
 
 // 备份列表数据
@@ -453,6 +462,11 @@ const exportFullBackup = () => {
 // 完整备份导入
 const importFullBackup = () => {
     emit("import-full-backup");
+};
+
+// 打开备份目录
+const openBackupDirectory = () => {
+    emit("open-backup-directory");
 };
 
 // 更新备份列表

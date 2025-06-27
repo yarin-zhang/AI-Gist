@@ -81,7 +81,8 @@
                             @import-full-backup="importFullBackup" @create-backup="createBackup"
                             @restore-backup="restoreSpecificBackup" @delete-backup="deleteBackup"
                             @refresh-backup-list="refreshBackupList" @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase" @clear-database="clearDatabase" /> 
+                            @repair-database="repairDatabase" @clear-database="clearDatabase" 
+                            @open-backup-directory="openBackupDirectory" /> 
                             
                         <!-- 外观设置 -->
                         <AppearanceSettings v-show="activeSettingKey === 'appearance'"
@@ -671,6 +672,28 @@ const repairDatabase = async () => {
         message.error("数据库修复失败");
     }
     loading.repair = false;
+};
+
+// 打开备份目录
+const openBackupDirectory = async () => {
+    try {
+        const result = await DataManagementAPI.getBackupDirectory();
+        
+        if (result.success && result.path) {
+            // 使用系统默认应用打开文件夹
+            const shellResult = await window.electronAPI.shell.openPath(result.path);
+            if (shellResult.success) {
+                message.success("已打开备份目录");
+            } else {
+                message.error(shellResult.error || "打开备份目录失败");
+            }
+        } else {
+            message.error(result.message || "获取备份目录路径失败");
+        }
+    } catch (error) {
+        console.error("打开备份目录失败:", error);
+        message.error("打开备份目录失败");
+    }
 };
 
 // 组件挂载时加载设置

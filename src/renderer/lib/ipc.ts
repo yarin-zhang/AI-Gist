@@ -189,6 +189,8 @@ export class IpcUtils {
             return api.data.selectExportPath(data) as T;
           case 'get-stats':
             return api.data.getStats() as T;
+          case 'get-backup-directory':
+            return api.data.getBackupDirectory() as T;
         }
         break;
     }

@@ -81,6 +81,21 @@ export default interface ElectronApi {
     selectImportFile: (format: string) => Promise<string | null>
     selectExportPath: (defaultName: string) => Promise<string | null>
     getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+    getBackupDirectory: () => Promise<{ success: boolean; path?: string; error?: string; message?: string }>
+  }
+
+  // 应用信息和更新
+  app: {
+    getVersion: () => Promise<string>
+    checkUpdates: () => Promise<{ success: boolean; data?: any; error?: string }>
+    openDownloadPage: (url: string) => Promise<{ success: boolean; error?: string }>
+    onUpdateAvailable: (callback: (updateInfo: any) => void) => () => void
+  }
+  
+  // Shell 功能
+  shell: {
+    openPath: (path: string) => Promise<{ success: boolean; error?: string }>
+    openExternal: (url: string) => Promise<{ success: boolean; error?: string }>
   }
 }
 

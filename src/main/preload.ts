@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
     getStats: () => ipcRenderer.invoke('data:get-stats'),
+    getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
   },
   // 应用信息和更新
   app: {
@@ -92,5 +93,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       // 返回移除监听器的函数
       return () => ipcRenderer.removeListener('update-available', listener);
     }
+  },
+  // Shell 功能
+  shell: {
+    openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
   }
 });

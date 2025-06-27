@@ -570,13 +570,13 @@ export class DataManagementService {
                     ],
                     properties: ['openFile']
                 });
-                
+
                 if (result.canceled || !result.filePaths.length) {
                     return { success: false, message: '用户取消了导入操作' };
                 }
 
                 const filePath = result.filePaths[0];
-                
+
                 // 读取文件
                 const fs = await import('fs').then(m => m.promises);
                 const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -639,6 +639,25 @@ export class DataManagementService {
                 };
             }
         });
+
+        // 获取备份目录路径
+        ipcMain.handle('data:get-backup-directory', async () => {
+            try {
+                return {
+                    success: true,
+                    path: this.backupDir
+                };
+            } catch (error) {
+                console.error('获取备份目录路径失败:', error);
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                return {
+                    success: false,
+                    error: errorMessage,
+                    message: `获取备份目录路径失败: ${errorMessage}`
+                };
+            }
+        });
+
         console.log('DataManagementService: 所有IPC处理程序注册完成');
     }
 
