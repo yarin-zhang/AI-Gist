@@ -89,6 +89,7 @@ export default interface ElectronApi {
 
   // 云端备份功能
   cloud: {
+    checkICloudAvailability: () => Promise<{ available: boolean; reason?: string }>
     getStorageConfigs: () => Promise<CloudStorageConfig[]>
     addStorageConfig: (config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
     updateStorageConfig: (id: string, config: Partial<CloudStorageConfig>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>

@@ -217,7 +217,7 @@
                     </NFormItem>
                     
                     <NFormItem label="存储类型" path="type">
-                        <NRadioGroup v-model:value="configForm.type">
+                        <NRadioGroup v-model:value="configForm.type" @update:value="handleTypeChange">
                             <NRadio value="webdav">WebDAV</NRadio>
                             <NRadio value="icloud">iCloud Drive</NRadio>
                         </NRadioGroup>
@@ -238,10 +238,22 @@
 
                     <!-- iCloud Drive 配置 -->
                     <template v-if="configForm.type === 'icloud'">
+                        <!-- iCloud 不可用时的提示 -->
+                        <template v-if="iCloudAvailability && !iCloudAvailability.available">
+                            <NAlert type="warning" style="margin-bottom: 16px;">
+                                <template #icon>
+                                    <NIcon><Wifi /></NIcon>
+                                </template>
+                                <NText depth="3" style="font-size: 12px;">
+                                    {{ iCloudAvailability.reason }}
+                                </NText>
+                            </NAlert>
+                        </template>
+                        
                         <NFormItem label="iCloud Drive 路径" path="path">
-                            <NInput v-model:value="configForm.path" placeholder="AI-Gist-Backups" />
+                            <NInput v-model:value="configForm.path" placeholder="AI-Gist-Backup" />
                             <NText depth="3" style="font-size: 12px;">
-                                将在 iCloud Drive 中创建此文件夹用于存储备份
+                                备份文件将直接保存在此文件夹中
                             </NText>
                         </NFormItem>
                     </template>
@@ -253,7 +265,14 @@
 
                 <NFlex justify="end" :size="12">
                     <NButton @click="showConfigModal = false">取消</NButton>
-                    <NButton type="primary" @click="saveConfig" :loading="loading.saveConfig">保存</NButton>
+                    <NButton 
+                        type="primary" 
+                        @click="saveConfig" 
+                        :loading="loading.saveConfig"
+                        :disabled="!canSaveICloudConfig"
+                    >
+                        保存
+                    </NButton>
                 </NFlex>
             </NFlex>
         </NModal>
@@ -303,11 +322,13 @@ const storageConfigs = ref<CloudStorageConfig[]>([]);
 const cloudBackups = ref<CloudBackupInfo[]>([]);
 const selectedStorageId = ref<string>('');
 const showConfigModal = ref(false);
+const iCloudAvailability = ref<{ available: boolean; reason?: string } | null>(null);
 const loading = ref({
     saveConfig: false,
     createBackup: false,
     restoreBackup: false,
     refreshList: false,
+    checkICloud: false,
 });
 
 // 表单数据
@@ -319,7 +340,7 @@ const configForm = ref({
     url: '',
     username: '',
     password: '',
-    path: '',
+    path: 'AI-Gist-Backup',
 });
 
 // 表单规则
@@ -365,9 +386,14 @@ const formRules = {
         }
     },
     path: {
-        required: configForm.value.type === 'icloud',
+        required: true,
         message: '请输入路径',
-        trigger: 'blur'
+        trigger: 'blur',
+        validator: (rule: any, value: string) => {
+            if (configForm.value.type === 'icloud' && (!value || value.trim() === '')) {
+                return new Error('iCloud 路径不能为空');
+            }
+        }
     }
 };
 
@@ -380,7 +406,33 @@ const storageOptions = computed(() => {
     }));
 });
 
+// 是否可以保存 iCloud 配置
+const canSaveICloudConfig = computed(() => {
+    if (configForm.value.type !== 'icloud') return true;
+    return iCloudAvailability.value?.available !== false;
+});
+
 // 方法
+const checkICloudAvailability = async () => {
+    loading.value.checkICloud = true;
+    try {
+        console.log('开始检测 iCloud 可用性...');
+        const result = await CloudBackupAPI.checkICloudAvailability();
+        console.log('iCloud 检测结果:', result);
+        iCloudAvailability.value = result;
+    } catch (error) {
+        console.error('检测 iCloud 可用性失败:', error);
+        console.error('错误详情:', {
+            name: (error as Error).name,
+            message: (error as Error).message,
+            stack: (error as Error).stack
+        });
+        iCloudAvailability.value = { available: false, reason: '检测失败，请检查网络连接' };
+    } finally {
+        loading.value.checkICloud = false;
+    }
+};
+
 const loadStorageConfigs = async () => {
     try {
         storageConfigs.value = await CloudBackupAPI.getStorageConfigs();
@@ -399,7 +451,7 @@ const showAddConfigModal = () => {
         url: '',
         username: '',
         password: '',
-        path: '',
+        path: 'AI-Gist-Backup',
     };
     showConfigModal.value = true;
 };
@@ -413,7 +465,7 @@ const editConfig = (config: CloudStorageConfig) => {
         url: config.type === 'webdav' ? (config as any).url : '',
         username: config.type === 'webdav' ? (config as any).username : '',
         password: config.type === 'webdav' ? (config as any).password : '',
-        path: config.type === 'icloud' ? (config as any).path : '',
+        path: config.type === 'icloud' ? (config as any).path || 'AI-Gist-Backup' : 'AI-Gist-Backup',
     };
     showConfigModal.value = true;
 };
@@ -421,6 +473,18 @@ const editConfig = (config: CloudStorageConfig) => {
 const saveConfig = async () => {
     loading.value.saveConfig = true;
     try {
+        // 前端验证
+        if (configForm.value.type === 'icloud' && (!configForm.value.path || configForm.value.path.trim() === '')) {
+            message.error('iCloud 路径不能为空');
+            return;
+        }
+
+        // 检查 iCloud 可用性
+        if (configForm.value.type === 'icloud' && iCloudAvailability.value && !iCloudAvailability.value.available) {
+            message.error(`无法保存 iCloud 配置：${iCloudAvailability.value.reason}`);
+            return;
+        }
+
         const configData = {
             name: configForm.value.name,
             type: configForm.value.type,
@@ -477,6 +541,18 @@ const deleteConfig = async (id: string) => {
 
 const testConnection = async (config: CloudStorageConfig) => {
     try {
+        // 前端验证
+        if (config.type === 'icloud' && (!(config as any).path || (config as any).path.trim() === '')) {
+            message.error('iCloud 路径不能为空');
+            return;
+        }
+
+        // 检查 iCloud 可用性
+        if (config.type === 'icloud' && iCloudAvailability.value && !iCloudAvailability.value.available) {
+            message.error(`无法测试 iCloud 连接：${iCloudAvailability.value.reason}`);
+            return;
+        }
+
         // 创建一个干净的配置对象，只包含必要的属性，避免序列化问题
         const cleanConfig: CloudStorageConfig = {
             id: config.id,
@@ -595,7 +671,8 @@ const getConfigDescription = (config: CloudStorageConfig) => {
     if (config.type === 'webdav') {
         return `${(config as any).url}`;
     } else {
-        return `iCloud Drive${(config as any).path ? ' - ' + (config as any).path : ''}`;
+        const path = (config as any).path || 'AI-Gist-Backup';
+        return `iCloud Drive - ${path}`;
     }
 };
 
@@ -609,8 +686,18 @@ const formatSize = (size: number) => {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// 监听存储类型变化
+const handleTypeChange = () => {
+    if (configForm.value.type === 'icloud' && (!configForm.value.path || configForm.value.path.trim() === '')) {
+        configForm.value.path = 'AI-Gist-Backup';
+    }
+};
+
 // 生命周期
 onMounted(async () => {
-    await loadStorageConfigs();
+    await Promise.all([
+        loadStorageConfigs(),
+        checkICloudAvailability()
+    ]);
 });
 </script> 

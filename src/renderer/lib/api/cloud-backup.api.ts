@@ -11,6 +11,19 @@ export class CloudBackupAPI {
   }
 
   /**
+   * 检测 iCloud 可用性
+   */
+  static async checkICloudAvailability(): Promise<{
+    available: boolean;
+    reason?: string;
+  }> {
+    if (!this.isElectronAvailable()) {
+      throw new Error('Electron API not available');
+    }
+    return await window.electronAPI.cloud.checkICloudAvailability();
+  }
+
+  /**
    * 获取存储配置列表
    */
   static async getStorageConfigs(): Promise<CloudStorageConfig[]> {

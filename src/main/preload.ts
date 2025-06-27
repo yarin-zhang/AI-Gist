@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 云端备份功能
   cloud: {
+    checkICloudAvailability: () => ipcRenderer.invoke('cloud:check-icloud-availability'),
     getStorageConfigs: () => ipcRenderer.invoke('cloud:get-storage-configs'),
     addStorageConfig: (config: any) => ipcRenderer.invoke('cloud:add-storage-config', config),
     updateStorageConfig: (id: string, config: any) => ipcRenderer.invoke('cloud:update-storage-config', id, config),

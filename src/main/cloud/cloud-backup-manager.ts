@@ -26,6 +26,16 @@ export class CloudBackupManager {
   }
 
   private setupIpcHandlers() {
+    // 检测 iCloud 可用性
+    ipcMain.handle('cloud:check-icloud-availability', async () => {
+      try {
+        return await ICloudProvider.isICloudAvailable();
+      } catch (error) {
+        console.error('检测 iCloud 可用性失败:', error);
+        return { available: false, reason: '检测失败' };
+      }
+    });
+
     // 获取存储配置列表
     ipcMain.handle('cloud:get-storage-configs', async () => {
       try {
@@ -40,6 +50,11 @@ export class CloudBackupManager {
     // 添加存储配置
     ipcMain.handle('cloud:add-storage-config', async (_, config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
       try {
+        // 验证 iCloud 路径不能为空
+        if (config.type === 'icloud' && (!(config as ICloudConfig).path || (config as ICloudConfig).path.trim() === '')) {
+          throw new Error('iCloud 路径不能为空');
+        }
+
         const newConfig: CloudStorageConfig = {
           ...config,
           id: uuidv4(),
@@ -74,6 +89,16 @@ export class CloudBackupManager {
         const existingConfig = this.storageConfigs.get(id);
         if (!existingConfig) {
           throw new Error('配置不存在');
+        }
+
+        // 验证 iCloud 路径不能为空
+        if (config.type === 'icloud' || existingConfig.type === 'icloud') {
+          const iCloudConfig = config as Partial<ICloudConfig>;
+          const existingICloudConfig = existingConfig as ICloudConfig;
+          const path = iCloudConfig.path ?? existingICloudConfig.path;
+          if (!path || path.trim() === '') {
+            throw new Error('iCloud 路径不能为空');
+          }
         }
 
         const updatedConfig: CloudStorageConfig = {
@@ -127,6 +152,11 @@ export class CloudBackupManager {
     // 测试存储连接
     ipcMain.handle('cloud:test-storage-connection', async (_, config: CloudStorageConfig) => {
       try {
+        // 验证 iCloud 路径不能为空
+        if (config.type === 'icloud' && (!(config as ICloudConfig).path || (config as ICloudConfig).path.trim() === '')) {
+          throw new Error('iCloud 路径不能为空');
+        }
+
         // 确保配置对象只包含必要的属性，避免序列化问题
         const cleanConfig: CloudStorageConfig = {
           id: config.id,
@@ -337,7 +367,7 @@ export class CloudBackupManager {
       case 'webdav':
         return fileName;
       case 'icloud':
-        return path.join((config as ICloudConfig).path || '', fileName);
+        return fileName;
       default:
         return fileName;
     }
