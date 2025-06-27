@@ -318,7 +318,7 @@ export class CloudBackupManager {
   private getCloudPath(config: CloudStorageConfig, fileName: string): string {
     switch (config.type) {
       case 'webdav':
-        return path.join((config as WebDAVConfig).path || '', fileName);
+        return fileName;
       case 'icloud':
         return path.join((config as ICloudConfig).path || '', fileName);
       default:

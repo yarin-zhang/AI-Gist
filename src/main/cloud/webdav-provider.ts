@@ -37,7 +37,7 @@ export class WebDAVProvider implements CloudStorageProvider {
   async listFiles(dirPath?: string): Promise<CloudFileInfo[]> {
     await this.ensureClient();
     try {
-      const targetPath = dirPath || this.config.path || '/';
+      const targetPath = dirPath || '/';
       const contents = await this.client.getDirectoryContents(targetPath);
       const files = Array.isArray(contents) ? contents : contents.data || [];
       return files.map((item: any) => ({
