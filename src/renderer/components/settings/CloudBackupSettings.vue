@@ -1,6 +1,139 @@
 <template>
     <NCard>
         <NFlex vertical :size="20">
+
+            <!-- 云端备份管理 - 使用标签页结构 -->
+            <div v-if="storageConfigs.length > 0">
+                <NFlex vertical :size="16">
+                    <NFlex vertical :size="12">
+                        <NText depth="2">云端备份管理</NText>
+                        <NText depth="3" style="font-size: 12px;">
+                            管理云端备份文件，支持创建、恢复和删除操作
+                        </NText>
+                    </NFlex>
+
+                    <!-- 标签页结构 -->
+                    <NTabs v-model:value="activeTabKey" type="line" animated>
+                        <NTabPane v-for="config in storageConfigs" :key="config.id" :name="config.id" :tab="config.name"
+                            :disabled="!config.enabled">
+                            <NFlex vertical :size="16">
+                                <!-- 备份操作按钮 -->
+                                <NFlex :size="12">
+                                    <NButton type="primary" @click="createCloudBackup(config.id)"
+                                        :loading="loading.createBackup">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Upload />
+                                            </NIcon>
+                                        </template>
+                                        创建云端备份
+                                    </NButton>
+                                    <NButton @click="refreshCloudBackupList(config.id)" :loading="loading.refreshList">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Refresh />
+                                            </NIcon>
+                                        </template>
+                                        刷新备份列表
+                                    </NButton>
+                                </NFlex>
+
+                                <!-- 云端备份列表 -->
+                                <div v-if="getPaginatedBackups(config.id).length > 0">
+                                    <NFlex vertical :size="12">
+                                        <NText depth="2">云端备份列表</NText>
+                                        <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
+                                            <NGridItem v-for="backup in getPaginatedBackups(config.id)" :key="backup.id"
+                                                span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                                <NCard size="small" :title="backup.name">
+                                                    <NFlex vertical :size="4">
+                                                        <NFlex align="center" :size="8">
+                                                            <NText strong>{{ backup.description || '云端备份' }}</NText>
+                                                        </NFlex>
+                                                        <NFlex align="center" :size="8">
+                                                            <NTag type="info" size="small">{{
+                                                                formatDate(backup.createdAt) }}</NTag>
+                                                            <NTag type="success" size="small">{{ formatSize(backup.size)
+                                                                }}</NTag>
+                                                        </NFlex>
+                                                    </NFlex>
+
+                                                    <template #action>
+                                                        <NFlex justify="space-between" align="center"
+                                                            style="width: 100%;">
+                                                            <NPopconfirm
+                                                                @positive-click="restoreCloudBackup(config.id, backup.id)"
+                                                                negative-text="取消" positive-text="确定恢复" placement="top"
+                                                                :show-icon="false">
+                                                                <template #trigger>
+                                                                    <NButton type="primary" size="small"
+                                                                        :loading="loading.restoreBackup"
+                                                                        :disabled="loading.restoreBackup">
+                                                                        <template #icon>
+                                                                            <NIcon>
+                                                                                <Recharging />
+                                                                            </NIcon>
+                                                                        </template>
+                                                                        恢复
+                                                                    </NButton>
+                                                                </template>
+                                                                <div style="max-width: 300px;">
+                                                                    <p>注意！恢复云端备份将会：</p>
+                                                                    <ul style="margin: 8px 0; padding-left: 20px;">
+                                                                        <li>自动备份当前数据</li>
+                                                                        <li>完全覆盖现有数据库</li>
+                                                                    </ul>
+                                                                </div>
+                                                            </NPopconfirm>
+                                                            <NPopconfirm
+                                                                @positive-click="deleteCloudBackup(config.id, backup.id)"
+                                                                negative-text="取消" positive-text="确定">
+                                                                <template #trigger>
+                                                                    <NButton type="error" secondary size="small">
+                                                                        <template #icon>
+                                                                            <NIcon>
+                                                                                <Trash />
+                                                                            </NIcon>
+                                                                        </template>
+                                                                        删除
+                                                                    </NButton>
+                                                                </template>
+                                                                确定要删除这个云端备份吗？
+                                                            </NPopconfirm>
+                                                        </NFlex>
+                                                    </template>
+                                                </NCard>
+                                            </NGridItem>
+                                        </NGrid>
+
+                                        <!-- 分页组件 -->
+                                        <div v-if="getPaginationData(config.id).totalPages > 1"
+                                            class="pagination-container">
+                                            <NPagination :page="getPaginationData(config.id).currentPage"
+                                                @update:page="(page) => updatePaginationState(config.id, page, getPaginationData(config.id).pageSize)"
+                                                :page-count="getPaginationData(config.id).totalPages"
+                                                :page-size="getPaginationData(config.id).pageSize"
+                                                :item-count="getPaginationData(config.id).totalItems" show-size-picker
+                                                show-quick-jumper :page-sizes="[6, 12, 18]"
+                                                @update:page-size="(size) => updatePaginationState(config.id, 1, size)" />
+                                        </div>
+                                    </NFlex>
+                                </div>
+
+                                <div v-else>
+                                    <NText depth="3" style="font-size: 14px;">
+                                        暂无云端备份，请先创建备份
+                                    </NText>
+                                </div>
+                            </NFlex>
+                        </NTabPane>
+                    </NTabs>
+                </NFlex>
+            </div>
+
+
+            <NDivider v-if="storageConfigs.length > 0" />
+
             <!-- 存储配置管理 -->
             <div>
                 <NFlex vertical :size="16">
@@ -9,7 +142,7 @@
                         <NText depth="3" style="font-size: 12px;">
                             配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能
                         </NText>
-                        
+
                         <NFlex :size="12">
                             <NButton type="primary" @click="showAddConfigModal">
                                 <template #icon>
@@ -27,11 +160,13 @@
                         <NFlex vertical :size="12">
                             <NText depth="2">已配置的存储</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
-                                <NGridItem v-for="config in storageConfigs" :key="config.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                <NGridItem v-for="config in storageConfigs" :key="config.id"
+                                    span="6 600:5 900:4 1200:3 1500:2 1800:1">
                                     <NCard size="small" :title="config.name">
                                         <NFlex vertical :size="8">
                                             <NFlex align="center" :size="8">
-                                                <NTag :type="config.type === 'webdav' ? 'info' : 'success'" size="small">
+                                                <NTag :type="config.type === 'webdav' ? 'info' : 'success'"
+                                                    size="small">
                                                     {{ config.type === 'webdav' ? 'WebDAV' : 'iCloud Drive' }}
                                                 </NTag>
                                                 <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
@@ -42,7 +177,7 @@
                                                 {{ getConfigDescription(config) }}
                                             </NText>
                                         </NFlex>
-                                        
+
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
                                                 <NButton size="small" @click="testConnection(config)">
@@ -61,7 +196,8 @@
                                                     </template>
                                                     编辑
                                                 </NButton>
-                                                <NPopconfirm @positive-click="deleteConfig(config.id)" negative-text="取消" positive-text="确定">
+                                                <NPopconfirm @positive-click="deleteConfig(config.id)"
+                                                    negative-text="取消" positive-text="确定">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
                                                             <template #icon>
@@ -90,137 +226,6 @@
                 </NFlex>
             </div>
 
-            <NDivider v-if="storageConfigs.length > 0"/>
-
-            <!-- 云端备份管理 - 使用标签页结构 -->
-            <div v-if="storageConfigs.length > 0">
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">云端备份管理</NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            管理云端备份文件，支持创建、恢复和删除操作
-                        </NText>
-                    </NFlex>
-
-                    <!-- 标签页结构 -->
-                    <NTabs v-model:value="activeTabKey" type="line" animated>
-                        <NTabPane 
-                            v-for="config in storageConfigs" 
-                            :key="config.id" 
-                            :name="config.id"
-                            :tab="config.name"
-                            :disabled="!config.enabled"
-                        >
-                            <NFlex vertical :size="16">
-                                <!-- 备份操作按钮 -->
-                                <NFlex :size="12">
-                                    <NButton type="primary" @click="createCloudBackup(config.id)" :loading="loading.createBackup">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Upload />
-                                            </NIcon>
-                                        </template>
-                                        创建云端备份
-                                    </NButton>
-                                    <NButton @click="refreshCloudBackupList(config.id)" :loading="loading.refreshList">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Refresh />
-                                            </NIcon>
-                                        </template>
-                                        刷新备份列表
-                                    </NButton>
-                                </NFlex>
-
-                                <!-- 云端备份列表 -->
-                                <div v-if="getPaginatedBackups(config.id).length > 0">
-                                    <NFlex vertical :size="12">
-                                        <NText depth="2">云端备份列表</NText>
-                                        <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
-                                            <NGridItem v-for="backup in getPaginatedBackups(config.id)" :key="backup.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
-                                                <NCard size="small" :title="backup.name">
-                                                    <NFlex vertical :size="4">
-                                                        <NFlex align="center" :size="8">
-                                                            <NText strong>{{ backup.description || '云端备份' }}</NText>
-                                                        </NFlex>
-                                                        <NFlex align="center" :size="8">
-                                                            <NTag type="info" size="small">{{ formatDate(backup.createdAt) }}</NTag>
-                                                            <NTag type="success" size="small">{{ formatSize(backup.size) }}</NTag>
-                                                        </NFlex>
-                                                    </NFlex>
-                                                    
-                                                    <template #action>
-                                                        <NFlex justify="space-between" align="center" style="width: 100%;">
-                                                            <NPopconfirm @positive-click="restoreCloudBackup(config.id, backup.id)"
-                                                                negative-text="取消" positive-text="确定恢复" placement="top"
-                                                                :show-icon="false">
-                                                                <template #trigger>
-                                                                    <NButton type="primary" size="small"
-                                                                        :loading="loading.restoreBackup"
-                                                                        :disabled="loading.restoreBackup">
-                                                                        <template #icon>
-                                                                            <NIcon>
-                                                                                <Recharging />
-                                                                            </NIcon>
-                                                                        </template>
-                                                                        恢复
-                                                                    </NButton>
-                                                                </template>
-                                                                <div style="max-width: 300px;">
-                                                                    <p>注意！恢复云端备份将会：</p>
-                                                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                                                        <li>自动备份当前数据</li>
-                                                                        <li>完全覆盖现有数据库</li>
-                                                                    </ul>
-                                                                </div>
-                                                            </NPopconfirm>
-                                                            <NPopconfirm @positive-click="deleteCloudBackup(config.id, backup.id)" negative-text="取消"
-                                                                positive-text="确定">
-                                                                <template #trigger>
-                                                                    <NButton type="error" secondary size="small">
-                                                                        <template #icon>
-                                                                            <NIcon>
-                                                                                <Trash />
-                                                                            </NIcon>
-                                                                        </template>
-                                                                        删除
-                                                                    </NButton>
-                                                                </template>
-                                                                确定要删除这个云端备份吗？
-                                                            </NPopconfirm>
-                                                        </NFlex>
-                                                    </template>
-                                                </NCard>
-                                            </NGridItem>
-                                        </NGrid>
-
-                                        <!-- 分页组件 -->
-                                        <div v-if="getPaginationData(config.id).totalPages > 1" class="pagination-container">
-                                            <NPagination 
-                                                :page="getPaginationData(config.id).currentPage"
-                                                @update:page="(page) => updatePaginationState(config.id, page, getPaginationData(config.id).pageSize)"
-                                                :page-count="getPaginationData(config.id).totalPages" 
-                                                :page-size="getPaginationData(config.id).pageSize"
-                                                :item-count="getPaginationData(config.id).totalItems" 
-                                                show-size-picker 
-                                                show-quick-jumper
-                                                :page-sizes="[6, 12, 18]"
-                                                @update:page-size="(size) => updatePaginationState(config.id, 1, size)"
-                                            />
-                                        </div>
-                                    </NFlex>
-                                </div>
-
-                                <div v-else>
-                                    <NText depth="3" style="font-size: 14px;">
-                                        暂无云端备份，请先创建备份
-                                    </NText>
-                                </div>
-                            </NFlex>
-                        </NTabPane>
-                    </NTabs>
-                </NFlex>
-            </div>
         </NFlex>
 
         <!-- 添加/编辑配置模态框 -->
@@ -259,14 +264,16 @@
                         <template v-if="iCloudAvailability && !iCloudAvailability.available">
                             <NAlert type="warning" style="margin-bottom: 16px;">
                                 <template #icon>
-                                    <NIcon><Wifi /></NIcon>
+                                    <NIcon>
+                                        <Wifi />
+                                    </NIcon>
                                 </template>
                                 <NText depth="3" style="font-size: 12px;">
                                     {{ iCloudAvailability.reason }}
                                 </NText>
                             </NAlert>
                         </template>
-                        
+
                         <NFormItem label="iCloud Drive 路径" path="path">
                             <NInput v-model:value="configForm.path" placeholder="AI-Gist-Backup" />
                         </NFormItem>
@@ -279,12 +286,8 @@
 
                 <NFlex justify="end" :size="12">
                     <NButton @click="showConfigModal = false">取消</NButton>
-                    <NButton 
-                        type="primary" 
-                        @click="saveConfig" 
-                        :loading="loading.saveConfig"
-                        :disabled="!canSaveICloudConfig"
-                    >
+                    <NButton type="primary" @click="saveConfig" :loading="loading.saveConfig"
+                        :disabled="!canSaveICloudConfig">
                         保存
                     </NButton>
                 </NFlex>
@@ -451,11 +454,11 @@ const updatePaginationState = (storageId: string, page: number, size: number) =>
 // 方法
 const getAutoGeneratedName = () => {
     const baseName = configForm.value.type === 'webdav' ? 'WebDAV' : 'iCloud Drive';
-    const existingCount = storageConfigs.value.filter(config => 
-        config.type === configForm.value.type && 
+    const existingCount = storageConfigs.value.filter(config =>
+        config.type === configForm.value.type &&
         config.name.startsWith(baseName)
     ).length;
-    
+
     if (existingCount === 0) {
         return baseName;
     } else {
@@ -648,10 +651,10 @@ const testConnection = async (config: CloudStorageConfig) => {
 const refreshCloudBackupList = async (storageId?: string) => {
     const targetStorageId = storageId || activeTabKey.value;
     if (!targetStorageId) return;
-    
+
     // 避免重复加载
     if (loading.value.refreshList) return;
-    
+
     loading.value.refreshList = true;
     try {
         const backups = await CloudBackupAPI.getCloudBackupList(targetStorageId);
@@ -669,12 +672,12 @@ const refreshCloudBackupList = async (storageId?: string) => {
 const createCloudBackup = async (storageId?: string) => {
     const targetStorageId = storageId || activeTabKey.value;
     if (!targetStorageId) return;
-    
+
     loading.value.createBackup = true;
     try {
         const timestamp = new Date().toLocaleString('zh-CN');
         const result = await CloudBackupAPI.createCloudBackup(targetStorageId, `云端备份 - ${timestamp}`);
-        
+
         if (result.success) {
             message.success(result.message);
             // 创建成功后刷新对应存储的备份列表
@@ -694,7 +697,7 @@ const restoreCloudBackup = async (storageId: string, backupId: string) => {
     loading.value.restoreBackup = true;
     try {
         const result = await CloudBackupAPI.restoreCloudBackup(storageId, backupId);
-        
+
         if (result.success) {
             message.success(result.message);
             // 恢复成功后刷新页面或通知父组件
@@ -713,7 +716,7 @@ const restoreCloudBackup = async (storageId: string, backupId: string) => {
 const deleteCloudBackup = async (storageId: string, backupId: string) => {
     try {
         const result = await CloudBackupAPI.deleteCloudBackup(storageId, backupId);
-        
+
         if (result.success) {
             message.success(result.message || '云端备份删除成功');
             await refreshCloudBackupList(storageId);
@@ -784,4 +787,4 @@ onMounted(async () => {
     padding-top: 12px;
     border-top: 1px solid var(--border-color);
 }
-</style> 
+</style>
