@@ -1,97 +1,6 @@
 <template>
     <NCard>
         <NFlex vertical :size="20">
-            <!-- 存储配置管理 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">云端存储配置</NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能
-                        </NText>
-                        
-                        <NFlex :size="12">
-                            <NButton type="primary" @click="showAddConfigModal">
-                                <template #icon>
-                                    <NIcon>
-                                        <Plus />
-                                    </NIcon>
-                                </template>
-                                添加存储配置
-                            </NButton>
-                        </NFlex>
-                    </NFlex>
-
-                    <!-- 存储配置列表 -->
-                    <div v-if="storageConfigs.length > 0">
-                        <NFlex vertical :size="12">
-                            <NText depth="2">已配置的存储</NText>
-                            <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
-                                <NGridItem v-for="config in storageConfigs" :key="config.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
-                                    <NCard size="small" :title="config.name">
-                                        <NFlex vertical :size="8">
-                                            <NFlex align="center" :size="8">
-                                                <NTag :type="config.type === 'webdav' ? 'info' : 'success'" size="small">
-                                                    {{ config.type === 'webdav' ? 'WebDAV' : 'iCloud Drive' }}
-                                                </NTag>
-                                                <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
-                                                    {{ config.enabled ? '已启用' : '已禁用' }}
-                                                </NTag>
-                                            </NFlex>
-                                            <NText depth="3" style="font-size: 12px;">
-                                                {{ getConfigDescription(config) }}
-                                            </NText>
-                                        </NFlex>
-                                        
-                                        <template #action>
-                                            <NFlex justify="space-between" align="center" style="width: 100%;">
-                                                <NButton size="small" @click="testConnection(config)">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Wifi />
-                                                        </NIcon>
-                                                    </template>
-                                                    测试连接
-                                                </NButton>
-                                                <NButton size="small" @click="editConfig(config)">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Edit />
-                                                        </NIcon>
-                                                    </template>
-                                                    编辑
-                                                </NButton>
-                                                <NPopconfirm @positive-click="deleteConfig(config.id)" negative-text="取消" positive-text="确定">
-                                                    <template #trigger>
-                                                        <NButton type="error" secondary size="small">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Trash />
-                                                                </NIcon>
-                                                            </template>
-                                                            删除
-                                                        </NButton>
-                                                    </template>
-                                                    确定要删除这个存储配置吗？
-                                                </NPopconfirm>
-                                            </NFlex>
-                                        </template>
-                                    </NCard>
-                                </NGridItem>
-                            </NGrid>
-                        </NFlex>
-                    </div>
-
-                    <div v-else>
-                        <NText depth="3" style="font-size: 14px;">
-                            暂无存储配置，请先添加存储配置
-                        </NText>
-                    </div>
-                </NFlex>
-            </div>
-
-            <NDivider v-if="storageConfigs.length > 0"/>
-
             <!-- 云端备份管理 - 使用标签页结构 -->
             <div v-if="storageConfigs.length > 0">
                 <NFlex vertical :size="16">
@@ -206,6 +115,97 @@
                     </NTabs>
                 </NFlex>
             </div>
+
+            <NDivider v-if="storageConfigs.length > 0"/>
+
+            <!-- 存储配置管理 -->
+            <div>
+                <NFlex vertical :size="16">
+                    <NFlex vertical :size="12">
+                        <NText depth="2">云端存储配置</NText>
+                        <NText depth="3" style="font-size: 12px;">
+                            配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能
+                        </NText>
+                        
+                        <NFlex :size="12">
+                            <NButton type="primary" @click="showAddConfigModal">
+                                <template #icon>
+                                    <NIcon>
+                                        <Plus />
+                                    </NIcon>
+                                </template>
+                                添加存储配置
+                            </NButton>
+                        </NFlex>
+                    </NFlex>
+
+                    <!-- 存储配置列表 -->
+                    <div v-if="storageConfigs.length > 0">
+                        <NFlex vertical :size="12">
+                            <NText depth="2">已配置的存储</NText>
+                            <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
+                                <NGridItem v-for="config in storageConfigs" :key="config.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                    <NCard size="small" :title="config.name">
+                                        <NFlex vertical :size="8">
+                                            <NFlex align="center" :size="8">
+                                                <NTag :type="config.type === 'webdav' ? 'info' : 'success'" size="small">
+                                                    {{ config.type === 'webdav' ? 'WebDAV' : 'iCloud Drive' }}
+                                                </NTag>
+                                                <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
+                                                    {{ config.enabled ? '已启用' : '已禁用' }}
+                                                </NTag>
+                                            </NFlex>
+                                            <NText depth="3" style="font-size: 12px;">
+                                                {{ getConfigDescription(config) }}
+                                            </NText>
+                                        </NFlex>
+                                        
+                                        <template #action>
+                                            <NFlex justify="space-between" align="center" style="width: 100%;">
+                                                <NButton size="small" @click="testConnection(config)">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Wifi />
+                                                        </NIcon>
+                                                    </template>
+                                                    测试连接
+                                                </NButton>
+                                                <NButton size="small" @click="editConfig(config)">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Edit />
+                                                        </NIcon>
+                                                    </template>
+                                                    编辑
+                                                </NButton>
+                                                <NPopconfirm @positive-click="deleteConfig(config.id)" negative-text="取消" positive-text="确定">
+                                                    <template #trigger>
+                                                        <NButton type="error" secondary size="small">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            删除
+                                                        </NButton>
+                                                    </template>
+                                                    确定要删除这个存储配置吗？
+                                                </NPopconfirm>
+                                            </NFlex>
+                                        </template>
+                                    </NCard>
+                                </NGridItem>
+                            </NGrid>
+                        </NFlex>
+                    </div>
+
+                    <div v-else>
+                        <NText depth="3" style="font-size: 14px;">
+                            暂无存储配置，请先添加存储配置
+                        </NText>
+                    </div>
+                </NFlex>
+            </div>
         </NFlex>
 
         <!-- 添加/编辑配置模态框 -->
@@ -223,9 +223,6 @@
                     <!-- 配置名称 - 根据类型自动生成 -->
                     <NFormItem label="配置名称" path="name">
                         <NInput v-model:value="configForm.name" placeholder="配置名称将根据存储类型自动生成" />
-                        <NText depth="3" style="font-size: 12px;">
-                            当前名称：{{ getAutoGeneratedName() }}
-                        </NText>
                     </NFormItem>
 
                     <!-- WebDAV 配置 -->
@@ -257,9 +254,6 @@
                         
                         <NFormItem label="iCloud Drive 路径" path="path">
                             <NInput v-model:value="configForm.path" placeholder="AI-Gist-Backup" />
-                            <NText depth="3" style="font-size: 12px;">
-                                备份文件将直接保存在此文件夹中
-                            </NText>
                         </NFormItem>
                     </template>
 
@@ -474,6 +468,8 @@ const showAddConfigModal = () => {
         password: '',
         path: 'AI-Gist-Backup',
     };
+    // 自动生成配置名称
+    configForm.value.name = getAutoGeneratedName();
     showConfigModal.value = true;
 };
 
@@ -713,7 +709,7 @@ const handleTypeChange = () => {
     if (configForm.value.type === 'icloud' && (!configForm.value.path || configForm.value.path.trim() === '')) {
         configForm.value.path = 'AI-Gist-Backup';
     }
-    // 自动更新配置名称
+    // 自动更新配置名称（仅在新建时）
     if (!configForm.value.id) {
         configForm.value.name = getAutoGeneratedName();
     }
