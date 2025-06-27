@@ -3039,7 +3039,7 @@ __metadata:
     vitest: "npm:^3.2.3"
     vue: "npm:^3.3.8"
     vue-eslint-parser: "npm:^10.1.4"
-    webdav: "npm:^5.8.0"
+    webdav: "npm:^5.5.0"
     zod: "npm:^3.25.40"
   languageName: unknown
   linkType: soft
@@ -8660,7 +8660,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"webdav@npm:^5.8.0":
+"webdav@npm:^5.5.0":
   version: 5.8.0
   resolution: "webdav@npm:5.8.0"
   dependencies:

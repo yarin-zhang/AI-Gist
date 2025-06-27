@@ -12,11 +12,25 @@ export class WebDAVProvider implements CloudStorageProvider {
   }
 
   private async initClient() {
-    const webdav = await import('webdav');
-    this.client = webdav.createClient(this.config.url, {
-      username: this.config.username,
-      password: this.config.password,
-    });
+    try {
+      // 使用 eval 来动态导入 webdav 模块，避免 TypeScript 编译时的模块解析问题
+      const webdavModule = await eval('import("webdav")');
+      
+      // webdav 模块直接导出 createClient 方法
+      const { createClient } = webdavModule as any;
+      
+      if (typeof createClient !== 'function') {
+        throw new Error('webdav 模块没有导出 createClient 方法');
+      }
+
+      this.client = createClient(this.config.url, {
+        username: this.config.username,
+        password: this.config.password,
+      });
+    } catch (error) {
+      console.error('WebDAV 客户端初始化失败:', error);
+      throw new Error(`WebDAV 客户端初始化失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
   }
 
   private async ensureClient() {
