@@ -111,19 +111,56 @@
 
             <NDivider />
             
+            <!-- 完整备份导出/导入 -->
+            <div>
+                <NFlex vertical :size="16">
+                    <NFlex vertical :size="12">
+                        <NText depth="2">完整备份管理</NText>
+                        <NText depth="3" style="font-size: 12px; ">
+                            导出完整备份压缩包，或从压缩包导入完整备份。导出的数据将包含 AI 配置信息中的 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                        </NText>
+                        
+                        <NFlex :size="12">
+                            <NButton type="primary" @click="exportFullBackup" 
+                                     :loading="props.loading?.export">
+                                <template #icon>
+                                    <NIcon>
+                                        <Archive />
+                                    </NIcon>
+                                </template>
+                                导出完整备份
+                            </NButton>
+                            <NButton @click="importFullBackup" 
+                                     :loading="props.loading?.import">
+                                <template #icon>
+                                    <NIcon>
+                                        <Folder />
+                                    </NIcon>
+                                </template>
+                                导入完整备份
+                            </NButton>
+                        </NFlex>
+                        
+                        
+                    </NFlex>
+                </NFlex>
+            </div>
+
+            <NDivider />
+            
             <!-- 选择性数据导出 -->
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
                         <NText depth="2">选择性数据导出</NText>
                         <NText depth="3" style="font-size: 12px; ">
-                            从备份中选择特定数据类型进行导出，便于数据分享。但无法恢复到应用中。
+                            选择部分数据进行可读格式导出，暂时无法恢复到应用中。
                         </NText>
                         
                         <!-- 数据类型选择 -->
                         <NCard size="small" >
                             <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型（单选）：</NText>
+                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型：</NText>
                                 <NFlex vertical :size="8">
                                     <NRadio 
                                         :checked="exportOptions.selectedType === 'prompts'" 
@@ -183,54 +220,18 @@
                         </NFlex>
                         
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
-                            <template #header>⚠️ 安全提示</template>
+                            <template #header>安全提示</template>
                             您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
                         </NAlert>
                         
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
-                            <template #header>💡 格式说明</template>
+                            <template #header>格式说明</template>
                             AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。
                         </NAlert>
                     </NFlex>
                 </NFlex>
             </div>
 
-            <NDivider />
-            
-            <!-- 完整备份导出/导入 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">完整备份管理</NText>
-                        <NText depth="3" style="font-size: 12px; ">
-                            导出完整备份压缩包，或从压缩包导入完整备份。导出的数据将包含 AI 配置信息中的 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
-                        </NText>
-                        
-                        <NFlex :size="12">
-                            <NButton type="primary" @click="exportFullBackup" 
-                                     :loading="props.loading?.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <Archive />
-                                    </NIcon>
-                                </template>
-                                导出完整备份
-                            </NButton>
-                            <NButton @click="importFullBackup" 
-                                     :loading="props.loading?.import">
-                                <template #icon>
-                                    <NIcon>
-                                        <Folder />
-                                    </NIcon>
-                                </template>
-                                导入完整备份
-                            </NButton>
-                        </NFlex>
-                        
-                        
-                    </NFlex>
-                </NFlex>
-            </div>
 
             <NDivider />
 
@@ -240,7 +241,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">数据库维护</NText>
                         <NText depth="3" style="font-size: 12px">
-                            当遇到同步错误或数据异常时，可尝试修复数据库
+                            当遇到数据异常时，可尝试修复数据库
                         </NText>
                         <NFlex :size="12">
                             <NButton type="primary" @click="checkDatabaseHealth">

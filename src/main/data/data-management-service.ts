@@ -342,16 +342,40 @@ export class DataManagementService {
 
         // 选择导出路径
         ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
+            // 根据文件名扩展名动态设置过滤器
+            const fileExtension = defaultName.split('.').pop()?.toLowerCase();
+            let filters;
+            
+            console.log('selectExportPath 调用，默认文件名:', defaultName, '检测到的扩展名:', fileExtension);
+            
+            if (fileExtension === 'csv') {
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else if (fileExtension === 'json') {
+                filters = [
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else {
+                // 默认过滤器，包含所有支持的类型
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            }
+            
+            console.log('设置的文件过滤器:', filters);
+            
             const result = await dialog.showSaveDialog({
                 title: '选择导出路径',
                 defaultPath: defaultName,
-                filters: [
-                    { name: 'JSON 文件', extensions: ['json'] },
-                    { name: 'CSV 文件', extensions: ['csv'] },
-                    { name: '所有文件', extensions: ['*'] },
-                ],
+                filters: filters,
             });
 
+            console.log('保存对话框结果:', result.canceled ? '已取消' : result.filePath);
             return result.canceled ? null : result.filePath;
         });        // 获取数据统计
         ipcMain.handle('data:get-stats', async () => {
@@ -445,11 +469,13 @@ export class DataManagementService {
                 if (options.includeAIConfigs) selectedTypes.push('AI配置');
                 
                 const fileName = `AI-Gist-选择性导出-${selectedTypes.join('_')}-${timestamp}.${options.format}`;
+                console.log('生成的文件名:', fileName, '格式:', options.format);
                 
                 // 如果没有提供导出路径，则显示保存对话框
                 let finalExportPath = exportPath;
                 if (!finalExportPath) {
                     const { dialog } = await import('electron');
+                    console.log('显示保存对话框，默认路径:', fileName);
                     const result = await dialog.showSaveDialog({
                         title: '选择导出位置',
                         defaultPath: fileName,
@@ -464,6 +490,7 @@ export class DataManagementService {
                     }
                     
                     finalExportPath = result.filePath;
+                    console.log('用户选择的保存路径:', finalExportPath);
                 }
 
                 // 根据格式导出数据
