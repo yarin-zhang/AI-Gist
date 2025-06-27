@@ -39,64 +39,73 @@
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
                             <NText depth="2">备份版本列表</NText>
-                            <div v-for="backup in paginatedBackups" :key="backup.id" class="backup-item">
-                                <NCard size="small">
-                                    <NFlex justify="space-between" align="center">
+                            <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
+                                <NGridItem v-for="backup in paginatedBackups" :key="backup.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                    <NCard size="small" :title="backup.version" >
                                         <NFlex vertical :size="4">
                                             <NFlex align="center" :size="8">
                                                 <NText strong>{{ backup.name }}</NText>
-                                                <NTag type="info" size="small">{{ backup.version }}</NTag>
                                             </NFlex>
                                         </NFlex>
-                                        <NFlex :size="8">
-                                            <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
-                                                negative-text="取消" positive-text="确定恢复" placement="top"
-                                                :show-icon="false">
-                                                <template #trigger>
-                                                    <NButton type="primary" size="small"
-                                                        :loading="props.loading?.backup"
-                                                        :disabled="props.loading?.backup">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Recharging />
-                                                            </NIcon>
-                                                        </template>
-                                                        恢复
-                                                    </NButton>
-                                                </template>
-                                                <div style="max-width: 300px;">
-                                                    <p>恢复备份将会：</p>
-                                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                                        <li>自动备份当前数据</li>
-                                                        <li>完全覆盖现有数据库</li>
-                                                        <li>此操作不可撤销</li>
-                                                    </ul>
-                                                </div>
-                                            </NPopconfirm>
-                                            <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
-                                                positive-text="确定">
-                                                <template #trigger>
-                                                    <NButton type="error" size="small">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Trash />
-                                                            </NIcon>
-                                                        </template>
-                                                        删除
-                                                    </NButton>
-                                                </template>
-                                                确定要删除这个备份吗？
-                                            </NPopconfirm>
+                                        <template #header-extra>
+
+                                            <NFlex vertical :size="4">
+                                            <NFlex align="center" :size="8">
+                                                <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
+                                            </NFlex>
                                         </NFlex>
-                                    </NFlex>
-                                </NCard>
-                            </div>
+                                        </template>
+                                        
+                                        <template #action>
+                                            <NFlex justify="space-between" align="center" style="width: 100%;">
+                                                <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
+                                                    negative-text="取消" positive-text="确定恢复" placement="top"
+                                                    :show-icon="false">
+                                                    <template #trigger>
+                                                        <NButton type="primary" size="small"
+                                                            :loading="props.loading?.backup"
+                                                            :disabled="props.loading?.backup">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Recharging />
+                                                                </NIcon>
+                                                            </template>
+                                                            恢复
+                                                        </NButton>
+                                                    </template>
+                                                    <div style="max-width: 300px;">
+                                                        <p>注意！恢复备份将会：</p>
+                                                        <ul style="margin: 8px 0; padding-left: 20px;">
+                                                            <li>自动备份当前数据</li>
+                                                            <li>完全覆盖现有数据库</li>
+                                                        </ul>
+                                                    </div>
+                                                </NPopconfirm>
+                                                <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
+                                                    positive-text="确定">
+                                                    <template #trigger>
+                                                        <NButton type="error" secondary size="small">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            删除
+                                                        </NButton>
+                                                    </template>
+                                                    确定要删除这个备份吗？
+                                                </NPopconfirm>
+                                            </NFlex>
+                                        </template>
+                                    </NCard>
+                                </NGridItem>
+                            </NGrid>
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
                                 <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
-                                    :page-sizes="[5, 10, 20]" />
+                                    :page-sizes="[6, 12, 18]" />
                             </div>
                         </NFlex>
                     </div>
@@ -307,6 +316,8 @@ import {
     NPagination,
     NCheckbox,
     NRadio,
+    NGrid,
+    NGridItem,
 } from "naive-ui";
 import {
     FileExport,
@@ -323,6 +334,7 @@ import {
     Folder,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
+import { useWindowSize } from "@/composables/useWindowSize";
 
 // Props
 const props = defineProps<{
@@ -401,7 +413,7 @@ const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', check
 
 // 分页相关状态
 const currentPage = ref(1);
-const pageSize = 5;
+const pageSize = 6;
 
 // 计算分页数据
 const paginatedBackups = computed(() => {
@@ -502,14 +514,6 @@ defineExpose({
 </script>
 
 <style scoped>
-.backup-item {
-    margin-bottom: 8px;
-}
-
-.backup-item:last-child {
-    margin-bottom: 0;
-}
-
 .pagination-container {
     display: flex;
     justify-content: center;
