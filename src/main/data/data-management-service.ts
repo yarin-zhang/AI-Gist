@@ -471,8 +471,9 @@ export class DataManagementService {
                 if (options.format === 'json') {
                     exportContent = JSON.stringify(filteredData, null, 2);
                 } else if (options.format === 'csv') {
-                    // 简单的CSV导出（仅支持提示词数据）
+                    // CSV导出支持提示词和分类数据
                     if (options.includePrompts && filteredData.prompts) {
+                        // 导出提示词数据
                         const prompts = filteredData.prompts;
                         const csvHeaders = ['ID', '标题', '内容', '标签', '创建时间'];
                         const csvRows = [csvHeaders.join(',')];
@@ -489,8 +490,25 @@ export class DataManagementService {
                         });
                         
                         exportContent = csvRows.join('\n');
+                    } else if (options.includeCategories && filteredData.categories) {
+                        // 导出分类数据
+                        const categories = filteredData.categories;
+                        const csvHeaders = ['ID', '名称', '描述', '创建时间'];
+                        const csvRows = [csvHeaders.join(',')];
+                        
+                        categories.forEach((cat: any) => {
+                            const row = [
+                                cat.id || '',
+                                `"${(cat.name || '').replace(/"/g, '""')}"`,
+                                `"${(cat.description || '').replace(/"/g, '""')}"`,
+                                cat.createdAt || ''
+                            ];
+                            csvRows.push(row.join(','));
+                        });
+                        
+                        exportContent = csvRows.join('\n');
                     } else {
-                        throw new Error('CSV 格式目前仅支持导出提示词数据');
+                        throw new Error('CSV 格式目前仅支持导出提示词和分类数据');
                     }
                 } else {
                     throw new Error(`不支持的导出格式: ${options.format}`);

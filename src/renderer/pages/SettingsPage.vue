@@ -445,10 +445,9 @@ const exportData = async (format: 'json' | 'csv') => {
             }, exportPath);
             
             if (result.success) {
-                const sizeText = result.size ? ` (${(result.size / 1024 / 1024).toFixed(2)} MB)` : '';
-                message.success(result.message || `数据导出成功${sizeText}`);
+                message.success(`数据导出成功`);
             } else {
-                message.error(result.message || '数据导出失败');
+                message.error('数据导出失败');
             }
         }
     } catch (error) {
@@ -489,13 +488,16 @@ const exportSelected = async (format: 'json' | 'csv', options: any) => {
     loading.export = true;
     try {
         const defaultName = `ai-gist-selected-${new Date().toISOString().split('T')[0]}.${format}`;
-        const result = await DataManagementAPI.exportSelectedData(options, defaultName);
+        const exportPath = await DataManagementAPI.selectExportPath(defaultName);
         
-        if (result.success) {
-            const sizeText = result.size ? ` (${(result.size / 1024 / 1024).toFixed(2)} MB)` : '';
-            message.success(result.message || `选择性导出成功${sizeText}`);
-        } else {
-            message.error(result.message || '选择性导出失败');
+        if (exportPath) {
+            const result = await DataManagementAPI.exportSelectedData(options, exportPath);
+            
+            if (result.success) {
+                message.success(result.message || `选择性导出成功`);
+            } else {
+                message.error(result.message || '选择性导出失败');
+            }
         }
     } catch (error) {
         console.error('选择性导出失败:', error);
@@ -612,12 +614,11 @@ const restoreSpecificBackup = async (backupId: string) => {
         const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
 
         if (result.success) {
-            const successMessage = result.message || "备份恢复成功";
-            message.success(`${successMessage}。已自动备份原数据: ${autoBackup.name}`);
+            message.success(`备份恢复成功。已自动备份原数据: ${autoBackup.name}`);
             // 恢复成功后刷新备份列表
             await refreshBackupList();
         } else {
-            message.error(result.message || "备份恢复失败");
+            message.error("备份恢复失败");
         }
     } catch (error) {
         console.error("恢复备份失败:", error);

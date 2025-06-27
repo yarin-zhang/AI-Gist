@@ -161,7 +161,7 @@
                             <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" 
                                      type="primary" 
                                      @click="exportSelectedData('csv')" 
-                                     :disabled="!hasSelectedData" 
+                                     :disabled="!hasSelectedData || !isCSVSupported" 
                                      :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
@@ -382,6 +382,11 @@ const dataStats = ref({
 // 计算是否选择了数据
 const hasSelectedData = computed(() => {
     return exportOptions.value.selectedType !== '';
+});
+
+// 计算是否支持CSV导出（支持提示词和分类数据）
+const isCSVSupported = computed(() => {
+    return exportOptions.value.selectedType === 'prompts' || exportOptions.value.selectedType === 'categories';
 });
 
 // 处理类型选择

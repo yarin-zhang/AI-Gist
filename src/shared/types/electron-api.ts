@@ -65,19 +65,19 @@ export default interface ElectronApi {
   }
 
   data: {
-    createBackup: (description?: string) => Promise<{ success: boolean; backupId?: string; error?: string }>
-    getBackupList: () => Promise<{ success: boolean; backups?: any[]; error?: string }>
-    restoreBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
-    restoreBackupWithReplace: (backupId: string) => Promise<{ success: boolean; error?: string }>
+    createBackup: (description?: string) => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }>
+    getBackupList: () => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }[]>
+    restoreBackup: (backupId: string) => Promise<{ success: boolean; error?: string; message?: string }>
+    restoreBackupWithReplace: (backupId: string) => Promise<{ success: boolean; error?: string; message?: string }>
     deleteBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
-    export: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string }>
-    import: (filePath: string, options: any) => Promise<{ success: boolean; error?: string }>
-    exportSelected: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string }>
-    exportFullBackup: () => Promise<{ success: boolean; error?: string }>
-    importFullBackup: () => Promise<{ success: boolean; error?: string }>
+    export: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string; filePath?: string }>
+    import: (filePath: string, options: any) => Promise<{ success: boolean; error?: string; message?: string; imported?: { categories: number; prompts: number; settings: number; history: number }; errors?: string[] }>
+    exportSelected: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string; message?: string; filePath?: string }>
+    exportFullBackup: () => Promise<{ success: boolean; error?: string; message?: string; filePath?: string }>
+    importFullBackup: () => Promise<{ success: boolean; error?: string; message?: string }>
     selectImportFile: (format: string) => Promise<string | null>
     selectExportPath: (defaultName: string) => Promise<string | null>
-    getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+    getStats: () => Promise<{ categories: number; prompts: number; history: number; aiConfigs: number; settings: number; posts: number; users: number; totalRecords: number }>
     getBackupDirectory: () => Promise<{ success: boolean; path?: string; error?: string; message?: string }>
   }
 
