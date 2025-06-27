@@ -40,6 +40,7 @@ export class WebDAVProvider implements CloudStorageProvider {
   async testConnection(): Promise<boolean> {
     await this.ensureClient();
     try {
+      // 使用默认路径 / 进行连接测试
       await this.client.getDirectoryContents('/');
       return true;
     } catch (error) {
@@ -51,6 +52,7 @@ export class WebDAVProvider implements CloudStorageProvider {
   async listFiles(dirPath?: string): Promise<CloudFileInfo[]> {
     await this.ensureClient();
     try {
+      // 如果没有指定路径，使用默认路径 /
       const targetPath = dirPath || '/';
       const contents = await this.client.getDirectoryContents(targetPath);
       const files = Array.isArray(contents) ? contents : contents.data || [];

@@ -127,7 +127,24 @@ export class CloudBackupManager {
     // 测试存储连接
     ipcMain.handle('cloud:test-storage-connection', async (_, config: CloudStorageConfig) => {
       try {
-        const provider = this.createProvider(config);
+        // 确保配置对象只包含必要的属性，避免序列化问题
+        const cleanConfig: CloudStorageConfig = {
+          id: config.id,
+          name: config.name,
+          type: config.type,
+          enabled: config.enabled,
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt,
+          ...(config.type === 'webdav' ? {
+            url: (config as WebDAVConfig).url,
+            username: (config as WebDAVConfig).username,
+            password: (config as WebDAVConfig).password,
+          } : {
+            path: (config as ICloudConfig).path,
+          })
+        };
+
+        const provider = this.createProvider(cleanConfig);
         const isConnected = await provider.testConnection();
         return { success: isConnected };
       } catch (error) {

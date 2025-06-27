@@ -413,7 +413,7 @@ const editConfig = (config: CloudStorageConfig) => {
         url: config.type === 'webdav' ? (config as any).url : '',
         username: config.type === 'webdav' ? (config as any).username : '',
         password: config.type === 'webdav' ? (config as any).password : '',
-        path: config.type === 'webdav' ? (config as any).path : (config as any).path,
+        path: config.type === 'icloud' ? (config as any).path : '',
     };
     showConfigModal.value = true;
 };
@@ -477,7 +477,24 @@ const deleteConfig = async (id: string) => {
 
 const testConnection = async (config: CloudStorageConfig) => {
     try {
-        const result = await CloudBackupAPI.testStorageConnection(config);
+        // 创建一个干净的配置对象，只包含必要的属性，避免序列化问题
+        const cleanConfig: CloudStorageConfig = {
+            id: config.id,
+            name: config.name,
+            type: config.type,
+            enabled: config.enabled,
+            createdAt: config.createdAt,
+            updatedAt: config.updatedAt,
+            ...(config.type === 'webdav' ? {
+                url: (config as any).url,
+                username: (config as any).username,
+                password: (config as any).password,
+            } : {
+                path: (config as any).path,
+            })
+        };
+
+        const result = await CloudBackupAPI.testStorageConnection(cleanConfig);
         if (result.success) {
             message.success('连接测试成功');
         } else {
@@ -576,7 +593,7 @@ const deleteCloudBackup = async (backupId: string) => {
 
 const getConfigDescription = (config: CloudStorageConfig) => {
     if (config.type === 'webdav') {
-        return `${(config as any).url}${(config as any).path ? ' - ' + (config as any).path : ''}`;
+        return `${(config as any).url}`;
     } else {
         return `iCloud Drive${(config as any).path ? ' - ' + (config as any).path : ''}`;
     }
