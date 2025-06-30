@@ -67,7 +67,7 @@
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" ref="contentScrollbarRef">
                                     <NFlex vertical size="medium" style="padding-right: 12px">
                                         <NInput :value="filledContent" type="textarea" readonly :style="{
-                                            height: `${contentHeight - 180}px`,
+                                            height: `${contentHeight - 280}px`,
                                             fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                         }" :placeholder="!filledContent ? '内容为空' : ''" />
 
@@ -101,22 +101,59 @@
                                                     />
                                                 </NFlex>
                                                 
-                                                <!-- 调试按钮 -->
-                                                <NFlex justify="center">
-                                                    <NButton 
-                                                        type="primary" 
-                                                        :loading="debugging"
-                                                        :disabled="!canDebug || debugging || !selectedModelKey"
-                                                        @click="debugPrompt"
-                                                        size="small"
-                                                    >
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Robot />
+                                                <!-- 调试按钮和进度显示 -->
+                                                <NFlex justify="center" vertical size="small">
+                                                    <!-- 调试按钮 -->
+                                                    <NFlex size="small" justify="center">
+                                                        <NButton 
+                                                            type="primary" 
+                                                            :loading="debugging"
+                                                            :disabled="!canDebug || debugging || !selectedModelKey"
+                                                            @click="debugPrompt"
+                                                            size="small"
+                                                        >
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Robot />
+                                                                </NIcon>
+                                                            </template>
+                                                            {{ debugging ? '调试中...' : '看看效果' }}
+                                                        </NButton>
+                                                        
+                                                        <!-- 中断按钮 -->
+                                                        <NButton 
+                                                            v-if="debugging"
+                                                            type="error" 
+                                                            secondary
+                                                            @click="stopDebug"
+                                                            size="small"
+                                                        >
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <X />
+                                                                </NIcon>
+                                                            </template>
+                                                            停止
+                                                        </NButton>
+                                                    </NFlex>
+                                                    
+                                                    <!-- 流式传输进度显示 -->
+                                                    <div v-if="debugging && debugStreaming" style="margin-top: 8px;">
+                                                        <NFlex align="center" size="small">
+                                                            <NIcon v-if="debugStreamStats.isGenerationActive" color="#18a058">
+                                                                <Loader />
                                                             </NIcon>
-                                                        </template>
-                                                        {{ debugging ? '调试中...' : '看看效果' }}
-                                                    </NButton>
+                                                            <NIcon v-else color="#d03050">
+                                                                <Clock />
+                                                            </NIcon>
+                                                            <NText depth="3" style="font-size: 12px;">
+                                                                已生成 {{ debugStreamStats.charCount }} 字符
+                                                                <span v-if="debugStreamStats.contentGrowthRate > 0">
+                                                                    ({{ debugStreamStats.contentGrowthRate.toFixed(1) }} 字符/秒)
+                                                                </span>
+                                                            </NText>
+                                                        </NFlex>
+                                                    </div>
                                                 </NFlex>
                                             </NFlex>
                                         </NAlert>
@@ -133,6 +170,9 @@
                                                             <CircleCheck />
                                                         </NIcon>
                                                         <NText>AI 响应</NText>
+                                                        <NTag v-if="debugStreaming" size="small" type="info" style="margin-left: 8px;">
+                                                            流式传输
+                                                        </NTag>
                                                     </NFlex>
                                                 </template>
                                                 <NInput
@@ -146,17 +186,33 @@
                                                         marginTop: '8px'
                                                     }"
                                                 />
-                                                <template #action>
-                                                    <NButton size="small" @click="copyToClipboard(debugResult)">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Copy />
-                                                            </NIcon>
-                                                        </template>
-                                                        复制结果
-                                                    </NButton>
-                                                </template>
                                             </NAlert>
+                                            
+                                            <!-- 调试结果操作按钮 -->
+                                            <NFlex v-if="debugResult" justify="space-between" style="margin-top: 8px;">
+                                                <NButton size="small" @click="copyToClipboard(debugResult)">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Copy />
+                                                        </NIcon>
+                                                    </template>
+                                                    复制结果
+                                                </NButton>
+                                                <NButton 
+                                                    v-if="debugging" 
+                                                    size="small" 
+                                                    type="error" 
+                                                    secondary
+                                                    @click="stopDebug"
+                                                >
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <X />
+                                                        </NIcon>
+                                                    </template>
+                                                    停止
+                                                </NButton>
+                                            </NFlex>
 
                                             <!-- 错误结果 -->
                                             <NAlert v-if="debugError" type="error" :show-icon="false">
@@ -764,11 +820,15 @@ import {
     CircleCheck,
     AlertTriangle,
     Plus,
+    X,
+    Loader,
+    Clock,
 } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
+import type { AIGenerationHistory } from "../../../shared/types/ai";
 
 interface Props {
     show: boolean;
@@ -791,9 +851,13 @@ const message = useMessage();
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors();
 
 // 响应式数据
-const variableValues = ref({});
-const useHistory = ref([]);
-const debugHistory = ref([]); // 调试历史记录
+const variableValues = ref<Record<string, any>>({});
+const useHistory = ref<Array<{
+    date: string;
+    content: string;
+    variables: Record<string, any>;
+}>>([]);
+const debugHistory = ref<AIGenerationHistory[]>([]); // 调试历史记录
 const activeTab = ref("detail"); // 默认显示详情页面
 const selectedHistoryIndex = ref(-1);
 const selectedDebugIndex = ref(-1); // 选中的调试记录索引
@@ -802,6 +866,24 @@ const selectedDebugIndex = ref(-1); // 选中的调试记录索引
 const debugging = ref(false);
 const debugResult = ref("");
 const debugError = ref("");
+
+// 流式调试相关状态
+const debugStreaming = ref(false);
+const debugStreamStats = ref({
+    charCount: 0,
+    isStreaming: true,
+    lastCharCount: 0,
+    noContentUpdateCount: 0,
+    lastUpdateTime: Date.now(),
+    isGenerationActive: true,
+    contentGrowthRate: 0
+});
+
+// 调试中断控制
+const debugGenerationControl = ref({
+    shouldStop: false,
+    abortController: null as AbortController | null
+});
 
 // 手动记录相关状态
 const showManualRecordModal = ref(false);
@@ -877,7 +959,7 @@ const selectedDebugHistory = computed(() => {
 });
 
 // 处理页面大小变化
-const handlePageSizeChange = (newPageSize) => {
+const handlePageSizeChange = (newPageSize: number) => {
     pageSize.value = newPageSize;
     currentPage.value = 1;
     selectedHistoryIndex.value = -1;
@@ -890,8 +972,8 @@ const initializeVariables = () => {
         return;
     }
 
-    const values = {};
-    props.prompt.variables.forEach((variable) => {
+    const values: Record<string, any> = {};
+    props.prompt.variables.forEach((variable: any) => {
         // 确保每个变量都有初始值，即使是空字符串
         values[variable.name] = variable.defaultValue || "";
     });
@@ -902,16 +984,16 @@ const initializeVariables = () => {
 };
 
 // 获取选择框选项
-const getSelectOptions = (options) => {
+const getSelectOptions = (options: any) => {
     if (!options) return [];
     // 如果是数组，直接使用；如果是字符串，按逗号分割
     const optionsArray = Array.isArray(options)
         ? options
         : options
             .split(",")
-            .map((opt) => opt.trim())
-            .filter((opt) => opt);
-    return optionsArray.map((option) => ({
+            .map((opt: string) => opt.trim())
+            .filter((opt: string) => opt);
+    return optionsArray.map((option: string) => ({
         label: option,
         value: option,
     }));
@@ -988,7 +1070,7 @@ const clearVariables = () => {
 };
 
 // 复制到剪贴板
-const copyToClipboard = async (text) => {
+const copyToClipboard = async (text: string) => {
     try {
         await navigator.clipboard.writeText(text);
         message.success("已复制到剪贴板");
@@ -1012,7 +1094,7 @@ const loadDebugHistory = async () => {
 };
 
 // 选择调试记录
-const selectDebugRecord = (index) => {
+const selectDebugRecord = (index: number) => {
     selectedDebugIndex.value = index;
     // 同时取消选择使用记录
     selectedHistoryIndex.value = -1;
@@ -1046,7 +1128,7 @@ const deleteDebugRecord = async () => {
     }
 };
 
-// 调试提示词功能
+// 调试提示词功能（支持流式传输）
 const debugPrompt = async () => {
     if (!canDebug.value) {
         message.warning("请先完成变量填写");
@@ -1067,8 +1149,24 @@ const debugPrompt = async () => {
     }
 
     debugging.value = true;
+    debugStreaming.value = true;
     debugResult.value = "";
     debugError.value = "";
+
+    // 重置流式传输状态
+    Object.assign(debugStreamStats.value, {
+        charCount: 0,
+        isStreaming: true,
+        lastCharCount: 0,
+        noContentUpdateCount: 0,
+        lastUpdateTime: Date.now(),
+        isGenerationActive: true,
+        contentGrowthRate: 0
+    });
+
+    // 重置生成控制状态
+    debugGenerationControl.value.shouldStop = false;
+    debugGenerationControl.value.abortController = new AbortController();
 
     try {
         console.log("开始调试提示词:", filledContent.value);
@@ -1081,7 +1179,7 @@ const debugPrompt = async () => {
             baseURL: selectedConfig.baseURL || '',
             apiKey: selectedConfig.apiKey || '',
             secretKey: selectedConfig.secretKey || '',
-            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map((m: any) => String(m)) : [],
             defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
             customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
             enabled: Boolean(selectedConfig.enabled),
@@ -1103,10 +1201,120 @@ const debugPrompt = async () => {
         console.log("请求参数:", request);
         console.log("配置参数:", serializedConfig);
 
-        // 调用AI接口 - 传递两个分离的参数：request 和 config
-        const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        let result;
         
-        debugResult.value = result.generatedPrompt;
+        // 检查是否支持流式传输
+        if ((window as any).electronAPI?.ai?.generatePromptStream) {
+            console.log('使用流式传输模式进行调试');
+            
+            // 使用流式传输
+            result = await (window as any).electronAPI.ai.generatePromptStream(
+                request,
+                serializedConfig,
+                (charCount: number, partialContent?: string) => {
+                    // 检查是否应该停止
+                    if (debugGenerationControl.value.shouldStop) {
+                        console.log('检测到停止信号，中断调试流式传输');
+                        return false; // 返回 false 表示停止流式传输
+                    }
+                    
+                    const now = Date.now();
+                    console.log('调试流式传输回调:', {
+                        charCount,
+                        hasContent: !!partialContent,
+                        contentLength: partialContent?.length || 0,
+                        contentPreview: partialContent?.substring(0, 50) || 'null',
+                        timeSinceLastUpdate: now - debugStreamStats.value.lastUpdateTime
+                    });
+
+                    // 更新时间统计
+                    const prevCharCount = debugStreamStats.value.charCount;
+                    const prevUpdateTime = debugStreamStats.value.lastUpdateTime;
+                    debugStreamStats.value.charCount = charCount;
+                    debugStreamStats.value.lastUpdateTime = now;
+                    
+                    // 计算内容增长速率
+                    if (prevUpdateTime > 0 && charCount > prevCharCount) {
+                        const timeDiff = (now - prevUpdateTime) / 1000;
+                        const charDiff = charCount - prevCharCount;
+                        debugStreamStats.value.contentGrowthRate = timeDiff > 0 ? charDiff / timeDiff : 0;
+                    }
+
+                    // 检测是否有真实内容
+                    const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
+                    
+                    // 判断生成是否活跃
+                    debugStreamStats.value.isGenerationActive = hasRealContent || 
+                        (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
+
+                    if (hasRealContent) {
+                        // 有真实内容时直接更新调试结果
+                        debugResult.value = partialContent;
+                        debugStreamStats.value.noContentUpdateCount = 0;
+                        console.log('✅ 调试内容已更新，当前长度:', partialContent.length);
+                    } else {
+                        // 没有内容时的处理
+                        debugStreamStats.value.noContentUpdateCount++;
+                        
+                        if (charCount > prevCharCount) {
+                            // 字符数在增长，说明正在生成
+                            const placeholderText = `正在调试中... (已生成 ${charCount} 字符)`;
+                            if (debugStreamStats.value.noContentUpdateCount > 3 && !debugResult.value) {
+                                debugResult.value = placeholderText;
+                                console.log('📝 显示调试占位符:', placeholderText);
+                            }
+                        }
+                    }
+
+                    return true; // 继续生成
+                }
+            );
+            
+            console.log('调试流式传输完成，最终结果:', {
+                success: !!result,
+                contentLength: result?.generatedPrompt?.length || 0
+            });
+
+            // 如果流式传输过程中没有获得内容，但最终结果有内容，则立即显示
+            if (result && result.generatedPrompt &&
+                (!debugResult.value || debugResult.value.startsWith('正在调试中...'))) {
+                console.log('🔧 调试流式传输未提供内容，使用最终结果');
+                debugResult.value = result.generatedPrompt;
+            }
+        } else {
+            console.log('使用普通生成模式进行调试');
+            // 使用普通生成
+            result = await (window as any).electronAPI.ai.generatePrompt(request, serializedConfig);
+            
+            // 模拟流式更新
+            if (result?.generatedPrompt) {
+                const content = result.generatedPrompt;
+                const totalChars = content.length;
+                const steps = Math.min(30, totalChars);
+                const stepSize = Math.ceil(totalChars / steps);
+                
+                for (let i = 0; i < steps; i++) {
+                    if (debugGenerationControl.value.shouldStop) break;
+                    
+                    const currentCharCount = Math.min((i + 1) * stepSize, totalChars);
+                    const partialContent = content.substring(0, currentCharCount);
+                    
+                    debugStreamStats.value.charCount = currentCharCount;
+                    debugResult.value = partialContent;
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
+                // 确保显示完整内容
+                debugResult.value = content;
+            }
+        }
+        
+        // 确保最终结果正确显示
+        if (result?.generatedPrompt) {
+            debugResult.value = result.generatedPrompt;
+        }
+        
         message.success("调试完成");
 
         // 保存调试结果到AI生成历史记录
@@ -1119,13 +1327,14 @@ const debugPrompt = async () => {
             status: 'success',
             debugResult: result.generatedPrompt, // AI的响应结果
             debugStatus: 'success',
-            customPrompt: `调试提示词内容：\n${filledContent.value}`
+            customPrompt: `调试提示词内容：\n${filledContent.value}`,
+            uuid: `debug_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` // 添加uuid字段
         });
 
         // 刷新调试历史记录
         await loadDebugHistory();
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("调试失败:", error);
         debugError.value = error.message || "调试失败";
         message.error("调试失败: " + (error.message || "未知错误"));
@@ -1143,18 +1352,44 @@ const debugPrompt = async () => {
                     status: 'error',
                     errorMessage: error.message || "调试失败",
                     debugStatus: 'error',
-                    debugErrorMessage: error.message || "调试失败"
+                    debugErrorMessage: error.message || "调试失败",
+                    uuid: `debug_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` // 添加uuid字段
                 });
                 
                 // 刷新调试历史记录
                 await loadDebugHistory();
             }
-        } catch (saveError) {
+        } catch (saveError: any) {
             console.error("保存调试失败记录时出错:", saveError);
         }
     } finally {
         debugging.value = false;
+        debugStreaming.value = false;
+        
+        // 清理生成控制状态
+        debugGenerationControl.value.shouldStop = false;
+        if (debugGenerationControl.value.abortController) {
+            debugGenerationControl.value.abortController = null;
+        }
+        
+        // 清理流式传输状态
+        debugStreamStats.value.isStreaming = false;
+        debugStreamStats.value.charCount = 0;
+        debugStreamStats.value.lastCharCount = 0;
+        debugStreamStats.value.noContentUpdateCount = 0;
+        debugStreamStats.value.lastUpdateTime = 0;
+        debugStreamStats.value.isGenerationActive = false;
+        debugStreamStats.value.contentGrowthRate = 0;
     }
+};
+
+// 中断调试
+const stopDebug = () => {
+    debugGenerationControl.value.shouldStop = true;
+    if (debugGenerationControl.value.abortController) {
+        debugGenerationControl.value.abortController.abort();
+    }
+    message.info("正在停止调试...");
 };
 
 // 使用 Prompt
@@ -1217,14 +1452,14 @@ const toggleFavorite = async () => {
 };
 
 // 加载历史记录
-const loadHistoryRecord = (record) => {
+const loadHistoryRecord = (record: any) => {
     variableValues.value = { ...record.variables };
     activeTab.value = "detail"; // 切换到详情页面
     message.success("已加载历史记录");
 };
 
 // 选择历史记录
-const selectHistoryRecord = (index) => {
+const selectHistoryRecord = (index: number) => {
     selectedHistoryIndex.value = index;
     // 取消选择调试记录
     selectedDebugIndex.value = -1;
@@ -1266,7 +1501,7 @@ const deleteHistoryRecord = async () => {
 };
 
 // 格式化日期
-const formatDate = (date) => {
+const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleString("zh-CN");
 };
 
@@ -1360,8 +1595,9 @@ const saveManualRecord = async () => {
         savingManualRecord.value = true;
 
         // 构建符合AIGenerationHistory接口的数据
+        const manualHistoryId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const historyData = {
-            historyId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            historyId: manualHistoryId,
             configId: 'manual', // 手动记录使用特殊的configId
             topic: `手动调试记录: ${manualRecordData.value.title}`,
             generatedPrompt: filledContent.value, // 当前填充后的提示词内容
@@ -1370,7 +1606,8 @@ const saveManualRecord = async () => {
             status: manualRecordData.value.status,
             debugResult: manualRecordData.value.result,
             debugStatus: manualRecordData.value.status,
-            debugErrorMessage: manualRecordData.value.status === 'error' ? manualRecordData.value.notes : undefined
+            debugErrorMessage: manualRecordData.value.status === 'error' ? manualRecordData.value.notes : undefined,
+            uuid: manualHistoryId // 使用相同的ID作为uuid
         };
 
         // 保存到数据库
@@ -1390,7 +1627,7 @@ const saveManualRecord = async () => {
         showManualRecordModal.value = false;
         message.success("手动调试记录已保存");
         
-    } catch (error) {
+    } catch (error: any) {
         console.error("保存手动调试记录失败:", error);
         message.error("保存调试记录失败: " + (error.message || "未知错误"));
     } finally {

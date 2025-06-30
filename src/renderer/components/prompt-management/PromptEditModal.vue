@@ -31,7 +31,7 @@
                                                     placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" 
                                                     show-count
                                                     :style="{ 
-                                                        height: `${contentHeight - 250}px`, 
+                                                        height: `${contentHeight - 280}px`, 
                                                         fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                                         backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
                                                         border: isStreaming ? '1px solid var(--success-color)' : undefined
