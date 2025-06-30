@@ -53,6 +53,13 @@
                                 </NIcon>
                             </template>
                         </NButton>
+                        <NButton :type="viewMode === 'tree' ? 'primary' : 'default'" @click="setViewMode('tree')">
+                            <template #icon>
+                                <NIcon>
+                                    <Folder />
+                                </NIcon>
+                            </template>
+                        </NButton>
                     </NButtonGroup>
                 </NFlex>
                 <!-- 搜索提示信息 -->
@@ -98,13 +105,13 @@
                                 <NTag v-for="category in categories" :key="category.id" size="small" :bordered="false"
                                     :checked="selectedCategory === category.id" checkable
                                     :color="getCategoryTagColor(category)"
-                                    @click="handleCategoryQuickFilter(category.id)" style="cursor: pointer;">
+                                    @click="handleCategoryQuickFilter(category.id || null)" style="cursor: pointer;">
                                     <template #icon>
                                         <NIcon>
                                             <Box />
                                         </NIcon>
                                     </template>
-                                    {{ category.name }} ({{ getCategoryPromptCount(category.id) }})
+                                    {{ category.name }} ({{ getCategoryPromptCount(category.id || null) }})
                                 </NTag>
                             </NFlex>
                         </div>
@@ -146,7 +153,10 @@
         <div v-if="initialLoading" style="text-align: center; padding: 40px;">
             <NSpin size="large" />
         </div>
-        <div v-else-if="prompts.length === 0 && !hasNextPage" style="text-align: center; padding: 40px;">
+        <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) || 
+                       (viewMode === 'tree' && treeData.length === 0) || 
+                       (viewMode === 'table' && prompts.length === 0)" 
+             style="text-align: center; padding: 40px;">
             <NEmpty description="暂无提示词，快来创建第一个吧！" />
         </div>
         <div v-else>
@@ -173,11 +183,27 @@
                         </NFlex>
                     </NFlex>
                 </NCard>
-            </div> <!-- 表格视图 -->
-            <div v-if="viewMode === 'table'" style="margin-top: 16px;">
+            </div>
+
+            <!-- 树形表格视图 -->
+            <div v-if="viewMode === 'tree'" style="margin-top: 16px;">
+                <NDataTable 
+                    :columns="treeTableColumns" 
+                    :data="treeData" 
+                    :loading="initialLoading"
+                    :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
+                    v-model:checked-row-keys="selectedRowKeys"
+                    :max-height="600" 
+                    :scroll-x="1200" 
+                    :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+                    default-expand-all />
+            </div>
+
+            <!-- 表格视图 -->
+            <div v-else-if="viewMode === 'table'" style="margin-top: 16px;">
                 <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
-                    :row-key="(row: any) => row.id" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination"  :max-height="600" :scroll-x="1200" remote />
+                    :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
+                    :pagination="tablePagination" :max-height="600" :scroll-x="1200" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
@@ -192,7 +218,7 @@
 
                             <template #header-extra>
                                 <NFlex size="small">
-                                    <NButton size="small" text @click.stop="toggleFavorite(prompt.id)"
+                                    <NButton size="small" text @click.stop="toggleFavorite(prompt.id!)"
                                         :type="prompt.isFavorite ? 'error' : 'default'">
                                         <template #icon>
                                             <NIcon>
@@ -233,7 +259,7 @@
                                 <NFlex justify="space-between" align="center">
                                     <!-- 标签区域 -->
                                     <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
-                                        <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
+                                        <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small" type="info">
                                             {{ prompt.variables.length }} 个变量
                                         </NTag>
                                         <NTag v-if="prompt.category" size="small"
@@ -321,12 +347,20 @@ import {
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
+import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
 
 interface Emits {
     (e: 'edit', prompt: any): void
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
     (e: 'manage-categories'): void
+}
+
+// 树形数据结构类型
+interface TreeNode {
+    type: 'category' | 'prompt';
+    data: CategoryWithRelations | PromptWithRelations;
+    children?: TreeNode[];
 }
 
 const emit = defineEmits<Emits>()
@@ -337,21 +371,26 @@ const { waitForDatabase } = useDatabase()
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
 // 响应式数据
-const prompts = ref([])
-const categories = ref([])
-const statistics = ref({
+const prompts = ref<PromptWithRelations[]>([])
+const categories = ref<CategoryWithRelations[]>([])
+const treeData = ref<TreeNode[]>([])
+const statistics = ref<{
+    totalCount: number;
+    categoryStats: Array<{id: string | null, name: string, count: number}>;
+    popularTags: Array<{name: string, count: number}>;
+}>({
     totalCount: 0,
     categoryStats: [],
     popularTags: []
-}) // 统计信息
+})
 const initialLoading = ref(false) // 首次加载状态
 const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
-const selectedCategory = ref(null)
+const selectedCategory = ref<number | null>(null)
 const showFavoritesOnly = ref(false)
 
 // 排序相关状态
-const sortType = ref('timeDesc') // 默认按时间倒序排序
+const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
 const sortOptions = [
     { label: '最新优先', value: 'timeDesc' },
     { label: '最早优先', value: 'timeAsc' },
@@ -374,12 +413,12 @@ const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
 const tagsExpanded = ref(true) // 高级筛选开启时默认展开
 
 // 视图模式状态
-const viewMode = ref('grid') // 'grid' | 'table'
+const viewMode = ref<'grid' | 'table' | 'tree'>('tree') // 'grid' | 'table' | 'tree'
 
 // 表格多选相关状态
-const selectedRowKeys = ref([])
+const selectedRowKeys = ref<(string | number)[]>([])
 const selectedRows = computed(() => {
-    return prompts.value.filter(prompt => selectedRowKeys.value.includes(prompt.id))
+    return prompts.value.filter(prompt => selectedRowKeys.value.includes(prompt.id!))
 })
 
 // 表格分页配置
@@ -391,7 +430,7 @@ const tablePagination = computed(() => ({
     pageSizes: [10, 20, 50, 100],
     showQuickJumper: true,
     pageSlot: 7,
-    prefix: ({ itemCount }) => `共 ${itemCount} 项`,
+    prefix: ({ itemCount }: { itemCount: number | undefined }) => `共 ${itemCount || 0} 项`,
     onUpdatePage: (page: number) => {
         console.log('Table pagination page changed to:', page)
         currentPage.value = page
@@ -409,21 +448,21 @@ const tablePagination = computed(() => ({
 const categoryOptions = computed(() => [
     { label: '全部分类', value: null },
     ...categories.value.map(cat => ({
-        label: `${cat.name} (${cat._count?.prompts || 0})`,
+        label: `${cat.name} (${cat.prompts?.length || 0})`,
         value: cat.id
     }))
 ])
 
 // 获取分类名称
-const getCategoryName = (categoryId: string | null) => {
+const getCategoryName = (categoryId: number | null) => {
     if (!categoryId) return '全部分类'
     const category = categories.value.find(cat => cat.id === categoryId)
     return category?.name || '未知分类'
 }
 
 // 获取分类下的提示词数量
-const getCategoryPromptCount = (categoryId: string | null) => {
-    const categoryStats = statistics.value.categoryStats.find(stat => stat.id === categoryId)
+const getCategoryPromptCount = (categoryId: number | null) => {
+    const categoryStats = statistics.value.categoryStats.find(stat => stat.id === categoryId?.toString())
     return categoryStats ? categoryStats.count : 0
 }
 
@@ -441,10 +480,215 @@ const popularTags = computed(() => {
     return statistics.value.popularTags || []
 })
 
+// 树形表格列定义
+const treeTableColumns = computed(() => [
+    {
+        type: 'selection' as const
+    },
+    {
+        title: '名称',
+        key: 'name',
+        width: 300,
+        ellipsis: {
+            tooltip: true
+        },
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                const category = row.data as CategoryWithRelations
+                return h(
+                    NFlex,
+                    { align: 'center', size: 'small' },
+                    {
+                        default: () => [
+                            h(NIcon, { size: 16, color: category.color }, { default: () => h(Folder) }),
+                            h(NText, { strong: true }, { default: () => category.name }),
+                            h(NTag, { size: 'small', type: 'info' }, { default: () => `${category.prompts?.length || 0} 个提示词` })
+                        ]
+                    }
+                )
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return h(
+                    NButton,
+                    {
+                        text: true,
+                        type: 'primary',
+                        onClick: () => emit('view', prompt)
+                    },
+                    { default: () => prompt.title }
+                )
+            }
+        }
+    },
+    {
+        title: '描述',
+        key: 'description',
+        width: 300,
+        ellipsis: {
+            tooltip: true
+        },
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                const category = row.data as CategoryWithRelations
+                return category.description || '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                if (prompt.description) {
+                    return prompt.description
+                }
+                const preview = prompt.content?.substring(0, 100) || ''
+                return preview + (prompt.content?.length > 100 ? '...' : '')
+            }
+        }
+    },
+    {
+        title: '标签',
+        key: 'tags',
+        width: 200,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                if (!prompt.tags) return '-'
+                const tags = getTagsArray(prompt.tags)
+                if (tags.length === 0) return '-'
+                return h(
+                    NFlex,
+                    { size: 'small', wrap: true },
+                    {
+                        default: () => tags.slice(0, 3).map(tag =>
+                            h(
+                                NTag,
+                                {
+                                    size: 'small',
+                                    bordered: false,
+                                    color: getTagColor(tag),
+                                    class: isTagMatched(tag) ? 'highlighted-tag' : ''
+                                },
+                                {
+                                    default: () => tag,
+                                    icon: () => h(NIcon, null, { default: () => h(Tag) })
+                                }
+                            )
+                        ).concat(
+                            tags.length > 3 ? [h(NText, { depth: 3, style: { fontSize: '12px' } }, { default: () => `+${tags.length - 3}` })] : []
+                        )
+                    }
+                )
+            }
+        }
+    },
+    {
+        title: '变量',
+        key: 'variables',
+        width: 80,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                const count = prompt.variables?.length || 0
+                return count > 0 ? h(
+                    NTag,
+                    { size: 'small', type: 'info' },
+                    { default: () => `${count}个` }
+                ) : '-'
+            }
+        }
+    },
+    {
+        title: '收藏',
+        key: 'isFavorite',
+        width: 80,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return h(
+                    NButton,
+                    {
+                        size: 'small',
+                        text: true,
+                        type: prompt.isFavorite ? 'error' : 'default',
+                        onClick: (e: Event) => {
+                            e.stopPropagation()
+                            toggleFavorite(prompt.id!)
+                        }
+                    },
+                    {
+                        icon: () => h(NIcon, null, { default: () => h(Heart) })
+                    }
+                )
+            }
+        }
+    },
+    {
+        title: '使用次数',
+        key: 'useCount',
+        width: 100,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return `${prompt.useCount || 0} 次`
+            }
+        }
+    },
+    {
+        title: '更新时间',
+        key: 'updatedAt',
+        width: 120,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                const category = row.data as CategoryWithRelations
+                return new Date(category.updatedAt).toLocaleDateString()
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return new Date(prompt.updatedAt).toLocaleDateString()
+            }
+        }
+    },
+    {
+        title: '操作',
+        key: 'actions',
+        width: 120,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return h(
+                    NDropdown,
+                    {
+                        options: getPromptActions(prompt),
+                        onSelect: (key: string) => handlePromptAction(key, prompt)
+                    },
+                    {
+                        default: () => h(
+                            NButton,
+                            {
+                                size: 'small',
+                                text: true,
+                                onClick: (e: Event) => e.stopPropagation()
+                            },
+                            {
+                                icon: () => h(NIcon, null, { default: () => h(DotsVertical) })
+                            }
+                        )
+                    }
+                )
+            }
+        }
+    }
+])
+
 // 表格列定义
 const tableColumns = computed(() => [
     {
-        type: 'selection'
+        type: 'selection' as const
     },
     {
         title: '标题',
@@ -453,7 +697,7 @@ const tableColumns = computed(() => [
         ellipsis: {
             tooltip: true
         },
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             return h(
                 NButton,
                 {
@@ -472,7 +716,7 @@ const tableColumns = computed(() => [
         ellipsis: {
             tooltip: true
         },
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             if (row.description) {
                 return row.description
             }
@@ -484,7 +728,7 @@ const tableColumns = computed(() => [
         title: '分类',
         key: 'category',
         width: 120,
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             if (!row.category) return '-'
             return h(
                 NTag,
@@ -493,7 +737,7 @@ const tableColumns = computed(() => [
                     color: getCategoryTagColor(row.category)
                 },
                 {
-                    default: () => row.category.name,
+                    default: () => row.category!.name,
                     icon: () => h(NIcon, null, { default: () => h(Box) })
                 }
             )
@@ -503,7 +747,7 @@ const tableColumns = computed(() => [
         title: '标签',
         key: 'tags',
         width: 200,
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             if (!row.tags) return '-'
             const tags = getTagsArray(row.tags)
             if (tags.length === 0) return '-'
@@ -536,7 +780,7 @@ const tableColumns = computed(() => [
         title: '变量',
         key: 'variables',
         width: 80,
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             const count = row.variables?.length || 0
             return count > 0 ? h(
                 NTag,
@@ -549,7 +793,7 @@ const tableColumns = computed(() => [
         title: '收藏',
         key: 'isFavorite',
         width: 80,
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             return h(
                 NButton,
                 {
@@ -558,7 +802,7 @@ const tableColumns = computed(() => [
                     type: row.isFavorite ? 'error' : 'default',
                     onClick: (e: Event) => {
                         e.stopPropagation()
-                        toggleFavorite(row.id)
+                        toggleFavorite(row.id!)
                     }
                 },
                 {
@@ -572,20 +816,20 @@ const tableColumns = computed(() => [
         key: 'useCount',
         width: 100,
         sorter: true,
-        render: (row: any) => `${row.useCount || 0} 次`
+        render: (row: PromptWithRelations) => `${row.useCount || 0} 次`
     },
     {
         title: '更新时间',
         key: 'updatedAt',
         width: 120,
         sorter: true,
-        render: (row: any) => new Date(row.updatedAt).toLocaleDateString()
+        render: (row: PromptWithRelations) => new Date(row.updatedAt).toLocaleDateString()
     },
     {
         title: '操作',
         key: 'actions',
         width: 120,
-        render: (row: any) => {
+        render: (row: PromptWithRelations) => {
             return h(
                 NDropdown,
                 {
@@ -609,6 +853,22 @@ const tableColumns = computed(() => [
         }
     }
 ])
+
+// 加载树形数据
+const loadTreeData = async () => {
+    try {
+        initialLoading.value = true
+        treeData.value = await api.categories.getTreeWithPrompts.query()
+        // 同时更新统计信息
+        statistics.value = await api.prompts.getStatistics.query()
+        totalCount.value = statistics.value.totalCount || 0
+    } catch (error) {
+        message.error('加载树形数据失败')
+        console.error(error)
+    } finally {
+        initialLoading.value = false
+    }
+}
 
 // 加载数据
 const loadPrompts = async (reset = true) => {
@@ -639,7 +899,7 @@ const loadPrompts = async (reset = true) => {
             filters,
             dataLength: result.data?.length || 0,
             total: result.total,
-            hasMore: result.hasMore,
+            hasNextPage: result.hasNextPage,
             currentPage: currentPage.value,
             reset
         })        // 如果是重置加载，直接替换数据；否则追加数据
@@ -651,7 +911,7 @@ const loadPrompts = async (reset = true) => {
 
         // 始终更新总数和分页状态（因为过滤条件可能导致总数变化）
         totalCount.value = result.total || 0
-        hasNextPage.value = result.hasMore || false
+        hasNextPage.value = result.hasNextPage || false
 
     } catch (error) {
         message.error('加载提示词失败')
@@ -663,7 +923,7 @@ const loadPrompts = async (reset = true) => {
 }
 
 // 切换视图模式
-const setViewMode = (mode: 'grid' | 'table') => {
+const setViewMode = (mode: 'grid' | 'table' | 'tree') => {
     viewMode.value = mode
     // 切换到表格视图时清除选择并重新加载数据
     if (mode === 'table') {
@@ -671,6 +931,9 @@ const setViewMode = (mode: 'grid' | 'table') => {
         // 重置页码并加载表格数据
         currentPage.value = 1
         loadPromptsForTable()
+    } else if (mode === 'tree') {
+        // 切换到树形视图时加载树形数据
+        loadTreeData()
     } else {
         // 切换到网格视图时重新加载数据
         loadPrompts(true)
@@ -688,7 +951,7 @@ const handleBatchDelete = async () => {
 
     try {
         // 使用批量删除API，只触发一次同步
-        const ids = selectedRows.value.map(prompt => prompt.id)
+        const ids = selectedRows.value.map(prompt => prompt.id!)
         const result = await api.prompts.batchDelete.mutate(ids)
         
         if (result.success > 0) {
@@ -696,13 +959,15 @@ const handleBatchDelete = async () => {
         }
         
         if (result.failed > 0) {
-            console.error('批量删除部分失败:', result.errors)
+            console.error('批量删除部分失败:', result)
             message.warning(`删除失败 ${result.failed} 个提示词，请检查控制台日志`)
         }
         
         clearSelection()
         if (viewMode.value === 'table') {
             await loadPromptsForTable()
+        } else if (viewMode.value === 'tree') {
+            await loadTreeData()
         } else {
             await loadPrompts(true) // 重新加载数据
         }
@@ -779,6 +1044,8 @@ const handleSearch = () => {
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        loadTreeData()
     } else {
         loadPrompts(true) // 重置加载
     }
@@ -790,6 +1057,8 @@ watch(sortType, () => {
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        loadTreeData()
     } else {
         loadPrompts(true) // 排序方式变化时重新加载数据
     }
@@ -800,17 +1069,21 @@ const handleCategoryFilter = () => {
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        loadTreeData()
     } else {
         loadPrompts(true) // 重置加载
     }
 }
 
-const handleCategoryQuickFilter = (categoryId: string | null) => {
+const handleCategoryQuickFilter = (categoryId: number | null) => {
     selectedCategory.value = categoryId
     // 重置页码
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        loadTreeData()
     } else {
         loadPrompts(true) // 重置加载
     }
@@ -830,6 +1103,8 @@ const toggleFavoritesFilter = () => {
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        loadTreeData()
     } else {
         loadPrompts(true) // 重置加载
     }
@@ -844,7 +1119,7 @@ const toggleAdvancedFilter = () => {
     }
 }
 
-const toggleFavorite = async (promptId) => {
+const toggleFavorite = async (promptId: number) => {
     try {
         // 先乐观更新UI
         const prompt = prompts.value.find(p => p.id === promptId)
@@ -878,7 +1153,7 @@ const handleTagQuickSearch = (tagName: string) => {
     handleSearch()
 }
 
-const getPromptActions = (prompt) => [
+const getPromptActions = (prompt: PromptWithRelations) => [
     {
         label: '编辑',
         key: 'edit',
@@ -896,7 +1171,7 @@ const getPromptActions = (prompt) => [
     }
 ]
 
-const handlePromptAction = (action, prompt) => {
+const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
     switch (action) {
         case 'edit':
             emit('edit', prompt)
@@ -910,7 +1185,7 @@ const handlePromptAction = (action, prompt) => {
     }
 }
 
-const handleCopyPrompt = async (prompt) => {
+const handleCopyPrompt = async (prompt: PromptWithRelations) => {
     try {
         await navigator.clipboard.writeText(prompt.content)
         message.success('提示词内容已复制到剪贴板')
@@ -919,12 +1194,14 @@ const handleCopyPrompt = async (prompt) => {
     }
 }
 
-const handleDeletePrompt = async (prompt) => {
+const handleDeletePrompt = async (prompt: PromptWithRelations) => {
     if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
         try {
-            await api.prompts.delete.mutate(prompt.id)
+            await api.prompts.delete.mutate(prompt.id!)
             if (viewMode.value === 'table') {
                 await loadPromptsForTable()
+            } else if (viewMode.value === 'tree') {
+                await loadTreeData()
             } else {
                 await loadPrompts(true) // 重置加载
             }
@@ -965,6 +1242,8 @@ onMounted(async () => {
     // 然后根据初始视图模式选择正确的加载方法
     if (viewMode.value === 'table') {
         await loadPromptsForTable()
+    } else if (viewMode.value === 'tree') {
+        await loadTreeData()
     } else {
         await loadPrompts(true) // 初始加载
     }
@@ -976,6 +1255,8 @@ defineExpose({
         currentPage.value = 1 // 重置页码
         if (viewMode.value === 'table') {
             loadPromptsForTable()
+        } else if (viewMode.value === 'tree') {
+            loadTreeData()
         } else {
             loadPrompts(true)
         }

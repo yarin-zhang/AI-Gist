@@ -4,7 +4,7 @@
  */
 
 import { BaseDatabaseService } from './base-database.service';
-import { Category, CategoryWithRelations, Prompt } from '@shared/types/database';
+import { Category, CategoryWithRelations, Prompt, PromptWithRelations, PromptVariable } from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
 
 /**
@@ -307,5 +307,71 @@ export class CategoryService extends BaseDatabaseService {
         };
         await this.add('categories', newData as Category);
     }
+  }
+
+  /**
+   * 获取树形结构的分类和提示词数据
+   * 将分类和提示词组织成树形结构，每个分类作为父节点，其下的提示词作为子节点
+   * @returns Promise<Array<{type: 'category', data: CategoryWithRelations, children: Array<{type: 'prompt', data: PromptWithRelations}>}>> 树形结构数据
+   */
+  async getCategoryTreeWithPrompts(): Promise<Array<{
+    type: 'category';
+    data: CategoryWithRelations;
+    children: Array<{
+      type: 'prompt';
+      data: PromptWithRelations;
+    }>;
+  }>> {
+    const categories = await this.getAll<Category>('categories');
+    const prompts = await this.getAll<Prompt>('prompts');
+    const variables = await this.getAll<PromptVariable>('promptVariables');
+
+    // 组装提示词的关联数据
+    const promptsWithRelations = prompts.map(prompt => ({
+      ...prompt,
+      category: categories.find(c => c.id === prompt.categoryId),
+      variables: variables.filter(v => v.promptId === prompt.id),
+    }));
+
+    // 构建树形结构
+    const treeData = categories.map(category => {
+      const categoryPrompts = promptsWithRelations.filter(prompt => prompt.categoryId === category.id);
+      
+      return {
+        type: 'category' as const,
+        data: {
+          ...category,
+          prompts: categoryPrompts
+        },
+        children: categoryPrompts.map(prompt => ({
+          type: 'prompt' as const,
+          data: prompt
+        }))
+      };
+    });
+
+    // 添加未分类的提示词作为特殊节点
+    const uncategorizedPrompts = promptsWithRelations.filter(prompt => !prompt.categoryId);
+    if (uncategorizedPrompts.length > 0) {
+      treeData.unshift({
+        type: 'category' as const,
+        data: {
+          id: 0,
+          uuid: 'uncategorized',
+          name: '未分类',
+          description: '未分配到任何分类的提示词',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          prompts: uncategorizedPrompts
+        },
+        children: uncategorizedPrompts.map(prompt => ({
+          type: 'prompt' as const,
+          data: prompt
+        }))
+      });
+    }
+
+    return treeData;
   }
 }

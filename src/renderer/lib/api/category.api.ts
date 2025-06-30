@@ -4,7 +4,7 @@
  */
 
 import { CategoryService } from '../services/category.service';
-import { Category, CategoryWithRelations } from '@shared/types/database';
+import { Category, CategoryWithRelations, PromptWithRelations } from '@shared/types/database';
 
 /**
  * 分类API客户端类
@@ -222,6 +222,26 @@ export class CategoryApiClient {
        */
       query: async (): Promise<Record<string, number>> => {
         return this.categoryService.getCategoryColorStats();
+      }
+    },
+
+    /**
+     * 获取树形结构的分类和提示词数据
+     */
+    getTreeWithPrompts: {
+      /**
+       * 获取树形结构的分类和提示词数据
+       * @returns Promise<Array<{type: 'category', data: CategoryWithRelations, children: Array<{type: 'prompt', data: PromptWithRelations}>}>> 树形结构数据
+       */
+      query: async (): Promise<Array<{
+        type: 'category';
+        data: CategoryWithRelations;
+        children: Array<{
+          type: 'prompt';
+          data: PromptWithRelations;
+        }>;
+      }>> => {
+        return this.categoryService.getCategoryTreeWithPrompts();
       }
     }
   };
