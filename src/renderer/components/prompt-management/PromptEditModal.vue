@@ -22,7 +22,7 @@
                             <!-- 左侧：内容编辑区 -->
                             <template #1>
                                 <NCard title="提示词内容" size="small" :style="{ height: '100%' }">
-                                    <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }" y-placement="bottom">
+                                    <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;">
                                                 <NInput 
@@ -802,14 +802,15 @@ const loadHistory = async () => {
         }
         
         historyList.value = await api.promptHistories.getByPromptId.query(props.prompt.id);
-    } catch (error) {
+    } catch (error: any) {
         console.error("加载历史记录失败:", error);
         historyList.value = [];
-        // 如果是数据库表不存在的错误，不显示用户错误信息
+        // 如果是数据库表不存在的错误，静默失败
         if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
-            console.warn("PromptHistories 表不存在，可能是数据库版本问题");
+            console.warn("PromptHistories 表不存在，跳过历史记录创建");
         } else {
-            message.error("加载历史记录失败");
+            // 其他错误也不影响主流程，只是记录失败
+            console.warn("创建历史记录失败，但不影响主流程");
         }
     } finally {
         loadingHistory.value = false;
@@ -834,7 +835,7 @@ const createHistoryRecord = async (currentPrompt: any) => {
         };
 
         await api.promptHistories.create.mutate(historyData);
-    } catch (error) {
+    } catch (error: any) {
         console.error("创建历史记录失败:", error);
         // 如果是数据库表不存在的错误，静默失败
         if (error.name === 'NotFoundError' || error.message.includes('object stores was not found')) {
@@ -1037,13 +1038,13 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
                 optimizationPrompt = `请将以下提示词优化得更加简短和精炼，保留核心要求，去除冗余内容：\n\n${formData.value.content}`;
                 break;
             case 'richer':
-                optimizationPrompt = `请将以下提示词优化得更加丰富和详细，添加更多具体的要求和细节：\n\n${formData.value.content}`;
+                optimizationPrompt = `请将以下提示词优化得略微丰富和详细一些，添加更多具体的要求和细节，但不要过于复杂：\n\n${formData.value.content}`;
                 break;
             case 'general':
-                optimizationPrompt = `请将以下提示词优化得更加通用，适用于更广泛的场景和用途：\n\n${formData.value.content}`;
+                optimizationPrompt = `请将以下提示词优化得更加通用，适用于更广泛的场景和用途，但不要过于复杂：\n\n${formData.value.content}`;
                 break;
             case 'extract':
-                optimizationPrompt = `请分析以下提示词，将其中可以变化的部分提取为变量，使用 {{变量名}} 的格式标记：\n\n${formData.value.content}`;
+                optimizationPrompt = `请分析以下提示词，将其中可以变化的、最有价值的 3~5 个部分提取为变量，使用 {{变量名}} 的格式标记：\n\n${formData.value.content}`;
                 break;
         }
         
@@ -1055,7 +1056,7 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
             baseURL: selectedConfig.baseURL || '',
             apiKey: selectedConfig.apiKey || '',
             secretKey: selectedConfig.secretKey || '',
-            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map((m: any) => String(m)) : [],
             defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
             customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
             enabled: Boolean(selectedConfig.enabled),
@@ -1198,7 +1199,7 @@ ${manualInstruction.value.trim()}
             baseURL: selectedConfig.baseURL || '',
             apiKey: selectedConfig.apiKey || '',
             secretKey: selectedConfig.secretKey || '',
-            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map(m => String(m)) : [],
+            models: Array.isArray(selectedConfig.models) ? selectedConfig.models.map((m: any) => String(m)) : [],
             defaultModel: selectedConfig.defaultModel ? String(selectedConfig.defaultModel) : '',
             customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
             enabled: Boolean(selectedConfig.enabled),
@@ -1401,6 +1402,8 @@ const generateAutoTitle = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
+        console.log("PromptEditModal - 接收到prompt数据:", newPrompt);
+        
         if (newPrompt) {
             // 有 prompt 数据，初始化为编辑模式
             formData.value = {
@@ -1412,12 +1415,14 @@ watch(
                     ? typeof newPrompt.tags === "string"
                         ? newPrompt.tags
                             .split(",")
-                            .map((t) => t.trim())
-                            .filter((t) => t)
-                        : newPrompt.tags
+                            .map((t: string) => t.trim())
+                            .filter((t: string) => t)
+                        : Array.isArray(newPrompt.tags) 
+                            ? newPrompt.tags 
+                            : []
                     : [],
                 variables:
-                    newPrompt.variables?.map((v) => ({
+                    newPrompt.variables?.map((v: any) => ({
                         name: v.name || "",
                         label: v.label || "",
                         type: v.type || "text",
@@ -1426,8 +1431,8 @@ watch(
                             : typeof v.options === "string"
                                 ? v.options
                                     .split(",")
-                                    .map((opt) => opt.trim())
-                                    .filter((opt) => opt)
+                                    .map((opt: string) => opt.trim())
+                                    .filter((opt: string) => opt)
                                 : [],
                         defaultValue: v.defaultValue || "",
                         required: v.required !== false,
@@ -1565,11 +1570,11 @@ const generateUniqueVariableName = () => {
 };
 
 // 获取变量默认值选项
-const getVariableDefaultOptions = (options) => {
+const getVariableDefaultOptions = (options: any) => {
     if (!Array.isArray(options) || options.length === 0) return [];
     return options
-        .filter((opt) => opt && opt.trim())
-        .map((option) => ({
+        .filter((opt: any) => opt && opt.trim())
+        .map((option: any) => ({
             label: option,
             value: option,
         }));
