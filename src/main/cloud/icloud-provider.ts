@@ -85,7 +85,7 @@ export class ICloudProvider implements CloudStorageProvider {
       }
       
       console.log('Windows 未找到 iCloud 路径');
-      return { available: false, reason: '未检测到 iCloud Drive，请先安装 iCloud for Windows' };
+      return { available: false, reason: '未检测到 iCloud Drive 目录，请先安装 iCloud for Windows。如已配置完毕，请重启本应用。' };
     }
     
     return { available: false, reason: '不支持的操作系统' };
