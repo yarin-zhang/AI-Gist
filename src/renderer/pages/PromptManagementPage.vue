@@ -85,9 +85,9 @@ const { safeDbOperation, waitForDatabase } = useDatabase()
 const promptListRef = ref()
 
 // 响应式数据
-const prompts = ref([])
-const categories = ref([])
-const selectedPrompt = ref(null)
+const prompts = ref<any[]>([])
+const categories = ref<any[]>([])
+const selectedPrompt = ref<any>(null)
 const showEditModal = ref(false)
 const showDetailModal = ref(false)
 const showCategoryManagement = ref(false)
@@ -133,20 +133,50 @@ const handleCreatePrompt = () => {
     showEditModal.value = true
 }
 
-const handleEditPrompt = (prompt) => {
+const handleEditPrompt = (prompt: any) => {
     selectedPrompt.value = prompt
     showEditModal.value = true
 }
 
-const handleViewPrompt = (prompt) => {
+const handleViewPrompt = (prompt: any) => {
     selectedPrompt.value = prompt
     showDetailModal.value = true
 }
 
-const handleEditFromDetail = (prompt) => {
-    showDetailModal.value = false
-    selectedPrompt.value = prompt
-    showEditModal.value = true
+const handleEditFromDetail = (prompt: any) => {
+    console.log("PromptManagementPage - 接收到编辑请求:", prompt);
+    
+    if (!prompt || !prompt.id) {
+        message.error("提示词数据不完整，无法编辑");
+        return;
+    }
+    
+    // 确保数据完整性
+    const editPrompt = {
+        id: prompt.id,
+        uuid: prompt.uuid,
+        title: prompt.title || "",
+        description: prompt.description || "",
+        content: prompt.content || "",
+        categoryId: prompt.categoryId || null,
+        category: prompt.category || null,
+        tags: prompt.tags || "",
+        variables: Array.isArray(prompt.variables) ? prompt.variables : [],
+        isActive: prompt.isActive !== false,
+        isFavorite: prompt.isFavorite || false,
+        useCount: prompt.useCount || 0,
+        createdAt: prompt.createdAt,
+        updatedAt: prompt.updatedAt
+    };
+    
+    console.log("PromptManagementPage - 准备编辑数据:", editPrompt);
+    
+    // 关闭详情模态框
+    showDetailModal.value = false;
+    
+    // 设置选中的提示词并打开编辑模态框
+    selectedPrompt.value = editPrompt;
+    showEditModal.value = true;
 }
 
 const handlePromptSaved = () => {

@@ -39,7 +39,7 @@
                     </template>
                     {{ prompt.isFavorite ? "取消收藏" : "收藏" }}
                 </NButton>
-                <NButton type="primary" @click="$emit('edit', prompt)">
+                <NButton type="primary" @click="handleEdit">
                     <template #icon>
                         <NIcon>
                             <Edit />
@@ -1633,6 +1633,35 @@ const saveManualRecord = async () => {
     } finally {
         savingManualRecord.value = false;
     }
+};
+
+// 编辑提示词
+const handleEdit = () => {
+    if (!props.prompt) {
+        message.error("提示词数据不存在");
+        return;
+    }
+    
+    // 确保传递完整的prompt数据，包括所有必要字段
+    const editPrompt = {
+        id: props.prompt.id,
+        uuid: props.prompt.uuid,
+        title: props.prompt.title,
+        description: props.prompt.description,
+        content: props.prompt.content,
+        categoryId: props.prompt.categoryId,
+        category: props.prompt.category,
+        tags: props.prompt.tags,
+        variables: props.prompt.variables || [],
+        isActive: props.prompt.isActive,
+        isFavorite: props.prompt.isFavorite,
+        useCount: props.prompt.useCount,
+        createdAt: props.prompt.createdAt,
+        updatedAt: props.prompt.updatedAt
+    };
+    
+    console.log("传递编辑数据:", editPrompt);
+    emit("edit", editPrompt);
 };
 </script>
 
