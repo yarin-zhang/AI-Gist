@@ -67,7 +67,7 @@
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" ref="contentScrollbarRef">
                                     <NFlex vertical size="medium" style="padding-right: 12px">
                                         <NInput :value="filledContent" type="textarea" readonly :style="{
-                                            height: `${contentHeight - 180}px`,
+                                            height: `${contentHeight - 280}px`,
                                             fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                         }" :placeholder="!filledContent ? '内容为空' : ''" />
 
@@ -104,7 +104,7 @@
                                                 <!-- 调试按钮和进度显示 -->
                                                 <NFlex justify="center" vertical size="small">
                                                     <!-- 调试按钮 -->
-                                                    <NFlex size="small">
+                                                    <NFlex size="small" justify="center">
                                                         <NButton 
                                                             type="primary" 
                                                             :loading="debugging"
@@ -186,33 +186,33 @@
                                                         marginTop: '8px'
                                                     }"
                                                 />
-                                                <template #action>
-                                                    <NFlex size="small">
-                                                        <NButton size="small" @click="copyToClipboard(debugResult)">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Copy />
-                                                                </NIcon>
-                                                            </template>
-                                                            复制结果
-                                                        </NButton>
-                                                        <NButton 
-                                                            v-if="debugging" 
-                                                            size="small" 
-                                                            type="error" 
-                                                            secondary
-                                                            @click="stopDebug"
-                                                        >
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <X />
-                                                                </NIcon>
-                                                            </template>
-                                                            停止
-                                                        </NButton>
-                                                    </NFlex>
-                                                </template>
                                             </NAlert>
+                                            
+                                            <!-- 调试结果操作按钮 -->
+                                            <NFlex v-if="debugResult" justify="space-between" style="margin-top: 8px;">
+                                                <NButton size="small" @click="copyToClipboard(debugResult)">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Copy />
+                                                        </NIcon>
+                                                    </template>
+                                                    复制结果
+                                                </NButton>
+                                                <NButton 
+                                                    v-if="debugging" 
+                                                    size="small" 
+                                                    type="error" 
+                                                    secondary
+                                                    @click="stopDebug"
+                                                >
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <X />
+                                                        </NIcon>
+                                                    </template>
+                                                    停止
+                                                </NButton>
+                                            </NFlex>
 
                                             <!-- 错误结果 -->
                                             <NAlert v-if="debugError" type="error" :show-icon="false">
@@ -828,7 +828,7 @@ import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
-import { AIGenerationHistory } from "@/shared/types/ai";
+import type { AIGenerationHistory } from "../../../shared/types/ai";
 
 interface Props {
     show: boolean;
@@ -1595,8 +1595,9 @@ const saveManualRecord = async () => {
         savingManualRecord.value = true;
 
         // 构建符合AIGenerationHistory接口的数据
+        const manualHistoryId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const historyData = {
-            historyId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            historyId: manualHistoryId,
             configId: 'manual', // 手动记录使用特殊的configId
             topic: `手动调试记录: ${manualRecordData.value.title}`,
             generatedPrompt: filledContent.value, // 当前填充后的提示词内容
@@ -1605,7 +1606,8 @@ const saveManualRecord = async () => {
             status: manualRecordData.value.status,
             debugResult: manualRecordData.value.result,
             debugStatus: manualRecordData.value.status,
-            debugErrorMessage: manualRecordData.value.status === 'error' ? manualRecordData.value.notes : undefined
+            debugErrorMessage: manualRecordData.value.status === 'error' ? manualRecordData.value.notes : undefined,
+            uuid: manualHistoryId // 使用相同的ID作为uuid
         };
 
         // 保存到数据库
@@ -1625,7 +1627,7 @@ const saveManualRecord = async () => {
         showManualRecordModal.value = false;
         message.success("手动调试记录已保存");
         
-    } catch (error) {
+    } catch (error: any) {
         console.error("保存手动调试记录失败:", error);
         message.error("保存调试记录失败: " + (error.message || "未知错误"));
     } finally {
