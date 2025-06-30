@@ -352,17 +352,10 @@
                             </NCard>
                         </template>
                     </NSplit>
-                    <NEmpty v-else description="暂无使用记录">
-                        <template #icon>
-                            <NIcon>
-                                <History />
-                            </NIcon>
-                        </template>
-                    </NEmpty>
                 </NTabPane>
 
                 <!-- 调试历史记录 Tab -->
-                <NTabPane name="debug" :tab="`调试历史记录 (${debugHistory.length})`" :disabled="debugHistory.length === 0">
+                <NTabPane name="debug" :tab="`调试历史记录 (${debugHistory.length})`">
                     <NSplit v-if="debugHistory.length > 0" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
                         :style="{ height: `${contentHeight - 50}px` }">
                         <!-- 左侧：调试记录预览 -->
@@ -370,10 +363,20 @@
                             <NCard size="small" :style="{ height: '100%' }">
                                 <template #header>
                                     <NFlex justify="space-between" align="center">
-                                        <NText strong>调试记录</NText>
                                         <NFlex align="center" size="small">
-                                            <NTag size="small" type="success">{{ debugHistory.length }} 条</NTag>
-                                            <NText depth="3">调试记录</NText>
+                                        <NText strong>调试记录</NText>
+                                        <NTag size="small" type="success">{{ debugHistory.length }} 条</NTag>
+                                        </NFlex>
+                                        <NFlex align="center" size="small">
+                                            <!-- 手动记录按钮 -->
+                                            <NButton size="small" type="primary" @click="showManualRecordModal = true">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Plus />
+                                                    </NIcon>
+                                                </template>
+                                                手动记录
+                                            </NButton>
                                         </NFlex>
                                     </NFlex>
                                 </template>
@@ -386,17 +389,23 @@
                                                         <Robot />
                                                     </NIcon>
                                                 </template>
-                                                调试记录
+                                                {{ selectedDebugHistory.model === 'manual' ? '手动记录' : '调试记录' }}
                                             </NTag>
                                             <NText depth="3">{{ formatDate(selectedDebugHistory.createdAt) }}</NText>
                                         </NFlex>
                                         
                                         <!-- 调试配置信息 -->
-                                        <div>
+                                        <div v-if="selectedDebugHistory.model !== 'manual'">
                                             <NText strong style="margin-bottom: 8px; display: block;">调试配置：</NText>
                                             <NFlex size="small">
                                                 <NTag size="small" type="primary" :bordered="false">{{ selectedDebugHistory.model }}</NTag>
                                             </NFlex>
+                                        </div>
+
+                                        <!-- 手动记录备注信息 -->
+                                        <div v-if="selectedDebugHistory.model === 'manual' && selectedDebugHistory.customPrompt">
+                                            <NText strong style="margin-bottom: 8px; display: block;">备注信息：</NText>
+                                            <NInput :value="selectedDebugHistory.customPrompt" readonly :rows="2" />
                                         </div>
 
                                         <!-- 原始提示词 -->
@@ -497,16 +506,27 @@
                                             <template #header>
                                                 <NFlex justify="space-between" align="center">
                                                     <NText depth="3" style="font-size: 12px;">{{ formatDate(record.createdAt) }}</NText>
-                                                    <NTag :type="record.debugStatus === 'success' ? 'success' : 'error'" size="tiny">
-                                                        {{ record.debugStatus === 'success' ? '成功' : '失败' }}
-                                                    </NTag>
+                                                    <NFlex size="small">
+                                                        <NTag :type="record.debugStatus === 'success' ? 'success' : 'error'" size="tiny">
+                                                            {{ record.debugStatus === 'success' ? '成功' : '失败' }}
+                                                        </NTag>
+                                                        <!-- 手动记录标识 -->
+                                                        <NTag v-if="record.model === 'manual'" type="warning" size="tiny">
+                                                            手动
+                                                        </NTag>
+                                                    </NFlex>
                                                 </NFlex>
                                             </template>
 
                                             <NFlex vertical size="small">
                                                 <NText style="font-size: 12px;">{{ record.topic }}</NText>
                                                 <NFlex size="small">
-                                                    <NTag size="tiny" type="primary" :bordered="false">{{ record.model }}</NTag>
+                                                    <NTag v-if="record.model !== 'manual'" size="tiny" type="primary" :bordered="false">
+                                                        {{ record.model }}
+                                                    </NTag>
+                                                    <NTag v-else size="tiny" type="warning" :bordered="false">
+                                                        手动记录
+                                                    </NTag>
                                                 </NFlex>
                                             </NFlex>
                                         </NCard>
@@ -515,13 +535,57 @@
                             </NCard>
                         </template>
                     </NSplit>
-                    <NEmpty v-else description="暂无调试记录">
-                        <template #icon>
-                            <NIcon>
-                                <Robot />
-                            </NIcon>
-                        </template>
-                    </NEmpty>
+                    
+                    <!-- 当没有调试记录时显示的内容 -->
+                    <div v-else :style="{ height: `${contentHeight - 50}px` }">
+                        <NCard size="small" :style="{ height: '100%' }">
+                            <template #header>
+                                <NFlex justify="space-between" align="center">
+                                    <NText strong>调试历史记录</NText>
+                                    <NButton size="small" type="primary" @click="showManualRecordModal = true">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Plus />
+                                            </NIcon>
+                                        </template>
+                                        手动记录
+                                    </NButton>
+                                </NFlex>
+                            </template>
+                            <NEmpty description="暂无调试记录，您可以手动添加记录或使用AI调试功能">
+                                <template #icon>
+                                    <NIcon>
+                                        <Robot />
+                                    </NIcon>
+                                </template>
+                                <template #extra>
+                                    <NFlex vertical size="medium" align="center">
+                                        <NText depth="3" style="font-size: 12px;">
+                                            调试记录可以帮助您跟踪提示词的效果和改进过程
+                                        </NText>
+                                        <NFlex size="small">
+                                            <NButton size="small" type="primary" @click="showManualRecordModal = true">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Plus />
+                                                    </NIcon>
+                                                </template>
+                                                手动记录
+                                            </NButton>
+                                            <NButton size="small" @click="activeTab = 'detail'">
+                                                <template #icon>
+                                                    <NIcon>
+                                                        <Bug />
+                                                    </NIcon>
+                                                </template>
+                                                去调试
+                                            </NButton>
+                                        </NFlex>
+                                    </NFlex>
+                                </template>
+                            </NEmpty>
+                        </NCard>
+                    </div>
                 </NTabPane>
 
             </NTabs>
@@ -575,6 +639,90 @@
             </NFlex>
         </template>
     </CommonModal>
+
+    <!-- 手动记录调试历史模态框 -->
+    <CommonModal :show="showManualRecordModal" @update:show="showManualRecordModal = false" @close="showManualRecordModal = false">
+        <template #header>
+            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
+                手动记录调试历史
+            </NText>
+            <NText depth="3">
+                手动添加调试记录，用于跟踪提示词的效果和改进过程
+            </NText>
+        </template>
+
+        <template #content="{ contentHeight }">
+            <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
+                <NForm ref="manualRecordFormRef" :model="manualRecordData" :rules="manualRecordRules" label-placement="top">
+                    <NFormItem label="记录标题" path="title">
+                        <NInput 
+                            v-model:value="manualRecordData.title" 
+                            placeholder="请输入记录标题，例如：第一次调试结果"
+                            :maxlength="100"
+                            show-count
+                        />
+                    </NFormItem>
+
+                    <NFormItem label="调试结果" path="result">
+                        <NInput 
+                            v-model:value="manualRecordData.result" 
+                            type="textarea"
+                            placeholder="请输入调试结果或AI响应内容"
+                            :rows="8"
+                            :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
+                            show-count
+                            :maxlength="2000"
+                        />
+                    </NFormItem>
+
+                    <NFormItem label="备注" path="notes">
+                        <NInput 
+                            v-model:value="manualRecordData.notes" 
+                            type="textarea"
+                            placeholder="可选：添加备注信息，如调试环境、参数设置等"
+                            :rows="3"
+                            show-count
+                            :maxlength="500"
+                        />
+                    </NFormItem>
+
+                    <NFormItem label="调试状态" path="status">
+                        <NSelect 
+                            v-model:value="manualRecordData.status"
+                            :options="[
+                                { label: '成功', value: 'success' },
+                                { label: '失败', value: 'error' }
+                            ]"
+                            placeholder="选择调试状态"
+                        />
+                    </NFormItem>
+                </NForm>
+            </NFlex>
+        </template>
+
+        <template #footer>
+            <NFlex justify="space-between" align="center">
+                <div>
+                    <NText depth="3">
+                        手动记录将保存到调试历史中，与AI调试结果区分显示
+                    </NText>
+                </div>
+                <div>
+                    <NFlex size="small">
+                        <NButton @click="showManualRecordModal = false">取消</NButton>
+                        <NButton 
+                            type="primary" 
+                            @click="saveManualRecord"
+                            :loading="savingManualRecord"
+                            :disabled="!manualRecordData.title.trim() || !manualRecordData.result.trim()"
+                        >
+                            保存记录
+                        </NButton>
+                    </NFlex>
+                </div>
+            </NFlex>
+        </template>
+    </CommonModal>
 </template>
 
 <script setup lang="ts">
@@ -615,6 +763,7 @@ import {
     Robot,
     CircleCheck,
     AlertTriangle,
+    Plus,
 } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
@@ -653,6 +802,36 @@ const selectedDebugIndex = ref(-1); // 选中的调试记录索引
 const debugging = ref(false);
 const debugResult = ref("");
 const debugError = ref("");
+
+// 手动记录相关状态
+const showManualRecordModal = ref(false);
+const savingManualRecord = ref(false);
+const manualRecordFormRef = ref();
+const manualRecordData = ref({
+    title: "",
+    result: "",
+    notes: "",
+    status: "success" as "success" | "error"
+});
+
+// 手动记录表单验证规则
+const manualRecordRules = {
+    title: {
+        required: true,
+        message: "请输入记录标题",
+        trigger: "blur"
+    },
+    result: {
+        required: true,
+        message: "请输入调试结果",
+        trigger: "blur"
+    },
+    status: {
+        required: true,
+        message: "请选择调试状态",
+        trigger: "change"
+    }
+};
 
 // AI 配置相关 - 使用新的组件
 const modelSelectorRef = ref();
@@ -1148,9 +1327,76 @@ watch(
             debugging.value = false;
             debugResult.value = "";
             debugError.value = "";
+            // 重置手动记录状态
+            showManualRecordModal.value = false;
+            savingManualRecord.value = false;
+            manualRecordData.value = {
+                title: "",
+                result: "",
+                notes: "",
+                status: "success"
+            };
         }
     }
 );
+
+// 手动记录调试历史
+const saveManualRecord = async () => {
+    try {
+        // 手动验证表单数据
+        if (!manualRecordData.value.title.trim()) {
+            message.error("请输入记录标题");
+            return;
+        }
+        if (!manualRecordData.value.result.trim()) {
+            message.error("请输入调试结果");
+            return;
+        }
+        if (!manualRecordData.value.status) {
+            message.error("请选择调试状态");
+            return;
+        }
+        
+        savingManualRecord.value = true;
+
+        // 构建符合AIGenerationHistory接口的数据
+        const historyData = {
+            historyId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            configId: 'manual', // 手动记录使用特殊的configId
+            topic: `手动调试记录: ${manualRecordData.value.title}`,
+            generatedPrompt: filledContent.value, // 当前填充后的提示词内容
+            model: 'manual', // 手动记录使用特殊的model标识
+            customPrompt: manualRecordData.value.notes || `手动调试记录：${manualRecordData.value.title}`,
+            status: manualRecordData.value.status,
+            debugResult: manualRecordData.value.result,
+            debugStatus: manualRecordData.value.status,
+            debugErrorMessage: manualRecordData.value.status === 'error' ? manualRecordData.value.notes : undefined
+        };
+
+        // 保存到数据库
+        await api.aiGenerationHistory.create.mutate(historyData);
+        
+        // 刷新调试历史记录
+        await loadDebugHistory();
+        
+        // 重置表单数据
+        manualRecordData.value = {
+            title: "",
+            result: "",
+            notes: "",
+            status: "success"
+        };
+        
+        showManualRecordModal.value = false;
+        message.success("手动调试记录已保存");
+        
+    } catch (error) {
+        console.error("保存手动调试记录失败:", error);
+        message.error("保存调试记录失败: " + (error.message || "未知错误"));
+    } finally {
+        savingManualRecord.value = false;
+    }
+};
 </script>
 
 <style scoped>

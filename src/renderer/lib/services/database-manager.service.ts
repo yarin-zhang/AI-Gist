@@ -316,38 +316,65 @@ export class DatabaseServiceManager {
       data = this.ensureUUIDsInImportData(data);
       
       const details: Record<string, number> = {};
-      const importPromises: Promise<void>[] = [];
       let totalErrors = 0;
+      
+      // ID映射表：旧ID -> 新ID
+      const idMapping: { [key: string]: number } = {};
       
       // 导入分类数据
       if (data.categories && data.categories.length > 0) {
         console.log(`导入分类数据: ${data.categories.length} 条`);
         for (const category of data.categories) {
+          const oldId = category.id;
           const { id, ...categoryDataWithoutId } = category;
-          importPromises.push(
-            this.category.createCategory(categoryDataWithoutId).then(() => {
-              // 成功创建分类，无需额外操作
-            }).catch(err => {
-              console.warn('导入分类数据失败:', category.id, err.message);
-              totalErrors++;
-            })
-          );
+          
+          try {
+            const newCategory = await this.category.createCategory(categoryDataWithoutId);
+            // 记录ID映射：旧ID -> 新ID
+            if (oldId !== undefined) {
+              idMapping[`category_${oldId}`] = newCategory.id!;
+              console.log(`分类ID映射: ${oldId} -> ${newCategory.id}`);
+            }
+          } catch (err) {
+            console.warn('导入分类数据失败:', category.id, err);
+            totalErrors++;
+          }
         }
       }
       
-      // 导入提示词数据
+      // 导入提示词数据（需要处理分类ID映射）
       if (data.prompts && data.prompts.length > 0) {
         console.log(`导入提示词数据: ${data.prompts.length} 条`);
         for (const prompt of data.prompts) {
+          const oldPromptId = prompt.id;
           const { id, ...promptDataWithoutId } = prompt;
-          importPromises.push(
-            this.prompt.createPrompt(promptDataWithoutId).then(() => {
-              // 成功创建提示词，无需额外操作
-            }).catch(err => {
-              console.warn('导入提示词数据失败:', prompt.id, err.message);
-              totalErrors++;
-            })
-          );
+          
+          // 处理分类ID映射
+          if (promptDataWithoutId.categoryId !== undefined) {
+            const oldCategoryId = promptDataWithoutId.categoryId;
+            const newCategoryId = idMapping[`category_${oldCategoryId}`];
+            
+            if (newCategoryId !== undefined) {
+              promptDataWithoutId.categoryId = newCategoryId;
+              console.log(`提示词分类ID映射: ${oldCategoryId} -> ${newCategoryId}`);
+            } else {
+              console.warn(`未找到分类ID映射: ${oldCategoryId}，将提示词设为未分类`);
+              promptDataWithoutId.categoryId = undefined;
+            }
+          }
+          
+          try {
+            const newPrompt = await this.prompt.createPrompt(promptDataWithoutId);
+            
+            // 记录提示词ID映射：旧ID -> 新ID
+            if (oldPromptId !== undefined) {
+              idMapping[`prompt_${oldPromptId}`] = newPrompt.id!;
+              console.log(`提示词ID映射: ${oldPromptId} -> ${newPrompt.id}`);
+            }
+          } catch (err) {
+            console.warn('导入提示词数据失败:', prompt.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -356,14 +383,12 @@ export class DatabaseServiceManager {
         console.log(`导入AI配置数据: ${data.aiConfigs.length} 条`);
         for (const config of data.aiConfigs) {
           const { id, ...configDataWithoutId } = config;
-          importPromises.push(
-            this.aiConfig.createAIConfig(configDataWithoutId).then(() => {
-              // 成功创建AI配置，无需额外操作
-            }).catch(err => {
-              console.warn('导入AI配置数据失败:', config.id, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.aiConfig.createAIConfig(configDataWithoutId);
+          } catch (err) {
+            console.warn('导入AI配置数据失败:', config.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -372,14 +397,12 @@ export class DatabaseServiceManager {
         console.log(`导入AI历史数据: ${data.aiHistory.length} 条`);
         for (const history of data.aiHistory) {
           const { id, ...historyDataWithoutId } = history;
-          importPromises.push(
-            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).then(() => {
-              // 成功创建AI历史，无需额外操作
-            }).catch(err => {
-              console.warn('导入AI历史数据失败:', history.id, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId);
+          } catch (err) {
+            console.warn('导入AI历史数据失败:', history.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -387,19 +410,14 @@ export class DatabaseServiceManager {
       if (data.settings && data.settings.length > 0) {
         console.log(`导入设置数据: ${data.settings.length} 条`);
         for (const setting of data.settings) {
-          importPromises.push(
-            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).then(() => {
-              // 成功更新设置，无需额外操作
-            }).catch(err => {
-              console.warn('导入设置数据失败:', setting.key, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description);
+          } catch (err) {
+            console.warn('导入设置数据失败:', setting.key, err);
+            totalErrors++;
+          }
         }
       }
-      
-      // 等待所有导入操作完成
-      await Promise.all(importPromises);
       
       // 统计导入结果
       details.categories = (data.categories?.length || 0);
@@ -411,6 +429,7 @@ export class DatabaseServiceManager {
       const totalImported = Object.values(details).reduce((sum, count) => sum + count, 0);
       
       console.log('渲染进程: 数据导入完成', details);
+      console.log('ID映射表:', idMapping);
       
       return {
         success: true,
@@ -469,35 +488,63 @@ export class DatabaseServiceManager {
       const restorePromises: Promise<void>[] = [];
       let totalErrors = 0;
       
+      // ID映射表：旧ID -> 新ID
+      const idMapping: { [key: string]: number } = {};
+      
       // 恢复分类数据
       if (backupData.categories && backupData.categories.length > 0) {
         console.log(`恢复分类数据: ${backupData.categories.length} 条`);
         for (const category of backupData.categories) {
+          const oldId = category.id;
           const { id, ...categoryDataWithoutId } = category;
-          restorePromises.push(
-            this.category.createCategory(categoryDataWithoutId).then(() => {
-              // 成功恢复分类，无需额外操作
-            }).catch(err => {
-              console.warn('恢复分类数据失败:', category.id, err.message);
-              totalErrors++;
-            })
-          );
+          
+          try {
+            const newCategory = await this.category.createCategory(categoryDataWithoutId);
+            // 记录ID映射：旧ID -> 新ID
+            if (oldId !== undefined) {
+              idMapping[`category_${oldId}`] = newCategory.id!;
+              console.log(`分类ID映射: ${oldId} -> ${newCategory.id}`);
+            }
+          } catch (err) {
+            console.warn('恢复分类数据失败:', category.id, err);
+            totalErrors++;
+          }
         }
       }
       
-      // 恢复提示词数据
+      // 恢复提示词数据（需要处理分类ID映射）
       if (backupData.prompts && backupData.prompts.length > 0) {
         console.log(`恢复提示词数据: ${backupData.prompts.length} 条`);
         for (const prompt of backupData.prompts) {
+          const oldPromptId = prompt.id;
           const { id, ...promptDataWithoutId } = prompt;
-          restorePromises.push(
-            this.prompt.createPrompt(promptDataWithoutId).then(() => {
-              // 成功恢复提示词，无需额外操作
-            }).catch(err => {
-              console.warn('恢复提示词数据失败:', prompt.id, err.message);
-              totalErrors++;
-            })
-          );
+          
+          // 处理分类ID映射
+          if (promptDataWithoutId.categoryId !== undefined) {
+            const oldCategoryId = promptDataWithoutId.categoryId;
+            const newCategoryId = idMapping[`category_${oldCategoryId}`];
+            
+            if (newCategoryId !== undefined) {
+              promptDataWithoutId.categoryId = newCategoryId;
+              console.log(`提示词分类ID映射: ${oldCategoryId} -> ${newCategoryId}`);
+            } else {
+              console.warn(`未找到分类ID映射: ${oldCategoryId}，将提示词设为未分类`);
+              promptDataWithoutId.categoryId = undefined;
+            }
+          }
+          
+          try {
+            const newPrompt = await this.prompt.createPrompt(promptDataWithoutId);
+            
+            // 记录提示词ID映射：旧ID -> 新ID
+            if (oldPromptId !== undefined) {
+              idMapping[`prompt_${oldPromptId}`] = newPrompt.id!;
+              console.log(`提示词ID映射: ${oldPromptId} -> ${newPrompt.id}`);
+            }
+          } catch (err) {
+            console.warn('恢复提示词数据失败:', prompt.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -506,14 +553,12 @@ export class DatabaseServiceManager {
         console.log(`恢复AI配置数据: ${backupData.aiConfigs.length} 条`);
         for (const config of backupData.aiConfigs) {
           const { id, ...configDataWithoutId } = config;
-          restorePromises.push(
-            this.aiConfig.createAIConfig(configDataWithoutId).then(() => {
-              // 成功恢复AI配置，无需额外操作
-            }).catch(err => {
-              console.warn('恢复AI配置数据失败:', config.id, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.aiConfig.createAIConfig(configDataWithoutId);
+          } catch (err) {
+            console.warn('恢复AI配置数据失败:', config.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -522,14 +567,12 @@ export class DatabaseServiceManager {
         console.log(`恢复AI历史数据: ${backupData.aiHistory.length} 条`);
         for (const history of backupData.aiHistory) {
           const { id, ...historyDataWithoutId } = history;
-          restorePromises.push(
-            this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId).then(() => {
-              // 成功恢复AI历史，无需额外操作
-            }).catch(err => {
-              console.warn('恢复AI历史数据失败:', history.id, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.aiGenerationHistory.createAIGenerationHistory(historyDataWithoutId);
+          } catch (err) {
+            console.warn('恢复AI历史数据失败:', history.id, err);
+            totalErrors++;
+          }
         }
       }
       
@@ -537,19 +580,14 @@ export class DatabaseServiceManager {
       if (backupData.settings && backupData.settings.length > 0) {
         console.log(`恢复设置数据: ${backupData.settings.length} 条`);
         for (const setting of backupData.settings) {
-          restorePromises.push(
-            this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description).then(() => {
-              // 成功恢复设置，无需额外操作
-            }).catch(err => {
-              console.warn('恢复设置数据失败:', setting.key, err.message);
-              totalErrors++;
-            })
-          );
+          try {
+            await this.appSettings.updateSettingByKey(setting.key, setting.value, setting.type, setting.description);
+          } catch (err) {
+            console.warn('恢复设置数据失败:', setting.key, err);
+            totalErrors++;
+          }
         }
       }
-      
-      // 等待所有恢复操作完成
-      await Promise.all(restorePromises);
       
       // 统计恢复结果
       details.categories = (backupData.categories?.length || 0);
@@ -561,6 +599,7 @@ export class DatabaseServiceManager {
       const totalRestored = Object.values(details).reduce((sum, count) => sum + count, 0);
       
       console.log(`渲染进程: 数据恢复完成，总计恢复记录数: ${totalRestored}, 错误数: ${totalErrors}`);
+      console.log('ID映射表:', idMapping);
       
       return {
         success: true,

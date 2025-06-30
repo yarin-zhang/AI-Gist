@@ -767,25 +767,23 @@ export class PromptService extends BaseDatabaseService {
     
     // 未分类数量
     const uncategorizedCount = prompts.filter(p => !p.categoryId).length;
-    if (uncategorizedCount > 0) {
-      categoryStats.push({
-        id: null,
-        name: '未分类',
-        count: uncategorizedCount
-      });
-    }
+    categoryStats.push({
+      id: null,
+      name: '未分类',
+      count: uncategorizedCount
+    });
 
-    // 各分类数量
+    // 各分类数量 - 返回所有分类，包括计数为 0 的
     categories.forEach(category => {
       const count = prompts.filter(p => p.categoryId === category.id).length;
-      if (count > 0) {
-        categoryStats.push({
-          id: category.id,
-          name: category.name,
-          count
-        });
-      }
-    });    // 计算热门标签
+      categoryStats.push({
+        id: category.id?.toString() || '',
+        name: category.name,
+        count
+      });
+    });
+
+    // 计算热门标签
     const tagCounts = new Map<string, number>();
     prompts.forEach(prompt => {
       // 处理 tags 字段，确保能正确处理字符串和数组两种格式
