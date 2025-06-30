@@ -413,7 +413,7 @@ const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
 const tagsExpanded = ref(true) // 高级筛选开启时默认展开
 
 // 视图模式状态
-const viewMode = ref<'grid' | 'table' | 'tree'>('tree') // 'grid' | 'table' | 'tree'
+const viewMode = ref<'grid' | 'table' | 'tree'>('grid') // 'grid' | 'table' | 'tree'
 
 // 表格多选相关状态
 const selectedRowKeys = ref<(string | number)[]>([])
