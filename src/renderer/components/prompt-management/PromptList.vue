@@ -462,8 +462,20 @@ const getCategoryName = (categoryId: number | null) => {
 
 // 获取分类下的提示词数量
 const getCategoryPromptCount = (categoryId: number | null) => {
+    // 首先尝试从统计信息中获取
     const categoryStats = statistics.value.categoryStats.find(stat => stat.id === categoryId?.toString())
-    return categoryStats ? categoryStats.count : 0
+    if (categoryStats) {
+        return categoryStats.count
+    }
+    
+    // 如果统计信息中没有，则从分类数据中获取
+    if (categoryId === null) {
+        // 未分类的数量
+        return prompts.value.filter(p => !p.categoryId).length
+    } else {
+        // 特定分类的数量
+        return prompts.value.filter(p => p.categoryId === categoryId).length
+    }
 }
 
 // 计算卡片间距 - 根据展开状态动态调整
@@ -1032,6 +1044,8 @@ const loadPromptsForTable = async () => {
 const loadCategories = async () => {
     try {
         categories.value = await api.categories.getAll.query()
+        // 每次加载分类时都同时更新统计信息，确保计数准确
+        await loadStatistics()
     } catch (error) {
         message.error('加载分类失败')
         console.error(error)

@@ -26,9 +26,9 @@
                                             </div>
                                             <div v-if="editingCategory?.id === category.id" style="min-width: 200px;">
                                                 <NFlex vertical size="small">
-                                                    <NInput v-model:value="editingCategory.name" size="small"
+                                                    <NInput v-model:value="editingCategory!.name" size="small"
                                                         placeholder="分类名称" />
-                                                    <NColorPicker v-model:value="editingCategory.color" :modes="['hex']"
+                                                    <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
                                                         :swatches="COLOR_SWATCHES" size="small" style="width: 100%;" />
                                                 </NFlex>
                                             </div>
@@ -36,7 +36,7 @@
                                                 <NFlex vertical size="small">
                                                     <NText strong>{{ category.name }}</NText>
                                                     <NText depth="3" style="font-size: 12px;">
-                                                        {{ category._count?.prompts || 0 }} 个提示词
+                                                        {{ getCategoryPromptCount(category.id) }} 个提示词
                                                     </NText>
                                                 </NFlex>
                                             </div>
@@ -66,7 +66,7 @@
                                                     </NButton>
                                                     <NButton size="small" text type="error"
                                                         @click="handleDelete(category)"
-                                                        :disabled="category._count?.prompts > 0">
+                                                        :disabled="getCategoryPromptCount(category.id) > 0">
                                                         <template #icon>
                                                             <NIcon>
                                                                 <Trash />
@@ -180,9 +180,52 @@ const newCategory = ref({
     color: '#18A05833'
 })
 
-const editingCategory = ref(null)
+const editingCategory = ref<{
+    id: number;
+    name: string;
+    color: string;
+} | null>(null)
 const creating = ref(false)
 const updating = ref(false)
+
+// 统计信息
+const statistics = ref<{
+    totalCount: number;
+    categoryStats: Array<{id: string | null, name: string, count: number}>;
+    popularTags: Array<{name: string, count: number}>;
+}>({
+    totalCount: 0,
+    categoryStats: [],
+    popularTags: []
+})
+
+// 获取分类下的提示词数量
+const getCategoryPromptCount = (categoryId: number) => {
+    const categoryStats = statistics.value.categoryStats.find(stat => stat.id === categoryId?.toString())
+    const count = categoryStats ? categoryStats.count : 0
+    console.log(`CategoryManageModal - getCategoryPromptCount(${categoryId}):`, {
+        categoryId,
+        categoryStats,
+        foundStat: categoryStats,
+        count,
+        allStats: statistics.value.categoryStats
+    })
+    return count
+}
+
+// 加载统计信息
+const loadStatistics = async () => {
+    try {
+        statistics.value = await api.prompts.getStatistics.query()
+        console.log('CategoryManageModal - Statistics loaded:', {
+            totalCount: statistics.value.totalCount,
+            categoryStats: statistics.value.categoryStats,
+            categoryStatsLength: statistics.value.categoryStats.length
+        })
+    } catch (error) {
+        console.error('加载统计信息失败:', error)
+    }
+}
 
 // 方法
 const handleCreate = async () => {
@@ -195,7 +238,10 @@ const handleCreate = async () => {
         creating.value = true
         await api.categories.create.mutate({
             name: newCategory.value.name,
-            color: newCategory.value.color
+            color: newCategory.value.color,
+            uuid: '', // 这个会被服务层自动生成
+            isActive: true,
+            description: ''
         })
 
         newCategory.value = {
@@ -204,6 +250,8 @@ const handleCreate = async () => {
         }
 
         message.success('分类创建成功')
+        // 重新加载统计信息
+        await loadStatistics()
         emit('updated')
     } catch (error) {
         message.error('创建分类失败')
@@ -213,7 +261,7 @@ const handleCreate = async () => {
     }
 }
 
-const handleEdit = (category) => {
+const handleEdit = (category: any) => {
     editingCategory.value = {
         id: category.id,
         name: category.name,
@@ -239,6 +287,8 @@ const handleSaveEdit = async () => {
 
         editingCategory.value = null
         message.success('分类更新成功')
+        // 重新加载统计信息
+        await loadStatistics()
         emit('updated')
     } catch (error) {
         message.error('更新分类失败')
@@ -252,8 +302,9 @@ const handleCancelEdit = () => {
     editingCategory.value = null
 }
 
-const handleDelete = async (category) => {
-    if (category._count?.prompts > 0) {
+const handleDelete = async (category: any) => {
+    const promptCount = getCategoryPromptCount(category.id)
+    if (promptCount > 0) {
         message.warning('该分类下还有提示词，无法删除')
         return
     }
@@ -265,6 +316,8 @@ const handleDelete = async (category) => {
     try {
         await api.categories.delete.mutate(category.id)
         message.success('分类删除成功')
+        // 重新加载统计信息
+        await loadStatistics()
         emit('updated')
     } catch (error) {
         message.error('删除分类失败')
@@ -277,12 +330,29 @@ const handleClose = () => {
     emit('update:show', false)
 }
 
-// 监听显示状态，重置编辑状态
-watch(() => props.show, (show) => {
+// 监听显示状态，重置编辑状态并加载统计信息
+watch(() => props.show, async (show) => {
     if (!show) {
         editingCategory.value = null
+    } else {
+        // 当模态框显示时，加载最新的统计信息
+        console.log('CategoryManageModal - Modal opened, loading statistics...')
+        await loadStatistics()
+        console.log('CategoryManageModal - Statistics loaded after modal opened:', {
+            totalCount: statistics.value.totalCount,
+            categoryStats: statistics.value.categoryStats,
+            categories: props.categories
+        })
     }
 })
+
+// 监听分类数据变化，重新加载统计信息
+watch(() => props.categories, async (newCategories) => {
+    if (props.show && newCategories.length > 0) {
+        console.log('CategoryManageModal - Categories changed, reloading statistics...')
+        await loadStatistics()
+    }
+}, { deep: true })
 </script>
 
 <style scoped>
