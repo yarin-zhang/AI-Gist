@@ -1,6 +1,8 @@
 import { createI18n } from 'vue-i18n'
 import zhCN from './locales/zh-CN.json'
+import zhTW from './locales/zh-TW.json'
 import enUS from './locales/en-US.json'
+import jaJP from './locales/ja-JP.json'
 
 const i18n = createI18n({
   legacy: false, // 使用 Composition API 模式
@@ -8,7 +10,9 @@ const i18n = createI18n({
   fallbackLocale: 'en-US', // 回退语言
   messages: {
     'zh-CN': zhCN,
-    'en-US': enUS
+    'zh-TW': zhTW,
+    'en-US': enUS,
+    'ja-JP': jaJP,
   }
 })
 

@@ -198,6 +198,8 @@
       "Automatically backup current data",
       "Completely overwrite existing database"
     ],
+    "restoreWarningItems[0]": "Automatically backup current data",
+    "restoreWarningItems[1]": "Completely overwrite existing databases",
     "storageConfiguration": "Cloud Storage Configuration",
     "storageDescription": "Configure WebDAV or iCloud Drive storage for cloud backup functionality",
     "testConnection": "Test Connection"
@@ -230,6 +232,10 @@
       "Reset database to initial state",
       "This operation cannot be undone"
     ],
+    "clearDatabaseWarningItems[0]": "Automatically create backups of current data",
+    "clearDatabaseWarningItems[1]": "Delete all existing data",
+    "clearDatabaseWarningItems[2]": "Reset the database to its initial state",
+    "clearDatabaseWarningItems[3]": "This operation is irrevocable",
     "clearDatabaseWarningText": "Clearing the database will:",
     "confirmClearDatabase": "Are you sure you want to clear the entire database?",
     "confirmDeleteBackup": "Are you sure you want to delete this backup?",
@@ -258,6 +264,8 @@
       "Automatically backup current data",
       "Completely overwrite existing database"
     ],
+    "restoreWarningItems[0]": "Automatically backup current data",
+    "restoreWarningItems[1]": "Completely overwrite existing databases",
     "securityWarning": "Security Warning",
     "securityWarningText": "You have selected to export AI configuration, the exported data will contain sensitive information such as API keys. Please keep export files safe to avoid leakage.",
     "selectDataTypeToExport": "Select data type to export:",
