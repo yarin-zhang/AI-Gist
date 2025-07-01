@@ -6,8 +6,10 @@ export function useI18n() {
   
   // 支持的语言列表
   const supportedLocales = [
-    { code: 'zh-CN' as const, name: '中文' },
-    { code: 'en-US' as const, name: 'English' }
+    { code: 'zh-CN' as const, name: '简体中文' },
+    { code: 'zh-TW' as const, name: '繁體中文' },
+    { code: 'en-US' as const, name: 'English' },
+    { code: 'ja-JP' as const, name: '日本語' }
   ]
   
   // 当前语言
