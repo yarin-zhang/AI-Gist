@@ -1,13 +1,13 @@
 <template>
     <NCard>
         <NFlex vertical :size="16">
-            <NFormItem label="启动模式">
+            <NFormItem :label="t('startup.startupMode')">
                 <NCheckbox v-model:checked="props.modelValue.startMinimized" @update:checked="handleUpdate">
                     <NFlex align="center" :size="8">
                         <div>
-                            <div>启动时最小化到托盘</div>
+                            <div>{{ t('startup.minimized') }}</div>
                             <NText depth="3" style="font-size: 12px">
-                                启动时不显示主窗口
+                                {{ t('startup.minimizedTip') }}
                             </NText>
                         </div>
                     </NFlex>
@@ -16,13 +16,13 @@
 
             <NDivider />
 
-            <NFormItem label="自启动设置">
+            <NFormItem :label="t('startup.autoStartSetting')">
                 <NCheckbox v-model:checked="props.modelValue.autoLaunch" @update:checked="handleUpdate">
                     <NFlex align="center" :size="8">
                         <div>
-                            <div>开机自动启动</div>
+                            <div>{{ t('startup.autoStart') }}</div>
                             <NText depth="3" style="font-size: 12px">
-                                系统启动时自动运行
+                                {{ t('startup.autoStartTip') }}
                             </NText>
                         </div>
                     </NFlex>
@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { NCard, NFlex, NFormItem, NCheckbox, NText, NDivider } from "naive-ui";
+import { useI18n } from 'vue-i18n'
 
 interface StartupBehaviorSettings {
     startMinimized: boolean;
@@ -47,6 +48,8 @@ const props = defineProps<{
 const emit = defineEmits<{
     "update:modelValue": [value: StartupBehaviorSettings];
 }>();
+
+const { t } = useI18n()
 
 const handleUpdate = () => {
     emit("update:modelValue", {

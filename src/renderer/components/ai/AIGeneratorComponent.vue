@@ -1,7 +1,7 @@
 <template>
     <div class="ai-generator">
         <!-- 没有AI 配置时显示的空状态 -->
-        <n-empty v-if="configs.length === 0 && !loading" description="暂无可用的 AI 配置" size="large" style="margin: 40px 0;">
+        <n-empty v-if="configs.length === 0 && !loading" :description="t('aiGenerator.noConfigAvailable')" size="large" style="margin: 40px 0;">
             <template #icon>
                 <n-icon size="48" :color="'var(--text-color-3)'">
                     <Robot />
@@ -10,7 +10,7 @@
             <template #extra>
                 <n-space vertical align="center">
                     <n-text depth="3" style="margin-bottom: 16px;">
-                        请先添加并启用至少一个 AI 配置才能使用生成功能
+                        {{ t('aiGenerator.addConfigFirst') }}
                     </n-text>
                     <n-button type="primary" @click="navigateToAIConfig">
                         <template #icon>
@@ -18,7 +18,7 @@
                                 <Plus />
                             </n-icon>
                         </template>
-                        添加 AI 配置
+                        {{ t('aiGenerator.addAIConfig') }}
                     </n-button>
                 </n-space>
             </template>
@@ -26,18 +26,18 @@
         <div v-if="configs.length > 0" class="ai-generator-layout">
             <!-- 主要内容区 -->
             <div class="main-content">
-                <n-card title="AI 提示词生成器" class="generator-card">
+                <n-card :title="t('aiGenerator.title')" class="generator-card">
                     <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top">
-                        <n-form-item label="要求" path="topic">
+                        <n-form-item :label="t('aiGenerator.requirement')" path="topic">
                             <n-split v-model:size="splitSize" direction="horizontal" :min="0.3" :max="1"
                                 :default-size="1" :disabled="true" :style="{ height: '120px', width: '100%' }">
                                 <template #1>
                                     <n-input v-model:value="formData.topic" type="textarea" :rows="4"
-                                        placeholder="描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等" :style="{ height: '100%' }" />
+                                        :placeholder="t('aiGenerator.requirementPlaceholder')" :style="{ height: '100%' }" />
                                 </template> <template #2>
                                     <div style="height: 100%; position: relative;">
                                         <n-input v-model:value="generatedResult" type="textarea" :rows="4"
-                                            placeholder="生成的提示词将在这里显示..." :readonly="autoSaveEnabled" show-count :style="{
+                                            :placeholder="t('aiGenerator.resultPlaceholder')" :readonly="autoSaveEnabled" show-count :style="{
                                                 height: '100%',
                                                 backgroundColor: 'var(--code-color)',
                                                 opacity: generatedResult ? 1 : 0.7
@@ -57,7 +57,7 @@
                                                 <Bolt />
                                             </n-icon>
                                         </template>
-                                        生成
+                                        {{ t('aiGenerator.generate') }}
                                     </n-button>
                                     
                                     <!-- 停止生成按钮 -->
@@ -67,13 +67,13 @@
                                                 <X />
                                             </n-icon>
                                         </template>
-                                        停止
+                                        {{ t('aiGenerator.stop') }}
                                     </n-button>
                                     <!-- 模型选择器 -->
                                     <AIModelSelector 
                                         ref="modelSelectorRef"
                                         v-model:modelKey="selectedModelKey"
-                                        placeholder="选择模型"
+                                        :placeholder="t('aiGenerator.selectModel')"
                                         :disabled="generating"
                                         style="min-width: 300px;"
                                         @configChange="onModelSelect"
@@ -84,12 +84,12 @@
                                                 <History />
                                             </n-icon>
                                         </template>
-                                        历史记录
+                                        {{ t('aiGenerator.history') }}
                                     </n-button>
                                 </n-space>
                                 <n-space align="center">
                                     <n-checkbox v-model:checked="autoSaveEnabled">
-                                        自动保存
+                                        {{ t('aiGenerator.autoSave') }}
                                     </n-checkbox>
                                     <n-button v-if="!autoSaveEnabled && generatedResult" type="primary"
                                         @click="manualSavePrompt">
@@ -98,7 +98,7 @@
                                                 <DeviceFloppy />
                                             </n-icon>
                                         </template>
-                                        保存
+                                        {{ t('common.save') }}
                                     </n-button>
                                 </n-space>
                             </n-space>
@@ -120,7 +120,7 @@
 
             <!-- 历史记录区（在下方，可切换显示） -->
             <div v-if="showHistory" class="history-section">
-                <n-card title="生成历史" class="history-card">
+                <n-card :title="t('aiGenerator.generationHistory')" class="history-card">
                     <template #header-extra>
                         <n-space>
                             <n-button size="small" @click="loadHistory">
@@ -129,7 +129,7 @@
                                         <Refresh />
                                     </n-icon>
                                 </template>
-                                刷新
+                                {{ t('common.refresh') }}
                             </n-button>
                             <n-button size="small" @click="toggleHistory">
                                 <template #icon>
@@ -137,7 +137,7 @@
                                         <X />
                                     </n-icon>
                                 </template>
-                                关闭
+                                {{ t('common.close') }}
                             </n-button>
                         </n-space>
                     </template>
@@ -169,25 +169,25 @@
                                     {{ item.generatedPrompt.substring(0, 100) }}...
                                 </div>
                                 <div v-else class="error-message">
-                                    错误: {{ item.errorMessage }}
+                                    {{ t('aiGenerator.error') }}: {{ item.errorMessage }}
                                 </div>
                             </n-thing>
 
                             <template #suffix>
                                <n-space vertical>
                                     <n-space v-if="item.status === 'success'">
-                                        <n-button size="small" @click="copyHistoryItem(item)">复制</n-button>
+                                        <n-button size="small" @click="copyHistoryItem(item)">{{ t('common.copy') }}</n-button>
 
-                                        <n-button size="small" @click="rewriteRequirement(item)" >
-                                            重写
+                                        <n-button size="small" @click="rewriteRequirement(item)">
+                                            {{ t('aiGenerator.rewrite') }}
                                         </n-button>
                                         <n-popconfirm @positive-click="deleteHistoryItem(item.id)">
                                             <template #trigger>
                                                 <n-button size="small">
-                                                    删除
+                                                    {{ t('common.delete') }}
                                                 </n-button>
                                             </template>
-                                            确定删除这条生成记录吗？
+                                            {{ t('aiGenerator.confirmDeleteHistory') }}
                                         </n-popconfirm>
                                     </n-space>
                                 </n-space>
@@ -195,7 +195,7 @@
                         </n-list-item>
                     </n-list>
 
-                    <n-empty v-if="history.length === 0" description="暂无生成历史" />
+                    <n-empty v-if="history.length === 0" :description="t('aiGenerator.noHistory')" />
 
                     <!-- 分页组件 -->
                     <div v-if="history.length > 0" style="margin-top: 16px; display: flex; justify-content: center;">
@@ -243,9 +243,11 @@ import AIModelSelector from '~/components/common/AIModelSelector.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 import { useDatabase } from '~/composables/useDatabase'
+import { useI18n } from 'vue-i18n'
 
 const message = useMessage()
 const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
+const { t } = useI18n()
 
 // 事件定义
 interface Emits {

@@ -232,7 +232,7 @@ const loadStatistics = async () => {
 // 方法
 const handleCreate = async () => {
     if (!newCategory.value.name.trim()) {
-        message.warning('请输入分类名称')
+        message.warning(t('promptManagement.enterCategoryName'))
         return
     }
 
@@ -251,12 +251,12 @@ const handleCreate = async () => {
             color: '#18A05833'
         }
 
-        message.success('分类创建成功')
+        message.success(t('promptManagement.categoryCreatedSuccess'))
         // 重新加载统计信息
         await loadStatistics()
         emit('updated')
     } catch (error) {
-        message.error('创建分类失败')
+        message.error(t('promptManagement.categoryCreatedFailed'))
         console.error(error)
     } finally {
         creating.value = false
@@ -273,7 +273,7 @@ const handleEdit = (category: any) => {
 
 const handleSaveEdit = async () => {
     if (!editingCategory.value?.name.trim()) {
-        message.warning('请输入分类名称')
+        message.warning(t('promptManagement.enterCategoryName'))
         return
     }
 
@@ -288,12 +288,12 @@ const handleSaveEdit = async () => {
         })
 
         editingCategory.value = null
-        message.success('分类更新成功')
+        message.success(t('promptManagement.categoryUpdatedSuccess'))
         // 重新加载统计信息
         await loadStatistics()
         emit('updated')
     } catch (error) {
-        message.error('更新分类失败')
+        message.error(t('promptManagement.categoryUpdatedFailed'))
         console.error(error)
     } finally {
         updating.value = false
@@ -307,22 +307,22 @@ const handleCancelEdit = () => {
 const handleDelete = async (category: any) => {
     const promptCount = getCategoryPromptCount(category.id)
     if (promptCount > 0) {
-        message.warning('该分类下还有提示词，无法删除')
+        message.warning(t('promptManagement.categoryHasPrompts'))
         return
     }
 
-    if (!confirm(`确定要删除分类 "${category.name}" 吗？`)) {
+    if (!confirm(t('promptManagement.confirmDeleteCategory', { name: category.name }))) {
         return
     }
 
     try {
         await api.categories.delete.mutate(category.id)
-        message.success('分类删除成功')
+        message.success(t('promptManagement.categoryDeletedSuccess'))
         // 重新加载统计信息
         await loadStatistics()
         emit('updated')
     } catch (error) {
-        message.error('删除分类失败')
+        message.error(t('promptManagement.categoryDeletedFailed'))
         console.error(error)
     }
 }

@@ -214,13 +214,13 @@
                         </NIcon>
                         <div>
                             <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                                {{ editingConfig ? "编辑配置" : "添加配置" }}
+                                {{ editingConfig ? t('aiConfig.editConfig') : t('aiConfig.addConfig') }}
                             </NText>
                             <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
                                 {{
                                     editingConfig
-                                        ? "修改现有的 AI 配置信息"
-                                        : "添加新的 AI 服务配置，支持多种接口。"
+                                        ? t('aiConfig.editConfigDesc')
+                                        : t('aiConfig.addConfigDesc')
                                 }}
                             </NText>
                         </div>
@@ -232,18 +232,18 @@
                     :max="0.8" :disabled="modalWidth <= 800">
                     <!-- 左侧：基本配置 -->
                     <template #1>
-                        <NCard title="基本配置" size="small" :style="{ height: '100%' }">
+                        <NCard :title="t('aiConfig.basicConfig')" size="small" :style="{ height: '100%' }">
                             <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                                 <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
                                     require-mark-placement="right-hanging" style="padding-right: 12px;">
                                     <NFlex vertical size="large">
-                                        <n-form-item label="服务类型" path="type">
+                                        <n-form-item :label="t('aiConfig.serviceType')" path="type">
                                             <n-select v-model:value="formData.type" :options="typeOptions"
                                                 @update:value="onTypeChange" />
                                         </n-form-item>
 
-                                        <n-form-item label="配置名称" path="name">
-                                            <n-input v-model:value="formData.name" placeholder="输入配置名称" />
+                                        <n-form-item :label="t('aiConfig.configName')" path="name">
+                                            <n-input v-model:value="formData.name" :placeholder="t('aiConfig.configNamePlaceholder')" />
                                         </n-form-item> <n-form-item :label="getBaseURLInfo.label" path="baseURL"
                                             v-if="needsBaseURL || formData.type === 'anthropic' || formData.type === 'google' || formData.type === 'cohere'">
                                             <n-input v-model:value="formData.baseURL"
@@ -253,11 +253,11 @@
                                         <n-form-item :label="getApiKeyLabel" path="apiKey" v-if="needsApiKey">
                                             <n-input v-model:value="formData.apiKey" type="password"
                                                 show-password-on="click"
-                                                :placeholder="`输入 ${getApiKeyLabel.replace('：', '')}`" />
+                                                :placeholder="`${t('aiConfig.enter')} ${getApiKeyLabel.replace('：', '')}`" />
                                         </n-form-item>
 
                                         <!-- 连接测试区域 -->
-                                        <n-form-item label="连接测试">
+                                        <n-form-item :label="t('aiConfig.connectionTest')">
                                             <NFlex vertical size="medium" style="width: 100%;"> <n-button
                                                     @click="testFormConnection" :loading="testingFormConnection"
                                                     :disabled="!canTestConnection" type="info" block>
@@ -266,17 +266,16 @@
                                                             <Server />
                                                         </NIcon>
                                                     </template>
-                                                    测试连接并获取模型列表
+                                                    {{ t('aiConfig.testConnectionAndGetModels') }}
                                                 </n-button>
 
                                                 <!-- 测试结果显示 -->
                                                 <n-alert v-if="formTestResult"
                                                     :type="formTestResult.success ? 'success' : 'error'"
-                                                    :title="formTestResult.success ? '连接成功' : '连接失败'">
+                                                    :title="formTestResult.success ? t('aiConfig.testSuccess') : t('aiConfig.testFailed')">
                                                     {{
                                                         formTestResult.success
-                                                            ? `发现 ${formTestResult.models?.length || 0
-                                                            } 个可用模型`
+                                                            ? t('aiConfig.foundModels', { count: formTestResult.models?.length || 0 })
                                                             : formTestResult.error
                                                     }}
                                                 </n-alert>
@@ -290,35 +289,35 @@
 
                     <!-- 右侧：模型配置 -->
                     <template #2>
-                        <NCard title="模型配置" size="small" :style="{ height: '100%' }">
+                        <NCard :title="t('aiConfig.modelConfig')" size="small" :style="{ height: '100%' }">
                             <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                                 <NFlex vertical size="large" style="padding-right: 12px;">
-                                    <n-form-item label="模型列表" path="models">
+                                    <n-form-item :label="t('aiConfig.modelList')" path="models">
                                         <n-dynamic-tags v-model:value="formData.models" />
                                         <template #feedback>
                                             <NText depth="3" style="font-size: 12px;">
-                                                点击左侧"测试连接"按钮可自动获取可用模型列表
+                                                {{ t('aiConfig.clickTestConnectionTip') }}
                                             </NText>
                                         </template>
                                     </n-form-item>
 
-                                    <n-form-item label="默认模型" path="defaultModel">
+                                    <n-form-item :label="t('aiConfig.defaultModel')" path="defaultModel">
                                         <n-select v-model:value="formData.defaultModel" :options="modelOptions"
-                                            placeholder="选择默认模型" filterable tag clearable />
+                                            :placeholder="t('aiConfig.selectDefaultModel')" filterable tag clearable />
                                     </n-form-item>
 
-                                    <n-form-item label="自定义模型" path="customModel">
-                                        <n-input v-model:value="formData.customModel" placeholder="输入自定义模型名称（可选）" />
+                                    <n-form-item :label="t('aiConfig.customModel')" path="customModel">
+                                        <n-input v-model:value="formData.customModel" :placeholder="t('aiConfig.customModelPlaceholder')" />
                                         <template #feedback>
                                             <NText depth="3" style="font-size: 12px;">
-                                                如果默认模型列表中没有您需要的模型，可以在此手动输入
+                                                {{ t('aiConfig.customModelTip') }}
                                             </NText>
                                         </template>
                                     </n-form-item>
 
                                     <!-- 模型信息显示 -->
                                     <div v-if="formData.models.length > 0">
-                                        <NText strong style="margin-bottom: 8px; display: block;">可用模型</NText>
+                                        <NText strong style="margin-bottom: 8px; display: block;">{{ t('aiConfig.availableModels') }}</NText>
                                         <NFlex wrap style="gap: 8px;">
                                             <NTag v-for="model in formData.models" :key="model" size="small"
                                                 :type="model === formData.defaultModel ? 'primary' : 'default'">

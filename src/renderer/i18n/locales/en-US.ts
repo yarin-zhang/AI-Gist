@@ -98,6 +98,15 @@ export default {
     createCategory: 'Create Category',
     noCategories: 'No categories, please create a new category on the left',
     categoryPromptCount: '{count} prompts',
+    enterCategoryName: 'Please enter category name',
+    categoryCreatedSuccess: 'Category created successfully',
+    categoryCreatedFailed: 'Failed to create category',
+    categoryUpdatedSuccess: 'Category updated successfully',
+    categoryUpdatedFailed: 'Failed to update category',
+    categoryHasPrompts: 'This category still has prompts and cannot be deleted',
+    confirmDeleteCategory: 'Are you sure you want to delete category "{name}"?',
+    categoryDeletedSuccess: 'Category deleted successfully',
+    categoryDeletedFailed: 'Failed to delete category'
   },
   
   // AI Config page
@@ -123,7 +132,25 @@ export default {
     systemPrompt: 'System Prompt',
     connectionTest: 'Connection Test',
     requestTest: 'Request Test',
-    delete: 'Delete'
+    delete: 'Delete',
+    editConfig: 'Edit Configuration',
+    addConfigDesc: 'Add new AI service configuration, supports multiple interfaces.',
+    basicConfig: 'Basic Configuration',
+    serviceType: 'Service Type',
+    configName: 'Configuration Name',
+    configNamePlaceholder: 'Enter configuration name',
+    enter: 'Enter',
+    testConnectionAndGetModels: 'Test connection and get model list',
+    testSuccess: 'Connection successful',
+    testFailed: 'Connection failed',
+    foundModels: 'Found {count} available models',
+    modelConfig: 'Model Configuration',
+    modelList: 'Model List',
+    clickTestConnectionTip: 'Click the "Test Connection" button on the left to automatically get available model list',
+    selectDefaultModel: 'Select default model',
+    customModelPlaceholder: 'Enter custom model name (optional)',
+    customModelTip: 'If the model you need is not in the default model list, you can manually enter it here',
+    availableModels: 'Available Models'
   },
   
   // Settings page
@@ -293,5 +320,88 @@ export default {
     language: 'Language',
     chinese: 'Chinese',
     english: 'English'
+  },
+  
+  // Startup behavior settings
+  startup: {
+    title: 'Startup Behavior',
+    subtitle: 'Configure the app behavior on startup',
+    startupMode: 'Startup Mode',
+    minimized: 'Minimize to tray on startup',
+    minimizedTip: 'Do not show main window on startup',
+    autoStartSetting: 'Auto Launch Setting',
+    autoStart: 'Auto launch on system startup',
+    autoStartTip: 'Run automatically when the system starts',
+    enableAutoStart: 'Enable auto launch',
+    disableAutoStart: 'Disable auto launch'
+  },
+  
+  // Close behavior settings
+  closeBehavior: {
+    title: 'Close Behavior',
+    subtitle: 'Configure the behavior when closing the window',
+    closeBehaviorMode: 'Close Behavior Mode',
+    ask: 'Ask each time',
+    askTip: 'Show dialog for you to choose',
+    fixed: 'Fixed behavior',
+    fixedTip: 'Execute specified action directly',
+    closeAction: 'Close Action',
+    quit: 'Quit application',
+    quitDesc: 'Completely exit the program',
+    minimize: 'Minimize to tray',
+    minimizeDesc: 'Continue running in background',
+    currentSetting: 'Current Setting',
+    askOnClose: 'Show selection dialog when closing',
+    directAction: 'Directly {action} when closing'
+  },
+  
+  aiGenerator: {
+    title: 'AI Prompt Generator',
+    noConfigAvailable: 'No available AI configurations',
+    addConfigFirst: 'Please add and enable at least one AI configuration to use the generation feature',
+    addAIConfig: 'Add AI Configuration',
+    requirement: 'Requirement',
+    requirementPlaceholder: 'Describe the prompt you want to generate, e.g., writing assistant, code review, translation tool, etc.',
+    resultPlaceholder: 'Generated prompt will be displayed here...',
+    generate: 'Generate',
+    stop: 'Stop',
+    selectModel: 'Select Model',
+    history: 'History',
+    autoSave: 'Auto Save',
+    generationHistory: 'Generation History',
+    error: 'Error',
+    rewrite: 'Rewrite',
+    confirmDeleteHistory: 'Are you sure you want to delete this generation record?',
+    noHistory: 'No generation history'
+  },
+  
+  quickOptimization: {
+    title: 'Quick Optimization Prompt Configuration',
+    subtitle: 'Manage quick optimization options when editing prompts',
+    optimizePrompt: 'Optimize Prompt',
+    noConfig: 'No configurations',
+    initializeDefaults: 'Initialize Default Configurations',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    sortOrder: 'Sort Order',
+    enable: 'Enable',
+    disable: 'Disable',
+    description: 'Description',
+    promptTemplate: 'Prompt Template',
+    addConfig: 'Add Configuration',
+    editConfig: 'Edit Configuration',
+    configName: 'Configuration Name',
+    configNamePlaceholder: 'Enter configuration name, e.g., More Concise, More Rich, etc.',
+    descriptionPlaceholder: 'Enter configuration description (optional)',
+    promptTemplatePlaceholder: 'Enter prompt template, use {{content}} as placeholder',
+    sortOrderPlaceholder: 'Sort number',
+    enabledStatus: 'Enabled Status'
+  },
+  
+  databaseStatus: {
+    connectionError: 'Database connection error',
+    retry: 'Retry',
+    retrying: 'Retrying...',
+    hide: 'Hide'
   }
 } 

@@ -9,7 +9,7 @@
       </div>
       <div class="text">
         <div class="error-message">
-          <div>数据库连接异常</div>
+          <div>{{ t('databaseStatus.connectionError') }}</div>
           <div class="error-detail">{{ databaseError }}</div>
         </div>
       </div>
@@ -19,10 +19,10 @@
           class="retry-btn"
           :disabled="isRetrying"
         >
-          {{ isRetrying ? '重试中...' : '重试' }}
+          {{ isRetrying ? t('databaseStatus.retrying') : t('databaseStatus.retry') }}
         </button>
         <button @click="hide" class="close-btn">
-          隐藏
+          {{ t('databaseStatus.hide') }}
         </button>
       </div>
     </div>
@@ -32,8 +32,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useDatabase } from '~/composables/useDatabase'
+import { useI18n } from 'vue-i18n'
 
 const { isDatabaseReady, databaseError, waitForDatabase, clearError } = useDatabase()
+const { t } = useI18n()
 
 const isHidden = ref(false)
 const isRetrying = ref(false)
