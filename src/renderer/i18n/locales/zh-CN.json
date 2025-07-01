@@ -131,10 +131,7 @@
     "refreshBackupList": "刷新备份列表",
     "restore": "恢复",
     "restoreWarning": "注意！恢复云端备份将会：",
-    "restoreWarningItems": [
-      "自动备份当前数据",
-      "完全覆盖现有数据库"
-    ],
+    "restoreWarningItems": ["自动备份当前数据", "完全覆盖现有数据库"],
     "storageConfiguration": "云端存储配置",
     "storageDescription": "配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能",
     "testConnection": "测试连接"
@@ -154,14 +151,10 @@
     "yes": "是"
   },
   "conflictResolution": {
-    "dataSummary": {
-    },
-    "operationHint": {
-    },
-    "quickActions": {
-    },
-    "strategies": {
-    }
+    "dataSummary": {},
+    "operationHint": {},
+    "quickActions": {},
+    "strategies": {}
   },
   "dataManagement": {
     "aiConfiguration": "AI 配置",
@@ -200,10 +193,7 @@
     "repairDatabase": "修复数据库",
     "restore": "恢复",
     "restoreWarning": "注意！恢复备份将会：",
-    "restoreWarningItems": [
-      "自动备份当前数据",
-      "完全覆盖现有数据库"
-    ],
+    "restoreWarningItems": ["自动备份当前数据", "完全覆盖现有数据库"],
     "securityWarning": "安全提示",
     "securityWarningText": "您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。",
     "selectDataTypeToExport": "选择要导出的数据类型：",
@@ -478,8 +468,45 @@
       "laboratory": "实验室",
       "startup": "启动行为设置"
     },
+    "sectionDescriptions": {
+      "close-behavior": {
+        "title": "关闭行为设置",
+        "description": "配置应用关闭时的行为"
+      },
+      "startup-behavior": {
+        "title": "启动行为设置",
+        "description": "配置应用启动和自启动选项"
+      },
+      "appearance": {
+        "title": "外观设置",
+        "description": "配置应用的主题模式"
+      },
+      "language": {
+        "title": "语言设置",
+        "description": "配置应用的显示语言"
+      },
+      "data-management": {
+        "title": "数据管理",
+        "description": "数据备份、恢复、导入导出功能"
+      },
+      "cloud-backup": {
+        "title": "云端备份",
+        "description": "配置 WebDAV 和 iCloud Drive 云端备份功能"
+      },
+      "about": {
+        "title": "关于",
+        "description": "查看应用版本信息和检查更新"
+      },
+      "laboratory": {
+        "title": "实验室",
+        "description": "开发中的实验性功能和组件测试"
+      }
+    },
     "subtitle": "个性化配置您的应用偏好",
-    "title": "应用设置"
+    "title": "应用设置",
+    "autoSave": "设置会自动保存",
+    "resetToDefault": "恢复默认设置",
+    "settingsMenu": "设置菜单"
   },
   "startup": {
     "autoStart": "开机自动启动",
@@ -488,5 +515,54 @@
     "minimized": "启动时最小化到托盘",
     "minimizedTip": "启动时不显示主窗口",
     "startupMode": "启动模式"
+  },
+  "settingsMessages": {
+    "loadSettings": "开始加载设置...",
+    "settingsLoaded": "设置加载成功:",
+    "loadSettingsFailed": "加载设置失败",
+    "saveSettingsFailed": "保存设置失败",
+    "settingsUpdated": "设置更新成功:",
+    "noSettingsToUpdate": "没有需要更新的设置",
+    "settingsReset": "设置已恢复为默认值",
+    "resetSettingsFailed": "重置设置失败",
+    "dataExportSuccess": "数据导出成功",
+    "dataExportFailed": "数据导出失败",
+    "dataImportSuccess": "数据导入成功",
+    "dataImportFailed": "数据导入失败",
+    "selectiveExportSuccess": "选择性导出成功",
+    "selectiveExportFailed": "选择性导出失败",
+    "fullBackupImportSuccess": "完整备份导入成功",
+    "fullBackupImportFailed": "完整备份导入失败",
+    "fullBackupExportSuccess": "完整备份导出成功",
+    "fullBackupExportFailed": "完整备份导出失败",
+    "getDataStatsFailed": "获取数据统计失败",
+    "getBackupListFailed": "获取备份列表失败",
+    "backupCreatedSuccess": "备份创建成功: {name} (大小: {size} KB)",
+    "backupCreatedFailed": "创建备份失败",
+    "creatingAutoBackup": "正在创建当前数据的自动备份...",
+    "autoBackupCreated": "自动备份创建成功: {name}",
+    "restoringBackup": "正在恢复备份数据...",
+    "backupRestoreSuccess": "备份恢复成功。已自动备份原数据: {name}",
+    "backupRestoreFailed": "备份恢复失败",
+    "backupDeleteSuccess": "备份删除成功",
+    "backupDeleteFailed": "删除备份失败",
+    "databaseHealthy": "数据库状态正常",
+    "databaseUnhealthy": "数据库存在异常，缺失的对象存储: {stores}",
+    "databaseHealthCheckFailed": "数据库健康检查失败",
+    "databaseCleared": "数据库清空成功",
+    "databaseClearFailed": "数据库清空失败",
+    "databaseRepairSuccess": "数据库修复成功：{message}",
+    "databaseNoRepairNeeded": "数据库状态正常，无需修复",
+    "databaseRepairFailed": "数据库修复失败：{message}",
+    "backupDirectoryOpened": "已打开备份目录",
+    "openBackupDirectoryFailed": "打开备份目录失败",
+    "getBackupDirectoryFailed": "获取备份目录路径失败",
+    "manualBackup": "手动备份 - {timestamp}",
+    "autoBackupBeforeRestore": "恢复前自动备份 - {timestamp}",
+    "originalConfig": "获取到的原始配置:",
+    "settingsResetLog": "设置已重置:",
+    "startDeleteBackup": "开始删除备份: {backupId}",
+    "databaseHealthCheckResult": "数据库健康检查结果:",
+    "stillMissingStores": "仍缺失的对象存储:"
   }
 }

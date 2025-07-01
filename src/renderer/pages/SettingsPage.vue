@@ -18,7 +18,7 @@
                                 <Check />
                             </NIcon>
                         </template>
-                        设置会自动保存
+                        {{ t('settings.autoSave') }}
                     </NButton>
                 </NFlex>
                     <NButton type="error" @click="resetSettings" :loading="loading.reset" secondary>
@@ -27,7 +27,7 @@
                                 <Refresh />
                             </NIcon>
                         </template>
-                        恢复默认设置
+                        {{ t('settings.resetToDefault') }}
                     </NButton>
                 </NFlex>
 
@@ -42,7 +42,7 @@
                                 <NIcon size="20" color="#409EFF">
                                     <Settings />
                                 </NIcon>
-                                <span>设置菜单</span>
+                                <span>{{ t('settings.settingsMenu') }}</span>
                             </NFlex>
                         </template>
 
@@ -285,49 +285,22 @@ const menuOptions = computed(() => {
 
 // 当前设置区域信息
 const currentSectionInfo = computed(() => {
-    const sections: Record<string, { title: string; icon: any; description: string }> = {
-        "close-behavior": {
-            title: "关闭行为设置",
-            icon: Power,
-            description: "配置应用关闭时的行为"
-        },
-        "startup-behavior": {
-            title: "启动行为设置",
-            icon: Rocket,
-            description: "配置应用启动和自启动选项"
-        },
-        appearance: {
-            title: "外观设置",
-            icon: Sun,
-            description: "配置应用的主题模式"
-        },
-        language: {
-            title: "语言设置",
-            icon: Globe,
-            description: "配置应用的显示语言"
-        },
-        "data-management": {
-            title: "数据管理",
-            icon: Database,
-            description: "数据备份、恢复、导入导出功能"
-        },
-        "cloud-backup": {
-            title: "云端备份",
-            icon: Cloud,
-            description: "配置 WebDAV 和 iCloud Drive 云端备份功能"
-        },
-        about: {
-            title: "关于",
-            icon: InfoCircle,
-            description: "查看应用版本信息和检查更新"
-        },
-        laboratory: {
-            title: "实验室",
-            icon: Flask,
-            description: "开发中的实验性功能和组件测试"
-        },
+    const key = activeSettingKey.value;
+    const section = {
+        "close-behavior": Power,
+        "startup-behavior": Rocket,
+        appearance: Sun,
+        language: Globe,
+        "data-management": Database,
+        "cloud-backup": Cloud,
+        about: InfoCircle,
+        laboratory: Flask
     };
-    return sections[activeSettingKey.value] || sections["data-management"];
+    return {
+        title: t(`settings.sectionDescriptions.${key}.title`),
+        icon: section[key as keyof typeof section] || Database,
+        description: t(`settings.sectionDescriptions.${key}.description`)
+    };
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
@@ -344,9 +317,9 @@ const handleMenuSelect = (key: string) => {
 // 加载设置
 const loadSettings = async () => {
     try {
-        console.log('开始加载设置...');
+        console.log(t('settingsMessages.loadSettings'));
         const prefs = await window.electronAPI.preferences.get();
-        console.log('获取到的原始配置:', prefs);
+        console.log(t('settingsMessages.originalConfig'), prefs);
 
         // 确保数据同步配置结构完整  
         const dataSyncConfig = prefs.dataSync || {};
@@ -363,12 +336,12 @@ const loadSettings = async () => {
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
 
-        console.log("设置加载成功:", {
+        console.log(t('settingsMessages.settingsLoaded'), {
             ...settings,
         });
     } catch (error) {
-        console.error("加载设置失败:", error);
-        message.error("加载设置失败");
+        console.error(t('settingsMessages.loadSettingsFailed'), error);
+        message.error(t('settingsMessages.loadSettingsFailed'));
     }
 };
 
@@ -391,7 +364,7 @@ const updateSetting = async () => {
         );
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
-        console.log("设置更新成功:", updatedPrefs);
+        console.log(t('settingsMessages.settingsUpdated'), updatedPrefs);
 
         // 如果更改了主题设置，也要更新主题管理器
         if (settings.themeSource) {
@@ -402,8 +375,8 @@ const updateSetting = async () => {
             saving.value = false;
         }, 500);
     } catch (error) {
-        console.error("保存设置失败:", error);
-        message.error("保存设置失败");
+        console.error(t('settingsMessages.saveSettingsFailed'), error);
+        message.error(t('settingsMessages.saveSettingsFailed'));
         saving.value = false;
     }
 };
@@ -441,13 +414,13 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
 
         // 如果没有要更新的数据，直接返回
         if (!settingsData || Object.keys(settingsData).length === 0) {
-            console.log('没有需要更新的设置');
+            console.log(t('settingsMessages.noSettingsToUpdate'));
             saving.value = false;
             return;
         }
 
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
-        console.log("设置更新成功:", updatedPrefs);
+        console.log(t('settingsMessages.settingsUpdated'), updatedPrefs);
 
         // 如果更改了主题设置，也要更新主题管理器
         if (settingsData.themeSource) {
@@ -458,8 +431,8 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
             saving.value = false;
         }, 500);
     } catch (error) {
-        console.error("保存设置失败:", error);
-        message.error("保存设置失败");
+        console.error(t('settingsMessages.saveSettingsFailed'), error);
+        message.error(t('settingsMessages.saveSettingsFailed'));
         saving.value = false;
     }
 };
@@ -474,11 +447,11 @@ const resetSettings = async () => {
         // 重置主题
         await window.electronAPI.theme.setSource(settings.themeSource);
 
-        message.success("设置已恢复为默认值");
-        console.log("设置已重置:", defaultPrefs);
+        message.success(t('settingsMessages.settingsReset'));
+        console.log(t('settingsMessages.settingsResetLog'), defaultPrefs);
     } catch (error) {
-        console.error("重置设置失败:", error);
-        message.error("重置设置失败");
+        console.error(t('settingsMessages.resetSettingsFailed'), error);
+        message.error(t('settingsMessages.resetSettingsFailed'));
     }
     loading.reset = false;
 };
@@ -500,14 +473,14 @@ const exportData = async (format: 'json' | 'csv') => {
             }, exportPath);
             
             if (result.success) {
-                message.success(`数据导出成功`);
+                message.success(t('settingsMessages.dataExportSuccess'));
             } else {
-                message.error('数据导出失败');
+                message.error(t('settingsMessages.dataExportFailed'));
             }
         }
     } catch (error) {
-        console.error('数据导出失败:', error);
-        message.error('数据导出失败');
+        console.error(t('settingsMessages.dataExportFailed'), error);
+        message.error(t('settingsMessages.dataExportFailed'));
     }
     loading.export = false;
 };
@@ -526,14 +499,14 @@ const importData = async (format: 'json' | 'csv') => {
             });
             
             if (result.success) {
-                message.success(result.message || '数据导入成功');
+                message.success(result.message || t('settingsMessages.dataImportSuccess'));
             } else {
-                message.error(result.message || '数据导入失败');
+                message.error(result.message || t('settingsMessages.dataImportFailed'));
             }
         }
     } catch (error) {
-        console.error('数据导入失败:', error);
-        message.error('数据导入失败');
+        console.error(t('settingsMessages.dataImportFailed'), error);
+        message.error(t('settingsMessages.dataImportFailed'));
     }
     loading.import = false;
 };
@@ -549,14 +522,14 @@ const exportSelected = async (format: 'json' | 'csv', options: any) => {
             const result = await DataManagementAPI.exportSelectedData(options, exportPath);
             
             if (result.success) {
-                message.success(result.message || `选择性导出成功`);
+                message.success(result.message || t('settingsMessages.selectiveExportSuccess'));
             } else {
-                message.error(result.message || '选择性导出失败');
+                message.error(result.message || t('settingsMessages.selectiveExportFailed'));
             }
         }
     } catch (error) {
-        console.error('选择性导出失败:', error);
-        message.error('选择性导出失败');
+        console.error(t('settingsMessages.selectiveExportFailed'), error);
+        message.error(t('settingsMessages.selectiveExportFailed'));
     }
     loading.export = false;
 };
@@ -568,13 +541,13 @@ const importFullBackup = async () => {
         const result = await DataManagementAPI.importFullBackup();
         
         if (result.success) {
-            message.success(result.message || '完整备份导入成功');
+            message.success(result.message || t('settingsMessages.fullBackupImportSuccess'));
         } else {
-            message.error(result.message || '完整备份导入失败');
+            message.error(result.message || t('settingsMessages.fullBackupImportFailed'));
         }
     } catch (error) {
-        console.error('完整备份导入失败:', error);
-        message.error('完整备份导入失败');
+        console.error(t('settingsMessages.fullBackupImportFailed'), error);
+        message.error(t('settingsMessages.fullBackupImportFailed'));
     }
     loading.import = false;
 };
@@ -586,13 +559,13 @@ const exportFullBackup = async () => {
         const result = await DataManagementAPI.exportFullBackup();
         
         if (result.success) {
-            message.success(result.message || '完整备份导出成功');
+            message.success(result.message || t('settingsMessages.fullBackupExportSuccess'));
         } else {
-            message.error(result.message || '完整备份导出失败');
+            message.error(result.message || t('settingsMessages.fullBackupExportFailed'));
         }
     } catch (error) {
-        console.error('完整备份导出失败:', error);
-        message.error('完整备份导出失败');
+        console.error(t('settingsMessages.fullBackupExportFailed'), error);
+        message.error(t('settingsMessages.fullBackupExportFailed'));
     }
     loading.export = false;
 };
@@ -607,7 +580,7 @@ const loadDataStats = async () => {
             dataManagementRef.value.updateDataStats(stats);
         }
     } catch (error) {
-        console.error("获取数据统计失败:", error);
+        console.error(t('settingsMessages.getDataStatsFailed'), error);
         // 不显示错误消息，因为这不是关键功能
     }
 };
@@ -631,8 +604,8 @@ const refreshBackupList = async () => {
             dataManagementRef.value.updateBackupList(formattedBackups);
         }
     } catch (error) {
-        console.error("获取备份列表失败:", error);
-        message.error("获取备份列表失败");
+        console.error(t('settingsMessages.getBackupListFailed'), error);
+        message.error(t('settingsMessages.getBackupListFailed'));
     }
 };
 
@@ -641,14 +614,17 @@ const createBackup = async () => {
     loading.backup = true;
     try {
         const timestamp = new Date().toLocaleString('zh-CN');
-        const backup = await DataManagementAPI.createBackup(`手动备份 - ${timestamp}`);
-        message.success(`备份创建成功: ${backup.name} (大小: ${(backup.size / 1024).toFixed(2)} KB)`);
+        const backup = await DataManagementAPI.createBackup(t('settingsMessages.manualBackup', { timestamp }));
+        message.success(t('settingsMessages.backupCreatedSuccess', { 
+            name: backup.name, 
+            size: (backup.size / 1024).toFixed(2) 
+        }));
 
         // 创建成功后立即刷新备份列表
         await refreshBackupList();
     } catch (error) {
-        console.error("创建备份失败:", error);
-        message.error("创建备份失败");
+        console.error(t('settingsMessages.backupCreatedFailed'), error);
+        message.error(t('settingsMessages.backupCreatedFailed'));
     } finally {
         loading.backup = false;
     }
@@ -659,26 +635,26 @@ const restoreSpecificBackup = async (backupId: string) => {
     loading.backup = true;
     try {
         // 步骤1: 先创建当前数据的自动备份
-        message.info("正在创建当前数据的自动备份...");
+        message.info(t('settingsMessages.creatingAutoBackup'));
         const timestamp = new Date().toLocaleString('zh-CN');
-        const autoBackup = await DataManagementAPI.createBackup(`恢复前自动备份 - ${timestamp}`);
-        console.log(`自动备份创建成功: ${autoBackup.name}`);
+        const autoBackup = await DataManagementAPI.createBackup(t('settingsMessages.autoBackupBeforeRestore', { timestamp }));
+        console.log(t('settingsMessages.autoBackupCreated', { name: autoBackup.name }));
 
         // 步骤2: 执行恢复操作
-        message.info("正在恢复备份数据...");
+        message.info(t('settingsMessages.restoringBackup'));
         const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
 
         if (result.success) {
-            message.success(`备份恢复成功。已自动备份原数据: ${autoBackup.name}`);
+            message.success(t('settingsMessages.backupRestoreSuccess', { name: autoBackup.name }));
             // 恢复成功后刷新备份列表
             await refreshBackupList();
         } else {
-            message.error("备份恢复失败");
+            message.error(t('settingsMessages.backupRestoreFailed'));
         }
     } catch (error) {
-        console.error("恢复备份失败:", error);
-        const errorMessage = error instanceof Error ? error.message : '恢复备份失败';
-        message.error(`恢复备份失败: ${errorMessage}`);
+        console.error(t('settingsMessages.backupRestoreFailed'), error);
+        const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupRestoreFailed');
+        message.error(`${t('settingsMessages.backupRestoreFailed')}: ${errorMessage}`);
     } finally {
         loading.backup = false;
     }
@@ -687,21 +663,21 @@ const restoreSpecificBackup = async (backupId: string) => {
 // 删除备份
 const deleteBackup = async (backupId: string) => {
     try {
-        console.log(`开始删除备份: ${backupId}`);
+        console.log(t('settingsMessages.startDeleteBackup', { backupId }));
         await DataManagementAPI.deleteBackup(backupId);
-        message.success("备份删除成功");
+        message.success(t('settingsMessages.backupDeleteSuccess'));
         // 删除成功后刷新备份列表
         await refreshBackupList();
     } catch (error) {
-        console.error("删除备份失败:", error);
-        const errorMessage = error instanceof Error ? error.message : '删除备份失败';
-        message.error(`删除备份失败: ${errorMessage}`);
+        console.error(t('settingsMessages.backupDeleteFailed'), error);
+        const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupDeleteFailed');
+        message.error(`${t('settingsMessages.backupDeleteFailed')}: ${errorMessage}`);
 
         // 删除失败后也刷新备份列表，以确保UI状态正确
         try {
             await refreshBackupList();
         } catch (refreshError) {
-            console.error("刷新备份列表失败:", refreshError);
+            console.error(t('settingsMessages.getBackupListFailed'), refreshError);
         }
     }
 };
@@ -713,14 +689,14 @@ const checkDatabaseHealth = async () => {
         const result = await databaseServiceManager.getHealthStatus();
         
         if (result.healthy) {
-            message.success("数据库状态正常");
+            message.success(t('settingsMessages.databaseHealthy'));
         } else {
-            message.warning(`数据库存在异常，缺失的对象存储: ${result.missingStores.join(', ')}`);
-            console.warn('数据库健康检查结果:', result);
+            message.warning(t('settingsMessages.databaseUnhealthy', { stores: result.missingStores.join(', ') }));
+            console.warn(t('settingsMessages.databaseHealthCheckResult'), result);
         }
     } catch (error) {
-        console.error("数据库健康检查失败:", error);
-        message.error("数据库健康检查失败");
+        console.error(t('settingsMessages.databaseHealthCheckFailed'), error);
+        message.error(t('settingsMessages.databaseHealthCheckFailed'));
     }
     loading.healthCheck = false;
 };
@@ -730,10 +706,10 @@ const clearDatabase = async () => {
     loading.clearDatabase = true;
     try {
         await databaseServiceManager.forceCleanAllTables();
-        message.success("数据库清空成功");
+        message.success(t('settingsMessages.databaseCleared'));
     } catch (error) {
-        console.error("数据库清空失败:", error);
-        message.error("数据库清空失败");
+        console.error(t('settingsMessages.databaseClearFailed'), error);
+        message.error(t('settingsMessages.databaseClearFailed'));
     }
     loading.clearDatabase = false;
 };
@@ -746,19 +722,19 @@ const repairDatabase = async () => {
 
         if (result.healthy) {
             if (result.repaired) {
-                message.success(`数据库修复成功：${result.message}`);
+                message.success(t('settingsMessages.databaseRepairSuccess', { message: result.message }));
             } else {
-                message.success("数据库状态正常，无需修复");
+                message.success(t('settingsMessages.databaseNoRepairNeeded'));
             }
         } else {
-            message.error(`数据库修复失败：${result.message}`);
+            message.error(t('settingsMessages.databaseRepairFailed', { message: result.message }));
             if (result.missingStores && result.missingStores.length > 0) {
-                console.error('仍缺失的对象存储:', result.missingStores);
+                console.error(t('settingsMessages.stillMissingStores'), result.missingStores);
             }
         }
     } catch (error) {
-        console.error("数据库修复失败:", error);
-        message.error("数据库修复失败");
+        console.error(t('settingsMessages.databaseRepairFailed', { message: '' }), error);
+        message.error(t('settingsMessages.databaseRepairFailed', { message: '' }));
     }
     loading.repair = false;
 };
@@ -772,16 +748,16 @@ const openBackupDirectory = async () => {
             // 使用系统默认应用打开文件夹
             const shellResult = await window.electronAPI.shell.openPath(result.path);
             if (shellResult.success) {
-                message.success("已打开备份目录");
+                message.success(t('settingsMessages.backupDirectoryOpened'));
             } else {
-                message.error(shellResult.error || "打开备份目录失败");
+                message.error(shellResult.error || t('settingsMessages.openBackupDirectoryFailed'));
             }
         } else {
-            message.error(result.message || "获取备份目录路径失败");
+            message.error(result.message || t('settingsMessages.getBackupDirectoryFailed'));
         }
     } catch (error) {
-        console.error("打开备份目录失败:", error);
-        message.error("打开备份目录失败");
+        console.error(t('settingsMessages.openBackupDirectoryFailed'), error);
+        message.error(t('settingsMessages.openBackupDirectoryFailed'));
     }
 };
 

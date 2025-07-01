@@ -459,6 +459,42 @@
     "title": "Quick Optimization Prompt Configuration"
   },
   "settings": {
+    "autoSave": "Settings will be saved automatically",
+    "resetToDefault": "Restore default settings",
+    "sectionDescriptions": {
+      "about": {
+        "description": "View application version information and check for updates",
+        "title": "about"
+      },
+      "appearance": {
+        "description": "Configure the theme mode of the application",
+        "title": "Appearance settings"
+      },
+      "close-behavior": {
+        "description": "Configure the behavior when the app is closed",
+        "title": "Turn off behavior settings"
+      },
+      "cloud-backup": {
+        "description": "Configure WebDAV and iCloud Drive cloud backup capabilities",
+        "title": "Cloud backup"
+      },
+      "data-management": {
+        "description": "Data backup, recovery, import and export functions",
+        "title": "Data Management"
+      },
+      "laboratory": {
+        "description": "Experimental functional and component testing in development",
+        "title": "laboratory"
+      },
+      "language": {
+        "description": "Configure the display language of the application",
+        "title": "Language settings"
+      },
+      "startup-behavior": {
+        "description": "Configure application startup and self-start options",
+        "title": "Start behavior settings"
+      }
+    },
     "sections": {
       "about": "About",
       "appearance": "Appearance",
@@ -468,8 +504,58 @@
       "laboratory": "Laboratory",
       "startup": "Startup Behavior"
     },
+    "settingsMenu": "Settings menu",
     "subtitle": "Manage application configuration and preferences",
     "title": "Settings"
+  },
+  "settingsMessages": {
+    "autoBackupBeforeRestore": "Automatic backup before recovery - {timestamp}",
+    "autoBackupCreated": "Automatic backup creation successfully: {name}",
+    "backupCreatedFailed": "Failed to create backup",
+    "backupCreatedSuccess": "Backup creation successfully: {name} (size: {size} KB)",
+    "backupDeleteFailed": "Failed to delete backup",
+    "backupDeleteSuccess": "Backup deletion successfully",
+    "backupDirectoryOpened": "The backup directory has been opened",
+    "backupRestoreFailed": "Backup recovery failed",
+    "backupRestoreSuccess": "The backup and recovery were successful. \nOriginal data has been automatically backed up: {name}",
+    "creatingAutoBackup": "An automatic backup of the current data is being created...",
+    "dataExportFailed": "Data export failed",
+    "dataExportSuccess": "Data export successfully",
+    "dataImportFailed": "Data import failed",
+    "dataImportSuccess": "Data import successfully",
+    "databaseClearFailed": "Database clearing failed",
+    "databaseCleared": "Database clearing successfully",
+    "databaseHealthCheckFailed": "Database health check failed",
+    "databaseHealthCheckResult": "Database health check results:",
+    "databaseHealthy": "The database status is normal",
+    "databaseNoRepairNeeded": "The database state is normal and no repair is required",
+    "databaseRepairFailed": "Database repair failed: {message}",
+    "databaseRepairSuccess": "Database repair successfully: {message}",
+    "databaseUnhealthy": "There is an exception in the database, missing object storage: {stores}",
+    "fullBackupExportFailed": "Full backup export failed",
+    "fullBackupExportSuccess": "Complete backup and export successfully",
+    "fullBackupImportFailed": "Complete backup import failed",
+    "fullBackupImportSuccess": "Complete backup import successfully",
+    "getBackupDirectoryFailed": "Failed to get the backup directory path",
+    "getBackupListFailed": "Failed to get the backup list",
+    "getDataStatsFailed": "Failed to obtain statistics",
+    "loadSettings": "Start loading settings...",
+    "loadSettingsFailed": "Loading settings failed",
+    "manualBackup": "Manual backup - {timestamp}",
+    "noSettingsToUpdate": "No update settings",
+    "openBackupDirectoryFailed": "Failed to open the backup directory",
+    "originalConfig": "The original configuration obtained:",
+    "resetSettingsFailed": "Reset settings failed",
+    "restoringBackup": "Recovering backup data...",
+    "saveSettingsFailed": "Save settings failed",
+    "selectiveExportFailed": "Selective export failed",
+    "selectiveExportSuccess": "Selective export successful",
+    "settingsLoaded": "Settings loaded successfully:",
+    "settingsReset": "Settings have been restored to default values",
+    "settingsResetLog": "Settings have been reset:",
+    "settingsUpdated": "Setting update successfully:",
+    "startDeleteBackup": "Start deleting backups: {backupId}",
+    "stillMissingStores": "Still missing object storage:"
   },
   "startup": {
     "autoStart": "Auto launch on system startup",
