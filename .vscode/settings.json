@@ -8,7 +8,7 @@
   "i18n-ally.enabledParsers": ["json", "js", "ts"],
 
   "i18n-ally.sortKeys": true,
-
+  
   "i18n-ally.sourceLanguage": "zh-CN",
 
   "i18n-ally.displayLanguage": "zh-CN",
