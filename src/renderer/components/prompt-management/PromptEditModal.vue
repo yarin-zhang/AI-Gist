@@ -44,9 +44,23 @@
                                         <NAlert type="info" :show-icon="false" style="margin: 0;">
                                             <NFlex justify="space-between" align="center">
                                                 <div>
-                                                    <NText depth="3" style="font-size: 12px;">
-                                                        快速优化提示词：
-                                                    </NText>
+                                                    <NFlex align="center" size="small">
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            快速优化提示词
+                                                        </NText>
+                                                        <NButton 
+                                                            size="tiny" 
+                                                            text 
+                                                            @click="openQuickOptimizationConfig"
+                                                            style="padding: 2px; margin-left: 4px;"
+                                                        >
+                                                            <template #icon>
+                                                                <NIcon size="12">
+                                                                    <Settings />
+                                                                </NIcon>
+                                                            </template>
+                                                        </NButton>
+                                                    </NFlex>
                                                     <!-- 流式传输状态显示 -->
                                                     <div v-if="isStreaming" style="margin-top: 4px;">
                                                         <NText type="success" style="font-size: 11px;">
@@ -67,36 +81,14 @@
                                                     <!-- 优化按钮 -->
                                                     <template v-else>
                                                         <NButton 
+                                                            v-for="config in quickOptimizationConfigs"
+                                                            :key="config.id"
                                                             size="small" 
-                                                            @click="optimizePrompt('shorter')"
-                                                            :loading="optimizing === 'shorter'"
+                                                            @click="optimizePrompt(config.id)"
+                                                            :loading="optimizing === config.name"
                                                             :disabled="!formData.content.trim() || optimizing !== null"
                                                         >
-                                                            更简短
-                                                        </NButton>
-                                                        <NButton 
-                                                            size="small" 
-                                                            @click="optimizePrompt('richer')"
-                                                            :loading="optimizing === 'richer'"
-                                                            :disabled="!formData.content.trim() || optimizing !== null"
-                                                        >
-                                                            更丰富
-                                                        </NButton>
-                                                        <NButton 
-                                                            size="small" 
-                                                            @click="optimizePrompt('general')"
-                                                            :loading="optimizing === 'general'"
-                                                            :disabled="!formData.content.trim() || optimizing !== null"
-                                                        >
-                                                            更通用
-                                                        </NButton>
-                                                        <NButton 
-                                                            size="small" 
-                                                            @click="optimizePrompt('extract')"
-                                                            :loading="optimizing === 'extract'"
-                                                            :disabled="!formData.content.trim() || optimizing !== null"
-                                                        >
-                                                            提取变量
+                                                            {{ config.name }}
                                                         </NButton>
                                                         <NButton 
                                                             size="small" 
@@ -127,7 +119,7 @@
                                                     <NInput
                                                         v-model:value="manualInstruction"
                                                         type="textarea"
-                                                        placeholder="请输入您希望如何调整提示词的指令，例如：'添加更多技术细节'、'简化语言表达'等..."
+                                                        placeholder="请输入您希望如何调整提示词的指令，例如：'添加更多细节'、'简化语言表达'等..."
                                                         :rows="3"
                                                         :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
                                                         show-count
@@ -588,7 +580,7 @@ import {
     NTabPane,
     useMessage,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, History, Settings } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
@@ -614,6 +606,7 @@ interface Props {
 interface Emits {
     (e: "update:show", value: boolean): void;
     (e: "saved"): void;
+    (e: "open-quick-optimization-config"): void;
 }
 
 const props = defineProps<Props>();
@@ -633,6 +626,7 @@ const previewHistory = ref<PromptHistory | null>(null);
 const optimizing = ref<string | null>(null);
 const modelSelectorRef = ref();
 const selectedModelKey = ref("");
+const quickOptimizationConfigs = ref<any[]>([]);
 
 // 手动调整状态
 const showManualInput = ref(false);
@@ -734,6 +728,30 @@ const getTabDescription = () => {
         default:
             return "编写提示词内容并配置变量参数";
     }
+};
+
+// 加载快速优化配置
+const loadQuickOptimizationConfigs = async () => {
+    try {
+        quickOptimizationConfigs.value = await api.quickOptimizationConfigs.getEnabled.query();
+    } catch (error) {
+        console.error("加载快速优化配置失败:", error);
+        // 如果加载失败，使用默认配置
+        quickOptimizationConfigs.value = [];
+    }
+};
+
+// 刷新快速优化配置（供外部调用）
+const refreshQuickOptimizationConfigs = async () => {
+    await loadQuickOptimizationConfigs();
+    // 添加一个短暂的视觉反馈，让用户知道配置已刷新
+    message.success("快速优化配置已刷新");
+};
+
+// 打开快速优化配置模态窗
+const openQuickOptimizationConfig = () => {
+    // 通过事件通知父组件打开快速优化配置模态窗
+    emit('open-quick-optimization-config');
 };
 
 // 重置表单方法
@@ -989,7 +1007,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
 };
 
 // 优化提示词功能（支持流式传输）
-const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract') => {
+const optimizePrompt = async (configId: number) => {
     if (!formData.value.content.trim()) {
         message.warning("请先输入提示词内容");
         return;
@@ -1008,8 +1026,15 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         return;
     }
 
+    // 查找对应的优化配置
+    const optimizationConfig = quickOptimizationConfigs.value.find(c => c.id === configId);
+    if (!optimizationConfig) {
+        message.error("未找到对应的优化配置");
+        return;
+    }
+
     // 重置状态
-    optimizing.value = type;
+    optimizing.value = optimizationConfig.name;
     isStreaming.value = true;
     generationControl.shouldStop = false;
     streamingContent.value = "";
@@ -1029,24 +1054,10 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
     const originalContent = formData.value.content;
 
     try {
-        console.log("开始流式优化提示词:", type, formData.value.content);
+        console.log("开始流式优化提示词:", optimizationConfig.name, formData.value.content);
         
-        // 构建优化指令
-        let optimizationPrompt = "";
-        switch (type) {
-            case 'shorter':
-                optimizationPrompt = `请将以下提示词优化得更加简短和精炼，保留核心要求，去除冗余内容：\n\n${formData.value.content}`;
-                break;
-            case 'richer':
-                optimizationPrompt = `请将以下提示词优化得略微丰富和详细一些，添加更多具体的要求和细节，但不要过于复杂：\n\n${formData.value.content}`;
-                break;
-            case 'general':
-                optimizationPrompt = `请将以下提示词优化得更加通用，适用于更广泛的场景和用途，但不要过于复杂：\n\n${formData.value.content}`;
-                break;
-            case 'extract':
-                optimizationPrompt = `请分析以下提示词，将其中可以变化的、最有价值的 3~5 个部分提取为变量，使用 {{变量名}} 的格式标记：\n\n${formData.value.content}`;
-                break;
-        }
+        // 使用配置的提示词模板
+        const optimizationPrompt = optimizationConfig.prompt.replace('{{content}}', formData.value.content);
         
         // 序列化配置以确保可以通过 IPC 传递
         const serializedConfig = {
@@ -1083,13 +1094,13 @@ const optimizePrompt = async (type: 'shorter' | 'richer' | 'general' | 'extract'
         await startStreamingGeneration(request, serializedConfig);
         
         // 如果是提取变量类型，立即重新提取变量
-        if (type === 'extract') {
+        if (optimizationConfig.name.includes('提取变量') || optimizationConfig.name.includes('变量')) {
             nextTick(() => {
                 extractVariables(formData.value.content);
             });
         }
         
-        message.success(`提示词已优化（${getOptimizationTypeName(type)}）`);
+        message.success(`提示词已优化（${optimizationConfig.name}）`);
 
     } catch (error) {
         console.error("优化失败:", error);
@@ -1243,17 +1254,7 @@ ${manualInstruction.value.trim()}
     }
 };
 
-// 获取优化类型名称
-const getOptimizationTypeName = (type: string) => {
-    switch (type) {
-        case 'shorter': return '更简短';
-        case 'richer': return '更丰富';
-        case 'general': return '更通用';
-        case 'extract': return '提取变量';
-        case 'manual': return '手动调整';
-        default: return '优化';
-    }
-};
+
 
 // 格式化日期
 const formatDate = (date: Date | string) => {
@@ -1462,6 +1463,16 @@ watch(
         }
     },
     { immediate: true }
+);
+
+// 监听弹窗显示状态，加载快速优化配置
+watch(
+    () => props.show,
+    (newShow) => {
+        if (newShow) {
+            loadQuickOptimizationConfigs();
+        }
+    }
 );
 
 // 监听弹窗显示状态
@@ -1761,6 +1772,11 @@ onBeforeUnmount(() => {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
+});
+
+// 暴露方法给父组件
+defineExpose({
+    refreshQuickOptimizationConfigs
 });
 </script>
 

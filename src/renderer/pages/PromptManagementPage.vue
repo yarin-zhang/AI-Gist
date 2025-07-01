@@ -38,13 +38,26 @@
         </NFlex>
 
         <!-- 模态框 -->
-        <PromptEditModal v-model:show="showEditModal" :prompt="selectedPrompt" :categories="categories"
-            @saved="handlePromptSaved" />
+        <PromptEditModal 
+            ref="promptEditModalRef"
+            v-model:show="showEditModal" 
+            :prompt="selectedPrompt" 
+            :categories="categories"
+            @saved="handlePromptSaved" 
+            @open-quick-optimization-config="handleOpenQuickOptimizationConfig" 
+        />
 
         <PromptDetailModal v-model:show="showDetailModal" :prompt="selectedPrompt" @edit="handleEditFromDetail"
             @updated="loadStatistics" />
 
         <CategoryManageModal v-model:show="showCategoryManagement" :categories="categories" @updated="loadCategories" />
+
+        <!-- 快速优化提示词配置管理模态窗 -->
+        <QuickOptimizationConfigModal 
+            :show="showQuickOptimizationModal" 
+            @update:show="showQuickOptimizationModal = $event"
+            @configs-updated="handleQuickOptimizationConfigsUpdated"
+        />
     </div>
 </template>
 
@@ -68,6 +81,7 @@ import PromptEditModal from '@/components/prompt-management/PromptEditModal.vue'
 import PromptDetailModal from '@/components/prompt-management/PromptDetailModal.vue'
 import CategoryManageModal from '@/components/prompt-management/CategoryManageModal.vue'
 import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
+import QuickOptimizationConfigModal from '@/components/ai/QuickOptimizationConfigModal.vue'
 
 // API 导入
 import { api } from '@/lib/api'
@@ -83,6 +97,7 @@ const { safeDbOperation, waitForDatabase } = useDatabase()
 
 // 组件引用
 const promptListRef = ref()
+const promptEditModalRef = ref()
 
 // 响应式数据
 const prompts = ref<any[]>([])
@@ -92,6 +107,7 @@ const showEditModal = ref(false)
 const showDetailModal = ref(false)
 const showCategoryManagement = ref(false)
 const showAIGenerator = ref(false)
+const showQuickOptimizationModal = ref(false)
 
 // 统计数据
 const totalPrompts = computed(() => prompts.value.length)
@@ -217,6 +233,20 @@ const handleListRefresh = () => {
     // 同时刷新页面统计数据
     loadStatistics()
 }
+
+// 处理打开快速优化配置模态窗
+const handleOpenQuickOptimizationConfig = () => {
+    showQuickOptimizationModal.value = true;
+};
+
+// 处理快速优化配置更新
+const handleQuickOptimizationConfigsUpdated = () => {
+    message.success("快速优化配置已更新");
+    // 如果编辑模态窗是打开的，立即刷新快速优化配置
+    if (showEditModal.value && promptEditModalRef.value?.refreshQuickOptimizationConfigs) {
+        promptEditModalRef.value.refreshQuickOptimizationConfigs();
+    }
+};
 
 // 生命周期
 onMounted(async () => {
