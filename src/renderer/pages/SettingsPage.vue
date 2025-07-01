@@ -4,9 +4,9 @@
             <!-- 页面标题 -->
             <NFlex justify="space-between" align="center">
                 <div>
-                    <NText strong style="font-size: 28px">应用设置</NText>
+                    <NText strong style="font-size: 28px">{{ t('settings.title') }}</NText>
                     <NText depth="3" style="display: block; margin-top: 4px">
-                        个性化配置您的应用偏好
+                        {{ t('settings.subtitle') }}
                     </NText>
                 </div>
                 <NFlex>
@@ -92,6 +92,32 @@
                             :model-value="{ themeSource: settings.themeSource }"
                             @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
 
+                        <!-- 语言设置 -->
+                        <NCard v-show="activeSettingKey === 'language'">
+                            <NFlex vertical :size="16">
+                                <NFlex vertical :size="12">
+                                    <NText depth="2">语言设置</NText>
+                                    <NText depth="3" style="font-size: 12px;">
+                                        选择应用的显示语言
+                                    </NText>
+                                </NFlex>
+                                
+                                <NFlex vertical :size="12">
+                                    <NText depth="2" style="font-size: 14px;">选择语言：</NText>
+                                    <NSelect
+                                        v-model:value="currentLocale"
+                                        :options="supportedLocales.map(locale => ({
+                                            label: locale.name,
+                                            value: locale.code
+                                        }))"
+                                        placeholder="选择语言"
+                                        style="max-width: 200px;"
+                                        @update:value="switchLocale"
+                                    />
+                                </NFlex>
+                            </NFlex>
+                        </NCard>
+
                         <!-- 关闭行为设置 -->
                         <CloseBehaviorSettings v-show="activeSettingKey === 'close-behavior'"
                             :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
@@ -120,6 +146,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, h, watch } from "vue";
+import { useI18n } from '~/composables/useI18n'
 import {
     NCard,
     NAlert,
@@ -128,6 +155,7 @@ import {
     NButton,
     NText,
     NMenu,
+    NSelect,
     useMessage,
 } from "naive-ui";
 import {
@@ -141,6 +169,7 @@ import {
     Database,
     InfoCircle,
     Cloud,
+    Globe,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -163,6 +192,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // 消息提示
 const message = useMessage();
+const { t, currentLocale, supportedLocales, switchLocale, initLocale } = useI18n()
 
 // 检测是否为开发环境
 const isDevelopment = import.meta.env.DEV;
@@ -220,6 +250,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
         },
         {
+            label: "语言设置",
+            key: "language",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
+        },
+        {
             label: "启动行为设置",
             key: "startup-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
@@ -265,6 +300,11 @@ const currentSectionInfo = computed(() => {
             title: "外观设置",
             icon: Sun,
             description: "配置应用的主题模式"
+        },
+        language: {
+            title: "语言设置",
+            icon: Globe,
+            description: "配置应用的显示语言"
         },
         "data-management": {
             title: "数据管理",
@@ -747,6 +787,7 @@ const openBackupDirectory = async () => {
 
 // 组件挂载时加载设置
 onMounted(async () => {
+    initLocale(); // 初始化语言设置
     await loadSettings();
     // 加载备份列表
     await refreshBackupList();

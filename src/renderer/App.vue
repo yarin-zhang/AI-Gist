@@ -9,6 +9,7 @@ import {
     dateZhCN
 } from 'naive-ui'
 import { useTheme } from '~/composables/useTheme'
+import i18n from '~/i18n'
 import MainPage from '~/pages/MainPage.vue'
 import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 import AppInitializer from '~/components/common/AppInitializer.vue'

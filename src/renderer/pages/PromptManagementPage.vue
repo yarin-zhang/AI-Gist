@@ -4,9 +4,9 @@
             <!-- 页面标题 -->
             <NFlex justify="space-between" align="center">
                 <div>
-                    <NText strong style="font-size: 28px;">AI 提示词</NText>
+                    <NText strong style="font-size: 28px;">{{ t('promptManagement.title') }}</NText>
                     <NText depth="3" style="display: block; margin-top: 4px;">
-                        管理和组织你的 AI 提示词库
+                        {{ t('promptManagement.subtitle') }}
                     </NText>
                 </div>
                 <NFlex>
@@ -17,7 +17,7 @@
                                 <Robot />
                             </NIcon>
                         </template>
-                        AI 生成
+                        {{ t('promptManagement.aiGenerate') }}
                     </NButton>
                     <NButton type="primary" @click="handleCreatePrompt">
                         <template #icon>
@@ -25,7 +25,7 @@
                                 <Plus />
                             </NIcon>
                         </template>
-                        新建提示词
+                        {{ t('promptManagement.createPrompt') }}
                     </NButton>
 
                 </NFlex>
@@ -63,6 +63,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
     NFlex,
     NText,
@@ -92,6 +93,7 @@ const emit = defineEmits<{
     'navigate-to-ai-config': []
 }>()
 
+const { t } = useI18n()
 const message = useMessage()
 const { safeDbOperation, waitForDatabase } = useDatabase()
 

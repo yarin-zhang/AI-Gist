@@ -59,12 +59,12 @@ app.whenReady().then(async () => {
   });
   trayManager.createTray();
 
-  // 设置内容安全策略
+  // 设置内容安全策略 - 允许 vue-i18n 正常工作
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ['script-src \'self\'']
+        'Content-Security-Policy': ['script-src \'self\' \'unsafe-eval\'']
       }
     })
   })

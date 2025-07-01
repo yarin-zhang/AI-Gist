@@ -4,7 +4,7 @@
         <template #header>
             <NFlex vertical>
             <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                {{ isEdit ? "编辑提示词" : "创建提示词" }}
+                {{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}
             </NText>
             <NText depth="3">
                 {{ getTabDescription() }}
@@ -21,14 +21,14 @@
                             :max="0.8" :disabled="modalWidth <= 800">
                             <!-- 左侧：内容编辑区 -->
                             <template #1>
-                                <NCard title="提示词内容" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
                                     <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;">
                                                 <NInput 
                                                     v-model:value="formData.content" 
                                                     type="textarea"
-                                                    placeholder="请输入提示词内容，使用 {{变量名}} 来定义变量" 
+                                                    :placeholder="t('promptManagement.contentPlaceholder')" 
                                                     show-count
                                                     :style="{ 
                                                         height: `${contentHeight - 280}px`, 
@@ -46,7 +46,7 @@
                                                 <div>
                                                     <NFlex align="center" size="small">
                                                         <NText depth="3" style="font-size: 12px;">
-                                                            快速优化提示词
+                                                            {{ t('promptManagement.quickOptimization') }}
                                                         </NText>
                                                         <NButton 
                                                             size="tiny" 
@@ -64,7 +64,7 @@
                                                     <!-- 流式传输状态显示 -->
                                                     <div v-if="isStreaming" style="margin-top: 4px;">
                                                         <NText type="success" style="font-size: 11px;">
-                                                            正在生成... ({{ streamStats.charCount }} 字符)
+                                                            {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{ t('promptManagement.characters') }})
                                                         </NText>
                                                     </div>
                                                 </div>
@@ -76,7 +76,7 @@
                                                         type="error"
                                                         @click="stopOptimization"
                                                     >
-                                                        停止生成
+                                                        {{ t('promptManagement.stopGeneration') }}
                                                     </NButton>
                                                     <!-- 优化按钮 -->
                                                     <template v-else>
@@ -95,7 +95,7 @@
                                                             @click="showManualAdjustment"
                                                             :disabled="!formData.content.trim() || optimizing !== null"
                                                         >
-                                                            手动调整
+                                                            {{ t('promptManagement.manualAdjustment') }}
                                                         </NButton>
                                                     </template>
                                                 </NFlex>
@@ -107,19 +107,19 @@
                                             <AIModelSelector
                                                 ref="modelSelectorRef"
                                                 v-model:modelKey="selectedModelKey"
-                                                placeholder="选择AI模型进行优化"
+                                                :placeholder="t('promptManagement.aiModelPlaceholder')"
                                                 :disabled="isStreaming || optimizing !== null"
                                             />
                                         </div>
                                         
                                         <!-- 手动调整输入框 -->
                                         <div v-if="showManualInput" style="margin-top: 8px;">
-                                            <NCard size="small" title="手动调整指令">
+                                            <NCard size="small" :title="t('promptManagement.manualAdjustmentTitle')">
                                                 <NFlex vertical size="small">
                                                     <NInput
                                                         v-model:value="manualInstruction"
                                                         type="textarea"
-                                                        placeholder="请输入您希望如何调整提示词的指令，例如：'添加更多细节'、'简化语言表达'等..."
+                                                        :placeholder="t('promptManagement.manualAdjustmentPlaceholder')"
                                                         :rows="3"
                                                         :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
                                                         show-count
@@ -127,11 +127,11 @@
                                                     />
                                                     <NFlex justify="space-between" align="center">
                                                         <NText depth="3" style="font-size: 12px;">
-                                                            AI 将根据您的指令调整当前提示词内容
+                                                            {{ t('promptManagement.manualAdjustmentTip') }}
                                                         </NText>
                                                         <NFlex size="small">
                                                             <NButton size="small" @click="hideManualAdjustment">
-                                                                取消
+                                                                {{ t('promptManagement.cancelAdjustment') }}
                                                             </NButton>
                                                             <NButton 
                                                                 size="small" 
@@ -140,7 +140,7 @@
                                                                 :loading="optimizing === 'manual'"
                                                                 :disabled="!manualInstruction.trim()"
                                                             >
-                                                                确定调整
+                                                                {{ t('promptManagement.confirmAdjustment') }}
                                                             </NButton>
                                                         </NFlex>
                                                     </NFlex>
@@ -558,6 +558,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive } from "vue";
+import { useI18n } from 'vue-i18n'
 import {
     NForm,
     NFormItem,
@@ -612,6 +613,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+const { t } = useI18n()
 const message = useMessage();
 const formRef = ref();
 const contentScrollbarRef = ref(); // 内容区域滚动条引用
