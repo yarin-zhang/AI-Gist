@@ -16,7 +16,7 @@
                                 <Settings />
                             </NIcon>
                         </template>
-                        优化配置
+                        优化提示词
                     </NButton>
                     <NButton type="primary" @click="showAddModal = true">
                         <template #icon>
@@ -165,7 +165,7 @@
                                             <Edit />
                                         </NIcon>
                                     </template>
-                                    编辑提示词
+                                    系统提示词
                                 </n-button>
                             </NFlex>
 

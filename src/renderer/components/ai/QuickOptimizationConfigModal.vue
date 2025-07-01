@@ -26,7 +26,7 @@
                 <NCard size="small" :style="{ flex: 1 }">
                     <template #header>
                         <NFlex justify="space-between" align="center">
-                            <NText strong>优化配置列表</NText>
+                            <NText strong>优化提示词</NText>
                             <NText depth="3" style="font-size: 12px;">
                                 {{ enabledCount }}/{{ totalCount }}
                             </NText>
