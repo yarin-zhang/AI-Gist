@@ -4,7 +4,7 @@
         <NCard>
             <NFlex vertical :size="getCardSpacing()">
                 <NFlex>
-                    <NInput v-model:value="searchText" placeholder="搜索提示词" style="flex: 1" @input="handleSearch"
+                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" style="flex: 1" @input="handleSearch"
                         clearable>
                         <template #prefix>
                             <NIcon>
@@ -12,7 +12,7 @@
                             </NIcon>
                         </template>
                     </NInput>
-                    <NSelect v-model:value="sortType" :options="sortOptions" placeholder="排序方式"
+                    <NSelect v-model:value="sortType" :options="sortOptions" :placeholder="t('promptManagement.sortBy')"
                         style="width: 160px; margin-right: 8px" />
                     <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
@@ -20,7 +20,7 @@
                                 <Tag />
                             </NIcon>
                         </template>
-                        高级筛选
+                        {{ t('promptManagement.advancedFilter') }}
                     </NButton>
                     <NButton :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
                         <template #icon>
@@ -28,7 +28,7 @@
                                 <Heart />
                             </NIcon>
                         </template>
-                        收藏
+                        {{ t('promptManagement.favorites') }}
                     </NButton>
                     <NButton @click="$emit('manage-categories')">
                         <template #icon>
@@ -36,7 +36,7 @@
                                 <Folder />
                             </NIcon>
                         </template>
-                        分类
+                        {{ t('promptManagement.categories') }}
                     </NButton>
                     <NButtonGroup>
                         <NButton :type="viewMode === 'grid' ? 'primary' : 'default'" @click="setViewMode('grid')">
@@ -67,12 +67,11 @@
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
                     <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
                         <Search />
-                    </NIcon> <span v-if="searchText.trim()">正在搜索: 包含 "{{ searchText.trim() }}" 的提示词</span>
-                    <span v-if="selectedCategory"> 分类: {{ getCategoryName(selectedCategory) }}</span>
-                    <span v-if="showFavoritesOnly">仅显示收藏</span>
+                    </NIcon> <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', { text: searchText.trim() }) }}</span>
+                    <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', { name: getCategoryName(selectedCategory) }) }}</span>
+                    <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
                     <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        (找到 {{ totalCount }} 个结果{{ hasNextPage || prompts.length < totalCount ? `，已显示 ${prompts.length}
-                            个` : '' }}) </span>
+                        ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }}) </span>
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
@@ -80,7 +79,7 @@
                     <!-- 分类快捷筛选 -->
                     <div v-if="categories.length > 0" :style="{ padding: categoriesExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
-                            <NText depth="2" style="font-size: 14px; font-weight: 500;">分类筛选</NText>
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{ t('promptManagement.categoryFilterTitle') }}</NText>
                             <NButton text size="small" @click="toggleCategoriesExpanded">
                                 <template #icon>
                                     <NIcon>
@@ -88,7 +87,7 @@
                                         <ChevronUp v-else />
                                     </NIcon>
                                 </template>
-                                {{ categoriesExpanded ? '收起' : '展开' }}
+                                {{ categoriesExpanded ? t('promptManagement.collapse') : t('promptManagement.expand') }}
                             </NButton>
                         </NFlex>
                         <div v-show="categoriesExpanded">
@@ -100,7 +99,7 @@
                                             <Box />
                                         </NIcon>
                                     </template>
-                                    全部分类 ({{ statistics.totalCount }})
+                                    {{ t('promptManagement.allCategories') }} ({{ statistics.totalCount }})
                                 </NTag>
                                 <NTag v-for="category in categories" :key="category.id" size="small" :bordered="false"
                                     :checked="selectedCategory === category.id" checkable
@@ -120,7 +119,7 @@
                     <!-- 热门标签快捷搜索 -->
                     <div v-if="popularTags.length > 0" :style="{ padding: tagsExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
-                            <NText depth="2" style="font-size: 14px; font-weight: 500;">热门标签</NText>
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{ t('promptManagement.popularTags') }}</NText>
                             <NButton text size="small" @click="toggleTagsExpanded">
                                 <template #icon>
                                     <NIcon>
@@ -128,7 +127,7 @@
                                         <ChevronUp v-else />
                                     </NIcon>
                                 </template>
-                                {{ tagsExpanded ? '收起' : '展开' }}
+                                {{ tagsExpanded ? t('promptManagement.collapse') : t('promptManagement.expand') }}
                             </NButton>
                         </NFlex>
                         <div v-show="tagsExpanded">
@@ -157,14 +156,14 @@
                        (viewMode === 'tree' && treeData.length === 0) || 
                        (viewMode === 'table' && prompts.length === 0)" 
              style="text-align: center; padding: 40px;">
-            <NEmpty description="暂无提示词，快来创建第一个吧！" />
+            <NEmpty :description="t('promptManagement.noPrompts')" />
         </div>
         <div v-else>
             <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
             <div v-if="viewMode === 'table' && selectedRows.length > 0" style="margin-bottom: 16px;">
                 <NCard>
                     <NFlex justify="space-between" align="center">
-                        <NText>已选择 {{ selectedRows.length }} 个提示词</NText>
+                        <NText>{{ t('promptManagement.selectedPrompts', { count: selectedRows.length }) }}</NText>
                         <NFlex size="small">
                             <NPopconfirm @positive-click="handleBatchDelete">
                                 <template #trigger>
@@ -174,12 +173,12 @@
                                                 <Trash />
                                             </NIcon>
                                         </template>
-                                        批量删除
+                                        {{ t('promptManagement.batchDelete') }}
                                     </NButton>
                                 </template>
-                                确定要删除这 {{ selectedRows.length }} 个提示词吗？此操作不可撤销。
+                                {{ t('promptManagement.confirmBatchDelete', { count: selectedRows.length }) }}
                             </NPopconfirm>
-                            <NButton size="small" @click="clearSelection">取消选择</NButton>
+                            <NButton size="small" @click="clearSelection">{{ t('promptManagement.cancelSelection') }}</NButton>
                         </NFlex>
                     </NFlex>
                 </NCard>
@@ -345,6 +344,7 @@ import {
     GridDots
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
+import { useI18n } from 'vue-i18n'
 import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
@@ -365,6 +365,7 @@ interface TreeNode {
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
+const { t } = useI18n()
 const { waitForDatabase } = useDatabase()
 
 // 使用标签颜色 composable

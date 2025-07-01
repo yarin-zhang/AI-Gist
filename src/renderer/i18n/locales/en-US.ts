@@ -57,7 +57,32 @@ export default {
     generating: 'Generating...',
     characters: 'characters',
     aiModelPlaceholder: 'Select AI model for optimization',
-    manualAdjustmentTitle: 'Manual Adjustment Instructions'
+    manualAdjustmentTitle: 'Manual Adjustment Instructions',
+    incompleteDataError: 'Prompt data incomplete, cannot edit',
+    // Prompt list related
+    searchPrompt: 'Search prompts',
+    sortBy: 'Sort by',
+    advancedFilter: 'Advanced Filter',
+    favorites: 'Favorites',
+    categories: 'Categories',
+    gridView: 'Grid View',
+    tableView: 'Table View',
+    treeView: 'Tree View',
+    searchingFor: 'Searching for: prompts containing "{text}"',
+    categoryFilter: 'Category: {name}',
+    favoritesOnly: 'Favorites only',
+    foundResults: 'Found {count} results',
+    showingResults: 'Showing {count}',
+    categoryFilterTitle: 'Category Filter',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    allCategories: 'All Categories',
+    popularTags: 'Popular Tags',
+    noPrompts: 'No prompts yet, come create the first one!',
+    selectedPrompts: 'Selected {count} prompts',
+    batchDelete: 'Batch Delete',
+    confirmBatchDelete: 'Are you sure you want to delete these {count} prompts? This operation cannot be undone.',
+    cancelSelection: 'Cancel Selection'
   },
   
   // AI Config page

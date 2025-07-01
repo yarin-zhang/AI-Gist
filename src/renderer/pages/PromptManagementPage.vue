@@ -165,7 +165,7 @@ const handleEditFromDetail = (prompt: any) => {
     console.log("PromptManagementPage - 接收到编辑请求:", prompt);
     
     if (!prompt || !prompt.id) {
-        message.error("提示词数据不完整，无法编辑");
+        message.error(t('promptManagement.incompleteDataError'));
         return;
     }
     
