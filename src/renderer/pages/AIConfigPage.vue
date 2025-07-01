@@ -132,15 +132,15 @@
                             <n-flex vertical>
                                 <p><strong>{{ t('aiConfig.createdAt') }}:</strong> {{ formatDate(config.createdAt) }}</p>
                                 <!-- <p>
-                                    <strong>系统提示词:</strong>
+                                    <strong>{{ t('aiConfig.systemPrompt') }}:</strong>
                                     <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
-                                        {{ config.systemPrompt ? '已自定义' : '使用默认' }}
+                                        {{ config.systemPrompt ? t('aiConfig.systemPromptCustomized') : t('aiConfig.systemPromptDefault') }}
                                     </NTag>
                                 </p> -->
                                 <!-- <p>
-                                    <strong>首选状态:</strong>
+                                    <strong>{{ t('aiConfig.preferredStatus') }}:</strong>
                                     <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
-                                        {{ config.isPreferred ? '全局首选' : '普通配置' }}
+                                        {{ config.isPreferred ? t('aiConfig.globalPreferredStatus') : t('aiConfig.normalConfig') }}
                                     </NTag>
                                 </p> -->
                             </n-flex>
@@ -339,9 +339,9 @@
             <!-- 底部固定区域 -->
             <template #footer>
                 <NFlex justify="end">
-                    <n-button @click="closeModal">取消</n-button>
+                    <n-button @click="closeModal">{{ t('aiConfig.cancel') }}</n-button>
                     <n-button type="primary" @click="saveConfig" :loading="saving">
-                        {{ editingConfig ? "更新配置" : "添加配置" }}
+                        {{ editingConfig ? t('aiConfig.updateConfig') : t('aiConfig.addConfigButton') }}
                     </n-button>
                 </NFlex>
             </template>
@@ -354,15 +354,15 @@
                     <NIcon size="24">
                         <Robot />
                     </NIcon>
-                    <NText strong>智能测试结果</NText>
+                    <NText strong>{{ t('aiConfig.intelligentTestResult') }}</NText>
                 </NFlex>
             </template>
 
             <div v-if="intelligentTestResult">
-                <n-alert v-if="intelligentTestResult.success" type="success" title="测试成功">
+                <n-alert v-if="intelligentTestResult.success" type="success" :title="t('aiConfig.testSuccessTitle')">
                     <div style="margin-top: 12px">
                         <div style="margin-bottom: 16px">
-                            <strong>输入 Prompt:</strong>
+                            <strong>{{ t('aiConfig.inputPrompt') }}</strong>
                             <div style="
                   background: var(--code-color);
                   padding: 12px;
@@ -375,7 +375,7 @@
                             </div>
                         </div>
                         <div>
-                            <strong>AI 回复:</strong>
+                            <strong>{{ t('aiConfig.aiResponse') }}</strong>
                             <div style="
                   background: var(--code-color);
                   padding: 12px;
@@ -388,9 +388,9 @@
                         </div>
                     </div>
                 </n-alert>
-                <n-alert v-else type="error" title="测试失败">
+                <n-alert v-else type="error" :title="t('aiConfig.testFailedTitle')">
                     <div v-if="intelligentTestResult.inputPrompt" style="margin-bottom: 12px">
-                        <strong>尝试发送的 Prompt:</strong>
+                        <strong>{{ t('aiConfig.attemptedPrompt') }}</strong>
                         <div style="
                 background: var(--code-color);
                 padding: 12px;
@@ -403,13 +403,13 @@
                         </div>
                     </div>
                     <div>
-                        <strong>错误信息:</strong> {{ intelligentTestResult.error }}
+                        <strong>{{ t('aiConfig.errorInfo') }}</strong> {{ intelligentTestResult.error }}
                     </div>
                 </n-alert>
             </div>
 
             <template #action>
-                <n-button @click="showIntelligentTestResult = false">关闭</n-button>
+                <n-button @click="showIntelligentTestResult = false">{{ t('aiConfig.close') }}</n-button>
             </template>
         </n-modal>
 
@@ -425,10 +425,10 @@
                         </NIcon>
                         <div>
                             <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                                编辑生成提示词
+                                {{ t('aiConfig.editGenerationPrompt') }}
                             </NText>
                             <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
-                                自定义 AI 生成提示词时使用的系统提示词
+                                {{ t('aiConfig.customSystemPromptDesc') }}
                             </NText>
                         </div>
                     </NFlex>
@@ -440,11 +440,11 @@
                 <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
                     <NAlert type="info" :show-icon="false">
                         <NText depth="3" style="font-size: 12px;">
-                            💡 此提示词用于指导 AI 如何生成新的提示词。留空将使用默认的系统提示词。
+                            {{ t('aiConfig.systemPromptTip') }}
                         </NText>
                     </NAlert>
 
-                    <NInput v-model:value="systemPromptContent" type="textarea" placeholder="请输入自定义的系统提示词..." :rows="15"
+                    <NInput v-model:value="systemPromptContent" type="textarea" :placeholder="t('aiConfig.systemPromptPlaceholder')" :rows="15"
                         :style="{
                             height: `${contentHeight - 120}px`,
                             fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace'
@@ -456,12 +456,12 @@
             <template #footer>
                 <NFlex justify="space-between">
                     <NButton @click="resetSystemPromptToDefault" secondary type="warning">
-                        重置为默认
+                        {{ t('aiConfig.resetToDefault') }}
                     </NButton>
                     <NFlex>
-                        <NButton @click="closeSystemPromptModal">取消</NButton>
+                        <NButton @click="closeSystemPromptModal">{{ t('aiConfig.cancel') }}</NButton>
                         <NButton type="primary" @click="saveSystemPrompt">
-                            保存
+                            {{ t('aiConfig.save') }}
                         </NButton>
                     </NFlex>
                 </NFlex>
@@ -564,12 +564,12 @@ const formData = reactive({
 
 // 表单校验规则
 const formRules = computed(() => ({
-    type: [{ required: true, message: "请选择类型", trigger: "change" }],
-    name: [{ required: true, message: "请输入配置名称", trigger: "blur" }],
+    type: [{ required: true, message: t('aiConfig.pleaseSelectType'), trigger: "change" }],
+    name: [{ required: true, message: t('aiConfig.pleaseEnterConfigName'), trigger: "blur" }],
     baseURL: [
         {
             required: needsBaseURL.value,
-            message: "请输入 Base URL",
+            message: t('aiConfig.pleaseEnterBaseURL'),
             trigger: "blur"
         }
     ],
@@ -618,49 +618,49 @@ const getBaseURLInfo = computed(() => {
     switch (formData.type) {
         case 'ollama':
             return {
-                label: 'Ollama 服务地址：',
-                placeholder: '例如: http://localhost:11434'
+                label: t('aiConfig.ollamaServiceAddress'),
+                placeholder: t('aiConfig.ollamaExample')
             };
         case 'lmstudio':
             return {
-                label: 'LM Studio 服务地址：',
-                placeholder: '例如: http://localhost:1234/v1'
+                label: t('aiConfig.lmstudioServiceAddress'),
+                placeholder: t('aiConfig.lmstudioExample')
             };
         case 'azure':
             return {
-                label: 'Azure OpenAI 端点：',
-                placeholder: '例如: https://your-resource.openai.azure.com'
+                label: t('aiConfig.azureOpenAIEndpoint'),
+                placeholder: t('aiConfig.azureExample')
             };
         case 'deepseek':
             return {
-                label: 'DeepSeek API 地址：',
-                placeholder: '例如: https://api.deepseek.com/v1'
+                label: t('aiConfig.deepseekAPIAddress'),
+                placeholder: t('aiConfig.deepseekExample')
             };
         case 'mistral':
             return {
-                label: 'Mistral API 地址：',
-                placeholder: '例如: https://api.mistral.ai/v1'
+                label: t('aiConfig.mistralAPIAddress'),
+                placeholder: t('aiConfig.mistralExample')
             };
         case 'anthropic':
             return {
-                label: '自定义端点（可选）：',
-                placeholder: '留空使用官方端点'
+                label: t('aiConfig.customEndpoint'),
+                placeholder: t('aiConfig.useOfficialEndpoint')
             };
         case 'google':
             return {
-                label: '自定义端点（可选）：',
-                placeholder: '留空使用官方端点'
+                label: t('aiConfig.customEndpoint'),
+                placeholder: t('aiConfig.useOfficialEndpoint')
             };
         case 'cohere':
             return {
-                label: '自定义端点（可选）：',
-                placeholder: '留空使用官方端点'
+                label: t('aiConfig.customEndpoint'),
+                placeholder: t('aiConfig.useOfficialEndpoint')
             };
         case 'openai':
         default:
             return {
-                label: 'Base URL：',
-                placeholder: '例如: https://api.openai.com/v1'
+                label: t('aiConfig.baseURL') + '：',
+                placeholder: t('aiConfig.openaiExample')
             };
     }
 });
@@ -669,7 +669,7 @@ const getBaseURLInfo = computed(() => {
 const typeOptions = [
     {
         type: 'group',
-        label: '本地服务',
+        label: t('aiConfig.localServices'),
         key: 'local',
         children: [
             { label: "Ollama", value: "ollama" },
@@ -678,7 +678,7 @@ const typeOptions = [
     },
     {
         type: 'group',
-        label: '在线服务',
+        label: t('aiConfig.onlineServices'),
         key: 'online',
         children: [
             { label: "OpenAI", value: "openai" },
@@ -758,7 +758,7 @@ const saveConfig = async () => {
                 isPreferred: editingConfig.value.isPreferred,
             };
             await databaseService.aiConfig.updateAIConfig(editingConfig.value.id!, updateData);
-            message.success("配置更新成功");
+            message.success(t('aiConfig.configUpdateSuccess'));
         } else {
             // 添加新配置
             const configData = {
@@ -776,13 +776,13 @@ const saveConfig = async () => {
                 enabled: true,
             };
             await databaseService.aiConfig.createAIConfig(configData);
-            message.success("配置添加成功");
+            message.success(t('aiConfig.configAddSuccess'));
         }
 
         closeModal();
         loadConfigs();
     } catch (error) {
-        message.error("保存失败: " + (error as Error).message);
+        message.error(t('aiConfig.saveFailed') + (error as Error).message);
     } finally {
         saving.value = false;
     }
@@ -806,10 +806,10 @@ const editConfig = (config: AIConfig) => {
 const deleteConfig = async (id: number) => {
     try {
         await databaseService.aiConfig.deleteAIConfig(id);
-        message.success("配置删除成功");
+        message.success(t('aiConfig.configDeleteSuccess'));
         loadConfigs();
     } catch (error) {
-        message.error("删除失败: " + (error as Error).message);
+        message.error(t('aiConfig.deleteFailed') + (error as Error).message);
     }
 };
 
@@ -826,10 +826,10 @@ const toggleConfig = async (id: number, enabled: boolean) => {
             }
         }
 
-        message.success(enabled ? "配置已启用" : "配置已禁用");
+        message.success(enabled ? t('aiConfig.configEnabled') : t('aiConfig.configDisabled'));
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
-        message.error("更新失败: " + (error as Error).message);
+        message.error(t('aiConfig.updateFailed') + (error as Error).message);
     }
 };
 
@@ -841,16 +841,16 @@ const setPreferred = async (config: AIConfig) => {
         if (config.isPreferred) {
             // 如果已经是首选，则取消首选
             await databaseService.aiConfig.clearPreferredAIConfig();
-            message.success("已取消首选设置");
+            message.success(t('aiConfig.preferredCleared'));
         } else {
             // 设置为首选
             await databaseService.aiConfig.setPreferredAIConfig(config.id);
-            message.success(`已将 "${config.name}" 设置为全局首选配置`);
+            message.success(t('aiConfig.setAsPreferredSuccess', { name: config.name }));
         }
 
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
-        message.error("设置失败: " + (error as Error).message);
+        message.error(t('aiConfig.setFailed') + (error as Error).message);
     }
 };
 
@@ -858,10 +858,10 @@ const setPreferred = async (config: AIConfig) => {
 const clearPreferred = async () => {
     try {
         await databaseService.aiConfig.clearPreferredAIConfig();
-        message.success("已清除全局首选配置");
+        message.success(t('aiConfig.globalPreferredCleared'));
         loadConfigs(); // 重新加载以更新UI状态
     } catch (error) {
-        message.error("清除失败: " + (error as Error).message);
+        message.error(t('aiConfig.clearFailed') + (error as Error).message);
     }
 };
 
@@ -876,15 +876,15 @@ const testConfig = async (config: AIConfig) => {
 
         const result = await window.electronAPI.ai.testConfig(serializedConfig);
         if (result.success) {
-            message.success("连接测试成功");
+            message.success(t('aiConfig.connectionTestSuccess'));
             if (result.models && result.models.length > 0) {
-                message.info(`发现 ${result.models.length} 个可用模型`);
+                message.info(t('aiConfig.modelsFound', { count: result.models.length }));
             }
         } else {
-            message.error(`连接测试失败: ${result.error}`);
+            message.error(t('aiConfig.connectionTestFailed') + result.error);
         }
     } catch (error) {
-        message.error("测试失败: " + (error as Error).message);
+        message.error(t('aiConfig.testFailed') + (error as Error).message);
     } finally {
         testingConfigs.value.delete(config.id);
     }
@@ -909,39 +909,30 @@ const testFormConnection = async () => {
             updatedAt: new Date().toISOString(),
         };
 
-        console.log('测试配置:', tempConfig);
-
         const result = await window.electronAPI.ai.testConfig(tempConfig);
-        console.log('测试结果:', result);
-
         formTestResult.value = result;
 
         if (result.success) {
-            message.success("连接测试成功");
+            message.success(t('aiConfig.connectionTestSuccess'));
 
             // 自动填充模型列表
             if (result.models && result.models.length > 0) {
-                console.log('获取到模型列表:', result.models);
                 formData.models = [...result.models];
 
                 // 如果还没有设置默认模型，自动设置第一个
                 if (!formData.defaultModel && result.models.length > 0) {
                     formData.defaultModel = result.models[0];
-                    console.log('自动设置默认模型:', formData.defaultModel);
                 }
 
-                message.info(`已自动填充 ${result.models.length} 个可用模型`);
+                message.info(t('aiConfig.modelsAutoFilled', { count: result.models.length }));
             } else {
-                console.log('未获取到模型列表');
-                message.warning('连接成功，但未获取到模型列表');
+                message.warning(t('aiConfig.connectionSuccessNoModels'));
             }
         } else {
-            console.error('连接测试失败:', result.error);
-            message.error(`连接测试失败: ${result.error}`);
+            message.error(t('aiConfig.connectionTestFailed') + result.error);
         }
     } catch (error) {
-        console.error('测试连接时出错:', error);
-        message.error("测试失败: " + (error as Error).message);
+        message.error(t('aiConfig.testFailed') + (error as Error).message);
         formTestResult.value = { success: false, error: (error as Error).message };
     } finally {
         testingFormConnection.value = false;
@@ -964,12 +955,12 @@ const intelligentTest = async (config: AIConfig) => {
         showIntelligentTestResult.value = true;
 
         if (result.success) {
-            message.success("智能测试完成，AI已成功响应");
+            message.success(t('aiConfig.intelligentTestComplete'));
         } else {
-            message.error(`智能测试失败: ${result.error}`);
+            message.error(t('aiConfig.intelligentTestFailed') + result.error);
         }
     } catch (error) {
-        message.error("智能测试失败: " + (error as Error).message);
+        message.error(t('aiConfig.intelligentTestFailed') + (error as Error).message);
         intelligentTestResult.value = {
             success: false,
             error: (error as Error).message,
@@ -995,7 +986,7 @@ const saveSystemPrompt = async () => {
         await databaseService.aiConfig.updateAIConfig(editingSystemPromptConfig.value.id, {
             systemPrompt: systemPromptContent.value.trim() || undefined,
         });
-        message.success("系统提示词更新成功");
+        message.success(t('aiConfig.systemPromptUpdateSuccess'));
         closeSystemPromptModal();
         loadConfigs();
     } catch (error) {
