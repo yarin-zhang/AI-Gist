@@ -7,13 +7,13 @@
                     <NAvatar size="large" :src="appIcon" style="width: 80px; height: 80px; margin-bottom: 16px;" />
                     <div>
                         <NText strong style="font-size: 24px; display: block; margin-bottom: 8px;">
-                            AI Gist
+                            {{ t('about.appName') }}
                         </NText>
                         <NText depth="3" style="font-size: 14px; display: block; margin-bottom: 4px;">
-                            本地优先的 AI 提示词管理工具
+                            {{ t('about.appDescription') }}
                         </NText>
                         <NText depth="3" style="font-size: 12px;">
-                            管理 AI 提示词 + 变量填充 + 分类标签
+                            {{ t('about.appFeatures') }}
                         </NText>
                     </div>
                 </div>
@@ -23,26 +23,26 @@
 
             <!-- 版本信息 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">版本信息</NText>
+                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.versionInfo') }}</NText>
                 <NFlex vertical :size="8">
                     <NFlex justify="space-between">
-                        <NText depth="2">当前版本</NText>
+                        <NText depth="2">{{ t('about.currentVersion') }}</NText>
                         <NText>{{ currentVersion }}</NText>
                     </NFlex>
                     <NFlex justify="space-between" v-if="updateInfo">
-                        <NText depth="2">最新版本</NText>
+                        <NText depth="2">{{ t('about.latestVersion') }}</NText>
                         <NFlex align="center" :size="8">
                             <NText>{{ updateInfo.latestVersion }}</NText>
                             <NTag v-if="updateInfo.hasUpdate" type="warning" size="small">
-                                有新版本
+                                {{ t('about.hasUpdate') }}
                             </NTag>
                             <NTag v-else type="success" size="small">
-                                已是最新
+                                {{ t('about.isLatest') }}
                             </NTag>
                         </NFlex>
                     </NFlex>
                     <NFlex justify="space-between" v-if="updateInfo?.publishedAt">
-                        <NText depth="2">发布日期</NText>
+                        <NText depth="2">{{ t('about.publishedAt') }}</NText>
                         <NText>{{ formatDate(updateInfo.publishedAt) }}</NText>
                     </NFlex>
                 </NFlex>
@@ -51,7 +51,7 @@
             <!-- 更新检查 -->
             <NFlex vertical :size="12">
                 <NFlex justify="space-between" align="center">
-                    <NText strong style="font-size: 16px;">更新检查</NText>
+                    <NText strong style="font-size: 16px;">{{ t('about.updateCheck') }}</NText>
                     <NButton 
                         @click="checkForUpdates" 
                         :loading="checking" 
@@ -63,16 +63,16 @@
                                 <Refresh />
                             </NIcon>
                         </template>
-                        检查更新
+                        {{ t('about.checkForUpdates') }}
                     </NButton>
                 </NFlex>
 
                 <!-- 更新信息 -->
                 <div v-if="updateInfo?.hasUpdate && updateInfo.releaseNotes">
-                    <NAlert type="info" title="发现新版本" style="margin-bottom: 12px;">
+                    <NAlert type="info" :title="t('about.newVersionAvailable')" style="margin-bottom: 12px;">
                         <NFlex vertical :size="8">
                             <NText>
-                                新版本 {{ updateInfo.latestVersion }} 已发布，建议您及时更新。
+                                {{ t('about.newVersionDesc', { version: updateInfo.latestVersion }) }}
                             </NText>
                             <NFlex :size="8">
                                 <NButton 
@@ -80,14 +80,14 @@
                                     type="primary" 
                                     size="small"
                                 >
-                                    下载新版本
+                                    {{ t('about.downloadNewVersion') }}
                                 </NButton>
                                 <NButton 
                                     @click="showReleaseNotes = !showReleaseNotes" 
                                     quaternary 
                                     size="small"
                                 >
-                                    {{ showReleaseNotes ? '隐藏' : '查看' }}更新说明
+                                    {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
                                 </NButton>
                             </NFlex>
                         </NFlex>
@@ -95,7 +95,7 @@
 
                     <!-- 更新说明 -->
                     <NCollapse v-if="showReleaseNotes" style="margin-top: 12px;">
-                        <NCollapseItem title="更新说明" name="release-notes">
+                        <NCollapseItem :title="t('about.releaseNotes')" name="release-notes">
                             <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">
                                 {{ updateInfo.releaseNotes }}
                             </div>
@@ -111,33 +111,33 @@
 
             <!-- 项目信息 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">项目信息</NText>
+                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.projectInfo') }}</NText>
                 <NFlex vertical :size="8">
                     <NFlex justify="space-between">
-                        <NText depth="2">开发者</NText>
-                        <NText>Yarin Zhang</NText>
+                        <NText depth="2">{{ t('about.developer') }}</NText>
+                        <NText>{{ t('about.developerName') }}</NText>
                     </NFlex>
                     <NFlex justify="space-between">
-                        <NText depth="2">GitHub</NText>
+                        <NText depth="2">{{ t('about.github') }}</NText>
                         <NButton 
                             text 
                             type="primary" 
                             @click="openGitHub"
                             style="padding: 0; font-size: 14px;"
                         >
-                            yarin-zhang/AI-Gist
+                            {{ t('about.githubRepo') }}
                         </NButton>
                     </NFlex>
                     <NFlex justify="space-between">
-                        <NText depth="2">许可证</NText>
-                        <NText>AGPL License</NText>
+                        <NText depth="2">{{ t('about.license') }}</NText>
+                        <NText>{{ t('about.licenseType') }}</NText>
                     </NFlex>
                 </NFlex>
             </NFlex>
 
             <!-- 反馈与支持 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">反馈与支持</NText>
+                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.feedbackSupport') }}</NText>
                 <NFlex :size="12" wrap>
                     <NButton @click="openIssues" secondary>
                         <template #icon>
@@ -145,7 +145,7 @@
                                 <Bug />
                             </NIcon>
                         </template>
-                        报告问题
+                        {{ t('about.reportIssue') }}
                     </NButton>
                     <NButton @click="openFeatureRequest" secondary>
                         <template #icon>
@@ -153,7 +153,7 @@
                                 <Bulb />
                             </NIcon>
                         </template>
-                        功能建议
+                        {{ t('about.featureRequest') }}
                     </NButton>
                 </NFlex>
             </NFlex>
@@ -163,6 +163,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { 
     NCard, 
     NFlex, 
@@ -178,6 +179,8 @@ import {
     useMessage 
 } from 'naive-ui';
 import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
+
+const { t } = useI18n();
 
 // 应用图标
 const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href;

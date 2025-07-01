@@ -4,9 +4,9 @@
             <!-- 页面标题 -->
             <NFlex justify="space-between" align="center">
                 <div>
-                    <NText strong style="font-size: 28px">AI 配置管理</NText>
+                    <NText strong style="font-size: 28px">{{ t('aiConfig.title') }}</NText>
                     <NText depth="3" style="display: block; margin-top: 4px">
-                        管理和测试你的 AI 服务连接配置
+                        {{ t('aiConfig.subtitle') }}
                     </NText>
                 </div>
                 <NFlex>
@@ -16,7 +16,7 @@
                                 <Settings />
                             </NIcon>
                         </template>
-                        优化提示词
+                        {{ t('aiConfig.optimizePrompt') }}
                     </NButton>
                     <NButton type="primary" @click="showAddModal = true">
                         <template #icon>
@@ -24,7 +24,7 @@
                                 <Plus />
                             </NIcon>
                         </template>
-                        添加配置
+                        {{ t('aiConfig.addConfig') }}
                     </NButton>
                 </NFlex>
             </NFlex>
@@ -37,7 +37,7 @@
                             <Settings />
                         </NIcon>
                         <NText>
-                            当前全局首选配置：
+                            {{ t('aiConfig.currentPreferredConfig') }}
                             <NText strong>{{ preferredConfig.name }}</NText>
                             <NTag size="small" :type="getConfigTagType(preferredConfig.type)" style="margin-left: 8px">
                                 {{ getConfigTypeLabel(preferredConfig.type) }}
@@ -45,7 +45,7 @@
                         </NText>
                     </NFlex>
                     <NButton size="small" @click="clearPreferred">
-                        取消首选
+                        {{ t('aiConfig.cancelPreferred') }}
                     </NButton>
                 </NFlex>
             </NAlert>
@@ -56,14 +56,14 @@
                         <Settings />
                     </NIcon>
                     <NText>
-                        您有多个已启用的 AI 配置，建议设置一个全局首选配置
+                        {{ t('aiConfig.multipleConfigsWarning') }}
                     </NText>
                 </NFlex>
             </NAlert>
             <!-- 配置卡片列表 -->
             <div class="config-list">
                 <div v-if="configs.length === 0" style="text-align: center; padding: 40px">
-                    <NEmpty description="暂无AI配置，快来添加第一个吧！">
+                    <NEmpty :description="t('aiConfig.noConfigs')">
                         <template #extra>
                             <NButton type="primary" @click="showAddModal = true">
                                 <template #icon>
@@ -71,7 +71,7 @@
                                         <Plus />
                                     </NIcon>
                                 </template>
-                                添加配置
+                                {{ t('aiConfig.addConfig') }}
                             </NButton>
                         </template>
                     </NEmpty>
@@ -89,7 +89,7 @@
                                     {{ getConfigTypeLabel(config.type) }}
                                 </n-tag>
                                 <n-tag :type="config.enabled ? 'success' : 'warning'">
-                                    {{ config.enabled ? "已启用" : "已禁用" }}
+                                    {{ config.enabled ? t('aiConfig.enabled') : t('aiConfig.disabled') }}
                                 </n-tag>
                                 <n-tag v-if="config.isPreferred" type="primary">
                                     <template #icon>
@@ -97,7 +97,7 @@
                                             <Settings />
                                         </NIcon>
                                     </template>
-                                    全局首选
+                                    {{ t('aiConfig.globalPreferred') }}
                                 </n-tag>
                             </div>
                             <div class="config-switch">
@@ -109,7 +109,7 @@
                                                 <Settings />
                                             </NIcon>
                                         </template>
-                                        {{ config.isPreferred ? '已设为首选' : '设为首选' }}
+                                        {{ config.isPreferred ? t('aiConfig.alreadyPreferred') : t('aiConfig.setAsPreferred') }}
                                     </n-button>
                                     <n-switch v-model:value="config.enabled"
                                         @update:value="(value) => toggleConfig(config.id!, value)" />
@@ -121,16 +121,16 @@
                     <div class="config-details">
                         <n-flex justify="space-between" >
                             <n-flex vertical>
-                                <p><strong>Base URL:</strong> {{ config.baseURL }}</p>
+                                <p><strong>{{ t('aiConfig.baseURL') }}:</strong> {{ config.baseURL }}</p>
                                 <p v-if="config.defaultModel">
-                                    <strong>默认模型:</strong> {{ config.defaultModel }}
+                                    <strong>{{ t('aiConfig.defaultModel') }}:</strong> {{ config.defaultModel }}
                                 </p>
                                 <p v-if="config.customModel">
-                                    <strong>自定义模型:</strong> {{ config.customModel }}
+                                    <strong>{{ t('aiConfig.customModel') }}:</strong> {{ config.customModel }}
                                 </p>
                             </n-flex>
                             <n-flex vertical>
-                                <p><strong>创建时间:</strong> {{ formatDate(config.createdAt) }}</p>
+                                <p><strong>{{ t('aiConfig.createdAt') }}:</strong> {{ formatDate(config.createdAt) }}</p>
                                 <!-- <p>
                                     <strong>系统提示词:</strong>
                                     <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
@@ -157,7 +157,7 @@
                                             <Settings />
                                         </NIcon>
                                     </template>
-                                    编辑
+                                    {{ t('aiConfig.edit') }}
                                 </n-button>
                                 <n-button size="small" @click="editSystemPrompt(config)">
                                     <template #icon>
@@ -165,7 +165,7 @@
                                             <Edit />
                                         </NIcon>
                                     </template>
-                                    系统提示词
+                                    {{ t('aiConfig.systemPrompt') }}
                                 </n-button>
                             </NFlex>
 
@@ -178,7 +178,7 @@
                                             <AccessPoint />
                                         </NIcon>
                                     </template>
-                                    连接测试
+                                    {{ t('aiConfig.connectionTest') }}
                                 </n-button>
                                 <n-button size="small" @click="intelligentTest(config)"
                                     :loading="intelligentTestingConfigs.has(config.id!)">
@@ -187,7 +187,7 @@
                                             <Robot />
                                         </NIcon>
                                     </template>
-                                    请求测试
+                                    {{ t('aiConfig.requestTest') }}
                                 </n-button>
                                 <n-button size="small" type="error" @click="deleteConfig(config.id!)">
                                     <template #icon>
@@ -195,7 +195,7 @@
                                             <DatabaseOff />
                                         </NIcon>
                                     </template>
-                                    删除
+                                    {{ t('aiConfig.delete') }}
                                 </n-button>
                             </NFlex>
                         </NFlex>
@@ -480,6 +480,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch, defineExpose } from "vue";
+import { useI18n } from 'vue-i18n';
 import {
     NButton,
     NCard,
@@ -512,6 +513,7 @@ import { useWindowSize } from "~/composables/useWindowSize";
 import CommonModal from "~/components/common/CommonModal.vue";
 import QuickOptimizationConfigModal from "~/components/ai/QuickOptimizationConfigModal.vue";
 
+const { t } = useI18n();
 const message = useMessage();
 const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase();
 
