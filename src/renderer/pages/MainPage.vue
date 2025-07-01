@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, h, nextTick, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
     NLayout,
     NLayoutSider,
@@ -23,6 +24,7 @@ import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
 import StatusBar from '~/components/common/StatusBar.vue'
 
+const { t } = useI18n()
 const currentView = ref('prompts')
 const settingsTargetSection = ref<string>()
 
@@ -32,17 +34,17 @@ const aiConfigPageRef = ref()
 // 菜单选项
 const menuOptions: MenuOption[] = [
     {
-        label: 'AI 提示词',
+        label: t('mainPage.menu.prompts'),
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
     },
     {
-        label: 'AI 配置',
+        label: t('mainPage.menu.aiConfig'),
         key: 'ai-config',
         icon: () => h(NIcon, null, { default: () => h(AIIcon) })
     },
     {
-        label: '设置',
+        label: t('mainPage.menu.settings'),
         key: 'settings',
         icon: () => h(NIcon, null, { default: () => h(SettingsIcon) })
     }
@@ -87,7 +89,7 @@ window.electronAPI.sendMessage('Hello from App.vue!')
                     show-trigger="bar">
                     <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
                         <NText strong style="font-size: 16px; ">
-                            AI Gist
+                            {{ t('mainPage.title') }}
                         </NText>
                     </NFlex>
                     <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"

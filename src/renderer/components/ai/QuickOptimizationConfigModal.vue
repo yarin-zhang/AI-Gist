@@ -9,10 +9,10 @@
                     </NIcon>
                     <div>
                         <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                            快速优化提示词配置
+                            {{ t('quickOptimization.title') }}
                         </NText>
                         <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
-                            管理提示词编辑时的快速优化选项
+                            {{ t('quickOptimization.subtitle') }}
                         </NText>
                     </div>
                 </NFlex>
@@ -26,7 +26,7 @@
                 <NCard size="small" :style="{ flex: 1 }">
                     <template #header>
                         <NFlex justify="space-between" align="center">
-                            <NText strong>优化提示词</NText>
+                            <NText strong>{{ t('quickOptimization.optimizePrompt') }}</NText>
                             <NText depth="3" style="font-size: 12px;">
                                 {{ enabledCount }}/{{ totalCount }}
                             </NText>
@@ -35,10 +35,10 @@
                     <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                         <NFlex vertical size="medium" style="padding-right: 12px;">
                             <div v-if="configs.length === 0" style="text-align: center; padding: 40px">
-                                <NEmpty description="暂无配置">
+                                <NEmpty :description="t('quickOptimization.noConfig')">
                                     <template #extra>
                                         <NButton size="small" @click="initializeDefaults" :loading="initializing">
-                                            初始化默认配置
+                                            {{ t('quickOptimization.initializeDefaults') }}
                                         </NButton>
                                     </template>
                                 </NEmpty>
@@ -55,10 +55,10 @@
                                         <NFlex align="center" size="small">
                                             <NText strong>{{ config.name }}</NText>
                                             <NTag size="small" :type="config.enabled ? 'success' : 'default'">
-                                                {{ config.enabled ? '已启用' : '已禁用' }}
+                                                {{ config.enabled ? t('quickOptimization.enabled') : t('quickOptimization.disabled') }}
                                             </NTag>
                                             <NTag size="small" type="info">
-                                                排序: {{ config.sortOrder }}
+                                                {{ t('quickOptimization.sortOrder') }}: {{ config.sortOrder }}
                                             </NTag>
                                         </NFlex>
                                         <NFlex size="small">
@@ -72,7 +72,7 @@
                                                         <Edit />
                                                     </NIcon>
                                                 </template>
-                                                编辑
+                                                {{ t('common.edit') }}
                                             </NButton>
                                             <NButton 
                                                 size="small" 
@@ -80,7 +80,7 @@
                                                 :type="config.enabled ? 'warning' : 'success'"
                                                 :disabled="!config.enabled && enabledCount >= 5"
                                             >
-                                                {{ config.enabled ? '禁用' : '启用' }}
+                                                {{ config.enabled ? t('quickOptimization.disable') : t('quickOptimization.enable') }}
                                             </NButton>
                                             <NButton 
                                                 size="small" 
@@ -92,7 +92,7 @@
                                                         <Trash />
                                                     </NIcon>
                                                 </template>
-                                                删除
+                                                {{ t('common.delete') }}
                                             </NButton>
                                         </NFlex>
                                     </NFlex>
@@ -100,11 +100,11 @@
 
                                 <NFlex vertical size="small">
                                     <div v-if="config.description">
-                                        <NText depth="3" style="font-size: 12px;">描述</NText>
+                                        <NText depth="3" style="font-size: 12px;">{{ t('quickOptimization.description') }}</NText>
                                         <NText style="font-size: 12px;">{{ config.description }}</NText>
                                     </div>
                                     <div>
-                                        <NText depth="3" style="font-size: 12px;">提示词模板</NText>
+                                        <NText depth="3" style="font-size: 12px;">{{ t('quickOptimization.promptTemplate') }}</NText>
                                         <NInput 
                                             :value="config.prompt" 
                                             type="textarea" 
@@ -131,7 +131,7 @@
                             <Plus />
                         </NIcon>
                     </template>
-                    添加配置
+                    {{ t('quickOptimization.addConfig') }}
                 </NButton>
             </NFlex>
         </template>
@@ -141,31 +141,31 @@
     <CommonModal ref="editModalRef" :show="showEditModal" @update:show="showEditModal = $event" @close="closeEditModal">
         <template #header>
             <NText :style="{ fontSize: '18px', fontWeight: 600 }">
-                {{ editingConfig ? "编辑配置" : "添加配置" }}
+                {{ editingConfig ? t('quickOptimization.editConfig') : t('quickOptimization.addConfig') }}
             </NText>
         </template>
 
         <template #content="{ contentHeight }">
             <NForm ref="editFormRef" :model="editFormData" :rules="editFormRules" label-placement="top">
                 <NFlex vertical size="large" :style="{ height: `${contentHeight}px` }">
-                    <NFormItem label="配置名称" path="name">
-                        <NInput v-model:value="editFormData.name" placeholder="输入配置名称，如：更简短、更丰富等" />
+                    <NFormItem :label="t('quickOptimization.configName')" path="name">
+                        <NInput v-model:value="editFormData.name" :placeholder="t('quickOptimization.configNamePlaceholder')" />
                     </NFormItem>
 
-                    <NFormItem label="描述" path="description">
+                    <NFormItem :label="t('quickOptimization.description')" path="description">
                         <NInput 
                             v-model:value="editFormData.description" 
                             type="textarea" 
-                            placeholder="输入配置描述（可选）" 
+                            :placeholder="t('quickOptimization.descriptionPlaceholder')" 
                             :rows="2" 
                         />
                     </NFormItem>
 
-                    <NFormItem label="提示词模板" path="prompt">
+                    <NFormItem :label="t('quickOptimization.promptTemplate')" path="prompt">
                         <NInput 
                             v-model:value="editFormData.prompt" 
                             type="textarea" 
-                            placeholder="输入提示词模板，使用 {{content}} 作为占位符" 
+                            :placeholder="t('quickOptimization.promptTemplatePlaceholder')" 
                             :rows="6"
                             :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
                             show-count
@@ -174,15 +174,15 @@
                     </NFormItem>
 
                     <NFlex>
-                        <NFormItem label="排序" path="sortOrder" style="flex: 1">
+                        <NFormItem :label="t('quickOptimization.sortOrder')" path="sortOrder" style="flex: 1">
                             <NInputNumber 
                                 v-model:value="editFormData.sortOrder" 
-                                placeholder="排序数字" 
+                                :placeholder="t('quickOptimization.sortOrderPlaceholder')" 
                                 :min="0"
                                 :max="999"
                             />
                         </NFormItem>
-                        <NFormItem label="启用状态" path="enabled" style="width: 120px">
+                        <NFormItem :label="t('quickOptimization.enabledStatus')" path="enabled" style="width: 120px">
                             <NSwitch v-model:value="editFormData.enabled" />
                         </NFormItem>
                     </NFlex>
@@ -192,9 +192,9 @@
 
         <template #footer>
             <NFlex justify="end">
-                <NButton @click="closeEditModal">取消</NButton>
+                <NButton @click="closeEditModal">{{ t('common.cancel') }}</NButton>
                 <NButton type="primary" @click="saveEditConfig" :loading="saving">
-                    {{ editingConfig ? "更新" : "创建" }}
+                    {{ editingConfig ? t('common.update') : t('common.create') }}
                 </NButton>
             </NFlex>
         </template>
@@ -224,6 +224,7 @@ import { Settings, Edit, Trash, Plus } from "@vicons/tabler";
 import CommonModal from "@/components/common/CommonModal.vue";
 import { api } from "@/lib/api";
 import type { QuickOptimizationConfig, CreateQuickOptimizationConfig, UpdateQuickOptimizationConfig } from "@shared/types/ai";
+import { useI18n } from 'vue-i18n'
 
 interface Props {
     show: boolean;
@@ -238,6 +239,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const message = useMessage();
+const { t } = useI18n()
 
 // 数据状态
 const configs = ref<QuickOptimizationConfig[]>([]);

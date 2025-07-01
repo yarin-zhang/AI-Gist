@@ -1,6 +1,28 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import i18n from './i18n'
 import { initDatabase, databaseService } from './lib/services'
+
+// 初始化语言设置
+function initLocale() {
+  const savedLocale = localStorage.getItem('locale')
+  if (savedLocale && ['zh-CN', 'en-US'].includes(savedLocale)) {
+    i18n.global.locale.value = savedLocale as 'zh-CN' | 'en-US'
+    console.log(`应用语言设置: ${savedLocale}`)
+  } else {
+    // 如果没有保存的语言设置，使用系统语言或默认语言
+    const systemLocale = navigator.language
+    if (systemLocale.startsWith('zh')) {
+      i18n.global.locale.value = 'zh-CN'
+      localStorage.setItem('locale', 'zh-CN')
+      console.log('检测到中文系统，设置语言为: zh-CN')
+    } else {
+      i18n.global.locale.value = 'en-US'
+      localStorage.setItem('locale', 'en-US')
+      console.log('设置默认语言为: en-US')
+    }
+  }
+}
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
@@ -34,8 +56,9 @@ function removeInitialLoading() {
 // 初始化数据库，然后启动应用
 async function startApp() {
   try {
-    // 立即设置初始主题
+    // 立即设置初始主题和语言
     setInitialTheme()
+    initLocale()
     
     await initDatabase();
     console.log('IndexedDB initialized successfully');
@@ -107,6 +130,7 @@ async function startApp() {
     // 数据库服务已经暴露，不再需要单独的 IPC 处理器
 
     const app = createApp(App);
+    app.use(i18n);
     app.mount('#app');
     
     // Vue 应用挂载完成后移除加载屏幕
@@ -115,12 +139,12 @@ async function startApp() {
     console.error('Failed to initialize database:', error);
     // 即使数据库初始化失败，也要启动应用
     const app = createApp(App);
+    app.use(i18n);
     app.mount('#app');
     
     // 移除加载屏幕
     removeInitialLoading();
   }
 }
-
 
 startApp();

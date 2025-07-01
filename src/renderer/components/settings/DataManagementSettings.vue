@@ -6,7 +6,7 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">数据备份</NText>
+                        <NText depth="2">{{ t('dataManagement.backupManagement') }}</NText>
                         <NFlex :size="12">
                             <NButton type="primary" @click="createBackup" :loading="props.loading?.backup">
                                 <template #icon>
@@ -14,7 +14,7 @@
                                         <Upload />
                                     </NIcon>
                                 </template>
-                                创建备份
+                                {{ t('dataManagement.createBackup') }}
                             </NButton>
                             <NButton @click="refreshBackupList">
                                 <template #icon>
@@ -22,7 +22,7 @@
                                         <Refresh />
                                     </NIcon>
                                 </template>
-                                刷新备份列表
+                                {{ t('dataManagement.refreshBackupList') }}
                             </NButton>
                             <NButton @click="openBackupDirectory">
                                 <template #icon>
@@ -30,7 +30,7 @@
                                         <Folder />
                                     </NIcon>
                                 </template>
-                                打开备份目录
+                                {{ t('dataManagement.openBackupDirectory') }}
                             </NButton>
                         </NFlex>
                     </NFlex>
@@ -38,7 +38,7 @@
                     <!-- 备份版本列表 -->
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
-                            <NText depth="2">备份版本列表</NText>
+                            <NText depth="2">{{ t('dataManagement.backupVersionList') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                 <NGridItem v-for="backup in paginatedBackups" :key="backup.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
                                     <NCard size="small" :title="backup.version" >
@@ -70,14 +70,13 @@
                                                                     <Recharging />
                                                                 </NIcon>
                                                             </template>
-                                                            恢复
+                                                            {{ t('dataManagement.restore') }}
                                                         </NButton>
                                                     </template>
                                                     <div style="max-width: 300px;">
-                                                        <p>注意！恢复备份将会：</p>
+                                                        <p>{{ t('dataManagement.restoreWarning') }}</p>
                                                         <ul style="margin: 8px 0; padding-left: 20px;">
-                                                            <li>自动备份当前数据</li>
-                                                            <li>完全覆盖现有数据库</li>
+                                                            <li v-for="item in t('dataManagement.restoreWarningItems')" :key="item">{{ item }}</li>
                                                         </ul>
                                                     </div>
                                                 </NPopconfirm>
@@ -90,10 +89,10 @@
                                                                     <Trash />
                                                                 </NIcon>
                                                             </template>
-                                                            删除
+                                                            {{ t('dataManagement.delete') }}
                                                         </NButton>
                                                     </template>
-                                                    确定要删除这个备份吗？
+                                                    {{ t('dataManagement.confirmDeleteBackup') }}
                                                 </NPopconfirm>
                                             </NFlex>
                                         </template>
@@ -112,7 +111,7 @@
 
                     <div v-else>
                         <NText depth="3" style="font-size: 14px;">
-                            暂无备份版本，请先创建备份
+                            {{ t('dataManagement.noBackups') }}
                         </NText>
                     </div>
                 </NFlex>
@@ -124,9 +123,9 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">完整备份管理</NText>
+                        <NText depth="2">{{ t('dataManagement.fullBackupManagement') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
-                            导出完整备份压缩包，或从压缩包导入完整备份。导出的数据将包含 AI 配置信息中的 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                            {{ t('dataManagement.fullBackupDescription') }}
                         </NText>
                         
                         <NFlex :size="12">
@@ -137,7 +136,7 @@
                                         <Archive />
                                     </NIcon>
                                 </template>
-                                导出完整备份
+                                {{ t('dataManagement.exportFullBackup') }}
                             </NButton>
                             <NButton @click="importFullBackup" 
                                      :loading="props.loading?.import">
@@ -146,7 +145,7 @@
                                         <Folder />
                                     </NIcon>
                                 </template>
-                                导入完整备份
+                                {{ t('dataManagement.importFullBackup') }}
                             </NButton>
                         </NFlex>
                         
@@ -161,22 +160,22 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">选择性数据导出</NText>
+                        <NText depth="2">{{ t('dataManagement.selectiveDataExport') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
-                            选择部分数据进行可读格式导出，暂时无法恢复到应用中。
+                            {{ t('dataManagement.exportDescription') }}
                         </NText>
                         
                         <!-- 数据类型选择 -->
                         <NCard size="small" >
                             <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">选择要导出的数据类型：</NText>
+                                <NText depth="2" style="font-size: 14px;">{{ t('dataManagement.selectDataTypeToExport') }}</NText>
                                 <NFlex vertical :size="8">
                                     <NRadio 
                                         :checked="exportOptions.selectedType === 'prompts'" 
                                         value="prompts"
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
-                                            <NText>描述词库</NText>
+                                            <NText>{{ t('dataManagement.promptLibrary') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
                                         </NFlex>
                                     </NRadio>
@@ -185,7 +184,7 @@
                                         value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
-                                            <NText>分类管理</NText>
+                                            <NText>{{ t('dataManagement.categoryManagement') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
                                         </NFlex>
                                     </NRadio>
@@ -194,9 +193,9 @@
                                         value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
-                                            <NText>AI 配置</NText>
+                                            <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
-                                            <NTag size="small" type="warning">包含敏感信息</NTag>
+                                            <NTag size="small" type="warning">{{ t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                 </NFlex>
@@ -214,7 +213,7 @@
                                         <FileExport />
                                     </NIcon>
                                 </template>
-                                导出为 CSV
+                                {{ t('dataManagement.exportToCSV') }}
                             </NButton>
                             <NButton @click="exportSelectedData('json')" 
                                      :disabled="!hasSelectedData" 
@@ -224,18 +223,18 @@
                                         <FileExport />
                                     </NIcon>
                                 </template>
-                                导出为 JSON
+                                {{ t('dataManagement.exportToJSON') }}
                             </NButton>
                         </NFlex>
                         
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
-                            <template #header>安全提示</template>
-                            您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。
+                            <template #header>{{ t('dataManagement.securityWarning') }}</template>
+                            {{ t('dataManagement.securityWarningText') }}
                         </NAlert>
                         
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
-                            <template #header>格式说明</template>
-                            AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。
+                            <template #header>{{ t('dataManagement.formatNote') }}</template>
+                            {{ t('dataManagement.formatNoteText') }}
                         </NAlert>
                     </NFlex>
                 </NFlex>
@@ -248,9 +247,9 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">数据库维护</NText>
+                        <NText depth="2">{{ t('dataManagement.databaseMaintenance') }}</NText>
                         <NText depth="3" style="font-size: 12px">
-                            当遇到数据异常时，可尝试修复数据库
+                            {{ t('dataManagement.maintenanceDescription') }}
                         </NText>
                         <NFlex :size="12">
                             <NButton type="primary" @click="checkDatabaseHealth">
@@ -259,7 +258,7 @@
                                         <AlertCircle />
                                     </NIcon>
                                 </template>
-                                检查数据库状态
+                                {{ t('dataManagement.checkDatabaseHealth') }}
                             </NButton>
                             <NButton type="warning" @click="repairDatabase">
                                 <template #icon>
@@ -267,9 +266,9 @@
                                         <Database />
                                     </NIcon>
                                 </template>
-                                修复数据库
+                                {{ t('dataManagement.repairDatabase') }}
                             </NButton>
-                            <NPopconfirm @positive-click="clearDatabase" negative-text="取消" positive-text="确定清空"
+                            <NPopconfirm @positive-click="clearDatabase" :negative-text="t('common.cancel')" :positive-text="t('dataManagement.clearDatabase')"
                                 placement="top">
                                 <template #trigger>
                                     <NButton type="error" :loading="props.loading?.clearDatabase">
@@ -278,19 +277,16 @@
                                                 <DatabaseOff />
                                             </NIcon>
                                         </template>
-                                        清空数据库
+                                        {{ t('dataManagement.clearDatabase') }}
                                     </NButton>
                                 </template>
                                 <div style="max-width: 350px;">
-                                    <p><strong>⚠️ 危险操作警告</strong></p>
-                                    <p>清空数据库将会：</p>
+                                    <p><strong>{{ t('dataManagement.clearDatabaseWarning') }}</strong></p>
+                                    <p>{{ t('dataManagement.clearDatabaseWarningText') }}</p>
                                     <ul style="margin: 8px 0; padding-left: 20px;">
-                                        <li>自动创建当前数据的备份</li>
-                                        <li>删除所有现有数据</li>
-                                        <li>重置数据库到初始状态</li>
-                                        <li>此操作不可撤销</li>
+                                        <li v-for="item in t('dataManagement.clearDatabaseWarningItems')" :key="item">{{ item }}</li>
                                     </ul>
-                                    <p><strong>确定要清空整个数据库吗？</strong></p>
+                                    <p><strong>{{ t('dataManagement.confirmClearDatabase') }}</strong></p>
                                 </div>
                             </NPopconfirm>
                         </NFlex>
@@ -334,6 +330,7 @@ import {
     Folder,
 } from "@vicons/tabler";
 import { ref, computed } from "vue";
+import { useI18n } from 'vue-i18n';
 import { useWindowSize } from "@/composables/useWindowSize";
 
 // Props
@@ -347,6 +344,8 @@ const props = defineProps<{
         clearDatabase?: boolean;
     };
 }>();
+
+const { t } = useI18n();
 
 const emit = defineEmits<{
     "export-data": [format: "csv" | "json"];

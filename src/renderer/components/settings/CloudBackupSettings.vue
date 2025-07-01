@@ -6,9 +6,9 @@
             <div v-if="storageConfigs.length > 0">
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">云端备份管理</NText>
+                        <NText depth="2">{{ t('cloudBackup.backupManagement') }}</NText>
                         <NText depth="3" style="font-size: 12px;">
-                            管理云端备份文件，支持创建、恢复和删除操作
+                            {{ t('cloudBackup.backupDescription') }}
                         </NText>
                     </NFlex>
 
@@ -26,7 +26,7 @@
                                                 <Upload />
                                             </NIcon>
                                         </template>
-                                        创建云端备份
+                                        {{ t('cloudBackup.createCloudBackup') }}
                                     </NButton>
                                     <NButton @click="refreshCloudBackupList(config.id)" :loading="loading.refreshList">
                                         <template #icon>
@@ -34,21 +34,21 @@
                                                 <Refresh />
                                             </NIcon>
                                         </template>
-                                        刷新备份列表
+                                        {{ t('cloudBackup.refreshBackupList') }}
                                     </NButton>
                                 </NFlex>
 
                                 <!-- 云端备份列表 -->
                                 <div v-if="getPaginatedBackups(config.id).length > 0">
-                                    <NFlex vertical :size="12">
-                                        <NText depth="2">云端备份列表</NText>
+                                                                            <NFlex vertical :size="12">
+                                            <NText depth="2">{{ t('cloudBackup.cloudBackupList') }}</NText>
                                         <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                             <NGridItem v-for="backup in getPaginatedBackups(config.id)" :key="backup.id"
                                                 span="6 600:5 900:4 1200:3 1500:2 1800:1">
                                                 <NCard size="small" :title="backup.name">
                                                     <NFlex vertical :size="4">
                                                         <NFlex align="center" :size="8">
-                                                            <NText strong>{{ backup.description || '云端备份' }}</NText>
+                                                            <NText strong>{{ backup.description || t('cloudBackup.cloudBackup') }}</NText>
                                                         </NFlex>
                                                         <NFlex align="center" :size="8">
                                                             <NTag type="info" size="small">{{
@@ -74,14 +74,13 @@
                                                                                 <Recharging />
                                                                             </NIcon>
                                                                         </template>
-                                                                        恢复
+                                                                        {{ t('cloudBackup.restore') }}
                                                                     </NButton>
                                                                 </template>
                                                                 <div style="max-width: 300px;">
-                                                                    <p>注意！恢复云端备份将会：</p>
+                                                                    <p>{{ t('cloudBackup.restoreWarning') }}</p>
                                                                     <ul style="margin: 8px 0; padding-left: 20px;">
-                                                                        <li>自动备份当前数据</li>
-                                                                        <li>完全覆盖现有数据库</li>
+                                                                        <li v-for="item in t('cloudBackup.restoreWarningItems')" :key="item">{{ item }}</li>
                                                                     </ul>
                                                                 </div>
                                                             </NPopconfirm>
@@ -95,10 +94,10 @@
                                                                                 <Trash />
                                                                             </NIcon>
                                                                         </template>
-                                                                        删除
+                                                                        {{ t('cloudBackup.delete') }}
                                                                     </NButton>
                                                                 </template>
-                                                                确定要删除这个云端备份吗？
+                                                                {{ t('cloudBackup.confirmDeleteBackup') }}
                                                             </NPopconfirm>
                                                         </NFlex>
                                                     </template>
@@ -122,7 +121,7 @@
 
                                 <div v-else>
                                     <NText depth="3" style="font-size: 14px;">
-                                        暂无云端备份，请先创建备份
+                                        {{ t('cloudBackup.noCloudBackups') }}
                                     </NText>
                                 </div>
                             </NFlex>
@@ -138,9 +137,9 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">云端存储配置</NText>
+                        <NText depth="2">{{ t('cloudBackup.storageConfiguration') }}</NText>
                         <NText depth="3" style="font-size: 12px;">
-                            配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能
+                            {{ t('cloudBackup.storageDescription') }}
                         </NText>
 
                         <NFlex :size="12">
@@ -150,15 +149,15 @@
                                         <Plus />
                                     </NIcon>
                                 </template>
-                                添加存储配置
+                                {{ t('cloudBackup.addStorageConfig') }}
                             </NButton>
                         </NFlex>
                     </NFlex>
 
                     <!-- 存储配置列表 -->
                     <div v-if="storageConfigs.length > 0">
-                        <NFlex vertical :size="12">
-                            <NText depth="2">已配置的存储</NText>
+                                                    <NFlex vertical :size="12">
+                                <NText depth="2">{{ t('cloudBackup.configuredStorage') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                 <NGridItem v-for="config in storageConfigs" :key="config.id"
                                     span="6 600:5 900:4 1200:3 1500:2 1800:1">
@@ -170,7 +169,7 @@
                                                     {{ config.type === 'webdav' ? 'WebDAV' : 'iCloud Drive' }}
                                                 </NTag>
                                                 <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
-                                                    {{ config.enabled ? '已启用' : '已禁用' }}
+                                                    {{ config.enabled ? t('cloudBackup.enabled') : t('cloudBackup.disabled') }}
                                                 </NTag>
                                             </NFlex>
                                             <NText depth="3" style="font-size: 12px;">
@@ -186,7 +185,7 @@
                                                             <Wifi />
                                                         </NIcon>
                                                     </template>
-                                                    测试连接
+                                                    {{ t('cloudBackup.testConnection') }}
                                                 </NButton>
                                                 <NButton size="small" @click="editConfig(config)">
                                                     <template #icon>
@@ -194,7 +193,7 @@
                                                             <Edit />
                                                         </NIcon>
                                                     </template>
-                                                    编辑
+                                                    {{ t('cloudBackup.editConfig') }}
                                                 </NButton>
                                                 <NPopconfirm @positive-click="deleteConfig(config.id)"
                                                     negative-text="取消" positive-text="确定">
@@ -331,10 +330,12 @@ import {
     Wifi,
 } from "@vicons/tabler";
 import { ref, computed, onMounted, watch } from "vue";
+import { useI18n } from 'vue-i18n';
 import { CloudBackupAPI } from "@/lib/api/cloud-backup.api";
 import type { CloudStorageConfig, CloudBackupInfo } from "@shared/types/cloud-backup";
 
 const message = useMessage();
+const { t } = useI18n();
 
 // 响应式数据
 const storageConfigs = ref<CloudStorageConfig[]>([]);
