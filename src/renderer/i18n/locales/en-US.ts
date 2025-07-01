@@ -153,14 +153,7 @@ export default {
     availableModels: 'Available Models'
   },
   
-  // Settings page
-  settings: {
-    title: 'Application Settings',
-    subtitle: 'Personalize your application preferences',
-    autoSave: 'Settings auto-save',
-    resetSettings: 'Reset to Default',
-    menu: 'Settings Menu'
-  },
+
   
   // Data Management
   dataManagement: {
@@ -259,6 +252,24 @@ export default {
     restoreFromCloud: 'Restore from Cloud',
     deleteCloudBackup: 'Delete Cloud Backup',
     cloudBackup: 'Cloud Backup'
+  },
+  
+  // Settings page
+  settings: {
+    title: 'Settings',
+    subtitle: 'Manage application configuration and preferences',
+    autoSave: 'Settings will be saved automatically',
+    resetSettings: 'Reset to Default Settings',
+    menu: 'Settings Menu',
+    sections: {
+      appearance: 'Appearance',
+      startup: 'Startup Behavior',
+      close: 'Close Behavior',
+      dataManagement: 'Data Management',
+      cloudBackup: 'Cloud Backup',
+      about: 'About',
+      laboratory: 'Laboratory'
+    }
   },
   
   // About page
@@ -403,5 +414,12 @@ export default {
     retry: 'Retry',
     retrying: 'Retrying...',
     hide: 'Hide'
+  },
+  
+  // Language settings
+  language: {
+    title: 'Language Settings',
+    description: 'Choose the display language for the application',
+    selectLanguage: 'Select Language'
   }
 } 

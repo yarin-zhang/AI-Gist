@@ -194,11 +194,12 @@ export default {
     menu: '设置菜单',
     sections: {
       appearance: '外观设置',
-      startup: '启动行为',
-      close: '关闭行为',
+      startup: '启动行为设置',
+      close: '关闭行为设置',
       dataManagement: '数据管理',
       cloudBackup: '云端备份',
-      about: '关于'
+      about: '关于',
+      laboratory: '实验室'
     }
   },
   
@@ -569,5 +570,12 @@ export default {
     retry: '重试',
     retrying: '重试中...',
     hide: '隐藏'
+  },
+  
+  // 语言设置
+  language: {
+    title: '语言设置',
+    description: '选择应用的显示语言',
+    selectLanguage: '选择语言'
   }
 } 

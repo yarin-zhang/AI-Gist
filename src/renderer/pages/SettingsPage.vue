@@ -96,21 +96,21 @@
                         <NCard v-show="activeSettingKey === 'language'">
                             <NFlex vertical :size="16">
                                 <NFlex vertical :size="12">
-                                    <NText depth="2">语言设置</NText>
+                                    <NText depth="2">{{ t('language.title') }}</NText>
                                     <NText depth="3" style="font-size: 12px;">
-                                        选择应用的显示语言
+                                        {{ t('language.description') }}
                                     </NText>
                                 </NFlex>
                                 
                                 <NFlex vertical :size="12">
-                                    <NText depth="2" style="font-size: 14px;">选择语言：</NText>
+                                    <NText depth="2" style="font-size: 14px;">{{ t('language.selectLanguage') }}：</NText>
                                     <NSelect
                                         v-model:value="currentLocale"
                                         :options="supportedLocales.map(locale => ({
                                             label: locale.name,
                                             value: locale.code
                                         }))"
-                                        placeholder="选择语言"
+                                        :placeholder="t('language.selectLanguage')"
                                         style="max-width: 200px;"
                                         @update:value="switchLocale"
                                     />
@@ -235,37 +235,37 @@ const settings = reactive({
 const menuOptions = computed(() => {
     const baseOptions = [
         {
-            label: "数据管理",
+            label: t('settings.sections.dataManagement'),
             key: "data-management",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
         },
         {
-            label: "云端备份",
+            label: t('settings.sections.cloudBackup'),
             key: "cloud-backup",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
         },
         {
-            label: "外观设置",
+            label: t('settings.sections.appearance'),
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
         },
         {
-            label: "语言设置",
+            label: t('language.title'),
             key: "language",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
         },
         {
-            label: "启动行为设置",
+            label: t('settings.sections.startup'),
             key: "startup-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
         },
         {
-            label: "关闭行为设置",
+            label: t('settings.sections.close'),
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
         },
         {
-            label: "关于",
+            label: t('settings.sections.about'),
             key: "about",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(InfoCircle) }),
         },
@@ -274,7 +274,7 @@ const menuOptions = computed(() => {
     // 仅在开发环境中添加实验室菜单
     if (isDevelopment) {
         baseOptions.push({
-            label: "实验室",
+            label: t('settings.sections.laboratory'),
             key: "laboratory",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Flask) }),
         });
