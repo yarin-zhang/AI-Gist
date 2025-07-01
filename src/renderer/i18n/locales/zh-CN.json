@@ -216,16 +216,6 @@
     "update": "更新",
     "yes": "是"
   },
-  "conflictResolution": {
-    "dataSummary": {
-    },
-    "operationHint": {
-    },
-    "quickActions": {
-    },
-    "strategies": {
-    }
-  },
   "dataManagement": {
     "aiConfiguration": "AI 配置",
     "backupManagement": "数据备份",
