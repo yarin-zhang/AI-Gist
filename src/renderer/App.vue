@@ -6,9 +6,13 @@ import {
     NMessageProvider,
     NDialogProvider,
     zhCN,
+    zhTW,
     enUS,
+    jaJP,
     dateZhCN,
-    dateEnUS
+    dateZhTW,
+    dateEnUS,
+    dateJaJP
 } from 'naive-ui'
 import { useTheme } from '~/composables/useTheme'
 import { useI18n } from '~/composables/useI18n'
@@ -25,11 +29,29 @@ const { currentLocale } = useI18n()
 
 // 根据当前语言计算 Naive UI 的 locale 和 date-locale
 const naiveLocale = computed(() => {
-    return currentLocale.value === 'zh-CN' ? zhCN : enUS
+    switch (currentLocale.value) {
+        case 'zh-CN':
+            return zhCN
+        case 'zh-TW':
+            return zhTW
+        case 'ja-JP':
+            return jaJP
+        default:
+            return enUS
+    }
 })
 
 const naiveDateLocale = computed(() => {
-    return currentLocale.value === 'zh-CN' ? dateZhCN : dateEnUS
+    switch (currentLocale.value) {
+        case 'zh-CN':
+            return dateZhCN
+        case 'zh-TW':
+            return dateZhTW
+        case 'ja-JP':
+            return dateJaJP
+        default:
+            return dateEnUS
+    }
 })
 
 // 初始化主题
