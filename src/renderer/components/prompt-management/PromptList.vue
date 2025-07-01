@@ -259,7 +259,7 @@
                                     <!-- 标签区域 -->
                                     <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
                                         <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small" type="info">
-                                            {{ prompt.variables.length }} 个变量
+                                            {{ t('promptManagement.variableCount', { count: prompt.variables.length }) }}
                                         </NTag>
                                         <NTag v-if="prompt.category" size="small"
                                             :color="getCategoryTagColor(prompt.category)">
@@ -285,7 +285,7 @@
                                     </NFlex>
                                     <!-- 使用次数区域 -->
                                     <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
-                                        使用 {{ prompt.useCount }} 次
+                                        {{ t('promptManagement.useCount', { count: prompt.useCount }) }}
                                     </NText>
                                 </NFlex>
                             </template>
@@ -296,10 +296,10 @@
                     <template #footer>
                         <div v-if="loadingMore" style="text-align: center; padding: 20px;">
                             <NSpin size="medium" />
-                            <NText depth="3" style="margin-left: 12px;">加载更多中...</NText>
+                            <NText depth="3" style="margin-left: 12px;">{{ t('promptManagement.loadingMore') }}</NText>
                         </div>
                         <div v-else-if="!hasNextPage && prompts.length > 0" style="text-align: center; padding: 20px;">
-                            <NText depth="3">已加载全部 {{ totalCount }} 个提示词</NText>
+                            <NText depth="3">{{ t('promptManagement.loadedAllPrompts', { count: totalCount }) }}</NText>
                         </div>
                     </template>
                 </NInfiniteScroll>
@@ -393,10 +393,10 @@ const showFavoritesOnly = ref(false)
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
 const sortOptions = [
-    { label: '最新优先', value: 'timeDesc' },
-    { label: '最早优先', value: 'timeAsc' },
-    { label: '使用次数', value: 'useCount' },
-    { label: '收藏优先', value: 'favorite' }
+    { label: t('promptManagement.sortOptions.latestFirst'), value: 'timeDesc' },
+    { label: t('promptManagement.sortOptions.earliestFirst'), value: 'timeAsc' },
+    { label: t('promptManagement.sortOptions.useCount'), value: 'useCount' },
+    { label: t('promptManagement.sortOptions.favoriteFirst'), value: 'favorite' }
 ]
 
 // 分页相关状态
@@ -431,7 +431,7 @@ const tablePagination = computed(() => ({
     pageSizes: [10, 20, 50, 100],
     showQuickJumper: true,
     pageSlot: 7,
-    prefix: ({ itemCount }: { itemCount: number | undefined }) => `共 ${itemCount || 0} 项`,
+    prefix: ({ itemCount }: { itemCount: number | undefined }) => t('promptManagement.totalItems', { count: itemCount || 0 }),
     onUpdatePage: (page: number) => {
         console.log('Table pagination page changed to:', page)
         currentPage.value = page
@@ -447,7 +447,7 @@ const tablePagination = computed(() => ({
 
 // 计算属性
 const categoryOptions = computed(() => [
-    { label: '全部分类', value: null },
+    { label: t('promptManagement.allCategories'), value: null },
     ...categories.value.map(cat => ({
         label: `${cat.name} (${cat.prompts?.length || 0})`,
         value: cat.id
@@ -456,9 +456,9 @@ const categoryOptions = computed(() => [
 
 // 获取分类名称
 const getCategoryName = (categoryId: number | null) => {
-    if (!categoryId) return '全部分类'
+    if (!categoryId) return t('promptManagement.allCategories')
     const category = categories.value.find(cat => cat.id === categoryId)
-    return category?.name || '未知分类'
+    return category?.name || t('promptManagement.unknownCategory')
 }
 
 // 获取分类下的提示词数量
@@ -499,7 +499,7 @@ const treeTableColumns = computed(() => [
         type: 'selection' as const
     },
     {
-        title: '名称',
+        title: t('promptManagement.title'),
         key: 'name',
         width: 300,
         ellipsis: {
@@ -515,7 +515,7 @@ const treeTableColumns = computed(() => [
                         default: () => [
                             h(NIcon, { size: 16, color: category.color }, { default: () => h(Folder) }),
                             h(NText, { strong: true }, { default: () => category.name }),
-                            h(NTag, { size: 'small', type: 'info' }, { default: () => `${category.prompts?.length || 0} 个提示词` })
+                            h(NTag, { size: 'small', type: 'info' }, { default: () => t('promptManagement.categoryPromptCount', { count: category.prompts?.length || 0 }) })
                         ]
                     }
                 )
@@ -534,7 +534,7 @@ const treeTableColumns = computed(() => [
         }
     },
     {
-        title: '描述',
+        title: t('promptManagement.description'),
         key: 'description',
         width: 300,
         ellipsis: {
@@ -555,7 +555,7 @@ const treeTableColumns = computed(() => [
         }
     },
     {
-        title: '标签',
+        title: t('promptManagement.tags'),
         key: 'tags',
         width: 200,
         render: (row: TreeNode) => {
@@ -593,7 +593,7 @@ const treeTableColumns = computed(() => [
         }
     },
     {
-        title: '变量',
+        title: t('promptManagement.variable'),
         key: 'variables',
         width: 80,
         render: (row: TreeNode) => {
@@ -605,13 +605,13 @@ const treeTableColumns = computed(() => [
                 return count > 0 ? h(
                     NTag,
                     { size: 'small', type: 'info' },
-                    { default: () => `${count}个` }
+                    { default: () => t('promptManagement.variableCount', { count }) }
                 ) : '-'
             }
         }
     },
     {
-        title: '收藏',
+        title: t('promptManagement.favorites'),
         key: 'isFavorite',
         width: 80,
         render: (row: TreeNode) => {
@@ -638,7 +638,7 @@ const treeTableColumns = computed(() => [
         }
     },
     {
-        title: '使用次数',
+        title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
         width: 100,
         render: (row: TreeNode) => {
@@ -646,12 +646,12 @@ const treeTableColumns = computed(() => [
                 return '-'
             } else {
                 const prompt = row.data as PromptWithRelations
-                return `${prompt.useCount || 0} 次`
+                return t('promptManagement.useCount', { count: prompt.useCount || 0 })
             }
         }
     },
     {
-        title: '更新时间',
+        title: t('promptManagement.update'),
         key: 'updatedAt',
         width: 120,
         render: (row: TreeNode) => {
@@ -665,7 +665,7 @@ const treeTableColumns = computed(() => [
         }
     },
     {
-        title: '操作',
+        title: t('promptManagement.select'),
         key: 'actions',
         width: 120,
         render: (row: TreeNode) => {
@@ -704,7 +704,7 @@ const tableColumns = computed(() => [
         type: 'selection' as const
     },
     {
-        title: '标题',
+        title: t('promptManagement.title'),
         key: 'title',
         width: 200,
         ellipsis: {
@@ -723,7 +723,7 @@ const tableColumns = computed(() => [
         }
     },
     {
-        title: '描述',
+        title: t('promptManagement.description'),
         key: 'description',
         width: 300,
         ellipsis: {
@@ -738,7 +738,7 @@ const tableColumns = computed(() => [
         }
     },
     {
-        title: '分类',
+        title: t('promptManagement.category'),
         key: 'category',
         width: 120,
         render: (row: PromptWithRelations) => {
@@ -757,7 +757,7 @@ const tableColumns = computed(() => [
         }
     },
     {
-        title: '标签',
+        title: t('promptManagement.tags'),
         key: 'tags',
         width: 200,
         render: (row: PromptWithRelations) => {
@@ -790,7 +790,7 @@ const tableColumns = computed(() => [
         }
     },
     {
-        title: '变量',
+        title: t('promptManagement.variable'),
         key: 'variables',
         width: 80,
         render: (row: PromptWithRelations) => {
@@ -798,12 +798,12 @@ const tableColumns = computed(() => [
             return count > 0 ? h(
                 NTag,
                 { size: 'small', type: 'info' },
-                { default: () => `${count}个` }
+                { default: () => t('promptManagement.variableCount', { count }) }
             ) : '-'
         }
     },
     {
-        title: '收藏',
+        title: t('promptManagement.favorites'),
         key: 'isFavorite',
         width: 80,
         render: (row: PromptWithRelations) => {
@@ -825,21 +825,21 @@ const tableColumns = computed(() => [
         }
     },
     {
-        title: '使用次数',
+        title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
         width: 100,
         sorter: true,
-        render: (row: PromptWithRelations) => `${row.useCount || 0} 次`
+        render: (row: PromptWithRelations) => t('promptManagement.useCount', { count: row.useCount || 0 })
     },
     {
-        title: '更新时间',
+        title: t('promptManagement.update'),
         key: 'updatedAt',
         width: 120,
         sorter: true,
         render: (row: PromptWithRelations) => new Date(row.updatedAt).toLocaleDateString()
     },
     {
-        title: '操作',
+        title: t('promptManagement.select'),
         key: 'actions',
         width: 120,
         render: (row: PromptWithRelations) => {
@@ -876,7 +876,7 @@ const loadTreeData = async () => {
         statistics.value = await api.prompts.getStatistics.query()
         totalCount.value = statistics.value.totalCount || 0
     } catch (error) {
-        message.error('加载树形数据失败')
+        message.error(t('promptManagement.loadTreeDataFailed'))
         console.error(error)
     } finally {
         initialLoading.value = false
@@ -927,7 +927,7 @@ const loadPrompts = async (reset = true) => {
         hasNextPage.value = result.hasNextPage || false
 
     } catch (error) {
-        message.error('加载提示词失败')
+        message.error(t('promptManagement.loadPromptsFailed'))
         console.error(error)
     } finally {
         initialLoading.value = false
@@ -968,12 +968,12 @@ const handleBatchDelete = async () => {
         const result = await api.prompts.batchDelete.mutate(ids)
         
         if (result.success > 0) {
-            message.success(`成功删除 ${result.success} 个提示词`)
+            message.success(t('promptManagement.batchDeleteSuccess', { count: result.success }))
         }
         
         if (result.failed > 0) {
-            console.error('批量删除部分失败:', result)
-            message.warning(`删除失败 ${result.failed} 个提示词，请检查控制台日志`)
+            console.error('Batch delete partially failed:', result)
+            message.warning(t('promptManagement.batchDeletePartialFailed', { count: result.failed }))
         }
         
         clearSelection()
@@ -987,7 +987,7 @@ const handleBatchDelete = async () => {
         await loadStatistics() // 重新加载统计信息
         emit('refresh')
     } catch (error) {
-        message.error('批量删除失败')
+        message.error(t('promptManagement.batchDeleteFailed'))
         console.error(error)
     }
 }
@@ -1035,7 +1035,7 @@ const loadPromptsForTable = async () => {
         })
 
     } catch (error) {
-        message.error('加载提示词失败')
+        message.error(t('promptManagement.loadPromptsFailed'))
         console.error(error)
     } finally {
         loadingMore.value = false
@@ -1048,7 +1048,7 @@ const loadCategories = async () => {
         // 每次加载分类时都同时更新统计信息，确保计数准确
         await loadStatistics()
     } catch (error) {
-        message.error('加载分类失败')
+        message.error(t('promptManagement.loadCategoriesFailed'))
         console.error(error)
     }
 }
@@ -1143,7 +1143,7 @@ const toggleFavorite = async (promptId: number) => {
         }
 
         await api.prompts.toggleFavorite.mutate(promptId)
-        message.success('收藏状态已更新')
+        message.success(t('promptManagement.updateFavoriteSuccess'))
         emit('refresh')
     } catch (error) {
         // 如果API调用失败，回滚UI状态
@@ -1151,7 +1151,7 @@ const toggleFavorite = async (promptId: number) => {
         if (prompt) {
             prompt.isFavorite = !prompt.isFavorite
         }
-        message.error('更新收藏状态失败')
+        message.error(t('promptManagement.updateFavoriteFailed'))
         console.error(error)
     }
 }
@@ -1170,17 +1170,17 @@ const handleTagQuickSearch = (tagName: string) => {
 
 const getPromptActions = (prompt: PromptWithRelations) => [
     {
-        label: '编辑',
+        label: t('promptManagement.edit'),
         key: 'edit',
         icon: () => h(NIcon, null, { default: () => h(Edit) })
     },
     {
-        label: '复制',
+        label: t('common.copy'),
         key: 'copy',
         icon: () => h(NIcon, null, { default: () => h(Copy) })
     },
     {
-        label: '删除',
+        label: t('promptManagement.delete'),
         key: 'delete',
         icon: () => h(NIcon, null, { default: () => h(Trash) })
     }
@@ -1203,14 +1203,14 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
 const handleCopyPrompt = async (prompt: PromptWithRelations) => {
     try {
         await navigator.clipboard.writeText(prompt.content)
-        message.success('提示词内容已复制到剪贴板')
+        message.success(t('promptManagement.copyPromptSuccess'))
     } catch (error) {
-        message.error('复制失败')
+        message.error(t('promptManagement.copyFailed'))
     }
 }
 
 const handleDeletePrompt = async (prompt: PromptWithRelations) => {
-    if (confirm(`确定要删除 "${prompt.title}" 吗？`)) {
+    if (confirm(t('promptManagement.confirmDeletePrompt', { title: prompt.title }))) {
         try {
             await api.prompts.delete.mutate(prompt.id!)
             if (viewMode.value === 'table') {
@@ -1221,10 +1221,10 @@ const handleDeletePrompt = async (prompt: PromptWithRelations) => {
                 await loadPrompts(true) // 重置加载
             }
             await loadStatistics() // 重新加载统计信息
-            message.success('提示词已删除')
+            message.success(t('promptManagement.deleteSuccess'))
             emit('refresh')
         } catch (error) {
-            message.error('删除失败')
+            message.error(t('promptManagement.deleteFailed'))
             console.error(error)
         }
     }
@@ -1243,7 +1243,7 @@ const loadStatistics = async () => {
             currentTotalCount: totalCount.value
         })
     } catch (error) {
-        message.error('加载统计信息失败')
+        message.error(t('promptManagement.loadStatisticsFailed'))
         console.error(error)
     }
 }

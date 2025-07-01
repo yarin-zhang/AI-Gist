@@ -258,7 +258,7 @@
                                         <AlertCircle />
                                     </NIcon>
                                 </template>
-                                检查数据库状态
+                                {{ t('dataManagement.checkDatabaseHealth') }}
                             </NButton>
                             <NButton type="warning" @click="repairDatabase">
                                 <template #icon>
