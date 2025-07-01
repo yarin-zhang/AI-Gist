@@ -16,7 +16,7 @@
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top">
                 <NTabs v-model:value="activeTab" type="segment" :style="{ height: `${contentHeight}px` }">
                     <!-- 编辑 Tab -->
-                    <NTabPane name="edit" tab="编辑">
+                    <NTabPane name="edit" :tab="t('promptManagement.edit')">
                         <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3"
                             :max="0.8" :disabled="modalWidth <= 800">
                             <!-- 左侧：内容编辑区 -->
@@ -237,12 +237,12 @@
                     </NTabPane>
 
                     <!-- 补充信息 Tab -->
-                    <NTabPane name="info" tab="补充信息">
+                    <NTabPane name="info" :tab="t('promptManagement.info')">
                         <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3"
                             :max="0.8" :disabled="modalWidth <= 800">
                             <!-- 左侧：基本信息 -->
                             <template #1>
-                                <NCard title="基本信息" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.basicInfo')" size="small" :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem label="标题" path="title">
@@ -260,7 +260,7 @@
 
                             <!-- 右侧：分类与标签 -->
                             <template #2>
-                                <NCard title="分类与标签" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.categoryAndTags')" size="small" :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem label="分类">
@@ -278,8 +278,8 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit" name="history" tab="历史记录">
-                        <NCard title="版本历史" size="small" :style="{ height: `${contentHeight - 50}px` }">
+                    <NTabPane v-if="isEdit" name="history" :tab="t('promptManagement.history')">
+                        <NCard :title="t('promptManagement.versionHistory')" size="small" :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
                                 <NFlex vertical size="medium" style="padding-right: 12px;" v-if="historyList.length > 0">
                                     <NCard v-for="(history, index) in historyList" :key="history.id" size="small">
@@ -322,7 +322,7 @@
                                         </NFlex>
                                     </NCard>
                                 </NFlex>
-                                <NEmpty v-else description="暂无版本历史" size="small">
+                                <NEmpty v-else :description="t('promptManagement.noHistory')" size="small">
                                     <template #icon>
                                         <NIcon>
                                             <History />
@@ -342,16 +342,16 @@
                 <div>
                     <!-- 显示当前活动的tab信息 -->
                     <NText depth="3" v-if="activeTab === 'history' && isEdit">
-                        版本历史记录，可以预览和回滚到之前的版本
+                        {{ t('promptManagement.historyDescription') }}
                     </NText>
                 </div>
                 <div>
                     <!-- 右侧区域 -->
                     <NFlex size="small">
-                        <NButton @click="handleCancel">取消</NButton>
+                        <NButton @click="handleCancel">{{ t('common.cancel') }}</NButton>
                         <NButton type="primary" @click="handleSave" :loading="saving"
                             :disabled="!formData.content.trim()">
-                            {{ isEdit ? "更新" : "创建" }}
+                            {{ isEdit ? t('promptManagement.update') : t('promptManagement.create') }}
                         </NButton>
                     </NFlex>
                 </div>

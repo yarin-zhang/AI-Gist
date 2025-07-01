@@ -100,6 +100,23 @@ export default {
     promptsCount: '{count} 个提示词',
     // 表格列
     name: '名称',
+    // 提示词编辑模态框
+    selectDefaultOption: '选择默认选项（可选）',
+    variableTip: '在左侧输入内容时使用 {{变量名}} 格式，会自动识别变量',
+    update: '更新',
+    historyVersionPreview: '历史版本预览 - 版本 {version}',
+    contentAndVariables: '内容与变量',
+    promptContent: '提示词内容',
+    categoryManageTitle: '分类管理',
+    categoryManageDesc: '管理您的提示词分类，创建、编辑或删除分类',
+    existingCategories: '现有分类',
+    totalCategories: '共 {count} 个分类',
+    categoryName: '分类名称',
+    categoryNamePlaceholder: '请输入分类名称',
+    color: '颜色',
+    createCategory: '创建分类',
+    noCategories: '暂无分类，请在左侧创建新分类',
+    categoryPromptCount: '{count} 个提示词',
   },
   
   // AI 配置页面
@@ -162,10 +179,13 @@ export default {
   appearance: {
     title: '外观设置',
     subtitle: '自定义应用的外观和主题',
-    theme: '主题',
-    light: '浅色',
-    dark: '深色',
+    theme: '主题模式',
+    light: '浅色主题',
+    dark: '深色主题',
     auto: '跟随系统',
+    autoSwitchTip: '自动切换主题',
+    alwaysLight: '始终使用浅色',
+    alwaysDark: '始终使用深色',
     language: '语言',
     chinese: '中文',
     english: 'English'

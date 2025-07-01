@@ -1,15 +1,15 @@
 <template>
     <NCard>
         <NFlex vertical :size="16">
-            <NFormItem label="主题模式">
+            <NFormItem :label="t('appearance.theme')">
                 <NRadioGroup v-model:value="props.modelValue.themeSource" @update:value="handleUpdate">
                     <NFlex vertical :size="8">
                         <NRadio value="system">
                             <NFlex align="center" :size="8">
                                 <div>
-                                    <div>跟随系统</div>
+                                    <div>{{ t('appearance.auto') }}</div>
                                     <NText depth="3" style="font-size: 12px">
-                                        自动切换主题
+                                        {{ t('appearance.autoSwitchTip') }}
                                     </NText>
                                 </div>
                             </NFlex>
@@ -17,9 +17,9 @@
                         <NRadio value="light">
                             <NFlex align="center" :size="8">
                                 <div>
-                                    <div>浅色主题</div>
+                                    <div>{{ t('appearance.light') }}</div>
                                     <NText depth="3" style="font-size: 12px">
-                                        始终使用浅色
+                                        {{ t('appearance.alwaysLight') }}
                                     </NText>
                                 </div>
                             </NFlex>
@@ -27,9 +27,9 @@
                         <NRadio value="dark">
                             <NFlex align="center" :size="8">
                                 <div>
-                                    <div>深色主题</div>
+                                    <div>{{ t('appearance.dark') }}</div>
                                     <NText depth="3" style="font-size: 12px">
-                                        始终使用深色
+                                        {{ t('appearance.alwaysDark') }}
                                     </NText>
                                 </div>
                             </NFlex>
@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { NCard, NFlex, NFormItem, NRadioGroup, NRadio, NText } from "naive-ui";
+import { useI18n } from 'vue-i18n'
 
 interface AppearanceSettings {
     themeSource: "system" | "light" | "dark";
@@ -55,6 +56,8 @@ const props = defineProps<{
 const emit = defineEmits<{
     "update:modelValue": [value: AppearanceSettings];
 }>();
+
+const { t } = useI18n()
 
 const handleUpdate = (value: string) => {
     emit("update:modelValue", { themeSource: value as "system" | "light" | "dark" });

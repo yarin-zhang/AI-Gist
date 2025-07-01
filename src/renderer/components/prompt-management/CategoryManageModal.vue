@@ -2,18 +2,18 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">分类管理</NText>
-            <NText depth="3">管理您的提示词分类，创建、编辑或删除分类</NText>
+            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{ t('promptManagement.categoryManageTitle') }}</NText>
+            <NText depth="3">{{ t('promptManagement.categoryManageDesc') }}</NText>
         </template><!-- 中间可操作区域 --> <template #content="{ contentHeight }">
             <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
                 :max="0.8" :disabled="modalWidth <= 800">
 
                 <!-- 左侧：分类列表 -->
                 <template #1>
-                    <NCard title="现有分类" size="small" :style="{ height: '100%' }">
+                    <NCard :title="t('promptManagement.existingCategories')" size="small" :style="{ height: '100%' }">
                         <template #header-extra>
                             <NText depth="3" style="font-size: 12px;">
-                                共 {{ categories.length }} 个分类
+                                {{ t('promptManagement.totalCategories', { count: categories.length }) }}
                             </NText>
                         </template>
                         <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
@@ -27,7 +27,7 @@
                                             <div v-if="editingCategory?.id === category.id" style="min-width: 200px;">
                                                 <NFlex vertical size="small">
                                                     <NInput v-model:value="editingCategory!.name" size="small"
-                                                        placeholder="分类名称" />
+                                                        :placeholder="t('promptManagement.categoryName')" />
                                                     <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
                                                         :swatches="COLOR_SWATCHES" size="small" style="width: 100%;" />
                                                 </NFlex>
@@ -36,7 +36,7 @@
                                                 <NFlex vertical size="small">
                                                     <NText strong>{{ category.name }}</NText>
                                                     <NText depth="3" style="font-size: 12px;">
-                                                        {{ getCategoryPromptCount(category.id) }} 个提示词
+                                                        {{ t('promptManagement.categoryPromptCount', { count: getCategoryPromptCount(category.id) }) }}
                                                     </NText>
                                                 </NFlex>
                                             </div>
@@ -47,10 +47,10 @@
                                                 <NFlex size="small">
                                                     <NButton size="small" type="primary" @click="handleSaveEdit"
                                                         :loading="updating">
-                                                        保存
+                                                        {{ t('common.save') }}
                                                     </NButton>
                                                     <NButton size="small" @click="handleCancelEdit">
-                                                        取消
+                                                        {{ t('common.cancel') }}
                                                     </NButton>
                                                 </NFlex>
                                             </div>
@@ -62,7 +62,7 @@
                                                                 <Edit />
                                                             </NIcon>
                                                         </template>
-                                                        编辑
+                                                        {{ t('common.edit') }}
                                                     </NButton>
                                                     <NButton size="small" text type="error"
                                                         @click="handleDelete(category)"
@@ -72,7 +72,7 @@
                                                                 <Trash />
                                                             </NIcon>
                                                         </template>
-                                                        删除
+                                                        {{ t('common.delete') }}
                                                     </NButton>
                                                 </NFlex>
                                             </div>
@@ -80,7 +80,7 @@
                                     </NFlex>
                                 </NCard>
                             </NFlex>
-                            <NEmpty v-else description="暂无分类，请在左侧创建新分类" size="large">
+                            <NEmpty v-else :description="t('promptManagement.noCategories')" size="large">
                                 <template #icon>
                                     <NIcon size="48">
                                         <Edit />
@@ -92,16 +92,16 @@
                 </template>
                 <!-- 右侧：创建新分类 -->
                 <template #2>
-                    <NCard title="创建分类" size="small" :style="{ height: '100%' }">
+                    <NCard :title="t('promptManagement.createCategory')" size="small" :style="{ height: '100%' }">
                         <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                             <NFlex vertical size="medium" style="padding-right: 12px;">
                                 <NForm :model="newCategory">
                                     <NFlex vertical size="medium">
-                                        <NFormItem label="分类名称">
-                                            <NInput v-model:value="newCategory.name" placeholder="请输入分类名称"
+                                        <NFormItem :label="t('promptManagement.categoryName')">
+                                            <NInput v-model:value="newCategory.name" :placeholder="t('promptManagement.categoryNamePlaceholder')"
                                                 @keyup.enter="handleCreate" />
                                         </NFormItem>
-                                        <NFormItem label="颜色">
+                                        <NFormItem :label="t('promptManagement.color')">
                                             <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
                                                 :swatches="COLOR_SWATCHES" style="width: 100%;" />
                                         </NFormItem>
@@ -112,7 +112,7 @@
                                                         <Edit />
                                                     </NIcon>
                                                 </template>
-                                                创建分类
+                                                {{ t('promptManagement.createCategory') }}
                                             </NButton>
                                         </NFormItem>
                                     </NFlex>
@@ -124,7 +124,7 @@
             </NSplit>
         </template><!-- 底部固定区域 --> <template #footer>
             <NFlex justify="end" align="center">
-                <NButton @click="handleClose">关闭</NButton>
+                <NButton @click="handleClose">{{ t('common.close') }}</NButton>
             </NFlex>
         </template>
     </CommonModal>
@@ -152,6 +152,7 @@ import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useWindowSize } from '@/composables/useWindowSize'
 import CommonModal from '@/components/common/CommonModal.vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
     show: boolean
@@ -167,6 +168,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const message = useMessage()
+const { t } = useI18n()
 
 // 使用统一的颜色配置
 const { COLOR_SWATCHES } = useTagColors()

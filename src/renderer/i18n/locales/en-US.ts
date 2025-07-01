@@ -82,7 +82,22 @@ export default {
     selectedPrompts: 'Selected {count} prompts',
     batchDelete: 'Batch Delete',
     confirmBatchDelete: 'Are you sure you want to delete these {count} prompts? This operation cannot be undone.',
-    cancelSelection: 'Cancel Selection'
+    cancelSelection: 'Cancel Selection',
+    // Prompt edit modal
+    variableTip: 'Use {{variableName}} format in the left content area, variables will be automatically detected',
+    historyVersionPreview: 'History Version Preview - Version {version}',
+    contentAndVariables: 'Content & Variables',
+    promptContent: 'Prompt Content',
+    categoryManageTitle: 'Category Management',
+    categoryManageDesc: 'Manage your prompt categories, create, edit or delete categories',
+    existingCategories: 'Existing Categories',
+    totalCategories: '{count} categories in total',
+    categoryName: 'Category Name',
+    categoryNamePlaceholder: 'Enter category name',
+    color: 'Color',
+    createCategory: 'Create Category',
+    noCategories: 'No categories, please create a new category on the left',
+    categoryPromptCount: '{count} prompts',
   },
   
   // AI Config page
@@ -262,5 +277,21 @@ export default {
     loading: 'Loading...',
     retry: 'Retry',
     hide: 'Hide'
+  },
+  
+  // Appearance settings
+  appearance: {
+    title: 'Appearance Settings',
+    subtitle: 'Customize the appearance and theme of the app',
+    theme: 'Theme Mode',
+    light: 'Light Theme',
+    dark: 'Dark Theme',
+    auto: 'Follow System',
+    autoSwitchTip: 'Auto switch theme',
+    alwaysLight: 'Always use light',
+    alwaysDark: 'Always use dark',
+    language: 'Language',
+    chinese: 'Chinese',
+    english: 'English'
   }
 } 
