@@ -3,11 +3,16 @@
  */
 
 /**
+ * 支持的语言类型
+ */
+export type SupportedLocale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP';
+
+/**
  * 用户偏好设置
  */
 export interface UserPreferences {
   theme: 'system' | 'light' | 'dark';
-  language: string;
+  language: SupportedLocale;
   autoStartup: boolean;
   minimizeToTray: boolean;
   showNotifications: boolean;
