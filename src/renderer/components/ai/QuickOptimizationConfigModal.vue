@@ -116,9 +116,7 @@
                                             :rows="3"
                                             :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace', fontSize: '11px' }"
                                         />
-                                        <NText depth="3" style="font-size: 11px;">
-                                            使用 {{content}} 作为原提示词内容的占位符
-                                        </NText>
+
                                     </div>
                                 </NFlex>
                             </NCard>
@@ -181,23 +179,19 @@
                         <NInput 
                             v-model:value="editFormData.prompt" 
                             type="textarea" 
-                            placeholder="输入提示词模板，使用 {{content}} 作为原提示词内容的占位符" 
+                            placeholder="输入提示词模板，使用 {{content}} 作为占位符" 
                             :rows="6"
                             :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
                             show-count
                         />
-                        <template #feedback>
-                            <NText depth="3" style="font-size: 12px;">
-                                使用 {{content}} 作为原提示词内容的占位符，AI 将根据此模板生成优化后的提示词
-                            </NText>
-                        </template>
+
                     </NFormItem>
 
                     <NFlex>
                         <NFormItem label="排序" path="sortOrder" style="flex: 1">
                             <NInputNumber 
                                 v-model:value="editFormData.sortOrder" 
-                                placeholder="排序数字，数字越小越靠前" 
+                                placeholder="排序数字" 
                                 :min="0"
                                 :max="999"
                             />
@@ -275,7 +269,7 @@ const editFormData = ref({
     name: "",
     description: "",
     prompt: "",
-    sortOrder: 0,
+    sortOrder: 1,
     enabled: true,
 });
 
@@ -292,8 +286,22 @@ const editFormRules = {
         trigger: "blur",
     },
     sortOrder: {
-        required: true,
-        message: "请输入排序数字",
+        required: false,
+        validator: (rule: any, value: any) => {
+            // 允许空值或数字
+            if (value === null || value === undefined || value === '') {
+                return true;
+            }
+            // 检查是否为有效数字
+            const numValue = Number(value);
+            if (isNaN(numValue)) {
+                return new Error('排序数字必须是有效数字');
+            }
+            if (numValue < 0) {
+                return new Error('排序数字不能为负数');
+            }
+            return true;
+        },
         trigger: "blur",
     },
 };
@@ -306,7 +314,9 @@ const enabledCount = computed(() => configs.value.filter(c => c.enabled).length)
 const loadConfigs = async () => {
     try {
         loading.value = true;
+        console.log('开始加载快速优化配置...');
         configs.value = await api.quickOptimizationConfigs.getAll.query();
+        console.log('加载到的配置:', configs.value);
     } catch (error) {
         console.error("加载快速优化配置失败:", error);
         message.error("加载配置失败");
@@ -365,7 +375,7 @@ const editConfig = (config: QuickOptimizationConfig) => {
         name: config.name,
         description: config.description || "",
         prompt: config.prompt,
-        sortOrder: config.sortOrder,
+        sortOrder: Number(config.sortOrder),
         enabled: config.enabled,
     };
     showEditModal.value = true;
@@ -378,20 +388,29 @@ const addNewConfig = () => {
         name: "",
         description: "",
         prompt: "",
-        sortOrder: configs.value.length + 1,
+        sortOrder: Number(configs.value.length + 1),
         enabled: true,
     };
+    console.log('添加新配置，初始数据:', editFormData.value);
     showEditModal.value = true;
 };
 
 // 保存编辑配置
 const saveEditConfig = async () => {
     try {
+        // 确保 sortOrder 有有效值
+        if (editFormData.value.sortOrder === null || editFormData.value.sortOrder === undefined || editFormData.value.sortOrder === '') {
+            editFormData.value.sortOrder = Number(configs.value.length + 1);
+        }
+        
         await editFormRef.value?.validate();
         saving.value = true;
 
+        console.log('准备保存配置数据:', editFormData.value);
+
         if (editingConfig.value) {
             // 更新配置
+            console.log('更新配置:', editingConfig.value.id, editFormData.value);
             await api.quickOptimizationConfigs.update.mutate({
                 id: editingConfig.value.id!,
                 data: editFormData.value as UpdateQuickOptimizationConfig
@@ -399,7 +418,9 @@ const saveEditConfig = async () => {
             message.success("配置更新成功");
         } else {
             // 创建新配置
-            await api.quickOptimizationConfigs.create.mutate(editFormData.value as CreateQuickOptimizationConfig);
+            console.log('创建新配置:', editFormData.value);
+            const result = await api.quickOptimizationConfigs.create.mutate(editFormData.value as CreateQuickOptimizationConfig);
+            console.log('创建结果:', result);
             message.success("配置创建成功");
         }
 
@@ -408,7 +429,21 @@ const saveEditConfig = async () => {
         emit("configs-updated");
     } catch (error) {
         console.error("保存配置失败:", error);
-        message.error("保存失败");
+        console.error("错误类型:", typeof error);
+        console.error("错误详情:", JSON.stringify(error, null, 2));
+        
+        // 提供更详细的错误信息
+        if (error && typeof error === 'object' && 'message' in error) {
+            message.error(`保存失败: ${error.message}`);
+        } else if (Array.isArray(error) && error.length > 0) {
+            // 处理数组形式的错误
+            const errorDetails = error.map((err: any) => 
+                typeof err === 'object' && err.message ? err.message : String(err)
+            ).join(', ');
+            message.error(`保存失败: ${errorDetails}`);
+        } else {
+            message.error(`保存失败: ${String(error)}`);
+        }
     } finally {
         saving.value = false;
     }
@@ -437,7 +472,7 @@ const closeEditModal = () => {
         name: "",
         description: "",
         prompt: "",
-        sortOrder: 0,
+        sortOrder: 1,
         enabled: true,
     };
 };
@@ -452,10 +487,23 @@ watch(
     () => props.show,
     (newShow) => {
         if (newShow) {
+            // 检查数据库健康状态
+            checkDatabaseHealth();
             loadConfigs();
         }
     }
 );
+
+// 检查数据库健康状态
+const checkDatabaseHealth = async () => {
+    try {
+        console.log('检查数据库健康状态...');
+        // 这里可以添加数据库健康检查逻辑
+        // 暂时只是记录日志
+    } catch (error) {
+        console.error('数据库健康检查失败:', error);
+    }
+};
 </script>
 
 <style scoped></style> 

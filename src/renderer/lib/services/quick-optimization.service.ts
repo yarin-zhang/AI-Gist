@@ -31,14 +31,31 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<QuickOptimizationConfig> 创建成功的快速优化提示词配置记录
    */
   async createQuickOptimizationConfig(data: CreateQuickOptimizationConfig): Promise<QuickOptimizationConfig> {
+    // 数据验证和清理
+    const validatedData = {
+      name: String(data.name || '').trim(),
+      description: data.description ? String(data.description).trim() : undefined,
+      prompt: String(data.prompt || '').trim(),
+      enabled: Boolean(data.enabled ?? true),
+      sortOrder: Number(data.sortOrder ?? 0)
+    };
+
+    // 验证必填字段
+    if (!validatedData.name) {
+      throw new Error('配置名称不能为空');
+    }
+    if (!validatedData.prompt) {
+      throw new Error('提示词模板不能为空');
+    }
+
     const configWithUUID = {
-      ...data,
+      ...validatedData,
       uuid: generateUUID(),
-      enabled: data.enabled ?? true,
-      sortOrder: data.sortOrder ?? 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    console.log('创建快速优化配置:', configWithUUID);
     return this.add<QuickOptimizationConfig>('quick_optimization_configs', configWithUUID);
   }
 
@@ -130,7 +147,8 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<QuickOptimizationConfig> 更新后的快速优化提示词配置记录
    */
   async toggleQuickOptimizationConfig(id: number, enabled: boolean): Promise<QuickOptimizationConfig> {
-    return this.updateQuickOptimizationConfig(id, { enabled });
+    const updatedConfig = await this.updateQuickOptimizationConfig(id, { enabled });
+    return updatedConfig;
   }
 
   /**
