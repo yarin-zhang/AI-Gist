@@ -241,7 +241,7 @@ const handleOpenQuickOptimizationConfig = () => {
 
 // 处理快速优化配置更新
 const handleQuickOptimizationConfigsUpdated = () => {
-    message.success("快速优化配置已更新");
+    // 静默更新，不显示消息
     // 如果编辑模态窗是打开的，立即刷新快速优化配置
     if (showEditModal.value && promptEditModalRef.value?.refreshQuickOptimizationConfigs) {
         promptEditModalRef.value.refreshQuickOptimizationConfigs();

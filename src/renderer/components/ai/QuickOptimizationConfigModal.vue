@@ -12,7 +12,7 @@
                             快速优化提示词配置
                         </NText>
                         <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
-                            管理提示词编辑时的快速优化选项，最多可启用 5 个
+                            管理提示词编辑时的快速优化选项
                         </NText>
                     </div>
                 </NFlex>
@@ -22,24 +22,20 @@
         <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
             <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
-                <!-- 统计信息 -->
-                <NAlert type="info" :show-icon="false">
-                    <NFlex justify="space-between" align="center">
-                        <NText depth="3" style="font-size: 12px;">
-                            当前配置：{{ enabledCount }}/5 个已启用，{{ totalCount }} 个总计
-                        </NText>
-                        <NButton size="small" @click="initializeDefaults" :loading="initializing">
-                            初始化默认配置
-                        </NButton>
-                    </NFlex>
-                </NAlert>
-
                 <!-- 配置列表 -->
-                <NCard title="优化配置列表" size="small" :style="{ flex: 1 }">
-                    <NScrollbar :style="{ height: `${contentHeight - 120}px` }">
+                <NCard size="small" :style="{ flex: 1 }">
+                    <template #header>
+                        <NFlex justify="space-between" align="center">
+                            <NText strong>优化配置列表</NText>
+                            <NText depth="3" style="font-size: 12px;">
+                                {{ enabledCount }}/{{ totalCount }}
+                            </NText>
+                        </NFlex>
+                    </template>
+                    <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                         <NFlex vertical size="medium" style="padding-right: 12px;">
                             <div v-if="configs.length === 0" style="text-align: center; padding: 40px">
-                                <NEmpty description="暂无配置，点击上方按钮初始化默认配置">
+                                <NEmpty description="暂无配置">
                                     <template #extra>
                                         <NButton size="small" @click="initializeDefaults" :loading="initializing">
                                             初始化默认配置
@@ -126,27 +122,17 @@
             </NFlex>
         </template>
 
-        <!-- 底部固定区域 -->
+                <!-- 底部固定区域 -->
         <template #footer>
-            <NFlex justify="space-between" align="center">
-                <div>
-                    <NText depth="3" style="font-size: 12px;">
-                        提示：最多只能启用 5 个优化配置，超出限制的配置将自动禁用
-                    </NText>
-                </div>
-                <div>
-                    <NFlex size="small">
-                        <NButton @click="handleCancel">关闭</NButton>
-                        <NButton type="primary" @click="addNewConfig">
-                            <template #icon>
-                                <NIcon>
-                                    <Plus />
-                                </NIcon>
-                            </template>
-                            添加配置
-                        </NButton>
-                    </NFlex>
-                </div>
+            <NFlex justify="end" align="center">
+                <NButton type="primary" @click="addNewConfig">
+                    <template #icon>
+                        <NIcon>
+                            <Plus />
+                        </NIcon>
+                    </template>
+                    添加配置
+                </NButton>
             </NFlex>
         </template>
     </CommonModal>
@@ -359,7 +345,7 @@ const toggleConfig = async (config: QuickOptimizationConfig) => {
             enabled: newEnabled
         });
         
-        message.success(newEnabled ? "配置已启用" : "配置已禁用");
+        // 不显示消息，由父组件统一处理
         await loadConfigs();
         emit("configs-updated");
     } catch (error) {
@@ -415,13 +401,13 @@ const saveEditConfig = async () => {
                 id: editingConfig.value.id!,
                 data: editFormData.value as UpdateQuickOptimizationConfig
             });
-            message.success("配置更新成功");
+            // 不显示消息，由父组件统一处理
         } else {
             // 创建新配置
             console.log('创建新配置:', editFormData.value);
             const result = await api.quickOptimizationConfigs.create.mutate(editFormData.value as CreateQuickOptimizationConfig);
             console.log('创建结果:', result);
-            message.success("配置创建成功");
+            // 不显示消息，由父组件统一处理
         }
 
         closeEditModal();
@@ -455,7 +441,7 @@ const deleteConfig = async (config: QuickOptimizationConfig) => {
 
     try {
         await api.quickOptimizationConfigs.delete.mutate(config.id);
-        message.success("配置删除成功");
+        // 不显示消息，由父组件统一处理
         await loadConfigs();
         emit("configs-updated");
     } catch (error) {

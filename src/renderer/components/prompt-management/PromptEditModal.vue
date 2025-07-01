@@ -744,8 +744,7 @@ const loadQuickOptimizationConfigs = async () => {
 // 刷新快速优化配置（供外部调用）
 const refreshQuickOptimizationConfigs = async () => {
     await loadQuickOptimizationConfigs();
-    // 添加一个短暂的视觉反馈，让用户知道配置已刷新
-    message.success("快速优化配置已刷新");
+    // 静默刷新，不显示消息
 };
 
 // 打开快速优化配置模态窗
@@ -1100,7 +1099,7 @@ const optimizePrompt = async (configId: number) => {
             });
         }
         
-        message.success(`提示词已优化（${optimizationConfig.name}）`);
+        message.success("优化完成");
 
     } catch (error) {
         console.error("优化失败:", error);
@@ -1236,7 +1235,7 @@ ${manualInstruction.value.trim()}
         // 启动流式传输监听
         await startStreamingGeneration(request, serializedConfig);
         
-        message.success("提示词已根据指令调整完成");
+        message.success("调整完成");
 
     } catch (error) {
         console.error("手动调整失败:", error);
