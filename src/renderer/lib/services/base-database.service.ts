@@ -12,10 +12,10 @@ import { generateUUID } from '../utils/uuid';
 export class BaseDatabaseService {
   protected db: IDBDatabase | null = null;
   protected readonly dbName = 'AIGistDB';
-  protected readonly dbVersion = 6; // 增加版本号以支持UUID索引
+  protected readonly dbVersion = 7; // 增加版本号以支持快速优化提示词配置表
   protected initializationPromise: Promise<void> | null = null;
   protected isInitialized = false;
-  private currentDbVersion = 6; // 添加一个可变的版本号变量
+  private currentDbVersion = 7; // 添加一个可变的版本号变量
 
   /**
    * 初始化数据库连接
@@ -95,9 +95,8 @@ export class BaseDatabaseService {
         categoryStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('categories 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const categoryStore = db.transaction(['categories'], 'readwrite').objectStore('categories');
-        this.ensureIndexExists(categoryStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 prompts 表
@@ -114,9 +113,8 @@ export class BaseDatabaseService {
         promptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('prompts 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const promptStore = db.transaction(['prompts'], 'readwrite').objectStore('prompts');
-        this.ensureIndexExists(promptStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 promptVariables 表
@@ -128,9 +126,8 @@ export class BaseDatabaseService {
         variableStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptVariables 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const variableStore = db.transaction(['promptVariables'], 'readwrite').objectStore('promptVariables');
-        this.ensureIndexExists(variableStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 promptHistories 表
@@ -142,9 +139,8 @@ export class BaseDatabaseService {
         historyStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('promptHistories 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const historyStore = db.transaction(['promptHistories'], 'readwrite').objectStore('promptHistories');
-        this.ensureIndexExists(historyStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 ai_configs 表
@@ -158,9 +154,22 @@ export class BaseDatabaseService {
         configStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_configs 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const configStore = db.transaction(['ai_configs'], 'readwrite').objectStore('ai_configs');
-        this.ensureIndexExists(configStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
+      }
+
+      // 创建 quick_optimization_configs 表
+      if (!db.objectStoreNames.contains('quick_optimization_configs')) {
+        console.log('创建 quick_optimization_configs 对象存储');
+        const quickOptStore = db.createObjectStore('quick_optimization_configs', { keyPath: 'id', autoIncrement: true });
+        quickOptStore.createIndex('name', 'name', { unique: false });
+        quickOptStore.createIndex('enabled', 'enabled', { unique: false });
+        quickOptStore.createIndex('sortOrder', 'sortOrder', { unique: false });
+        quickOptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
+      } else {
+        console.log('quick_optimization_configs 对象存储已存在');
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 ai_generation_history 表
@@ -174,9 +183,8 @@ export class BaseDatabaseService {
         generationStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
       } else {
         console.log('ai_generation_history 对象存储已存在');
-        // 为已存在的对象存储添加缺失的索引
-        const generationStore = db.transaction(['ai_generation_history'], 'readwrite').objectStore('ai_generation_history');
-        this.ensureIndexExists(generationStore, 'uuid', 'uuid', { unique: true });
+        // 在版本升级期间，不创建新的事务
+        // 索引会在下次数据库操作时自动检查
       }
 
       // 创建 settings 表

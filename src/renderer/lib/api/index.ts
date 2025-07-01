@@ -10,6 +10,7 @@ import { AIConfigApiClient, createAIConfigApiClient } from './ai-config.api';
 import { AIGenerationHistoryApiClient, createAIGenerationHistoryApiClient } from './ai-generation-history.api';
 import { AppSettingsApiClient, createAppSettingsApiClient } from './app-settings.api';
 import { DataManagementAPI } from './data-management.api';
+import { QuickOptimizationApiClient, createQuickOptimizationApiClient } from './quick-optimization.api';
 
 // 导出所有API客户端类
 export { 
@@ -18,7 +19,8 @@ export {
   AIConfigApiClient,
   AIGenerationHistoryApiClient,
   AppSettingsApiClient,
-  DataManagementAPI
+  DataManagementAPI,
+  QuickOptimizationApiClient
 };
 
 // 导出所有工厂函数
@@ -27,7 +29,8 @@ export {
   createPromptApiClient,
   createAIConfigApiClient,
   createAIGenerationHistoryApiClient,
-  createAppSettingsApiClient
+  createAppSettingsApiClient,
+  createQuickOptimizationApiClient
 };
 
 /**
@@ -43,6 +46,7 @@ export class ApiClientManager {
   public readonly aiConfig: AIConfigApiClient;
   public readonly aiGenerationHistory: AIGenerationHistoryApiClient;
   public readonly appSettings: AppSettingsApiClient;
+  public readonly quickOptimization: QuickOptimizationApiClient;
 
   private constructor() {
     // 初始化所有API客户端实例
@@ -51,6 +55,7 @@ export class ApiClientManager {
     this.aiConfig = createAIConfigApiClient();
     this.aiGenerationHistory = createAIGenerationHistoryApiClient();
     this.appSettings = createAppSettingsApiClient();
+    this.quickOptimization = createQuickOptimizationApiClient();
   }
 
   /**
@@ -75,6 +80,7 @@ function createApiClient() {
   const aiConfigClient = createAIConfigApiClient();
   const aiGenerationHistoryClient = createAIGenerationHistoryApiClient();
   const appSettingsClient = createAppSettingsApiClient();
+  const quickOptimizationClient = createQuickOptimizationApiClient();
 
   return {
     // 分类相关API
@@ -93,7 +99,10 @@ function createApiClient() {
 
     // 应用设置相关API
     appSettings: appSettingsClient.appSettings,
-    settingValues: appSettingsClient.values
+    settingValues: appSettingsClient.values,
+
+    // 快速优化提示词配置相关API
+    quickOptimizationConfigs: quickOptimizationClient.quickOptimizationConfigs
   };
 }
 

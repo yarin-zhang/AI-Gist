@@ -142,3 +142,40 @@ export interface AIServiceStatus {
 export interface AIConfigValidation extends ValidationResult {
   warnings?: ValidationError[];
 }
+
+/**
+ * 快速优化提示词配置数据模型
+ */
+export interface QuickOptimizationConfig {
+  id?: number;
+  uuid: string; // 全局唯一标识符，用于 WebDAV 同步
+  name: string; // 优化类型名称，如"更简短"、"更丰富"等
+  description?: string; // 优化类型描述
+  prompt: string; // 优化提示词模板
+  enabled: boolean; // 是否启用
+  sortOrder: number; // 排序顺序
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * 快速优化提示词配置创建数据
+ */
+export interface CreateQuickOptimizationConfig {
+  name: string;
+  description?: string;
+  prompt: string;
+  enabled?: boolean;
+  sortOrder?: number;
+}
+
+/**
+ * 快速优化提示词配置更新数据
+ */
+export interface UpdateQuickOptimizationConfig {
+  name?: string;
+  description?: string;
+  prompt?: string;
+  enabled?: boolean;
+  sortOrder?: number;
+}

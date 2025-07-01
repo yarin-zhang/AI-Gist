@@ -10,6 +10,14 @@
                     </NText>
                 </div>
                 <NFlex>
+                    <NButton @click="showQuickOptimizationModal = true" style="margin-right: 8px;">
+                        <template #icon>
+                            <NIcon>
+                                <Settings />
+                            </NIcon>
+                        </template>
+                        优化提示词
+                    </NButton>
                     <NButton type="primary" @click="showAddModal = true">
                         <template #icon>
                             <NIcon>
@@ -157,7 +165,7 @@
                                             <Edit />
                                         </NIcon>
                                     </template>
-                                    编辑提示词
+                                    系统提示词
                                 </n-button>
                             </NFlex>
 
@@ -460,6 +468,13 @@
                 </NFlex>
             </template>
         </CommonModal>
+
+        <!-- 快速优化提示词配置管理模态窗 -->
+        <QuickOptimizationConfigModal 
+            :show="showQuickOptimizationModal" 
+            @update:show="showQuickOptimizationModal = $event"
+            @configs-updated="handleQuickOptimizationConfigsUpdated"
+        />
     </div>
 </template>
 
@@ -495,6 +510,7 @@ import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
 import { useWindowSize } from "~/composables/useWindowSize";
 import CommonModal from "~/components/common/CommonModal.vue";
+import QuickOptimizationConfigModal from "~/components/ai/QuickOptimizationConfigModal.vue";
 
 const message = useMessage();
 const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase();
@@ -529,6 +545,9 @@ const autoShowAddModal = ref(false);
 const showSystemPromptModal = ref(false);
 const editingSystemPromptConfig = ref<AIConfig | null>(null);
 const systemPromptContent = ref("");
+
+// 快速优化配置相关状态
+const showQuickOptimizationModal = ref(false);
 
 // 表单数据
 const formData = reactive({
@@ -1179,6 +1198,11 @@ watch(autoShowAddModal, (show) => {
         autoShowAddModal.value = false; // 重置状态
     }
 });
+
+// 处理快速优化配置更新
+const handleQuickOptimizationConfigsUpdated = () => {
+    message.success("快速优化配置已更新");
+};
 
 // 导出方法供父组件调用
 const openAddConfigModal = () => {

@@ -13,6 +13,7 @@ import { PromptService } from './prompt.service';
 import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
+import { QuickOptimizationService } from './quick-optimization.service';
 import { generateUUID } from '../utils/uuid';
 
 /**
@@ -28,6 +29,7 @@ export class DatabaseServiceManager {
   public readonly aiConfig: AIConfigService;
   public readonly aiGenerationHistory: AIGenerationHistoryService;
   public readonly appSettings: AppSettingsService;
+  public readonly quickOptimization: QuickOptimizationService;
 
   private constructor() {
     // 初始化所有服务实例
@@ -36,6 +38,7 @@ export class DatabaseServiceManager {
     this.aiConfig = AIConfigService.getInstance();
     this.aiGenerationHistory = AIGenerationHistoryService.getInstance();
     this.appSettings = AppSettingsService.getInstance();
+    this.quickOptimization = QuickOptimizationService.getInstance();
   }
 
   /**
@@ -102,7 +105,8 @@ export class DatabaseServiceManager {
       'promptHistories',
       'ai_configs',
       'ai_generation_history',
-      'settings'
+      'settings',
+      'quick_optimization_configs'
     ];
 
     const missingStores: string[] = [];
