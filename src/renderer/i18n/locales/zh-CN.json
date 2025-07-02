@@ -588,7 +588,6 @@
     "variableDescription": "变量描述",
     "variableDescriptionPlaceholder": "请输入变量描述",
     "jinjaVariableTip": "在左侧输入Jinja模板时，会自动识别变量",
-    "jinjaSyntaxHelpDesc": "Jinja模板语法帮助信息",
     "copyResult": "复制结果",
     "copySuccess": "复制成功",
     "addFirstVariable": "添加第一个变量",
