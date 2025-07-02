@@ -38,29 +38,27 @@ class WindowManager {
         preload: join(__dirname, '..', 'preload.js'), // 预加载脚本
         nodeIntegration: false, // 禁用 Node.js 集成
         contextIsolation: true, // 启用上下文隔离
-        devTools: process.env.NODE_ENV === 'development', // 开发模式下启用开发者工具
+        devTools: true, // 允许使用开发者工具（生产环境也可用）
       }
     });
 
     // 处理窗口关闭事件
     this.mainWindow.on('close', (event) => this.handleWindowClose(event));
 
-    // 开发模式下的开发者工具支持
-    if (process.env.NODE_ENV === 'development') {
-      // 设置快捷键来打开开发者工具
-      this.mainWindow.webContents.on('before-input-event', (event, input) => {
-        // F12 或 Ctrl+Shift+I 打开开发者工具
+    // 开发者工具支持（开发和生产环境都支持）
+    this.mainWindow.webContents.on('before-input-event', (event, input) => {
+      // Shift + F12 打开开发者工具（生产环境可用）
+      if (input.shift && input.key === 'F12') {
+        this.mainWindow?.webContents.toggleDevTools();
+      }
+      // 开发环境下的额外快捷键
+      if (process.env.NODE_ENV === 'development') {
         if ((input.key === 'F12') || 
             (input.control && input.shift && input.key === 'I')) {
           this.mainWindow?.webContents.toggleDevTools();
         }
-      });
-
-      // 窗口加载完成后，可以选择自动打开开发者工具（注释掉，按需启用）
-      // this.mainWindow.webContents.once('did-finish-load', () => {
-      //   this.mainWindow?.webContents.openDevTools();
-      // });
-    }
+      }
+    });
 
     // 根据环境加载不同的页面
     this.loadContent();

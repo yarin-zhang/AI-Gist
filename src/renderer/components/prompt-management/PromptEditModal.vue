@@ -28,7 +28,6 @@
                                                 <NInput 
                                                     v-model:value="formData.content" 
                                                     type="textarea"
-                                                    :placeholder="t('promptManagement.contentPlaceholder')" 
                                                     show-count
                                                     :style="{ 
                                                         height: `${contentHeight - 280}px`, 
