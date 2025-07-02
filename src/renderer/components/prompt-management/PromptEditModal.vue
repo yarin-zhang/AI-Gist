@@ -22,6 +22,36 @@
                             <!-- 左侧：内容编辑区 -->
                             <template #1>
                                 <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
+                                    <template #header-extra>
+                                        <NTooltip placement="top">
+                                            <template #trigger>
+                                                <NButton 
+                                                    size="small" 
+                                                    :type="isJinjaEnabled ? 'primary' : 'default'"
+                                                    @click="toggleJinjaMode"
+                                                    :disabled="isStreaming || optimizing !== null"
+                                                >
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Code />
+                                                        </NIcon>
+                                                    </template>
+                                                    {{ isJinjaEnabled ? t('promptManagement.jinjaEnabled') : t('promptManagement.jinjaDisabled') }}
+                                                </NButton>
+                                            </template>
+                                            <NFlex vertical size="small">
+                                                <NText>{{ t('promptManagement.jinjaSupportTooltip') }}</NText>
+                                                <NButton 
+                                                    size="tiny" 
+                                                    text 
+                                                    type="primary"
+                                                    @click="openJinjaWebsite"
+                                                >
+                                                    {{ t('promptManagement.jinjaSupportLearnMore') }}
+                                                </NButton>
+                                            </NFlex>
+                                        </NTooltip>
+                                    </template>
                                     <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem path="content" style="flex: 1;" :show-label="false">
@@ -29,7 +59,7 @@
                                                     v-model:value="formData.content" 
                                                     type="textarea"
                                                     show-count
-                                                    :placeholder="t('promptManagement.contentPlaceholder')"
+                                                    :placeholder="isJinjaEnabled ? t('promptManagement.jinjaTemplatePlaceholder') : t('promptManagement.contentPlaceholder')"
                                                     :style="{ 
                                                         fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                                         backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
@@ -569,14 +599,16 @@ import {
     NSplit,
     NTabs,
     NTabPane,
+    NTooltip,
     useMessage,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History, Settings } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
 import type { PromptHistory } from "@/lib/db";
+import { jinjaService } from "@/lib/utils/jinja.service";
 
 interface Variable {
     name: string;
@@ -624,6 +656,9 @@ const quickOptimizationConfigs = ref<any[]>([]);
 const showManualInput = ref(false);
 const manualInstruction = ref("");
 
+// Jinja 模板相关状态
+const isJinjaEnabled = ref(false);
+
 // 流式传输状态
 const streamingContent = ref("");
 const isStreaming = ref(false);
@@ -658,6 +693,7 @@ const formData = ref<{
     categoryId: number | null;
     tags: string[];
     variables: Variable[];
+    isJinjaTemplate?: boolean;
 }>({
     title: "",
     description: "",
@@ -665,6 +701,7 @@ const formData = ref<{
     categoryId: null,
     tags: [],
     variables: [],
+    isJinjaTemplate: false,
 });
 
 // 计算属性
@@ -768,9 +805,13 @@ const resetForm = () => {
         categoryId: null,
         tags: [],
         variables: [],
+        isJinjaTemplate: false,
     };
     activeTab.value = "edit";
     historyList.value = [];
+    
+    // 重置 Jinja 模式状态
+    isJinjaEnabled.value = false;
     
     // 重置优化状态
     optimizing.value = null;
@@ -1331,18 +1372,24 @@ const getCategoryName = (categoryId: any) => {
 
 // 提取变量的方法 - 优化版本：去重并只保留实际存在的变量
 const extractVariables = (content: string) => {
-    const variableRegex = /\{\{([^}]+)\}\}/g;
-    const matches = content.match(variableRegex);
+    let currentVariableNames = new Set<string>();
 
-    // 提取当前内容中的所有变量名
-    const currentVariableNames = new Set<string>();
-    if (matches) {
-        matches.forEach((match) => {
-            const variableName = match.replace(/[{}]/g, "").trim();
-            if (variableName) {
-                currentVariableNames.add(variableName);
-            }
-        });
+    if (isJinjaEnabled.value) {
+        // Jinja 模式：使用 Jinja 服务提取变量
+        currentVariableNames = new Set(jinjaService.extractVariables(content));
+    } else {
+        // 变量模式：使用原有的正则表达式提取
+        const variableRegex = /\{\{([^}]+)\}\}/g;
+        const matches = content.match(variableRegex);
+
+        if (matches) {
+            matches.forEach((match) => {
+                const variableName = match.replace(/[{}]/g, "").trim();
+                if (variableName) {
+                    currentVariableNames.add(variableName);
+                }
+            });
+        }
     }
 
     // 保留现有变量的配置信息
@@ -1437,7 +1484,11 @@ watch(
                         required: v.required !== false,
                         placeholder: v.placeholder || "",
                     })) || [],
+                isJinjaTemplate: newPrompt.isJinjaTemplate || false,
             };
+
+            // 设置 Jinja 模式状态
+            isJinjaEnabled.value = newPrompt.isJinjaTemplate || false;
 
             // 如果有内容但没有变量配置，立即提取变量
             if (
@@ -1707,6 +1758,7 @@ const handleSave = async () => {
             isFavorite: false,
             useCount: 0,
             isActive: true,
+            isJinjaTemplate: isJinjaEnabled.value,
             variables: formData.value.variables
                 .filter((v) => v.name && v.label)
                 .map((v) => ({
@@ -1776,6 +1828,40 @@ onBeforeUnmount(() => {
         debounceTimer.value = null;
     }
 });
+
+// Jinja 相关方法
+const toggleJinjaMode = () => {
+    if (isJinjaEnabled.value) {
+        // 从 Jinja 模式切换到变量模式
+        isJinjaEnabled.value = false;
+        message.info(t('promptManagement.jinjaDisabled'));
+    } else {
+        // 从变量模式切换到 Jinja 模式
+        if (formData.value.content.trim()) {
+            // 如果有现有内容，提示用户确认
+            if (confirm(t('promptManagement.jinjaClearContentMessage'))) {
+                isJinjaEnabled.value = true;
+                formData.value.content = '';
+                formData.value.variables = [];
+                message.success(t('promptManagement.jinjaEnabled'));
+            }
+        } else {
+            // 没有内容，直接切换
+            isJinjaEnabled.value = true;
+            message.success(t('promptManagement.jinjaEnabled'));
+        }
+    }
+};
+
+const openJinjaWebsite = () => {
+    // 打开 Jinja 官网
+    if ((window as any).electronAPI?.shell?.openExternal) {
+        (window as any).electronAPI.shell.openExternal('https://jinja.palletsprojects.com/en/stable/');
+    } else {
+        // 降级到浏览器打开
+        window.open('https://jinja.palletsprojects.com/en/stable/', '_blank');
+    }
+};
 
 // 暴露方法给父组件
 defineExpose({

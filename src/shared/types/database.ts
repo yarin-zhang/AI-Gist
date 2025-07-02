@@ -43,6 +43,7 @@ export interface Prompt {
   useCount: number;
   version?: number;
   isActive: boolean;
+  isJinjaTemplate?: boolean; // 是否为 Jinja 模板
   createdAt: Date;
   updatedAt: Date;
 }
