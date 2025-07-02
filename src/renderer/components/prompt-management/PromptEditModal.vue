@@ -651,13 +651,20 @@ const debounceTimer = ref<number | null>(null);
 const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 
 // 表单数据
-const formData = ref({
+const formData = ref<{
+    title: string;
+    description: string;
+    content: string;
+    categoryId: number | null;
+    tags: string[];
+    variables: Variable[];
+}>({
     title: "",
     description: "",
     content: "",
     categoryId: null,
-    tags: [] as string[],
-    variables: [] as Variable[],
+    tags: [],
+    variables: [],
 });
 
 // 计算属性
@@ -1294,7 +1301,7 @@ const rollbackToHistory = (history: PromptHistory) => {
             title: history.title,
             description: history.description || "",
             content: history.content,
-            categoryId: history.categoryId || undefined,
+            categoryId: history.categoryId ? history.categoryId : null,
             tags: history.tags
                 ? typeof history.tags === "string"
                     ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
