@@ -20,6 +20,7 @@ import i18n from '~/i18n'
 import MainPage from '~/pages/MainPage.vue'
 import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 import AppInitializer from '~/components/common/AppInitializer.vue'
+import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 
 // 使用主题管理
 const { naiveTheme, initTheme } = useTheme()
@@ -65,6 +66,8 @@ onMounted(async () => {
         <NMessageProvider>
             <NDialogProvider>
                 <AppInitializer>
+                    <!-- 国际化错误检测横幅 -->
+                    <I18nErrorBanner />
                     <!-- 数据库状态横幅 -->
                     <DatabaseStatusBanner />
                     <MainPage />
