@@ -342,9 +342,36 @@
                             <NText strong>{{ t(`promptManagement.jinja${category.charAt(0).toUpperCase() + category.slice(1)}`) }}</NText>
                         </template>
                         <NFlex vertical size="small">
-                            <div v-for="example in examples" :key="example" style="font-family: 'Monaco, Menlo, Ubuntu Mono, monospace'; font-size: 12px; background: var(--color-fill-2); padding: 4px 8px; border-radius: 4px;">
-                                {{ example }}
-                            </div>
+                            <NFlex v-for="example in examples" :key="example.code" align="center" size="small" style="padding: 8px; border-radius: 4px; background: var(--color-fill-2);">
+                                <NInput 
+                                    :value="example.code" 
+                                    readonly 
+                                    size="small"
+                                    :style="{ 
+                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                        fontSize: '12px',
+                                        flex: 1,
+                                        cursor: 'pointer'
+                                    }"
+                                    @click="copySyntaxCode(example.code)"
+                                />
+                                <NButton 
+                                    size="tiny" 
+                                    text 
+                                    type="primary"
+                                    @click="copySyntaxCode(example.code)"
+                                    style="margin-left: 8px;"
+                                >
+                                    <template #icon>
+                                        <NIcon size="14">
+                                            <Copy />
+                                        </NIcon>
+                                    </template>
+                                </NButton>
+                                <NText depth="3" style="font-size: 12px; margin-left: 8px; min-width: 80px;">
+                                    {{ t(`promptManagement.jinjaSyntaxExamples.${example.description}`) }}
+                                </NText>
+                            </NFlex>
                         </NFlex>
                     </NCard>
                 </NFlex>
@@ -678,6 +705,17 @@ const copyToClipboard = async (text: string) => {
     } catch (error) {
         console.error('复制失败:', error);
         message.error(t('promptManagement.copyFailed'));
+    }
+};
+
+// 复制语法代码
+const copySyntaxCode = async (code: string) => {
+    try {
+        await navigator.clipboard.writeText(code);
+        message.success(t('promptManagement.jinjaSyntaxCopySuccess'));
+    } catch (error) {
+        console.error('复制语法代码失败:', error);
+        message.error(t('promptManagement.jinjaSyntaxCopyFailed'));
     }
 };
 

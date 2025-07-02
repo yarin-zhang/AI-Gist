@@ -173,36 +173,29 @@ export class JinjaService {
   /**
    * 获取语法帮助信息
    */
-  getSyntaxHelp(): Record<string, string[]> {
+  getSyntaxHelp(): Record<string, Array<{ code: string; description: string }>> {
     return {
       variables: [
-        '{{ variable_name }} - 输出变量值',
-        '{{ variable_name | upper }} - 转换为大写',
-        '{{ variable_name | lower }} - 转换为小写',
-        '{{ variable_name | title }} - 首字母大写',
-        '{{ variable_name | truncate(50) }} - 截断到指定长度',
-        '{{ variable_name | default("默认值") }} - 设置默认值'
+        { code: '{{ variable_name }}', description: 'variableOutput' },
+        { code: '{{ variable_name | upper }}', description: 'variableUpper' },
+        { code: '{{ variable_name | lower }}', description: 'variableLower' },
+        { code: '{{ variable_name | title }}', description: 'variableTitle' },
+        { code: '{{ variable_name | truncate(50) }}', description: 'variableTruncate' },
+        { code: '{{ variable_name | default("默认值") }}', description: 'variableDefault' },
+        { code: '{{ list | join(", ") }}', description: 'filterJoin' },
+        { code: '{{ number | number(2) }}', description: 'filterNumber' },
+        { code: '{{ date | date("YYYY-MM-DD") }}', description: 'filterDate' }
       ],
       conditionals: [
-        '{% if condition %}内容{% endif %} - 条件判断',
-        '{% if condition %}内容{% else %}其他内容{% endif %} - 条件判断带else',
-        '{% if variable %}变量存在{% endif %} - 检查变量是否存在',
-        '{% if variable == "value" %}值相等{% endif %} - 值比较'
+        { code: '{% if condition %}内容{% endif %}', description: 'conditionalIf' },
+        { code: '{% if condition %}内容{% else %}其他内容{% endif %}', description: 'conditionalIfElse' },
+        { code: '{% if variable %}变量存在{% endif %}', description: 'conditionalExists' },
+        { code: '{% if variable == "value" %}值相等{% endif %}', description: 'conditionalEquals' }
       ],
       loops: [
-        '{% for item in items %}{{ item }}{% endfor %} - 循环遍历',
-        '{% for item in items %}{{ loop.index }}. {{ item }}{% endfor %} - 带索引的循环',
-        '{% for item in items %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} - 循环分隔符'
-      ],
-      filters: [
-        '{{ variable | upper }} - 大写',
-        '{{ variable | lower }} - 小写',
-        '{{ variable | title }} - 首字母大写',
-        '{{ variable | truncate(50) }} - 截断',
-        '{{ variable | default("默认值") }} - 默认值',
-        '{{ list | join(", ") }} - 列表连接',
-        '{{ number | number(2) }} - 数字格式化',
-        '{{ date | date("YYYY-MM-DD") }} - 日期格式化'
+        { code: '{% for item in items %}{{ item }}{% endfor %}', description: 'loopFor' },
+        { code: '{% for item in items %}{{ loop.index }}. {{ item }}{% endfor %}', description: 'loopWithIndex' },
+        { code: '{% for item in items %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %}', description: 'loopWithSeparator' }
       ]
     };
   }

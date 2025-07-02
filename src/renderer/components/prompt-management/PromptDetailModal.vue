@@ -88,21 +88,7 @@
                                             <NText>{{ t('promptManagement.detailModal.unfilledVariablesTip') }}</NText>
                                         </NFlex>
 
-                                        <!-- Jinja 模板预览按钮 -->
-                                        <NFlex v-if="props.prompt?.isJinjaTemplate" align="center" style="margin-top: 8px;">
-                                            <NButton 
-                                                size="small" 
-                                                type="info" 
-                                                @click="showJinjaPreview = true"
-                                            >
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Eye />
-                                                    </NIcon>
-                                                </template>
-                                                {{ t('promptManagement.jinjaTemplatePreview') }}
-                                            </NButton>
-                                        </NFlex>
+
 
                                         <!-- 调试区域 -->
                                         <NAlert v-if="canDebug" type="info" :show-icon="false" style="margin-top: 16px;">
@@ -821,82 +807,7 @@
         </template>
     </CommonModal>
 
-    <!-- Jinja 模板预览模态框 -->
-    <CommonModal :show="showJinjaPreview" @update:show="showJinjaPreview = false" @close="showJinjaPreview = false">
-        <template #header>
-            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
-                {{ t('promptManagement.jinjaTemplatePreview') }}
-            </NText>
-            <NText depth="3">
-                {{ t('promptManagement.jinjaRenderedContent') }}
-            </NText>
-        </template>
 
-        <template #content="{ contentHeight }">
-            <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
-                <!-- 原始模板 -->
-                <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.originalPrompt') }}</NText>
-                    <NInput 
-                        :value="props.prompt?.content" 
-                        type="textarea" 
-                        readonly 
-                        :rows="6"
-                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                    />
-                </div>
-
-                <!-- 变量值 -->
-                <div v-if="Object.keys(variableValues).length > 0">
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.includedVariables') }}</NText>
-                    <NFlex vertical size="small">
-                        <NFlex v-for="(value, key) in variableValues" :key="key" align="center" size="small">
-                            <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
-                            <NInput :value="value" readonly size="small" />
-                        </NFlex>
-                    </NFlex>
-                </div>
-
-                <!-- 渲染结果 -->
-                <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.jinjaRenderedContent') }}</NText>
-                    <NInput 
-                        :value="filledContent" 
-                        type="textarea" 
-                        readonly 
-                        :rows="8"
-                        :style="{ 
-                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                            backgroundColor: 'var(--success-color-suppl)'
-                        }"
-                    />
-                </div>
-            </NFlex>
-        </template>
-
-        <template #footer>
-            <NFlex justify="space-between" align="center">
-                <div>
-                    <NText depth="3">
-                        {{ t('promptManagement.jinjaTemplateSuccess') }}
-                    </NText>
-                </div>
-                <div>
-                    <NFlex size="small">
-                        <NButton @click="showJinjaPreview = false">{{ t('common.close') }}</NButton>
-                        <NButton type="primary" @click="copyToClipboard(filledContent)">
-                            <template #icon>
-                                <NIcon>
-                                    <Copy />
-                                </NIcon>
-                            </template>
-                            {{ t('promptManagement.detailModal.copyResult') }}
-                        </NButton>
-                    </NFlex>
-                </div>
-            </NFlex>
-        </template>
-    </CommonModal>
 </template>
 
 <script setup lang="ts">
@@ -942,7 +853,6 @@ import {
     Loader,
     Clock,
     Code,
-    Eye,
 } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
@@ -1013,8 +923,7 @@ const showManualRecordModal = ref(false);
 const savingManualRecord = ref(false);
 const manualRecordFormRef = ref();
 
-// Jinja 预览相关状态
-const showJinjaPreview = ref(false);
+
 const manualRecordData = ref({
     title: "",
     result: "",
