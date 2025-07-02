@@ -338,6 +338,7 @@
     "createFailed": "创建失败",
     "createPrompt": "新建提示词",
     "createSuccess": "提示词创建成功",
+    "delete": "删除",
     "deleteFailed": "删除失败",
     "deleteSuccess": "提示词已删除",
     "description": "描述",
@@ -417,7 +418,7 @@
       "variables": "变量"
     },
     "detectedVariables": "检测到的变量",
-    "edit": "编辑提示词",
+    "edit": "编辑",
     "editUpdate": "编辑更新",
     "enterAdjustmentInstruction": "请输入调整指令",
     "enterCategoryName": "请输入分类名称",

@@ -791,6 +791,7 @@ const openQuickOptimizationConfig = () => {
 
 // 重置表单方法
 const resetForm = () => {
+    
     // 清理防抖定时器
     if (debounceTimer.value) {
         clearTimeout(debounceTimer.value);
@@ -1448,7 +1449,7 @@ const generateAutoTitle = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
-        console.log("PromptEditModal - 接收到prompt数据:", newPrompt);
+
         
         if (newPrompt) {
             // 有 prompt 数据，初始化为编辑模式
@@ -1532,6 +1533,8 @@ watch(
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
             
+
+            
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
                 // 只有在确实没有 prompt 且不是编辑模式时才重置表单
@@ -1558,8 +1561,9 @@ watch(
             manualInstruction.value = "";
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
+            // 注意：只有在新建模式下才重置表单，编辑模式下保留数据
             setTimeout(() => {
-                if (!props.show) {
+                if (!props.show && !isEdit.value) {
                     resetForm();
                 }
             }, 200);
@@ -1614,6 +1618,8 @@ watch(
     },
     { deep: true }
 );
+
+
 
 // 生成唯一变量名的辅助方法
 const generateUniqueVariableName = () => {
@@ -1776,6 +1782,8 @@ const handleSave = async () => {
                     placeholder: v.placeholder || undefined,
                 })) as any,
         };
+
+
 
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新

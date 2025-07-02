@@ -1695,7 +1695,7 @@ const handleClose = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
-        console.log("Prompt 变化:", newPrompt); // 调试用
+
         if (newPrompt) {
             initializeVariables();
 
@@ -1718,15 +1718,7 @@ watch(
     { immediate: true }
 );
 
-// 监听变量值变化，用于调试
-watch(
-    () => variableValues.value,
-    (newValues) => {
-        console.log("变量值变化:", newValues);
-        console.log("填充后内容:", filledContent.value);
-    },
-    { deep: true }
-);
+
 
 // 监听显示状态
 watch(
@@ -1837,11 +1829,11 @@ const handleEdit = () => {
         isActive: props.prompt.isActive,
         isFavorite: props.prompt.isFavorite,
         useCount: props.prompt.useCount,
+        isJinjaTemplate: props.prompt.isJinjaTemplate || false,
         createdAt: props.prompt.createdAt,
         updatedAt: props.prompt.updatedAt
     };
     
-    console.log("传递编辑数据:", editPrompt);
     emit("edit", editPrompt);
 };
 </script>
