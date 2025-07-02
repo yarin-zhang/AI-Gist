@@ -1,4 +1,4 @@
-import nunjucks from 'nunjucks';
+import * as nunjucks from 'nunjucks';
 
 /**
  * Jinja 模板服务
@@ -8,14 +8,8 @@ export class JinjaService {
   private env: nunjucks.Environment;
 
   constructor() {
-    // 创建 Nunjucks 环境
-    this.env = nunjucks.configure({
-      autoescape: false, // 不自动转义，保持原始格式
-      trimBlocks: true,
-      lstripBlocks: true,
-      throwOnUndefined: false, // 不抛出未定义变量错误
-      noCache: true // 开发模式下不缓存
-    });
+    // 创建 Nunjucks 环境，使用默认配置
+    this.env = new nunjucks.Environment();
 
     // 添加自定义过滤器
     this.addCustomFilters();
@@ -43,8 +37,8 @@ export class JinjaService {
    */
   validateTemplate(template: string): { isValid: boolean; error?: string } {
     try {
-      // 尝试编译模板
-      this.env.compile(template);
+      // 尝试渲染模板来验证语法
+      this.env.renderString(template, {});
       return { isValid: true };
     } catch (error) {
       return {
