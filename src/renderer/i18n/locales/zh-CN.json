@@ -536,6 +536,7 @@
     "jinjaClearContentMessage": "启用 Jinja 模板后，现有内容将被清空。您确定要继续吗？",
     "jinjaTemplateMode": "Jinja 模板模式",
     "jinjaVariableMode": "变量模式",
+    "jinjaVariablesTitle": "Jinja 变量",
     "jinjaSyntaxHelp": "Jinja 语法帮助",
     "jinjaBasicSyntax": "基础语法",
     "jinjaVariables": "变量：{'{{'} variable_name {'}}'}",

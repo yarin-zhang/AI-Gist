@@ -54,20 +54,22 @@
                         </NFormItem>
                     </NFlex>
                     
-                    <!-- 模板验证状态 -->
-                    <div v-if="content.trim()" style="margin-top: 8px;">
-                        <NAlert 
-                            :type="templateValidation.isValid ? 'success' : 'error'" 
-                            :show-icon="true"
-                            :title="templateValidation.isValid ? t('promptManagement.templateValid') : t('promptManagement.templateInvalid')"
-                        >
-                            <template v-if="templateValidation.isValid">
-                                <NText>{{ t('promptManagement.templateValidMessage') }}</NText>
-                            </template>
-                            <template v-else>
-                                <NText>{{ templateValidation.error }}</NText>
-                            </template>
-                        </NAlert>
+                    <!-- 快速插入变量 -->
+                    <div v-if="jinjaVariables.length > 0" style="margin-top: 8px;">
+                        <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">
+                            {{ t('promptManagement.quickInsertVariables') }}
+                        </NText>
+                        <NFlex size="small" wrap>
+                            <NButton 
+                                v-for="variable in jinjaVariables" 
+                                :key="variable.name"
+                                size="tiny" 
+                                @click="insertVariableToTemplate(variable.name)"
+                                :disabled="isStreaming || optimizing !== null || !variable.name"
+                            >
+                                {{ variable.name }}
+                            </NButton>
+                        </NFlex>
                     </div>
                     
                     <NAlert type="info" :show-icon="false" style="margin: 8px 0;">
@@ -185,7 +187,7 @@
             <NCard size="small" :style="{ height: '100%' }">
                 <template #header>
                     <NFlex justify="space-between" align="center">
-                        <NText strong>{{ t('promptManagement.jinjaVariables') }}</NText>
+                        <NText strong>{{ t('promptManagement.jinjaVariablesTitle') }}</NText>
                         <NFlex size="small">
                             <NButton size="small" @click="addJinjaVariable" :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
@@ -208,6 +210,22 @@
                 </template>
                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                     <NFlex vertical size="medium" style="padding-right: 12px;">
+                        <!-- 模板验证状态 -->
+                        <div v-if="content.trim()">
+                            <NAlert 
+                                :type="templateValidation.isValid ? 'success' : 'error'" 
+                                :show-icon="true"
+                                :title="templateValidation.isValid ? t('promptManagement.templateValid') : t('promptManagement.templateInvalid')"
+                            >
+                                <template v-if="templateValidation.isValid">
+                                    <NText>{{ t('promptManagement.templateValidMessage') }}</NText>
+                                </template>
+                                <template v-else>
+                                    <NText>{{ templateValidation.error }}</NText>
+                                </template>
+                            </NAlert>
+                        </div>
+
                         <!-- 变量列表 -->
                         <div v-if="jinjaVariables.length > 0">
                             <NCard v-for="(variable, index) in jinjaVariables" :key="index" size="small" style="margin-bottom: 8px;">
@@ -279,38 +297,6 @@
                                         />
                                     </NFormItem>
 
-                                    <!-- 占位符 -->
-                                    <NFormItem :label="t('promptManagement.variablePlaceholder')">
-                                        <NInput 
-                                            v-model:value="variable.placeholder" 
-                                            :placeholder="t('promptManagement.variablePlaceholderText')" 
-                                            size="small"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
-                                    </NFormItem>
-
-                                    <!-- 描述 -->
-                                    <NFormItem :label="t('promptManagement.variableDescription')">
-                                        <NInput 
-                                            v-model:value="variable.description" 
-                                            type="textarea" 
-                                            :placeholder="t('promptManagement.variableDescriptionPlaceholder')" 
-                                            size="small" 
-                                            :rows="2"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
-                                    </NFormItem>
-
-                                    <!-- 选项（仅对选择类型显示） -->
-                                    <NFormItem v-if="variable.type === 'select'" :label="t('promptManagement.variableOptions')">
-                                        <NDynamicInput 
-                                            v-model:value="variable.options" 
-                                            :placeholder="t('promptManagement.variableOptionsPlaceholder')"
-                                            size="small"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
-                                    </NFormItem>
-
                                     <!-- 必填开关 -->
                                     <NFlex justify="space-between" align="center">
                                         <NText depth="3" style="font-size: 12px;">
@@ -344,36 +330,6 @@
                                 </NButton>
                             </template>
                         </NEmpty>
-
-                        <!-- 快速插入变量按钮 -->
-                        <div v-if="jinjaVariables.length > 0" style="margin-top: 16px;">
-                            <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">
-                                {{ t('promptManagement.quickInsertVariables') }}
-                            </NText>
-                            <NFlex size="small" wrap>
-                                <NButton 
-                                    v-for="variable in jinjaVariables" 
-                                    :key="variable.name"
-                                    size="tiny" 
-                                    @click="insertVariableToTemplate(variable.name)"
-                                    :disabled="isStreaming || optimizing !== null || !variable.name"
-                                >
-                                    {{ variable.name }}
-                                </NButton>
-                            </NFlex>
-                        </div>
-
-                        <!-- 模板语法提示 -->
-                        <NAlert type="info" :show-icon="false" style="margin-top: 16px;">
-                            <NFlex vertical size="small">
-                                <NText depth="3" style="font-size: 12px;">
-                                    {{ t('promptManagement.jinjaVariableUsageTip') }}
-                                </NText>
-                                <div style="font-family: 'Monaco, Menlo, Ubuntu Mono, monospace'; font-size: 11px; background: var(--color-fill-2); padding: 4px 8px; border-radius: 4px;">
-                                    variable_name → &#123;&#123; variable_name &#125;&#125;
-                                </div>
-                            </NFlex>
-                        </NAlert>
                     </NFlex>
                 </NScrollbar>
             </NCard>
@@ -515,7 +471,6 @@ import {
     NEmpty,
     NSwitch,
     NScrollbar,
-    NDynamicInput,
     NSplit,
     NTooltip,
     NTag,
@@ -530,12 +485,9 @@ import { jinjaService } from "@/lib/utils/jinja.service";
 interface JinjaVariable {
     name: string;
     label: string;
-    type: 'template' | 'loop' | 'select';
+    type: 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict';
     defaultValue?: string;
     required: boolean;
-    description?: string;
-    placeholder?: string;
-    options?: string[];
 }
 
 interface Props {
@@ -588,9 +540,12 @@ const jinjaVariables = ref<JinjaVariable[]>([]);
 
 // 变量类型选项
 const variableTypeOptions = [
-    { label: t('promptManagement.text'), value: 'template' },
-    { label: t('promptManagement.select'), value: 'select' },
-    { label: t('promptManagement.loop'), value: 'loop' },
+    { label: '字符串 (str)', value: 'str' },
+    { label: '整数 (int)', value: 'int' },
+    { label: '浮点数 (float)', value: 'float' },
+    { label: '布尔值 (bool)', value: 'bool' },
+    { label: '列表 (list)', value: 'list' },
+    { label: '字典 (dict)', value: 'dict' },
 ];
 
 // 语法帮助信息
@@ -709,7 +664,7 @@ const addJinjaVariable = () => {
     jinjaVariables.value.push({
         name: '',
         label: '',
-        type: 'template',
+        type: 'str',
         required: true,
     });
 };
@@ -733,10 +688,14 @@ const insertVariableToTemplate = (variableName: string) => {
 // 获取变量类型颜色
 const getVariableTypeColor = (type: string) => {
     switch (type) {
-        case 'loop':
+        case 'int':
+        case 'float':
             return 'warning';
-        case 'select':
-            return 'info';
+        case 'bool':
+            return 'success';
+        case 'list':
+        case 'dict':
+            return 'error';
         default:
             return 'info';
     }
@@ -745,12 +704,20 @@ const getVariableTypeColor = (type: string) => {
 // 获取变量类型标签
 const getVariableTypeLabel = (type: string) => {
     switch (type) {
-        case 'loop':
-            return t('promptManagement.loopVariable');
-        case 'select':
-            return t('promptManagement.selectVariable');
+        case 'str':
+            return '字符串';
+        case 'int':
+            return '整数';
+        case 'float':
+            return '浮点数';
+        case 'bool':
+            return '布尔值';
+        case 'list':
+            return '列表';
+        case 'dict':
+            return '字典';
         default:
-            return t('promptManagement.templateVariable');
+            return '字符串';
     }
 };
 
