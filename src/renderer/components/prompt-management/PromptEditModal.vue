@@ -29,6 +29,7 @@
                                                     v-model:value="formData.content" 
                                                     type="textarea"
                                                     show-count
+                                                    :placeholder="t('promptManagement.contentPlaceholder')"
                                                     :style="{ 
                                                         height: `${contentHeight - 280}px`, 
                                                         fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
