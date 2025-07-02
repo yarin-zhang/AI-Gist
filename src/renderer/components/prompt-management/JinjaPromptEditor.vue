@@ -816,10 +816,12 @@ watch(
 // 监听Jinja变量变化，更新预览变量值并通知父组件
 watch(
     () => jinjaVariables.value,
-    () => {
+    (newVariables) => {
         updatePreviewVariableValues();
-        // 通知父组件变量已更新
-        emit('update:variables', [...jinjaVariables.value]);
+        // 通知父组件变量已更新 - 使用 nextTick 避免递归更新
+        nextTick(() => {
+            emit('update:variables', [...newVariables]);
+        });
     },
     { deep: true }
 );

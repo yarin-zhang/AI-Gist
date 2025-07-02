@@ -1381,7 +1381,12 @@ watch(
                 clearTimeout(debounceTimer.value);
                 debounceTimer.value = null;
             }
-            formData.value.variables = [];
+            // 使用 nextTick 避免递归更新
+            nextTick(() => {
+                if (!isInitializing.value) {
+                    formData.value.variables = [];
+                }
+            });
         }
     }
 );
@@ -1393,29 +1398,47 @@ watch(
         // 防止在初始化过程中触发
         if (isInitializing.value) return;
         
-        newVariables.forEach((variable) => {
+        // 检查是否需要更新变量
+        let needsUpdate = false;
+        const updatedVariables = newVariables.map((variable) => {
+            const updatedVariable = { ...variable };
+            
             // 当变量类型为选项时，检查默认值是否在选项中
-            if (variable.type === "select" && variable.defaultValue) {
-                if (!variable.options || !variable.options.includes(variable.defaultValue)) {
-                    variable.defaultValue = "";
+            if (updatedVariable.type === "select" && updatedVariable.defaultValue) {
+                if (!updatedVariable.options || !updatedVariable.options.includes(updatedVariable.defaultValue)) {
+                    updatedVariable.defaultValue = "";
+                    needsUpdate = true;
                 }
             }
             // 当变量类型为文本且选项不为空时，清空选项
             if (
-                variable.type === "text" &&
-                variable.options &&
-                variable.options.length > 0
+                updatedVariable.type === "text" &&
+                updatedVariable.options &&
+                updatedVariable.options.length > 0
             ) {
-                variable.options = [];
+                updatedVariable.options = [];
+                needsUpdate = true;
             }
             // 当变量类型切换到选项但没有选项时，提供默认选项
             if (
-                variable.type === "select" &&
-                (!Array.isArray(variable.options) || variable.options.length === 0)
+                updatedVariable.type === "select" &&
+                (!Array.isArray(updatedVariable.options) || updatedVariable.options.length === 0)
             ) {
-                variable.options = ["选项1", "选项2"];
+                updatedVariable.options = ["选项1", "选项2"];
+                needsUpdate = true;
             }
+            
+            return updatedVariable;
         });
+        
+        // 只有在确实需要更新时才更新，避免无限循环
+        if (needsUpdate) {
+            nextTick(() => {
+                if (!isInitializing.value) {
+                    formData.value.variables = updatedVariables;
+                }
+            });
+        }
     },
     { deep: true }
 );
@@ -1738,6 +1761,27 @@ const updateContent = (newContent: string) => {
 
 // 变量更新方法
 const updateVariables = (newVariables: any[]) => {
+    // 防止在初始化过程中触发
+    if (isInitializing.value) return;
+    
+    // 检查变量是否真的发生了变化
+    const currentVariables = formData.value.variables;
+    if (currentVariables.length === newVariables.length) {
+        const hasChanges = newVariables.some((newVar, index) => {
+            const currentVar = currentVariables[index];
+            return newVar.name !== currentVar.name ||
+                   newVar.type !== currentVar.type ||
+                   newVar.required !== currentVar.required ||
+                   newVar.defaultValue !== currentVar.defaultValue ||
+                   newVar.placeholder !== currentVar.placeholder ||
+                   JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options);
+        });
+        
+        if (!hasChanges) {
+            return; // 没有变化，不更新
+        }
+    }
+    
     formData.value.variables = newVariables.map(v => ({
         name: v.name,
         type: v.type,

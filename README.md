@@ -8,11 +8,11 @@
 
 ✨ 本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。
 
-[🏠 首页](https://getaigist.com) | [🔗 立即下载](https://github.com/yarin-zhang/AI-Gist/releases)
+![主要截图](docs/images/imageMain.png?v=202507011121)
+
+[🏠 访问官网](https://getaigist.com) | [🔗 立即下载](https://github.com/yarin-zhang/AI-Gist/releases)
 
 </div>
-
-![主要截图](docs/images/imageMain.png?v=202507011121)
 
 ## 📌 特点
 
@@ -53,23 +53,52 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
 
+如果 Github 下载较慢，可以尝试通过 SourceForge 进行下载。
+
+[![Download AI-Gist](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/ai-gist/files/latest/download)
+
 ## 🚀 安装说明
 
 - **Windows：** 下载 `.exe` 文件后双击运行安装
 - **macOS：** 下载 `.dmg` 文件后打开，将应用拖拽到应用程序文件夹，在终端执行 `xattr -cr /Applications/AI\ Gist.app` 以解除“已损坏”报错后启动。
 - **Linux：** 下载 `.AppImage` 文件后添加执行权限：`chmod +x ai-gist-linux.AppImage`
 
-## 📒 使用说明
+## 📒 使用场景
 
-方法一：手动维护数据
+- 管理提示词
+  - 点击“新建提示词”
+  - 输入提示词模板，用 `{{变量名}}` 来插入变量，AI Gist 会自动读取其中的变量。
+  - 使用时直接选择模板，输入变量值。
+  - 点击“复制内容”，即可自动记录使用历史。
 
-- 在应用中手动添加提示词模板、变量和分类标签
-- 使用时直接选择模板，输入变量值即可
+- AI 生成提示词
+  - 先在应用中添加 AI 模型（支持纯本地 Ollama、LM Studio 模型，以及常见的 OpenAI、DeepSeek 等在线模型）。
+  - 在首页点击“AI 生成”按钮，可以通过 AI 模型生成提示词。
 
-方法二：AI 生成提示词
+- AI 润色提示词
+  - 先添加 AI 模型
+  - 在编辑提示词页面对现有提示词进行快速润色，例如“提取变量”、“更具体”等。也可以自定义润色提示词。
 
-- 先在应用中添加 AI 模型（支持纯本地 Ollama、LM Studio 模型，以及常见的 OpenAI、DeepSeek 等在线模型）。
-- 在首页使用 AI 模型生成提示词。
+## 应用截图
+
+![截图01](docs/images/image01.png?v=202507011121)
+
+![截图02](docs/images/image02.png?v=202507011121)
+
+![截图03](docs/images/image03.png?v=202507011121)
+
+![截图04](docs/images/image04.png?v=202507011121)
+
+![截图05](docs/images/image05.png?v=202507011121)
+
+![截图06](docs/images/image06.png?v=202507011121)
+
+![截图07](docs/images/image07.png?v=202507011121)
+
+![截图08](docs/images/image08.png?v=202507011121)
+
+![截图09](docs/images/image09.png?v=202507011121)
+
 
 ## 开发说明
 
@@ -104,26 +133,6 @@ yarn build:linux    # 构建 Linux 安装包
 
 - [项目架构指南](./docs/project-architecture.md)
 - [GitHub Actions 自动构建与发布](./docs/github-actions.md)
-
-## 应用截图
-
-![截图01](docs/images/image01.png?v=202507011121)
-
-![截图02](docs/images/image02.png?v=202507011121)
-
-![截图03](docs/images/image03.png?v=202507011121)
-
-![截图04](docs/images/image04.png?v=202507011121)
-
-![截图05](docs/images/image05.png?v=202507011121)
-
-![截图06](docs/images/image06.png?v=202507011121)
-
-![截图07](docs/images/image07.png?v=202507011121)
-
-![截图08](docs/images/image08.png?v=202507011121)
-
-![截图09](docs/images/image09.png?v=202507011121)
 
 ## 贡献
 

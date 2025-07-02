@@ -456,6 +456,8 @@ watch(
 watch(
     () => props.variables,
     (newVariables) => {
+        // 检查是否需要更新变量
+        let needsUpdate = false;
         const updatedVariables = newVariables.map(variable => {
             const updatedVariable = { ...variable };
             
@@ -463,6 +465,7 @@ watch(
             if (updatedVariable.type === "select" && updatedVariable.defaultValue) {
                 if (!updatedVariable.options || !updatedVariable.options.includes(updatedVariable.defaultValue)) {
                     updatedVariable.defaultValue = "";
+                    needsUpdate = true;
                 }
             }
             // 当变量类型为文本且选项不为空时，清空选项
@@ -472,6 +475,7 @@ watch(
                 updatedVariable.options.length > 0
             ) {
                 updatedVariable.options = [];
+                needsUpdate = true;
             }
             // 当变量类型切换到选项但没有选项时，提供默认选项
             if (
@@ -479,12 +483,16 @@ watch(
                 (!Array.isArray(updatedVariable.options) || updatedVariable.options.length === 0)
             ) {
                 updatedVariable.options = ["选项1", "选项2"];
+                needsUpdate = true;
             }
             
             return updatedVariable;
         });
         
-        emit("update:variables", updatedVariables);
+        // 只有在确实需要更新时才更新，避免无限循环
+        if (needsUpdate) {
+            emit("update:variables", updatedVariables);
+        }
     },
     { deep: true }
 );
