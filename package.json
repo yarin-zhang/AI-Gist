@@ -1,6 +1,6 @@
 {
     "name": "ai-gist",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
     "scripts": {
@@ -28,6 +28,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.29.0",
+        "@types/nunjucks": "^3.2.6",
         "@types/uuid": "^10.0.0",
         "@typescript-eslint/eslint-plugin": "^8.35.0",
         "@typescript-eslint/parser": "^8.35.0",
@@ -62,6 +63,7 @@
         "cohere-ai": "^7.17.1",
         "langchain": "^0.3.27",
         "naive-ui": "^2.41.0",
+        "nunjucks": "^3.2.4",
         "unzipper": "^0.12.3",
         "uuid": "^11.1.0",
         "vue": "^3.3.8",

@@ -162,7 +162,6 @@ const handleViewPrompt = (prompt: any) => {
 }
 
 const handleEditFromDetail = (prompt: any) => {
-    console.log("PromptManagementPage - 接收到编辑请求:", prompt);
     
     if (!prompt || !prompt.id) {
         message.error(t('promptManagement.incompleteDataError'));
@@ -183,11 +182,12 @@ const handleEditFromDetail = (prompt: any) => {
         isActive: prompt.isActive !== false,
         isFavorite: prompt.isFavorite || false,
         useCount: prompt.useCount || 0,
+        isJinjaTemplate: prompt.isJinjaTemplate || false,
         createdAt: prompt.createdAt,
         updatedAt: prompt.updatedAt
     };
     
-    console.log("PromptManagementPage - 准备编辑数据:", editPrompt);
+
     
     // 关闭详情模态框
     showDetailModal.value = false;

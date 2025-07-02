@@ -17,214 +17,43 @@
                 <NTabs v-model:value="activeTab" type="segment" :style="{ height: `${contentHeight}px` }">
                     <!-- 编辑 Tab -->
                     <NTabPane name="edit" :tab="t('promptManagement.edit')">
-                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3"
-                            :max="0.8" :disabled="modalWidth <= 800">
-                            <!-- 左侧：内容编辑区 -->
-                            <template #1>
-                                <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
-                                    <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
-                                        <NFlex vertical size="medium" style="padding-right: 12px;">
-                                            <NFormItem path="content" style="flex: 1;">
-                                                <NInput 
-                                                    v-model:value="formData.content" 
-                                                    type="textarea"
-                                                    show-count
-                                                    :placeholder="t('promptManagement.contentPlaceholder')"
-                                                    :style="{ 
-                                                        height: `${contentHeight - 280}px`, 
-                                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                                        backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
-                                                        border: isStreaming ? '1px solid var(--success-color)' : undefined
-                                                    }"
-                                                    :autosize="false" 
-                                                    :readonly="isStreaming"
-                                                />
-                                            </NFormItem>
-                                        </NFlex>
-                                        <NAlert type="info" :show-icon="false" style="margin: 0;">
-                                            <NFlex justify="space-between" align="center">
-                                                <div>
-                                                    <NFlex align="center" size="small">
-                                                        <NText depth="3" style="font-size: 12px;">
-                                                            {{ t('promptManagement.quickOptimization') }}
-                                                        </NText>
-                                                        <NButton 
-                                                            size="tiny" 
-                                                            text 
-                                                            @click="openQuickOptimizationConfig"
-                                                            style="padding: 2px; margin-left: 4px;"
-                                                        >
-                                                            <template #icon>
-                                                                <NIcon size="12">
-                                                                    <Settings />
-                                                                </NIcon>
-                                                            </template>
-                                                        </NButton>
-                                                    </NFlex>
-                                                    <!-- 流式传输状态显示 -->
-                                                    <div v-if="isStreaming" style="margin-top: 4px;">
-                                                        <NText type="success" style="font-size: 11px;">
-                                                            {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{ t('promptManagement.characters') }})
-                                                        </NText>
-                                                    </div>
-                                                </div>
-                                                <NFlex size="small">
-                                                    <!-- 停止按钮 -->
-                                                    <NButton 
-                                                        v-if="isStreaming"
-                                                        size="small" 
-                                                        type="error"
-                                                        @click="stopOptimization"
-                                                    >
-                                                        {{ t('promptManagement.stopGeneration') }}
-                                                    </NButton>
-                                                    <!-- 优化按钮 -->
-                                                    <template v-else>
-                                                        <NButton 
-                                                            v-for="config in quickOptimizationConfigs"
-                                                            :key="config.id"
-                                                            size="small" 
-                                                            @click="optimizePrompt(config.id)"
-                                                            :loading="optimizing === config.name"
-                                                            :disabled="!formData.content.trim() || optimizing !== null"
-                                                        >
-                                                            {{ config.name }}
-                                                        </NButton>
-                                                        <NButton 
-                                                            size="small" 
-                                                            @click="showManualAdjustment"
-                                                            :disabled="!formData.content.trim() || optimizing !== null"
-                                                        >
-                                                            {{ t('promptManagement.manualAdjustment') }}
-                                                        </NButton>
-                                                    </template>
-                                                </NFlex>
-                                            </NFlex>
-                                        </NAlert>
-                                        
-                                        <!-- AI模型选择器 -->
-                                        <div style="margin-top: 8px;">
-                                            <AIModelSelector
-                                                ref="modelSelectorRef"
-                                                v-model:modelKey="selectedModelKey"
-                                                :placeholder="t('promptManagement.aiModelPlaceholder')"
-                                                :disabled="isStreaming || optimizing !== null"
-                                            />
-                                        </div>
-                                        
-                                        <!-- 手动调整输入框 -->
-                                        <div v-if="showManualInput" style="margin-top: 8px;">
-                                            <NCard size="small" :title="t('promptManagement.manualAdjustmentTitle')">
-                                                <NFlex vertical size="small">
-                                                    <NInput
-                                                        v-model:value="manualInstruction"
-                                                        type="textarea"
-                                                        :placeholder="t('promptManagement.manualAdjustmentPlaceholder')"
-                                                        :rows="3"
-                                                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                                        show-count
-                                                        :maxlength="500"
-                                                    />
-                                                    <NFlex justify="space-between" align="center">
-                                                        <NText depth="3" style="font-size: 12px;">
-                                                            {{ t('promptManagement.manualAdjustmentTip') }}
-                                                        </NText>
-                                                        <NFlex size="small">
-                                                            <NButton size="small" @click="hideManualAdjustment">
-                                                                {{ t('promptManagement.cancelAdjustment') }}
-                                                            </NButton>
-                                                            <NButton 
-                                                                size="small" 
-                                                                type="primary"
-                                                                @click="applyManualAdjustment"
-                                                                :loading="optimizing === 'manual'"
-                                                                :disabled="!manualInstruction.trim()"
-                                                            >
-                                                                {{ t('promptManagement.confirmAdjustment') }}
-                                                            </NButton>
-                                                        </NFlex>
-                                                    </NFlex>
-                                                </NFlex>
-                                            </NCard>
-                                        </div>
-                                    </NScrollbar>
-                                </NCard>
-                            </template>
+                        <!-- 常规模式编辑器 -->
+                        <RegularPromptEditor
+                            v-if="!isJinjaEnabled"
+                            :content="formData.content"
+                            :variables="formData.variables"
+                            :content-height="contentHeight"
+                            :quick-optimization-configs="quickOptimizationConfigs"
+                            :optimizing="optimizing"
+                            :is-streaming="isStreaming"
+                            :stream-stats="streamStats"
+                            @update:content="updateContent"
+                            @update:variables="updateVariables"
+                            @optimize-prompt="optimizePrompt"
+                            @stop-optimization="stopOptimization"
+                            @open-quick-optimization-config="openQuickOptimizationConfig"
+                            @manual-adjustment="applyManualAdjustment"
+                            ref="regularEditorRef"
+                        />
 
-                            <!-- 右侧：变量配置区 -->
-                            <template #2>
-                                <NCard size="small" :style="{ height: '100%' }">
-                                    <template #header>
-                                        <NFlex justify="space-between" align="center">
-                                            <NText strong>{{ t('promptManagement.detectedVariables') }}</NText>
-                                            <NButton size="small" @click="addVariable">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Plus />
-                                                    </NIcon>
-                                                </template>
-                                                {{ t('promptManagement.addVariable') }}
-                                            </NButton>
-                                        </NFlex>
-                                    </template>
-                                    <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
-                                        <NFlex vertical size="medium" style="padding-right: 12px;"
-                                            v-if="formData.variables.length > 0">
-                                            <NCard v-for="(variable, index) in formData.variables" :key="index" size="small">
-                                                <template #header>
-                                                    <NFlex justify="space-between" align="center">
-                                                        <NText>{{ variable.name || t('promptManagement.variable') + (index + 1) }}</NText>
-                                                        <NButton size="small" text type="error" @click="removeVariable(index)">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Trash />
-                                                                </NIcon>
-                                                            </template>
-                                                        </NButton>
-                                                    </NFlex>
-                                                </template>
-
-                                                <NFlex vertical size="small">
-                                                    <NFlex>
-                                                        <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
-                                                            <NInput v-model:value="variable.name" :placeholder="t('promptManagement.variableNamePlaceholder')" size="small" />
-                                                        </NFormItem>
-                                                        <NFormItem :label="t('promptManagement.variableLabel')" style="flex: 1">
-                                                            <NInput v-model:value="variable.label" :placeholder="t('promptManagement.variableLabelPlaceholder')" size="small" />
-                                                        </NFormItem>
-                                                    </NFlex>
-
-                                                    <NFlex>
-                                                        <NFormItem :label="t('promptManagement.variableType')" style="flex: 1">
-                                                            <NSelect v-model:value="variable.type" :options="variableTypeOptions" size="small" />
-                                                        </NFormItem>
-                                                        <NFormItem :label="t('promptManagement.variableRequired')" style="width: 80px">
-                                                            <NSwitch v-model:value="variable.required" size="small" />
-                                                        </NFormItem>
-                                                    </NFlex>
-
-                                                    <NFormItem :label="t('promptManagement.variableDefault')">
-                                                        <NInput v-if="variable.type === 'text'" v-model:value="variable.defaultValue" :placeholder="t('promptManagement.variableDefaultPlaceholder')" size="small" />
-                                                        <NSelect v-else-if="variable.type === 'select'" v-model:value="variable.defaultValue" :options="getVariableDefaultOptions(variable.options)" :placeholder="t('promptManagement.selectDefaultOption')" size="small" clearable />
-                                                    </NFormItem>
-
-                                                    <NFormItem v-if="variable.type === 'select'" :label="t('promptManagement.variableOptions')">
-                                                        <NDynamicInput v-model:value="variable.options" show-sort-button :placeholder="t('promptManagement.variableOptionsPlaceholder')" :min="1" />
-                                                    </NFormItem>
-                                                </NFlex>
-                                            </NCard>
-                                        </NFlex>
-                                        <NEmpty v-else :description="t('promptManagement.variableTip')" size="small">
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Plus />
-                                                </NIcon>
-                                            </template>
-                                        </NEmpty>
-                                    </NScrollbar>
-                                </NCard>
-                            </template>
-                        </NSplit>
+                        <!-- Jinja模式编辑器 -->
+                        <JinjaPromptEditor
+                            v-else
+                            :content="formData.content"
+                            :variables="formData.variables"
+                            :content-height="contentHeight"
+                            :quick-optimization-configs="quickOptimizationConfigs"
+                            :optimizing="optimizing"
+                            :is-streaming="isStreaming"
+                            :stream-stats="streamStats"
+                            @update:content="updateContent"
+                            @update:variables="updateVariables"
+                            @optimize-prompt="optimizePrompt"
+                            @stop-optimization="stopOptimization"
+                            @open-quick-optimization-config="openQuickOptimizationConfig"
+                            @manual-adjustment="applyManualAdjustment"
+                            ref="jinjaEditorRef"
+                        />
                     </NTabPane>
 
                     <!-- 补充信息 Tab -->
@@ -269,7 +98,7 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit" name="history" :tab="t('promptManagement.history')">
+                    <NTabPane v-if="isEdit && historyList.length > 0" name="history" :tab="t('promptManagement.history')">
                         <NCard :title="t('promptManagement.versionHistory')" size="small" :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
                                 <NFlex vertical size="medium" style="padding-right: 12px;" v-if="historyList.length > 0">
@@ -331,10 +160,41 @@
         <template #footer>
             <NFlex justify="space-between" align="center">
                 <div>
-                    <!-- 显示当前活动的tab信息 -->
-                    <NText depth="3" v-if="activeTab === 'history' && isEdit">
-                        {{ t('promptManagement.historyDescription') }}
-                    </NText>
+                    <!-- 左侧区域：模式切换按钮和提示信息 -->
+                    <NFlex align="center" size="small">
+                        <!-- 模式切换按钮 - 仅在编辑Tab时显示 -->
+                        <NFlex v-if="activeTab === 'edit'" size="small">
+                            <NButton 
+                                :type="!isJinjaEnabled ? 'primary' : 'default'"
+                                @click="switchToRegularMode"
+                                :disabled="isStreaming || optimizing !== null"
+                            >
+                                <template #icon>
+                                    <NIcon>
+                                        <Code />
+                                    </NIcon>
+                                </template>
+                                {{ t('promptManagement.regularMode') }}
+                            </NButton>
+                            <NButton 
+                                :type="isJinjaEnabled ? 'primary' : 'default'"
+                                @click="switchToJinjaMode"
+                                :disabled="isStreaming || optimizing !== null"
+                            >
+                                <template #icon>
+                                    <NIcon>
+                                        <Code />
+                                    </NIcon>
+                                </template>
+                                {{ t('promptManagement.jinjaMode') }}
+                            </NButton>
+                        </NFlex>
+                        
+                        <!-- 显示当前活动的tab信息 -->
+                        <NText depth="3" v-if="activeTab === 'history' && isEdit">
+                            {{ t('promptManagement.historyDescription') }}
+                        </NText>
+                    </NFlex>
                 </div>
                 <div>
                     <!-- 右侧区域 -->
@@ -406,7 +266,7 @@
                                                             <div style="width: 60px;">
                                                                 <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableLabel') }}</NText>
                                                             </div>
-                                                            <NText style="font-size: 12px;">{{ variable.label }}</NText>
+                                                            <NText style="font-size: 12px;">{{ variable.name }}</NText>
                                                         </NFlex>
                                                         <NFlex>
                                                             <div style="width: 60px;">
@@ -570,19 +430,25 @@ import {
     NSplit,
     NTabs,
     NTabPane,
+    NTooltip,
     useMessage,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History, Settings } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
+import RegularPromptEditor from "@/components/prompt-management/RegularPromptEditor.vue";
+import JinjaPromptEditor from "@/components/prompt-management/JinjaPromptEditor.vue";
 import type { PromptHistory } from "@/lib/db";
+import { jinjaService } from "@/lib/utils/jinja.service";
+
+// 统一变量类型定义
+type VariableType = 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'select';
 
 interface Variable {
     name: string;
-    label: string;
-    type: string;
+    type: VariableType;
     options?: string[];
     defaultValue?: string;
     required: boolean;
@@ -614,6 +480,7 @@ const historyList = ref<PromptHistory[]>([]);
 const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
 const previewHistory = ref<PromptHistory | null>(null);
+const isInitializing = ref(false); // 防止递归更新的标志
 
 // 优化相关状态
 const optimizing = ref<string | null>(null);
@@ -621,9 +488,10 @@ const modelSelectorRef = ref();
 const selectedModelKey = ref("");
 const quickOptimizationConfigs = ref<any[]>([]);
 
-// 手动调整状态
-const showManualInput = ref(false);
-const manualInstruction = ref("");
+// 手动调整状态现在由子组件处理
+
+// Jinja 模板相关状态
+const isJinjaEnabled = ref(false);
 
 // 流式传输状态
 const streamingContent = ref("");
@@ -652,13 +520,22 @@ const debounceTimer = ref<number | null>(null);
 const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 
 // 表单数据
-const formData = ref({
+const formData = ref<{
+    title: string;
+    description: string;
+    content: string;
+    categoryId: number | null;
+    tags: string[];
+    variables: Variable[];
+    isJinjaTemplate?: boolean;
+}>({
     title: "",
     description: "",
     content: "",
     categoryId: null,
-    tags: [] as string[],
-    variables: [] as Variable[],
+    tags: [],
+    variables: [],
+    isJinjaTemplate: false,
 });
 
 // 计算属性
@@ -748,11 +625,15 @@ const openQuickOptimizationConfig = () => {
 
 // 重置表单方法
 const resetForm = () => {
+    
     // 清理防抖定时器
     if (debounceTimer.value) {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
+
+    // 设置初始化标志，防止递归更新
+    isInitializing.value = true;
 
     // 重置表单数据到初始状态
     formData.value = {
@@ -762,9 +643,13 @@ const resetForm = () => {
         categoryId: null,
         tags: [],
         variables: [],
+        isJinjaTemplate: false,
     };
     activeTab.value = "edit";
     historyList.value = [];
+    
+    // 重置 Jinja 模式状态
+    isJinjaEnabled.value = false;
     
     // 重置优化状态
     optimizing.value = null;
@@ -772,9 +657,7 @@ const resetForm = () => {
     streamingContent.value = "";
     generationControl.shouldStop = false;
     
-    // 重置手动调整状态
-    showManualInput.value = false;
-    manualInstruction.value = "";
+    // 重置手动调整状态现在由子组件处理
     
     // 重置流式统计
     Object.assign(streamStats, {
@@ -790,11 +673,18 @@ const resetForm = () => {
     // 清理表单验证状态
     nextTick(() => {
         formRef.value?.restoreValidation();
+        // 重置初始化标志
+        isInitializing.value = false;
     });
 };
 
 // 加载历史记录
 const loadHistory = async () => {
+    // 防止递归调用
+    if (loadingHistory.value) {
+        return;
+    }
+    
     if (!isEdit.value || !props.prompt?.id) {
         historyList.value = [];
         return;
@@ -1007,8 +897,10 @@ const optimizePrompt = async (configId: number) => {
         return;
     }
 
-    const selectedConfig = modelSelectorRef.value?.selectedConfig;
-    const selectedModel = modelSelectorRef.value?.selectedModel;
+    // 根据当前模式获取对应的模型选择器
+    const currentEditorRef = isJinjaEnabled.value ? jinjaEditorRef.value : regularEditorRef.value;
+    const selectedConfig = currentEditorRef?.modelSelectorRef?.selectedConfig;
+    const selectedModel = currentEditorRef?.modelSelectorRef?.selectedModel;
 
     if (!selectedConfig) {
         message.warning(t('promptManagement.noAIConfigAvailable'));
@@ -1087,13 +979,6 @@ const optimizePrompt = async (configId: number) => {
         // 启动流式传输监听
         await startStreamingGeneration(request, serializedConfig);
         
-        // 如果是提取变量类型，立即重新提取变量
-        if (optimizationConfig.name.includes('extractVariable') || optimizationConfig.name.includes('variable')) {
-            nextTick(() => {
-                extractVariables(formData.value.content);
-            });
-        }
-        
         message.success(t('promptManagement.optimizationComplete'));
 
     } catch (error: any) {
@@ -1114,29 +999,11 @@ const optimizePrompt = async (configId: number) => {
     }
 };
 
-// 显示手动调整输入框
-const showManualAdjustment = () => {
-    showManualInput.value = true;
-    manualInstruction.value = "";
-    
-    // 使用 nextTick 确保 DOM 更新后再滚动
-    nextTick(() => {
-        // 滚动到底部以显示手动调整输入框
-        if (contentScrollbarRef.value) {
-            contentScrollbarRef.value.scrollTo({ top: 999999, behavior: 'smooth' });
-        }
-    });
-};
-
-// 隐藏手动调整输入框
-const hideManualAdjustment = () => {
-    showManualInput.value = false;
-    manualInstruction.value = "";
-};
+// 手动调整方法现在由子组件处理
 
 // 应用手动调整
-const applyManualAdjustment = async () => {
-    if (!manualInstruction.value.trim()) {
+const applyManualAdjustment = async (instruction: string) => {
+    if (!instruction.trim()) {
         message.warning(t('promptManagement.enterAdjustmentInstruction'));
         return;
     }
@@ -1146,8 +1013,10 @@ const applyManualAdjustment = async () => {
         return;
     }
 
-    const selectedConfig = modelSelectorRef.value?.selectedConfig;
-    const selectedModel = modelSelectorRef.value?.selectedModel;
+    // 根据当前模式获取对应的模型选择器
+    const currentEditorRef = isJinjaEnabled.value ? jinjaEditorRef.value : regularEditorRef.value;
+    const selectedConfig = currentEditorRef?.modelSelectorRef?.selectedConfig;
+    const selectedModel = currentEditorRef?.modelSelectorRef?.selectedModel;
 
     if (!selectedConfig) {
         message.warning(t('promptManagement.noAIConfigAvailable'));
@@ -1165,14 +1034,6 @@ const applyManualAdjustment = async () => {
     generationControl.shouldStop = false;
     streamingContent.value = "";
     
-    // 立即隐藏手动调整输入框并向上滚动
-    hideManualAdjustment();
-    nextTick(() => {
-        if (contentScrollbarRef.value) {
-            contentScrollbarRef.value.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    });
-    
     // 重置流式传输统计
     streamStats.charCount = 0;
     streamStats.isStreaming = true;
@@ -1183,7 +1044,7 @@ const applyManualAdjustment = async () => {
     streamStats.contentGrowthRate = 0;
 
     try {
-        console.log("开始手动调整提示词:", manualInstruction.value, formData.value.content);
+        console.log("开始手动调整提示词:", instruction, formData.value.content);
         
         // 构建手动调整指令，包含原有提示词
         const adjustmentPrompt = `${t('promptManagement.adjustPromptInstruction')}
@@ -1192,7 +1053,7 @@ ${t('promptManagement.originalPrompt')}
 ${formData.value.content}
 
 ${t('promptManagement.adjustmentInstruction')}
-${manualInstruction.value.trim()}
+${instruction.trim()}
 
 ${t('promptManagement.outputImprovedPrompt')}`;
         
@@ -1291,28 +1152,40 @@ const closePreviewModal = () => {
 // 回滚到历史版本
 const rollbackToHistory = (history: PromptHistory) => {
     try {
-        formData.value = {
-            title: history.title,
-            description: history.description || "",
-            content: history.content,
-            categoryId: history.categoryId || undefined,
-            tags: history.tags
-                ? typeof history.tags === "string"
-                    ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
-                    : history.tags
-                : [],
-            variables: history.variables
-                ? JSON.parse(history.variables)
-                : [],
-        };
+        // 设置初始化标志，防止递归更新
+        isInitializing.value = true;
         
-        // 切换到编辑Tab
-        activeTab.value = "edit";
-        
-        message.success(t('promptManagement.rolledBackToVersion', { version: history.version }));
+        // 使用 nextTick 避免递归更新
+        nextTick(() => {
+            formData.value = {
+                title: history.title,
+                description: history.description || "",
+                content: history.content,
+                categoryId: history.categoryId ? history.categoryId : null,
+                tags: history.tags
+                    ? typeof history.tags === "string"
+                        ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
+                        : history.tags
+                    : [],
+                variables: history.variables
+                    ? JSON.parse(history.variables)
+                    : [],
+            };
+            
+            // 切换到编辑Tab
+            activeTab.value = "edit";
+            
+            message.success(t('promptManagement.rolledBackToVersion', { version: history.version }));
+            
+            // 重置初始化标志
+            nextTick(() => {
+                isInitializing.value = false;
+            });
+        });
     } catch (error) {
         console.error("回滚失败:", error);
         message.error(t('promptManagement.rollbackFailed'));
+        isInitializing.value = false;
     }
 };
 
@@ -1323,61 +1196,14 @@ const getCategoryName = (categoryId: any) => {
     return category?.name || t('promptManagement.unknownCategory');
 };
 
-// 提取变量的方法 - 优化版本：去重并只保留实际存在的变量
+// 变量提取方法现在由子组件处理，这里只保留基础逻辑
 const extractVariables = (content: string) => {
-    const variableRegex = /\{\{([^}]+)\}\}/g;
-    const matches = content.match(variableRegex);
-
-    // 提取当前内容中的所有变量名
-    const currentVariableNames = new Set<string>();
-    if (matches) {
-        matches.forEach((match) => {
-            const variableName = match.replace(/[{}]/g, "").trim();
-            if (variableName) {
-                currentVariableNames.add(variableName);
-            }
-        });
-    }
-
-    // 保留现有变量的配置信息
-    const existingVariableConfigs = new Map();
-    formData.value.variables.forEach((variable) => {
-        if (variable.name) {
-            existingVariableConfigs.set(variable.name, variable);
-        }
-    });
-
-    // 重新构建变量列表：只包含当前内容中实际存在的变量
-    formData.value.variables = Array.from(currentVariableNames).map(
-        (variableName) => {
-            // 如果已有配置，保留原配置；否则创建新配置
-            return (
-                existingVariableConfigs.get(variableName) || {
-                    name: variableName,
-                    label: variableName,
-                    type: "text",
-                    options: [],
-                    defaultValue: "",
-                    required: true,
-                    placeholder: "",
-                }
-            );
-        }
-    );
+    // 这个方法现在由子组件处理，保留空实现以兼容现有代码
 };
 
 // 防抖的变量提取方法
 const debouncedExtractVariables = (content: string) => {
-    // 清除之前的定时器
-    if (debounceTimer.value) {
-        clearTimeout(debounceTimer.value);
-    }
-
-    // 设置新的定时器
-    debounceTimer.value = setTimeout(() => {
-        extractVariables(content);
-        debounceTimer.value = null;
-    }, DEBOUNCE_DELAY) as unknown as number;
+    // 这个方法现在由子组件处理，保留空实现以兼容现有代码
 };
 
 // 自动生成标题的函数
@@ -1395,7 +1221,10 @@ const generateAutoTitle = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
-        console.log("PromptEditModal - 接收到prompt数据:", newPrompt);
+        // 防止递归更新
+        if (newPrompt === undefined || isInitializing.value) return;
+        
+        isInitializing.value = true;
         
         if (newPrompt) {
             // 有 prompt 数据，初始化为编辑模式
@@ -1417,7 +1246,6 @@ watch(
                 variables:
                     newPrompt.variables?.map((v: any) => ({
                         name: v.name || "",
-                        label: v.label || "",
                         type: v.type || "text",
                         options: Array.isArray(v.options)
                             ? v.options
@@ -1431,28 +1259,55 @@ watch(
                         required: v.required !== false,
                         placeholder: v.placeholder || "",
                     })) || [],
+                isJinjaTemplate: newPrompt.isJinjaTemplate || false,
             };
 
-            // 如果有内容但没有变量配置，立即提取变量
-            if (
-                newPrompt.content &&
-                (!newPrompt.variables || newPrompt.variables.length === 0)
-            ) {
+            // 设置 Jinja 模式状态
+            isJinjaEnabled.value = newPrompt.isJinjaTemplate || false;
+
+            // 如果是 Jinja 模式，初始化 Jinja 编辑器
+            if (isJinjaEnabled.value) {
                 nextTick(() => {
-                    extractVariables(newPrompt.content);
+                    if (jinjaEditorRef.value?.initializeJinjaVariables) {
+                        jinjaEditorRef.value.initializeJinjaVariables();
+                    }
                 });
+            } else {
+                // 常规模式：如果有内容但没有变量配置，立即提取变量
+                if (
+                    newPrompt.content &&
+                    (!newPrompt.variables || newPrompt.variables.length === 0)
+                ) {
+                    nextTick(() => {
+                        // 防止在初始化过程中触发
+                        if (!isInitializing.value) {
+                            extractVariables(newPrompt.content);
+                        }
+                    });
+                }
             }
             
             // 加载历史记录
-            loadHistory();
+            nextTick(() => {
+                if (!isInitializing.value) {
+                    loadHistory();
+                }
+            });
         } else {
             // 没有 prompt 数据，重置为新建模式
             resetForm();
             // 在新建模式下，确保当前tab不是历史记录
-            if (activeTab.value === 'history') {
-                activeTab.value = 'edit';
-            }
+            nextTick(() => {
+                if (activeTab.value === 'history') {
+                    activeTab.value = 'edit';
+                }
+            });
         }
+        
+        // 重置初始化标志
+        nextTick(() => {
+            isInitializing.value = false;
+        });
     },
     { immediate: true }
 );
@@ -1475,6 +1330,8 @@ watch(
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
             
+
+            
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
                 // 只有在确实没有 prompt 且不是编辑模式时才重置表单
@@ -1496,13 +1353,12 @@ watch(
             streamingContent.value = "";
             generationControl.shouldStop = false;
             
-            // 重置手动调整状态
-            showManualInput.value = false;
-            manualInstruction.value = "";
+            // 重置手动调整状态现在由子组件处理
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
+            // 注意：只有在新建模式下才重置表单，编辑模式下保留数据
             setTimeout(() => {
-                if (!props.show) {
+                if (!props.show && !isEdit.value) {
                     resetForm();
                 }
             }, 200);
@@ -1514,6 +1370,9 @@ watch(
 watch(
     () => formData.value.content,
     (newContent) => {
+        // 防止在初始化过程中触发
+        if (isInitializing.value) return;
+        
         if (newContent) {
             debouncedExtractVariables(newContent);
         } else {
@@ -1531,6 +1390,9 @@ watch(
 watch(
     () => formData.value.variables,
     (newVariables) => {
+        // 防止在初始化过程中触发
+        if (isInitializing.value) return;
+        
         newVariables.forEach((variable) => {
             // 当变量类型为选项时，检查默认值是否在选项中
             if (variable.type === "select" && variable.defaultValue) {
@@ -1557,6 +1419,8 @@ watch(
     },
     { deep: true }
 );
+
+
 
 // 生成唯一变量名的辅助方法
 const generateUniqueVariableName = () => {
@@ -1590,7 +1454,6 @@ const addVariable = () => {
     // 添加变量配置
     formData.value.variables.push({
         name: variableName,
-        label: variableName,
         type: "text",
         options: [],
         defaultValue: "",
@@ -1628,9 +1491,7 @@ const handleCancel = () => {
     streamingContent.value = "";
     generationControl.shouldStop = true; // 如果正在生成，停止生成
     
-    // 重置手动调整状态
-    showManualInput.value = false;
-    manualInstruction.value = "";
+    // 重置手动调整状态现在由子组件处理
 
     emit("update:show", false);
 };
@@ -1692,20 +1553,27 @@ const handleSave = async () => {
             // 继续执行，不因为标题检查失败而中断保存流程
         }
 
-        const data = {
-            title: finalTitle,
-            description: formData.value.description || undefined,
-            content: formData.value.content,
-            categoryId: formData.value.categoryId || undefined,
-            tags: formData.value.tags.length > 0 ? formData.value.tags : [],
-            isFavorite: false,
-            useCount: 0,
-            isActive: true,
-            variables: formData.value.variables
-                .filter((v) => v.name && v.label)
+        // 处理变量数据
+        let variablesData: any[] = [];
+        
+        if (isJinjaEnabled.value) {
+            // Jinja 模式：使用 Jinja 编辑器中的变量
+            const jinjaVariables = jinjaEditorRef.value?.jinjaVariables || [];
+            variablesData = jinjaVariables
+                .filter((v: any) => v.name)
+                .map((v: any) => ({
+                    name: v.name,
+                    type: v.type,
+                    defaultValue: v.defaultValue || undefined,
+                    required: v.required,
+                    placeholder: v.placeholder || undefined,
+                }));
+        } else {
+            // 常规模式：使用表单中的变量
+            variablesData = formData.value.variables
+                .filter((v) => v.name)
                 .map((v) => ({
                     name: v.name,
-                    label: v.label,
                     type: v.type,
                     options:
                         v.type === "select" &&
@@ -1716,8 +1584,23 @@ const handleSave = async () => {
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
-                })) as any,
+                }));
+        }
+
+        const data = {
+            title: finalTitle,
+            description: formData.value.description || undefined,
+            content: formData.value.content,
+            categoryId: formData.value.categoryId || undefined,
+            tags: formData.value.tags.length > 0 ? formData.value.tags : [],
+            isFavorite: false,
+            useCount: 0,
+            isActive: true,
+            isJinjaTemplate: isJinjaEnabled.value,
+            variables: variablesData,
         };
+
+
 
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新
@@ -1770,6 +1653,100 @@ onBeforeUnmount(() => {
         debounceTimer.value = null;
     }
 });
+
+// Jinja 相关方法
+const toggleJinjaMode = () => {
+    if (isJinjaEnabled.value) {
+        // 从 Jinja 模式切换到变量模式
+        isJinjaEnabled.value = false;
+        message.info(t('promptManagement.jinjaDisabled'));
+    } else {
+        // 从变量模式切换到 Jinja 模式
+        if (formData.value.content.trim()) {
+            // 如果有现有内容，提示用户确认
+            if (confirm(t('promptManagement.jinjaClearContentMessage'))) {
+                isJinjaEnabled.value = true;
+                formData.value.content = '';
+                formData.value.variables = [];
+                message.success(t('promptManagement.jinjaEnabled'));
+            }
+        } else {
+            // 没有内容，直接切换
+            isJinjaEnabled.value = true;
+            message.success(t('promptManagement.jinjaEnabled'));
+        }
+    }
+};
+
+const openJinjaWebsite = () => {
+    // 打开 Jinja 官网
+    if ((window as any).electronAPI?.shell?.openExternal) {
+        (window as any).electronAPI.shell.openExternal('https://jinja.palletsprojects.com/en/stable/');
+    } else {
+        // 降级到浏览器打开
+        window.open('https://jinja.palletsprojects.com/en/stable/', '_blank');
+    }
+};
+
+// 编辑器引用
+const regularEditorRef = ref();
+const jinjaEditorRef = ref();
+
+// 模式切换方法
+const switchToRegularMode = () => {
+    if (isJinjaEnabled.value) {
+        // 从 Jinja 模式切换到常规模式
+        if (formData.value.content.trim()) {
+            // 如果有现有内容，提示用户确认
+            if (confirm(t('promptManagement.regularModeClearContentMessage'))) {
+                isJinjaEnabled.value = false;
+                formData.value.content = '';
+                formData.value.variables = [];
+                message.success(t('promptManagement.regularModeEnabled'));
+            }
+        } else {
+            // 没有内容，直接切换
+            isJinjaEnabled.value = false;
+            message.success(t('promptManagement.regularModeEnabled'));
+        }
+    }
+};
+
+const switchToJinjaMode = () => {
+    if (!isJinjaEnabled.value) {
+        // 从常规模式切换到 Jinja 模式
+        if (formData.value.content.trim()) {
+            // 如果有现有内容，提示用户确认
+            if (confirm(t('promptManagement.jinjaClearContentMessage'))) {
+                isJinjaEnabled.value = true;
+                formData.value.content = '';
+                formData.value.variables = [];
+                message.success(t('promptManagement.jinjaEnabled'));
+            }
+        } else {
+            // 没有内容，直接切换
+            isJinjaEnabled.value = true;
+            message.success(t('promptManagement.jinjaEnabled'));
+        }
+    }
+};
+
+// 内容更新方法
+const updateContent = (newContent: string) => {
+    formData.value.content = newContent;
+};
+
+// 变量更新方法
+const updateVariables = (newVariables: any[]) => {
+    formData.value.variables = newVariables.map(v => ({
+        name: v.name,
+        type: v.type,
+        options: v.options,
+        defaultValue: v.defaultValue,
+        required: v.required,
+        placeholder: v.placeholder,
+    })) as Variable[];
+};
 
 // 暴露方法给父组件
 defineExpose({
