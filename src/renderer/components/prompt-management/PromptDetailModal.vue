@@ -66,8 +66,7 @@
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" ref="contentScrollbarRef">
                                     <NFlex vertical size="medium" style="padding-right: 12px">
-                                        <NInput :value="filledContent" type="textarea" readonly :style="{
-                                            height: `${contentHeight - 280}px`,
+                                        <NInput :value="filledContent" type="textarea" readonly :autosize=" { minRows: 9 }" :style="{
                                             fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                         }" :placeholder="!filledContent ? t('promptManagement.detailModal.contentEmpty') : ''" />
 

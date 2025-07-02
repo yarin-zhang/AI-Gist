@@ -24,19 +24,18 @@
                                 <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
                                     <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
-                                            <NFormItem path="content" style="flex: 1;">
+                                            <NFormItem path="content" style="flex: 1;" :show-label="false">
                                                 <NInput 
                                                     v-model:value="formData.content" 
                                                     type="textarea"
                                                     show-count
                                                     :placeholder="t('promptManagement.contentPlaceholder')"
                                                     :style="{ 
-                                                        height: `${contentHeight - 280}px`, 
                                                         fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                                         backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
                                                         border: isStreaming ? '1px solid var(--success-color)' : undefined
                                                     }"
-                                                    :autosize="false" 
+                                                    :autosize=" { minRows: 9 }" 
                                                     :readonly="isStreaming"
                                                 />
                                             </NFormItem>

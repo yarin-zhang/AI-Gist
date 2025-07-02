@@ -520,7 +520,7 @@
     "variableOptions": "选项",
     "variableOptionsPlaceholder": "请输入选项",
     "variableRequired": "必填",
-    "variableTip": "在左侧输入内容时使用 '{{变量名}}' 格式，会自动识别变量",
+    "variableTip": "在左侧输入内容时使用 {'{{'}变量名{'}}'} 格式，会自动识别变量",
     "variableType": "类型",
     "version": "版本",
     "versionHistory": "版本历史"
