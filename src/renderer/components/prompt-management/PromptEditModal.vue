@@ -96,7 +96,7 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit" name="history" :tab="t('promptManagement.history')">
+                    <NTabPane v-if="isEdit && historyList.length > 0" name="history" :tab="t('promptManagement.history')">
                         <NCard :title="t('promptManagement.versionHistory')" size="small" :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
                                 <NFlex vertical size="medium" style="padding-right: 12px;" v-if="historyList.length > 0">
@@ -476,6 +476,7 @@ const historyList = ref<PromptHistory[]>([]);
 const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
 const previewHistory = ref<PromptHistory | null>(null);
+const isInitializing = ref(false); // 防止递归更新的标志
 
 // 优化相关状态
 const optimizing = ref<string | null>(null);
@@ -627,6 +628,9 @@ const resetForm = () => {
         debounceTimer.value = null;
     }
 
+    // 设置初始化标志，防止递归更新
+    isInitializing.value = true;
+
     // 重置表单数据到初始状态
     formData.value = {
         title: "",
@@ -665,11 +669,18 @@ const resetForm = () => {
     // 清理表单验证状态
     nextTick(() => {
         formRef.value?.restoreValidation();
+        // 重置初始化标志
+        isInitializing.value = false;
     });
 };
 
 // 加载历史记录
 const loadHistory = async () => {
+    // 防止递归调用
+    if (loadingHistory.value) {
+        return;
+    }
+    
     if (!isEdit.value || !props.prompt?.id) {
         historyList.value = [];
         return;
@@ -1137,28 +1148,40 @@ const closePreviewModal = () => {
 // 回滚到历史版本
 const rollbackToHistory = (history: PromptHistory) => {
     try {
-        formData.value = {
-            title: history.title,
-            description: history.description || "",
-            content: history.content,
-            categoryId: history.categoryId ? history.categoryId : null,
-            tags: history.tags
-                ? typeof history.tags === "string"
-                    ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
-                    : history.tags
-                : [],
-            variables: history.variables
-                ? JSON.parse(history.variables)
-                : [],
-        };
+        // 设置初始化标志，防止递归更新
+        isInitializing.value = true;
         
-        // 切换到编辑Tab
-        activeTab.value = "edit";
-        
-        message.success(t('promptManagement.rolledBackToVersion', { version: history.version }));
+        // 使用 nextTick 避免递归更新
+        nextTick(() => {
+            formData.value = {
+                title: history.title,
+                description: history.description || "",
+                content: history.content,
+                categoryId: history.categoryId ? history.categoryId : null,
+                tags: history.tags
+                    ? typeof history.tags === "string"
+                        ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
+                        : history.tags
+                    : [],
+                variables: history.variables
+                    ? JSON.parse(history.variables)
+                    : [],
+            };
+            
+            // 切换到编辑Tab
+            activeTab.value = "edit";
+            
+            message.success(t('promptManagement.rolledBackToVersion', { version: history.version }));
+            
+            // 重置初始化标志
+            nextTick(() => {
+                isInitializing.value = false;
+            });
+        });
     } catch (error) {
         console.error("回滚失败:", error);
         message.error(t('promptManagement.rollbackFailed'));
+        isInitializing.value = false;
     }
 };
 
@@ -1194,7 +1217,10 @@ const generateAutoTitle = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
-
+        // 防止递归更新
+        if (newPrompt === undefined || isInitializing.value) return;
+        
+        isInitializing.value = true;
         
         if (newPrompt) {
             // 有 prompt 数据，初始化为编辑模式
@@ -1242,20 +1268,34 @@ watch(
                 (!newPrompt.variables || newPrompt.variables.length === 0)
             ) {
                 nextTick(() => {
-                    extractVariables(newPrompt.content);
+                    // 防止在初始化过程中触发
+                    if (!isInitializing.value) {
+                        extractVariables(newPrompt.content);
+                    }
                 });
             }
             
             // 加载历史记录
-            loadHistory();
+            nextTick(() => {
+                if (!isInitializing.value) {
+                    loadHistory();
+                }
+            });
         } else {
             // 没有 prompt 数据，重置为新建模式
             resetForm();
             // 在新建模式下，确保当前tab不是历史记录
-            if (activeTab.value === 'history') {
-                activeTab.value = 'edit';
-            }
+            nextTick(() => {
+                if (activeTab.value === 'history') {
+                    activeTab.value = 'edit';
+                }
+            });
         }
+        
+        // 重置初始化标志
+        nextTick(() => {
+            isInitializing.value = false;
+        });
     },
     { immediate: true }
 );
@@ -1318,6 +1358,9 @@ watch(
 watch(
     () => formData.value.content,
     (newContent) => {
+        // 防止在初始化过程中触发
+        if (isInitializing.value) return;
+        
         if (newContent) {
             debouncedExtractVariables(newContent);
         } else {
@@ -1335,6 +1378,9 @@ watch(
 watch(
     () => formData.value.variables,
     (newVariables) => {
+        // 防止在初始化过程中触发
+        if (isInitializing.value) return;
+        
         newVariables.forEach((variable) => {
             // 当变量类型为选项时，检查默认值是否在选项中
             if (variable.type === "select" && variable.defaultValue) {
