@@ -56,8 +56,7 @@ export interface PromptVariable {
   uuid: string; // 全局唯一标识符，用于WebDAV同步
   promptId: number;
   name: string;
-  label: string;
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean';
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict';
   defaultValue?: string;
   options?: string[];
   required: boolean;

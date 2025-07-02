@@ -257,7 +257,7 @@
                                 </template>
 
                                 <NFlex vertical size="small">
-                                    <!-- 变量名称 -->
+                                    <!-- 变量名称和类型 -->
                                     <NFlex>
                                         <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
                                             <NInput 
@@ -276,16 +276,6 @@
                                             />
                                         </NFormItem>
                                     </NFlex>
-
-                                    <!-- 显示名称 -->
-                                    <NFormItem :label="t('promptManagement.variableLabel')">
-                                        <NInput 
-                                            v-model:value="variable.label" 
-                                            :placeholder="t('promptManagement.variableLabelPlaceholder')" 
-                                            size="small"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
-                                    </NFormItem>
 
                                     <!-- 默认值 -->
                                     <NFormItem :label="t('promptManagement.variableDefault')">
@@ -484,10 +474,11 @@ import { jinjaService } from "@/lib/utils/jinja.service";
 
 interface JinjaVariable {
     name: string;
-    label: string;
-    type: 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict';
+    type: 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'select';
     defaultValue?: string;
     required: boolean;
+    options?: string[];
+    placeholder?: string;
 }
 
 interface Props {
@@ -497,10 +488,12 @@ interface Props {
     optimizing: string | null;
     isStreaming: boolean;
     streamStats: any;
+    variables?: JinjaVariable[];
 }
 
 interface Emits {
     (e: "update:content", value: string): void;
+    (e: "update:variables", variables: JinjaVariable[]): void;
     (e: "optimize-prompt", configId: number): void;
     (e: "stop-optimization"): void;
     (e: "open-quick-optimization-config"): void;
@@ -537,6 +530,35 @@ const templateValidation = ref<{ isValid: boolean; error?: string }>({ isValid: 
 
 // Jinja变量列表
 const jinjaVariables = ref<JinjaVariable[]>([]);
+
+// 初始化变量列表
+const initializeJinjaVariables = () => {
+    if (props.variables && props.variables.length > 0) {
+        // 如果有传入的变量，使用传入的变量
+        jinjaVariables.value = [...props.variables];
+    } else {
+        // 否则从模板内容中提取变量
+        const extractedVariables = extractVariablesFromContent();
+        jinjaVariables.value = extractedVariables;
+    }
+};
+
+// 从模板内容中提取变量
+const extractVariablesFromContent = (): JinjaVariable[] => {
+    if (!props.content.trim()) return [];
+    
+    try {
+        const variableNames = jinjaService.extractVariables(props.content);
+        return variableNames.map(name => ({
+            name,
+            type: 'str',
+            required: true,
+        }));
+    } catch (error) {
+        console.error('提取变量失败:', error);
+        return [];
+    }
+};
 
 // 变量类型选项
 const variableTypeOptions = [
@@ -663,15 +685,18 @@ const copyToClipboard = async (text: string) => {
 const addJinjaVariable = () => {
     jinjaVariables.value.push({
         name: '',
-        label: '',
         type: 'str',
         required: true,
     });
+    // 通知父组件变量已更新
+    emit('update:variables', [...jinjaVariables.value]);
 };
 
 // 移除Jinja变量
 const removeJinjaVariable = (index: number) => {
     jinjaVariables.value.splice(index, 1);
+    // 通知父组件变量已更新
+    emit('update:variables', [...jinjaVariables.value]);
 };
 
 // 插入变量到模板
@@ -721,12 +746,22 @@ const getVariableTypeLabel = (type: string) => {
     }
 };
 
-// 监听内容变化，验证模板（使用防抖）
+// 监听内容变化，验证模板并更新变量（使用防抖）
 watch(
     () => props.content,
     (newContent) => {
         if (newContent) {
             debouncedValidateTemplate(newContent);
+            // 当内容变化时，重新提取变量
+            const extractedVariables = extractVariablesFromContent();
+            if (extractedVariables.length > 0) {
+                // 合并现有变量和新提取的变量
+                const existingNames = new Set(jinjaVariables.value.map(v => v.name));
+                const newVariables = extractedVariables.filter(v => !existingNames.has(v.name));
+                if (newVariables.length > 0) {
+                    jinjaVariables.value.push(...newVariables);
+                }
+            }
         } else {
             // 如果内容为空，立即清空验证状态
             if (debounceTimer.value) {
@@ -734,15 +769,19 @@ watch(
                 debounceTimer.value = null;
             }
             templateValidation.value = { isValid: true, error: '' };
+            // 清空变量列表
+            jinjaVariables.value = [];
         }
     }
 );
 
-// 监听Jinja变量变化，更新预览变量值
+// 监听Jinja变量变化，更新预览变量值并通知父组件
 watch(
     () => jinjaVariables.value,
     () => {
         updatePreviewVariableValues();
+        // 通知父组件变量已更新
+        emit('update:variables', [...jinjaVariables.value]);
     },
     { deep: true }
 );
@@ -752,6 +791,7 @@ defineExpose({
     modelSelectorRef,
     selectedModelKey,
     jinjaVariables,
+    initializeJinjaVariables,
 });
 </script>
 

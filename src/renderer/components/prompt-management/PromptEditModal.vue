@@ -40,12 +40,14 @@
                         <JinjaPromptEditor
                             v-else
                             :content="formData.content"
+                            :variables="formData.variables"
                             :content-height="contentHeight"
                             :quick-optimization-configs="quickOptimizationConfigs"
                             :optimizing="optimizing"
                             :is-streaming="isStreaming"
                             :stream-stats="streamStats"
                             @update:content="updateContent"
+                            @update:variables="updateVariables"
                             @optimize-prompt="optimizePrompt"
                             @stop-optimization="stopOptimization"
                             @open-quick-optimization-config="openQuickOptimizationConfig"
@@ -264,7 +266,7 @@
                                                             <div style="width: 60px;">
                                                                 <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableLabel') }}</NText>
                                                             </div>
-                                                            <NText style="font-size: 12px;">{{ variable.label }}</NText>
+                                                            <NText style="font-size: 12px;">{{ variable.name }}</NText>
                                                         </NFlex>
                                                         <NFlex>
                                                             <div style="width: 60px;">
@@ -441,10 +443,12 @@ import JinjaPromptEditor from "@/components/prompt-management/JinjaPromptEditor.
 import type { PromptHistory } from "@/lib/db";
 import { jinjaService } from "@/lib/utils/jinja.service";
 
+// 统一变量类型定义
+type VariableType = 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'select';
+
 interface Variable {
     name: string;
-    label: string;
-    type: string;
+    type: VariableType;
     options?: string[];
     defaultValue?: string;
     required: boolean;
@@ -1242,7 +1246,6 @@ watch(
                 variables:
                     newPrompt.variables?.map((v: any) => ({
                         name: v.name || "",
-                        label: v.label || "",
                         type: v.type || "text",
                         options: Array.isArray(v.options)
                             ? v.options
@@ -1262,17 +1265,26 @@ watch(
             // 设置 Jinja 模式状态
             isJinjaEnabled.value = newPrompt.isJinjaTemplate || false;
 
-            // 如果有内容但没有变量配置，立即提取变量
-            if (
-                newPrompt.content &&
-                (!newPrompt.variables || newPrompt.variables.length === 0)
-            ) {
+            // 如果是 Jinja 模式，初始化 Jinja 编辑器
+            if (isJinjaEnabled.value) {
                 nextTick(() => {
-                    // 防止在初始化过程中触发
-                    if (!isInitializing.value) {
-                        extractVariables(newPrompt.content);
+                    if (jinjaEditorRef.value?.initializeJinjaVariables) {
+                        jinjaEditorRef.value.initializeJinjaVariables();
                     }
                 });
+            } else {
+                // 常规模式：如果有内容但没有变量配置，立即提取变量
+                if (
+                    newPrompt.content &&
+                    (!newPrompt.variables || newPrompt.variables.length === 0)
+                ) {
+                    nextTick(() => {
+                        // 防止在初始化过程中触发
+                        if (!isInitializing.value) {
+                            extractVariables(newPrompt.content);
+                        }
+                    });
+                }
             }
             
             // 加载历史记录
@@ -1442,7 +1454,6 @@ const addVariable = () => {
     // 添加变量配置
     formData.value.variables.push({
         name: variableName,
-        label: variableName,
         type: "text",
         options: [],
         defaultValue: "",
@@ -1542,21 +1553,27 @@ const handleSave = async () => {
             // 继续执行，不因为标题检查失败而中断保存流程
         }
 
-        const data = {
-            title: finalTitle,
-            description: formData.value.description || undefined,
-            content: formData.value.content,
-            categoryId: formData.value.categoryId || undefined,
-            tags: formData.value.tags.length > 0 ? formData.value.tags : [],
-            isFavorite: false,
-            useCount: 0,
-            isActive: true,
-            isJinjaTemplate: isJinjaEnabled.value,
-            variables: formData.value.variables
-                .filter((v) => v.name && v.label)
+        // 处理变量数据
+        let variablesData: any[] = [];
+        
+        if (isJinjaEnabled.value) {
+            // Jinja 模式：使用 Jinja 编辑器中的变量
+            const jinjaVariables = jinjaEditorRef.value?.jinjaVariables || [];
+            variablesData = jinjaVariables
+                .filter((v: any) => v.name)
+                .map((v: any) => ({
+                    name: v.name,
+                    type: v.type,
+                    defaultValue: v.defaultValue || undefined,
+                    required: v.required,
+                    placeholder: v.placeholder || undefined,
+                }));
+        } else {
+            // 常规模式：使用表单中的变量
+            variablesData = formData.value.variables
+                .filter((v) => v.name)
                 .map((v) => ({
                     name: v.name,
-                    label: v.label,
                     type: v.type,
                     options:
                         v.type === "select" &&
@@ -1567,7 +1584,20 @@ const handleSave = async () => {
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
-                })) as any,
+                }));
+        }
+
+        const data = {
+            title: finalTitle,
+            description: formData.value.description || undefined,
+            content: formData.value.content,
+            categoryId: formData.value.categoryId || undefined,
+            tags: formData.value.tags.length > 0 ? formData.value.tags : [],
+            isFavorite: false,
+            useCount: 0,
+            isActive: true,
+            isJinjaTemplate: isJinjaEnabled.value,
+            variables: variablesData,
         };
 
 
@@ -1707,8 +1737,15 @@ const updateContent = (newContent: string) => {
 };
 
 // 变量更新方法
-const updateVariables = (newVariables: Variable[]) => {
-    formData.value.variables = newVariables;
+const updateVariables = (newVariables: any[]) => {
+    formData.value.variables = newVariables.map(v => ({
+        name: v.name,
+        type: v.type,
+        options: v.options,
+        defaultValue: v.defaultValue,
+        required: v.required,
+        placeholder: v.placeholder,
+    })) as Variable[];
 };
 
 // 暴露方法给父组件

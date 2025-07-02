@@ -167,14 +167,9 @@
                             </template>
 
                             <NFlex vertical size="small">
-                                <NFlex>
-                                    <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
-                                        <NInput v-model:value="variable.name" :placeholder="t('promptManagement.variableNamePlaceholder')" size="small" />
-                                    </NFormItem>
-                                    <NFormItem :label="t('promptManagement.variableLabel')" style="flex: 1">
-                                        <NInput v-model:value="variable.label" :placeholder="t('promptManagement.variableLabelPlaceholder')" size="small" />
-                                    </NFormItem>
-                                </NFlex>
+                                <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
+                                    <NInput v-model:value="variable.name" :placeholder="t('promptManagement.variableNamePlaceholder')" size="small" />
+                                </NFormItem>
 
                                 <NFlex>
                                     <NFormItem :label="t('promptManagement.variableType')" style="flex: 1">
@@ -236,7 +231,6 @@ import AIModelSelector from "@/components/common/AIModelSelector.vue";
 
 interface Variable {
     name: string;
-    label: string;
     type: string;
     options?: string[];
     defaultValue?: string;
@@ -318,7 +312,6 @@ const extractVariables = (content: string) => {
             return (
                 existingVariableConfigs.get(variableName) || {
                     name: variableName,
-                    label: variableName,
                     type: "text",
                     options: [],
                     defaultValue: "",
@@ -376,7 +369,6 @@ const addVariable = () => {
     const variableName = generateUniqueVariableName();
     const newVariable = {
         name: variableName,
-        label: variableName,
         type: "text",
         options: [],
         defaultValue: "",

@@ -277,7 +277,7 @@
                                                 <NInput 
                                                     v-model:value="variableValues[variableName]" 
                                                     type="textarea" 
-                                                    :placeholder="t('promptManagement.detailModal.inputVariable', { label: variableName })"
+                                                    :placeholder="`请输入 ${variableName} 的值`"
                                                     :rows="1" 
                                                     :autosize="{ minRows: 1, maxRows: 5 }" 
                                                 />
@@ -285,14 +285,14 @@
                                         </template>
                                         <!-- 变量模式：显示配置的变量 -->
                                         <template v-else>
-                                            <NFormItem v-for="variable in prompt.variables" :key="variable.id"
-                                                :label="variable.label" :required="variable.required">
-                                                <NInput v-if="variable.type === 'text'"
-                                                    v-model:value="variableValues[variable.name]" type="textarea" :placeholder="variable.placeholder || t('promptManagement.detailModal.inputVariable', { label: variable.label })"
-                                                    :rows="1" :autosize="{ minRows: 1, maxRows: 5 }" />
-                                                <NSelect v-else-if="variable.type === 'select'"
-                                                    v-model:value="variableValues[variable.name]"
-                                                    :options="getSelectOptions(variable.options)" :placeholder="variable.placeholder || t('promptManagement.detailModal.selectVariable', { label: variable.label })"
+                                            <NFormItem v-for="variable in prompt.variables" :key="variable.name"
+                                                :label="variable.name" :required="variable.required">
+                                                <NInput 
+                                                    v-model:value="variableValues[variable.name]" 
+                                                    type="textarea" 
+                                                    :placeholder="`请输入 ${variable.name} 的值`"
+                                                    :rows="1" 
+                                                    :autosize="{ minRows: 1, maxRows: 5 }" 
                                                 />
                                             </NFormItem>
                                         </template>
@@ -695,8 +695,8 @@
                         <NText depth="3" style="margin-right: 8px">{{
                             formatDate(prompt.updatedAt)
                             }}</NText>
-                        <NTag v-if="prompt.variables?.length > 0" size="small" type="info">
-                            {{ prompt.variables.length }} 个变量
+                        <NTag v-if="hasVariables" size="small" type="info">
+                            {{ getVariableCount() }} 个变量
                         </NTag>
                         <NTag v-if="prompt.category" size="small" :color="getCategoryTagColor(prompt.category)">
                             <template #icon>
@@ -1096,14 +1096,22 @@ const initializeVariables = () => {
     const values: Record<string, any> = {};
 
     if (props.prompt?.isJinjaTemplate) {
-        // Jinja 模板模式：从模板内容中提取变量
-        try {
-            const templateVariables = jinjaService.extractVariables(props.prompt.content || '');
-            templateVariables.forEach(variableName => {
-                values[variableName] = "";
+        // Jinja 模板模式：优先使用存储的变量配置，如果没有则从模板内容中提取
+        if (props.prompt?.variables && props.prompt.variables.length > 0) {
+            // 使用存储的变量配置
+            props.prompt.variables.forEach((variable: any) => {
+                values[variable.name] = variable.defaultValue || "";
             });
-        } catch (error) {
-            console.error("提取 Jinja 模板变量失败:", error);
+        } else {
+            // 从模板内容中提取变量
+            try {
+                const templateVariables = jinjaService.extractVariables(props.prompt.content || '');
+                templateVariables.forEach(variableName => {
+                    values[variableName] = "";
+                });
+            } catch (error) {
+                console.error("提取 Jinja 模板变量失败:", error);
+            }
         }
     } else {
         // 变量模式：使用存储的变量配置
@@ -1118,21 +1126,7 @@ const initializeVariables = () => {
     variableValues.value = values;
 };
 
-// 获取选择框选项
-const getSelectOptions = (options: any) => {
-    if (!options) return [];
-    // 如果是数组，直接使用；如果是字符串，按逗号分割
-    const optionsArray = Array.isArray(options)
-        ? options
-        : options
-            .split(",")
-            .map((opt: string) => opt.trim())
-            .filter((opt: string) => opt);
-    return optionsArray.map((option: string) => ({
-        label: option,
-        value: option,
-    }));
-};
+
 
 // 生成填充后的 Prompt - 改为计算属性，自动生成
 const filledContent = computed(() => {
@@ -1153,7 +1147,7 @@ const filledContent = computed(() => {
     } else {
         // 变量模式：检查是否有变量配置
         if (props.prompt.variables && props.prompt.variables.length > 0) {
-            // 原有的变量替换逻辑
+            // 变量替换逻辑
             Object.entries(variableValues.value).forEach(([key, value]) => {
                 const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
                 // 如果变量有值，就替换；如果没有值，保留原始的 {{key}} 格式
@@ -1174,7 +1168,11 @@ const filledContent = computed(() => {
 // 是否有变量
 const hasVariables = computed(() => {
     if (props.prompt?.isJinjaTemplate) {
-        // Jinja 模板模式：从模板内容中提取变量
+        // Jinja 模板模式：优先检查存储的变量配置
+        if (props.prompt?.variables && props.prompt.variables.length > 0) {
+            return true;
+        }
+        // 如果没有存储的变量配置，从模板内容中提取
         try {
             const templateVariables = jinjaService.extractVariables(props.prompt.content || '');
             return templateVariables.length > 0;
@@ -1208,10 +1206,18 @@ const hasUnfilledVariables = computed(() => {
             return true; // 验证失败，认为有未填写的变量
         }
     } else {
-        // 原有的变量模式：检查是否还有未替换的变量占位符
-        const content = filledContent.value;
-        const hasPlaceholders = /\{\{[^}]+\}\}/.test(content);
-        return hasPlaceholders;
+        // 变量模式：检查配置的变量是否都已填写
+        if (props.prompt?.variables) {
+            return props.prompt.variables.some((variable: any) => {
+                const value = variableValues.value[variable.name];
+                return variable.required && (
+                    value === undefined || 
+                    value === null || 
+                    value.toString().trim() === ""
+                );
+            });
+        }
+        return false;
     }
 });
 
@@ -1233,15 +1239,39 @@ const selectedHistory = computed(() => {
 
 // 获取 Jinja 模板变量列表
 const getJinjaTemplateVariables = () => {
-    if (!props.prompt?.isJinjaTemplate || !props.prompt?.content) {
+    if (!props.prompt?.isJinjaTemplate) {
         return [];
     }
     
-    try {
-        return jinjaService.extractVariables(props.prompt.content);
-    } catch (error) {
-        console.error("提取 Jinja 模板变量失败:", error);
-        return [];
+    // 优先使用存储的变量配置
+    if (props.prompt?.variables && props.prompt.variables.length > 0) {
+        return props.prompt.variables.map((v: any) => v.name);
+    }
+    
+    // 如果没有存储的变量配置，从模板内容中提取
+    if (props.prompt?.content) {
+        try {
+            return jinjaService.extractVariables(props.prompt.content);
+        } catch (error) {
+            console.error("提取 Jinja 模板变量失败:", error);
+            return [];
+        }
+    }
+    
+    return [];
+};
+
+// 获取变量数量
+const getVariableCount = () => {
+    if (props.prompt?.isJinjaTemplate) {
+        // Jinja 模板模式：优先使用存储的变量配置
+        if (props.prompt?.variables && props.prompt.variables.length > 0) {
+            return props.prompt.variables.length;
+        }
+        // 如果没有存储的变量配置，从模板内容中提取
+        return getJinjaTemplateVariables().length;
+    } else {
+        return props.prompt?.variables?.length || 0;
     }
 };
 
