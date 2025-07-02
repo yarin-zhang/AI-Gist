@@ -156,7 +156,9 @@ export interface PromptHistory {
   title: string;
   content: string;
   description?: string;
+  categoryId?: number;
   tags?: string;
+  variables?: string;
   version: number;
   changeDescription?: string; // 变更描述
   createdAt: Date;

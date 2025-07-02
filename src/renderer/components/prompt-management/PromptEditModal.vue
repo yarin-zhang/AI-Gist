@@ -841,7 +841,9 @@ const createHistoryRecord = async (currentPrompt: any) => {
             categoryId: currentPrompt.categoryId,
             tags: currentPrompt.tags,
             variables: JSON.stringify(currentPrompt.variables || []),
-            changeDescription: t('promptManagement.editUpdate')
+            changeDescription: t('promptManagement.editUpdate'),
+            uuid: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date()
         };
 
         await api.promptHistories.create.mutate(historyData);
@@ -865,8 +867,8 @@ const stopOptimization = async () => {
         generationControl.shouldStop = true;
         
         // 调用停止API
-        if (window.electronAPI.ai.stopGeneration) {
-            await window.electronAPI.ai.stopGeneration();
+        if ((window as any).electronAPI?.ai?.stopGeneration) {
+            await (window as any).electronAPI.ai.stopGeneration();
         }
         
         // 重置状态
@@ -886,11 +888,11 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
     let result;
     
     // 检查是否支持流式传输
-    if (window.electronAPI.ai.generatePromptStream) {
+    if ((window as any).electronAPI?.ai?.generatePromptStream) {
         console.log(t('promptManagement.streamModeLog'));
         
         // 使用流式传输
-        result = await window.electronAPI.ai.generatePromptStream(
+        result = await (window as any).electronAPI.ai.generatePromptStream(
             request,
             serializedConfig,
             (charCount: number, partialContent?: string) => {
@@ -967,7 +969,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
     } else {
         console.log(t('promptManagement.normalModeLog'));
         // 使用普通生成
-        result = await window.electronAPI.ai.generatePrompt(request, serializedConfig);
+        result = await (window as any).electronAPI.ai.generatePrompt(request, serializedConfig);
         
         // 模拟流式更新
         if (result?.generatedPrompt) {
@@ -1094,7 +1096,7 @@ const optimizePrompt = async (configId: number) => {
         
         message.success(t('promptManagement.optimizationComplete'));
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("优化失败:", error);
         message.error(t('promptManagement.optimizationFailed') + ": " + (error.message || t('common.unknownError')));
         
@@ -1230,7 +1232,7 @@ ${t('promptManagement.outputImprovedPrompt')}`;
         
         message.success(t('promptManagement.adjustmentComplete'));
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("手动调整失败:", error);
         if (error.name === 'AbortError') {
             message.info(t('promptManagement.manualAdjustmentCancelled'));
@@ -1262,7 +1264,7 @@ const getContentPreview = (content: string) => {
 };
 
 // 解析预览变量
-const getPreviewVariables = (variables: string | any[]) => {
+const getPreviewVariables = (variables: string | any[] | undefined) => {
     try {
         if (typeof variables === 'string') {
             return JSON.parse(variables) || [];
@@ -1293,7 +1295,7 @@ const rollbackToHistory = (history: PromptHistory) => {
             title: history.title,
             description: history.description || "",
             content: history.content,
-            categoryId: history.categoryId || null,
+            categoryId: history.categoryId || undefined,
             tags: history.tags
                 ? typeof history.tags === "string"
                     ? history.tags.split(",").map((t) => t.trim()).filter((t) => t)
@@ -1695,10 +1697,10 @@ const handleSave = async () => {
             description: formData.value.description || undefined,
             content: formData.value.content,
             categoryId: formData.value.categoryId || undefined,
-            tags:
-                formData.value.tags.length > 0
-                    ? formData.value.tags.join(",")
-                    : undefined,
+            tags: formData.value.tags.length > 0 ? formData.value.tags : [],
+            isFavorite: false,
+            useCount: 0,
+            isActive: true,
             variables: formData.value.variables
                 .filter((v) => v.name && v.label)
                 .map((v) => ({
@@ -1714,7 +1716,7 @@ const handleSave = async () => {
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
-                })),
+                })) as any,
         };
 
         if (isEdit.value) {
@@ -1730,7 +1732,12 @@ const handleSave = async () => {
             // 重新加载历史记录
             loadHistory();
         } else {
-            await api.prompts.create.mutate(data);
+            // 新建模式：需要添加 uuid 字段
+            const createData = {
+                ...data,
+                uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            };
+            await api.prompts.create.mutate(createData);
             message.success(t('promptManagement.createSuccess'));
         }
 
