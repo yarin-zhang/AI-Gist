@@ -7,7 +7,7 @@
         "dev": "node scripts/dev-server.js",
         "build": "node scripts/build.js && electron-builder",
         "build:win": "node scripts/build.js && electron-builder --win",
-        "build:mac": "node scripts/build.js && electron-builder --mac",
+        "build:mac": "node scripts/build.js && PYTHON=python3 npm_config_python=python3 electron-builder --mac",
         "build:linux": "node scripts/build.js && electron-builder --linux",
         "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
         "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
