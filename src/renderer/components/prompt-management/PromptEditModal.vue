@@ -87,9 +87,8 @@
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
                     <NTabPane v-if="isEdit" name="history"
                         :tab="t('promptManagement.history')">
-                        <NCard :title="t('promptManagement.versionHistory')" size="small"
-                            :style="{ height: `${contentHeight - 50}px` }">
-                            <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
+                        <NCard :title="t('promptManagement.versionHistory')" size="small">
+                            <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
                                 <!-- 加载状态 -->
                                 <div v-if="loadingHistory" style="display: flex; justify-content: center; align-items: center; height: 200px;">
                                     <NSpin size="medium">
