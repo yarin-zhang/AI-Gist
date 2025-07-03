@@ -1,26 +1,11 @@
 <template>
     <div class="ai-model-selector">
         <NFormItem v-if="showLabel" :label="label" size="small" style="margin-bottom: 0; flex: 1;">
-            <NSelect
-                v-model:value="selectedModelKey"
-                :options="modelDropdownOptions"
-                :placeholder="placeholder"
-                size="small"
-                filterable
-                @update:value="onModelSelect"
-                :disabled="disabled"
-            />
+            <NSelect v-model:value="selectedModelKey" :options="modelDropdownOptions" :placeholder="placeholder"
+                size="small" filterable @update:value="onModelSelect" :disabled="disabled" />
         </NFormItem>
-        <NSelect
-            v-else
-            v-model:value="selectedModelKey"
-            :options="modelDropdownOptions"
-            :placeholder="placeholder"
-            size="small"
-            filterable
-            @update:value="onModelSelect"
-            :disabled="disabled"
-        />
+        <NSelect v-else v-model:value="selectedModelKey" :options="modelDropdownOptions" :placeholder="placeholder"
+            size="small" filterable @update:value="onModelSelect" :disabled="disabled" />
     </div>
 </template>
 
@@ -28,7 +13,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { NSelect, NFormItem } from 'naive-ui'
 import { api } from '@/lib/api'
-import type { AIConfig } from '@/lib/db'
+import type { AIConfig } from '@shared/types/database'
 
 interface Props {
     modelKey?: string // 当前选中的模型key，格式为 "configId:model"
@@ -72,10 +57,10 @@ const modelDropdownOptions = computed(() => {
 
         // 添加默认模型
         if (config.defaultModel) {
-            const label = isPreferred 
+            const label = isPreferred
                 ? `★ ${config.defaultModel} (${config.name} - 默认)`
                 : `${config.defaultModel} (${config.name} - 默认)`
-            
+
             targetArray.push({
                 label,
                 value: `${config.configId}:${config.defaultModel}`,
@@ -88,10 +73,10 @@ const modelDropdownOptions = computed(() => {
         // 添加其他模型
         models.forEach(model => {
             if (model !== config.defaultModel) { // 避免重复添加默认模型
-                const label = isPreferred 
+                const label = isPreferred
                     ? `★ ${model} (${config.name})`
                     : `${model} (${config.name})`
-                
+
                 targetArray.push({
                     label,
                     value: `${config.configId}:${model}`,
@@ -104,10 +89,10 @@ const modelDropdownOptions = computed(() => {
 
         // 添加自定义模型
         if (config.customModel && !models.includes(config.customModel) && config.customModel !== config.defaultModel) {
-            const label = isPreferred 
+            const label = isPreferred
                 ? `★ ${config.customModel} (${config.name} - 自定义)`
                 : `${config.customModel} (${config.name} - 自定义)`
-                
+
             targetArray.push({
                 label,
                 value: `${config.configId}:${config.customModel}`,
@@ -179,17 +164,17 @@ const loadConfigs = async () => {
 // 模型选择处理
 const onModelSelect = (modelKey: string) => {
     if (!modelKey) return
-    
+
     selectedModelKey.value = modelKey
-    
+
     // 解析选择的模型key，格式为 "configId:model"
     const [configId, model] = modelKey.split(':')
-    
+
     // 更新当前使用的配置
     const config = configs.value.find(c => c.configId === configId)
-    
+
     console.log('切换到配置:', config?.name, '模型:', model)
-    
+
     // 触发事件
     emit('update:modelKey', modelKey)
     emit('configChange', config || null)
@@ -222,4 +207,4 @@ defineExpose({
 .ai-model-selector {
     width: 100%;
 }
-</style> 
+</style>

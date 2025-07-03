@@ -3214,7 +3214,7 @@ __metadata:
     "@vue/eslint-config-typescript": "npm:^14.5.1"
     archiver: "npm:^7.0.1"
     chalk: "npm:^4.1.2"
-    chokidar: "npm:^3.5.3"
+    chokidar: "npm:^4.0.3"
     cohere-ai: "npm:^7.17.1"
     electron: "npm:^32.1.2"
     electron-builder: "npm:^25.1.6"
@@ -3859,7 +3859,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chokidar@npm:^4.0.0":
+"chokidar@npm:^4.0.0, chokidar@npm:^4.0.3":
   version: 4.0.3
   resolution: "chokidar@npm:4.0.3"
   dependencies:

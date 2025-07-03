@@ -25,36 +25,26 @@
                     </NIcon>
                 </template>
             </NButton>
-              <!-- 如果有 Footer，使用 flexbox 布局确保底部固定高度 -->
+            <!-- 如果有 Footer，使用 flexbox 布局确保底部固定高度 -->
             <div v-if="hasFooter" :style="{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }">
                 <!-- 上部分：Header + Content，占据剩余空间 -->
                 <div :style="{ flex: 1, minHeight: 0, overflow: 'hidden' }">
-                    <NSplit
-                        direction="vertical"
-                        :style="{ height: '100%' }"
-                        :default-size="`${headerDefaultHeight}px`"
-                        :min="`${minHeaderHeight}px`"
-                        :max="`${headerMaxHeight}px`"
-                        :disabled="!headerResizable"
-                        :resize-trigger-size="3"
-                        :pane1-style="{ overflow: 'hidden' }"
-                        :pane2-style="{ overflow: 'hidden' }"
-                    >
+                    <NSplit direction="vertical" :style="{ height: '100%' }" :default-size="`${headerDefaultHeight}px`"
+                        :min="`${minHeaderHeight}px`" :max="`${headerMaxHeight}px`" :disabled="!headerResizable"
+                        :resize-trigger-size="3" :pane1-style="{ overflow: 'hidden' }"
+                        :pane2-style="{ overflow: 'hidden' }">
                         <!-- Header -->
                         <template #1>
-                            <div 
-                                class="modal-header" 
-                                :style="{ 
-                                    padding: `0 ${contentPadding}px`,
-                                    height: '100%',
-                                    borderBottom: '1px solid var(--app-border-color)',
-                                    backgroundColor: 'var(--app-surface-color)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'center',
-                                    position: 'relative'
-                                }"
-                            >
+                            <div class="modal-header" :style="{
+                                padding: `0 ${contentPadding}px`,
+                                height: '100%',
+                                borderBottom: '1px solid var(--app-border-color)',
+                                backgroundColor: 'var(--app-surface-color)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                position: 'relative'
+                            }">
                                 <!-- Header Extra 区域 - 绝对定位在右上角 -->
                                 <div v-if="slots['header-extra']" :style="{
                                     position: 'absolute',
@@ -66,9 +56,9 @@
                                 }">
                                     <slot name="header-extra" />
                                 </div>
-                                
+
                                 <!-- 主要的 Header 内容 -->
-                                <div :style="{ 
+                                <div :style="{
                                     paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
                                     overflow: 'hidden',
                                     width: '100%'
@@ -77,9 +67,9 @@
                                 </div>
                             </div>
                         </template>
-                          <!-- Content -->
+                        <!-- Content -->
                         <template #2>
-                            <div class="modal-content" :style="{ 
+                            <div class="modal-content" :style="{
                                 padding: `${contentPadding}px`,
                                 height: '100%',
                                 overflow: 'hidden',
@@ -93,52 +83,36 @@
                             </div>
                         </template>
                     </NSplit>
-                </div>                <!-- Footer：固定高度 -->
+                </div> <!-- Footer：固定高度 -->
                 <div :style="{ height: `${footerDefaultHeight}px`, flexShrink: 0 }">
-                    <NFlex 
-                        class="modal-footer" 
-                        vertical 
-                        justify="center" 
-                        :style="{ 
-                            padding: `0 ${contentPadding}px`,
-                            height: '100%',
-                            borderTop: '1px solid var(--app-border-color)',
-                            backgroundColor: 'var(--app-surface-color)'
-                        }"
-                    >
+                    <NFlex class="modal-footer" vertical justify="center" :style="{
+                        padding: `0 ${contentPadding}px`,
+                        height: '100%',
+                        borderTop: '1px solid var(--app-border-color)',
+                        backgroundColor: 'var(--app-surface-color)'
+                    }">
                         <slot name="footer" />
                     </NFlex>
                 </div>
             </div>
-            
+
             <!-- 如果没有 Footer，只使用 Header + Content -->
-            <NSplit 
-                v-else
-                direction="vertical" 
-                :style="{ height: '100%', width: '100%' }"
-                :default-size="`${headerDefaultHeight}px`"
-                :min="`${minHeaderHeight}px`"
-                :max="`${headerMaxHeight}px`"
-                :disabled="!headerResizable"
-                :resize-trigger-size="3"
-                :pane1-style="{ overflow: 'hidden' }"
-                :pane2-style="{ overflow: 'hidden' }"
-            >
+            <NSplit v-else direction="vertical" :style="{ height: '100%', width: '100%' }"
+                :default-size="`${headerDefaultHeight}px`" :min="`${minHeaderHeight}px`" :max="`${headerMaxHeight}px`"
+                :disabled="!headerResizable" :resize-trigger-size="3" :pane1-style="{ overflow: 'hidden' }"
+                :pane2-style="{ overflow: 'hidden' }">
                 <!-- Header -->
                 <template #1>
-                    <div 
-                        class="modal-header" 
-                        :style="{ 
-                            padding: `0 ${contentPadding}px`,
-                            height: '100%',
-                            borderBottom: '1px solid var(--app-border-color)',
-                            backgroundColor: 'var(--app-surface-color)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            position: 'relative'
-                        }"
-                    >
+                    <div class="modal-header" :style="{
+                        padding: `0 ${contentPadding}px`,
+                        height: '100%',
+                        borderBottom: '1px solid var(--app-border-color)',
+                        backgroundColor: 'var(--app-surface-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        position: 'relative'
+                    }">
                         <!-- Header Extra 区域 - 绝对定位在右上角 -->
                         <div v-if="slots['header-extra']" :style="{
                             position: 'absolute',
@@ -150,9 +124,9 @@
                         }">
                             <slot name="header-extra" />
                         </div>
-                        
+
                         <!-- 主要的 Header 内容 -->
-                        <div :style="{ 
+                        <div :style="{
                             paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
                             overflow: 'hidden',
                             width: '100%'
@@ -161,9 +135,9 @@
                         </div>
                     </div>
                 </template>
-                  <!-- Content -->
+                <!-- Content -->
                 <template #2>
-                    <div class="modal-content" :style="{ 
+                    <div class="modal-content" :style="{
                         padding: `${contentPadding}px`,
                         height: '100%',
                         overflow: 'hidden',
@@ -234,18 +208,18 @@ const hasFooter = computed(() => {
 // 计算内容区域的实际可用高度
 const contentHeight = computed(() => {
     let availableHeight = modalHeight.value;
-    
+
     // 减去 Header 的高度
     availableHeight -= props.headerDefaultHeight;
-    
+
     // 如果有 Footer，减去 Footer 的高度
     if (hasFooter.value) {
         availableHeight -= props.footerDefaultHeight;
     }
-    
+
     // 减去内容区域的内边距 (上下各一份)
     availableHeight -= props.contentPadding * 2;
-    
+
     return Math.max(0, availableHeight);
 });
 
@@ -305,5 +279,4 @@ const handleClose = () => {
     background-color: var(--app-bg-color);
     border: 1px solid var(--app-border-color);
 }
-
 </style>

@@ -65,7 +65,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NButton,NFlex,NText } from 'naive-ui'
+import { NButton, NFlex, NText } from 'naive-ui'
 import CommonModal from '~/components/common/CommonModal.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 

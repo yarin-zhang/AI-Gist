@@ -28,7 +28,8 @@
                 </NRadioGroup>
             </NFormItem>
 
-            <NFormItem v-if="props.modelValue.closeBehaviorMode === 'fixed'" :label="t('closeBehavior.closeAction')" style="margin-left: 24px">
+            <NFormItem v-if="props.modelValue.closeBehaviorMode === 'fixed'" :label="t('closeBehavior.closeAction')"
+                style="margin-left: 24px">
                 <NRadioGroup v-model:value="props.modelValue.closeAction" @update:value="handleUpdate">
                     <NFlex vertical :size="8">
                         <NRadio value="quit">
@@ -62,7 +63,10 @@
 
             <NAlert v-if="props.modelValue.closeBehaviorMode === 'fixed'" type="success" show-icon>
                 <template #header>{{ t('closeBehavior.currentSetting') }}</template>
-                {{ t('closeBehavior.directAction', { action: props.modelValue.closeAction === "quit" ? t('closeBehavior.quit') : t('closeBehavior.minimize') }) }}
+                {{ t('closeBehavior.directAction', {
+                    action: props.modelValue.closeAction === "quit" ?
+                        t('closeBehavior.quit') :
+                        t('closeBehavior.minimize') }) }}
             </NAlert>
         </NFlex>
     </NCard>

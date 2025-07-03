@@ -484,6 +484,7 @@
     "loadPromptsFailed": "プロンプトの読み込みに失敗",
     "loadStatisticsFailed": "統計の読み込みに失敗",
     "loadTreeDataFailed": "ツリーデータの読み込みに失敗",
+    "loadingHistory": "履歴を読み込み中...",
     "loadedAllPrompts": "すべての{count}個のプロンプトを読み込みました",
     "loadingMore": "さらに読み込み中...",
     "loopVariable": "ループ変数",

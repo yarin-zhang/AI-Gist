@@ -40,8 +40,9 @@
                         <NFlex vertical :size="12">
                             <NText depth="2">{{ t('dataManagement.backupVersionList') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
-                                <NGridItem v-for="backup in paginatedBackups" :key="backup.id" span="6 600:5 900:4 1200:3 1500:2 1800:1">
-                                    <NCard size="small" :title="backup.version" >
+                                <NGridItem v-for="backup in paginatedBackups" :key="backup.id"
+                                    span="6 600:5 900:4 1200:3 1500:2 1800:1">
+                                    <NCard size="small" :title="backup.version">
                                         <NFlex vertical :size="4">
                                             <NFlex align="center" :size="8">
                                                 <NText strong>{{ backup.name }}</NText>
@@ -50,12 +51,12 @@
                                         <template #header-extra>
 
                                             <NFlex vertical :size="4">
-                                            <NFlex align="center" :size="8">
-                                                <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
+                                                <NFlex align="center" :size="8">
+                                                    <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
+                                                </NFlex>
                                             </NFlex>
-                                        </NFlex>
                                         </template>
-                                        
+
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
                                                 <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
@@ -77,8 +78,8 @@
                                                         <p>{{ t('dataManagement.restoreWarning') }}</p>
                                                     </div>
                                                 </NPopconfirm>
-                                                <NPopconfirm @positive-click="deleteBackup(backup.id)" negative-text="取消"
-                                                    positive-text="确定">
+                                                <NPopconfirm @positive-click="deleteBackup(backup.id)"
+                                                    negative-text="取消" positive-text="确定">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
                                                             <template #icon>
@@ -115,7 +116,7 @@
             </div>
 
             <NDivider />
-            
+
             <!-- 完整备份导出/导入 -->
             <div>
                 <NFlex vertical :size="16">
@@ -124,10 +125,9 @@
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.fullBackupDescription') }}
                         </NText>
-                        
+
                         <NFlex :size="12">
-                            <NButton type="primary" @click="exportFullBackup" 
-                                     :loading="props.loading?.export">
+                            <NButton type="primary" @click="exportFullBackup" :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <Archive />
@@ -135,8 +135,7 @@
                                 </template>
                                 {{ t('dataManagement.exportFullBackup') }}
                             </NButton>
-                            <NButton @click="importFullBackup" 
-                                     :loading="props.loading?.import">
+                            <NButton @click="importFullBackup" :loading="props.loading?.import">
                                 <template #icon>
                                     <NIcon>
                                         <Folder />
@@ -145,14 +144,14 @@
                                 {{ t('dataManagement.importFullBackup') }}
                             </NButton>
                         </NFlex>
-                        
-                        
+
+
                     </NFlex>
                 </NFlex>
             </div>
 
             <NDivider />
-            
+
             <!-- 选择性数据导出 -->
             <div>
                 <NFlex vertical :size="16">
@@ -161,50 +160,44 @@
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.exportDescription') }}
                         </NText>
-                        
+
                         <!-- 数据类型选择 -->
-                        <NCard size="small" >
+                        <NCard size="small">
                             <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">{{ t('dataManagement.selectDataTypeToExport') }}</NText>
+                                <NText depth="2" style="font-size: 14px;">{{ t('dataManagement.selectDataTypeToExport')
+                                    }}</NText>
                                 <NFlex vertical :size="8">
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'prompts'" 
-                                        value="prompts"
+                                    <NRadio :checked="exportOptions.selectedType === 'prompts'" value="prompts"
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
                                         </NFlex>
                                     </NRadio>
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'categories'" 
-                                        value="categories"
+                                    <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
                                         </NFlex>
                                     </NRadio>
-                                    <NRadio 
-                                        :checked="exportOptions.selectedType === 'aiConfigs'" 
-                                        value="aiConfigs"
+                                    <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
                                             <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
-                                            <NTag size="small" type="warning">{{ t('dataManagement.containsSensitiveInfo') }}</NTag>
+                                            <NTag size="small" type="warning">{{
+                                                t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                 </NFlex>
                             </NFlex>
                         </NCard>
-                        
+
                         <NFlex :size="12">
-                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" 
-                                     type="primary" 
-                                     @click="exportSelectedData('csv')" 
-                                     :disabled="!hasSelectedData || !isCSVSupported" 
-                                     :loading="props.loading?.export">
+                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" type="primary"
+                                @click="exportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
+                                :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -212,9 +205,8 @@
                                 </template>
                                 {{ t('dataManagement.exportToCSV') }}
                             </NButton>
-                            <NButton @click="exportSelectedData('json')" 
-                                     :disabled="!hasSelectedData" 
-                                     :loading="props.loading?.export">
+                            <NButton @click="exportSelectedData('json')" :disabled="!hasSelectedData"
+                                :loading="props.loading?.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -223,12 +215,12 @@
                                 {{ t('dataManagement.exportToJSON') }}
                             </NButton>
                         </NFlex>
-                        
+
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
                             <template #header>{{ t('dataManagement.securityWarning') }}</template>
                             {{ t('dataManagement.securityWarningText') }}
                         </NAlert>
-                        
+
                         <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
                             <template #header>{{ t('dataManagement.formatNote') }}</template>
                             {{ t('dataManagement.formatNoteText') }}
@@ -265,8 +257,8 @@
                                 </template>
                                 {{ t('dataManagement.repairDatabase') }}
                             </NButton>
-                            <NPopconfirm @positive-click="clearDatabase" :negative-text="t('common.cancel')" :positive-text="t('dataManagement.clearDatabase')"
-                                placement="top">
+                            <NPopconfirm @positive-click="clearDatabase" :negative-text="t('common.cancel')"
+                                :positive-text="t('dataManagement.clearDatabase')" placement="top">
                                 <template #trigger>
                                     <NButton type="error" :loading="props.loading?.clearDatabase">
                                         <template #icon>
@@ -281,7 +273,9 @@
                                     <p><strong>{{ t('dataManagement.clearDatabaseWarning') }}</strong></p>
                                     <p>{{ t('dataManagement.clearDatabaseWarningText') }}</p>
                                     <ul style="margin: 8px 0; padding-left: 20px;">
-                                        <li v-for="item in t('dataManagement.clearDatabaseWarningItems')" :key="item">{{ item }}</li>
+                                        <li v-for="item in t('dataManagement.clearDatabaseWarningItems')" :key="item">{{
+                                            item }}
+                                        </li>
                                     </ul>
                                     <p><strong>{{ t('dataManagement.confirmClearDatabase') }}</strong></p>
                                 </div>

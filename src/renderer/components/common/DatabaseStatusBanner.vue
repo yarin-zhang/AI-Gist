@@ -1,8 +1,5 @@
 <template>
-  <div 
-    v-if="databaseError && !isHidden" 
-    class="database-status-banner error"
-  >
+  <div v-if="databaseError && !isHidden" class="database-status-banner error">
     <div class="content">
       <div class="icon">
         <div class="error-icon">⚠️</div>
@@ -14,11 +11,7 @@
         </div>
       </div>
       <div class="actions">
-        <button 
-          @click="retry" 
-          class="retry-btn"
-          :disabled="isRetrying"
-        >
+        <button @click="retry" class="retry-btn" :disabled="isRetrying">
           {{ isRetrying ? t('databaseStatus.retrying') : t('databaseStatus.retry') }}
         </button>
         <button @click="hide" class="close-btn">
@@ -47,7 +40,7 @@ const hide = () => {
 const retry = async () => {
   isRetrying.value = true
   clearError()
-  
+
   try {
     await waitForDatabase()
     if (isDatabaseReady.value) {
@@ -135,7 +128,8 @@ const retry = async () => {
   flex-shrink: 0;
 }
 
-.retry-btn, .close-btn {
+.retry-btn,
+.close-btn {
   padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.1);
@@ -146,7 +140,8 @@ const retry = async () => {
   transition: all 0.2s ease;
 }
 
-.retry-btn:hover:not(:disabled), .close-btn:hover {
+.retry-btn:hover:not(:disabled),
+.close-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.5);
 }
@@ -157,7 +152,12 @@ const retry = async () => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

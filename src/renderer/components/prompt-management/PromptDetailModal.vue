@@ -3,31 +3,27 @@
         @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <div :style="{ 
+            <div :style="{
                 maxWidth: 'calc(100% - 240px)', /* 匹配 CommonModal 的右边距 */
-                overflow: 'hidden' 
+                overflow: 'hidden'
             }">
                 <NFlex vertical size="small">
-                    <NText :style="{ 
-                        fontSize: '20px', 
+                    <NText :style="{
+                        fontSize: '20px',
                         fontWeight: 600,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
                     }">{{
                         prompt?.title
-                        }}</NText>
-                    <NText 
-                        depth="3" 
-                        v-if="prompt.description" 
-                        class="header-description"
-                    >{{
+                    }}</NText>
+                    <NText depth="3" v-if="prompt.description" class="header-description">{{
                         prompt.description || t('promptManagement.detailModal.noDescription')
-                        }}</NText>
+                    }}</NText>
                 </NFlex>
             </div>
         </template>
-        
+
         <!-- Header 额外区域 - 操作按钮 -->
         <template #header-extra>
             <NFlex size="small">
@@ -37,7 +33,8 @@
                             <Heart />
                         </NIcon>
                     </template>
-                    {{ prompt.isFavorite ? t('promptManagement.detailModal.cancelFavorite') : t('promptManagement.detailModal.favorite') }}
+                    {{ prompt.isFavorite ? t('promptManagement.detailModal.cancelFavorite') :
+                        t('promptManagement.detailModal.favorite') }}
                 </NButton>
                 <NButton type="primary" @click="handleEdit">
                     <template #icon>
@@ -48,13 +45,13 @@
                     {{ t('promptManagement.detailModal.edit') }}
                 </NButton>
             </NFlex>
-        </template>        <!-- 中间可操作区域 -->
+        </template> <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
             <!-- Tabs 切换 -->
             <NTabs v-model:value="activeTab" type="segment" :style="{ height: `${contentHeight}px` }">
                 <!-- 详情 Tab -->
                 <NTabPane name="detail" :tab="t('promptManagement.detailModal.detail')">
-                    <NSplit direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
+                    <NSplit direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6"
                         :style="{ height: `${contentHeight - 50}px` }">
                         <!-- 左侧：提示词内容 -->
                         <template #1>
@@ -63,7 +60,8 @@
                                     <NFlex justify="space-between" align="center">
                                         <NFlex align="center" size="small">
                                             <NText strong>{{ t('promptManagement.detailModal.promptContent') }}</NText>
-                                            <NTag v-if="props.prompt?.isJinjaTemplate" size="small" type="info" style="margin-left: 8px;">
+                                            <NTag v-if="props.prompt?.isJinjaTemplate" size="small" type="info"
+                                                style="margin-left: 8px;">
                                                 <template #icon>
                                                     <NIcon>
                                                         <Code />
@@ -76,9 +74,11 @@
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" ref="contentScrollbarRef">
                                     <NFlex vertical size="medium" style="padding-right: 12px">
-                                        <NInput :value="filledContent" type="textarea" readonly :autosize=" { minRows: 9 }" :style="{
-                                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                        }" :placeholder="!filledContent ? t('promptManagement.detailModal.contentEmpty') : ''" />
+                                        <NInput :value="filledContent" type="textarea" readonly
+                                            :autosize="{ minRows: 9 }" :style="{
+                                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                            }"
+                                            :placeholder="!filledContent ? t('promptManagement.detailModal.contentEmpty') : ''" />
 
                                         <!-- 如果有未填写的变量，显示提示 -->
                                         <NFlex v-if="hasUnfilledVariables" align="center">
@@ -91,54 +91,46 @@
 
 
                                         <!-- 调试区域 -->
-                                        <NAlert v-if="canDebug" type="info" :show-icon="false" style="margin-top: 16px;">
+                                        <NAlert v-if="canDebug" type="info" :show-icon="false"
+                                            style="margin-top: 16px;">
                                             <template #header>
                                                 <NFlex align="center" size="small">
                                                     <NIcon>
                                                         <Bug />
                                                     </NIcon>
-                                                    <NText strong>{{ t('promptManagement.detailModal.debugPrompt') }}</NText>
+                                                    <NText strong>{{ t('promptManagement.detailModal.debugPrompt') }}
+                                                    </NText>
                                                 </NFlex>
                                             </template>
-                                            
+
                                             <!-- AI配置和模型选择 -->
                                             <NFlex vertical size="medium" style="margin-top: 12px;">
                                                 <NFlex size="medium" align="end">
-                                                    <AIModelSelector
-                                                        ref="modelSelectorRef"
+                                                    <AIModelSelector ref="modelSelectorRef"
                                                         v-model:modelKey="selectedModelKey"
                                                         :placeholder="t('promptManagement.detailModal.selectAIModel')"
-                                                        :disabled="debugging"
-                                                    />
+                                                        :disabled="debugging" />
                                                 </NFlex>
-                                                
+
                                                 <!-- 调试按钮和进度显示 -->
                                                 <NFlex justify="center" vertical size="small">
                                                     <!-- 调试按钮 -->
                                                     <NFlex size="small" justify="center">
-                                                        <NButton 
-                                                            type="primary" 
-                                                            :loading="debugging"
+                                                        <NButton type="primary" :loading="debugging"
                                                             :disabled="!canDebug || debugging || !selectedModelKey"
-                                                            @click="debugPrompt"
-                                                            size="small"
-                                                        >
+                                                            @click="debugPrompt" size="small">
                                                             <template #icon>
                                                                 <NIcon>
                                                                     <Robot />
                                                                 </NIcon>
                                                             </template>
-                                                            {{ debugging ? t('promptManagement.detailModal.debugging') : t('promptManagement.detailModal.seeEffect') }}
+                                                            {{ debugging ? t('promptManagement.detailModal.debugging') :
+                                                            t('promptManagement.detailModal.seeEffect') }}
                                                         </NButton>
-                                                        
+
                                                         <!-- 中断按钮 -->
-                                                        <NButton 
-                                                            v-if="debugging"
-                                                            type="error" 
-                                                            secondary
-                                                            @click="stopDebug"
-                                                            size="small"
-                                                        >
+                                                        <NButton v-if="debugging" type="error" secondary
+                                                            @click="stopDebug" size="small">
                                                             <template #icon>
                                                                 <NIcon>
                                                                     <X />
@@ -147,20 +139,25 @@
                                                             {{ t('promptManagement.detailModal.stop') }}
                                                         </NButton>
                                                     </NFlex>
-                                                    
+
                                                     <!-- 流式传输进度显示 -->
                                                     <div v-if="debugging && debugStreaming" style="margin-top: 8px;">
                                                         <NFlex align="center" size="small">
-                                                            <NIcon v-if="debugStreamStats.isGenerationActive" color="#18a058">
+                                                            <NIcon v-if="debugStreamStats.isGenerationActive"
+                                                                color="#18a058">
                                                                 <Loader />
                                                             </NIcon>
                                                             <NIcon v-else color="#d03050">
                                                                 <Clock />
                                                             </NIcon>
                                                             <NText depth="3" style="font-size: 12px;">
-                                                                {{ t('promptManagement.detailModal.generatedChars', { count: debugStreamStats.charCount }) }}
+                                                                {{ t('promptManagement.detailModal.generatedChars', {
+                                                                count: debugStreamStats.charCount
+                                                                }) }}
                                                                 <span v-if="debugStreamStats.contentGrowthRate > 0">
-                                                                    {{ t('promptManagement.detailModal.charsPerSecond', { rate: debugStreamStats.contentGrowthRate.toFixed(1) }) }}
+                                                                    {{ t('promptManagement.detailModal.charsPerSecond',
+                                                                    { rate:
+                                                                    debugStreamStats.contentGrowthRate.toFixed(1) }) }}
                                                                 </span>
                                                             </NText>
                                                         </NFlex>
@@ -171,8 +168,9 @@
 
                                         <!-- 调试结果显示 -->
                                         <div v-if="debugResult || debugError">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.debugResultLabel') }}</NText>
-                                            
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.debugResultLabel') }}</NText>
+
                                             <!-- 成功结果 -->
                                             <NAlert v-if="debugResult" type="success" :show-icon="false">
                                                 <template #header>
@@ -180,25 +178,22 @@
                                                         <NIcon>
                                                             <CircleCheck />
                                                         </NIcon>
-                                                        <NText>{{ t('promptManagement.detailModal.aiResponse') }}</NText>
-                                                        <NTag v-if="debugStreaming" size="small" type="info" style="margin-left: 8px;">
+                                                        <NText>{{ t('promptManagement.detailModal.aiResponse') }}
+                                                        </NText>
+                                                        <NTag v-if="debugStreaming" size="small" type="info"
+                                                            style="margin-left: 8px;">
                                                             {{ t('promptManagement.detailModal.streaming') }}
                                                         </NTag>
                                                     </NFlex>
                                                 </template>
-                                                <NInput
-                                                    v-model:value="debugResult"
-                                                    type="textarea"
-                                                    readonly
-                                                    :rows="8"
-                                                    :style="{ 
+                                                <NInput v-model:value="debugResult" type="textarea" readonly :rows="8"
+                                                    :style="{
                                                         fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                                         backgroundColor: 'var(--success-color-suppl)',
                                                         marginTop: '8px'
-                                                    }"
-                                                />
+                                                    }" />
                                             </NAlert>
-                                            
+
                                             <!-- 调试结果操作按钮 -->
                                             <NFlex v-if="debugResult" justify="space-between" style="margin-top: 8px;">
                                                 <NButton size="small" @click="copyToClipboard(debugResult)">
@@ -209,13 +204,8 @@
                                                     </template>
                                                     {{ t('promptManagement.detailModal.copyResult') }}
                                                 </NButton>
-                                                <NButton 
-                                                    v-if="debugging" 
-                                                    size="small" 
-                                                    type="error" 
-                                                    secondary
-                                                    @click="stopDebug"
-                                                >
+                                                <NButton v-if="debugging" size="small" type="error" secondary
+                                                    @click="stopDebug">
                                                     <template #icon>
                                                         <NIcon>
                                                             <X />
@@ -232,7 +222,8 @@
                                                         <NIcon>
                                                             <AlertTriangle />
                                                         </NIcon>
-                                                        <NText>{{ t('promptManagement.detailModal.debugFailed') }}</NText>
+                                                        <NText>{{ t('promptManagement.detailModal.debugFailed') }}
+                                                        </NText>
                                                     </NFlex>
                                                 </template>
                                                 <NText>{{ debugError }}</NText>
@@ -249,41 +240,33 @@
                                 <template #header>
                                     <NFlex justify="space-between" align="center">
                                         <NText strong>{{ t('promptManagement.detailModal.variableSettings') }}</NText>
-                                        <NButton v-if="hasVariables" size="small"
-                                            @click="clearVariables">{{ t('promptManagement.detailModal.clear') }}</NButton>
+                                        <NButton v-if="hasVariables" size="small" @click="clearVariables">{{
+                                            t('promptManagement.detailModal.clear') }}</NButton>
                                     </NFlex>
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 140}px` }">
-                                    <NFlex vertical size="medium" style="padding-right: 12px"
-                                        v-if="hasVariables">
+                                    <NFlex vertical size="medium" style="padding-right: 12px" v-if="hasVariables">
                                         <!-- Jinja 模板模式：显示动态提取的变量 -->
                                         <template v-if="prompt.isJinjaTemplate">
-                                            <NFormItem v-for="variableName in getJinjaTemplateVariables()" :key="variableName"
-                                                :label="variableName" :required="true">
-                                                <NInput 
-                                                    v-model:value="variableValues[variableName]" 
-                                                    type="textarea" 
-                                                    :placeholder="`请输入 ${variableName} 的值`"
-                                                    :rows="1" 
-                                                    :autosize="{ minRows: 1, maxRows: 5 }" 
-                                                />
+                                            <NFormItem v-for="variableName in getJinjaTemplateVariables()"
+                                                :key="variableName" :label="variableName" :required="true">
+                                                <NInput v-model:value="variableValues[variableName]" type="textarea"
+                                                    :placeholder="`请输入 ${variableName} 的值`" :rows="1"
+                                                    :autosize="{ minRows: 1, maxRows: 5 }" />
                                             </NFormItem>
                                         </template>
                                         <!-- 变量模式：显示配置的变量 -->
                                         <template v-else>
                                             <NFormItem v-for="variable in prompt.variables" :key="variable.name"
                                                 :label="variable.name" :required="variable.required">
-                                                <NInput 
-                                                    v-model:value="variableValues[variable.name]" 
-                                                    type="textarea" 
-                                                    :placeholder="`请输入 ${variable.name} 的值`"
-                                                    :rows="1" 
-                                                    :autosize="{ minRows: 1, maxRows: 5 }" 
-                                                />
+                                                <NInput v-model:value="variableValues[variable.name]" type="textarea"
+                                                    :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
+                                                    :autosize="{ minRows: 1, maxRows: 5 }" />
                                             </NFormItem>
                                         </template>
                                     </NFlex>
-                                    <NEmpty v-else :description="t('promptManagement.detailModal.noConfigurableVariables')">
+                                    <NEmpty v-else
+                                        :description="t('promptManagement.detailModal.noConfigurableVariables')">
                                         <template #icon>
                                             <NIcon>
                                                 <Wand />
@@ -297,9 +280,11 @@
                 </NTabPane>
 
                 <!-- 历史记录 Tab -->
-                <NTabPane name="history" :tab="t('promptManagement.detailModal.variableHistory', { count: useHistory.length })" :disabled="useHistory.length === 0">
-                    <NSplit v-if="useHistory.length > 0" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
-                        :style="{ height: `${contentHeight - 50}px` }">
+                <NTabPane name="history"
+                    :tab="t('promptManagement.detailModal.variableHistory', { count: useHistory.length })"
+                    :disabled="useHistory.length === 0">
+                    <NSplit v-if="useHistory.length > 0" direction="horizontal" :min="0.3" :max="0.8"
+                        :default-size="0.6" :style="{ height: `${contentHeight - 50}px` }">
                         <!-- 左侧：使用记录预览 -->
                         <template #1>
                             <NCard size="small" :style="{ height: '100%' }">
@@ -307,23 +292,29 @@
                                     <NFlex justify="space-between" align="center">
                                         <NText strong>{{ t('promptManagement.detailModal.usageRecords') }}</NText>
                                         <NFlex align="center" size="small">
-                                            <NTag size="small" type="info">{{ useHistory.length }} {{ t('promptManagement.detailModal.records') }}</NTag>
-                                            <NText depth="3">{{ t('promptManagement.detailModal.usageRecords') }}</NText>
+                                            <NTag size="small" type="info">{{ useHistory.length }} {{
+                                                t('promptManagement.detailModal.records') }}</NTag>
+                                            <NText depth="3">{{ t('promptManagement.detailModal.usageRecords') }}
+                                            </NText>
                                         </NFlex>
                                     </NFlex>
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" v-if="selectedHistory">
                                     <NFlex vertical size="medium" style="padding-right: 12px;">
                                         <NFlex align="center" size="small">
-                                            <NTag type="info" size="small">{{ t('promptManagement.detailModal.usageRecord') }}</NTag>
+                                            <NTag type="info" size="small">{{
+                                                t('promptManagement.detailModal.usageRecord') }}</NTag>
                                             <NText depth="3">{{ selectedHistory.date }}</NText>
                                         </NFlex>
-                                        
+
                                         <!-- 变量信息 -->
-                                        <div v-if="selectedHistory.variables && Object.keys(selectedHistory.variables).length > 0">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.includedVariables') }}</NText>
+                                        <div
+                                            v-if="selectedHistory.variables && Object.keys(selectedHistory.variables).length > 0">
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.includedVariables') }}</NText>
                                             <NFlex vertical size="small">
-                                                <NFlex v-for="(value, key) in selectedHistory.variables" :key="key" align="center" size="small">
+                                                <NFlex v-for="(value, key) in selectedHistory.variables" :key="key"
+                                                    align="center" size="small">
                                                     <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
                                                     <NInput :value="value" readonly size="small" />
                                                 </NFlex>
@@ -332,10 +323,12 @@
 
                                         <!-- 完整内容 -->
                                         <div>
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.completeContent') }}</NText>
-                                            <NInput :value="selectedHistory.content" type="textarea" readonly :rows="8" :style="{
-                                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                            }" />
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.completeContent') }}</NText>
+                                            <NInput :value="selectedHistory.content" type="textarea" readonly :rows="8"
+                                                :style="{
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                }" />
                                         </div>
 
                                         <!-- 操作按钮 -->
@@ -353,7 +346,8 @@
                                                 </template>
                                                 {{ t('promptManagement.detailModal.confirmDeleteHistory') }}
                                             </NPopconfirm>
-                                            <NButton type="primary" size="small" @click="copyToClipboard(selectedHistory.content)">
+                                            <NButton type="primary" size="small"
+                                                @click="copyToClipboard(selectedHistory.content)">
                                                 <template #icon>
                                                     <NIcon>
                                                         <Copy />
@@ -382,23 +376,22 @@
                                         <NText strong>{{ t('promptManagement.detailModal.recordList') }}</NText>
                                         <NFlex size="small">
                                             <!-- 分页控件 -->
-                                            <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
-                                                size="small" show-quick-jumper show-size-picker :page-sizes="[1, 3, 5, 10]"
-                                                :page-slot="5" @update:page-size="handlePageSizeChange" />
+                                            <NPagination v-model:page="currentPage" :page-count="totalPages"
+                                                :page-size="pageSize" size="small" show-quick-jumper show-size-picker
+                                                :page-sizes="[1, 3, 5, 10]" :page-slot="5"
+                                                @update:page-size="handlePageSizeChange" />
                                         </NFlex>
                                     </NFlex>
                                 </template>
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                     <NFlex vertical size="small" style="padding: 12px;">
                                         <NCard v-for="(record, index) in paginatedHistory"
-                                            :key="(currentPage - 1) * pageSize + index" size="small" hoverable
-                                            :style="{ 
+                                            :key="(currentPage - 1) * pageSize + index" size="small" hoverable :style="{
                                                 cursor: 'pointer',
-                                                borderColor: selectedHistoryIndex === (currentPage - 1) * pageSize + index 
-                                                    ? 'var(--info-color)' 
+                                                borderColor: selectedHistoryIndex === (currentPage - 1) * pageSize + index
+                                                    ? 'var(--info-color)'
                                                     : undefined
-                                            }"
-                                            @click="selectHistoryRecord((currentPage - 1) * pageSize + index)">
+                                            }" @click="selectHistoryRecord((currentPage - 1) * pageSize + index)">
                                             <template #header>
                                                 <NFlex justify="space-between" align="center">
                                                     <NText depth="3" style="font-size: 12px;">{{ record.date }}</NText>
@@ -407,16 +400,22 @@
 
                                             <NFlex vertical size="small">
                                                 <NText class="history-content-preview" style="font-size: 12px;">
-                                                    {{ record.content.substring(0, 60) }}{{ record.content.length > 60 ? "..." : "" }}
+                                                    {{ record.content.substring(0, 60) }}{{ record.content.length > 60 ?
+                                                    "..." : "" }}
                                                 </NText>
 
-                                                <NFlex v-if="record.variables && Object.keys(record.variables).length > 0" size="small">
-                                                    <NText depth="3" style="font-size: 11px;">{{ t('promptManagement.detailModal.variables') }}：</NText>
-                                                    <NTag v-for="key in Object.keys(record.variables).slice(0, 2)" :key="key"
-                                                        size="tiny" type="primary" :bordered="false">
+                                                <NFlex
+                                                    v-if="record.variables && Object.keys(record.variables).length > 0"
+                                                    size="small">
+                                                    <NText depth="3" style="font-size: 11px;">{{
+                                                        t('promptManagement.detailModal.variables') }}：
+                                                    </NText>
+                                                    <NTag v-for="key in Object.keys(record.variables).slice(0, 2)"
+                                                        :key="key" size="tiny" type="primary" :bordered="false">
                                                         {{ key }}
                                                     </NTag>
-                                                    <NText v-if="Object.keys(record.variables).length > 2" depth="3" style="font-size: 11px;">
+                                                    <NText v-if="Object.keys(record.variables).length > 2" depth="3"
+                                                        style="font-size: 11px;">
                                                         +{{ Object.keys(record.variables).length - 2 }}
                                                     </NText>
                                                 </NFlex>
@@ -424,7 +423,8 @@
 
                                             <template #action>
                                                 <NFlex justify="end">
-                                                    <NButton size="tiny" text type="primary" @click.stop="loadHistoryRecord(record)">
+                                                    <NButton size="tiny" text type="primary"
+                                                        @click.stop="loadHistoryRecord(record)">
                                                         {{ t('promptManagement.detailModal.reload') }}
                                                     </NButton>
                                                 </NFlex>
@@ -438,17 +438,19 @@
                 </NTabPane>
 
                 <!-- 调试历史记录 Tab -->
-                <NTabPane name="debug" :tab="t('promptManagement.detailModal.debugHistory', { count: debugHistory.length })">
-                    <NSplit v-if="debugHistory.length > 0" direction="horizontal" :min="0.3" :max="0.8" :default-size="0.6" 
-                        :style="{ height: `${contentHeight - 50}px` }">
+                <NTabPane name="debug"
+                    :tab="t('promptManagement.detailModal.debugHistory', { count: debugHistory.length })">
+                    <NSplit v-if="debugHistory.length > 0" direction="horizontal" :min="0.3" :max="0.8"
+                        :default-size="0.6" :style="{ height: `${contentHeight - 50}px` }">
                         <!-- 左侧：调试记录预览 -->
                         <template #1>
                             <NCard size="small" :style="{ height: '100%' }">
                                 <template #header>
                                     <NFlex justify="space-between" align="center">
                                         <NFlex align="center" size="small">
-                                        <NText strong>{{ t('promptManagement.detailModal.debugRecords') }}</NText>
-                                        <NTag size="small" type="success">{{ debugHistory.length }} {{ t('promptManagement.detailModal.records') }}</NTag>
+                                            <NText strong>{{ t('promptManagement.detailModal.debugRecords') }}</NText>
+                                            <NTag size="small" type="success">{{ debugHistory.length }} {{
+                                                t('promptManagement.detailModal.records') }}</NTag>
                                         </NFlex>
                                         <NFlex align="center" size="small">
                                             <!-- 手动记录按钮 -->
@@ -466,50 +468,64 @@
                                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }" v-if="selectedDebugHistory">
                                     <NFlex vertical size="medium" style="padding-right: 12px;">
                                         <NFlex align="center" size="small">
-                                            <NTag :type="selectedDebugHistory.debugStatus === 'success' ? 'success' : 'error'" size="small">
+                                            <NTag
+                                                :type="selectedDebugHistory.debugStatus === 'success' ? 'success' : 'error'"
+                                                size="small">
                                                 <template #icon>
                                                     <NIcon>
                                                         <Robot />
                                                     </NIcon>
                                                 </template>
-                                                {{ selectedDebugHistory.model === 'manual' ? t('promptManagement.detailModal.manualRecordType') : t('promptManagement.detailModal.debugRecordType') }}
+                                                {{ selectedDebugHistory.model === 'manual' ?
+                                                    t('promptManagement.detailModal.manualRecordType')
+                                                : t('promptManagement.detailModal.debugRecordType') }}
                                             </NTag>
                                             <NText depth="3">{{ formatDate(selectedDebugHistory.createdAt) }}</NText>
                                         </NFlex>
-                                        
+
                                         <!-- 调试配置信息 -->
                                         <div v-if="selectedDebugHistory.model !== 'manual'">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.debugConfig') }}</NText>
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.debugConfig') }}</NText>
                                             <NFlex size="small">
-                                                <NTag size="small" type="primary" :bordered="false">{{ selectedDebugHistory.model }}</NTag>
+                                                <NTag size="small" type="primary" :bordered="false">{{
+                                                    selectedDebugHistory.model }}</NTag>
                                             </NFlex>
                                         </div>
 
                                         <!-- 手动记录备注信息 -->
-                                        <div v-if="selectedDebugHistory.model === 'manual' && selectedDebugHistory.customPrompt">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.notesLabel') }}</NText>
+                                        <div
+                                            v-if="selectedDebugHistory.model === 'manual' && selectedDebugHistory.customPrompt">
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.notesLabel') }}</NText>
                                             <NInput :value="selectedDebugHistory.customPrompt" readonly :rows="2" />
                                         </div>
 
                                         <!-- 原始提示词 -->
                                         <div>
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.originalPrompt') }}</NText>
-                                            <NInput :value="selectedDebugHistory.generatedPrompt" type="textarea" readonly :rows="4" :style="{
-                                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                            }" />
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.originalPrompt') }}</NText>
+                                            <NInput :value="selectedDebugHistory.generatedPrompt" type="textarea"
+                                                readonly :rows="4" :style="{
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                }" />
                                         </div>
 
                                         <!-- AI响应结果 -->
                                         <div v-if="selectedDebugHistory.debugResult">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.aiResponseResult') }}</NText>
-                                            <NInput :value="selectedDebugHistory.debugResult" type="textarea" readonly :rows="6" :style="{
-                                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                            }" />
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.aiResponseResult') }}</NText>
+                                            <NInput :value="selectedDebugHistory.debugResult" type="textarea" readonly
+                                                :rows="6" :style="{
+                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                                }" />
                                         </div>
 
                                         <!-- 错误信息 -->
-                                        <div v-if="selectedDebugHistory.debugStatus === 'error' && selectedDebugHistory.debugErrorMessage">
-                                            <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.detailModal.errorInfo') }}</NText>
+                                        <div
+                                            v-if="selectedDebugHistory.debugStatus === 'error' && selectedDebugHistory.debugErrorMessage">
+                                            <NText strong style="margin-bottom: 8px; display: block;">{{
+                                                t('promptManagement.detailModal.errorInfo') }}</NText>
                                             <NAlert type="error">
                                                 {{ selectedDebugHistory.debugErrorMessage }}
                                             </NAlert>
@@ -531,7 +547,8 @@
                                                 {{ t('promptManagement.detailModal.confirmDeleteDebugRecord') }}
                                             </NPopconfirm>
                                             <NFlex size="small">
-                                                <NButton v-if="selectedDebugHistory.debugResult" size="small" @click="copyToClipboard(selectedDebugHistory.debugResult)">
+                                                <NButton v-if="selectedDebugHistory.debugResult" size="small"
+                                                    @click="copyToClipboard(selectedDebugHistory.debugResult)">
                                                     <template #icon>
                                                         <NIcon>
                                                             <Copy />
@@ -539,7 +556,8 @@
                                                     </template>
                                                     {{ t('promptManagement.detailModal.copyAIResponse') }}
                                                 </NButton>
-                                                <NButton size="small" @click="copyToClipboard(selectedDebugHistory.generatedPrompt)">
+                                                <NButton size="small"
+                                                    @click="copyToClipboard(selectedDebugHistory.generatedPrompt)">
                                                     <template #icon>
                                                         <NIcon>
                                                             <Copy />
@@ -569,9 +587,10 @@
                                         <NText strong>{{ t('promptManagement.detailModal.recordList') }}</NText>
                                         <NFlex size="small">
                                             <!-- 分页控件 -->
-                                            <NPagination v-model:page="debugCurrentPage" :page-count="debugTotalPages" :page-size="debugPageSize"
-                                                size="small" show-quick-jumper show-size-picker :page-sizes="[1, 3, 5, 10]"
-                                                :page-slot="5" @update:page-size="(newSize) => { debugPageSize = newSize; debugCurrentPage = 1; selectedDebugIndex = -1; }" />
+                                            <NPagination v-model:page="debugCurrentPage" :page-count="debugTotalPages"
+                                                :page-size="debugPageSize" size="small" show-quick-jumper
+                                                show-size-picker :page-sizes="[1, 3, 5, 10]" :page-slot="5"
+                                                @update:page-size="(newSize) => { debugPageSize = newSize; debugCurrentPage = 1; selectedDebugIndex = -1; }" />
                                         </NFlex>
                                     </NFlex>
                                 </template>
@@ -579,22 +598,28 @@
                                     <NFlex vertical size="small" style="padding: 12px;">
                                         <NCard v-for="(record, index) in paginatedDebugHistory"
                                             :key="(debugCurrentPage - 1) * debugPageSize + index" size="small" hoverable
-                                            :style="{ 
+                                            :style="{
                                                 cursor: 'pointer',
-                                                borderColor: selectedDebugIndex === (debugCurrentPage - 1) * debugPageSize + index 
-                                                    ? 'var(--success-color)' 
+                                                borderColor: selectedDebugIndex === (debugCurrentPage - 1) * debugPageSize + index
+                                                    ? 'var(--success-color)'
                                                     : undefined
                                             }"
                                             @click="selectDebugRecord((debugCurrentPage - 1) * debugPageSize + index)">
                                             <template #header>
                                                 <NFlex justify="space-between" align="center">
-                                                    <NText depth="3" style="font-size: 12px;">{{ formatDate(record.createdAt) }}</NText>
+                                                    <NText depth="3" style="font-size: 12px;">{{
+                                                        formatDate(record.createdAt) }}</NText>
                                                     <NFlex size="small">
-                                                        <NTag :type="record.debugStatus === 'success' ? 'success' : 'error'" size="tiny">
-                                                            {{ record.debugStatus === 'success' ? t('promptManagement.detailModal.success') : t('promptManagement.detailModal.failed') }}
+                                                        <NTag
+                                                            :type="record.debugStatus === 'success' ? 'success' : 'error'"
+                                                            size="tiny">
+                                                            {{ record.debugStatus === 'success' ?
+                                                                t('promptManagement.detailModal.success') :
+                                                            t('promptManagement.detailModal.failed') }}
                                                         </NTag>
                                                         <!-- 手动记录标识 -->
-                                                        <NTag v-if="record.model === 'manual'" type="warning" size="tiny">
+                                                        <NTag v-if="record.model === 'manual'" type="warning"
+                                                            size="tiny">
                                                             {{ t('promptManagement.detailModal.manual') }}
                                                         </NTag>
                                                     </NFlex>
@@ -604,7 +629,8 @@
                                             <NFlex vertical size="small">
                                                 <NText style="font-size: 12px;">{{ record.topic }}</NText>
                                                 <NFlex size="small">
-                                                    <NTag v-if="record.model !== 'manual'" size="tiny" type="primary" :bordered="false">
+                                                    <NTag v-if="record.model !== 'manual'" size="tiny" type="primary"
+                                                        :bordered="false">
                                                         {{ record.model }}
                                                     </NTag>
                                                     <NTag v-else size="tiny" type="warning" :bordered="false">
@@ -618,7 +644,7 @@
                             </NCard>
                         </template>
                     </NSplit>
-                    
+
                     <!-- 当没有调试记录时显示的内容 -->
                     <div v-else :style="{ height: `${contentHeight - 50}px` }">
                         <NCard size="small" :style="{ height: '100%' }">
@@ -672,7 +698,7 @@
                 </NTabPane>
 
             </NTabs>
-        </template>        <!-- 底部固定区域 -->
+        </template> <!-- 底部固定区域 -->
         <template #footer>
             <NFlex justify="space-between" align="center">
                 <div>
@@ -680,7 +706,7 @@
                     <NFlex size="small" align="center" wrap>
                         <NText depth="3" style="margin-right: 8px">{{
                             formatDate(prompt.updatedAt)
-                            }}</NText>
+                        }}</NText>
                         <NTag v-if="hasVariables" size="small" type="info">
                             {{ getVariableCount() }} 个变量
                         </NTag>
@@ -724,7 +750,8 @@
     </CommonModal>
 
     <!-- 手动记录调试历史模态框 -->
-    <CommonModal :show="showManualRecordModal" @update:show="showManualRecordModal = false" @close="showManualRecordModal = false">
+    <CommonModal :show="showManualRecordModal" @update:show="showManualRecordModal = false"
+        @close="showManualRecordModal = false">
         <template #header>
             <NText :style="{ fontSize: '18px', fontWeight: 600 }">
                 {{ t('promptManagement.detailModal.manualRecordTitle') }}
@@ -736,48 +763,32 @@
 
         <template #content="{ contentHeight }">
             <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
-                <NForm ref="manualRecordFormRef" :model="manualRecordData" :rules="manualRecordRules" label-placement="top">
+                <NForm ref="manualRecordFormRef" :model="manualRecordData" :rules="manualRecordRules"
+                    label-placement="top">
                     <NFormItem :label="t('promptManagement.detailModal.recordTitle')" path="title">
-                        <NInput 
-                            v-model:value="manualRecordData.title" 
-                            :placeholder="t('promptManagement.detailModal.recordTitlePlaceholder')"
-                            :maxlength="100"
-                            show-count
-                        />
+                        <NInput v-model:value="manualRecordData.title"
+                            :placeholder="t('promptManagement.detailModal.recordTitlePlaceholder')" :maxlength="100"
+                            show-count />
                     </NFormItem>
 
                     <NFormItem :label="t('promptManagement.detailModal.debugResultField')" path="result">
-                        <NInput 
-                            v-model:value="manualRecordData.result" 
-                            type="textarea"
-                            :placeholder="t('promptManagement.detailModal.debugResultPlaceholder')"
-                            :rows="8"
-                            :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                            show-count
-                            :maxlength="2000"
-                        />
+                        <NInput v-model:value="manualRecordData.result" type="textarea"
+                            :placeholder="t('promptManagement.detailModal.debugResultPlaceholder')" :rows="8"
+                            :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" show-count
+                            :maxlength="2000" />
                     </NFormItem>
 
                     <NFormItem :label="t('promptManagement.detailModal.notesField')" path="notes">
-                        <NInput 
-                            v-model:value="manualRecordData.notes" 
-                            type="textarea"
-                            :placeholder="t('promptManagement.detailModal.notesPlaceholder')"
-                            :rows="3"
-                            show-count
-                            :maxlength="500"
-                        />
+                        <NInput v-model:value="manualRecordData.notes" type="textarea"
+                            :placeholder="t('promptManagement.detailModal.notesPlaceholder')" :rows="3" show-count
+                            :maxlength="500" />
                     </NFormItem>
 
                     <NFormItem :label="t('promptManagement.detailModal.debugStatus')" path="status">
-                        <NSelect 
-                            v-model:value="manualRecordData.status"
-                            :options="[
-                                { label: t('promptManagement.detailModal.success'), value: 'success' },
-                                { label: t('promptManagement.detailModal.failed'), value: 'error' }
-                            ]"
-                            :placeholder="t('promptManagement.detailModal.selectDebugStatus')"
-                        />
+                        <NSelect v-model:value="manualRecordData.status" :options="[
+                            { label: t('promptManagement.detailModal.success'), value: 'success' },
+                            { label: t('promptManagement.detailModal.failed'), value: 'error' }
+                        ]" :placeholder="t('promptManagement.detailModal.selectDebugStatus')" />
                     </NFormItem>
                 </NForm>
             </NFlex>
@@ -792,13 +803,10 @@
                 </div>
                 <div>
                     <NFlex size="small">
-                        <NButton @click="showManualRecordModal = false">{{ t('promptManagement.detailModal.cancel') }}</NButton>
-                        <NButton 
-                            type="primary" 
-                            @click="saveManualRecord"
-                            :loading="savingManualRecord"
-                            :disabled="!manualRecordData.title.trim() || !manualRecordData.result.trim()"
-                        >
+                        <NButton @click="showManualRecordModal = false">{{ t('promptManagement.detailModal.cancel') }}
+                        </NButton>
+                        <NButton type="primary" @click="saveManualRecord" :loading="savingManualRecord"
+                            :disabled="!manualRecordData.title.trim() || !manualRecordData.result.trim()">
                             {{ t('promptManagement.detailModal.saveRecord') }}
                         </NButton>
                     </NFlex>
@@ -1102,13 +1110,13 @@ const hasUnfilledVariables = computed(() => {
         // Jinja 模板模式：检查是否有未定义的变量
         try {
             const templateVariables = jinjaService.extractVariables(props.prompt.content);
-            
+
             // 检查每个模板变量是否都有对应的值
             return templateVariables.some(variableName => {
                 const value = variableValues.value[variableName];
-                return value === undefined || 
-                       value === null || 
-                       value.toString().trim() === "";
+                return value === undefined ||
+                    value === null ||
+                    value.toString().trim() === "";
             });
         } catch (error) {
             console.error("检查 Jinja 模板变量失败:", error);
@@ -1120,8 +1128,8 @@ const hasUnfilledVariables = computed(() => {
             return props.prompt.variables.some((variable: any) => {
                 const value = variableValues.value[variable.name];
                 return variable.required && (
-                    value === undefined || 
-                    value === null || 
+                    value === undefined ||
+                    value === null ||
                     value.toString().trim() === ""
                 );
             });
@@ -1151,12 +1159,12 @@ const getJinjaTemplateVariables = () => {
     if (!props.prompt?.isJinjaTemplate) {
         return [];
     }
-    
+
     // 优先使用存储的变量配置
     if (props.prompt?.variables && props.prompt.variables.length > 0) {
         return props.prompt.variables.map((v: any) => v.name);
     }
-    
+
     // 如果没有存储的变量配置，从模板内容中提取
     if (props.prompt?.content) {
         try {
@@ -1166,7 +1174,7 @@ const getJinjaTemplateVariables = () => {
             return [];
         }
     }
-    
+
     return [];
 };
 
@@ -1203,10 +1211,10 @@ const copyToClipboard = async (text: string) => {
 const loadDebugHistory = async () => {
     try {
         if (!props.prompt?.id) return;
-        
+
         // 使用新的API方法根据提示词ID获取调试记录
         debugHistory.value = await api.aiGenerationHistory.getDebugHistoryByPromptId.query(props.prompt.id);
-        
+
     } catch (error) {
         console.error("加载调试历史失败:", error);
         debugHistory.value = [];
@@ -1227,18 +1235,18 @@ const deleteDebugRecord = async () => {
             const record = debugHistory.value[selectedDebugIndex.value];
             if (record.id) {
                 await api.aiGenerationHistory.delete.mutate(record.id);
-                
+
                 // 从本地列表中移除
                 debugHistory.value.splice(selectedDebugIndex.value, 1);
-                
+
                 // 重置选择
                 selectedDebugIndex.value = -1;
-                
+
                 // 如果当前页面没有记录了，回到第一页
                 if (paginatedDebugHistory.value.length === 0 && debugCurrentPage.value > 1) {
                     debugCurrentPage.value = 1;
                 }
-                
+
                 message.success("调试记录已删除");
             }
         } catch (error) {
@@ -1290,7 +1298,7 @@ const debugPrompt = async () => {
 
     try {
         console.log("开始调试提示词:", filledContent.value);
-        
+
         // 序列化配置以确保可以通过 IPC 传递
         const serializedConfig = {
             configId: selectedConfig.configId || '',
@@ -1322,11 +1330,11 @@ const debugPrompt = async () => {
         console.log("配置参数:", serializedConfig);
 
         let result;
-        
+
         // 检查是否支持流式传输
         if ((window as any).electronAPI?.ai?.generatePromptStream) {
             console.log('使用流式传输模式进行调试');
-            
+
             // 使用流式传输
             result = await (window as any).electronAPI.ai.generatePromptStream(
                 request,
@@ -1337,7 +1345,7 @@ const debugPrompt = async () => {
                         console.log('检测到停止信号，中断调试流式传输');
                         return false; // 返回 false 表示停止流式传输
                     }
-                    
+
                     const now = Date.now();
                     console.log('调试流式传输回调:', {
                         charCount,
@@ -1352,7 +1360,7 @@ const debugPrompt = async () => {
                     const prevUpdateTime = debugStreamStats.value.lastUpdateTime;
                     debugStreamStats.value.charCount = charCount;
                     debugStreamStats.value.lastUpdateTime = now;
-                    
+
                     // 计算内容增长速率
                     if (prevUpdateTime > 0 && charCount > prevCharCount) {
                         const timeDiff = (now - prevUpdateTime) / 1000;
@@ -1362,9 +1370,9 @@ const debugPrompt = async () => {
 
                     // 检测是否有真实内容
                     const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
-                    
+
                     // 判断生成是否活跃
-                    debugStreamStats.value.isGenerationActive = hasRealContent || 
+                    debugStreamStats.value.isGenerationActive = hasRealContent ||
                         (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
 
                     if (hasRealContent) {
@@ -1375,7 +1383,7 @@ const debugPrompt = async () => {
                     } else {
                         // 没有内容时的处理
                         debugStreamStats.value.noContentUpdateCount++;
-                        
+
                         if (charCount > prevCharCount) {
                             // 字符数在增长，说明正在生成
                             const placeholderText = `正在调试中... (已生成 ${charCount} 字符)`;
@@ -1389,7 +1397,7 @@ const debugPrompt = async () => {
                     return true; // 继续生成
                 }
             );
-            
+
             console.log('调试流式传输完成，最终结果:', {
                 success: !!result,
                 contentLength: result?.generatedPrompt?.length || 0
@@ -1405,36 +1413,36 @@ const debugPrompt = async () => {
             console.log('使用普通生成模式进行调试');
             // 使用普通生成
             result = await (window as any).electronAPI.ai.generatePrompt(request, serializedConfig);
-            
+
             // 模拟流式更新
             if (result?.generatedPrompt) {
                 const content = result.generatedPrompt;
                 const totalChars = content.length;
                 const steps = Math.min(30, totalChars);
                 const stepSize = Math.ceil(totalChars / steps);
-                
+
                 for (let i = 0; i < steps; i++) {
                     if (debugGenerationControl.value.shouldStop) break;
-                    
+
                     const currentCharCount = Math.min((i + 1) * stepSize, totalChars);
                     const partialContent = content.substring(0, currentCharCount);
-                    
+
                     debugStreamStats.value.charCount = currentCharCount;
                     debugResult.value = partialContent;
-                    
+
                     await new Promise(resolve => setTimeout(resolve, 50));
                 }
-                
+
                 // 确保显示完整内容
                 debugResult.value = content;
             }
         }
-        
+
         // 确保最终结果正确显示
         if (result?.generatedPrompt) {
             debugResult.value = result.generatedPrompt;
         }
-        
+
         message.success("调试完成");
 
         // 保存调试结果到AI生成历史记录
@@ -1475,7 +1483,7 @@ const debugPrompt = async () => {
                     debugErrorMessage: error.message || "调试失败",
                     uuid: `debug_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` // 添加uuid字段
                 });
-                
+
                 // 刷新调试历史记录
                 await loadDebugHistory();
             }
@@ -1485,13 +1493,13 @@ const debugPrompt = async () => {
     } finally {
         debugging.value = false;
         debugStreaming.value = false;
-        
+
         // 清理生成控制状态
         debugGenerationControl.value.shouldStop = false;
         if (debugGenerationControl.value.abortController) {
             debugGenerationControl.value.abortController = null;
         }
-        
+
         // 清理流式传输状态
         debugStreamStats.value.isStreaming = false;
         debugStreamStats.value.charCount = 0;
@@ -1649,7 +1657,7 @@ watch(
             } else {
                 useHistory.value = [];
             }
-            
+
             // 加载调试历史
             loadDebugHistory();
         }
@@ -1703,7 +1711,7 @@ const saveManualRecord = async () => {
             message.error("请选择调试状态");
             return;
         }
-        
+
         savingManualRecord.value = true;
 
         // 构建符合AIGenerationHistory接口的数据
@@ -1724,10 +1732,10 @@ const saveManualRecord = async () => {
 
         // 保存到数据库
         await api.aiGenerationHistory.create.mutate(historyData);
-        
+
         // 刷新调试历史记录
         await loadDebugHistory();
-        
+
         // 重置表单数据
         manualRecordData.value = {
             title: "",
@@ -1735,10 +1743,10 @@ const saveManualRecord = async () => {
             notes: "",
             status: "success"
         };
-        
+
         showManualRecordModal.value = false;
         message.success("手动调试记录已保存");
-        
+
     } catch (error: any) {
         console.error("保存手动调试记录失败:", error);
         message.error("保存调试记录失败: " + (error.message || "未知错误"));
@@ -1753,7 +1761,7 @@ const handleEdit = () => {
         message.error("提示词数据不存在");
         return;
     }
-    
+
     // 确保传递完整的prompt数据，包括所有必要字段
     const editPrompt = {
         id: props.prompt.id,
@@ -1772,7 +1780,7 @@ const handleEdit = () => {
         createdAt: props.prompt.createdAt,
         updatedAt: props.prompt.updatedAt
     };
-    
+
     emit("edit", editPrompt);
 };
 </script>

@@ -3,7 +3,7 @@
     <NFlex class="status-bar-content" align="center" justify="end">
       <!-- 左侧：预留扩展空间 -->
       <NFlex class="status-bar-left" align="center" gap="8px">
-    </NFlex>
+      </NFlex>
 
       <!-- 右侧：状态指示器组 -->
       <NFlex class="status-bar-right" align="center" gap="8px">

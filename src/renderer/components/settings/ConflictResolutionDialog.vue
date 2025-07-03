@@ -1,13 +1,6 @@
 <template>
-    <NModal 
-        :show="show" 
-        @update:show="(value) => emit('update:show', value)"
-        preset="dialog" 
-        title="解决数据冲突"
-        :mask-closable="false"
-        :closable="false"
-        style="width: 90%; max-width: 1400px;"
-    >
+    <NModal :show="show" @update:show="(value) => emit('update:show', value)" preset="dialog" title="解决数据冲突"
+        :mask-closable="false" :closable="false" style="width: 90%; max-width: 1400px;">
         <div v-if="conflictData">
             <NFlex vertical :size="20">
                 <!-- 冲突概述 -->
@@ -49,7 +42,7 @@
                                     </NFlex>
                                 </NRadio>
                             </div>
-                            
+
                             <div class="strategy-option">
                                 <NRadio value="use_remote">
                                     <NFlex align="center" :size="12">
@@ -65,7 +58,7 @@
                                     </NFlex>
                                 </NRadio>
                             </div>
-                            
+
                             <div class="strategy-option">
                                 <NRadio value="merge_smart">
                                     <NFlex align="center" :size="12">
@@ -81,7 +74,7 @@
                                     </NFlex>
                                 </NRadio>
                             </div>
-                            
+
                             <div class="strategy-option">
                                 <NRadio value="merge_manual">
                                     <NFlex align="center" :size="12">
@@ -115,7 +108,7 @@
                                         <li>删除项：保留本地存在但远程已删除的项目</li>
                                     </ul>
                                 </NAlert>
-                                
+
                                 <div class="merge-summary">
                                     <NFlex :size="16">
                                         <div v-if="addedItems.length > 0">
@@ -150,7 +143,7 @@
                                         <strong>未选择的修改项将保持本地版本。</strong>
                                     </div>
                                 </NAlert>
-                                
+
                                 <!-- 快速操作 -->
                                 <NFlex :size="12">
                                     <NButton size="small" @click="selectAllAdded">
@@ -166,29 +159,28 @@
                                         清空选择
                                     </NButton>
                                 </NFlex>
-                                
+
                                 <NTabs type="line" animated>
                                     <!-- 新增项 -->
-                                    <NTabPane 
-                                        name="added" 
-                                        :tab="`🆕 新增项 (${addedItems.length})`" 
-                                        v-if="addedItems.length > 0"
-                                    >
+                                    <NTabPane name="added" :tab="`🆕 新增项 (${addedItems.length})`"
+                                        v-if="addedItems.length > 0">
                                         <NFlex vertical :size="8">
                                             <NText depth="2" style="font-size: 14px;">
                                                 以下项目在远程存在，但本地没有。勾选的项目将被添加到本地：
                                             </NText>
-                                            <div v-for="item in addedItems" :key="`${item._type}-${item.id}`" class="diff-item added-item">
-                                                <NCheckbox 
+                                            <div v-for="item in addedItems" :key="`${item._type}-${item.id}`"
+                                                class="diff-item added-item">
+                                                <NCheckbox
                                                     :checked="mergeSelections.added.includes(`${item._type}-${item.id}`)"
-                                                    @update:checked="(checked) => handleMergeSelection('added', `${item._type}-${item.id}`, checked)"
-                                                >
+                                                    @update:checked="(checked) => handleMergeSelection('added', `${item._type}-${item.id}`, checked)">
                                                     <NFlex align="center" :size="12" style="width: 100%;">
                                                         <NTag :type="getDataTypeColor(item._type)" size="small">
                                                             {{ getDataTypeLabel(item._type) }}
                                                         </NTag>
                                                         <div style="flex: 1;">
-                                                            <div style="font-weight: 600;">{{ item.name || item.title || item.id }}</div>
+                                                            <div style="font-weight: 600;">{{ item.name || item.title ||
+                                                                item.id }}
+                                                            </div>
                                                             <NText depth="3" style="font-size: 12px;">
                                                                 {{ item.description || '无描述' }}
                                                             </NText>
@@ -203,40 +195,43 @@
                                     </NTabPane>
 
                                     <!-- 修改项 -->
-                                    <NTabPane 
-                                        name="modified" 
-                                        :tab="`🔄 修改项 (${modifiedItems.length})`" 
-                                        v-if="modifiedItems.length > 0"
-                                    >
+                                    <NTabPane name="modified" :tab="`🔄 修改项 (${modifiedItems.length})`"
+                                        v-if="modifiedItems.length > 0">
                                         <NFlex vertical :size="12">
                                             <NText depth="2" style="font-size: 14px;">
                                                 以下项目在本地和远程都有修改，请选择要保留的版本：
                                             </NText>
-                                            <div v-for="item in modifiedItems" :key="`${item._type}-${item.id}`" class="diff-item modified-item">
+                                            <div v-for="item in modifiedItems" :key="`${item._type}-${item.id}`"
+                                                class="diff-item modified-item">
                                                 <div class="item-header">
                                                     <NFlex align="center" :size="12">
                                                         <NTag :type="getDataTypeColor(item._type)" size="small">
                                                             {{ getDataTypeLabel(item._type) }}
                                                         </NTag>
-                                                        <div style="font-weight: 600;">{{ item.local?.name || item.local?.title || item.id }}</div>
-                                                        <NTag 
-                                                            :type="mergeSelections.modified[`${item._type}-${item.id}`] ? 'success' : 'warning'" 
-                                                            size="tiny"
-                                                        >
-                                                            {{ mergeSelections.modified[`${item._type}-${item.id}`] === 'local' ? '已选本地' : 
-                                                               mergeSelections.modified[`${item._type}-${item.id}`] === 'remote' ? '已选远程' : '未选择' }}
+                                                        <div style="font-weight: 600;">{{ item.local?.name ||
+                                                            item.local?.title ||
+                                                            item.id }}</div>
+                                                        <NTag
+                                                            :type="mergeSelections.modified[`${item._type}-${item.id}`] ? 'success' : 'warning'"
+                                                            size="tiny">
+                                                            {{ mergeSelections.modified[`${item._type}-${item.id}`] ===
+                                                                'local' ? '已选本地'
+                                                                :
+                                                            mergeSelections.modified[`${item._type}-${item.id}`] ===
+                                                            'remote' ? '已选远程' :
+                                                            '未选择' }}
                                                         </NTag>
                                                     </NFlex>
                                                 </div>
                                                 <div class="item-content">
                                                     <NFlex :size="16">
                                                         <div class="version-option">
-                                                            <NRadio 
+                                                            <NRadio
                                                                 :checked="mergeSelections.modified[`${item._type}-${item.id}`] === 'local'"
                                                                 @update:checked="(checked) => checked && handleModifiedSelection(`${item._type}-${item.id}`, 'local')"
-                                                                :name="`modified-${item._type}-${item.id}`"
-                                                            >
-                                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                                :name="`modified-${item._type}-${item.id}`">
+                                                                <div
+                                                                    style="display: flex; align-items: center; gap: 8px;">
                                                                     <strong>本地版本</strong>
                                                                     <NTag size="tiny" type="info">
                                                                         {{ formatDate(item.localLastModified) }}
@@ -248,12 +243,12 @@
                                                             </NCard>
                                                         </div>
                                                         <div class="version-option">
-                                                            <NRadio 
+                                                            <NRadio
                                                                 :checked="mergeSelections.modified[`${item._type}-${item.id}`] === 'remote'"
                                                                 @update:checked="(checked) => checked && handleModifiedSelection(`${item._type}-${item.id}`, 'remote')"
-                                                                :name="`modified-${item._type}-${item.id}`"
-                                                            >
-                                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                                :name="`modified-${item._type}-${item.id}`">
+                                                                <div
+                                                                    style="display: flex; align-items: center; gap: 8px;">
                                                                     <strong>远程版本</strong>
                                                                     <NTag size="tiny" type="warning">
                                                                         {{ formatDate(item.remoteLastModified) }}
@@ -271,26 +266,25 @@
                                     </NTabPane>
 
                                     <!-- 删除项 -->
-                                    <NTabPane 
-                                        name="deleted" 
-                                        :tab="`🗑️ 删除项 (${deletedItems.length})`" 
-                                        v-if="deletedItems.length > 0"
-                                    >
+                                    <NTabPane name="deleted" :tab="`🗑️ 删除项 (${deletedItems.length})`"
+                                        v-if="deletedItems.length > 0">
                                         <NFlex vertical :size="8">
                                             <NText depth="2" style="font-size: 14px;">
                                                 以下项目在本地存在，但远程已删除。勾选的项目将被保留：
                                             </NText>
-                                            <div v-for="item in deletedItems" :key="`${item._type}-${item.id}`" class="diff-item deleted-item">
-                                                <NCheckbox 
+                                            <div v-for="item in deletedItems" :key="`${item._type}-${item.id}`"
+                                                class="diff-item deleted-item">
+                                                <NCheckbox
                                                     :checked="mergeSelections.deleted.includes(`${item._type}-${item.id}`)"
-                                                    @update:checked="(checked) => handleMergeSelection('deleted', `${item._type}-${item.id}`, checked)"
-                                                >
+                                                    @update:checked="(checked) => handleMergeSelection('deleted', `${item._type}-${item.id}`, checked)">
                                                     <NFlex align="center" :size="12" style="width: 100%;">
                                                         <NTag :type="getDataTypeColor(item._type)" size="small">
                                                             {{ getDataTypeLabel(item._type) }}
                                                         </NTag>
                                                         <div style="flex: 1;">
-                                                            <div style="font-weight: 600;">{{ item.name || item.title || item.id }}</div>
+                                                            <div style="font-weight: 600;">{{ item.name || item.title ||
+                                                                item.id }}
+                                                            </div>
                                                             <NText depth="3" style="font-size: 12px;">
                                                                 {{ item.description || '本地保留，远程已删除' }}
                                                             </NText>
@@ -315,17 +309,12 @@
                         </NText>
                     </div>
                     <div v-else></div>
-                    
+
                     <NFlex :size="12">
                         <NButton @click="handleCancel">
                             取消操作
                         </NButton>
-                        <NButton 
-                            type="primary" 
-                            @click="handleConfirm"
-                            :loading="loading"
-                            :disabled="!canConfirm"
-                        >
+                        <NButton type="primary" @click="handleConfirm" :loading="loading" :disabled="!canConfirm">
                             <template #icon>
                                 <NIcon>
                                     <CircleCheck />
@@ -412,14 +401,14 @@ const modifiedItems = computed(() => props.conflictData?.differences?.modified |
 const deletedItems = computed(() => props.conflictData?.differences?.deleted || []);
 
 // 总差异数量
-const totalDifferences = computed(() => 
+const totalDifferences = computed(() =>
     addedItems.value.length + modifiedItems.value.length + deletedItems.value.length
 );
 
 const canConfirm = computed(() => {
     if (selectedStrategy.value === 'merge_manual') {
         // 检查是否所有修改项都有选择
-        const allModifiedSelected = modifiedItems.value.every(item => 
+        const allModifiedSelected = modifiedItems.value.every(item =>
             mergeSelections.value.modified[`${item._type}-${item.id}`]
         );
         return allModifiedSelected;
@@ -486,19 +475,19 @@ const getDataTypeLabel = (type: string) => {
 // 格式化项目预览
 const formatItemPreview = (item: any) => {
     if (!item) return '';
-    
+
     const preview = {
         name: item.name || item.title,
         description: item.description,
         content: item.content ? item.content.substring(0, 100) + '...' : undefined,
         updatedAt: item.updatedAt,
     };
-    
+
     // 过滤掉undefined的字段
     const filtered = Object.fromEntries(
         Object.entries(preview).filter(([_, value]) => value !== undefined)
     );
-    
+
     return JSON.stringify(filtered, null, 2);
 };
 
@@ -554,10 +543,10 @@ const showItemDetail = (item: any) => {
 
 // 获取操作提示
 const getOperationHint = () => {
-    const unselectedModified = modifiedItems.value.filter(item => 
+    const unselectedModified = modifiedItems.value.filter(item =>
         !mergeSelections.value.modified[`${item._type}-${item.id}`]
     ).length;
-    
+
     if (unselectedModified > 0) {
         return `还有 ${unselectedModified} 个修改项未选择版本`;
     }
@@ -578,7 +567,7 @@ const getConfirmButtonText = () => {
 // 处理确认
 const handleConfirm = () => {
     let resolution;
-    
+
     switch (selectedStrategy.value) {
         case 'merge_smart':
             // 智能合并：自动处理规则
@@ -601,7 +590,7 @@ const handleConfirm = () => {
                 strategy: selectedStrategy.value
             };
     }
-    
+
     emit('resolve', resolution);
 };
 
@@ -609,9 +598,9 @@ const handleConfirm = () => {
 const buildSmartMergedData = () => {
     const localData = props.conflictData?.localData || {};
     const remoteData = props.conflictData?.remoteData || {};
-    
+
     const mergedData = JSON.parse(JSON.stringify(localData)); // 深拷贝本地数据
-    
+
     // 自动添加所有新增项
     for (const item of addedItems.value) {
         if (mergedData[item._type]) {
@@ -621,12 +610,12 @@ const buildSmartMergedData = () => {
             mergedData[item._type].push(cleanItem);
         }
     }
-    
+
     // 自动处理修改项：选择时间更新的版本
     for (const item of modifiedItems.value) {
         const localTime = new Date(item.localLastModified || item.local?.updatedAt || 0).getTime();
         const remoteTime = new Date(item.remoteLastModified || item.remote?.updatedAt || 0).getTime();
-        
+
         if (mergedData[item._type]) {
             const index = mergedData[item._type].findIndex(dataItem => dataItem.id === item.id);
             if (index > -1) {
@@ -635,9 +624,9 @@ const buildSmartMergedData = () => {
             }
         }
     }
-    
+
     // 删除项：保留本地版本（即不删除）
-    
+
     return mergedData;
 };
 
@@ -645,45 +634,45 @@ const buildSmartMergedData = () => {
 const buildMergedData = () => {
     const localData = props.conflictData?.localData || {};
     const remoteData = props.conflictData?.remoteData || {};
-    
+
     const mergedData = JSON.parse(JSON.stringify(localData)); // 深拷贝本地数据
-    
+
     // 处理新增项
     for (const itemKey of mergeSelections.value.added) {
         const [type, id] = itemKey.split('-');
-        const remoteItem = addedItems.value.find(item => 
+        const remoteItem = addedItems.value.find(item =>
             item._type === type && item.id === id
         );
-        
+
         if (remoteItem && mergedData[type]) {
             // 移除临时属性
             const cleanItem = { ...remoteItem };
             delete cleanItem._type;
             delete cleanItem._changeType;
-            
+
             mergedData[type].push(cleanItem);
         }
     }
-    
+
     // 处理修改项
     for (const [itemKey, version] of Object.entries(mergeSelections.value.modified)) {
         const [type, id] = itemKey.split('-');
-        const modifiedItem = modifiedItems.value.find(item => 
+        const modifiedItem = modifiedItems.value.find(item =>
             item._type === type && item.id === id
         );
-        
+
         if (modifiedItem && mergedData[type]) {
             const index = mergedData[type].findIndex(item => item.id === id);
             if (index > -1) {
-                mergedData[type][index] = version === 'local' ? 
+                mergedData[type][index] = version === 'local' ?
                     modifiedItem.local : modifiedItem.remote;
             }
         }
     }
-    
+
     // 处理删除项（从删除列表中移除表示要保留）
     // 这里不需要特殊处理，因为我们基于本地数据，默认就保留了这些项
-    
+
     return mergedData;
 };
 

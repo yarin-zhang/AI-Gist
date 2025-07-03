@@ -10,6 +10,8 @@ import type { ExportResult, ImportResult } from './data-management';
 // 导入通用类型
 import type { PaginationResult } from './common';
 
+export * from './ai';
+
 /**
  * 分类数据模型
  */
@@ -159,6 +161,7 @@ export interface PromptHistory {
   categoryId?: number;
   tags?: string;
   variables?: string;
+  isJinjaTemplate?: boolean; // 是否为 Jinja 模板
   version: number;
   changeDescription?: string; // 变更描述
   createdAt: Date;

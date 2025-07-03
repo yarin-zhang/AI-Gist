@@ -18,19 +18,10 @@
               {{ databaseError }}
             </NText>
             <NFlex justify="center" :size="12">
-              <NButton 
-                type="primary" 
-                @click="retry" 
-                :loading="isRetrying"
-                size="large"
-              >
+              <NButton type="primary" @click="retry" :loading="isRetrying" size="large">
                 重试
               </NButton>
-              <NButton 
-                @click="continueWithoutDb" 
-                size="large"
-                quaternary
-              >
+              <NButton @click="continueWithoutDb" size="large" quaternary>
                 继续使用应用
               </NButton>
             </NFlex>
@@ -75,7 +66,7 @@ const retry = async () => {
   isRetrying.value = true
   clearError()
   hasInitializationCompleted.value = false
-  
+
   try {
     await initializeDatabase()
   } finally {

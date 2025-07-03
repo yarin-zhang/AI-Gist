@@ -2,7 +2,8 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{ t('promptManagement.categoryManageTitle') }}</NText>
+            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{ t('promptManagement.categoryManageTitle') }}
+            </NText>
             <NText depth="3">{{ t('promptManagement.categoryManageDesc') }}</NText>
         </template><!-- 中间可操作区域 --> <template #content="{ contentHeight }">
             <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
@@ -28,15 +29,18 @@
                                                 <NFlex vertical size="small">
                                                     <NInput v-model:value="editingCategory!.name" size="small"
                                                         :placeholder="t('promptManagement.categoryName')" />
-                                                    <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
-                                                        :swatches="COLOR_SWATCHES" size="small" style="width: 100%;" />
+                                                    <NColorPicker v-model:value="editingCategory!.color"
+                                                        :modes="['hex']" :swatches="COLOR_SWATCHES" size="small"
+                                                        style="width: 100%;" />
                                                 </NFlex>
                                             </div>
                                             <div v-else>
                                                 <NFlex vertical size="small">
                                                     <NText strong>{{ category.name }}</NText>
                                                     <NText depth="3" style="font-size: 12px;">
-                                                        {{ t('promptManagement.categoryPromptCount', { count: getCategoryPromptCount(category.id) }) }}
+                                                        {{ t('promptManagement.categoryPromptCount', {
+                                                            count:
+                                                        getCategoryPromptCount(category.id) }) }}
                                                     </NText>
                                                 </NFlex>
                                             </div>
@@ -98,7 +102,8 @@
                                 <NForm :model="newCategory">
                                     <NFlex vertical size="medium">
                                         <NFormItem :label="t('promptManagement.categoryName')">
-                                            <NInput v-model:value="newCategory.name" :placeholder="t('promptManagement.categoryNamePlaceholder')"
+                                            <NInput v-model:value="newCategory.name"
+                                                :placeholder="t('promptManagement.categoryNamePlaceholder')"
                                                 @keyup.enter="handleCreate" />
                                         </NFormItem>
                                         <NFormItem :label="t('promptManagement.color')">
@@ -193,8 +198,8 @@ const updating = ref(false)
 // 统计信息
 const statistics = ref<{
     totalCount: number;
-    categoryStats: Array<{id: string | null, name: string, count: number}>;
-    popularTags: Array<{name: string, count: number}>;
+    categoryStats: Array<{ id: string | null, name: string, count: number }>;
+    popularTags: Array<{ name: string, count: number }>;
 }>({
     totalCount: 0,
     categoryStats: [],
