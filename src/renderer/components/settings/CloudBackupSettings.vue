@@ -40,21 +40,22 @@
 
                                 <!-- 云端备份列表 -->
                                 <div v-if="getPaginatedBackups(config.id).length > 0">
-                                                                            <NFlex vertical :size="12">
-                                            <NText depth="2">{{ t('cloudBackup.cloudBackupList') }}</NText>
+                                    <NFlex vertical :size="12">
+                                        <NText depth="2">{{ t('cloudBackup.cloudBackupList') }}</NText>
                                         <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                             <NGridItem v-for="backup in getPaginatedBackups(config.id)" :key="backup.id"
                                                 span="6 600:5 900:4 1200:3 1500:2 1800:1">
                                                 <NCard size="small" :title="backup.name">
                                                     <NFlex vertical :size="4">
                                                         <NFlex align="center" :size="8">
-                                                            <NText strong>{{ backup.description || t('cloudBackup.cloudBackup') }}</NText>
+                                                            <NText strong>{{ backup.description ||
+                                                                t('cloudBackup.cloudBackup') }}</NText>
                                                         </NFlex>
                                                         <NFlex align="center" :size="8">
                                                             <NTag type="info" size="small">{{
                                                                 formatDate(backup.createdAt) }}</NTag>
                                                             <NTag type="success" size="small">{{ formatSize(backup.size)
-                                                                }}</NTag>
+                                                            }}</NTag>
                                                         </NFlex>
                                                     </NFlex>
 
@@ -153,8 +154,8 @@
 
                     <!-- 存储配置列表 -->
                     <div v-if="storageConfigs.length > 0">
-                                                    <NFlex vertical :size="12">
-                                <NText depth="2">{{ t('cloudBackup.configuredStorage') }}</NText>
+                        <NFlex vertical :size="12">
+                            <NText depth="2">{{ t('cloudBackup.configuredStorage') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                 <NGridItem v-for="config in storageConfigs" :key="config.id"
                                     span="6 600:5 900:4 1200:3 1500:2 1800:1">
@@ -166,7 +167,8 @@
                                                     {{ config.type === 'webdav' ? 'WebDAV' : 'iCloud Drive' }}
                                                 </NTag>
                                                 <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
-                                                    {{ config.enabled ? t('cloudBackup.enabled') : t('cloudBackup.disabled') }}
+                                                    {{ config.enabled ? t('cloudBackup.enabled') :
+                                                    t('cloudBackup.disabled') }}
                                                 </NTag>
                                             </NFlex>
                                             <NText depth="3" style="font-size: 12px;">

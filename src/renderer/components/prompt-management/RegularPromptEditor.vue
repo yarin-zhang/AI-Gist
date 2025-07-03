@@ -1,26 +1,19 @@
 <template>
-    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
-        :max="0.8" :disabled="modalWidth <= 800">
+    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
+        :disabled="modalWidth <= 800">
         <!-- 左侧：内容编辑区 -->
         <template #1>
             <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
                 <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                     <NFlex vertical size="medium" style="padding-right: 12px;">
                         <NFormItem path="content" style="flex: 1;" :show-label="false">
-                            <NInput 
-                                :value="content" 
-                                @update:value="(value) => $emit('update:content', value)"
-                                type="textarea"
-                                show-count
-                                :placeholder="t('promptManagement.contentPlaceholder')"
-                                :style="{ 
+                            <NInput :value="content" @update:value="(value) => $emit('update:content', value)"
+                                type="textarea" show-count :placeholder="t('promptManagement.contentPlaceholder')"
+                                :style="{
                                     fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                     backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
                                     border: isStreaming ? '1px solid var(--success-color)' : undefined
-                                }"
-                                :autosize="{ minRows: 9 }" 
-                                :readonly="isStreaming"
-                            />
+                                }" :autosize="{ minRows: 9 }" :readonly="isStreaming" />
                         </NFormItem>
                     </NFlex>
                     <NAlert type="info" :show-icon="false" style="margin: 0;">
@@ -30,12 +23,8 @@
                                     <NText depth="3" style="font-size: 12px;">
                                         {{ t('promptManagement.quickOptimization') }}
                                     </NText>
-                                    <NButton 
-                                        size="tiny" 
-                                        text 
-                                        @click="$emit('open-quick-optimization-config')"
-                                        style="padding: 2px; margin-left: 4px;"
-                                    >
+                                    <NButton size="tiny" text @click="$emit('open-quick-optimization-config')"
+                                        style="padding: 2px; margin-left: 4px;">
                                         <template #icon>
                                             <NIcon size="12">
                                                 <Settings />
@@ -46,67 +35,49 @@
                                 <!-- 流式传输状态显示 -->
                                 <div v-if="isStreaming" style="margin-top: 4px;">
                                     <NText type="success" style="font-size: 11px;">
-                                        {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{ t('promptManagement.characters') }})
+                                        {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{
+                                        t('promptManagement.characters') }})
                                     </NText>
                                 </div>
                             </div>
                             <NFlex size="small">
                                 <!-- 停止按钮 -->
-                                <NButton 
-                                    v-if="isStreaming"
-                                    size="small" 
-                                    type="error"
-                                    @click="$emit('stop-optimization')"
-                                >
+                                <NButton v-if="isStreaming" size="small" type="error"
+                                    @click="$emit('stop-optimization')">
                                     {{ t('promptManagement.stopGeneration') }}
                                 </NButton>
                                 <!-- 优化按钮 -->
                                 <template v-else>
-                                    <NButton 
-                                        v-for="config in quickOptimizationConfigs"
-                                        :key="config.id"
-                                        size="small" 
+                                    <NButton v-for="config in quickOptimizationConfigs" :key="config.id" size="small"
                                         @click="$emit('optimize-prompt', config.id)"
                                         :loading="optimizing === config.name"
-                                        :disabled="!content.trim() || optimizing !== null"
-                                    >
+                                        :disabled="!content.trim() || optimizing !== null">
                                         {{ config.name }}
                                     </NButton>
-                                    <NButton 
-                                        size="small" 
-                                        @click="showManualAdjustment"
-                                        :disabled="!content.trim() || optimizing !== null"
-                                    >
+                                    <NButton size="small" @click="showManualAdjustment"
+                                        :disabled="!content.trim() || optimizing !== null">
                                         {{ t('promptManagement.manualAdjustment') }}
                                     </NButton>
                                 </template>
                             </NFlex>
                         </NFlex>
                     </NAlert>
-                    
+
                     <!-- AI模型选择器 -->
                     <div style="margin-top: 8px;">
-                        <AIModelSelector
-                            ref="modelSelectorRef"
-                            v-model:modelKey="selectedModelKey"
+                        <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
                             :placeholder="t('promptManagement.aiModelPlaceholder')"
-                            :disabled="isStreaming || optimizing !== null"
-                        />
+                            :disabled="isStreaming || optimizing !== null" />
                     </div>
-                    
+
                     <!-- 手动调整输入框 -->
                     <div v-if="showManualInput" style="margin-top: 8px;">
                         <NCard size="small" :title="t('promptManagement.manualAdjustmentTitle')">
                             <NFlex vertical size="small">
-                                <NInput
-                                    v-model:value="manualInstruction"
-                                    type="textarea"
-                                    :placeholder="t('promptManagement.manualAdjustmentPlaceholder')"
-                                    :rows="3"
-                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                    show-count
-                                    :maxlength="500"
-                                />
+                                <NInput v-model:value="manualInstruction" type="textarea"
+                                    :placeholder="t('promptManagement.manualAdjustmentPlaceholder')" :rows="3"
+                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" show-count
+                                    :maxlength="500" />
                                 <NFlex justify="space-between" align="center">
                                     <NText depth="3" style="font-size: 12px;">
                                         {{ t('promptManagement.manualAdjustmentTip') }}
@@ -115,13 +86,8 @@
                                         <NButton size="small" @click="hideManualAdjustment">
                                             {{ t('promptManagement.cancelAdjustment') }}
                                         </NButton>
-                                        <NButton 
-                                            size="small" 
-                                            type="primary"
-                                            @click="applyManualAdjustment"
-                                            :loading="optimizing === 'manual'"
-                                            :disabled="!manualInstruction.trim()"
-                                        >
+                                        <NButton size="small" type="primary" @click="applyManualAdjustment"
+                                            :loading="optimizing === 'manual'" :disabled="!manualInstruction.trim()">
                                             {{ t('promptManagement.confirmAdjustment') }}
                                         </NButton>
                                     </NFlex>
@@ -150,8 +116,7 @@
                     </NFlex>
                 </template>
                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
-                    <NFlex vertical size="medium" style="padding-right: 12px;"
-                        v-if="variables.length > 0">
+                    <NFlex vertical size="medium" style="padding-right: 12px;" v-if="variables.length > 0">
                         <NCard v-for="(variable, index) in variables" :key="index" size="small">
                             <template #header>
                                 <NFlex justify="space-between" align="center">
@@ -168,12 +133,14 @@
 
                             <NFlex vertical size="small">
                                 <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
-                                    <NInput v-model:value="variable.name" :placeholder="t('promptManagement.variableNamePlaceholder')" size="small" />
+                                    <NInput v-model:value="variable.name"
+                                        :placeholder="t('promptManagement.variableNamePlaceholder')" size="small" />
                                 </NFormItem>
 
                                 <NFlex>
                                     <NFormItem :label="t('promptManagement.variableType')" style="flex: 1">
-                                        <NSelect v-model:value="variable.type" :options="variableTypeOptions" size="small" />
+                                        <NSelect v-model:value="variable.type" :options="variableTypeOptions"
+                                            size="small" />
                                     </NFormItem>
                                     <NFormItem :label="t('promptManagement.variableRequired')" style="width: 80px">
                                         <NSwitch v-model:value="variable.required" size="small" />
@@ -181,12 +148,19 @@
                                 </NFlex>
 
                                 <NFormItem :label="t('promptManagement.variableDefault')">
-                                    <NInput v-if="variable.type === 'text'" v-model:value="variable.defaultValue" :placeholder="t('promptManagement.variableDefaultPlaceholder')" size="small" />
-                                    <NSelect v-else-if="variable.type === 'select'" v-model:value="variable.defaultValue" :options="getVariableDefaultOptions(variable.options)" :placeholder="t('promptManagement.selectDefaultOption')" size="small" clearable />
+                                    <NInput v-if="variable.type === 'text'" v-model:value="variable.defaultValue"
+                                        :placeholder="t('promptManagement.variableDefaultPlaceholder')" size="small" />
+                                    <NSelect v-else-if="variable.type === 'select'"
+                                        v-model:value="variable.defaultValue"
+                                        :options="getVariableDefaultOptions(variable.options)"
+                                        :placeholder="t('promptManagement.selectDefaultOption')" size="small"
+                                        clearable />
                                 </NFormItem>
 
-                                <NFormItem v-if="variable.type === 'select'" :label="t('promptManagement.variableOptions')">
-                                    <NDynamicInput v-model:value="variable.options" show-sort-button :placeholder="t('promptManagement.variableOptionsPlaceholder')" :min="1" />
+                                <NFormItem v-if="variable.type === 'select'"
+                                    :label="t('promptManagement.variableOptions')">
+                                    <NDynamicInput v-model:value="variable.options" show-sort-button
+                                        :placeholder="t('promptManagement.variableOptionsPlaceholder')" :min="1" />
                                 </NFormItem>
                             </NFlex>
                         </NCard>
@@ -403,7 +377,7 @@ const removeVariable = (index: number) => {
 const showManualAdjustment = () => {
     showManualInput.value = true;
     manualInstruction.value = "";
-    
+
     // 使用 nextTick 确保 DOM 更新后再滚动
     nextTick(() => {
         // 滚动到底部以显示手动调整输入框
@@ -425,7 +399,7 @@ const applyManualAdjustment = () => {
         message.warning(t('promptManagement.enterAdjustmentInstruction'));
         return;
     }
-    
+
     if (!props.content.trim()) {
         message.warning(t('promptManagement.enterPromptContentFirst'));
         return;
@@ -460,7 +434,7 @@ watch(
         let needsUpdate = false;
         const updatedVariables = newVariables.map(variable => {
             const updatedVariable = { ...variable };
-            
+
             // 当变量类型为选项时，检查默认值是否在选项中
             if (updatedVariable.type === "select" && updatedVariable.defaultValue) {
                 if (!updatedVariable.options || !updatedVariable.options.includes(updatedVariable.defaultValue)) {
@@ -485,10 +459,10 @@ watch(
                 updatedVariable.options = ["选项1", "选项2"];
                 needsUpdate = true;
             }
-            
+
             return updatedVariable;
         });
-        
+
         // 只有在确实需要更新时才更新，避免无限循环
         if (needsUpdate) {
             emit("update:variables", updatedVariables);
@@ -504,4 +478,4 @@ defineExpose({
 });
 </script>
 
-<style scoped></style> 
+<style scoped></style>

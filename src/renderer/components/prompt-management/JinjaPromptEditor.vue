@@ -1,18 +1,14 @@
 <template>
-    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
-        :max="0.8" :disabled="modalWidth <= 800">
+    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
+        :disabled="modalWidth <= 800">
         <!-- 左侧：模板编辑区 -->
         <template #1>
             <NCard :title="t('promptManagement.jinjaTemplate')" size="small" :style="{ height: '100%' }">
                 <template #header-extra>
                     <NTooltip placement="top">
                         <template #trigger>
-                            <NButton 
-                                size="small" 
-                                type="info"
-                                @click="showSyntaxHelp = true"
-                                :disabled="isStreaming || optimizing !== null"
-                            >
+                            <NButton size="small" type="info" @click="showSyntaxHelp = true"
+                                :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
                                         <Help />
@@ -23,12 +19,7 @@
                         </template>
                         <NFlex vertical size="small">
                             <NText>{{ t('promptManagement.jinjaSupportTooltip') }}</NText>
-                            <NButton 
-                                size="tiny" 
-                                text 
-                                type="primary"
-                                @click="openJinjaWebsite"
-                            >
+                            <NButton size="tiny" text type="primary" @click="openJinjaWebsite">
                                 {{ t('promptManagement.jinjaSupportLearnMore') }}
                             </NButton>
                         </NFlex>
@@ -37,41 +28,30 @@
                 <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                     <NFlex vertical size="medium" style="padding-right: 12px;">
                         <NFormItem path="content" style="flex: 1;" :show-label="false">
-                            <NInput 
-                                :value="content" 
-                                @update:value="(value) => $emit('update:content', value)"
-                                type="textarea"
-                                show-count
-                                :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
-                                :style="{ 
+                            <NInput :value="content" @update:value="(value) => $emit('update:content', value)"
+                                type="textarea" show-count :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
+                                :style="{
                                     fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                     backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
                                     border: isStreaming ? '1px solid var(--success-color)' : undefined
-                                }"
-                                :autosize="{ minRows: 9 }" 
-                                :readonly="isStreaming"
-                            />
+                                }" :autosize="{ minRows: 9 }" :readonly="isStreaming" />
                         </NFormItem>
                     </NFlex>
-                    
+
                     <!-- 快速插入变量 -->
                     <div v-if="jinjaVariables.length > 0" style="margin-top: 8px;">
                         <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">
                             {{ t('promptManagement.quickInsertVariables') }}
                         </NText>
                         <NFlex size="small" wrap>
-                            <NButton 
-                                v-for="variable in jinjaVariables" 
-                                :key="variable.name"
-                                size="tiny" 
+                            <NButton v-for="variable in jinjaVariables" :key="variable.name" size="tiny"
                                 @click="insertVariableToTemplate(variable.name)"
-                                :disabled="isStreaming || optimizing !== null || !variable.name"
-                            >
+                                :disabled="isStreaming || optimizing !== null || !variable.name">
                                 {{ variable.name }}
                             </NButton>
                         </NFlex>
                     </div>
-                    
+
                     <NAlert type="info" :show-icon="false" style="margin: 8px 0;">
                         <NFlex justify="space-between" align="center">
                             <div>
@@ -79,12 +59,8 @@
                                     <NText depth="3" style="font-size: 12px;">
                                         {{ t('promptManagement.quickOptimization') }}
                                     </NText>
-                                    <NButton 
-                                        size="tiny" 
-                                        text 
-                                        @click="$emit('open-quick-optimization-config')"
-                                        style="padding: 2px; margin-left: 4px;"
-                                    >
+                                    <NButton size="tiny" text @click="$emit('open-quick-optimization-config')"
+                                        style="padding: 2px; margin-left: 4px;">
                                         <template #icon>
                                             <NIcon size="12">
                                                 <Settings />
@@ -95,67 +71,49 @@
                                 <!-- 流式传输状态显示 -->
                                 <div v-if="isStreaming" style="margin-top: 4px;">
                                     <NText type="success" style="font-size: 11px;">
-                                        {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{ t('promptManagement.characters') }})
+                                        {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{
+                                        t('promptManagement.characters') }})
                                     </NText>
                                 </div>
                             </div>
                             <NFlex size="small">
                                 <!-- 停止按钮 -->
-                                <NButton 
-                                    v-if="isStreaming"
-                                    size="small" 
-                                    type="error"
-                                    @click="$emit('stop-optimization')"
-                                >
+                                <NButton v-if="isStreaming" size="small" type="error"
+                                    @click="$emit('stop-optimization')">
                                     {{ t('promptManagement.stopGeneration') }}
                                 </NButton>
                                 <!-- 优化按钮 -->
                                 <template v-else>
-                                    <NButton 
-                                        v-for="config in quickOptimizationConfigs"
-                                        :key="config.id"
-                                        size="small" 
+                                    <NButton v-for="config in quickOptimizationConfigs" :key="config.id" size="small"
                                         @click="$emit('optimize-prompt', config.id)"
                                         :loading="optimizing === config.name"
-                                        :disabled="!content.trim() || optimizing !== null"
-                                    >
+                                        :disabled="!content.trim() || optimizing !== null">
                                         {{ config.name }}
                                     </NButton>
-                                    <NButton 
-                                        size="small" 
-                                        @click="showManualAdjustment"
-                                        :disabled="!content.trim() || optimizing !== null"
-                                    >
+                                    <NButton size="small" @click="showManualAdjustment"
+                                        :disabled="!content.trim() || optimizing !== null">
                                         {{ t('promptManagement.manualAdjustment') }}
                                     </NButton>
                                 </template>
                             </NFlex>
                         </NFlex>
                     </NAlert>
-                    
+
                     <!-- AI模型选择器 -->
                     <div style="margin-top: 8px;">
-                        <AIModelSelector
-                            ref="modelSelectorRef"
-                            v-model:modelKey="selectedModelKey"
+                        <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
                             :placeholder="t('promptManagement.aiModelPlaceholder')"
-                            :disabled="isStreaming || optimizing !== null"
-                        />
+                            :disabled="isStreaming || optimizing !== null" />
                     </div>
-                    
+
                     <!-- 手动调整输入框 -->
                     <div v-if="showManualInput" style="margin-top: 8px;">
                         <NCard size="small" :title="t('promptManagement.manualAdjustmentTitle')">
                             <NFlex vertical size="small">
-                                <NInput
-                                    v-model:value="manualInstruction"
-                                    type="textarea"
-                                    :placeholder="t('promptManagement.manualAdjustmentPlaceholder')"
-                                    :rows="3"
-                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                                    show-count
-                                    :maxlength="500"
-                                />
+                                <NInput v-model:value="manualInstruction" type="textarea"
+                                    :placeholder="t('promptManagement.manualAdjustmentPlaceholder')" :rows="3"
+                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" show-count
+                                    :maxlength="500" />
                                 <NFlex justify="space-between" align="center">
                                     <NText depth="3" style="font-size: 12px;">
                                         {{ t('promptManagement.manualAdjustmentTip') }}
@@ -164,13 +122,8 @@
                                         <NButton size="small" @click="hideManualAdjustment">
                                             {{ t('promptManagement.cancelAdjustment') }}
                                         </NButton>
-                                        <NButton 
-                                            size="small" 
-                                            type="primary"
-                                            @click="applyManualAdjustment"
-                                            :loading="optimizing === 'manual'"
-                                            :disabled="!manualInstruction.trim()"
-                                        >
+                                        <NButton size="small" type="primary" @click="applyManualAdjustment"
+                                            :loading="optimizing === 'manual'" :disabled="!manualInstruction.trim()">
                                             {{ t('promptManagement.confirmAdjustment') }}
                                         </NButton>
                                     </NFlex>
@@ -189,7 +142,8 @@
                     <NFlex justify="space-between" align="center">
                         <NText strong>{{ t('promptManagement.jinjaVariablesTitle') }}</NText>
                         <NFlex size="small">
-                            <NButton size="small" @click="addJinjaVariable" :disabled="isStreaming || optimizing !== null">
+                            <NButton size="small" @click="addJinjaVariable"
+                                :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
                                         <Plus />
@@ -212,11 +166,8 @@
                     <NFlex vertical size="medium" style="padding-right: 12px;">
                         <!-- 模板验证状态 -->
                         <div v-if="content.trim()">
-                            <NAlert 
-                                :type="templateValidation.isValid ? 'success' : 'error'" 
-                                :show-icon="true"
-                                :title="templateValidation.isValid ? t('promptManagement.templateValid') : t('promptManagement.templateInvalid')"
-                            >
+                            <NAlert :type="templateValidation.isValid ? 'success' : 'error'" :show-icon="true"
+                                :title="templateValidation.isValid ? t('promptManagement.templateValid') : t('promptManagement.templateInvalid')">
                                 <template v-if="templateValidation.isValid">
                                     <NText>{{ t('promptManagement.templateValidMessage') }}</NText>
                                 </template>
@@ -228,11 +179,13 @@
 
                         <!-- 变量列表 -->
                         <div v-if="jinjaVariables.length > 0">
-                            <NCard v-for="(variable, index) in jinjaVariables" :key="index" size="small" style="margin-bottom: 8px;">
+                            <NCard v-for="(variable, index) in jinjaVariables" :key="index" size="small"
+                                style="margin-bottom: 8px;">
                                 <template #header>
                                     <NFlex justify="space-between" align="center">
                                         <NFlex align="center" size="small">
-                                            <NText strong>{{ variable.name || t('promptManagement.unnamedVariable') }}</NText>
+                                            <NText strong>{{ variable.name || t('promptManagement.unnamedVariable') }}
+                                            </NText>
                                             <NTag size="small" :type="getVariableTypeColor(variable.type)">
                                                 {{ getVariableTypeLabel(variable.type) }}
                                             </NTag>
@@ -240,13 +193,8 @@
                                                 {{ t('promptManagement.required') }}
                                             </NTag>
                                         </NFlex>
-                                        <NButton 
-                                            size="tiny" 
-                                            type="error" 
-                                            text
-                                            @click="removeJinjaVariable(index)"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        >
+                                        <NButton size="tiny" type="error" text @click="removeJinjaVariable(index)"
+                                            :disabled="isStreaming || optimizing !== null">
                                             <template #icon>
                                                 <NIcon>
                                                     <Trash />
@@ -260,31 +208,21 @@
                                     <!-- 变量名称和类型 -->
                                     <NFlex>
                                         <NFormItem :label="t('promptManagement.variableName')" style="flex: 1">
-                                            <NInput 
-                                                v-model:value="variable.name" 
-                                                :placeholder="t('promptManagement.variableNamePlaceholder')" 
-                                                size="small"
-                                                :disabled="isStreaming || optimizing !== null"
-                                            />
+                                            <NInput v-model:value="variable.name"
+                                                :placeholder="t('promptManagement.variableNamePlaceholder')"
+                                                size="small" :disabled="isStreaming || optimizing !== null" />
                                         </NFormItem>
                                         <NFormItem :label="t('promptManagement.variableType')" style="width: 120px">
-                                            <NSelect 
-                                                v-model:value="variable.type" 
-                                                :options="variableTypeOptions" 
-                                                size="small"
-                                                :disabled="isStreaming || optimizing !== null"
-                                            />
+                                            <NSelect v-model:value="variable.type" :options="variableTypeOptions"
+                                                size="small" :disabled="isStreaming || optimizing !== null" />
                                         </NFormItem>
                                     </NFlex>
 
                                     <!-- 默认值 -->
                                     <NFormItem :label="t('promptManagement.variableDefault')">
-                                        <NInput 
-                                            v-model:value="variable.defaultValue" 
-                                            :placeholder="t('promptManagement.variableDefaultPlaceholder')" 
-                                            size="small"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
+                                        <NInput v-model:value="variable.defaultValue"
+                                            :placeholder="t('promptManagement.variableDefaultPlaceholder')" size="small"
+                                            :disabled="isStreaming || optimizing !== null" />
                                     </NFormItem>
 
                                     <!-- 必填开关 -->
@@ -292,11 +230,8 @@
                                         <NText depth="3" style="font-size: 12px;">
                                             {{ t('promptManagement.variableRequired') }}
                                         </NText>
-                                        <NSwitch 
-                                            v-model:value="variable.required" 
-                                            size="small"
-                                            :disabled="isStreaming || optimizing !== null"
-                                        />
+                                        <NSwitch v-model:value="variable.required" size="small"
+                                            :disabled="isStreaming || optimizing !== null" />
                                     </NFlex>
                                 </NFlex>
                             </NCard>
@@ -310,7 +245,8 @@
                                 </NIcon>
                             </template>
                             <template #extra>
-                                <NButton size="small" @click="addJinjaVariable" :disabled="isStreaming || optimizing !== null">
+                                <NButton size="small" @click="addJinjaVariable"
+                                    :disabled="isStreaming || optimizing !== null">
                                     <template #icon>
                                         <NIcon>
                                             <Plus />
@@ -339,29 +275,20 @@
                 <NFlex vertical size="medium" style="padding-right: 12px;">
                     <NCard v-for="(examples, category) in syntaxHelp" :key="category" size="small">
                         <template #header>
-                            <NText strong>{{ t(`promptManagement.jinja${category.charAt(0).toUpperCase() + category.slice(1)}`) }}</NText>
+                            <NText strong>{{ t(`promptManagement.jinja${category.charAt(0).toUpperCase() +
+                                category.slice(1)}`) }}</NText>
                         </template>
                         <NFlex vertical size="small">
-                            <NFlex v-for="example in examples" :key="example.code" align="center" size="small" style="padding: 8px; border-radius: 4px; background: var(--color-fill-2);">
-                                <NInput 
-                                    :value="example.code" 
-                                    readonly 
-                                    size="small"
-                                    :style="{ 
-                                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                        fontSize: '12px',
-                                        flex: 1,
-                                        cursor: 'pointer'
-                                    }"
-                                    @click="copySyntaxCode(example.code)"
-                                />
-                                <NButton 
-                                    size="tiny" 
-                                    text 
-                                    type="primary"
-                                    @click="copySyntaxCode(example.code)"
-                                    style="margin-left: 8px;"
-                                >
+                            <NFlex v-for="example in examples" :key="example.code" align="center" size="small"
+                                style="padding: 8px; border-radius: 4px; background: var(--color-fill-2);">
+                                <NInput :value="example.code" readonly size="small" :style="{
+                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                    fontSize: '12px',
+                                    flex: 1,
+                                    cursor: 'pointer'
+                                }" @click="copySyntaxCode(example.code)" />
+                                <NButton size="tiny" text type="primary" @click="copySyntaxCode(example.code)"
+                                    style="margin-left: 8px;">
                                     <template #icon>
                                         <NIcon size="14">
                                             <Copy />
@@ -398,7 +325,8 @@
     </CommonModal>
 
     <!-- 模板预览模态框 -->
-    <CommonModal :show="showTemplatePreview" @update:show="showTemplatePreview = false" @close="showTemplatePreview = false">
+    <CommonModal :show="showTemplatePreview" @update:show="showTemplatePreview = false"
+        @close="showTemplatePreview = false">
         <template #header>
             <NText :style="{ fontSize: '18px', fontWeight: 600 }">
                 {{ t('promptManagement.jinjaTemplatePreview') }}
@@ -409,19 +337,16 @@
             <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
                 <!-- 原始模板 -->
                 <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.originalTemplate') }}</NText>
-                    <NInput 
-                        :value="content" 
-                        type="textarea" 
-                        readonly 
-                        :rows="6"
-                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }"
-                    />
+                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.originalTemplate')
+                        }}</NText>
+                    <NInput :value="content" type="textarea" readonly :rows="6"
+                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" />
                 </div>
 
                 <!-- 变量值 -->
                 <div v-if="Object.keys(previewVariableValues).length > 0">
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.previewVariables') }}</NText>
+                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.previewVariables')
+                        }}</NText>
                     <NFlex vertical size="small">
                         <NFlex v-for="(value, key) in previewVariableValues" :key="key" align="center" size="small">
                             <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
@@ -432,17 +357,12 @@
 
                 <!-- 渲染结果 -->
                 <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.jinjaRenderedContent') }}</NText>
-                    <NInput 
-                        :value="previewRenderedContent" 
-                        type="textarea" 
-                        readonly 
-                        :rows="8"
-                        :style="{ 
-                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                            backgroundColor: 'var(--success-color-suppl)'
-                        }"
-                    />
+                    <NText strong style="margin-bottom: 8px; display: block;">{{
+                        t('promptManagement.jinjaRenderedContent') }}</NText>
+                    <NInput :value="previewRenderedContent" type="textarea" readonly :rows="8" :style="{
+                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                        backgroundColor: 'var(--success-color-suppl)'
+                    }" />
                 </div>
             </NFlex>
         </template>
@@ -573,7 +493,7 @@ const initializeJinjaVariables = () => {
 // 从模板内容中提取变量
 const extractVariablesFromContent = (): JinjaVariable[] => {
     if (!props.content.trim()) return [];
-    
+
     try {
         const variableNames = jinjaService.extractVariables(props.content);
         return variableNames.map(name => ({
@@ -603,7 +523,7 @@ const syntaxHelp = computed(() => jinjaService.getSyntaxHelp());
 // 预览渲染内容
 const previewRenderedContent = computed(() => {
     if (!props.content.trim()) return '';
-    
+
     try {
         return jinjaService.render(props.content, previewVariableValues.value);
     } catch (error) {
@@ -656,7 +576,7 @@ const debouncedValidateTemplate = (content: string) => {
 const showManualAdjustment = () => {
     showManualInput.value = true;
     manualInstruction.value = "";
-    
+
     // 使用 nextTick 确保 DOM 更新后再滚动
     nextTick(() => {
         // 滚动到底部以显示手动调整输入框
@@ -678,7 +598,7 @@ const applyManualAdjustment = () => {
         message.warning(t('promptManagement.enterAdjustmentInstruction'));
         return;
     }
-    
+
     if (!props.content.trim()) {
         message.warning(t('promptManagement.enterPromptContentFirst'));
         return;
@@ -835,4 +755,4 @@ defineExpose({
 });
 </script>
 
-<style scoped></style> 
+<style scoped></style>

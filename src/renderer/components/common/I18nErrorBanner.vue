@@ -39,10 +39,10 @@ const setupI18nErrorListener = () => {
     const originalError = console.error;
     console.error = (...args) => {
         const message = args.join(' ');
-        if (message.includes('Message compilation error') || 
+        if (message.includes('Message compilation error') ||
             message.includes('vue-i18n') ||
             message.includes('Not allowed nest placeholder')) {
-            
+
             // 避免重复添加相同的错误
             if (!errors.value.includes(message)) {
                 errors.value.push(message);
@@ -56,10 +56,10 @@ const setupI18nErrorListener = () => {
     // 监听全局错误
     window.addEventListener('error', (event) => {
         const message = event.message || event.error?.message || '';
-        if (message.includes('Message compilation error') || 
+        if (message.includes('Message compilation error') ||
             message.includes('vue-i18n') ||
             message.includes('Not allowed nest placeholder')) {
-            
+
             if (!errors.value.includes(message)) {
                 errors.value.push(message);
                 errorCount.value = errors.value.length;
@@ -71,10 +71,10 @@ const setupI18nErrorListener = () => {
     // 监听未处理的 Promise 拒绝
     window.addEventListener('unhandledrejection', (event) => {
         const message = event.reason?.message || String(event.reason);
-        if (message.includes('Message compilation error') || 
+        if (message.includes('Message compilation error') ||
             message.includes('vue-i18n') ||
             message.includes('Not allowed nest placeholder')) {
-            
+
             if (!errors.value.includes(message)) {
                 errors.value.push(message);
                 errorCount.value = errors.value.length;
@@ -118,4 +118,4 @@ onMounted(() => {
 [data-theme="dark"] .i18n-error-banner {
     background: rgba(0, 0, 0, 0.95);
 }
-</style> 
+</style>

@@ -52,12 +52,7 @@
             <NFlex vertical :size="12">
                 <NFlex justify="space-between" align="center">
                     <NText strong style="font-size: 16px;">{{ t('about.updateCheck') }}</NText>
-                    <NButton 
-                        @click="checkForUpdates" 
-                        :loading="checking" 
-                        secondary
-                        type="primary"
-                    >
+                    <NButton @click="checkForUpdates" :loading="checking" secondary type="primary">
                         <template #icon>
                             <NIcon>
                                 <Refresh />
@@ -75,18 +70,10 @@
                                 {{ t('about.newVersionDesc', { version: updateInfo.latestVersion }) }}
                             </NText>
                             <NFlex :size="8">
-                                <NButton 
-                                    @click="openDownloadPage" 
-                                    type="primary" 
-                                    size="small"
-                                >
+                                <NButton @click="openDownloadPage" type="primary" size="small">
                                     {{ t('about.downloadNewVersion') }}
                                 </NButton>
-                                <NButton 
-                                    @click="showReleaseNotes = !showReleaseNotes" 
-                                    quaternary 
-                                    size="small"
-                                >
+                                <NButton @click="showReleaseNotes = !showReleaseNotes" quaternary size="small">
                                     {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
                                 </NButton>
                             </NFlex>
@@ -119,12 +106,7 @@
                     </NFlex>
                     <NFlex justify="space-between">
                         <NText depth="2">{{ t('about.github') }}</NText>
-                        <NButton 
-                            text 
-                            type="primary" 
-                            @click="openGitHub"
-                            style="padding: 0; font-size: 14px;"
-                        >
+                        <NButton text type="primary" @click="openGitHub" style="padding: 0; font-size: 14px;">
                             {{ t('about.githubRepo') }}
                         </NButton>
                     </NFlex>
@@ -164,19 +146,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { 
-    NCard, 
-    NFlex, 
-    NText, 
-    NButton, 
-    NIcon, 
-    NTag, 
-    NAlert, 
-    NCollapse, 
+import {
+    NCard,
+    NFlex,
+    NText,
+    NButton,
+    NIcon,
+    NTag,
+    NAlert,
+    NCollapse,
     NCollapseItem,
     NDivider,
     NAvatar,
-    useMessage 
+    useMessage
 } from 'naive-ui';
 import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
 
@@ -205,10 +187,10 @@ const formatDate = (dateString: string) => {
 // 检查更新
 const checkForUpdates = async () => {
     if (checking.value) return;
-    
+
     checking.value = true;
     checkError.value = '';
-    
+
     try {
         const result = await window.electronAPI.app.checkUpdates();
         if (result.success) {
@@ -224,14 +206,14 @@ const checkForUpdates = async () => {
     } catch (error: any) {
         checkError.value = error.message || '检查更新失败';
     }
-    
+
     checking.value = false;
 };
 
 // 打开下载页面
 const openDownloadPage = async () => {
     if (!updateInfo.value?.downloadUrl) return;
-    
+
     try {
         await window.electronAPI.app.openDownloadPage(updateInfo.value.downloadUrl);
     } catch (error) {
@@ -278,7 +260,7 @@ const getCurrentVersion = async () => {
 // 组件挂载时初始化
 onMounted(async () => {
     await getCurrentVersion();
-    
+
     // 监听更新通知
     window.electronAPI.app.onUpdateAvailable((info: any) => {
         updateInfo.value = info;

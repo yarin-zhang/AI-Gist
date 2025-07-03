@@ -14,7 +14,7 @@
       <NCard title="组件测试" size="small">
         <NFlex vertical :size="16">
           <NText depth="2">测试组件功能</NText>
-          
+
           <!-- 模态框测试 -->
           <div>
             <NText tag="div" depth="3" style="margin-bottom: 8px;">模态框布局测试:</NText>
@@ -27,7 +27,7 @@
       <NCard title="系统信息" size="small">
         <NFlex vertical :size="12">
           <NText depth="2">获取系统相关信息</NText>
-          
+
           <div>
             <NFlex :size="8">
               <NButton @click="getSystemInfo" size="small" type="primary">获取系统信息</NButton>

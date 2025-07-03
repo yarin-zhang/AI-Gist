@@ -10,6 +10,8 @@ import type { ExportResult, ImportResult } from './data-management';
 // 导入通用类型
 import type { PaginationResult } from './common';
 
+export * from './ai';
+
 /**
  * 分类数据模型
  */

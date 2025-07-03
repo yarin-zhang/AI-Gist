@@ -4,8 +4,8 @@
         <NCard>
             <NFlex vertical :size="getCardSpacing()">
                 <NFlex>
-                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" style="flex: 1" @input="handleSearch"
-                        clearable>
+                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" style="flex: 1"
+                        @input="handleSearch" clearable>
                         <template #prefix>
                             <NIcon>
                                 <Search />
@@ -67,11 +67,18 @@
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
                     <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
                         <Search />
-                    </NIcon> <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', { text: searchText.trim() }) }}</span>
-                    <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', { name: getCategoryName(selectedCategory) }) }}</span>
+                    </NIcon> <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', {
+                        text:
+                        searchText.trim() }) }}</span>
+                    <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
+                        name:
+                            getCategoryName(selectedCategory) })
+                        }}</span>
                     <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
                     <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }}) </span>
+                        ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
+                            < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
+                            </span>
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
@@ -79,7 +86,9 @@
                     <!-- 分类快捷筛选 -->
                     <div v-if="categories.length > 0" :style="{ padding: categoriesExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
-                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{ t('promptManagement.categoryFilterTitle') }}</NText>
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{
+                                t('promptManagement.categoryFilterTitle') }}
+                            </NText>
                             <NButton text size="small" @click="toggleCategoriesExpanded">
                                 <template #icon>
                                     <NIcon>
@@ -119,7 +128,8 @@
                     <!-- 热门标签快捷搜索 -->
                     <div v-if="popularTags.length > 0" :style="{ padding: tagsExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
-                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{ t('promptManagement.popularTags') }}</NText>
+                            <NText depth="2" style="font-size: 14px; font-weight: 500;">{{
+                                t('promptManagement.popularTags') }}</NText>
                             <NButton text size="small" @click="toggleTagsExpanded">
                                 <template #icon>
                                     <NIcon>
@@ -152,10 +162,9 @@
         <div v-if="initialLoading" style="text-align: center; padding: 40px;">
             <NSpin size="large" />
         </div>
-        <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) || 
-                       (viewMode === 'tree' && treeData.length === 0) || 
-                       (viewMode === 'table' && prompts.length === 0)" 
-             style="text-align: center; padding: 40px;">
+        <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) ||
+            (viewMode === 'tree' && treeData.length === 0) ||
+            (viewMode === 'table' && prompts.length === 0)" style="text-align: center; padding: 40px;">
             <NEmpty :description="t('promptManagement.noPrompts')" />
         </div>
         <div v-else>
@@ -178,7 +187,8 @@
                                 </template>
                                 {{ t('promptManagement.confirmBatchDelete', { count: selectedRows.length }) }}
                             </NPopconfirm>
-                            <NButton size="small" @click="clearSelection">{{ t('promptManagement.cancelSelection') }}</NButton>
+                            <NButton size="small" @click="clearSelection">{{ t('promptManagement.cancelSelection') }}
+                            </NButton>
                         </NFlex>
                     </NFlex>
                 </NCard>
@@ -186,16 +196,10 @@
 
             <!-- 树形表格视图 -->
             <div v-if="viewMode === 'tree'" style="margin-top: 16px;">
-                <NDataTable 
-                    :columns="treeTableColumns" 
-                    :data="treeData" 
-                    :loading="initialLoading"
+                <NDataTable :columns="treeTableColumns" :data="treeData" :loading="initialLoading"
                     :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
-                    v-model:checked-row-keys="selectedRowKeys"
-                    :max-height="600" 
-                    :scroll-x="1200" 
-                    :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
-                    default-expand-all />
+                    v-model:checked-row-keys="selectedRowKeys" :max-height="600" :scroll-x="1200"
+                    :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" default-expand-all />
             </div>
 
             <!-- 表格视图 -->
@@ -258,8 +262,10 @@
                                 <NFlex justify="space-between" align="center">
                                     <!-- 标签区域 -->
                                     <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
-                                        <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small" type="info">
-                                            {{ t('promptManagement.variableCount', { count: prompt.variables.length }) }}
+                                        <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small"
+                                            type="info">
+                                            {{ t('promptManagement.variableCount', { count: prompt.variables.length })
+                                            }}
                                         </NTag>
                                         <NTag v-if="prompt.category" size="small"
                                             :color="getCategoryTagColor(prompt.category)">
@@ -377,8 +383,8 @@ const categories = ref<CategoryWithRelations[]>([])
 const treeData = ref<TreeNode[]>([])
 const statistics = ref<{
     totalCount: number;
-    categoryStats: Array<{id: string | null, name: string, count: number}>;
-    popularTags: Array<{name: string, count: number}>;
+    categoryStats: Array<{ id: string | null, name: string, count: number }>;
+    popularTags: Array<{ name: string, count: number }>;
 }>({
     totalCount: 0,
     categoryStats: [],
@@ -468,7 +474,7 @@ const getCategoryPromptCount = (categoryId: number | null) => {
     if (categoryStats) {
         return categoryStats.count
     }
-    
+
     // 如果统计信息中没有，则从分类数据中获取
     if (categoryId === null) {
         // 未分类的数量
@@ -966,16 +972,16 @@ const handleBatchDelete = async () => {
         // 使用批量删除API，只触发一次同步
         const ids = selectedRows.value.map(prompt => prompt.id!)
         const result = await api.prompts.batchDelete.mutate(ids)
-        
+
         if (result.success > 0) {
             message.success(t('promptManagement.batchDeleteSuccess', { count: result.success }))
         }
-        
+
         if (result.failed > 0) {
             console.error('Batch delete partially failed:', result)
             message.warning(t('promptManagement.batchDeletePartialFailed', { count: result.failed }))
         }
-        
+
         clearSelection()
         if (viewMode.value === 'table') {
             await loadPromptsForTable()

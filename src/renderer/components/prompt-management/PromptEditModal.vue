@@ -3,12 +3,12 @@
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
-                {{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}
-            </NText>
-            <NText depth="3">
-                {{ getTabDescription() }}
-            </NText>
+                <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                    {{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}
+                </NText>
+                <NText depth="3">
+                    {{ getTabDescription() }}
+                </NText>
             </NFlex>
         </template>
         <!-- 中间可操作区域 -->
@@ -18,60 +18,44 @@
                     <!-- 编辑 Tab -->
                     <NTabPane name="edit" :tab="t('promptManagement.edit')">
                         <!-- 常规模式编辑器 -->
-                        <RegularPromptEditor
-                            v-if="!isJinjaEnabled"
-                            :content="formData.content"
-                            :variables="formData.variables"
-                            :content-height="contentHeight"
-                            :quick-optimization-configs="quickOptimizationConfigs"
-                            :optimizing="optimizing"
-                            :is-streaming="isStreaming"
-                            :stream-stats="streamStats"
-                            @update:content="updateContent"
-                            @update:variables="updateVariables"
-                            @optimize-prompt="optimizePrompt"
+                        <RegularPromptEditor v-if="!isJinjaEnabled" :content="formData.content"
+                            :variables="formData.variables" :content-height="contentHeight"
+                            :quick-optimization-configs="quickOptimizationConfigs" :optimizing="optimizing"
+                            :is-streaming="isStreaming" :stream-stats="streamStats" @update:content="updateContent"
+                            @update:variables="updateVariables" @optimize-prompt="optimizePrompt"
                             @stop-optimization="stopOptimization"
                             @open-quick-optimization-config="openQuickOptimizationConfig"
-                            @manual-adjustment="applyManualAdjustment"
-                            ref="regularEditorRef"
-                        />
+                            @manual-adjustment="applyManualAdjustment" ref="regularEditorRef" />
 
                         <!-- Jinja模式编辑器 -->
-                        <JinjaPromptEditor
-                            v-else
-                            :content="formData.content"
-                            :variables="formData.variables"
-                            :content-height="contentHeight"
-                            :quick-optimization-configs="quickOptimizationConfigs"
-                            :optimizing="optimizing"
-                            :is-streaming="isStreaming"
-                            :stream-stats="streamStats"
-                            @update:content="updateContent"
-                            @update:variables="updateVariables"
-                            @optimize-prompt="optimizePrompt"
-                            @stop-optimization="stopOptimization"
+                        <JinjaPromptEditor v-else :content="formData.content" :variables="formData.variables"
+                            :content-height="contentHeight" :quick-optimization-configs="quickOptimizationConfigs"
+                            :optimizing="optimizing" :is-streaming="isStreaming" :stream-stats="streamStats"
+                            @update:content="updateContent" @update:variables="updateVariables"
+                            @optimize-prompt="optimizePrompt" @stop-optimization="stopOptimization"
                             @open-quick-optimization-config="openQuickOptimizationConfig"
-                            @manual-adjustment="applyManualAdjustment"
-                            ref="jinjaEditorRef"
-                        />
+                            @manual-adjustment="applyManualAdjustment" ref="jinjaEditorRef" />
                     </NTabPane>
 
                     <!-- 补充信息 Tab -->
                     <NTabPane name="info" :tab="t('promptManagement.info')">
-                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3"
-                            :max="0.8" :disabled="modalWidth <= 800">
+                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }"
+                            :default-size="0.6" :min="0.3" :max="0.8" :disabled="modalWidth <= 800">
                             <!-- 左侧：基本信息 -->
                             <template #1>
-                                <NCard :title="t('promptManagement.basicInfo')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.basicInfo')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem :label="t('promptManagement.title')" path="title">
-                                                <NInput v-model:value="formData.title" :placeholder="t('promptManagement.titlePlaceholder')" />
+                                                <NInput v-model:value="formData.title"
+                                                    :placeholder="t('promptManagement.titlePlaceholder')" />
                                             </NFormItem>
 
                                             <NFormItem :label="t('promptManagement.description')" path="description">
                                                 <NInput v-model:value="formData.description" type="textarea"
-                                                    :placeholder="t('promptManagement.descriptionPlaceholder')" :rows="8" />
+                                                    :placeholder="t('promptManagement.descriptionPlaceholder')"
+                                                    :rows="8" />
                                             </NFormItem>
                                         </NFlex>
                                     </NScrollbar>
@@ -80,15 +64,18 @@
 
                             <!-- 右侧：分类与标签 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.categoryAndTags')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.categoryAndTags')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <NFormItem :label="t('promptManagement.category')">
                                                 <NSelect v-model:value="formData.categoryId" :options="categoryOptions"
-                                                    :placeholder="t('promptManagement.categoryPlaceholder')" clearable />
+                                                    :placeholder="t('promptManagement.categoryPlaceholder')"
+                                                    clearable />
                                             </NFormItem>
                                             <NFormItem :label="t('promptManagement.tags')" path="tags">
-                                                <NDynamicTags v-model:value="formData.tags" :placeholder="t('promptManagement.tagsPlaceholder')" :max="5" />
+                                                <NDynamicTags v-model:value="formData.tags"
+                                                    :placeholder="t('promptManagement.tagsPlaceholder')" :max="5" />
                                             </NFormItem>
                                         </NFlex>
                                     </NScrollbar>
@@ -98,15 +85,19 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit && historyList.length > 0" name="history" :tab="t('promptManagement.history')">
-                        <NCard :title="t('promptManagement.versionHistory')" size="small" :style="{ height: `${contentHeight - 50}px` }">
+                    <NTabPane v-if="isEdit && historyList.length > 0" name="history"
+                        :tab="t('promptManagement.history')">
+                        <NCard :title="t('promptManagement.versionHistory')" size="small"
+                            :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
-                                <NFlex vertical size="medium" style="padding-right: 12px;" v-if="historyList.length > 0">
+                                <NFlex vertical size="medium" style="padding-right: 12px;"
+                                    v-if="historyList.length > 0">
                                     <NCard v-for="(history, index) in historyList" :key="history.id" size="small">
                                         <template #header>
                                             <NFlex justify="space-between" align="center">
                                                 <NFlex align="center" size="small">
-                                                    <NText strong>{{ t('promptManagement.version') }} {{ history.version }}</NText>
+                                                    <NText strong>{{ t('promptManagement.version') }} {{ history.version
+                                                        }}</NText>
                                                     <NTag size="small" type="info">
                                                         {{ formatDate(history.createdAt) }}
                                                     </NTag>
@@ -120,7 +111,8 @@
                                                         </template>
                                                         {{ t('promptManagement.preview') }}
                                                     </NButton>
-                                                    <NButton size="small" type="primary" @click="rollbackToHistory(history)">
+                                                    <NButton size="small" type="primary"
+                                                        @click="rollbackToHistory(history)">
                                                         <template #icon>
                                                             <NIcon>
                                                                 <ArrowBackUp />
@@ -134,10 +126,12 @@
                                         <NFlex vertical size="small">
                                             <NText depth="3">{{ history.title }}</NText>
                                             <NText depth="3" v-if="history.changeDescription">
-                                                {{ t('promptManagement.changeDescription') }}: {{ history.changeDescription }}
+                                                {{ t('promptManagement.changeDescription') }}: {{
+                                                history.changeDescription }}
                                             </NText>
                                             <NText depth="3" style="font-size: 12px;">
-                                                {{ t('promptManagement.contentPreview') }}: {{ getContentPreview(history.content) }}
+                                                {{ t('promptManagement.contentPreview') }}: {{
+                                                getContentPreview(history.content) }}
                                             </NText>
                                         </NFlex>
                                     </NCard>
@@ -164,11 +158,8 @@
                     <NFlex align="center" size="small">
                         <!-- 模式切换按钮 - 仅在编辑Tab时显示 -->
                         <NFlex v-if="activeTab === 'edit'" size="small">
-                            <NButton 
-                                :type="!isJinjaEnabled ? 'primary' : 'default'"
-                                @click="switchToRegularMode"
-                                :disabled="isStreaming || optimizing !== null"
-                            >
+                            <NButton :type="!isJinjaEnabled ? 'primary' : 'default'" @click="switchToRegularMode"
+                                :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
                                         <Code />
@@ -176,11 +167,8 @@
                                 </template>
                                 {{ t('promptManagement.regularMode') }}
                             </NButton>
-                            <NButton 
-                                :type="isJinjaEnabled ? 'primary' : 'default'"
-                                @click="switchToJinjaMode"
-                                :disabled="isStreaming || optimizing !== null"
-                            >
+                            <NButton :type="isJinjaEnabled ? 'primary' : 'default'" @click="switchToJinjaMode"
+                                :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
                                         <Code />
@@ -189,7 +177,7 @@
                                 {{ t('promptManagement.jinjaMode') }}
                             </NButton>
                         </NFlex>
-                        
+
                         <!-- 显示当前活动的tab信息 -->
                         <NText depth="3" v-if="activeTab === 'history' && isEdit">
                             {{ t('promptManagement.historyDescription') }}
@@ -226,22 +214,18 @@
                 <NTabs type="segment" :style="{ height: '100%' }">
                     <!-- 内容与变量 Tab -->
                     <NTabPane name="content" :tab="t('promptManagement.contentAndVariables')">
-                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3" :max="0.8">
+                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }"
+                            :default-size="0.6" :min="0.3" :max="0.8">
                             <!-- 左侧：提示词内容 -->
                             <template #1>
-                                <NCard :title="t('promptManagement.promptContent')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.promptContent')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <div style="padding-right: 12px;">
-                                            <NInput
-                                                :value="previewHistory.content"
-                                                type="textarea"
-                                                readonly
-                                                :style="{ 
-                                                    height: `${contentHeight - 180}px`, 
-                                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' 
-                                                }"
-                                                :autosize="false"
-                                            />
+                                            <NInput :value="previewHistory.content" type="textarea" readonly :style="{
+                                                height: `${contentHeight - 180}px`,
+                                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace'
+                                            }" :autosize="false" />
                                         </div>
                                     </NScrollbar>
                                 </NCard>
@@ -249,59 +233,73 @@
 
                             <!-- 右侧：变量配置 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.variableConfig')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.variableConfig')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <div style="padding-right: 12px;">
-                                            <NFlex vertical size="medium" v-if="getPreviewVariables(previewHistory.variables).length > 0">
-                                                <NCard 
-                                                    v-for="(variable, index) in getPreviewVariables(previewHistory.variables)" 
-                                                    :key="index" 
-                                                    size="small"
-                                                >
+                                            <NFlex vertical size="medium"
+                                                v-if="getPreviewVariables(previewHistory.variables).length > 0">
+                                                <NCard
+                                                    v-for="(variable, index) in getPreviewVariables(previewHistory.variables)"
+                                                    :key="index" size="small">
                                                     <template #header>
                                                         <NText strong>{{ variable.name }}</NText>
                                                     </template>
                                                     <NFlex vertical size="small">
                                                         <NFlex>
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableLabel') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.variableLabel') }}</NText>
                                                             </div>
                                                             <NText style="font-size: 12px;">{{ variable.name }}</NText>
                                                         </NFlex>
                                                         <NFlex>
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableType') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.variableType') }}</NText>
                                                             </div>
-                                                            <NTag size="small" :type="variable.type === 'text' ? 'default' : 'info'">
-                                                                {{ variable.type === 'text' ? t('promptManagement.text') : t('promptManagement.select') }}
+                                                            <NTag size="small"
+                                                                :type="variable.type === 'text' ? 'default' : 'info'">
+                                                                {{ variable.type === 'text' ? t('promptManagement.text')
+                                                                : t('promptManagement.select') }}
                                                             </NTag>
                                                         </NFlex>
                                                         <NFlex>
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableRequired') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.variableRequired') }}</NText>
                                                             </div>
-                                                            <NTag size="small" :type="variable.required ? 'error' : 'success'">
-                                                                {{ variable.required ? t('common.yes') : t('common.no') }}
+                                                            <NTag size="small"
+                                                                :type="variable.required ? 'error' : 'success'">
+                                                                {{ variable.required ? t('common.yes') : t('common.no')
+                                                                }}
                                                             </NTag>
                                                         </NFlex>
                                                         <NFlex v-if="variable.defaultValue">
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableDefault') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.variableDefault') }}</NText>
                                                             </div>
-                                                            <NText style="font-size: 12px;">{{ variable.defaultValue }}</NText>
+                                                            <NText style="font-size: 12px;">{{ variable.defaultValue }}
+                                                            </NText>
                                                         </NFlex>
                                                         <NFlex v-if="variable.placeholder">
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.placeholder') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.placeholder') }}</NText>
                                                             </div>
-                                                            <NText depth="3" style="font-size: 12px;">{{ variable.placeholder }}</NText>
+                                                            <NText depth="3" style="font-size: 12px;">{{
+                                                                variable.placeholder }}</NText>
                                                         </NFlex>
-                                                        <NFlex v-if="variable.type === 'select' && variable.options && variable.options.length > 0">
+                                                        <NFlex
+                                                            v-if="variable.type === 'select' && variable.options && variable.options.length > 0">
                                                             <div style="width: 60px;">
-                                                                <NText depth="3" style="font-size: 12px;">{{ t('promptManagement.variableOptions') }}</NText>
+                                                                <NText depth="3" style="font-size: 12px;">{{
+                                                                    t('promptManagement.variableOptions') }}</NText>
                                                             </div>
                                                             <NFlex size="small" wrap>
-                                                                <NTag v-for="option in variable.options" :key="option" size="small">
+                                                                <NTag v-for="option in variable.options" :key="option"
+                                                                    size="small">
                                                                     {{ option }}
                                                                 </NTag>
                                                             </NFlex>
@@ -309,7 +307,8 @@
                                                     </NFlex>
                                                 </NCard>
                                             </NFlex>
-                                            <NEmpty v-else :description="t('promptManagement.noVariablesInVersion')" size="small">
+                                            <NEmpty v-else :description="t('promptManagement.noVariablesInVersion')"
+                                                size="small">
                                                 <template #icon>
                                                     <NIcon>
                                                         <Plus />
@@ -325,25 +324,27 @@
 
                     <!-- 补充信息 Tab -->
                     <NTabPane name="info" :tab="t('promptManagement.additionalInfo')">
-                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }" :default-size="0.6" :min="0.3" :max="0.8">
+                        <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }"
+                            :default-size="0.6" :min="0.3" :max="0.8">
                             <!-- 左侧：基本信息 -->
                             <template #1>
-                                <NCard :title="t('promptManagement.basicInfo')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.basicInfo')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <div>
-                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">{{ t('promptManagement.title') }}</NText>
+                                                <NText depth="3"
+                                                    style="font-size: 12px; margin-bottom: 4px; display: block;">{{
+                                                    t('promptManagement.title') }}</NText>
                                                 <NInput :value="previewHistory.title" readonly />
                                             </div>
 
                                             <div v-if="previewHistory.description">
-                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">{{ t('promptManagement.description') }}</NText>
-                                                <NInput 
-                                                    :value="previewHistory.description" 
-                                                    type="textarea" 
-                                                    readonly 
-                                                    :rows="8" 
-                                                />
+                                                <NText depth="3"
+                                                    style="font-size: 12px; margin-bottom: 4px; display: block;">{{
+                                                    t('promptManagement.description') }}</NText>
+                                                <NInput :value="previewHistory.description" type="textarea" readonly
+                                                    :rows="8" />
                                             </div>
                                         </NFlex>
                                     </NScrollbar>
@@ -352,29 +353,34 @@
 
                             <!-- 右侧：分类与标签 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.categoryAndTags')" size="small" :style="{ height: '100%' }">
+                                <NCard :title="t('promptManagement.categoryAndTags')" size="small"
+                                    :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
                                             <div v-if="previewHistory.categoryId">
-                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">{{ t('promptManagement.category') }}</NText>
+                                                <NText depth="3"
+                                                    style="font-size: 12px; margin-bottom: 4px; display: block;">{{
+                                                    t('promptManagement.category') }}</NText>
                                                 <NInput :value="getCategoryName(previewHistory.categoryId)" readonly />
                                             </div>
 
                                             <div v-if="previewHistory.tags">
-                                                <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">{{ t('promptManagement.tags') }}</NText>
+                                                <NText depth="3"
+                                                    style="font-size: 12px; margin-bottom: 8px; display: block;">{{
+                                                    t('promptManagement.tags') }}</NText>
                                                 <NFlex size="small" wrap>
-                                                    <NTag 
+                                                    <NTag
                                                         v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
-                                                        :key="tag"
-                                                        size="small"
-                                                    >
+                                                        :key="tag" size="small">
                                                         {{ tag }}
                                                     </NTag>
                                                 </NFlex>
                                             </div>
 
                                             <div v-if="previewHistory.changeDescription">
-                                                <NText depth="3" style="font-size: 12px; margin-bottom: 4px; display: block;">{{ t('promptManagement.changeDescription') }}</NText>
+                                                <NText depth="3"
+                                                    style="font-size: 12px; margin-bottom: 4px; display: block;">{{
+                                                    t('promptManagement.changeDescription') }}</NText>
                                                 <NInput :value="previewHistory.changeDescription" readonly />
                                             </div>
                                         </NFlex>
@@ -625,7 +631,7 @@ const openQuickOptimizationConfig = () => {
 
 // 重置表单方法
 const resetForm = () => {
-    
+
     // 清理防抖定时器
     if (debounceTimer.value) {
         clearTimeout(debounceTimer.value);
@@ -647,18 +653,18 @@ const resetForm = () => {
     };
     activeTab.value = "edit";
     historyList.value = [];
-    
+
     // 重置 Jinja 模式状态
     isJinjaEnabled.value = false;
-    
+
     // 重置优化状态
     optimizing.value = null;
     isStreaming.value = false;
     streamingContent.value = "";
     generationControl.shouldStop = false;
-    
+
     // 重置手动调整状态现在由子组件处理
-    
+
     // 重置流式统计
     Object.assign(streamStats, {
         charCount: 0,
@@ -684,7 +690,7 @@ const loadHistory = async () => {
     if (loadingHistory.value) {
         return;
     }
-    
+
     if (!isEdit.value || !props.prompt?.id) {
         historyList.value = [];
         return;
@@ -692,7 +698,7 @@ const loadHistory = async () => {
 
     try {
         loadingHistory.value = true;
-        
+
         // 先检查表是否存在
         const tableExists = await api.promptHistories.checkExists.query();
         if (!tableExists) {
@@ -700,7 +706,7 @@ const loadHistory = async () => {
             historyList.value = [];
             return;
         }
-        
+
         historyList.value = await api.promptHistories.getByPromptId.query(props.prompt.id);
     } catch (error: any) {
         console.error("加载历史记录失败:", error);
@@ -721,7 +727,7 @@ const loadHistory = async () => {
 const createHistoryRecord = async (currentPrompt: any) => {
     try {
         const latestVersion = await api.promptHistories.getLatestVersion.query(currentPrompt.id);
-        
+
         const historyData = {
             promptId: currentPrompt.id,
             version: latestVersion + 1,
@@ -752,20 +758,20 @@ const createHistoryRecord = async (currentPrompt: any) => {
 // 停止优化生成
 const stopOptimization = async () => {
     console.log(t('promptManagement.stopOptimizationLog'));
-    
+
     try {
         generationControl.shouldStop = true;
-        
+
         // 调用停止API
         if ((window as any).electronAPI?.ai?.stopGeneration) {
             await (window as any).electronAPI.ai.stopGeneration();
         }
-        
+
         // 重置状态
         isStreaming.value = false;
         optimizing.value = null;
         generationControl.shouldStop = false;
-        
+
         message.info(t('promptManagement.optimizationStopped'));
     } catch (error) {
         console.error('停止优化失败:', error);
@@ -776,11 +782,11 @@ const stopOptimization = async () => {
 // 启动流式生成
 const startStreamingGeneration = async (request: any, serializedConfig: any) => {
     let result;
-    
+
     // 检查是否支持流式传输
     if ((window as any).electronAPI?.ai?.generatePromptStream) {
         console.log(t('promptManagement.streamModeLog'));
-        
+
         // 使用流式传输
         result = await (window as any).electronAPI.ai.generatePromptStream(
             request,
@@ -791,7 +797,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
                     console.log('检测到停止信号，中断流式优化');
                     return false; // 返回 false 表示停止流式传输
                 }
-                
+
                 const now = Date.now();
                 console.log('优化流式传输回调:', {
                     charCount,
@@ -805,7 +811,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
                 const prevUpdateTime = streamStats.lastUpdateTime;
                 streamStats.charCount = charCount;
                 streamStats.lastUpdateTime = now;
-                
+
                 // 计算内容增长速率
                 if (prevUpdateTime > 0 && charCount > prevCharCount) {
                     const timeDiff = (now - prevUpdateTime) / 1000;
@@ -815,9 +821,9 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
 
                 // 检测是否有真实内容
                 const hasRealContent = typeof partialContent === 'string' && partialContent.length > 0;
-                
+
                 // 判断生成是否活跃
-                streamStats.isGenerationActive = hasRealContent || 
+                streamStats.isGenerationActive = hasRealContent ||
                     (charCount > prevCharCount && (now - prevUpdateTime) < 2000);
 
                 if (hasRealContent) {
@@ -829,7 +835,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
                 } else {
                     // 没有内容时的处理
                     streamStats.noContentUpdateCount++;
-                    
+
                     if (charCount > prevCharCount) {
                         // 字符数在增长，说明正在生成
                         const placeholderText = `${t('promptManagement.optimizing')} (${t('promptManagement.generatedChars', { count: charCount })})`;
@@ -843,7 +849,7 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
                 return true; // 继续生成
             }
         );
-        
+
         console.log('流式传输完成，最终结果:', {
             success: !!result,
             contentLength: result?.generatedPrompt?.length || 0
@@ -860,33 +866,33 @@ const startStreamingGeneration = async (request: any, serializedConfig: any) => 
         console.log(t('promptManagement.normalModeLog'));
         // 使用普通生成
         result = await (window as any).electronAPI.ai.generatePrompt(request, serializedConfig);
-        
+
         // 模拟流式更新
         if (result?.generatedPrompt) {
             const content = result.generatedPrompt;
             const totalChars = content.length;
             const steps = Math.min(30, totalChars);
             const stepSize = Math.ceil(totalChars / steps);
-            
+
             for (let i = 0; i < steps; i++) {
                 if (generationControl.shouldStop) break;
-                
+
                 const currentCharCount = Math.min((i + 1) * stepSize, totalChars);
                 const partialContent = content.substring(0, currentCharCount);
-                
+
                 streamStats.charCount = currentCharCount;
                 formData.value.content = partialContent;
                 streamingContent.value = partialContent;
-                
+
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
-            
+
             // 确保显示完整内容
             formData.value.content = content;
             streamingContent.value = content;
         }
     }
-    
+
     return result;
 };
 
@@ -924,7 +930,7 @@ const optimizePrompt = async (configId: number) => {
     isStreaming.value = true;
     generationControl.shouldStop = false;
     streamingContent.value = "";
-    
+
     // 重置流式统计
     Object.assign(streamStats, {
         charCount: 0,
@@ -941,10 +947,10 @@ const optimizePrompt = async (configId: number) => {
 
     try {
         console.log("开始流式优化提示词:", optimizationConfig.name, formData.value.content);
-        
+
         // 使用配置的提示词模板
         const optimizationPrompt = optimizationConfig.prompt.replace('{{content}}', formData.value.content);
-        
+
         // 序列化配置以确保可以通过 IPC 传递
         const serializedConfig = {
             configId: selectedConfig.configId || '',
@@ -978,13 +984,13 @@ const optimizePrompt = async (configId: number) => {
 
         // 启动流式传输监听
         await startStreamingGeneration(request, serializedConfig);
-        
+
         message.success(t('promptManagement.optimizationComplete'));
 
     } catch (error: any) {
         console.error("优化失败:", error);
         message.error(t('promptManagement.optimizationFailed') + ": " + (error.message || t('common.unknownError')));
-        
+
         // 出错时恢复原始内容
         formData.value.content = originalContent;
     } finally {
@@ -1007,7 +1013,7 @@ const applyManualAdjustment = async (instruction: string) => {
         message.warning(t('promptManagement.enterAdjustmentInstruction'));
         return;
     }
-    
+
     if (!formData.value.content.trim()) {
         message.warning(t('promptManagement.enterPromptContentFirst'));
         return;
@@ -1033,7 +1039,7 @@ const applyManualAdjustment = async (instruction: string) => {
     isStreaming.value = true;
     generationControl.shouldStop = false;
     streamingContent.value = "";
-    
+
     // 重置流式传输统计
     streamStats.charCount = 0;
     streamStats.isStreaming = true;
@@ -1045,7 +1051,7 @@ const applyManualAdjustment = async (instruction: string) => {
 
     try {
         console.log("开始手动调整提示词:", instruction, formData.value.content);
-        
+
         // 构建手动调整指令，包含原有提示词
         const adjustmentPrompt = `${t('promptManagement.adjustPromptInstruction')}
 
@@ -1056,7 +1062,7 @@ ${t('promptManagement.adjustmentInstruction')}
 ${instruction.trim()}
 
 ${t('promptManagement.outputImprovedPrompt')}`;
-        
+
         // 序列化配置以确保可以通过 IPC 传递
         const serializedConfig = {
             configId: selectedConfig.configId || '',
@@ -1090,7 +1096,7 @@ ${t('promptManagement.outputImprovedPrompt')}`;
 
         // 启动流式传输监听
         await startStreamingGeneration(request, serializedConfig);
-        
+
         message.success(t('promptManagement.adjustmentComplete'));
 
     } catch (error: any) {
@@ -1154,7 +1160,7 @@ const rollbackToHistory = (history: PromptHistory) => {
     try {
         // 设置初始化标志，防止递归更新
         isInitializing.value = true;
-        
+
         // 使用 nextTick 避免递归更新
         nextTick(() => {
             formData.value = {
@@ -1171,12 +1177,12 @@ const rollbackToHistory = (history: PromptHistory) => {
                     ? JSON.parse(history.variables)
                     : [],
             };
-            
+
             // 切换到编辑Tab
             activeTab.value = "edit";
-            
+
             message.success(t('promptManagement.rolledBackToVersion', { version: history.version }));
-            
+
             // 重置初始化标志
             nextTick(() => {
                 isInitializing.value = false;
@@ -1223,9 +1229,9 @@ watch(
     (newPrompt) => {
         // 防止递归更新
         if (newPrompt === undefined || isInitializing.value) return;
-        
+
         isInitializing.value = true;
-        
+
         if (newPrompt) {
             // 有 prompt 数据，初始化为编辑模式
             formData.value = {
@@ -1239,8 +1245,8 @@ watch(
                             .split(",")
                             .map((t: string) => t.trim())
                             .filter((t: string) => t)
-                        : Array.isArray(newPrompt.tags) 
-                            ? newPrompt.tags 
+                        : Array.isArray(newPrompt.tags)
+                            ? newPrompt.tags
                             : []
                     : [],
                 variables:
@@ -1286,7 +1292,7 @@ watch(
                     });
                 }
             }
-            
+
             // 加载历史记录
             nextTick(() => {
                 if (!isInitializing.value) {
@@ -1303,7 +1309,7 @@ watch(
                 }
             });
         }
-        
+
         // 重置初始化标志
         nextTick(() => {
             isInitializing.value = false;
@@ -1329,9 +1335,9 @@ watch(
         if (newShow && !oldShow) {
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
-            
 
-            
+
+
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
                 // 只有在确实没有 prompt 且不是编辑模式时才重置表单
@@ -1346,13 +1352,13 @@ watch(
                 clearTimeout(debounceTimer.value);
                 debounceTimer.value = null;
             }
-            
+
             // 重置优化状态
             optimizing.value = null;
             isStreaming.value = false;
             streamingContent.value = "";
             generationControl.shouldStop = false;
-            
+
             // 重置手动调整状态现在由子组件处理
 
             // 延迟重置表单，确保弹窗完全关闭后再重置
@@ -1372,7 +1378,7 @@ watch(
     (newContent) => {
         // 防止在初始化过程中触发
         if (isInitializing.value) return;
-        
+
         if (newContent) {
             debouncedExtractVariables(newContent);
         } else {
@@ -1397,12 +1403,12 @@ watch(
     (newVariables) => {
         // 防止在初始化过程中触发
         if (isInitializing.value) return;
-        
+
         // 检查是否需要更新变量
         let needsUpdate = false;
         const updatedVariables = newVariables.map((variable) => {
             const updatedVariable = { ...variable };
-            
+
             // 当变量类型为选项时，检查默认值是否在选项中
             if (updatedVariable.type === "select" && updatedVariable.defaultValue) {
                 if (!updatedVariable.options || !updatedVariable.options.includes(updatedVariable.defaultValue)) {
@@ -1427,10 +1433,10 @@ watch(
                 updatedVariable.options = ["选项1", "选项2"];
                 needsUpdate = true;
             }
-            
+
             return updatedVariable;
         });
-        
+
         // 只有在确实需要更新时才更新，避免无限循环
         if (needsUpdate) {
             nextTick(() => {
@@ -1507,13 +1513,13 @@ const handleCancel = () => {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
-    
+
     // 重置优化和流式传输状态
     optimizing.value = null;
     isStreaming.value = false;
     streamingContent.value = "";
     generationControl.shouldStop = true; // 如果正在生成，停止生成
-    
+
     // 重置手动调整状态现在由子组件处理
 
     emit("update:show", false);
@@ -1578,7 +1584,7 @@ const handleSave = async () => {
 
         // 处理变量数据
         let variablesData: any[] = [];
-        
+
         if (isJinjaEnabled.value) {
             // Jinja 模式：使用 Jinja 编辑器中的变量
             const jinjaVariables = jinjaEditorRef.value?.jinjaVariables || [];
@@ -1628,13 +1634,13 @@ const handleSave = async () => {
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新
             await createHistoryRecord(props.prompt);
-            
+
             await api.prompts.update.mutate({
                 id: props.prompt.id,
                 data,
             });
             message.success(t('promptManagement.updateSuccess'));
-            
+
             // 重新加载历史记录
             loadHistory();
         } else {
@@ -1763,25 +1769,25 @@ const updateContent = (newContent: string) => {
 const updateVariables = (newVariables: any[]) => {
     // 防止在初始化过程中触发
     if (isInitializing.value) return;
-    
+
     // 检查变量是否真的发生了变化
     const currentVariables = formData.value.variables;
     if (currentVariables.length === newVariables.length) {
         const hasChanges = newVariables.some((newVar, index) => {
             const currentVar = currentVariables[index];
             return newVar.name !== currentVar.name ||
-                   newVar.type !== currentVar.type ||
-                   newVar.required !== currentVar.required ||
-                   newVar.defaultValue !== currentVar.defaultValue ||
-                   newVar.placeholder !== currentVar.placeholder ||
-                   JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options);
+                newVar.type !== currentVar.type ||
+                newVar.required !== currentVar.required ||
+                newVar.defaultValue !== currentVar.defaultValue ||
+                newVar.placeholder !== currentVar.placeholder ||
+                JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options);
         });
-        
+
         if (!hasChanges) {
             return; // 没有变化，不更新
         }
     }
-    
+
     formData.value.variables = newVariables.map(v => ({
         name: v.name,
         type: v.type,
