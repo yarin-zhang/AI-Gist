@@ -1,0 +1,191 @@
+/* router-fade */
+.router-fade-enter-active,
+.router-fade-leave-active {
+	transition: opacity var(--router-transition-duration) ease-in-out;
+}
+.router-fade-enter-from,
+.router-fade-leave-to {
+	opacity: 0;
+}
+
+/* router-fade-up */
+.router-fade-up-enter-active,
+.router-fade-up-leave-active {
+	transition:
+		opacity var(--router-transition-duration) ease-in-out,
+		transform var(--router-transition-duration) ease-in-out;
+}
+.router-fade-up-enter-from {
+	opacity: 0;
+	transform: translateY(10px);
+}
+.router-fade-up-leave-to {
+	opacity: 0;
+	transform: translateY(-10px);
+}
+
+/* router-fade-bottom */
+.router-fade-bottom-enter-active,
+.router-fade-bottom-leave-active {
+	transition:
+		opacity var(--router-transition-duration) ease-in-out,
+		transform var(--router-transition-duration) ease-in-out;
+}
+.router-fade-bottom-enter-from {
+	opacity: 0;
+	transform: translateY(-10px);
+}
+.router-fade-bottom-leave-to {
+	opacity: 0;
+	transform: translateY(10px);
+}
+
+/* router-fade-left */
+.router-fade-left-enter-active,
+.router-fade-left-leave-active {
+	transition:
+		opacity var(--router-transition-duration) ease-in-out,
+		transform var(--router-transition-duration) ease-in-out;
+}
+.router-fade-left-enter-from {
+	opacity: 0;
+	transform: translateX(10px);
+}
+.router-fade-left-leave-to {
+	opacity: 0;
+	transform: translateX(-10px);
+}
+
+/* router-fade-right */
+.router-fade-right-enter-active,
+.router-fade-right-leave-active {
+	transition:
+		opacity var(--router-transition-duration) ease-in-out,
+		transform var(--router-transition-duration) ease-in-out;
+}
+.router-fade-right-enter-from {
+	opacity: 0;
+	transform: translateX(-10px);
+}
+.router-fade-right-leave-to {
+	opacity: 0;
+	transform: translateX(10px);
+}
+
+// 页面切换动画
+.page-transition {
+  &-fade-enter-active,
+  &-fade-leave-active {
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-fade-enter-from,
+  &-fade-leave-to {
+    opacity: 0;
+  }
+}
+
+.page-transition {
+  &-slide-up-enter-active,
+  &-slide-up-leave-active {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-slide-up-enter-from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  
+  &-slide-up-leave-to {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+.page-transition {
+  &-slide-down-enter-active,
+  &-slide-down-leave-active {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-slide-down-enter-from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  
+  &-slide-down-leave-to {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+.page-transition {
+  &-slide-left-enter-active,
+  &-slide-left-leave-active {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-slide-left-enter-from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  
+  &-slide-left-leave-to {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+
+.page-transition {
+  &-slide-right-enter-active,
+  &-slide-right-leave-active {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-slide-right-enter-from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  
+  &-slide-right-leave-to {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+
+// 缩放动画
+.page-transition {
+  &-scale-enter-active,
+  &-scale-leave-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  &-scale-enter-from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  
+  &-scale-leave-to {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+
+// 翻转动画
+.page-transition {
+  &-flip-enter-active,
+  &-flip-leave-active {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+  
+  &-flip-enter-from {
+    opacity: 0;
+    transform: rotateY(-90deg);
+  }
+  
+  &-flip-leave-to {
+    opacity: 0;
+    transform: rotateY(90deg);
+  }
+} 

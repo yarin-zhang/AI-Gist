@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 表面颜色 */
+    --surface-primary: rgb(255, 255, 255);
+    --surface-secondary: rgb(248, 250, 252);
+    --surface-tertiary: rgb(241, 245, 249);
+    --surface-sidebar: rgb(255, 255, 255);
+    --surface-body: rgb(250, 251, 253);
+    
+    /* 内容颜色 */
+    --content-primary: rgb(15, 23, 42);
+    --content-secondary: rgb(71, 85, 105);
+    --content-tertiary: rgb(148, 163, 184);
+    --content-muted: rgb(203, 213, 225);
+    
+    /* 强调色 */
+    --accent-primary: rgb(59, 130, 246);
+    --accent-success: rgb(34, 197, 94);
+    --accent-warning: rgb(245, 158, 11);
+    --accent-error: rgb(239, 68, 68);
+    --accent-info: rgb(99, 102, 241);
+    
+    /* 边框颜色 */
+    --border-default: rgb(226, 232, 240);
+    --border-strong: rgb(203, 213, 225);
+    --border-subtle: rgb(241, 245, 249);
+    
+    /* 交互颜色 */
+    --interactive-hover: rgba(148, 163, 184, 0.1);
+    --interactive-active: rgba(148, 163, 184, 0.2);
+    --interactive-focus: rgba(59, 130, 246, 0.1);
+  }
+  
+  .dark {
+    /* 表面颜色 */
+    --surface-primary: rgb(30, 41, 59);
+    --surface-secondary: rgb(51, 65, 85);
+    --surface-tertiary: rgb(71, 85, 105);
+    --surface-sidebar: rgb(15, 23, 42);
+    --surface-body: rgb(2, 6, 23);
+    
+    /* 内容颜色 */
+    --content-primary: rgb(248, 250, 252);
+    --content-secondary: rgb(203, 213, 225);
+    --content-tertiary: rgb(148, 163, 184);
+    --content-muted: rgb(100, 116, 139);
+    
+    /* 强调色 */
+    --accent-primary: rgb(96, 165, 250);
+    --accent-success: rgb(74, 222, 128);
+    --accent-warning: rgb(251, 191, 36);
+    --accent-error: rgb(248, 113, 113);
+    --accent-info: rgb(129, 140, 248);
+    
+    /* 边框颜色 */
+    --border-default: rgb(71, 85, 105);
+    --border-strong: rgb(100, 116, 139);
+    --border-subtle: rgb(51, 65, 85);
+    
+    /* 交互颜色 */
+    --interactive-hover: rgba(148, 163, 184, 0.1);
+    --interactive-active: rgba(148, 163, 184, 0.2);
+    --interactive-focus: rgba(96, 165, 250, 0.1);
+  }
+}
+
+@layer components {
+  .btn-modern {
+    @apply bg-accent-primary text-white px-4 py-2 rounded-lg hover:bg-accent-primary/90 transition-all duration-200 shadow-sm;
+  }
+  
+  .card-modern {
+    @apply bg-surface-primary border border-border-default rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .input-modern {
+    @apply bg-surface-primary border border-border-default rounded-md px-3 py-2 focus:border-accent-primary focus:ring-2 focus:ring-interactive-focus transition-all duration-200;
+  }
+} 

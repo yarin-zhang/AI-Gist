@@ -23,7 +23,7 @@ import AppInitializer from '~/components/common/AppInitializer.vue'
 import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 
 // 使用主题管理
-const { naiveTheme, initTheme } = useTheme()
+const { naiveTheme, getThemeOverrides, initTheme } = useTheme()
 
 // 使用 i18n
 const { currentLocale } = useI18n()
@@ -62,7 +62,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <NConfigProvider :theme="naiveTheme" :locale="naiveLocale" :date-locale="naiveDateLocale">
+    <NConfigProvider :theme="naiveTheme" :theme-overrides="getThemeOverrides()" :locale="naiveLocale" :date-locale="naiveDateLocale">
         <NMessageProvider>
             <NDialogProvider>
                 <AppInitializer>

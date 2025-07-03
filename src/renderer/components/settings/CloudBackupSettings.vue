@@ -79,9 +79,6 @@
                                                                 </template>
                                                                 <div style="max-width: 300px;">
                                                                     <p>{{ t('cloudBackup.restoreWarning') }}</p>
-                                                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                                                        <li v-for="item in t('cloudBackup.restoreWarningItems')" :key="item">{{ item }}</li>
-                                                                    </ul>
                                                                 </div>
                                                             </NPopconfirm>
                                                             <NPopconfirm

@@ -193,11 +193,7 @@
     "noCloudBackups": "暂无云端备份，请先创建备份",
     "refreshBackupList": "刷新备份列表",
     "restore": "恢复",
-    "restoreWarning": "注意！恢复云端备份将会：",
-    "restoreWarningItems": [
-      "自动备份当前数据",
-      "完全覆盖现有数据库"
-    ],
+    "restoreWarning": "注意！恢复云端备份将会自动备份当前数据并完全覆盖现有数据库",
     "storageConfiguration": "云端存储配置",
     "storageDescription": "配置 WebDAV 或 iCloud Drive 存储，用于云端备份功能",
     "testConnection": "测试连接"
@@ -253,11 +249,7 @@
     "refreshBackupList": "刷新备份列表",
     "repairDatabase": "修复数据库",
     "restore": "恢复",
-    "restoreWarning": "注意！恢复备份将会：",
-    "restoreWarningItems": [
-      "自动备份当前数据",
-      "完全覆盖现有数据库"
-    ],
+    "restoreWarning": "注意！恢复备份将会自动备份当前数据并完全覆盖现有数据库",
     "securityWarning": "安全提示",
     "securityWarningText": "您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。",
     "selectDataTypeToExport": "选择要导出的数据类型：",

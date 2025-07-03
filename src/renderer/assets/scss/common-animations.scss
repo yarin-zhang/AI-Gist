@@ -1,0 +1,125 @@
+// 元素出现动画
+.fade-in {
+	&.fade-in-up {
+		animation: slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		opacity: 0;
+	}
+	
+	&.fade-in-down {
+		animation: slide-down 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		opacity: 0;
+	}
+	
+	&.fade-in-left {
+		animation: slide-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		opacity: 0;
+	}
+	
+	&.fade-in-right {
+		animation: slide-right 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		opacity: 0;
+	}
+
+	// 延迟动画
+	&.delay-50 {
+		@for $i from 0 through 20 {
+			&:nth-child(#{$i + 1}) {
+				animation-delay: $i * 0.05s;
+			}
+		}
+	}
+	
+	&.delay-100 {
+		@for $i from 0 through 20 {
+			&:nth-child(#{$i + 1}) {
+				animation-delay: $i * 0.1s;
+			}
+		}
+	}
+	
+	&.delay-150 {
+		@for $i from 0 through 20 {
+			&:nth-child(#{$i + 1}) {
+				animation-delay: $i * 0.15s;
+			}
+		}
+	}
+}
+
+// 关键帧动画
+@keyframes slide-up {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes slide-left {
+	from {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes slide-right {
+	from {
+		opacity: 0;
+		transform: translateX(-20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+// 悬停动画
+.hover-lift {
+	transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	
+	&:hover {
+		transform: translateY(-2px);
+	}
+}
+
+.hover-scale {
+	transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	
+	&:hover {
+		transform: scale(1.02);
+	}
+}
+
+// 脉冲动画
+.pulse-glow {
+	animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-glow {
+	0%, 100% {
+		opacity: 1;
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+	}
+	50% {
+		opacity: 0.8;
+		box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+	}
+} 
