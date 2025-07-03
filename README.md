@@ -8,7 +8,7 @@
 
 ✨ 本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。
 
-![主要截图](docs/images/imageMain.png?v=202507011121)
+![主要截图](docs/images/image-main.png?v=202507031628)
 
 [🏠 访问官网](https://getaigist.com) | [🔗 立即下载](https://github.com/yarin-zhang/AI-Gist/releases)
 
@@ -22,7 +22,7 @@ AI Gist 提供基础的 AI 提示词管理功能，旨在帮助用户高效地�
 - **变量填充**：支持在提示词中定义变量，使用时可动态填充，支持 Jinja 模板。
 - **历史记录**：保存使用过的提示词，方便重复使用和优化。
 
-![特点01](docs/images/imageFeature01.png?v=202507011121)
+![特点01](docs/images/image-main-dark.png?v=202507031628)
 
 AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升管理效率。用之前，改一改。
 
@@ -30,7 +30,7 @@ AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升�
 - **AI 提示词生成**：通过 AI 模型自动生成提示词，提升创作效率。
 - **AI 快速调整**：支持快速调整提示词风格并提取变量。
 
-![特点02](docs/images/imageFeature02.png?v=202507011121)
+![特点02](docs/images/image-ai-generator.png?v=202507031628)
 
 AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持云备份功能，方便在不同设备间同步。
 
@@ -38,7 +38,7 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 - **掌控数据**：拥有完整的数据控制，完整支持导出和导入。
 - **云端备份**：支持 WebDAV、iCloud 备份，方便在多设备间共享数据。
 
-![特点03](docs/images/imageFeature03.png?v=202507011121)
+![特点03](docs/images/image-data-cloud-backup.png?v=202507031628)
 
 - **跨平台支持**：支持 Windows、macOS 和 Linux 系统。
 
@@ -65,40 +65,76 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 
 ## 📒 使用场景
 
-- 管理提示词
-  - 点击“新建提示词”
-  - 输入提示词模板，用 `{{变量名}}` 来插入变量，AI Gist 会自动读取其中的变量。
-  - 使用时直接选择模板，输入变量值。
-  - 点击“复制内容”，即可自动记录使用历史。
+### 管理提示词
 
-- AI 生成提示词
-  - 先在应用中添加 AI 模型（支持纯本地 Ollama、LM Studio 模型，以及常见的 OpenAI、DeepSeek 等在线模型）。
-  - 在首页点击“AI 生成”按钮，可以通过 AI 模型生成提示词。
+- 点击“新建提示词”
+- 输入提示词模板，用 `{{变量名}}` 来插入变量，AI Gist 会自动读取其中的变量。
+- 使用时直接选择模板，输入变量值。
+- 点击“复制内容”，即可自动记录使用历史。
 
-- AI 润色提示词
-  - 先添加 AI 模型
-  - 在编辑提示词页面对现有提示词进行快速润色，例如“提取变量”、“更具体”等。也可以自定义润色提示词。
+### AI 生成提示词
+
+- 先在应用中添加 AI 模型（支持纯本地 Ollama、LM Studio 模型，以及常见的 OpenAI、DeepSeek 等在线模型）。
+- 在首页点击“AI 生成”按钮，可以通过 AI 模型生成提示词。
+
+### AI 润色提示词
+
+- 先添加 AI 模型
+- 在编辑提示词页面对现有提示词进行快速润色，例如“提取变量”、“更具体”等。也可以自定义润色提示词。
 
 ## 应用截图
 
-![截图01](docs/images/image01.png?v=202507011121)
+<div align="center">
 
-![截图02](docs/images/image02.png?v=202507011121)
+![变量填充](docs/images/image-variable-fill.png?v=202507031628)
 
-![截图03](docs/images/image03.png?v=202507011121)
+变量填充
 
-![截图04](docs/images/image04.png?v=202507011121)
+![编辑提示词](docs/images/image-edit-prompt.png?v=202507031628)
 
-![截图05](docs/images/image05.png?v=202507011121)
+编辑提示词
 
-![截图06](docs/images/image06.png?v=202507011121)
+![Jinja 模板](docs/images/image-jinja-template.png?v=202507031628)
 
-![截图07](docs/images/image07.png?v=202507011121)
+Jinja 模板
 
-![截图08](docs/images/image08.png?v=202507011121)
+![AI 模型管理](docs/images/image-ai-config.png?v=202507031628)
 
-![截图09](docs/images/image09.png?v=202507011121)
+AI 模型管理
 
+![AI 添加配置](docs/images/image-ai-add-config.png?v=202507031628)
+
+添加 AI 配置
+
+![AI 快速调整](docs/images/image-ai-quick-adjust.png?v=202507031628)
+
+AI 快速调整
+
+![高级筛选](docs/images/image-filter.png?v=202507031628)
+
+高级筛选
+
+![表格视图](docs/images/image-table-view.png?v=202507031628)
+
+表格视图
+
+![文件夹视图](docs/images/image-folder-view.png?v=202507031628)
+
+文件夹视图
+
+![分类管理](docs/images/image-category.png?v=202507031628)
+
+分类管理
+
+![数据备份](docs/images/image-data-local-backup.png?v=202507031628)
+
+数据备份
+
+![明亮模式](docs/images/image-main-light.png?v=202507031628)
+
+明亮模式
+
+</div>
 
 ## 开发说明
 
@@ -143,7 +179,7 @@ yarn build:linux    # 构建 Linux 安装包
 欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
 
 <p align="center">
-  <img src="docs/images/QQ-QRCode.png?v=202507011121" alt="QQ 群" width="200" />
+  <img src="docs/images/QQ-QRCode.png?v=202507031628" alt="QQ 群" width="200" />
 </p>
 
 ## 许可证
