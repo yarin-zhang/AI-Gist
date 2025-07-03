@@ -3,6 +3,8 @@ import App from './App.vue'
 import i18n from './i18n'
 import { initDatabase, databaseService } from './lib/services'
 import type { SupportedLocale } from '@shared/types/preferences'
+import './tailwind.css'
+import './assets/scss/index.scss'
 
 // 初始化语言设置
 function initLocale() {

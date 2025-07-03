@@ -1,0 +1,167 @@
+.status-badge {
+	color: var(--content-primary);
+	font-size: var(--font-size-xs);
+	padding: var(--spacing-xs) var(--spacing-sm);
+	border-radius: var(--radius-sm);
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	font-weight: var(--font-weight-medium);
+	gap: var(--spacing-xs);
+
+	&::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background-color: currentColor;
+		border-radius: inherit;
+		opacity: 0.12;
+		z-index: 0;
+	}
+
+	> * {
+		position: relative;
+		z-index: 1;
+	}
+}
+
+.app-container {
+	.page-header {
+		margin-bottom: var(--spacing-2xl);
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: var(--spacing-xl);
+
+		.page-title {
+			font-weight: var(--font-weight-bold);
+			font-size: var(--font-size-3xl);
+			line-height: var(--line-height-tight);
+			color: var(--content-primary);
+		}
+
+		.page-actions {
+			display: flex;
+			gap: var(--spacing-lg);
+			align-items: center;
+
+			a {
+				color: var(--accent-primary);
+				text-decoration: none;
+				font-weight: var(--font-weight-medium);
+				transition: color 0.2s ease;
+
+				&:hover {
+					color: var(--accent-primary);
+					text-decoration: underline;
+				}
+
+				.icon {
+					margin-left: var(--spacing-xs);
+				}
+			}
+		}
+
+		@media (max-width: 768px) {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: var(--spacing-md);
+
+			.page-title {
+				font-size: var(--font-size-2xl);
+			}
+		}
+	}
+
+	.content-grid {
+		display: grid;
+		gap: var(--spacing-xl);
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+		align-items: start;
+
+		@media (max-width: 480px) {
+			grid-template-columns: 1fr;
+		}
+
+		> * {
+			overflow: hidden;
+		}
+	}
+}
+
+.custom-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-default) transparent;
+
+	&::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background-color: var(--border-default);
+		border-radius: 4px;
+		border: 2px solid transparent;
+		background-clip: content-box;
+
+		&:hover {
+			background-color: var(--border-strong);
+		}
+	}
+}
+
+.code-inline {
+	background-color: var(--surface-secondary);
+	color: var(--content-primary);
+	padding: var(--spacing-xs) var(--spacing-sm);
+	border-radius: var(--radius-sm);
+	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	font-size: 0.875em;
+	border: 1px solid var(--border-subtle);
+}
+
+.text-gradient {
+	background: linear-gradient(135deg, var(--accent-primary), var(--accent-info));
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+.glass-effect {
+	background: rgba(255, 255, 255, 0.1);
+	backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-effect {
+	background: rgba(0, 0, 0, 0.2);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/*
+	DOES NOT WORK ON FIREFOX!
+	:has() CSS relational pseudo-class not yet supported by Firefox
+	(https://caniuse.com/css-has)
+	you can find a worker around in pages that use this class
+*/
+#app {
+	.layout {
+		.main {
+			.view:has(.page-without-footer) {
+				& + footer {
+					display: none;
+				}
+			}
+		}
+	}
+}
+
+.code-bg-transparent {
+	code {
+		background-color: transparent;
+	}
+} 

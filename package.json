@@ -64,6 +64,8 @@
         "langchain": "^0.3.27",
         "naive-ui": "^2.41.0",
         "nunjucks": "^3.2.4",
+        "sass": "^1.89.2",
+        "tailwindcss": "^4.1.11",
         "unzipper": "^0.12.3",
         "uuid": "^11.1.0",
         "vue": "^3.3.8",
