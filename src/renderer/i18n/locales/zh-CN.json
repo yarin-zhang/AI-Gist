@@ -432,6 +432,7 @@
     "loadPromptsFailed": "加载提示词失败",
     "loadStatisticsFailed": "加载统计信息失败",
     "loadTreeDataFailed": "加载树形数据失败",
+    "loadingHistory": "正在加载历史记录...",
     "loadedAllPrompts": "已加载全部 {count} 个提示词",
     "loadingMore": "加载更多中...",
     "manualAdjustment": "手动调整",

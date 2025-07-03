@@ -490,6 +490,7 @@
     "loadPromptsFailed": "Failed to load prompts",
     "loadStatisticsFailed": "Failed to load statistics",
     "loadTreeDataFailed": "Failed to load tree data",
+    "loadingHistory": "Loading history...",
     "loadedAllPrompts": "All {count} prompts loaded",
     "loadingMore": "Loading more...",
     "loopVariable": "Loop Variable",

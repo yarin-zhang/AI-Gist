@@ -161,6 +161,7 @@ export interface PromptHistory {
   categoryId?: number;
   tags?: string;
   variables?: string;
+  isJinjaTemplate?: boolean; // 是否为 Jinja 模板
   version: number;
   changeDescription?: string; // 变更描述
   createdAt: Date;

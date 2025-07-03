@@ -484,6 +484,7 @@
     "loadPromptsFailed": "加載提示詞失敗",
     "loadStatisticsFailed": "加載統計信息失敗",
     "loadTreeDataFailed": "加載樹形數據失敗",
+    "loadingHistory": "正在加載歷史記錄...",
     "loadedAllPrompts": "已加載全部 {count} 個提示詞",
     "loadingMore": "加載更多中...",
     "loopVariable": "循環變量",

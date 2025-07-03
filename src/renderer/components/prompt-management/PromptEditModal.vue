@@ -85,13 +85,23 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit && historyList.length > 0" name="history"
+                    <NTabPane v-if="isEdit" name="history"
                         :tab="t('promptManagement.history')">
                         <NCard :title="t('promptManagement.versionHistory')" size="small"
                             :style="{ height: `${contentHeight - 50}px` }">
                             <NScrollbar :style="{ height: `${contentHeight - 100}px` }">
+                                <!-- 加载状态 -->
+                                <div v-if="loadingHistory" style="display: flex; justify-content: center; align-items: center; height: 200px;">
+                                    <NSpin size="medium">
+                                        <template #description>
+                                            <NText depth="3">{{ t('promptManagement.loadingHistory') }}</NText>
+                                        </template>
+                                    </NSpin>
+                                </div>
+                                
+                                <!-- 历史记录列表 -->
                                 <NFlex vertical size="medium" style="padding-right: 12px;"
-                                    v-if="historyList.length > 0">
+                                    v-else-if="historyList.length > 0">
                                     <NCard v-for="(history, index) in historyList" :key="history.id" size="small">
                                         <template #header>
                                             <NFlex justify="space-between" align="center">
@@ -136,6 +146,7 @@
                                         </NFlex>
                                     </NCard>
                                 </NFlex>
+                                <!-- 空状态 -->
                                 <NEmpty v-else :description="t('promptManagement.noHistory')" size="small">
                                     <template #icon>
                                         <NIcon>
@@ -437,6 +448,7 @@ import {
     NTabs,
     NTabPane,
     NTooltip,
+    NSpin,
     useMessage,
 } from "naive-ui";
 import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code } from "@vicons/tabler";
@@ -726,7 +738,14 @@ const loadHistory = async () => {
 // 创建历史记录
 const createHistoryRecord = async (currentPrompt: any) => {
     try {
+        console.log('开始创建历史记录:', {
+            promptId: currentPrompt.id,
+            title: currentPrompt.title,
+            variables: currentPrompt.variables
+        });
+        
         const latestVersion = await api.promptHistories.getLatestVersion.query(currentPrompt.id);
+        console.log('获取最新版本号:', latestVersion);
 
         const historyData = {
             promptId: currentPrompt.id,
@@ -735,14 +754,17 @@ const createHistoryRecord = async (currentPrompt: any) => {
             content: currentPrompt.content,
             description: currentPrompt.description,
             categoryId: currentPrompt.categoryId,
-            tags: currentPrompt.tags,
+            tags: Array.isArray(currentPrompt.tags) ? currentPrompt.tags.join(',') : currentPrompt.tags,
             variables: JSON.stringify(currentPrompt.variables || []),
+            isJinjaTemplate: currentPrompt.isJinjaTemplate || false,
             changeDescription: t('promptManagement.editUpdate'),
             uuid: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             createdAt: new Date()
         };
 
+        console.log('历史记录数据:', historyData);
         await api.promptHistories.create.mutate(historyData);
+        console.log('历史记录创建成功');
     } catch (error: any) {
         console.error("创建历史记录失败:", error);
         // 如果是数据库表不存在的错误，静默失败
@@ -1177,6 +1199,9 @@ const rollbackToHistory = (history: PromptHistory) => {
                     ? JSON.parse(history.variables)
                     : [],
             };
+
+            // 设置 Jinja 模式状态
+            isJinjaEnabled.value = history.isJinjaTemplate || false;
 
             // 切换到编辑Tab
             activeTab.value = "edit";
@@ -1633,7 +1658,28 @@ const handleSave = async () => {
 
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新
-            await createHistoryRecord(props.prompt);
+            // 构建当前提示词的完整数据用于历史记录
+            const currentPromptData = {
+                ...props.prompt,
+                title: finalTitle,
+                description: formData.value.description || undefined,
+                content: formData.value.content,
+                categoryId: formData.value.categoryId || undefined,
+                tags: formData.value.tags.length > 0 ? formData.value.tags : [],
+                isJinjaTemplate: isJinjaEnabled.value,
+                variables: variablesData, // 这里保持为数组，createHistoryRecord 会处理 JSON.stringify
+            };
+            
+            console.log('创建历史记录 - 当前数据:', {
+                promptId: currentPromptData.id,
+                title: currentPromptData.title,
+                content: currentPromptData.content,
+                isJinjaTemplate: currentPromptData.isJinjaTemplate,
+                variables: currentPromptData.variables,
+                variablesCount: currentPromptData.variables?.length || 0
+            });
+            
+            await createHistoryRecord(currentPromptData);
 
             await api.prompts.update.mutate({
                 id: props.prompt.id,
