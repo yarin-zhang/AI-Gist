@@ -193,13 +193,7 @@
     "noCloudBackups": "No cloud backups yet, please create backup first",
     "refreshBackupList": "Refresh Backup List",
     "restore": "Restore",
-    "restoreWarning": "Warning! Restoring cloud backup will:",
-    "restoreWarningItems": [
-      "Automatically backup current data",
-      "Completely overwrite existing database"
-    ],
-    "restoreWarningItems[0]": "Automatically backup current data",
-    "restoreWarningItems[1]": "Completely overwrite existing databases",
+    "restoreWarning": "Warning! Restoring cloud backup will automatically backup current data and completely overwrite existing database",
     "storageConfiguration": "Cloud Storage Configuration",
     "storageDescription": "Configure WebDAV or iCloud Drive storage for cloud backup functionality",
     "testConnection": "Test Connection"
@@ -259,13 +253,7 @@
     "refreshBackupList": "Refresh Backup List",
     "repairDatabase": "Repair Database",
     "restore": "Restore",
-    "restoreWarning": "Warning! Restoring backup will:",
-    "restoreWarningItems": [
-      "Automatically backup current data",
-      "Completely overwrite existing database"
-    ],
-    "restoreWarningItems[0]": "Automatically backup current data",
-    "restoreWarningItems[1]": "Completely overwrite existing databases",
+    "restoreWarning": "Warning! Restoring backup will automatically backup current data and completely overwrite existing database",
     "securityWarning": "Security Warning",
     "securityWarningText": "You have selected to export AI configuration, the exported data will contain sensitive information such as API keys. Please keep export files safe to avoid leakage.",
     "selectDataTypeToExport": "Select data type to export:",
