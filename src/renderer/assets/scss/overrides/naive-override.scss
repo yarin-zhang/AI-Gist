@@ -177,11 +177,12 @@
 // 表单组件
 .n-form-item {
 	.n-form-item-feedback-wrapper:not(:empty) {
-		transform: translateY(-8px);
+		transform: translateY(-4px);
 		padding-left: 0px !important;
 		padding-right: 0px !important;
 		padding-top: 0 !important;
 		z-index: 1;
+		margin-top: var(--spacing-xs);
 
 		.n-form-item-feedback {
 			font-size: var(--font-size-sm);
@@ -191,12 +192,14 @@
 			background: color-mix(in srgb, currentColor 5%, var(--surface-primary) 95%);
 			border: 1px solid currentColor;
 			border-top: 0;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 		}
 	}
 
 	&.n-form-item--small-size {
 		.n-form-item-feedback-wrapper:not(:empty) {
-			transform: translateY(-6px);
+			transform: translateY(-3px);
+			margin-top: var(--spacing-xs);
 
 			.n-form-item-feedback {
 				font-size: var(--font-size-xs);
@@ -207,6 +210,9 @@
 
 	&.n-form-item--large-size {
 		.n-form-item-feedback-wrapper:not(:empty) {
+			transform: translateY(-5px);
+			margin-top: var(--spacing-sm);
+
 			.n-form-item-feedback {
 				padding: var(--spacing-sm) var(--spacing-lg);
 			}
