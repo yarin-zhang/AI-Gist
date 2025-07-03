@@ -37,7 +37,7 @@
         "@vitest/ui": "^1.6.0",
         "@vue/eslint-config-typescript": "^14.5.1",
         "chalk": "^4.1.2",
-        "chokidar": "^3.5.3",
+        "chokidar": "^4.0.3",
         "electron": "^32.1.2",
         "electron-builder": "^25.1.6",
         "eslint": "^9.29.0",
