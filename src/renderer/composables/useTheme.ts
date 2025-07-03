@@ -317,7 +317,6 @@ export function useTheme() {
 		cleanup,
 		
 		// 主题方法
-		toggleTheme,
 		setTheme,
 		getThemeOverrides: getThemeOverridesConfig,
 		getCssVars: () => getCssVars(themeName.value)
