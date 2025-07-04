@@ -18,29 +18,32 @@
 
 AI Gist 提供基础的 AI 提示词管理功能，旨在帮助用户高效地创建、组织和使用 AI 提示词。支持 Jinja 模板。
 
-- **提示词模板管理**：集中管理和组织所有 AI 提示词模板，用标签和分类进行区分。
-- **变量填充**：支持在提示词中定义变量，使用时可动态填充，支持 Jinja 模板。
-- **历史记录**：保存使用过的提示词，方便重复使用和优化。
+* **变量填充**：调用模板时动态填入变量，结构清晰灵活，支持 Jinja 模板。
+* **多视图管理**：集中管理提示词模板，支持卡片视图、表格视图、分类视图。
+* **筛选分类**：快速筛选、查找、组织提示词，支持标签、分类、评分、收藏等功能。
+* **多种历史记录**：便于重复调用与持续优化，事后可回溯。
 
 ![特点01](docs/images/image-main-dark.png?v=202507031628)
 
 AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升管理效率。用之前，改一改。
 
-- **AI 模型集成**：支持多种 AI 模型，包括本地模型和在线模型。
-- **AI 提示词生成**：通过 AI 模型自动生成提示词，提升创作效率。
-- **AI 快速调整**：支持快速调整提示词风格并提取变量。
+* **接入多种 AI 模型**：支持接入多种 AI 模型（包括本地模型 Ollama、LM Studio，以及 OpenAI 等多种常见在线模型）。
+* **AI 生成**：使用 AI 快捷生成提示词，支持自定义系统提示词。
+* **AI 调优**：使用 AI 改写提示词，快速让提示词更具体、更丰富，同样支持自定义。
+* **AI 提取变量**：无需手动挖空，使用 AI 自动提取可能的变量。
 
 ![特点02](docs/images/image-ai-generator.png?v=202507031628)
 
 AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持云备份功能，方便在不同设备间同步。
 
-- **本地优先**：所有数据存储在本地，确保隐私和安全。
-- **掌控数据**：拥有完整的数据控制，完整支持导出和导入。
-- **云端备份**：支持 WebDAV、iCloud 备份，方便在多设备间共享数据。
+* **本地优先**：所有数据存储在本地，默认情况无需联网，确保隐私和安全。
+* **掌控数据**：拥有完整的数据控制，支持完整导出和导入，通用格式 CSV 导出。
+* **云端备份**：支持 WebDAV、iCloud 备份与恢复，方便在多设备间共享数据。
 
 ![特点03](docs/images/image-data-cloud-backup.png?v=202507031628)
 
-- **跨平台支持**：支持 Windows、macOS 和 Linux 系统。
+* **多平台支持**：支持 Windows / macOS / Linux。
+* **多语言支持**：支持简体中文、繁体中文、英文、日语。
 
 ## ⬇️ 下载
 
@@ -53,9 +56,12 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
 
-如果 Github 下载较慢，可以尝试通过 SourceForge 进行下载。
+如果 Github 下载较慢，可以尝试通过百度网盘、SourceForge 进行下载。
 
-[![Download AI-Gist](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/ai-gist/files/latest/download)
+| 镜像源 | 下载链接 | 说明 |
+|------|----------|------|
+| [<img src="https://img.shields.io/badge/百度网盘-下载-blue?logo=baidu&style=flat-square" alt="Baidu Download">](https://pan.baidu.com/s/10apxOpgNciADcKfhuli5sA?pwd=4321) | [百度网盘](https://pan.baidu.com/s/10apxOpgNciADcKfhuli5sA?pwd=4321) | 中国用户推荐 提取码：4321 |
+| [![Download AI-Gist](https://img.shields.io/badge/SourceForge-下载-green?logo=sourceforge&style=flat)](https://sourceforge.net/projects/ai-gist/files/latest/download) | [SourceForge](https://sourceforge.net/projects/ai-gist/files/latest/download) | 国际用户推荐 |
 
 ## 🚀 安装说明
 
