@@ -56,9 +56,12 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
 
-如果 Github 下载较慢，可以尝试通过 SourceForge 进行下载。
+如果 Github 下载较慢，可以尝试通过百度网盘、SourceForge 进行下载。
 
-[![Download AI-Gist](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/ai-gist/files/latest/download)
+| 镜像源 | 下载链接 | 说明 |
+|------|----------|------|
+| [<img src="https://img.shields.io/badge/百度网盘-下载-blue?logo=baidu&style=flat-square" alt="Baidu Download">](https://pan.baidu.com/s/10apxOpgNciADcKfhuli5sA?pwd=4321) | [百度网盘](https://pan.baidu.com/s/10apxOpgNciADcKfhuli5sA?pwd=4321) | 中国用户推荐 提取码：4321 |
+| [![Download AI-Gist](https://img.shields.io/badge/SourceForge-下载-green?logo=sourceforge&style=flat)](https://sourceforge.net/projects/ai-gist/files/latest/download) | [SourceForge](https://sourceforge.net/projects/ai-gist/files/latest/download) | 国际用户推荐 |
 
 ## 🚀 安装说明
 
