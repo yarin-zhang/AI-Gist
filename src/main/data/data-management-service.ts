@@ -7,8 +7,6 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import * as archiver from 'archiver';
-import * as unzipper from 'unzipper';
 import { 
   BackupInfo, 
   ExportOptions, 
@@ -17,7 +15,6 @@ import {
   ExportResult,
   DataStats 
 } from '@shared/types/data-management';
-import { createHash } from 'crypto';
 
 export class DataManagementService {
     private backupDir: string;
