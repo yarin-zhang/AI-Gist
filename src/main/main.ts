@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
   preferencesManager.applyAllSettings();
   // 初始化主题管理器
   themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
-  dataManagementService = new DataManagementService(app.getPath('userData'));
+  dataManagementService = new DataManagementService();
   
   // 初始化云端备份管理器
   cloudBackupManager = new CloudBackupManager(dataManagementService);

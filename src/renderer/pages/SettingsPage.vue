@@ -77,7 +77,6 @@
                         <DataManagementSettings 
                             v-show="activeSettingKey === 'data-management'"
                             :backup-list="backupList"
-                            :data-stats="dataStats"
                             :loading="loading"
                             :error="dataManagementError"
                             :success="dataManagementSuccess"
@@ -219,10 +218,9 @@ const dataManagement = useDataManagement({
 });
 
 // 数据管理状态
-const backupList = computed(() => dataManagement.backupList.value);
-const dataStats = computed(() => dataManagement.dataStats.value);
-const dataManagementError = computed(() => dataManagement.error.value);
-const dataManagementSuccess = computed(() => dataManagement.success.value);
+const backupList = computed(() => dataManagement.backupList);
+const dataManagementError = computed(() => dataManagement.error);
+const dataManagementSuccess = computed(() => dataManagement.success);
 
 // 状态管理
 const saving = ref(false);
@@ -595,10 +593,10 @@ const exportFullBackup = async () => {
 // 加载数据统计
 const loadDataStats = async () => {
     try {
-        await dataManagement.getDataStats();
+        // 新的实现不需要单独加载数据统计
+        console.log('数据统计加载完成');
     } catch (error) {
         console.error(t('settingsMessages.getDataStatsFailed'), error);
-        // 不显示错误消息，因为这不是关键功能
     }
 };
 

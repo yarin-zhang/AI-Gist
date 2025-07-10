@@ -68,14 +68,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 数据管理
   data: {
-    createBackup: (description?: string, data?: any) => ipcRenderer.invoke('data:create-backup', { description, data }),
-    getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
-    readBackup: (backupId: string) => ipcRenderer.invoke('data:read-backup', { backupId }),
-    deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
-    getStats: () => ipcRenderer.invoke('data:get-stats'),
-    getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
+    writeFile: (filePath: string, content: string) => ipcRenderer.invoke('data:write-file', { filePath, content }),
+    readFile: (filePath: string) => ipcRenderer.invoke('data:read-file', { filePath }),
   },
   // 文件操作
   fs: {

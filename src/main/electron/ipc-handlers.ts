@@ -1,4 +1,6 @@
 import { ipcMain } from 'electron';
+import { promises as fs } from 'fs';
+import { shell } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
@@ -367,20 +369,17 @@ class IpcHandlers {
   private setupShellHandlers() {
     // 打开路径
     ipcMain.handle('shell:open-path', (_, path: string) => {
-      const { shell } = require('electron');
       return shell.openPath(path);
     });
 
     // 打开外部链接
     ipcMain.handle('shell:open-external', (_, url: string) => {
-      const { shell } = require('electron');
       return shell.openExternal(url);
     });
 
     // 文件操作
     // 读取文件
     ipcMain.handle('fs:read-file', async (_, { filePath }) => {
-      const fs = require('fs').promises;
       try {
         const content = await fs.readFile(filePath, 'utf-8');
         return content;
@@ -392,7 +391,6 @@ class IpcHandlers {
 
     // 写入文件
     ipcMain.handle('fs:write-file', async (_, { filePath, content }) => {
-      const fs = require('fs').promises;
       try {
         await fs.writeFile(filePath, content, 'utf-8');
         return { success: true };

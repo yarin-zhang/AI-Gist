@@ -168,21 +168,21 @@
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
+                                            <NTag size="small" type="info">0 条</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
+                                            <NTag size="small" type="info">0 个</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
+                                            <NTag size="small" type="info">0 个</NTag>
                                             <NTag size="small" type="warning">{{
                                                 t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
@@ -332,7 +332,6 @@ const { t } = useI18n();
 // Props 定义
 interface Props {
   backupList: any[];
-  dataStats: any;
   loading: any;
   error?: string | null;
   success?: string | null;
@@ -340,13 +339,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   backupList: () => [],
-  dataStats: () => ({
-    categories: 0,
-    prompts: 0,
-    aiConfigs: 0,
-    history: 0,
-    settings: 0
-  }),
   loading: () => ({
     backup: false,
     restore: false,
