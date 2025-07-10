@@ -38,7 +38,7 @@ export class ICloudProvider implements CloudStorageProvider {
         path.join(homedir, 'Library', 'CloudStorage', 'iCloud Drive'),
       ];
       
-      console.log('macOS iCloud 可能路径:', possiblePaths);
+      // console.log('macOS iCloud 可能路径:', possiblePaths);
       
       try {
         const fsSync = await import('fs');
