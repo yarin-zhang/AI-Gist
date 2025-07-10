@@ -91,6 +91,11 @@ async function startApp() {
         return await databaseService.importData(data);
       },
       
+      // 数据导入对象方法（主进程调用）
+      importDataObject: async (data: any) => {
+        return await databaseService.importData(data);
+      },
+      
       // 同步数据导入方法（用于WebDAV同步）
       syncImportDataObject: async (data: any) => {
         return await databaseService.syncImportData(data);

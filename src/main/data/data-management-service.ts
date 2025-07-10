@@ -1,6 +1,6 @@
 /**
- * 数据管理服务
- * 这个文件需要在主进程中实现
+ * 数据管理服务 - 简化版
+ * 只负责基本的文件读写操作，复杂逻辑移到 Vue composables 中
  */
 
 import { ipcMain, dialog, BrowserWindow } from 'electron';
@@ -37,51 +37,15 @@ export class DataManagementService {
 
     private setupIpcHandlers() {
         console.log('DataManagementService: 开始注册IPC处理程序...');
-        // 创建备份
-        ipcMain.handle('data:create-backup', async (event, { description }) => {
-            try {
-                const backupId = uuidv4();
-                const timestamp = new Date().toISOString();
-                const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
-                const backupPath = path.join(this.backupDir, `${backupName}.json`);
 
-                // 这里应该从数据库中导出所有数据
-                const backupData = await this.exportAllData();
-                
-                const backupInfo: BackupInfo = {
-                    id: backupId,
-                    name: backupName,
-                    description: description || '自动备份',
-                    createdAt: timestamp,
-                    size: 0, // 将在写入后计算
-                    data: backupData,
-                };
-
-                await fs.writeFile(backupPath, JSON.stringify(backupInfo, null, 2));
-                
-                const stats = await fs.stat(backupPath);
-                backupInfo.size = stats.size;
-                
-                // 创建返回对象，不包含数据内容
-                const { data, ...backupInfoWithoutData } = backupInfo;
-                return backupInfoWithoutData;
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : '未知错误';
-                throw new Error(`创建备份失败: ${errorMessage}`);
-            }
-        });
-
-        // 获取备份列表
+        // 获取备份列表 - 只读取文件列表
         ipcMain.handle('data:get-backup-list', async () => {
             try {
-                // 确保备份目录存在
                 await this.ensureBackupDir();
                 
                 const files = await fs.readdir(this.backupDir);
                 const backups: BackupInfo[] = [];
                 
-                // console.log(`备份目录中有 ${files.length} 个文件:`, files);
-
                 for (const file of files) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
@@ -89,7 +53,6 @@ export class DataManagementService {
                             const content = await fs.readFile(filePath, 'utf-8');
                             const backup: BackupInfo = JSON.parse(content);
                             
-                            // 验证备份文件的必要字段
                             if (!backup.id || !backup.name || !backup.createdAt) {
                                 console.warn(`备份文件 ${file} 缺少必要字段, 跳过`);
                                 continue;
@@ -97,15 +60,12 @@ export class DataManagementService {
                             
                             const { data, ...backupWithoutData } = backup;
                             backups.push(backupWithoutData);
-                            // console.log(`成功加载备份: ${backup.name} (ID: ${backup.id})`);
                         } catch (fileError) {
                             console.error(`读取备份文件 ${file} 失败:`, fileError);
-                            // 继续处理其他文件
                         }
                     }
                 }
 
-                // 按创建时间排序
                 const sortedBackups = backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 console.log(`返回 ${sortedBackups.length} 个有效备份`);
                 return sortedBackups;
@@ -116,274 +76,101 @@ export class DataManagementService {
             }
         });
 
-        // 恢复备份
-        ipcMain.handle('data:restore-backup', async (event, { backupId }) => {
+        // 创建备份 - 只负责文件写入
+        ipcMain.handle('data:create-backup', async (event, { description, data }) => {
             try {
-                console.log(`开始恢复备份: ${backupId}`);
-                console.log(`备份目录: ${this.backupDir}`);
-                
-                // 检查备份目录是否存在
-                try {
-                    await fs.access(this.backupDir);
-                } catch (error) {
-                    console.error('备份目录不存在:', this.backupDir);
-                    throw new Error('备份目录不存在');
-                }
-                
-                const backups = await fs.readdir(this.backupDir);
-                console.log(`找到 ${backups.length} 个文件:`, backups);
-                
-                let backupFile: BackupInfo | null = null;
+                const backupId = uuidv4();
+                const timestamp = new Date().toISOString();
+                const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
+                const backupPath = path.join(this.backupDir, `${backupName}.json`);
 
-                for (const file of backups) {
+                const backupInfo: BackupInfo = {
+                    id: backupId,
+                    name: backupName,
+                    description: description || '自动备份',
+                    createdAt: timestamp,
+                    size: 0,
+                    data: data,
+                };
+
+                await fs.writeFile(backupPath, JSON.stringify(backupInfo, null, 2));
+                
+                const stats = await fs.stat(backupPath);
+                backupInfo.size = stats.size;
+                
+                const { data: _, ...backupInfoWithoutData } = backupInfo;
+                return backupInfoWithoutData;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : '未知错误';
+                throw new Error(`创建备份失败: ${errorMessage}`);
+            }
+        });
+
+        // 读取备份文件 - 只负责文件读取
+        ipcMain.handle('data:read-backup', async (event, { backupId }) => {
+            try {
+                const files = await fs.readdir(this.backupDir);
+                
+                for (const file of files) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
                         try {
                             const content = await fs.readFile(filePath, 'utf-8');
                             const backup: BackupInfo = JSON.parse(content);
-                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
                             
                             if (backup.id === backupId) {
-                                backupFile = backup;
-                                console.log(`找到匹配的备份文件: ${file}`);
-                                break;
+                                return backup;
                             }
                         } catch (fileError) {
-                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
-                            // 继续处理其他文件，不抛出错误
+                            console.error(`读取备份文件失败 ${file}:`, fileError);
                         }
                     }
                 }
 
-                if (!backupFile) {
-                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
-                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
-                }
-
-                console.log(`开始恢复备份数据: ${backupFile.name}`);
-                // 恢复数据到数据库
-                await this.restoreAllData(backupFile.data);
-                
-                return { 
-                    success: true,
-                    message: `数据恢复成功: ${backupFile.name}`
-                };
+                throw new Error(`备份文件不存在 (ID: ${backupId})`);
             } catch (error) {
-                console.error('恢复备份失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
-                return {
-                    success: false,
-                    message: `恢复备份失败: ${errorMessage}`
-                };
+                throw new Error(`读取备份失败: ${errorMessage}`);
             }
         });
 
-        // 恢复备份（完全替换现有数据）
-        ipcMain.handle('data:restore-backup-replace', async (event, { backupId }) => {
-            try {
-                console.log(`开始完全替换恢复备份: ${backupId}`);
-                console.log(`备份目录: ${this.backupDir}`);
-                
-                // 检查备份目录是否存在
-                try {
-                    await fs.access(this.backupDir);
-                } catch (error) {
-                    console.error('备份目录不存在:', this.backupDir);
-                    throw new Error('备份目录不存在');
-                }
-                
-                const backups = await fs.readdir(this.backupDir);
-                console.log(`找到 ${backups.length} 个文件:`, backups);
-                
-                let backupFile: BackupInfo | null = null;
-
-                for (const file of backups) {
-                    if (file.endsWith('.json')) {
-                        const filePath = path.join(this.backupDir, file);
-                        try {
-                            const content = await fs.readFile(filePath, 'utf-8');
-                            const backup: BackupInfo = JSON.parse(content);
-                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
-                            
-                            if (backup.id === backupId) {
-                                backupFile = backup;
-                                console.log(`找到匹配的备份文件: ${file}`);
-                                break;
-                            }
-                        } catch (fileError) {
-                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
-                            // 继续处理其他文件，不抛出错误
-                        }
-                    }
-                }
-
-                if (!backupFile) {
-                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
-                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
-                }
-
-                console.log(`开始完全替换恢复备份数据: ${backupFile.name}`);
-                // 使用替换模式恢复数据到数据库
-                await this.restoreAllDataWithReplace(backupFile.data);
-                
-                return { 
-                    success: true,
-                    message: `数据完全恢复成功: ${backupFile.name}`
-                };
-            } catch (error) {
-                console.error('完全替换恢复备份失败:', error);
-                const errorMessage = error instanceof Error ? error.message : '未知错误';
-                return {
-                    success: false,
-                    message: `恢复备份失败: ${errorMessage}`
-                };
-            }
-        });
-
-        // 删除备份
+        // 删除备份文件 - 只负责文件删除
         ipcMain.handle('data:delete-backup', async (event, { backupId }) => {
             try {
-                console.log(`尝试删除备份: ${backupId}`);
-                console.log(`备份目录: ${this.backupDir}`);
+                const files = await fs.readdir(this.backupDir);
                 
-                // 检查备份目录是否存在
-                try {
-                    await fs.access(this.backupDir);
-                } catch (error) {
-                    console.error('备份目录不存在:', this.backupDir);
-                    throw new Error('备份目录不存在');
-                }
-                
-                const backups = await fs.readdir(this.backupDir);
-                console.log(`找到 ${backups.length} 个文件:`, backups);
-                
-                let foundBackup = false;
-                
-                for (const file of backups) {
+                for (const file of files) {
                     if (file.endsWith('.json')) {
                         const filePath = path.join(this.backupDir, file);
                         try {
                             const content = await fs.readFile(filePath, 'utf-8');
                             const backup: BackupInfo = JSON.parse(content);
-                            console.log(`检查备份文件 ${file}, ID: ${backup.id}`);
                             
                             if (backup.id === backupId) {
-                                foundBackup = true;
-                                console.log(`找到匹配的备份文件: ${file}, 开始删除`);
                                 await fs.unlink(filePath);
-                                console.log(`成功删除备份文件: ${file}`);
                                 return { success: true };
                             }
                         } catch (fileError) {
-                            console.error(`读取或解析备份文件失败 ${file}:`, fileError);
-                            // 继续处理其他文件，不抛出错误
+                            console.error(`读取备份文件失败 ${file}:`, fileError);
                         }
                     }
                 }
 
-                if (!foundBackup) {
-                    console.error(`未找到 ID 为 ${backupId} 的备份文件`);
-                    throw new Error(`备份文件不存在 (ID: ${backupId})`);
-                }
-                
-                return { success: true };
+                throw new Error(`备份文件不存在 (ID: ${backupId})`);
             } catch (error) {
-                console.error('删除备份时发生错误:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 throw new Error(`删除备份失败: ${errorMessage}`);
             }
         });
 
-        // 导出数据
-        ipcMain.handle('data:export', async (event, { options, exportPath }) => {
-            try {
-                const data = await this.exportData(options);
-                
-                if (exportPath) {
-                    // 写入文件
-                    await fs.writeFile(exportPath, data, 'utf-8');
-                    console.log(`数据已导出到: ${exportPath}`);
-                }
-                
-                return { success: true, filePath: exportPath };
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : '未知错误';
-                throw new Error(`导出数据失败: ${errorMessage}`);
-            }
-        });
-
-        // 导入数据
-        ipcMain.handle('data:import', async (event, { filePath, options }) => {
-            try {
-                const result = await this.importData(filePath, options);
-                return result;
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : '未知错误';
-                throw new Error(`导入数据失败: ${errorMessage}`);
-            }
-        });
-
-        // 选择导入文件
-        ipcMain.handle('data:select-import-file', async (event, { format }) => {
-            const result = await dialog.showOpenDialog({
-                title: '选择导入文件',
-                filters: [
-                    { name: `${format.toUpperCase()} 文件`, extensions: [format] },
-                    { name: '所有文件', extensions: ['*'] },
-                ],
-                properties: ['openFile'],
-            });
-
-            return result.canceled ? null : result.filePaths[0];
-        });
-
-        // 选择导出路径
-        ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
-            // 根据文件名扩展名动态设置过滤器
-            const fileExtension = defaultName.split('.').pop()?.toLowerCase();
-            let filters;
-            
-            console.log('selectExportPath 调用，默认文件名:', defaultName, '检测到的扩展名:', fileExtension);
-            
-            if (fileExtension === 'csv') {
-                filters = [
-                    { name: 'CSV 文件', extensions: ['csv'] },
-                    { name: '所有文件', extensions: ['*'] },
-                ];
-            } else if (fileExtension === 'json') {
-                filters = [
-                    { name: 'JSON 文件', extensions: ['json'] },
-                    { name: '所有文件', extensions: ['*'] },
-                ];
-            } else {
-                // 默认过滤器，包含所有支持的类型
-                filters = [
-                    { name: 'CSV 文件', extensions: ['csv'] },
-                    { name: 'JSON 文件', extensions: ['json'] },
-                    { name: '所有文件', extensions: ['*'] },
-                ];
-            }
-            
-            console.log('设置的文件过滤器:', filters);
-            
-            const result = await dialog.showSaveDialog({
-                title: '选择导出路径',
-                defaultPath: defaultName,
-                filters: filters,
-            });
-
-            console.log('保存对话框结果:', result.canceled ? '已取消' : result.filePath);
-            return result.canceled ? null : result.filePath;
-        });        // 获取数据统计
+        // 获取数据统计 - 通过渲染进程获取
         ipcMain.handle('data:get-stats', async () => {
             try {
-                // 通过 executeJavaScript 调用渲染进程暴露的方法
                 const mainWindow = BrowserWindow.getAllWindows()[0];
                 if (!mainWindow) {
                     throw new Error('没有找到主窗口，无法访问数据库');
                 }
 
-                // 调用渲染进程中暴露的统计方法
                 const result = await mainWindow.webContents.executeJavaScript(`
                     (async () => {
                         try {
@@ -411,19 +198,15 @@ export class DataManagementService {
             }
         });
 
-        // 选择性数据导出
-        console.log('DataManagementService: 注册 data:export-selected 处理程序');
-        ipcMain.handle('data:export-selected', async (event, { options, exportPath }) => {
+        // 导出数据 - 通过渲染进程获取数据后写入文件
+        ipcMain.handle('data:export-data', async (event, { options, exportPath }) => {
             try {
-                console.log('开始选择性数据导出:', options);
-                
-                // 通过 executeJavaScript 调用渲染进程暴露的方法获取数据
                 const mainWindow = BrowserWindow.getAllWindows()[0];
                 if (!mainWindow) {
                     throw new Error('没有找到主窗口，无法访问数据库');
                 }
 
-                // 调用渲染进程导出数据
+                // 从渲染进程获取数据
                 const exportResult = await mainWindow.webContents.executeJavaScript(`
                     (async () => {
                         try {
@@ -466,13 +249,10 @@ export class DataManagementService {
                 if (options.includeAIConfigs) selectedTypes.push('AI配置');
                 
                 const fileName = `AI-Gist-选择性导出-${selectedTypes.join('_')}-${timestamp}.${options.format}`;
-                console.log('生成的文件名:', fileName, '格式:', options.format);
                 
                 // 如果没有提供导出路径，则显示保存对话框
                 let finalExportPath = exportPath;
                 if (!finalExportPath) {
-                    const { dialog } = await import('electron');
-                    console.log('显示保存对话框，默认路径:', fileName);
                     const result = await dialog.showSaveDialog({
                         title: '选择导出位置',
                         defaultPath: fileName,
@@ -487,7 +267,6 @@ export class DataManagementService {
                     }
                     
                     finalExportPath = result.filePath;
-                    console.log('用户选择的保存路径:', finalExportPath);
                 }
 
                 // 根据格式导出数据
@@ -495,54 +274,13 @@ export class DataManagementService {
                 if (options.format === 'json') {
                     exportContent = JSON.stringify(filteredData, null, 2);
                 } else if (options.format === 'csv') {
-                    // CSV导出支持提示词和分类数据
-                    if (options.includePrompts && filteredData.prompts) {
-                        // 导出提示词数据
-                        const prompts = filteredData.prompts;
-                        const csvHeaders = ['ID', '标题', '内容', '标签', '创建时间'];
-                        const csvRows = [csvHeaders.join(',')];
-                        
-                        prompts.forEach((prompt: any) => {
-                            const row = [
-                                prompt.id || '',
-                                `"${(prompt.title || '').replace(/"/g, '""')}"`,
-                                `"${(prompt.content || '').replace(/"/g, '""')}"`,
-                                `"${this.normalizeTags(prompt.tags)}"`,
-                                prompt.createdAt || ''
-                            ];
-                            csvRows.push(row.join(','));
-                        });
-                        
-                        exportContent = csvRows.join('\n');
-                    } else if (options.includeCategories && filteredData.categories) {
-                        // 导出分类数据
-                        const categories = filteredData.categories;
-                        const csvHeaders = ['ID', '名称', '描述', '创建时间'];
-                        const csvRows = [csvHeaders.join(',')];
-                        
-                        categories.forEach((cat: any) => {
-                            const row = [
-                                cat.id || '',
-                                `"${(cat.name || '').replace(/"/g, '""')}"`,
-                                `"${(cat.description || '').replace(/"/g, '""')}"`,
-                                cat.createdAt || ''
-                            ];
-                            csvRows.push(row.join(','));
-                        });
-                        
-                        exportContent = csvRows.join('\n');
-                    } else {
-                        throw new Error('CSV 格式目前仅支持导出提示词和分类数据');
-                    }
+                    exportContent = this.convertToCSV(filteredData);
                 } else {
                     throw new Error(`不支持的导出格式: ${options.format}`);
                 }
 
                 // 写入文件
-                const fs = await import('fs').then(m => m.promises);
                 await fs.writeFile(finalExportPath!, exportContent, 'utf-8');
-                
-                console.log(`选择性数据已导出到: ${finalExportPath}`);
                 
                 return {
                     success: true,
@@ -551,37 +289,50 @@ export class DataManagementService {
                 };
                 
             } catch (error) {
-                console.error('选择性数据导出失败:', error);
+                console.error('数据导出失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
                 return {
                     success: false,
                     error: errorMessage,
-                    message: `选择性数据导出失败: ${errorMessage}`
+                    message: `数据导出失败: ${errorMessage}`
                 };
             }
         });
 
-        // 导出完整备份
-        ipcMain.handle('data:export-full-backup', async () => {
+        // 导入数据 - 读取文件后传递给渲染进程，或直接传递数据
+        ipcMain.handle('data:import-data', async (event, { filePath, data, options }) => {
             try {
-                console.log('开始导出完整备份...');
-                
-                // 通过 executeJavaScript 调用渲染进程暴露的方法
+                let importData;
+
+                if (data) {
+                    // 直接传递数据
+                    importData = data;
+                } else if (filePath) {
+                    // 从文件读取数据
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    if (options.format === 'csv') {
+                        importData = this.parseCSV(content);
+                    } else {
+                        importData = JSON.parse(content);
+                    }
+                } else {
+                    throw new Error('必须提供 filePath 或 data 参数');
+                }
+
+                // 传递给渲染进程处理
                 const mainWindow = BrowserWindow.getAllWindows()[0];
                 if (!mainWindow) {
                     throw new Error('没有找到主窗口，无法访问数据库');
                 }
 
-                // 调用渲染进程导出数据
-                const exportResult = await mainWindow.webContents.executeJavaScript(`
+                const result = await mainWindow.webContents.executeJavaScript(`
                     (async () => {
                         try {
-                            if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                            if (!window.databaseAPI || !window.databaseAPI.importDataObject) {
                                 throw new Error('数据库API未初始化');
                             }
-                            
-                            const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-                            return await databaseServiceManager.exportAllData();
+                            const data = ${JSON.stringify(importData)};
+                            return await window.databaseAPI.importDataObject(data);
                         } catch (error) {
                             return {
                                 success: false,
@@ -591,143 +342,65 @@ export class DataManagementService {
                     })()
                 `);
 
-                if (!exportResult.success) {
-                    throw new Error(`获取数据失败: ${exportResult.error}`);
+                if (!result.success) {
+                    throw new Error(`导入数据失败: ${result.error}`);
                 }
 
-                // 添加备份元数据
-                const backupData = {
-                    version: '1.0.0',
-                    createdAt: new Date().toISOString(),
-                    appName: 'AI-Gist',
-                    ...exportResult.data
-                };
-
-                // 生成文件名
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const fileName = `AI-Gist-完整备份-${timestamp}.json`;
-                
-                // 显示保存对话框
-                const { dialog } = await import('electron');
-                const result = await dialog.showSaveDialog({
-                    title: '选择完整备份导出位置',
-                    defaultPath: fileName,
-                    filters: [
-                        { name: 'JSON 文件', extensions: ['json'] },
-                        { name: '所有文件', extensions: ['*'] }
-                    ]
-                });
-                
-                if (result.canceled) {
-                    return { success: false, message: '用户取消了导出操作' };
-                }
-
-                // 写入文件
-                const fs = await import('fs').then(m => m.promises);
-                await fs.writeFile(result.filePath!, JSON.stringify(backupData, null, 2), 'utf-8');
-                
-                console.log(`完整备份已导出到: ${result.filePath}`);
-                
                 return {
                     success: true,
-                    filePath: result.filePath,
-                    message: `完整备份已成功导出到 ${result.filePath}`
+                    message: '导入成功',
+                    imported: result.details
                 };
-                
             } catch (error) {
-                console.error('完整备份导出失败:', error);
                 const errorMessage = error instanceof Error ? error.message : '未知错误';
-                return {
-                    success: false,
-                    error: errorMessage,
-                    message: `完整备份导出失败: ${errorMessage}`
-                };
+                throw new Error(`导入数据失败: ${errorMessage}`);
             }
         });
 
-        // 导入完整备份
-        ipcMain.handle('data:import-full-backup', async () => {
-            try {
-                console.log('开始导入完整备份...');
-                
-                // 显示文件选择对话框
-                const { dialog } = await import('electron');
-                const result = await dialog.showOpenDialog({
-                    title: '选择要导入的完整备份文件',
-                    filters: [
-                        { name: 'JSON 文件', extensions: ['json'] },
-                        { name: '所有文件', extensions: ['*'] }
-                    ],
-                    properties: ['openFile']
-                });
+        // 选择导入文件
+        ipcMain.handle('data:select-import-file', async (event, { format }) => {
+            const result = await dialog.showOpenDialog({
+                title: '选择导入文件',
+                filters: [
+                    { name: `${format.toUpperCase()} 文件`, extensions: [format] },
+                    { name: '所有文件', extensions: ['*'] },
+                ],
+                properties: ['openFile'],
+            });
 
-                if (result.canceled || !result.filePaths.length) {
-                    return { success: false, message: '用户取消了导入操作' };
-                }
+            return result.canceled ? null : result.filePaths[0];
+        });
 
-                const filePath = result.filePaths[0];
-
-                // 读取文件
-                const fs = await import('fs').then(m => m.promises);
-                const fileContent = await fs.readFile(filePath, 'utf-8');
-                
-                let backupData;
-                try {
-                    backupData = JSON.parse(fileContent);
-                } catch (error) {
-                    throw new Error('备份文件格式无效，请确保是有效的 JSON 文件');
-                }
-
-                // 验证备份数据结构
-                if (!backupData || typeof backupData !== 'object') {
-                    throw new Error('备份文件数据结构无效');
-                }
-
-                // 通过 executeJavaScript 调用渲染进程暴露的方法
-                const mainWindow = BrowserWindow.getAllWindows()[0];
-                if (!mainWindow) {
-                    throw new Error('没有找到主窗口，无法访问数据库');
-                }
-
-                // 调用渲染进程导入数据
-                const importResult = await mainWindow.webContents.executeJavaScript(`
-                    (async () => {
-                        try {
-                            if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
-                                throw new Error('数据库API未初始化');
-                            }
-                            
-                            const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-                            return await databaseServiceManager.replaceAllData(${JSON.stringify(backupData)});
-                        } catch (error) {
-                            return {
-                                success: false,
-                                error: error.message || '未知错误'
-                            };
-                        }
-                    })()
-                `);
-
-                if (!importResult.success) {
-                    throw new Error(`导入数据失败: ${importResult.error}`);
-                }
-                
-                console.log('完整备份导入成功');
-                
-                return {
-                    success: true,
-                    message: '完整备份导入成功，数据已完全替换'
-                };
-                
-            } catch (error) {
-                console.error('完整备份导入失败:', error);
-                const errorMessage = error instanceof Error ? error.message : '未知错误';
-                return {
-                    success: false,
-                    error: errorMessage,
-                    message: `完整备份导入失败: ${errorMessage}`
-                };
+        // 选择导出路径
+        ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
+            const fileExtension = defaultName.split('.').pop()?.toLowerCase();
+            let filters;
+            
+            if (fileExtension === 'csv') {
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else if (fileExtension === 'json') {
+                filters = [
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
+            } else {
+                filters = [
+                    { name: 'CSV 文件', extensions: ['csv'] },
+                    { name: 'JSON 文件', extensions: ['json'] },
+                    { name: '所有文件', extensions: ['*'] },
+                ];
             }
+            
+            const result = await dialog.showSaveDialog({
+                title: '选择导出路径',
+                defaultPath: defaultName,
+                filters: filters,
+            });
+
+            return result.canceled ? null : result.filePath;
         });
 
         // 获取备份目录路径
@@ -751,235 +424,8 @@ export class DataManagementService {
         console.log('DataManagementService: 所有IPC处理程序注册完成');
     }
 
-    private async exportAllData() {
-        try {
-            console.log('正在从渲染进程获取数据库数据...');
-            
-            // 通过 executeJavaScript 调用渲染进程暴露的方法
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (!mainWindow) {
-                throw new Error('没有找到主窗口，无法访问数据库');
-            }
-
-            // 首先检查数据库健康状态并尝试修复
-            console.log('正在检查数据库健康状态...');
-            const healthCheckResult = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
-                            throw new Error('数据库API未初始化');
-                        }
-                        
-                        const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-                        return await databaseServiceManager.checkAndRepairDatabase();
-                    } catch (error) {
-                        return {
-                            healthy: false,
-                            repaired: false,
-                            message: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-
-            if (!healthCheckResult.healthy) {
-                console.error('数据库健康检查失败:', healthCheckResult.message);
-                throw new Error(`数据库异常: ${healthCheckResult.message}`);
-            }
-
-            if (healthCheckResult.repaired) {
-                console.log('数据库已修复:', healthCheckResult.message);
-            }
-
-            // 调用渲染进程中暴露的导出方法
-            const result = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.exportAllData) {
-                            throw new Error('数据库API未初始化');
-                        }
-                        return await window.databaseAPI.exportAllData();
-                    } catch (error) {
-                        return {
-                            success: false,
-                            error: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-            
-            if (!result.success) {
-                throw new Error(`数据库操作失败: ${result.error}`);
-            }
-            
-            // 确保 result.data 存在
-            if (!result.data) {
-                console.warn('导出结果中缺少 data 字段，使用默认空数据结构');
-                const defaultData = {
-                    categories: [],
-                    prompts: [],
-                    aiConfigs: [],
-                    aiHistory: [],
-                    settings: []
-                };
-                return {
-                    ...defaultData,
-                    totalRecords: 0
-                };
-            }
-            
-            // 计算总记录数
-            const totalRecords = (
-                (result.data.categories?.length || 0) +
-                (result.data.prompts?.length || 0) +
-                (result.data.aiConfigs?.length || 0) +
-                (result.data.aiHistory?.length || 0) +
-                (result.data.settings?.length || 0)
-            );
-            
-            console.log(`成功获取数据库数据，总记录数: ${totalRecords}`);
-            
-            // 返回正确的数据结构，包含totalRecords字段
-            return {
-                ...result.data,
-                totalRecords
-            };
-            
-        } catch (error) {
-            console.error('导出数据失败:', error);
-            throw new Error(`数据导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
-        }
-    }
-
-    private async restoreAllData(data: any) {
-        try {
-            console.log('正在恢复数据到数据库...');
-            
-            // 通过 executeJavaScript 调用渲染进程暴露的方法
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (!mainWindow) {
-                throw new Error('没有找到主窗口，无法访问数据库');
-            }
-
-            // 调用渲染进程中暴露的恢复方法
-            const result = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.restoreData) {
-                            throw new Error('数据库API未初始化');
-                        }
-                        const data = ${JSON.stringify(data)};
-                        return await window.databaseAPI.restoreData(data);
-                    } catch (error) {
-                        return {
-                            success: false,
-                            error: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-            
-            if (!result.success) {
-                throw new Error(`数据恢复失败: ${result.error}`);
-            }
-            
-            console.log(`数据恢复成功，总计恢复记录数: ${result.totalImported}`);
-            console.log('恢复详情:', result.details);
-            
-        } catch (error) {
-            console.error('恢复数据失败:', error);
-            throw new Error(`数据恢复失败: ${error instanceof Error ? error.message : '未知错误'}`);
-        }
-    }
-
-    private async restoreAllDataWithReplace(data: any) {
-        try {
-            console.log('正在完全替换数据库数据...');
-            
-            // 通过 executeJavaScript 调用渲染进程暴露的方法
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (!mainWindow) {
-                throw new Error('没有找到主窗口，无法访问数据库');
-            }
-
-            // 调用渲染进程中暴露的替换恢复方法
-            const result = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.replaceAllData) {
-                            throw new Error('数据库API未初始化或不支持完全替换');
-                        }
-                        const data = ${JSON.stringify(data)};
-                        return await window.databaseAPI.replaceAllData(data);
-                    } catch (error) {
-                        return {
-                            success: false,
-                            error: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-            
-            if (!result.success) {
-                throw new Error(`数据替换失败: ${result.error}`);
-            }
-            
-            console.log(`数据完全替换成功，总计恢复记录数: ${result.totalImported}`);
-            console.log('替换详情:', result.details);
-            
-        } catch (error) {
-            console.error('替换数据失败:', error);
-            throw new Error(`数据完全替换失败: ${error instanceof Error ? error.message : '未知错误'}`);
-        }
-    }
-
-    private async exportData(options: any) {
-        // 根据选项导出特定数据
-        const data = await this.exportAllData();
-        
-        if (options.format === 'csv') {
-            // 转换为 CSV 格式
-            return this.convertToCSV(data);
-        }
-        
-        return JSON.stringify(data, null, 2);
-    }
-
-    private async importData(filePath: string, options: any) {
-        try {
-            const content = await fs.readFile(filePath, 'utf-8');
-            let data;
-
-            if (options.format === 'csv') {
-                data = this.parseCSV(content);
-            } else {
-                data = JSON.parse(content);
-            }
-
-            // 这里应该将数据导入到数据库
-            return {
-                success: true,
-                message: '导入成功',
-                imported: {
-                    categories: data.categories?.length || 0,
-                    prompts: data.prompts?.length || 0,
-                    settings: Object.keys(data.settings || {}).length,
-                    history: data.history?.length || 0,
-                },
-                errors: [],
-            };
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            throw new Error(`导入数据失败: ${errorMessage}`);
-        }
-    }
-
     /**
      * 统一处理 tags 字段转换
-     * 将字符串或数组格式的 tags 转换为字符串
-     * @param tags 标签数据（可能是字符串或数组）
-     * @param separator 分隔符，默认为分号
-     * @returns 转换后的标签字符串
      */
     private normalizeTags(tags: any, separator = ';'): string {
         if (!tags) return '';
@@ -987,7 +433,6 @@ export class DataManagementService {
         if (Array.isArray(tags)) {
             return tags.join(separator);
         } else if (typeof tags === 'string') {
-            // 如果是字符串，先按逗号分割，再用指定分隔符连接
             return tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag).join(separator);
         }
         
@@ -995,10 +440,8 @@ export class DataManagementService {
     }
 
     private convertToCSV(data: any): string {
-        // 简单的 CSV 转换实现
         let csv = '';
         
-        // 添加分类数据
         if (data.categories && data.categories.length > 0) {
             csv += '--- 分类数据 ---\n';
             csv += 'ID,名称,描述,创建时间\n';
@@ -1008,7 +451,6 @@ export class DataManagementService {
             csv += '\n';
         }
         
-        // 添加提示词数据
         if (data.prompts && data.prompts.length > 0) {
             csv += '--- 提示词数据 ---\n';
             csv += 'ID,标题,内容,分类ID,标签,创建时间\n';
@@ -1018,7 +460,6 @@ export class DataManagementService {
             csv += '\n';
         }
         
-        // 添加历史数据
         if (data.history && data.history.length > 0) {
             csv += '--- 历史数据 ---\n';
             csv += 'ID,提示词ID,输入,输出,时间戳\n';
@@ -1032,356 +473,6 @@ export class DataManagementService {
 
     private parseCSV(content: string): any {
         // 简单的 CSV 解析实现
-        // 实际应用中需要更复杂的逻辑
         return { categories: [], prompts: [], settings: {}, history: [] };
-    }
-
-    /**
-     * 创建备份 - 供 WebDAV 同步使用
-     */
-    async createBackup(description?: string): Promise<BackupInfo> {
-        try {
-            const backupId = uuidv4();
-            const timestamp = new Date().toISOString();
-            const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
-            const backupPath = path.join(this.backupDir, `${backupName}.json`);
-
-            // 从数据库中导出所有数据
-            const backupData = await this.exportAllData();
-            
-            const backupInfo: BackupInfo = {
-                id: backupId,
-                name: backupName,
-                description: description || '自动备份',
-                createdAt: timestamp,
-                size: 0, // 将在写入后计算
-                data: backupData,
-            };
-
-            await fs.writeFile(backupPath, JSON.stringify(backupInfo, null, 2));
-            
-            const stats = await fs.stat(backupPath);
-            backupInfo.size = stats.size;
-            
-            return backupInfo;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            throw new Error(`创建备份失败: ${errorMessage}`);
-        }
-    }
-
-    /**
-     * 生成导出数据 - 供 WebDAV 同步使用
-     */
-    async generateExportData() {
-        try {
-            const exportResult = await this.exportAllData();
-            
-            // 检查导出结果
-            if (!exportResult) {
-                console.warn('导出数据为空，返回默认空数据结构');
-                return {
-                    success: true,
-                    data: {
-                        categories: [],
-                        prompts: [],
-                        aiConfigs: [],
-                        aiHistory: [],
-                        settings: []
-                    },
-                    message: '导出数据为空，使用默认空结构'
-                };
-            }
-            
-            // 确保数据结构完整，即使某些数据为空
-            const safeData = {
-                categories: Array.isArray(exportResult.categories) ? exportResult.categories : [],
-                prompts: Array.isArray(exportResult.prompts) ? exportResult.prompts : [],
-                aiConfigs: Array.isArray(exportResult.aiConfigs) ? exportResult.aiConfigs : [],
-                aiHistory: Array.isArray(exportResult.aiHistory) ? exportResult.aiHistory : [],
-                settings: Array.isArray(exportResult.settings) ? exportResult.settings : []
-            };
-            
-            // 检查并补全 UUID
-            const processedData = this.ensureUUIDsInExportData(safeData);
-            
-            console.log('生成导出数据完成:', {
-                categoriesCount: processedData.categories.length,
-                promptsCount: processedData.prompts.length,
-                aiConfigsCount: processedData.aiConfigs.length,
-                aiHistoryCount: processedData.aiHistory.length,
-                settingsCount: processedData.settings.length
-            });
-            
-            return {
-                success: true,
-                data: processedData,
-                message: '导出数据生成成功'
-            };
-            
-        } catch (error) {
-            console.error('生成导出数据失败:', error);
-            // 返回安全的空数据结构，确保同步不会失败
-            return {
-                success: true,
-                data: {
-                    categories: [],
-                    prompts: [],
-                    aiConfigs: [],
-                    aiHistory: [],
-                    settings: []
-                },
-                message: `导出数据生成失败，使用空结构: ${error instanceof Error ? error.message : '未知错误'}`
-            };
-        }
-    }
-
-    /**
-     * 直接导入数据对象 - 供 WebDAV 同步使用
-     */
-    async importDataObject(data: any): Promise<{
-        success: boolean;
-        message: string;
-        imported: {
-            categories: number;
-            prompts: number;
-            settings: number;
-            history: number;
-        };
-        errors: string[];
-    }> {
-        try {
-            console.log('开始导入数据对象...');
-            
-            // 通过 executeJavaScript 调用渲染进程暴露的方法
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (!mainWindow) {
-                throw new Error('没有找到主窗口，无法访问数据库');
-            }
-
-            // 调用渲染进程中暴露的导入方法
-            const result = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.importDataObject) {
-                            throw new Error('数据库API未初始化');
-                        }
-                        const data = ${JSON.stringify(data)};
-                        return await window.databaseAPI.importDataObject(data);
-                    } catch (error) {
-                        return {
-                            success: false,
-                            error: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-            
-            if (!result.success) {
-                console.error('导入数据对象失败:', result.error);
-                return {
-                    success: false,
-                    message: `导入失败: ${result.error}`,
-                    imported: {
-                        categories: 0,
-                        prompts: 0,
-                        settings: 0,
-                        history: 0,
-                    },
-                    errors: [result.error],
-                };
-            }
-            
-            console.log('数据对象导入成功:', result.details);
-            
-            return {
-                success: true,
-                message: '导入成功',
-                imported: {
-                    categories: result.details?.categories || 0,
-                    prompts: result.details?.prompts || 0,
-                    settings: result.details?.settings || 0,
-                    history: result.details?.aiHistory || 0,
-                },
-                errors: [],
-            };
-            
-        } catch (error) {
-            console.error('导入数据对象失败:', error);
-            return {
-                success: false,
-                message: `导入失败: ${error instanceof Error ? error.message : '未知错误'}`,
-                imported: {
-                    categories: 0,
-                    prompts: 0,
-                    settings: 0,
-                    history: 0,
-                },
-                errors: [error instanceof Error ? error.message : '未知错误'],
-            };
-        }
-    }
-
-    /**
-     * 同步导入数据对象 - 使用 upsert 逻辑供 WebDAV 同步使用
-     */
-    async syncImportDataObject(data: any): Promise<{
-        success: boolean;
-        message: string;
-        imported: {
-            categories: number;
-            prompts: number;
-            settings: number;
-            history: number;
-        };
-        errors: string[];
-    }> {
-        try {
-            console.log('开始同步导入数据对象...');
-            
-            // 通过 executeJavaScript 调用渲染进程暴露的方法
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (!mainWindow) {
-                throw new Error('没有找到主窗口，无法访问数据库');
-            }
-
-            // 调用渲染进程中暴露的同步导入方法
-            const result = await mainWindow.webContents.executeJavaScript(`
-                (async () => {
-                    try {
-                        if (!window.databaseAPI || !window.databaseAPI.syncImportDataObject) {
-                            throw new Error('数据库API未初始化或同步导入方法不存在');
-                        }
-                        const data = ${JSON.stringify(data)};
-                        return await window.databaseAPI.syncImportDataObject(data);
-                    } catch (error) {
-                        return {
-                            success: false,
-                            error: error.message || '未知错误'
-                        };
-                    }
-                })()
-            `);
-            
-            if (!result.success) {
-                console.error('同步导入数据对象失败:', result.error);
-                return {
-                    success: false,
-                    message: `同步导入失败: ${result.error}`,
-                    imported: {
-                        categories: 0,
-                        prompts: 0,
-                        settings: 0,
-                        history: 0,
-                    },
-                    errors: [result.error],
-                };
-            }
-            
-            console.log('数据对象同步导入成功:', result.details);
-            
-            return {
-                success: true,
-                message: '同步导入成功',
-                imported: {
-                    categories: result.details?.categories || 0,
-                    prompts: result.details?.prompts || 0,
-                    settings: result.details?.settings || 0,
-                    history: result.details?.aiHistory || 0,
-                },
-                errors: [],
-            };
-            
-        } catch (error) {
-            console.error('同步导入数据对象失败:', error);
-            return {
-                success: false,
-                message: `同步导入失败: ${error instanceof Error ? error.message : '未知错误'}`,
-                imported: {
-                    categories: 0,
-                    prompts: 0,
-                    settings: 0,
-                    history: 0,
-                },
-                errors: [error instanceof Error ? error.message : '未知错误'],
-            };
-        }
-    }
-
-    /**
-     * 确保导出数据中所有需要同步的条目都有 UUID
-     */
-    private ensureUUIDsInExportData(data: any): any {
-        if (!data || typeof data !== 'object') {
-            console.warn('ensureUUIDsInExportData: 输入数据无效，返回空结构');
-            return {
-                categories: [],
-                prompts: [],
-                aiConfigs: [],
-                aiHistory: [],
-                settings: []
-            };
-        }
-
-        // 生成简单的 UUID（类似 v4 格式）
-        const generateUUID = () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        };
-
-        // 确保所有必要的数组都存在
-        const safeData = {
-            categories: Array.isArray(data.categories) ? data.categories : [],
-            prompts: Array.isArray(data.prompts) ? data.prompts : [],
-            aiConfigs: Array.isArray(data.aiConfigs) ? data.aiConfigs : [],
-            aiHistory: Array.isArray(data.aiHistory) ? data.aiHistory : [],
-            settings: Array.isArray(data.settings) ? data.settings : []
-        };
-
-        // 为每个数组中的项目补全 UUID
-        const syncableTypes = ['categories', 'prompts', 'aiConfigs', 'aiHistory'] as const;
-        
-        for (const type of syncableTypes) {
-            if (safeData[type] && Array.isArray(safeData[type])) {
-                (safeData as any)[type] = (safeData as any)[type].map((item: any) => {
-                    if (!item || typeof item !== 'object') {
-                        console.warn(`跳过无效的 ${type} 项目:`, item);
-                        return item;
-                    }
-                    
-                    // 优先使用uuid字段，如果没有则使用id，都没有则生成新的
-                    if (!item.uuid) {
-                        const existingId = item.id;
-                        if (existingId) {
-                            console.log(`为 ${type} 中的条目补全 UUID（使用现有ID）: ${existingId}`);
-                            item.uuid = String(existingId);
-                        } else {
-                            const newUuid = generateUUID();
-                            console.log(`为 ${type} 中的条目生成新 UUID: ${newUuid}`);
-                            item.uuid = newUuid;
-                            item.id = newUuid; // 同时设置id字段以保持兼容性
-                        }
-                    } else if (!item.id) {
-                        // 如果有uuid但没有id，则设置id字段
-                        item.id = String(item.uuid);
-                    }
-                    
-                    return item;
-                }).filter((item: any) => item !== null && item !== undefined);
-            }
-        }
-        
-        console.log('UUID 补全完成:', {
-            categoriesCount: safeData.categories.length,
-            promptsCount: safeData.prompts.length,
-            aiConfigsCount: safeData.aiConfigs.length,
-            aiHistoryCount: safeData.aiHistory.length,
-            settingsCount: safeData.settings.length
-        });
-        
-        return safeData;
     }
 }

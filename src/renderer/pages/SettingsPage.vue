@@ -74,15 +74,25 @@
 
 
                         <!-- 数据管理设置 -->
-                        <DataManagementSettings ref="dataManagementRef" v-show="activeSettingKey === 'data-management'"
-                            :model-value="{ dataSync: { ...settings.dataSync } }"
-                            @update:model-value="(val: any) => { Object.assign(settings.dataSync, val.dataSync); }"
-                            @export-data="exportData" @import-data="importData" @export-selected-data="exportSelected"
-                            @export-full-backup="exportFullBackup" @import-full-backup="importFullBackup" @create-backup="createBackup"
-                            @restore-backup="restoreSpecificBackup" @delete-backup="deleteBackup"
-                            @refresh-backup-list="refreshBackupList" @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase" @clear-database="clearDatabase" 
-                            @open-backup-directory="openBackupDirectory" /> 
+                        <DataManagementSettings 
+                            v-show="activeSettingKey === 'data-management'"
+                            :backup-list="backupList"
+                            :data-stats="dataStats"
+                            :loading="loading"
+                            :error="dataManagementError"
+                            :success="dataManagementSuccess"
+                            @create-backup="createBackup"
+                            @refresh-backup-list="refreshBackupList"
+                            @restore-backup="restoreSpecificBackup"
+                            @delete-backup="deleteBackup"
+                            @open-backup-directory="openBackupDirectory"
+                            @export-full-backup="exportFullBackup"
+                            @import-full-backup="importFullBackup"
+                            @export-selected-data="exportSelected"
+                            @check-database-health="checkDatabaseHealth"
+                            @repair-database="repairDatabase"
+                            @clear-database="clearDatabase"
+                            @clear-messages="clearDataManagementMessages" />
                             
                         <!-- 云端备份设置 -->
                         <CloudBackupSettings v-show="activeSettingKey === 'cloud-backup'" />
@@ -180,6 +190,7 @@ import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import { DataManagementAPI } from "@/lib/api";
 import { databaseServiceManager } from "@/lib/services";
+import { useDataManagement } from '@/composables/useDataManagement';
 
 // Props 定义
 interface Props {
@@ -201,8 +212,17 @@ const currentMode = import.meta.env.MODE;
 // 当前激活的设置项
 const activeSettingKey = ref(props.targetSection || 'data-management');
 
-// 组件引用
-const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
+// 使用数据管理 composable
+const dataManagement = useDataManagement({
+  autoRefresh: false,
+  refreshInterval: 30000
+});
+
+// 数据管理状态
+const backupList = computed(() => dataManagement.backupList.value);
+const dataStats = computed(() => dataManagement.dataStats.value);
+const dataManagementError = computed(() => dataManagement.error.value);
+const dataManagementSuccess = computed(() => dataManagement.success.value);
 
 // 状态管理
 const saving = ref(false);
@@ -214,6 +234,8 @@ const loading = reactive({
     healthCheck: false,
     backup: false,
     clearDatabase: false,
+    restore: false,
+    refreshBackupList: false
 });
 
 // 设置数据
@@ -573,12 +595,7 @@ const exportFullBackup = async () => {
 // 加载数据统计
 const loadDataStats = async () => {
     try {
-        const stats = await DataManagementAPI.getDataStats();
-        
-        // 更新子组件的数据统计
-        if (dataManagementRef.value) {
-            dataManagementRef.value.updateDataStats(stats);
-        }
+        await dataManagement.getDataStats();
     } catch (error) {
         console.error(t('settingsMessages.getDataStatsFailed'), error);
         // 不显示错误消息，因为这不是关键功能
@@ -588,24 +605,13 @@ const loadDataStats = async () => {
 // 刷新备份列表
 const refreshBackupList = async () => {
     try {
-        const backups = await DataManagementAPI.getBackupList();
-
-        // 转换备份数据格式以匹配组件期望的格式
-        const formattedBackups = backups.map((backup: any) => ({
-            id: backup.id,
-            name: backup.name,
-            createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
-            size: `${(backup.size / 1024).toFixed(2)} KB`,
-            version: backup.description || 'v1.0'
-        }));
-
-        // 更新子组件的备份列表
-        if (dataManagementRef.value) {
-            dataManagementRef.value.updateBackupList(formattedBackups);
-        }
+        loading.refreshBackupList = true;
+        await dataManagement.getBackupList();
     } catch (error) {
         console.error(t('settingsMessages.getBackupListFailed'), error);
         message.error(t('settingsMessages.getBackupListFailed'));
+    } finally {
+        loading.refreshBackupList = false;
     }
 };
 
@@ -614,14 +620,13 @@ const createBackup = async () => {
     loading.backup = true;
     try {
         const timestamp = new Date().toLocaleString('zh-CN');
-        const backup = await DataManagementAPI.createBackup(t('settingsMessages.manualBackup', { timestamp }));
-        message.success(t('settingsMessages.backupCreatedSuccess', { 
-            name: backup.name, 
-            size: (backup.size / 1024).toFixed(2) 
-        }));
-
-        // 创建成功后立即刷新备份列表
-        await refreshBackupList();
+        const backup = await dataManagement.createBackup(t('settingsMessages.manualBackup', { timestamp }));
+        if (backup) {
+            message.success(t('settingsMessages.backupCreatedSuccess', { 
+                name: backup.name, 
+                size: (backup.size / 1024).toFixed(2) 
+            }));
+        }
     } catch (error) {
         console.error(t('settingsMessages.backupCreatedFailed'), error);
         message.error(t('settingsMessages.backupCreatedFailed'));
@@ -632,22 +637,20 @@ const createBackup = async () => {
 
 // 恢复指定备份
 const restoreSpecificBackup = async (backupId: string) => {
-    loading.backup = true;
+    loading.restore = true;
     try {
         // 步骤1: 先创建当前数据的自动备份
         message.info(t('settingsMessages.creatingAutoBackup'));
         const timestamp = new Date().toLocaleString('zh-CN');
-        const autoBackup = await DataManagementAPI.createBackup(t('settingsMessages.autoBackupBeforeRestore', { timestamp }));
-        console.log(t('settingsMessages.autoBackupCreated', { name: autoBackup.name }));
+        const autoBackup = await dataManagement.createBackup(t('settingsMessages.autoBackupBeforeRestore', { timestamp }));
+        console.log(t('settingsMessages.autoBackupCreated', { name: autoBackup?.name }));
 
         // 步骤2: 执行恢复操作
         message.info(t('settingsMessages.restoringBackup'));
-        const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
+        const success = await dataManagement.restoreBackup(backupId);
 
-        if (result.success) {
-            message.success(t('settingsMessages.backupRestoreSuccess', { name: autoBackup.name }));
-            // 恢复成功后刷新备份列表
-            await refreshBackupList();
+        if (success) {
+            message.success(t('settingsMessages.backupRestoreSuccess', { name: autoBackup?.name }));
         } else {
             message.error(t('settingsMessages.backupRestoreFailed'));
         }
@@ -656,7 +659,7 @@ const restoreSpecificBackup = async (backupId: string) => {
         const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupRestoreFailed');
         message.error(`${t('settingsMessages.backupRestoreFailed')}: ${errorMessage}`);
     } finally {
-        loading.backup = false;
+        loading.restore = false;
     }
 };
 
@@ -664,21 +667,16 @@ const restoreSpecificBackup = async (backupId: string) => {
 const deleteBackup = async (backupId: string) => {
     try {
         console.log(t('settingsMessages.startDeleteBackup', { backupId }));
-        await DataManagementAPI.deleteBackup(backupId);
-        message.success(t('settingsMessages.backupDeleteSuccess'));
-        // 删除成功后刷新备份列表
-        await refreshBackupList();
+        const success = await dataManagement.deleteBackup(backupId);
+        if (success) {
+            message.success(t('settingsMessages.backupDeleteSuccess'));
+        } else {
+            message.error(t('settingsMessages.backupDeleteFailed'));
+        }
     } catch (error) {
         console.error(t('settingsMessages.backupDeleteFailed'), error);
         const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupDeleteFailed');
         message.error(`${t('settingsMessages.backupDeleteFailed')}: ${errorMessage}`);
-
-        // 删除失败后也刷新备份列表，以确保UI状态正确
-        try {
-            await refreshBackupList();
-        } catch (refreshError) {
-            console.error(t('settingsMessages.getBackupListFailed'), refreshError);
-        }
     }
 };
 
@@ -686,13 +684,11 @@ const deleteBackup = async (backupId: string) => {
 const checkDatabaseHealth = async () => {
     loading.healthCheck = true;
     try {
-        const result = await databaseServiceManager.getHealthStatus();
-        
-        if (result.healthy) {
+        const success = await dataManagement.checkDatabaseHealth();
+        if (success) {
             message.success(t('settingsMessages.databaseHealthy'));
         } else {
-            message.warning(t('settingsMessages.databaseUnhealthy', { stores: result.missingStores.join(', ') }));
-            console.warn(t('settingsMessages.databaseHealthCheckResult'), result);
+            message.warning(t('settingsMessages.databaseUnhealthy'));
         }
     } catch (error) {
         console.error(t('settingsMessages.databaseHealthCheckFailed'), error);
@@ -705,8 +701,12 @@ const checkDatabaseHealth = async () => {
 const clearDatabase = async () => {
     loading.clearDatabase = true;
     try {
-        await databaseServiceManager.forceCleanAllTables();
-        message.success(t('settingsMessages.databaseCleared'));
+        const success = await dataManagement.clearDatabase();
+        if (success) {
+            message.success(t('settingsMessages.databaseCleared'));
+        } else {
+            message.error(t('settingsMessages.databaseClearFailed'));
+        }
     } catch (error) {
         console.error(t('settingsMessages.databaseClearFailed'), error);
         message.error(t('settingsMessages.databaseClearFailed'));
@@ -718,23 +718,15 @@ const clearDatabase = async () => {
 const repairDatabase = async () => {
     loading.repair = true;
     try {
-        const result = await databaseServiceManager.checkAndRepairDatabase();
-
-        if (result.healthy) {
-            if (result.repaired) {
-                message.success(t('settingsMessages.databaseRepairSuccess', { message: result.message }));
-            } else {
-                message.success(t('settingsMessages.databaseNoRepairNeeded'));
-            }
+        const success = await dataManagement.repairDatabase();
+        if (success) {
+            message.success(t('settingsMessages.databaseRepairSuccess'));
         } else {
-            message.error(t('settingsMessages.databaseRepairFailed', { message: result.message }));
-            if (result.missingStores && result.missingStores.length > 0) {
-                console.error(t('settingsMessages.stillMissingStores'), result.missingStores);
-            }
+            message.error(t('settingsMessages.databaseRepairFailed'));
         }
     } catch (error) {
-        console.error(t('settingsMessages.databaseRepairFailed', { message: '' }), error);
-        message.error(t('settingsMessages.databaseRepairFailed', { message: '' }));
+        console.error(t('settingsMessages.databaseRepairFailed'), error);
+        message.error(t('settingsMessages.databaseRepairFailed'));
     }
     loading.repair = false;
 };
@@ -742,23 +734,21 @@ const repairDatabase = async () => {
 // 打开备份目录
 const openBackupDirectory = async () => {
     try {
-        const result = await DataManagementAPI.getBackupDirectory();
-        
-        if (result.success && result.path) {
-            // 使用系统默认应用打开文件夹
-            const shellResult = await window.electronAPI.shell.openPath(result.path);
-            if (shellResult.success) {
-                message.success(t('settingsMessages.backupDirectoryOpened'));
-            } else {
-                message.error(shellResult.error || t('settingsMessages.openBackupDirectoryFailed'));
-            }
+        const success = await dataManagement.openBackupDirectory();
+        if (success) {
+            message.success(t('settingsMessages.backupDirectoryOpened'));
         } else {
-            message.error(result.message || t('settingsMessages.getBackupDirectoryFailed'));
+            message.error(t('settingsMessages.openBackupDirectoryFailed'));
         }
     } catch (error) {
         console.error(t('settingsMessages.openBackupDirectoryFailed'), error);
         message.error(t('settingsMessages.openBackupDirectoryFailed'));
     }
+};
+
+// 清除数据管理消息
+const clearDataManagementMessages = () => {
+    dataManagement.clearMessages();
 };
 
 // 组件挂载时加载设置

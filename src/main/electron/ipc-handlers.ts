@@ -365,27 +365,40 @@ class IpcHandlers {
    * 设置 Shell 功能处理器
    */
   private setupShellHandlers() {
-    // 打开文件夹
-    ipcMain.handle('shell:open-path', async (_, path: string) => {
-      try {
-        const { shell } = await import('electron');
-        await shell.openPath(path);
-        return { success: true, error: null };
-      } catch (error: any) {
-        console.error('打开文件夹失败:', error);
-        return { success: false, error: error.message || '打开文件夹失败' };
-      }
+    // 打开路径
+    ipcMain.handle('shell:open-path', (_, path: string) => {
+      const { shell } = require('electron');
+      return shell.openPath(path);
     });
 
     // 打开外部链接
-    ipcMain.handle('shell:open-external', async (_, url: string) => {
+    ipcMain.handle('shell:open-external', (_, url: string) => {
+      const { shell } = require('electron');
+      return shell.openExternal(url);
+    });
+
+    // 文件操作
+    // 读取文件
+    ipcMain.handle('fs:read-file', async (_, { filePath }) => {
+      const fs = require('fs').promises;
       try {
-        const { shell } = await import('electron');
-        await shell.openExternal(url);
-        return { success: true, error: null };
-      } catch (error: any) {
-        console.error('打开外部链接失败:', error);
-        return { success: false, error: error.message || '打开外部链接失败' };
+        const content = await fs.readFile(filePath, 'utf-8');
+        return content;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`读取文件失败: ${errorMessage}`);
+      }
+    });
+
+    // 写入文件
+    ipcMain.handle('fs:write-file', async (_, { filePath, content }) => {
+      const fs = require('fs').promises;
+      try {
+        await fs.writeFile(filePath, content, 'utf-8');
+        return { success: true };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`写入文件失败: ${errorMessage}`);
       }
     });
   }
@@ -430,6 +443,8 @@ class IpcHandlers {
     // 清理 Shell 处理器
     ipcMain.removeHandler('shell:open-path');
     ipcMain.removeHandler('shell:open-external');
+    ipcMain.removeHandler('fs:read-file');
+    ipcMain.removeHandler('fs:write-file');
     
     // 清理活跃的生成请求
     for (const abortController of this.activeGenerations.values()) {

@@ -5,6 +5,7 @@ import path from 'path';
 // 第三方库导入
 import { ipcMain } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
+import { BrowserWindow } from 'electron';
 
 // 本地模块导入
 import { 
@@ -220,7 +221,47 @@ export class CloudBackupManager {
     ipcMain.handle('cloud:create-backup', async (_, storageId: string, description?: string): Promise<CloudBackupResult> => {
       try {
         const config = this.getStorageConfig(storageId);
-        const localBackup = await this.dataManagementService.createBackup(description);
+        // 直接通过数据库服务导出数据，然后创建备份
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (!mainWindow) {
+          throw new Error('没有找到主窗口，无法访问数据库');
+        }
+        
+        // 从渲染进程获取数据
+        const exportResult = await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            try {
+              if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                throw new Error('数据库API未初始化');
+              }
+              const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+              return await databaseServiceManager.exportAllData();
+            } catch (error) {
+              return {
+                success: false,
+                error: error.message || '未知错误'
+              };
+            }
+          })()
+        `);
+        
+        if (!exportResult.success) {
+          throw new Error(`获取数据失败: ${exportResult.error}`);
+        }
+        
+        // 创建本地备份信息
+        const backupId = uuidv4();
+        const timestamp = new Date().toISOString();
+        const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
+        
+        const localBackup = {
+          id: backupId,
+          name: backupName,
+          description: description || '云端备份',
+          createdAt: timestamp,
+          data: exportResult.data
+        };
+        
         const provider = this.createProvider(config);
         const cloudBackup = await this.uploadBackupToCloud(provider, config, localBackup);
         

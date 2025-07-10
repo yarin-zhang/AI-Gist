@@ -1,6 +1,7 @@
 import {contextBridge, ipcRenderer} from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   sendMessage: (message: string) => ipcRenderer.send('message', message),
   
   // 用户偏好设置
@@ -67,20 +68,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 数据管理
   data: {
-    createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),
+    createBackup: (description?: string, data?: any) => ipcRenderer.invoke('data:create-backup', { description, data }),
     getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
-    restoreBackup: (backupId: string) => ipcRenderer.invoke('data:restore-backup', { backupId }),
-    restoreBackupWithReplace: (backupId: string) => ipcRenderer.invoke('data:restore-backup-replace', { backupId }),
+    readBackup: (backupId: string) => ipcRenderer.invoke('data:read-backup', { backupId }),
     deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
-    export: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export', { options, exportPath }),
-    import: (filePath: string, options: any) => ipcRenderer.invoke('data:import', { filePath, options }),
-    exportSelected: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export-selected', { options, exportPath }),
-    exportFullBackup: () => ipcRenderer.invoke('data:export-full-backup'),
-    importFullBackup: () => ipcRenderer.invoke('data:import-full-backup'),
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
     getStats: () => ipcRenderer.invoke('data:get-stats'),
     getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
+  },
+  // 文件操作
+  fs: {
+    readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', { filePath }),
+    writeFile: (filePath: string, content: string) => ipcRenderer.invoke('fs:write-file', { filePath, content }),
   },
   // 云端备份功能
   cloud: {

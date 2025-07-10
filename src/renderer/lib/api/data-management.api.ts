@@ -1,6 +1,6 @@
 /**
  * 数据管理 API
- * 直接使用 Electron API，不再依赖 IPC 工具类
+ * 适配简化后的主进程，只保留基础文件操作
  */
 
 /**
@@ -15,43 +15,33 @@ export class DataManagementAPI {
   }
 
   /**
-   * 创建备份
-   */
-  static async createBackup(description?: string) {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.createBackup(description);
-  }
-
-  /**
    * 获取备份列表
    */
   static async getBackupList() {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.getBackupList();
+    return await window.electronAPI.invoke('data:get-backup-list');
   }
 
   /**
-   * 恢复备份
+   * 创建备份（需要传入数据）
    */
-  static async restoreBackup(backupId: string) {
+  static async createBackup(description?: string, data?: any) {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.restoreBackup(backupId);
+    return await window.electronAPI.invoke('data:create-backup', { description, data });
   }
 
   /**
-   * 恢复备份（替换模式）
+   * 读取备份数据
    */
-  static async restoreBackupWithReplace(backupId: string) {
+  static async readBackup(backupId: string) {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.restoreBackupWithReplace(backupId);
+    return await window.electronAPI.invoke('data:read-backup', { backupId });
   }
 
   /**
@@ -61,27 +51,7 @@ export class DataManagementAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    await window.electronAPI.data.deleteBackup(backupId);
-  }
-
-  /**
-   * 导出数据
-   */
-  static async exportData(options: any, exportPath?: string) {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.export(options, exportPath);
-  }
-
-  /**
-   * 导入数据
-   */
-  static async importData(filePath: string, options: any) {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.import(filePath, options);
+    return await window.electronAPI.invoke('data:delete-backup', { backupId });
   }
 
   /**
@@ -91,7 +61,7 @@ export class DataManagementAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.selectImportFile(format);
+    return await window.electronAPI.invoke('data:select-import-file', { format });
   }
 
   /**
@@ -101,37 +71,7 @@ export class DataManagementAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.selectExportPath(defaultName);
-  }
-
-  /**
-   * 导出选中的数据
-   */
-  static async exportSelectedData(options: any, exportPath?: string) {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.exportSelected(options, exportPath);
-  }
-
-  /**
-   * 导出完整备份
-   */
-  static async exportFullBackup() {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.exportFullBackup();
-  }
-
-  /**
-   * 导入完整备份
-   */
-  static async importFullBackup() {
-    if (!this.isElectronAvailable()) {
-      throw new Error('Electron API not available');
-    }
-    return await window.electronAPI.data.importFullBackup();
+    return await window.electronAPI.invoke('data:select-export-path', { defaultName });
   }
 
   /**
@@ -141,7 +81,7 @@ export class DataManagementAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.getStats();
+    return await window.electronAPI.invoke('data:get-stats');
   }
 
   /**
@@ -151,6 +91,72 @@ export class DataManagementAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.data.getBackupDirectory();
+    return await window.electronAPI.invoke('data:get-backup-directory');
+  }
+
+  /**
+   * 读取文件内容
+   */
+  static async readFile(filePath: string) {
+    if (!this.isElectronAvailable()) {
+      throw new Error('Electron API not available');
+    }
+    return await window.electronAPI.invoke('fs:read-file', { filePath });
+  }
+
+  /**
+   * 写入文件内容
+   */
+  static async writeFile(filePath: string, content: string) {
+    if (!this.isElectronAvailable()) {
+      throw new Error('Electron API not available');
+    }
+    return await window.electronAPI.invoke('fs:write-file', { filePath, content });
+  }
+
+  /**
+   * 恢复备份（替换所有数据）
+   */
+  static async restoreBackupWithReplace(backupId: string) {
+    if (!this.isElectronAvailable()) {
+      throw new Error('Electron API not available');
+    }
+    
+    try {
+      console.log('开始恢复备份:', backupId);
+      
+      // 1. 读取备份数据
+      const backup = await this.readBackup(backupId);
+      console.log('读取备份数据成功:', backup);
+      
+      if (!backup || !backup.data) {
+        throw new Error('备份数据无效');
+      }
+
+      // 2. 通过渲染进程恢复数据
+      console.log('开始调用 data:import-data');
+      const result = await window.electronAPI.invoke('data:import-data', {
+        data: backup.data,
+        options: {
+          format: 'json',
+          overwrite: true,
+          mergeStrategy: 'replace'
+        }
+      });
+      console.log('data:import-data 调用结果:', result);
+
+      return {
+        success: true,
+        message: '备份恢复成功',
+        backup: backup
+      };
+    } catch (error) {
+      console.error('恢复备份失败:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : '备份恢复失败',
+        error: error
+      };
+    }
   }
 }
