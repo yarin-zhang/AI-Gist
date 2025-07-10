@@ -314,14 +314,14 @@ export class CategoryService extends BaseDatabaseService {
    * 将分类和提示词组织成树形结构，每个分类作为父节点，其下的提示词作为子节点
    * @returns Promise<Array<{type: 'category', data: CategoryWithRelations, children: Array<{type: 'prompt', data: PromptWithRelations}>}>> 树形结构数据
    */
-  async getCategoryTreeWithPrompts(): Promise<Array<{
+  async getCategoryTreeWithPrompts(): Promise<{
     type: 'category';
     data: CategoryWithRelations;
-    children: Array<{
+    children: {
       type: 'prompt';
       data: PromptWithRelations;
-    }>;
-  }>> {
+    }[];
+  }[]> {
     const categories = await this.getAll<Category>('categories');
     const prompts = await this.getAll<Prompt>('prompts');
     const variables = await this.getAll<PromptVariable>('promptVariables');

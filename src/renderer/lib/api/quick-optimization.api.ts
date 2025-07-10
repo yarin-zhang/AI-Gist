@@ -168,7 +168,7 @@ export class QuickOptimizationApiClient {
        * @param configs 配置ID和排序顺序的数组
        * @returns Promise<void> 排序完成
        */
-      mutate: async (configs: Array<{id: number, sortOrder: number}>): Promise<void> => {
+      mutate: async (configs: {id: number, sortOrder: number}[]): Promise<void> => {
         return this.quickOptimizationService.reorderQuickOptimizationConfigs(configs);
       }
     },

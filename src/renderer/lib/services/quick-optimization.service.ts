@@ -137,7 +137,7 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<void> 删除完成
    */
   async deleteQuickOptimizationConfigByUUID(uuid: string): Promise<void> {
-    return this.deleteByUUID('quick_optimization_configs', uuid);
+    await this.deleteByUUID('quick_optimization_configs', uuid);
   }
 
   /**
@@ -147,8 +147,7 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<QuickOptimizationConfig> 更新后的快速优化提示词配置记录
    */
   async toggleQuickOptimizationConfig(id: number, enabled: boolean): Promise<QuickOptimizationConfig> {
-    const updatedConfig = await this.updateQuickOptimizationConfig(id, { enabled });
-    return updatedConfig;
+    return this.updateQuickOptimizationConfig(id, { enabled });
   }
 
   /**
@@ -156,7 +155,7 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @param configs Array<{id: number, sortOrder: number}> 配置ID和排序顺序的数组
    * @returns Promise<void> 排序完成
    */
-  async reorderQuickOptimizationConfigs(configs: Array<{id: number, sortOrder: number}>): Promise<void> {
+  async reorderQuickOptimizationConfigs(configs: {id: number, sortOrder: number}[]): Promise<void> {
     const updates = configs.map(config => 
       this.updateQuickOptimizationConfig(config.id, { sortOrder: config.sortOrder })
     );

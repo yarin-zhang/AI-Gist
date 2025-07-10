@@ -132,7 +132,7 @@ export class JinjaService {
     });
 
     // 截断过滤器
-    this.env.addFilter('truncate', (str: string, length: number = 50) => {
+    this.env.addFilter('truncate', (str: string, length = 50) => {
       if (!str) return '';
       return str.length > length ? str.substring(0, length) + '...' : str;
     });
@@ -143,17 +143,17 @@ export class JinjaService {
     });
 
     // 列表连接过滤器
-    this.env.addFilter('join', (list: any[], separator: string = ', ') => {
+    this.env.addFilter('join', (list: any[], separator = ', ') => {
       return Array.isArray(list) ? list.join(separator) : String(list);
     });
 
     // 数字格式化过滤器
-    this.env.addFilter('number', (num: number, precision: number = 2) => {
+    this.env.addFilter('number', (num: number, precision = 2) => {
       return typeof num === 'number' ? num.toFixed(precision) : String(num);
     });
 
     // 日期格式化过滤器
-    this.env.addFilter('date', (date: Date | string, format: string = 'YYYY-MM-DD') => {
+    this.env.addFilter('date', (date: Date | string, format = 'YYYY-MM-DD') => {
       if (!date) return '';
       const d = new Date(date);
       if (isNaN(d.getTime())) return String(date);
@@ -173,7 +173,7 @@ export class JinjaService {
   /**
    * 获取语法帮助信息
    */
-  getSyntaxHelp(): Record<string, Array<{ code: string; description: string }>> {
+  getSyntaxHelp(): Record<string, { code: string; description: string }[]> {
     return {
       variables: [
         { code: '{{ variable_name }}', description: 'variableOutput' },

@@ -323,7 +323,7 @@ export class DatabaseServiceManager {
       let totalErrors = 0;
       
       // ID映射表：旧ID -> 新ID
-      const idMapping: { [key: string]: number } = {};
+      const idMapping: Record<string, number> = {};
       
       // 导入分类数据
       if (data.categories && data.categories.length > 0) {
@@ -493,7 +493,7 @@ export class DatabaseServiceManager {
       let totalErrors = 0;
       
       // ID映射表：旧ID -> 新ID
-      const idMapping: { [key: string]: number } = {};
+      const idMapping: Record<string, number> = {};
       
       // 恢复分类数据
       if (backupData.categories && backupData.categories.length > 0) {

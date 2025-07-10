@@ -233,14 +233,14 @@ export class CategoryApiClient {
        * 获取树形结构的分类和提示词数据
        * @returns Promise<Array<{type: 'category', data: CategoryWithRelations, children: Array<{type: 'prompt', data: PromptWithRelations}>}>> 树形结构数据
        */
-      query: async (): Promise<Array<{
+      query: async (): Promise<{
         type: 'category';
         data: CategoryWithRelations;
-        children: Array<{
+        children: {
           type: 'prompt';
           data: PromptWithRelations;
-        }>;
-      }>> => {
+        }[];
+      }[]> => {
         return this.categoryService.getCategoryTreeWithPrompts();
       }
     }
