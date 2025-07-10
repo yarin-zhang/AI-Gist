@@ -13,7 +13,8 @@ export class ICloudProvider implements CloudStorageProvider {
     if (!config.path || config.path.trim() === '') {
       throw new Error('iCloud 路径不能为空');
     }
-    this.basePath = this.getICloudBasePath();
+    // 初始化时设置一个默认路径，实际路径会在需要时动态获取
+    this.basePath = '';
   }
 
   /**
@@ -37,14 +38,14 @@ export class ICloudProvider implements CloudStorageProvider {
         path.join(homedir, 'Library', 'CloudStorage', 'iCloud Drive'),
       ];
       
-      console.log('macOS iCloud 可能路径:', possiblePaths);
+      // console.log('macOS iCloud 可能路径:', possiblePaths);
       
       try {
-        const fsSync = require('fs');
+        const fsSync = await import('fs');
         
         for (const basePath of possiblePaths) {
           console.log(`检查路径: ${basePath}`);
-          if (fsSync.existsSync(basePath)) {
+          if (fsSync.default.existsSync(basePath)) {
             console.log(`macOS iCloud 路径存在: ${basePath}`);
             return { available: true };
           } else {
@@ -73,8 +74,8 @@ export class ICloudProvider implements CloudStorageProvider {
       for (const basePath of possiblePaths) {
         try {
           // 使用同步方法检查路径是否存在
-          const fsSync = require('fs');
-          if (fsSync.existsSync(basePath)) {
+          const fsSync = await import('fs');
+          if (fsSync.default.existsSync(basePath)) {
             console.log(`Windows iCloud 路径存在: ${basePath}`);
             return { available: true };
           }
@@ -94,7 +95,7 @@ export class ICloudProvider implements CloudStorageProvider {
   /**
    * 获取 iCloud 基础路径
    */
-  private getICloudBasePath(): string {
+  private async getICloudBasePath(): Promise<string> {
     const platform = os.platform();
     
     if (platform === 'darwin') {
@@ -108,8 +109,8 @@ export class ICloudProvider implements CloudStorageProvider {
       
       for (const basePath of possiblePaths) {
         try {
-          const fsSync = require('fs');
-          if (fsSync.existsSync(basePath)) {
+          const fsSync = await import('fs');
+          if (fsSync.default.existsSync(basePath)) {
             return basePath;
           }
         } catch {
@@ -132,8 +133,8 @@ export class ICloudProvider implements CloudStorageProvider {
       for (const basePath of possiblePaths) {
         try {
           // 同步检查路径是否存在
-          const fsSync = require('fs');
-          if (fsSync.existsSync(basePath)) {
+          const fsSync = await import('fs');
+          if (fsSync.default.existsSync(basePath)) {
             return basePath;
           }
         } catch {
@@ -150,7 +151,8 @@ export class ICloudProvider implements CloudStorageProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      const fullPath = path.join(this.basePath, this.config.path);
+      const basePath = await this.getICloudBasePath();
+      const fullPath = path.join(basePath, this.config.path);
       // 尝试访问目录，如果不存在则创建
       try {
         await fs.access(fullPath);
@@ -168,7 +170,8 @@ export class ICloudProvider implements CloudStorageProvider {
   async listFiles(dirPath?: string): Promise<CloudFileInfo[]> {
     try {
       // 所有操作都在用户设置的目录下进行
-      const targetPath = path.join(this.basePath, this.config.path);
+      const basePath = await this.getICloudBasePath();
+      const targetPath = path.join(basePath, this.config.path);
       const entries = await fs.readdir(targetPath, { withFileTypes: true });
       
       const files: CloudFileInfo[] = [];
@@ -199,7 +202,8 @@ export class ICloudProvider implements CloudStorageProvider {
 
   async readFile(filePath: string): Promise<Buffer> {
     try {
-      const fullPath = path.join(this.basePath, this.config.path, filePath);
+      const basePath = await this.getICloudBasePath();
+      const fullPath = path.join(basePath, this.config.path, filePath);
       return await fs.readFile(fullPath);
     } catch (error) {
       console.error('iCloud Drive 读取文件失败:', error);
@@ -209,11 +213,12 @@ export class ICloudProvider implements CloudStorageProvider {
 
   async writeFile(filePath: string, data: Buffer): Promise<void> {
     try {
-      const fullPath = path.join(this.basePath, this.config.path, filePath);
+      const basePath = await this.getICloudBasePath();
+      const fullPath = path.join(basePath, this.config.path, filePath);
       const dirPath = path.dirname(fullPath);
       
       // 确保目录存在（如果文件名包含路径）
-      if (dirPath !== path.join(this.basePath, this.config.path)) {
+      if (dirPath !== path.join(basePath, this.config.path)) {
         await fs.mkdir(dirPath, { recursive: true });
       }
       
@@ -227,7 +232,8 @@ export class ICloudProvider implements CloudStorageProvider {
 
   async deleteFile(filePath: string): Promise<void> {
     try {
-      const fullPath = path.join(this.basePath, this.config.path, filePath);
+      const basePath = await this.getICloudBasePath();
+      const fullPath = path.join(basePath, this.config.path, filePath);
       await fs.unlink(fullPath);
     } catch (error) {
       console.error('iCloud Drive 删除文件失败:', error);
@@ -237,7 +243,8 @@ export class ICloudProvider implements CloudStorageProvider {
 
   async createDirectory(dirPath: string): Promise<void> {
     try {
-      const fullPath = path.join(this.basePath, this.config.path, dirPath);
+      const basePath = await this.getICloudBasePath();
+      const fullPath = path.join(basePath, this.config.path, dirPath);
       
       // 检查目录是否已存在
       try {

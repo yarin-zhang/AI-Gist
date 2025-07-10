@@ -15,7 +15,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export class CloudBackupManager {
-  private storageConfigs: Map<string, CloudStorageConfig> = new Map();
+  private storageConfigs = new Map<string, CloudStorageConfig>();
   private dataManagementService: DataManagementService;
   private configPath: string;
 

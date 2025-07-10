@@ -478,7 +478,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch, defineExpose } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import {
     NButton,
@@ -497,8 +497,6 @@ import {
     NScrollbar,
     NFlex,
     NText,
-    NFormRules,
-    NMessage,
     NAlert,
     NEmpty,
     NSplit,
@@ -733,7 +731,7 @@ const loadConfigs = async () => {
             () => databaseService.aiConfig.getPreferredAIConfig(),
             null
         );
-        preferredConfig.value = preferred;
+        preferredConfig.value = preferred || null;
     }
 };
 
@@ -905,8 +903,8 @@ const testFormConnection = async () => {
             apiKey: formData.apiKey,
             models: [],
             enabled: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
         };
 
         const result = await window.electronAPI.ai.testConfig(tempConfig);
@@ -1130,8 +1128,8 @@ const getConfigTypeLabel = (type: string) => {
 };
 
 // 获取配置标签颜色类型
-const getConfigTagType = (type: string) => {
-    const tagTypes: Record<string, string> = {
+const getConfigTagType = (type: string): 'success' | 'error' | 'default' | 'warning' | 'primary' | 'info' => {
+    const tagTypes: Record<string, 'success' | 'error' | 'default' | 'warning' | 'primary' | 'info'> = {
         'openai': 'success',
         'ollama': 'info',
         'anthropic': 'warning',
@@ -1165,14 +1163,8 @@ const serializeConfig = (config: AIConfig) => {
         customModel: config.customModel,
         enabled: config.enabled,
         systemPrompt: config.systemPrompt,
-        createdAt:
-            config.createdAt instanceof Date
-                ? config.createdAt.toISOString()
-                : config.createdAt,
-        updatedAt:
-            config.updatedAt instanceof Date
-                ? config.updatedAt.toISOString()
-                : config.updatedAt,
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt),
     };
 };
 

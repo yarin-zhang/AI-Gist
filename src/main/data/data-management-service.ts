@@ -7,8 +7,6 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import * as archiver from 'archiver';
-import * as unzipper from 'unzipper';
 import { 
   BackupInfo, 
   ExportOptions, 
@@ -17,7 +15,6 @@ import {
   ExportResult,
   DataStats 
 } from '@shared/types/data-management';
-import { createHash } from 'crypto';
 
 export class DataManagementService {
     private backupDir: string;
@@ -83,7 +80,7 @@ export class DataManagementService {
                 const files = await fs.readdir(this.backupDir);
                 const backups: BackupInfo[] = [];
                 
-                console.log(`备份目录中有 ${files.length} 个文件:`, files);
+                // console.log(`备份目录中有 ${files.length} 个文件:`, files);
 
                 for (const file of files) {
                     if (file.endsWith('.json')) {
@@ -100,7 +97,7 @@ export class DataManagementService {
                             
                             const { data, ...backupWithoutData } = backup;
                             backups.push(backupWithoutData);
-                            console.log(`成功加载备份: ${backup.name} (ID: ${backup.id})`);
+                            // console.log(`成功加载备份: ${backup.name} (ID: ${backup.id})`);
                         } catch (fileError) {
                             console.error(`读取备份文件 ${file} 失败:`, fileError);
                             // 继续处理其他文件

@@ -2,6 +2,9 @@
  * 云端备份相关类型定义
  */
 
+// 使用 Uint8Array 替代 Buffer 类型
+type Buffer = Uint8Array;
+
 export interface CloudStorageConfig {
   id: string;
   name: string;

@@ -117,7 +117,7 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
 }
 
 // 获取 CSS 变量
-export function getCssVars(themeName: 'light' | 'dark'): { [key: string]: string } {
+export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> {
   const palette = tokens.palette[themeName]
   const { surface, content, accent, border, interactive } = palette
   

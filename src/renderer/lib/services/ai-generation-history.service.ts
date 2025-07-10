@@ -134,7 +134,11 @@ export class AIGenerationHistoryService extends BaseDatabaseService {
     return {
       data: histories,
       total,
-      hasMore
+      page: options?.page || 1,
+      pageSize: options?.limit || histories.length,
+      totalPages: Math.ceil(total / (options?.limit || histories.length)),
+      hasNextPage: hasMore,
+      hasPrevPage: (options?.page || 1) > 1
     };
   }
 

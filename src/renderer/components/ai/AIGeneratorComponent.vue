@@ -181,7 +181,7 @@
                                         <n-button size="small" @click="rewriteRequirement(item)">
                                             {{ t('aiGenerator.rewrite') }}
                                         </n-button>
-                                        <n-popconfirm @positive-click="deleteHistoryItem(item.id)">
+                                        <n-popconfirm @positive-click="deleteHistoryItem(item.id?.toString() || '')">
                                             <template #trigger>
                                                 <n-button size="small">
                                                     {{ t('common.delete') }}
@@ -457,9 +457,11 @@ const manualSavePrompt = async () => {
             content: generatedResult.value,
             description: ``,
             tags: ['AI生成', '手动保存'],
-            categoryId: null,
+            categoryId: undefined,
             isFavorite: false,
-            useCount: 0
+            useCount: 0,
+            uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            isActive: true
         }
 
         await api.prompts.create.mutate(promptData)
@@ -607,6 +609,8 @@ const generatePrompt = async () => {
                             }
                         }
                     }
+                    
+                    return true; // 继续生成
                 }
             );
             console.log('流式传输完成，最终结果:', {
@@ -643,7 +647,8 @@ const generatePrompt = async () => {
             topic: result.topic,
             generatedPrompt: result.generatedPrompt,
             model: result.model,
-            status: 'success'
+            status: 'success',
+            uuid: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         })
 
         // 根据自动保存开关决定是否立即保存
@@ -698,7 +703,8 @@ const generatePrompt = async () => {
                 generatedPrompt: '', 
                 model: selectedModel || 'unknown',
                 status: 'error',
-                errorMessage: (error as Error).message
+                errorMessage: (error as Error).message,
+                uuid: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             })
             if (showHistory.value) {
                 loadHistory()
@@ -773,9 +779,11 @@ const saveGeneratedPrompt = async (result: any) => {
             content: result.generatedPrompt,
             description: ``,
             tags: ['AI生成', '自动保存'],
-            categoryId: null, // 可以根据需要设置默认分类
+            categoryId: undefined, // 可以根据需要设置默认分类
             isFavorite: false,
-            useCount: 0
+            useCount: 0,
+            uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            isActive: true
         }
 
         await api.prompts.create.mutate(promptData)
@@ -893,7 +901,7 @@ const serializeConfig = (config: AIConfig) => {
         systemPrompt: config.systemPrompt, // 添加自定义系统提示词
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
-    }
+    } as unknown as AIConfig
     
     console.log('前端序列化配置 - 原始 systemPrompt:', config.systemPrompt);
     console.log('前端序列化配置 - 序列化后 systemPrompt:', serialized.systemPrompt);
@@ -948,6 +956,8 @@ const loadCategories = async () => {
         categories.value = []
     }
 }
+
+
 </script>
 
 <style scoped>

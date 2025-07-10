@@ -7,7 +7,7 @@ import type {
 
 export class CloudBackupAPI {
   private static isElectronAvailable(): boolean {
-    return typeof window !== 'undefined' && window.electronAPI && window.electronAPI.cloud;
+    return typeof window !== 'undefined' && !!window.electronAPI && !!window.electronAPI.cloud;
   }
 
   /**
