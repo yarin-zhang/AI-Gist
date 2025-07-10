@@ -231,7 +231,11 @@ export class PromptService extends BaseDatabaseService {
     return {
       data: result,
       total,
-      hasMore
+      page: filters?.page || 1,
+      pageSize: filters?.limit || result.length,
+      totalPages: Math.ceil(total / (filters?.limit || result.length)),
+      hasNextPage: hasMore,
+      hasPrevPage: (filters?.page || 1) > 1
     };
   }
 

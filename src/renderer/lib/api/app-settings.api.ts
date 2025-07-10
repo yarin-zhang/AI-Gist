@@ -31,7 +31,11 @@ export class AppSettingsApiClient {
        * @returns Promise<AppSettings> 创建的设置记录
        */
       mutate: async (input: Omit<AppSettings, 'id' | 'createdAt' | 'updatedAt'>): Promise<AppSettings> => {
-        return this.appSettingsService.createSetting(input);
+        return this.appSettingsService.createSetting({
+          ...input,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
       }
     },
 
@@ -74,7 +78,7 @@ export class AppSettingsApiClient {
       mutate: async (input: { 
         key: string; 
         value: string; 
-        type?: 'string' | 'number' | 'boolean' | 'json';
+        type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
         description?: string;
       }): Promise<AppSettings> => {
         const { key, value, type = 'string', description } = input;
@@ -136,7 +140,7 @@ export class AppSettingsApiClient {
        */
       mutate: async (input: Record<string, {
         value: string;
-        type?: 'string' | 'number' | 'boolean' | 'json';
+        type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
         description?: string;
       }>): Promise<{ success: number; failed: number }> => {
         return this.appSettingsService.setBatchSettings(input);
