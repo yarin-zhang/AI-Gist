@@ -257,7 +257,7 @@ const editFormData = ref({
     name: "",
     description: "",
     prompt: "",
-    sortOrder: 1,
+    sortOrder: 1 as number | null,
     enabled: true,
 });
 
@@ -387,7 +387,7 @@ const addNewConfig = () => {
 const saveEditConfig = async () => {
     try {
         // 确保 sortOrder 有有效值
-        if (editFormData.value.sortOrder === null || editFormData.value.sortOrder === undefined || editFormData.value.sortOrder === '') {
+        if (editFormData.value.sortOrder === null || editFormData.value.sortOrder === undefined || isNaN(editFormData.value.sortOrder)) {
             editFormData.value.sortOrder = Number(configs.value.length + 1);
         }
         
