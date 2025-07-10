@@ -15,4 +15,12 @@ export { GoogleProvider } from './google-provider';
 export { AzureProvider } from './azure-provider';
 
 // 工厂类
-export { AIProviderFactory } from './provider-factory'; 
+export { AIProviderFactory } from './provider-factory';
+
+// 提示词模板管理
+export { 
+  PromptTemplateManager, 
+  PromptTemplate, 
+  getPromptTemplateManager, 
+  buildPrompts 
+} from './prompt-templates'; 

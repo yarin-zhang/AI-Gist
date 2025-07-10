@@ -1,4 +1,5 @@
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { buildPrompts } from './prompt-templates';
 
 /**
  * AI供应商测试结果
@@ -147,6 +148,34 @@ export abstract class BaseAIProvider implements AIProvider {
       return '无法连接到服务器，请检查网络连接';
     }
     return error.message || '未知错误';
+  }
+
+  /**
+   * 统一的提示词构建方法
+   * 使用提示词模板管理器来构建系统提示词和用户提示词
+   */
+  protected buildPrompts(request: AIGenerationRequest, config: AIConfig): { systemPrompt: string; userPrompt: string } {
+    return buildPrompts(request, config);
+  }
+
+  /**
+   * 创建生成结果
+   */
+  protected createGenerationResult(
+    request: AIGenerationRequest, 
+    config: AIConfig, 
+    model: string, 
+    generatedPrompt: string
+  ): AIGenerationResult {
+    return {
+      id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      configId: config.configId,
+      topic: request.topic,
+      generatedPrompt: generatedPrompt,
+      model: model,
+      customPrompt: request.customPrompt,
+      createdAt: new Date()
+    };
   }
 
   // 抽象方法，子类必须实现
