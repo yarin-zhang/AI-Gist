@@ -449,8 +449,8 @@ const handleModifiedSelection = (itemKey: string, version: 'local' | 'remote') =
 };
 
 // 获取数据类型颜色
-const getDataTypeColor = (type: string) => {
-    const colors = {
+const getDataTypeColor = (type: string): 'success' | 'info' | 'warning' | 'default' | 'error' => {
+    const colors: Record<string, 'success' | 'info' | 'warning' | 'default' | 'error'> = {
         categories: 'success',
         prompts: 'info',
         aiConfigs: 'warning',
@@ -462,7 +462,7 @@ const getDataTypeColor = (type: string) => {
 
 // 获取数据类型标签
 const getDataTypeLabel = (type: string) => {
-    const labels = {
+    const labels: Record<string, string> = {
         prompts: '提示词',
         aiConfigs: 'AI配置',
         categories: '分类',
@@ -617,7 +617,7 @@ const buildSmartMergedData = () => {
         const remoteTime = new Date(item.remoteLastModified || item.remote?.updatedAt || 0).getTime();
 
         if (mergedData[item._type]) {
-            const index = mergedData[item._type].findIndex(dataItem => dataItem.id === item.id);
+            const index = mergedData[item._type].findIndex((dataItem: any) => dataItem.id === item.id);
             if (index > -1) {
                 // 使用时间更新的版本
                 mergedData[item._type][index] = remoteTime > localTime ? item.remote : item.local;
@@ -662,7 +662,7 @@ const buildMergedData = () => {
         );
 
         if (modifiedItem && mergedData[type]) {
-            const index = mergedData[type].findIndex(item => item.id === id);
+            const index = mergedData[type].findIndex((item: any) => item.id === id);
             if (index > -1) {
                 mergedData[type][index] = version === 'local' ?
                     modifiedItem.local : modifiedItem.remote;

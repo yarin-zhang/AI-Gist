@@ -901,7 +901,7 @@ const serializeConfig = (config: AIConfig) => {
         systemPrompt: config.systemPrompt, // 添加自定义系统提示词
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
-    }
+    } as unknown as AIConfig
     
     console.log('前端序列化配置 - 原始 systemPrompt:', config.systemPrompt);
     console.log('前端序列化配置 - 序列化后 systemPrompt:', serialized.systemPrompt);
@@ -957,18 +957,7 @@ const loadCategories = async () => {
     }
 }
 
-// 添加 Electron API 类型声明
-declare global {
-    interface Window {
-        electronAPI: {
-            ai: {
-                generatePrompt: (request: any, config: any) => Promise<any>
-                generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<any>
-                stopGeneration: () => Promise<any>
-            }
-        }
-    }
-}
+
 </script>
 
 <style scoped>
