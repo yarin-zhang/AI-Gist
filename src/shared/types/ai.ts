@@ -9,7 +9,7 @@ import type { ValidationResult, ValidationError } from './common';
 /**
  * AI 服务提供商类型
  */
-export type AIProviderType = 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral';
+export type AIProviderType = 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'mistral';
 
 /**
  * AI 配置数据模型
