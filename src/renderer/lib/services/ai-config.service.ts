@@ -168,7 +168,7 @@ export class AIConfigService extends BaseDatabaseService {
   /**
    * 根据AI服务类型获取配置
    * 查询指定类型的所有AI配置
-   * @param type 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'cohere' | 'mistral' AI服务类型
+   * @param type 'openai' | 'ollama' | 'anthropic' | 'google' | 'azure' | 'lmstudio' | 'deepseek' | 'mistral' AI服务类型
    * @returns Promise<AIConfig[]> 该类型的AI配置列表
    */
   async getAIConfigsByType(type: AIConfig['type']): Promise<AIConfig[]> {
