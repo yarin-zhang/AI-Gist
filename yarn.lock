@@ -3101,6 +3101,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@vue/tsconfig@npm:^0.7.0":
+  version: 0.7.0
+  resolution: "@vue/tsconfig@npm:0.7.0"
+  peerDependencies:
+    typescript: 5.x
+    vue: ^3.4.0
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+    vue:
+      optional: true
+  checksum: 10c0/5b36db5ee9e14b47e516164a21ebbf24e558042a16162a69291fe3dc0dcdf598bc0d9dada1b1008d95afab97a22396e8579e4f0df141a015ffa0837bf6ccbf2f
+  languageName: node
+  linkType: hard
+
 "@xmldom/xmldom@npm:^0.8.8":
   version: 0.8.10
   resolution: "@xmldom/xmldom@npm:0.8.10"
@@ -3212,6 +3227,7 @@ __metadata:
     "@vitest/coverage-v8": "npm:^3.2.3"
     "@vitest/ui": "npm:^1.6.0"
     "@vue/eslint-config-typescript": "npm:^14.5.1"
+    "@vue/tsconfig": "npm:^0.7.0"
     archiver: "npm:^7.0.1"
     chalk: "npm:^4.1.2"
     chokidar: "npm:^4.0.3"

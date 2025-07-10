@@ -15,25 +15,23 @@
     "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "~/*": ["./*"],
-      "@shared/*": ["../shared/*"],
-      "@main/*": ["../main/*"],
-      "@renderer/*": ["./*"],
-      "@root/*": ["../*"]
+      "@/*": ["src/renderer/*"],
+      "~/*": ["src/renderer/*"],
+      "@shared/*": ["src/shared/*"],
+      "@main/*": ["src/main/*"],
+      "@renderer/*": ["src/renderer/*"],
+      "@root/*": ["src/*"]
     }
   },
   "include": [
-    "./**/*.ts", 
-    "./**/*.d.ts", 
-    "./**/*.tsx", 
-    "./**/*.vue", 
-    "../shared/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.d.ts", 
+    "src/**/*.tsx",
+    "src/**/*.vue"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "build"
   ]
-}
-  
+} 
