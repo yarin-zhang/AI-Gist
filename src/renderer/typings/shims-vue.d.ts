@@ -5,23 +5,4 @@ declare module '*.vue' {
   export default component
 }
 
-// 扩展 Window 接口以包含 electronAPI
-declare global {
-  interface Window {
-    electronAPI: {
-      preferences: {
-        get: () => Promise<any>;
-        set: (data: any) => Promise<any>;
-        reset: () => Promise<any>;
-      };
-      theme: {
-        setSource: (source: string) => Promise<void>;
-      };
-      shell: {
-        openPath: (path: string) => Promise<{ success: boolean; error?: string }>;
-      };
-    };
-  }
-}
-
 export {};
