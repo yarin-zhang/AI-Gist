@@ -1,15 +1,57 @@
+// 标准库导入
 import { app } from 'electron';
 import * as fs from 'fs';
 import path from 'path';
+
+// 本地模块导入
 import { UserPreferences } from '@shared/types';
 import { themeManager } from './theme-manager';
 
 /**
+ * 常量定义
+ */
+const CONSTANTS = {
+  CONFIG_FILE: 'user-preferences.json',
+  LOG_MESSAGES: {
+    CONFIG_LOADED: '用户偏好设置已加载:',
+    CONFIG_UPDATED: '配置已更新并保存',
+    CONFIG_SAVED: '用户偏好设置已保存:',
+    CONFIG_RESET: '偏好设置已重置为默认值',
+    PREFERENCES_UPDATED: '偏好设置已更新:',
+    CONFIG_FORMAT_CHANGED: '检测到配置格式变化，正在清理...',
+    AUTO_LAUNCH_ENABLED: '已启用开机自启动',
+    AUTO_LAUNCH_DISABLED: '已禁用开机自启动',
+    THEME_APPLIED: '已应用主题设置:',
+    DEV_SKIP_AUTO_LAUNCH: '开发环境：跳过自启动设置以避免权限错误',
+    DEV_AUTO_LAUNCH_STATUS: '开发环境：返回配置中的自启动状态',
+    AUTO_LAUNCH_PERMISSION_ERROR: '自启动设置失败：权限不足。这通常发生在：',
+    AUTO_LAUNCH_ERROR_REASONS: [
+      '1. 应用未正确签名',
+      '2. 系统安全设置阻止了操作',
+      '3. 用户需要在系统偏好设置中手动授权'
+    ]
+  },
+  ERROR_MESSAGES: {
+    READ_OLD_CONFIG: '读取旧配置失败:',
+    LOAD_PREFERENCES: '加载用户偏好设置失败:',
+    SAVE_PREFERENCES: '保存用户偏好设置失败:',
+    AUTO_LAUNCH_SETTING: '设置自启动失败:',
+    GET_AUTO_LAUNCH_STATUS: '获取自启动状态失败，使用配置中的值:',
+    APPLY_THEME: '应用主题设置失败:'
+  }
+} as const;
+
+/**
  * 用户偏好设置管理器
+ * 负责管理用户偏好设置的加载、保存、更新和应用
  */
 class PreferencesManager {
+  // ==================== 私有属性 ====================
   private userPrefs: UserPreferences;
-  private configPath: string;  private readonly defaultPreferences: UserPreferences = {
+  private configPath: string;
+
+  // ==================== 默认配置 ====================
+  private readonly defaultPreferences: UserPreferences = {
     // 旧属性
     closeBehaviorMode: 'ask',
     closeAction: 'quit',
@@ -38,10 +80,20 @@ class PreferencesManager {
     },
   };
 
+  // ==================== 构造函数 ====================
   constructor() {
-    // 设置配置文件路径
-    this.configPath = path.join(app.getPath('userData'), 'user-preferences.json');
-    // 初始化偏好设置
+    this.configPath = path.join(app.getPath('userData'), CONSTANTS.CONFIG_FILE);
+    this.userPrefs = this.loadPreferences();
+    this.initializeConfiguration();
+    console.log(CONSTANTS.LOG_MESSAGES.CONFIG_LOADED, this.userPrefs);
+  }
+
+  // ==================== 配置初始化和加载 ====================
+
+  /**
+   * 初始化配置
+   */
+  private initializeConfiguration(): void {
     const oldConfigExists = fs.existsSync(this.configPath);
     let oldConfigData = null;
     
@@ -49,20 +101,17 @@ class PreferencesManager {
       try {
         oldConfigData = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
       } catch (error) {
-        console.error('读取旧配置失败:', error);
+        console.error(CONSTANTS.ERROR_MESSAGES.READ_OLD_CONFIG, error);
       }
     }
-    
-    this.userPrefs = this.loadPreferences();
     
     // 如果配置发生了变化或首次运行，保存清理后的配置
     if (!oldConfigExists || (oldConfigData && JSON.stringify(oldConfigData) !== JSON.stringify(this.userPrefs))) {
       this.savePreferences();
-      console.log('配置已更新并保存');
+      console.log(CONSTANTS.LOG_MESSAGES.CONFIG_UPDATED);
     }
-    
-    console.log('用户偏好设置已加载:', this.userPrefs);
   }
+
   /**
    * 从文件加载偏好设置
    */
@@ -71,46 +120,18 @@ class PreferencesManager {
       if (fs.existsSync(this.configPath)) {
         const data = fs.readFileSync(this.configPath, 'utf8');
         const loadedPrefs = JSON.parse(data);
-          // 合并默认值，确保新增的字段有默认值，并清理已删除的字段
-        const cleanedPrefs: UserPreferences = {
-          // 旧属性
-          closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
-          closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
-          startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
-          autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,
-          themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource,
-          // 新属性
-          theme: loadedPrefs.theme ?? this.defaultPreferences.theme,
-          language: loadedPrefs.language ?? this.defaultPreferences.language,
-          autoStartup: loadedPrefs.autoStartup ?? this.defaultPreferences.autoStartup,
-          minimizeToTray: loadedPrefs.minimizeToTray ?? this.defaultPreferences.minimizeToTray,
-          showNotifications: loadedPrefs.showNotifications ?? this.defaultPreferences.showNotifications,
-          checkUpdates: loadedPrefs.checkUpdates ?? this.defaultPreferences.checkUpdates,
-          windowSize: {
-            width: loadedPrefs.windowSize?.width ?? this.defaultPreferences.windowSize.width,
-            height: loadedPrefs.windowSize?.height ?? this.defaultPreferences.windowSize.height,
-          },
-          windowPosition: {
-            x: loadedPrefs.windowPosition?.x ?? this.defaultPreferences.windowPosition.x,
-            y: loadedPrefs.windowPosition?.y ?? this.defaultPreferences.windowPosition.y,
-          },
-          dataSync: {
-            lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
-            autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
-            backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
-          },
-        };
+        const cleanedPrefs = this.mergeWithDefaults(loadedPrefs);
         
         // 如果配置发生了变化（比如删除了字段），重新保存清理后的配置
         if (JSON.stringify(loadedPrefs) !== JSON.stringify(cleanedPrefs)) {
-          console.log('检测到配置格式变化，正在清理...');
+          console.log(CONSTANTS.LOG_MESSAGES.CONFIG_FORMAT_CHANGED);
           return cleanedPrefs;
         }
         
         return cleanedPrefs;
       }
     } catch (error) {
-      console.error('加载用户偏好设置失败:', error);
+      console.error(CONSTANTS.ERROR_MESSAGES.LOAD_PREFERENCES, error);
     }
     
     // 如果加载失败或文件不存在，返回默认设置
@@ -118,23 +139,65 @@ class PreferencesManager {
   }
 
   /**
+   * 将加载的配置与默认值合并
+   */
+  private mergeWithDefaults(loadedPrefs: any): UserPreferences {
+    return {
+      // 旧属性
+      closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
+      closeAction: loadedPrefs.closeAction ?? this.defaultPreferences.closeAction,
+      startMinimized: loadedPrefs.startMinimized ?? this.defaultPreferences.startMinimized,
+      autoLaunch: loadedPrefs.autoLaunch ?? this.defaultPreferences.autoLaunch,
+      themeSource: loadedPrefs.themeSource ?? this.defaultPreferences.themeSource,
+      // 新属性
+      theme: loadedPrefs.theme ?? this.defaultPreferences.theme,
+      language: loadedPrefs.language ?? this.defaultPreferences.language,
+      autoStartup: loadedPrefs.autoStartup ?? this.defaultPreferences.autoStartup,
+      minimizeToTray: loadedPrefs.minimizeToTray ?? this.defaultPreferences.minimizeToTray,
+      showNotifications: loadedPrefs.showNotifications ?? this.defaultPreferences.showNotifications,
+      checkUpdates: loadedPrefs.checkUpdates ?? this.defaultPreferences.checkUpdates,
+      windowSize: {
+        width: loadedPrefs.windowSize?.width ?? this.defaultPreferences.windowSize.width,
+        height: loadedPrefs.windowSize?.height ?? this.defaultPreferences.windowSize.height,
+      },
+      windowPosition: {
+        x: loadedPrefs.windowPosition?.x ?? this.defaultPreferences.windowPosition.x,
+        y: loadedPrefs.windowPosition?.y ?? this.defaultPreferences.windowPosition.y,
+      },
+      dataSync: {
+        lastSyncTime: loadedPrefs.dataSync?.lastSyncTime ?? this.defaultPreferences.dataSync!.lastSyncTime,
+        autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
+        backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
+      },
+    };
+  }
+
+  // ==================== 配置保存 ====================
+
+  /**
    * 保存偏好设置到文件
    */
   private savePreferences(): void {
     try {
-      // 确保目录存在
-      const configDir = path.dirname(this.configPath);
-      if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true });
-      }
-      
-      // 保存到文件
+      this.ensureConfigDirectoryExists();
       fs.writeFileSync(this.configPath, JSON.stringify(this.userPrefs, null, 2), 'utf8');
-      console.log('用户偏好设置已保存:', this.configPath);
+      console.log(CONSTANTS.LOG_MESSAGES.CONFIG_SAVED, this.configPath);
     } catch (error) {
-      console.error('保存用户偏好设置失败:', error);
+      console.error(CONSTANTS.ERROR_MESSAGES.SAVE_PREFERENCES, error);
     }
   }
+
+  /**
+   * 确保配置目录存在
+   */
+  private ensureConfigDirectoryExists(): void {
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+  }
+
+  // ==================== 公共接口方法 ====================
 
   /**
    * 获取用户偏好设置
@@ -142,12 +205,29 @@ class PreferencesManager {
   getPreferences(): UserPreferences {
     return { ...this.userPrefs };
   }
+
   /**
    * 更新用户偏好设置
    */
   updatePreferences(newPrefs: Partial<UserPreferences>): UserPreferences {
     const oldAutoLaunch = this.userPrefs.autoLaunch;
     
+    this.mergePreferences(newPrefs);
+    this.savePreferences();
+    
+    // 如果自启动设置发生变化，立即应用
+    if (newPrefs.autoLaunch !== undefined && newPrefs.autoLaunch !== oldAutoLaunch) {
+      this.applyAutoLaunchSetting();
+    }
+    
+    console.log(CONSTANTS.LOG_MESSAGES.PREFERENCES_UPDATED, newPrefs);
+    return this.getPreferences();
+  }
+
+  /**
+   * 合并偏好设置
+   */
+  private mergePreferences(newPrefs: Partial<UserPreferences>): void {
     // 深度合并嵌套对象
     if (newPrefs.dataSync) {
       this.userPrefs.dataSync = { ...this.userPrefs.dataSync, ...newPrefs.dataSync };
@@ -159,16 +239,6 @@ class PreferencesManager {
         (this.userPrefs as any)[key] = (newPrefs as any)[key];
       }
     }
-    
-    this.savePreferences(); // 立即保存到文件
-    
-    // 如果自启动设置发生变化，立即应用
-    if (newPrefs.autoLaunch !== undefined && newPrefs.autoLaunch !== oldAutoLaunch) {
-      this.applyAutoLaunchSetting();
-    }
-    
-    console.log('偏好设置已更新:', newPrefs);
-    return this.getPreferences();
   }
 
   /**
@@ -176,8 +246,8 @@ class PreferencesManager {
    */
   resetPreferences(): UserPreferences {
     this.userPrefs = { ...this.defaultPreferences };
-    this.savePreferences(); // 保存重置后的设置
-    console.log('偏好设置已重置为默认值');
+    this.savePreferences();
+    console.log(CONSTANTS.LOG_MESSAGES.CONFIG_RESET);
     return this.getPreferences();
   }
 
@@ -188,28 +258,65 @@ class PreferencesManager {
     return this.configPath;
   }
 
+  // ==================== 自启动管理 ====================
+
   /**
    * 应用自启动设置
    */
   applyAutoLaunchSetting(): void {
+    if (this.isDevelopmentEnvironment()) {
+      console.log(CONSTANTS.LOG_MESSAGES.DEV_SKIP_AUTO_LAUNCH);
+      return;
+    }
+
     try {
       if (this.userPrefs.autoLaunch) {
-        // 启用自启动
-        app.setLoginItemSettings({
-          openAtLogin: true,
-          name: app.getName(),
-          path: app.getPath('exe')
-        });
-        console.log('已启用开机自启动');
+        this.enableAutoLaunch();
       } else {
-        // 禁用自启动
-        app.setLoginItemSettings({
-          openAtLogin: false
-        });
-        console.log('已禁用开机自启动');
+        this.disableAutoLaunch();
       }
     } catch (error) {
-      console.error('设置自启动失败:', error);
+      this.handleAutoLaunchError(error);
+    }
+  }
+
+  /**
+   * 启用自启动
+   */
+  private enableAutoLaunch(): void {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      name: app.getName(),
+      path: app.getPath('exe')
+    });
+    console.log(CONSTANTS.LOG_MESSAGES.AUTO_LAUNCH_ENABLED);
+  }
+
+  /**
+   * 禁用自启动
+   */
+  private disableAutoLaunch(): void {
+    app.setLoginItemSettings({
+      openAtLogin: false
+    });
+    console.log(CONSTANTS.LOG_MESSAGES.AUTO_LAUNCH_DISABLED);
+  }
+
+  /**
+   * 处理自启动错误
+   */
+  private handleAutoLaunchError(error: unknown): void {
+    if (error instanceof Error) {
+      if (error.message.includes('Operation not permitted')) {
+        console.warn(CONSTANTS.LOG_MESSAGES.AUTO_LAUNCH_PERMISSION_ERROR);
+        CONSTANTS.LOG_MESSAGES.AUTO_LAUNCH_ERROR_REASONS.forEach(reason => {
+          console.warn(reason);
+        });
+      } else {
+        console.error(CONSTANTS.ERROR_MESSAGES.AUTO_LAUNCH_SETTING, error.message);
+      }
+    } else {
+      console.error(CONSTANTS.ERROR_MESSAGES.AUTO_LAUNCH_SETTING, error);
     }
   }
 
@@ -217,14 +324,21 @@ class PreferencesManager {
    * 获取当前自启动状态
    */
   getAutoLaunchStatus(): boolean {
+    if (this.isDevelopmentEnvironment()) {
+      console.log(CONSTANTS.LOG_MESSAGES.DEV_AUTO_LAUNCH_STATUS);
+      return this.userPrefs.autoLaunch;
+    }
+
     try {
       const loginItemSettings = app.getLoginItemSettings();
       return loginItemSettings.openAtLogin;
     } catch (error) {
-      console.error('获取自启动状态失败:', error);
-      return false;
+      console.warn(CONSTANTS.ERROR_MESSAGES.GET_AUTO_LAUNCH_STATUS, error);
+      return this.userPrefs.autoLaunch;
     }
   }
+
+  // ==================== 主题管理 ====================
 
   /**
    * 应用主题设置
@@ -232,11 +346,13 @@ class PreferencesManager {
   applyThemeSettings(): void {
     try {
       themeManager.setThemeSource(this.userPrefs.themeSource);
-      console.log(`已应用主题设置: ${this.userPrefs.themeSource}`);
+      console.log(CONSTANTS.LOG_MESSAGES.THEME_APPLIED, this.userPrefs.themeSource);
     } catch (error) {
-      console.error('应用主题设置失败:', error);
+      console.error(CONSTANTS.ERROR_MESSAGES.APPLY_THEME, error);
     }
   }
+
+  // ==================== 设置应用 ====================
 
   /**
    * 应用所有设置
@@ -245,7 +361,16 @@ class PreferencesManager {
     this.applyAutoLaunchSetting();
     this.applyThemeSettings();
   }
+
+  // ==================== 工具方法 ====================
+
+  /**
+   * 检查是否为开发环境
+   */
+  private isDevelopmentEnvironment(): boolean {
+    return process.env.NODE_ENV === 'development';
+  }
 }
 
-// 单例模式
+// 单例模式导出
 export const preferencesManager = new PreferencesManager();

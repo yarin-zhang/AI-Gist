@@ -1342,11 +1342,11 @@ export class DataManagementService {
         };
 
         // 为每个数组中的项目补全 UUID
-        const syncableTypes = ['categories', 'prompts', 'aiConfigs', 'aiHistory'];
+        const syncableTypes = ['categories', 'prompts', 'aiConfigs', 'aiHistory'] as const;
         
         for (const type of syncableTypes) {
             if (safeData[type] && Array.isArray(safeData[type])) {
-                safeData[type] = safeData[type].map((item: any) => {
+                (safeData as any)[type] = (safeData as any)[type].map((item: any) => {
                     if (!item || typeof item !== 'object') {
                         console.warn(`跳过无效的 ${type} 项目:`, item);
                         return item;
