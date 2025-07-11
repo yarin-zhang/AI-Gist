@@ -6,6 +6,7 @@
 import { ref, reactive } from 'vue';
 import { DataManagementAPI } from '@renderer/lib/api/data-management.api';
 import { useDatabase } from './useDatabase';
+import { databaseService } from '@renderer/lib/db';
 
 export interface BackupInfo {
   id: string;
@@ -24,7 +25,7 @@ export interface DataManagementState {
 }
 
 export function useDataManagement() {
-  const { databaseServiceManager } = useDatabase();
+  const { waitForDatabase, safeDbOperation } = useDatabase();
   
   // 状态管理
   const state = reactive<DataManagementState>({
@@ -76,7 +77,10 @@ export function useDataManagement() {
       clearMessages();
       
       // 1. 导出所有数据
-      const data = await databaseServiceManager.exportAllData();
+      const result = await safeDbOperation(() => databaseService.exportAllData());
+      if (!result || !result.success) {
+        throw new Error('导出数据失败');
+      }
       
       // 2. 创建备份信息
       const backupId = crypto.randomUUID();
@@ -88,8 +92,8 @@ export function useDataManagement() {
         name: backupName,
         description: description || '自动备份',
         createdAt: timestamp,
-        size: JSON.stringify(data).length,
-        data: data,
+        size: JSON.stringify(result.data).length,
+        data: result.data,
       };
 
       // 3. 保存到 localStorage
@@ -121,12 +125,12 @@ export function useDataManagement() {
       }
 
       // 2. 恢复到数据库
-      const result = await databaseServiceManager.replaceAllData(backup.data);
-      if (result.success) {
+      const result = await safeDbOperation(() => databaseService.replaceAllData(backup.data));
+      if (result && result.success) {
         state.success = '备份恢复成功';
         return true;
       } else {
-        throw new Error(result.message || '恢复失败');
+        throw new Error(result?.message || '恢复失败');
       }
     } catch (err) {
       state.error = err instanceof Error ? err.message : '恢复备份失败';
@@ -157,19 +161,35 @@ export function useDataManagement() {
     }
   };
 
-  // 数据导入导出功能
-  const exportData = async (options: any): Promise<boolean> => {
+  // 打开备份目录
+  const openBackupDirectory = async (): Promise<void> => {
+    try {
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        // 获取用户数据目录作为备份目录
+        const userDataPath = await window.electronAPI.app.getPath('userData');
+        const backupPath = `${userDataPath}/backups`;
+        await window.electronAPI.shell.openPath(backupPath);
+      }
+    } catch (err) {
+      state.error = '无法打开备份目录';
+    }
+  };
+
+  // 完整备份导出
+  const exportFullBackup = async (): Promise<boolean> => {
     try {
       setLoading('export', true);
       clearMessages();
       
-      // 1. 从数据库获取数据
-      const data = await databaseServiceManager.exportAllData();
+      // 1. 从数据库获取所有数据
+      const result = await safeDbOperation(() => databaseService.exportAllData());
+      if (!result || !result.success) {
+        throw new Error('导出数据失败');
+      }
       
       // 2. 选择导出路径
       const timestamp = new Date().toISOString().split('T')[0];
-      const format = options.format || 'json';
-      const defaultName = `ai-gist-export-${timestamp}.${format}`;
+      const defaultName = `ai-gist-full-backup-${timestamp}.json`;
       const filePath = await DataManagementAPI.selectExportPath(defaultName);
       
       if (!filePath) {
@@ -178,88 +198,163 @@ export function useDataManagement() {
       }
       
       // 3. 导出数据
-      const success = await DataManagementAPI.exportDataToFile(data, filePath, format);
+      const success = await DataManagementAPI.exportDataToFile(result.data, filePath, 'json');
       
       if (success) {
-        state.success = '数据导出成功';
+        state.success = '完整备份导出成功';
         return true;
       } else {
-        state.error = '数据导出失败';
+        state.error = '完整备份导出失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '数据导出失败';
+      state.error = err instanceof Error ? err.message : '完整备份导出失败';
       return false;
     } finally {
       setLoading('export', false);
     }
   };
 
-  const importData = async (filePath: string, options: any): Promise<boolean> => {
+  // 完整备份导入
+  const importFullBackup = async (): Promise<boolean> => {
     try {
       setLoading('import', true);
       clearMessages();
       
-      // 1. 读取文件数据
-      const data = await DataManagementAPI.importDataFromFile(filePath, options.format);
+      // 1. 选择导入文件
+      const filePath = await DataManagementAPI.selectImportFile('json');
+      if (!filePath) {
+        state.error = '未选择导入文件';
+        return false;
+      }
+      
+      // 2. 读取文件数据
+      const data = await DataManagementAPI.importDataFromFile(filePath, 'json');
       if (!data) {
         state.error = '文件读取失败';
         return false;
       }
       
-      // 2. 导入到数据库
-      const result = await databaseServiceManager.importData(data, options);
+      // 3. 导入到数据库
+      const result = await safeDbOperation(() => databaseService.replaceAllData(data));
       
-      if (result.success) {
-        state.success = '数据导入成功';
+      if (result && result.success) {
+        state.success = '完整备份导入成功';
         return true;
       } else {
-        state.error = result.message || '数据导入失败';
+        state.error = result?.message || '完整备份导入失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '数据导入失败';
+      state.error = err instanceof Error ? err.message : '完整备份导入失败';
       return false;
     } finally {
       setLoading('import', false);
     }
   };
 
-  // 数据库健康检查和修复
+  // 选择性数据导出
+  const exportSelectedData = async (format: 'csv' | 'json', options: any): Promise<boolean> => {
+    try {
+      setLoading('export', true);
+      clearMessages();
+      
+      // 1. 从数据库获取选定数据
+      const result = await safeDbOperation(() => databaseService.exportAllData());
+      if (!result || !result.success) {
+        throw new Error('导出数据失败');
+      }
+      
+      // 2. 根据选项过滤数据
+      let filteredData: any = {};
+      
+      if (options.includeCategories) {
+        filteredData.categories = result.data?.categories || [];
+      }
+      
+      if (options.includePrompts) {
+        filteredData.prompts = result.data?.prompts || [];
+      }
+      
+      if (options.includeAIConfigs) {
+        filteredData.aiConfigs = result.data?.aiConfigs || [];
+      }
+      
+      // 3. 选择导出路径
+      const timestamp = new Date().toISOString().split('T')[0];
+      const defaultName = `ai-gist-selected-${timestamp}.${format}`;
+      const filePath = await DataManagementAPI.selectExportPath(defaultName);
+      
+      if (!filePath) {
+        state.error = '未选择导出路径';
+        return false;
+      }
+      
+      // 4. 导出数据
+      const success = await DataManagementAPI.exportDataToFile(filteredData, filePath, format);
+      
+      if (success) {
+        state.success = '选择性数据导出成功';
+        return true;
+      } else {
+        state.error = '选择性数据导出失败';
+        return false;
+      }
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : '选择性数据导出失败';
+      return false;
+    } finally {
+      setLoading('export', false);
+    }
+  };
+
+  // 获取数据统计信息
+  const getDataStatistics = async (): Promise<any> => {
+    try {
+      const result = await safeDbOperation(() => databaseService.getDataStats());
+      return result || { categories: 0, prompts: 0, aiConfigs: 0, aiHistory: 0, settings: 0 };
+    } catch (err) {
+      console.error('获取数据统计失败:', err);
+      return { categories: 0, prompts: 0, aiConfigs: 0, aiHistory: 0, settings: 0 };
+    }
+  };
+
+  // 数据库健康检查
   const checkDatabaseHealth = async (): Promise<any> => {
     try {
       setLoading('healthCheck', true);
       clearMessages();
       
-      const result = await databaseServiceManager.checkDatabaseHealth();
+      const result = await safeDbOperation(() => databaseService.getHealthStatus());
       
-      if (result.healthy) {
+      if (result && result.healthy) {
         state.success = '数据库健康检查通过';
       } else {
-        state.error = `数据库存在问题: ${result.issues.join(', ')}`;
+        state.error = `数据库存在问题: ${result?.missingStores?.join(', ') || '未知问题'}`;
       }
       
       return result;
     } catch (err) {
       state.error = err instanceof Error ? err.message : '数据库健康检查失败';
-      return { healthy: false, issues: ['检查失败'] };
+      return { healthy: false, missingStores: ['检查失败'] };
     } finally {
       setLoading('healthCheck', false);
     }
   };
 
+  // 修复数据库
   const repairDatabase = async (): Promise<boolean> => {
     try {
       setLoading('repair', true);
       clearMessages();
       
-      const result = await databaseServiceManager.repairDatabase();
+      const result = await safeDbOperation(() => databaseService.repairDatabase());
       
-      if (result.success) {
+      if (result && result.success) {
         state.success = '数据库修复成功';
         return true;
       } else {
-        state.error = result.message || '数据库修复失败';
+        state.error = result?.message || '数据库修复失败';
         return false;
       }
     } catch (err) {
@@ -273,23 +368,23 @@ export function useDataManagement() {
   // 清空数据库
   const clearDatabase = async (): Promise<boolean> => {
     try {
-      setLoading('clear', true);
+      setLoading('clearDatabase', true);
       clearMessages();
       
-      const result = await databaseServiceManager.clearAllData();
+      // 清空所有表
+      await safeDbOperation(() => databaseService.forceCleanAllTables());
       
-      if (result.success) {
-        state.success = '数据库清空成功';
-        return true;
-      } else {
-        state.error = result.message || '数据库清空失败';
-        return false;
-      }
+      // 清空备份列表
+      state.backupList = [];
+      localStorage.removeItem('ai-gist-backups');
+      
+      state.success = '数据库清空成功';
+      return true;
     } catch (err) {
       state.error = err instanceof Error ? err.message : '数据库清空失败';
       return false;
     } finally {
-      setLoading('clear', false);
+      setLoading('clearDatabase', false);
     }
   };
 
@@ -305,10 +400,15 @@ export function useDataManagement() {
     createBackup,
     restoreBackup,
     deleteBackup,
+    openBackupDirectory,
     
-    // 数据导入导出
-    exportData,
-    importData,
+    // 完整备份管理
+    exportFullBackup,
+    importFullBackup,
+    
+    // 选择性数据导出
+    exportSelectedData,
+    getDataStatistics,
     
     // 数据库管理
     checkDatabaseHealth,

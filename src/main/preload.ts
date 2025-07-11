@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 应用信息和更新
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),
+    getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
     checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
     openDownloadPage: (url: string) => ipcRenderer.invoke('app:open-download-page', url),
     onUpdateAvailable: (callback: (updateInfo: any) => void) => {

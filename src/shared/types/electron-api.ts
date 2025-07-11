@@ -104,6 +104,7 @@ export default interface ElectronApi {
   // 应用信息和更新
   app: {
     getVersion: () => Promise<string>
+    getPath: (name: string) => Promise<string>
     checkUpdates: () => Promise<{ success: boolean; data?: any; error?: string }>
     openDownloadPage: (url: string) => Promise<{ success: boolean; error?: string }>
     onUpdateAvailable: (callback: (updateInfo: any) => void) => () => void

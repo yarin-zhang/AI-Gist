@@ -8,7 +8,7 @@ export class DataManagementAPI {
    * 检查 Electron API 是否可用
    */
   private static isElectronAvailable(): boolean {
-    return typeof window !== 'undefined' && window.electronAPI;
+    return typeof window !== 'undefined' && !!(window as any).electronAPI;
   }
 
   /**
@@ -20,7 +20,7 @@ export class DataManagementAPI {
     }
     
     try {
-      return await window.electronAPI.invoke('data:select-import-file', { format });
+      return await (window as any).electronAPI.invoke('data:select-import-file', { format });
     } catch (error) {
       console.error('选择导入文件失败:', error);
       return null;
@@ -36,7 +36,7 @@ export class DataManagementAPI {
     }
     
     try {
-      return await window.electronAPI.invoke('data:select-export-path', { defaultName });
+      return await (window as any).electronAPI.invoke('data:select-export-path', { defaultName });
     } catch (error) {
       console.error('选择导出路径失败:', error);
       return null;
@@ -52,7 +52,7 @@ export class DataManagementAPI {
     }
     
     try {
-      const result = await window.electronAPI.invoke('data:write-file', { filePath, content });
+      const result = await (window as any).electronAPI.invoke('data:write-file', { filePath, content });
       return result.success;
     } catch (error) {
       console.error('写入文件失败:', error);
@@ -69,7 +69,7 @@ export class DataManagementAPI {
     }
     
     try {
-      const result = await window.electronAPI.invoke('data:read-file', { filePath });
+      const result = await (window as any).electronAPI.invoke('data:read-file', { filePath });
       return result.success ? result.content : null;
     } catch (error) {
       console.error('读取文件失败:', error);
@@ -297,51 +297,108 @@ export class DataManagementAPI {
    * 从数据库获取所有数据
    */
   private static async getAllDataFromDatabase(): Promise<any> {
-    // 这里应该调用数据库服务获取所有数据
-    // 暂时返回模拟数据
-    return {
-      categories: [],
-      prompts: [],
-      aiConfigs: [],
-      history: [],
-      settings: {}
-    };
+    try {
+      // 从 window 对象获取数据库服务
+      if (typeof window !== 'undefined' && (window as any).databaseAPI) {
+        const result = await (window as any).databaseAPI.exportAllData();
+        return result.data || {
+          categories: [],
+          prompts: [],
+          aiConfigs: [],
+          aiHistory: [],
+          settings: []
+        };
+      }
+      
+      // 如果无法访问数据库服务，返回空数据
+      return {
+        categories: [],
+        prompts: [],
+        aiConfigs: [],
+        aiHistory: [],
+        settings: []
+      };
+    } catch (error) {
+      console.error('获取数据库数据失败:', error);
+      return {
+        categories: [],
+        prompts: [],
+        aiConfigs: [],
+        aiHistory: [],
+        settings: []
+      };
+    }
   }
 
   /**
    * 从数据库获取选定的数据
    */
   private static async getSelectedDataFromDatabase(options: any): Promise<any> {
-    const data: any = {};
-    
-    if (options.includeCategories) {
-      data.categories = []; // 从数据库获取分类
+    try {
+      const allData = await this.getAllDataFromDatabase();
+      const data: any = {};
+      
+      if (options.includeCategories) {
+        data.categories = allData.categories || [];
+      }
+      
+      if (options.includePrompts) {
+        data.prompts = allData.prompts || [];
+      }
+      
+      if (options.includeAIConfigs) {
+        data.aiConfigs = allData.aiConfigs || [];
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('获取选定数据失败:', error);
+      return {};
     }
-    
-    if (options.includePrompts) {
-      data.prompts = []; // 从数据库获取提示词
-    }
-    
-    if (options.includeAIConfigs) {
-      data.aiConfigs = []; // 从数据库获取AI配置
-    }
-    
-    return data;
   }
 
   /**
    * 将数据导入到数据库
    */
   private static async importDataToDatabase(data: any): Promise<any> {
-    // 这里应该调用数据库服务导入数据
-    // 暂时返回成功
-    return {
-      success: true,
-      imported: {
-        categories: data.categories?.length || 0,
-        prompts: data.prompts?.length || 0,
-        aiConfigs: data.aiConfigs?.length || 0
+    try {
+      // 从 window 对象获取数据库服务
+      if (typeof window !== 'undefined' && (window as any).databaseAPI) {
+        const result = await (window as any).databaseAPI.replaceAllData(data);
+        return {
+          success: result.success,
+          imported: {
+            categories: data.categories?.length || 0,
+            prompts: data.prompts?.length || 0,
+            aiConfigs: data.aiConfigs?.length || 0,
+            aiHistory: data.aiHistory?.length || 0,
+            settings: data.settings?.length || 0
+          }
+        };
       }
-    };
+      
+      return {
+        success: false,
+        imported: {
+          categories: 0,
+          prompts: 0,
+          aiConfigs: 0,
+          aiHistory: 0,
+          settings: 0
+        }
+      };
+    } catch (error) {
+      console.error('导入数据到数据库失败:', error);
+      return {
+        success: false,
+        imported: {
+          categories: 0,
+          prompts: 0,
+          aiConfigs: 0,
+          aiHistory: 0,
+          settings: 0
+        }
+      };
+    }
   }
 }

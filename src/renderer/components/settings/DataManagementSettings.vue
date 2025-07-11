@@ -8,7 +8,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">{{ t('dataManagement.backupManagement') }}</NText>
                         <NFlex :size="12">
-                            <NButton type="primary" @click="$emit('create-backup')" :loading="loading.backup">
+                            <NButton type="primary" @click="handleCreateBackup" :loading="loading.backup">
                                 <template #icon>
                                     <NIcon>
                                         <Upload />
@@ -16,7 +16,7 @@
                                 </template>
                                 {{ t('dataManagement.createBackup') }}
                             </NButton>
-                            <NButton @click="$emit('refresh-backup-list')" :loading="loading.refreshBackupList">
+                            <NButton @click="handleRefreshBackupList" :loading="loading.refreshBackupList">
                                 <template #icon>
                                     <NIcon>
                                         <Refresh />
@@ -24,7 +24,7 @@
                                 </template>
                                 {{ t('dataManagement.refreshBackupList') }}
                             </NButton>
-                            <NButton @click="$emit('open-backup-directory')">
+                            <NButton @click="handleOpenBackupDirectory">
                                 <template #icon>
                                     <NIcon>
                                         <Folder />
@@ -58,7 +58,7 @@
 
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
-                                                <NPopconfirm @positive-click="$emit('restore-backup', backup.id)"
+                                                <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
                                                     negative-text="取消" positive-text="确定恢复" placement="top"
                                                     :show-icon="false">
                                                     <template #trigger>
@@ -77,7 +77,7 @@
                                                         <p>{{ t('dataManagement.restoreWarning') }}</p>
                                                     </div>
                                                 </NPopconfirm>
-                                                <NPopconfirm @positive-click="$emit('delete-backup', backup.id)"
+                                                <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
                                                     negative-text="取消" positive-text="确定">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
@@ -126,7 +126,7 @@
                         </NText>
 
                         <NFlex :size="12">
-                            <NButton type="primary" @click="$emit('export-full-backup')" :loading="loading.export">
+                            <NButton type="primary" @click="handleExportFullBackup" :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
                                         <Archive />
@@ -134,7 +134,7 @@
                                 </template>
                                 {{ t('dataManagement.exportFullBackup') }}
                             </NButton>
-                            <NButton @click="$emit('import-full-backup')" :loading="loading.import">
+                            <NButton @click="handleImportFullBackup" :loading="loading.import">
                                 <template #icon>
                                     <NIcon>
                                         <Folder />
@@ -168,21 +168,21 @@
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">0 条</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.prompts }} 条</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">0 个</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.categories }} 个</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">0 个</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.aiConfigs }} 个</NTag>
                                             <NTag size="small" type="warning">{{
                                                 t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
@@ -237,7 +237,7 @@
                             {{ t('dataManagement.maintenanceDescription') }}
                         </NText>
                         <NFlex :size="12">
-                            <NButton type="primary" @click="$emit('check-database-health')">
+                            <NButton type="primary" @click="handleCheckDatabaseHealth">
                                 <template #icon>
                                     <NIcon>
                                         <AlertCircle />
@@ -245,7 +245,7 @@
                                 </template>
                                 {{ t('dataManagement.checkDatabaseHealth') }}
                             </NButton>
-                            <NButton type="warning" @click="$emit('repair-database')">
+                            <NButton type="warning" @click="handleRepairDatabase">
                                 <template #icon>
                                     <NIcon>
                                         <Database />
@@ -253,7 +253,7 @@
                                 </template>
                                 {{ t('dataManagement.repairDatabase') }}
                             </NButton>
-                            <NPopconfirm @positive-click="$emit('clear-database')" :negative-text="t('common.cancel')"
+                            <NPopconfirm @positive-click="handleClearDatabase" :negative-text="t('common.cancel')"
                                 :positive-text="t('dataManagement.clearDatabase')" placement="top">
                                 <template #trigger>
                                     <NButton type="error" :loading="loading.clearDatabase">
@@ -282,11 +282,11 @@
             </div>
 
             <!-- 消息提示 -->
-            <NAlert v-if="error" type="error" show-icon closable @close="$emit('clear-messages')">
+            <NAlert v-if="error" type="error" show-icon closable @close="clearMessages">
                 {{ error }}
             </NAlert>
             
-            <NAlert v-if="success" type="success" show-icon closable @close="$emit('clear-messages')">
+            <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
                 {{ success }}
             </NAlert>
         </NFlex>
@@ -324,61 +324,52 @@ import {
     Archive,
     Folder,
 } from "@vicons/tabler";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useI18n } from 'vue-i18n';
+import { useDataManagement } from '@renderer/composables/useDataManagement';
 
 const { t } = useI18n();
 
-// Props 定义
-interface Props {
-  backupList: any[];
-  loading: any;
-  error?: string | null;
-  success?: string | null;
-}
+// 使用数据管理 composable
+const {
+    backupList,
+    loading,
+    error,
+    success,
+    getBackupList,
+    createBackup,
+    restoreBackup,
+    deleteBackup,
+    openBackupDirectory,
+    exportFullBackup,
+    importFullBackup,
+    exportSelectedData,
+    getDataStatistics,
+    checkDatabaseHealth,
+    repairDatabase,
+    clearDatabase,
+    clearMessages
+} = useDataManagement();
 
-const props = withDefaults(defineProps<Props>(), {
-  backupList: () => [],
-  loading: () => ({
-    backup: false,
-    restore: false,
-    export: false,
-    import: false,
-    healthCheck: false,
-    repair: false,
-    clearDatabase: false,
-    refreshBackupList: false
-  }),
-  error: null,
-  success: null
+// 数据统计
+const dataStats = ref({
+    categories: 0,
+    prompts: 0,
+    aiConfigs: 0,
+    aiHistory: 0,
+    settings: 0
 });
-
-// Emits 定义
-const emit = defineEmits<{
-  'create-backup': [];
-  'refresh-backup-list': [];
-  'restore-backup': [backupId: string];
-  'delete-backup': [backupId: string];
-  'open-backup-directory': [];
-  'export-full-backup': [];
-  'import-full-backup': [];
-  'export-selected-data': [format: 'csv' | 'json', options: any];
-  'check-database-health': [];
-  'repair-database': [];
-  'clear-database': [];
-  'clear-messages': [];
-}>();
 
 // 分页
 const currentPage = ref(1);
 const pageSize = ref(6);
-const totalItems = computed(() => props.backupList.length);
+const totalItems = computed(() => backupList.length);
 const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value));
 const paginatedBackups = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
   const end = start + pageSize.value;
   // 转换备份数据格式以匹配组件期望的格式
-  const formattedBackups = props.backupList.map((backup: any) => ({
+  const formattedBackups = backupList.map((backup: any) => ({
     id: backup.id,
     name: backup.name,
     createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
@@ -412,8 +403,36 @@ const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', check
     }
 };
 
-// 处理选择性数据导出
-const handleExportSelectedData = (format: 'csv' | 'json') => {
+// 事件处理函数
+const handleCreateBackup = async () => {
+    await createBackup();
+};
+
+const handleRefreshBackupList = async () => {
+    await getBackupList();
+};
+
+const handleRestoreBackup = async (backupId: string) => {
+    await restoreBackup(backupId);
+};
+
+const handleDeleteBackup = async (backupId: string) => {
+    await deleteBackup(backupId);
+};
+
+const handleOpenBackupDirectory = async () => {
+    await openBackupDirectory();
+};
+
+const handleExportFullBackup = async () => {
+    await exportFullBackup();
+};
+
+const handleImportFullBackup = async () => {
+    await importFullBackup();
+};
+
+const handleExportSelectedData = async (format: 'csv' | 'json') => {
     const options = {
         format,
         selectedType: exportOptions.value.selectedType,
@@ -421,8 +440,32 @@ const handleExportSelectedData = (format: 'csv' | 'json') => {
         includePrompts: exportOptions.value.selectedType === 'prompts',
         includeAIConfigs: exportOptions.value.selectedType === 'aiConfigs',
     };
-    emit('export-selected-data', format, options);
+    await exportSelectedData(format, options);
 };
+
+const handleCheckDatabaseHealth = async () => {
+    await checkDatabaseHealth();
+};
+
+const handleRepairDatabase = async () => {
+    await repairDatabase();
+};
+
+const handleClearDatabase = async () => {
+    await clearDatabase();
+};
+
+// 初始化
+onMounted(async () => {
+    // 加载备份列表
+    await getBackupList();
+    
+    // 加载数据统计
+    const stats = await getDataStatistics();
+    if (stats) {
+        dataStats.value = stats;
+    }
+});
 </script>
 
 <style scoped>

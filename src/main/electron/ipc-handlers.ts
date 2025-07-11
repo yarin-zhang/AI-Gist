@@ -332,6 +332,12 @@ class IpcHandlers {
       return updateService.getCurrentVersion();
     });
 
+    // 获取应用路径
+    ipcMain.handle('app:get-path', (_, name: string) => {
+      const { app } = require('electron');
+      return app.getPath(name);
+    });
+
     // 检查更新
     ipcMain.handle('app:check-updates', async () => {
       try {
@@ -435,6 +441,7 @@ class IpcHandlers {
     
     // 清理更新处理器
     ipcMain.removeHandler('app:get-version');
+    ipcMain.removeHandler('app:get-path');
     ipcMain.removeHandler('app:check-updates');
     ipcMain.removeHandler('app:open-download-page');
     
