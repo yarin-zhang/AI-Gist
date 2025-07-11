@@ -48,7 +48,251 @@ const CONSTANTS = {
  * 负责协调不同AI供应商的服务，提供统一的API接口
  */
 class AIServiceManager {
+  // 私有属性
+  private activeGenerations = new Map<string, AbortController>(); // 存储活跃的生成请求
   
+  // ==================== IPC 相关方法 ====================
+
+  /**
+   * 处理 AI 配置添加请求
+   * @param config 原始配置
+   * @returns 处理后的配置
+   */
+  processAddConfig(config: any): any {
+    // 确保日期字段正确处理
+    const processedConfig = {
+      ...config,
+      createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
+      updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
+    };
+    return processedConfig;
+  }
+
+  /**
+   * 处理 AI 配置更新请求
+   * @param id 配置ID
+   * @param config 原始配置
+   * @returns 处理后的配置
+   */
+  processUpdateConfig(id: string, config: any): any {
+    // 确保日期字段正确处理
+    const processedConfig = {
+      ...config,
+      updatedAt: new Date()
+    };
+    return processedConfig;
+  }
+
+  /**
+   * 处理 AI 配置测试请求
+   * @param config 原始配置
+   * @returns 测试结果
+   */
+  async processTestConfig(config: any): Promise<{ success: boolean; error?: string; models?: string[] }> {
+    // 将配置转换为内部格式
+    const processedConfig = {
+      ...config,
+      models: Array.isArray(config.models) ? config.models : [],
+      createdAt: new Date(config.createdAt),
+      updatedAt: new Date(config.updatedAt)
+    };
+    
+    return await this.testConfig(processedConfig);
+  }
+
+  /**
+   * 处理获取模型列表请求
+   * @param config 原始配置
+   * @returns 模型列表
+   */
+  async processGetModels(config: any): Promise<string[]> {
+    // 将配置转换为内部格式
+    const processedConfig = {
+      ...config,
+      models: Array.isArray(config.models) ? config.models : [],
+      createdAt: new Date(config.createdAt),
+      updatedAt: new Date(config.updatedAt)
+    };
+    
+    return await this.getAvailableModels(processedConfig);
+  }
+
+  /**
+   * 处理生成提示词请求
+   * @param request 生成请求
+   * @param config 原始配置
+   * @returns 生成结果
+   */
+  async processGeneratePrompt(request: AIGenerationRequest, config: any): Promise<AIGenerationResult> {
+    // 将配置转换为内部格式
+    const processedConfig = {
+      ...config,
+      models: Array.isArray(config.models) ? config.models : [],
+      createdAt: new Date(config.createdAt),
+      updatedAt: new Date(config.updatedAt)
+    };
+    
+    // 调试：打印配置信息
+    console.log('AI服务管理器 - 原始配置 systemPrompt:', config.systemPrompt);
+    console.log('AI服务管理器 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
+    
+    const requestWithConfig = {
+      ...request,
+      config: processedConfig
+    };
+    
+    return await this.generatePrompt(requestWithConfig);
+  }
+
+  /**
+   * 处理智能测试请求
+   * @param config 原始配置
+   * @returns 测试结果
+   */
+  async processIntelligentTest(config: any): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
+    // 将配置转换为内部格式
+    const processedConfig = {
+      ...config,
+      models: Array.isArray(config.models) ? config.models : [],
+      createdAt: new Date(config.createdAt),
+      updatedAt: new Date(config.updatedAt)
+    };
+    
+    return await this.intelligentTest(processedConfig);
+  }
+
+  /**
+   * 处理流式生成提示词请求
+   * @param request 生成请求
+   * @param config 原始配置
+   * @param onProgress 进度回调函数
+   * @returns 生成结果
+   */
+  async processGeneratePromptWithStream(
+    request: AIGenerationRequest,
+    config: any,
+    onProgress: (charCount: number, partialContent?: string) => boolean
+  ): Promise<AIGenerationResult> {
+    // 生成唯一的请求ID
+    const requestId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // 创建 AbortController
+    const abortController = new AbortController();
+    this.activeGenerations.set(requestId, abortController);
+    
+    try {
+      // 将配置转换为内部格式
+      const processedConfig = {
+        ...config,
+        models: Array.isArray(config.models) ? config.models : [],
+        createdAt: new Date(config.createdAt),
+        updatedAt: new Date(config.updatedAt)
+      };
+      
+      // 调试：打印配置信息
+      console.log('AI服务管理器流式生成 - 原始配置 systemPrompt:', config.systemPrompt);
+      console.log('AI服务管理器流式生成 - 处理后配置 systemPrompt:', processedConfig.systemPrompt);
+      console.log('AI服务管理器流式生成 - 请求ID:', requestId);
+      
+      const result = await this.generatePromptWithStream(
+        request,
+        processedConfig,
+        (charCount: number, partialContent?: string) => {
+          // 检查是否已被中断
+          if (abortController.signal.aborted) {
+            console.log('AI服务管理器: 检测到中断信号，停止发送进度');
+            return false;
+          }
+          
+          // 调用进度回调
+          return onProgress(charCount, partialContent);
+        },
+        abortController.signal
+      );
+      
+      return result;
+    } catch (error: any) {
+      if (error.message?.includes('中断生成') || abortController.signal.aborted) {
+        console.log('AI服务管理器: 生成被中断');
+        throw new Error('生成已被中断');
+      }
+      throw error;
+    } finally {
+      // 清理
+      this.activeGenerations.delete(requestId);
+    }
+  }
+
+  /**
+   * 停止所有活跃的生成请求
+   * @returns 停止结果
+   */
+  stopAllGenerations(): { success: boolean; message: string } {
+    console.log('AI服务管理器: 收到停止生成请求，活跃请求数:', this.activeGenerations.size);
+    
+    // 中断所有活跃的生成请求
+    for (const [requestId, abortController] of this.activeGenerations) {
+      console.log(`AI服务管理器: 中断生成请求 ${requestId}`);
+      abortController.abort();
+    }
+    
+    // 清空活跃请求
+    this.activeGenerations.clear();
+    
+    return { success: true, message: '已停止所有生成请求' };
+  }
+
+  /**
+   * 处理调试提示词请求
+   * @param prompt 提示词
+   * @param config 原始配置
+   * @returns 调试结果
+   */
+  async processDebugPrompt(prompt: string, config: any): Promise<{
+    success: boolean;
+    result: string | null;
+    model: string | null;
+    error: string | null;
+  }> {
+    // 将配置转换为内部格式
+    const processedConfig = {
+      ...config,
+      models: Array.isArray(config.models) ? config.models : [],
+      createdAt: new Date(config.createdAt),
+      updatedAt: new Date(config.updatedAt)
+    };
+    
+    // 创建调试请求
+    const debugRequest = {
+      configId: config.configId,
+      topic: prompt,
+      customPrompt: prompt,
+      model: config.defaultModel || config.customModel,
+      config: processedConfig
+    };
+    
+    try {
+      console.log('AI服务管理器调试提示词 - 配置:', processedConfig);
+      console.log('AI服务管理器调试提示词 - 请求:', debugRequest);
+      
+      const result = await this.generatePrompt(debugRequest);
+      return {
+        success: true,
+        result: result.generatedPrompt,
+        model: result.model,
+        error: null
+      };
+    } catch (error: any) {
+      console.error('AI服务管理器调试提示词失败:', error);
+      return {
+        success: false,
+        result: null,
+        model: null,
+        error: error.message || '调试失败'
+      };
+    }
+  }
+
   // ==================== 配置测试 ====================
 
   /**
