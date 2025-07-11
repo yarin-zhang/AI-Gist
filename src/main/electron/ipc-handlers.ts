@@ -4,7 +4,7 @@ import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
 import { aiServiceManager } from '../ai/ai-service-manager';
-import { updateService } from './update-service';
+import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
 import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
@@ -172,18 +172,18 @@ class IpcHandlers {
   private setupUpdateHandlers() {
     // 获取当前版本
     ipcMain.handle('app:get-version', () => {
-      return updateService.getCurrentVersion();
+      return updateManager.getCurrentVersion();
     });
 
     // 获取应用路径
     ipcMain.handle('app:get-path', (_, name: string) => {
-      return updateService.getAppPath(name as any);
+      return updateManager.getAppPath(name as any);
     });
 
     // 打开下载页面
     ipcMain.handle('app:open-download-page', async (_, url: string) => {
       try {
-        await updateService.openDownloadPage(url);
+        await updateManager.openDownloadPage(url);
         return { success: true, error: null };
       } catch (error: any) {
         console.error('打开下载页面失败:', error);
