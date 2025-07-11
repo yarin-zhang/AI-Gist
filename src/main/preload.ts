@@ -77,6 +77,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fs: {
     readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', { filePath }),
     writeFile: (filePath: string, content: string) => ipcRenderer.invoke('fs:write-file', { filePath, content }),
+    ensureDir: (dirPath: string) => ipcRenderer.invoke('fs:ensure-dir', { dirPath }),
+    stat: (filePath: string) => ipcRenderer.invoke('fs:stat', { filePath }),
+    readdir: (dirPath: string) => ipcRenderer.invoke('fs:readdir', { dirPath }),
+    unlink: (filePath: string) => ipcRenderer.invoke('fs:unlink', { filePath }),
   },
   // 云端备份功能
   cloud: {

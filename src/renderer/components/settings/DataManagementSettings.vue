@@ -99,7 +99,7 @@
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
+                                <NPagination v-model:page="currentPage" :page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
                                     :page-sizes="[6, 12, 18]" />
                             </div>
@@ -324,7 +324,7 @@ import {
     Archive,
     Folder,
 } from "@vicons/tabler";
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useDataManagement } from '@renderer/composables/useDataManagement';
 
@@ -363,13 +363,13 @@ const dataStats = ref({
 // 分页
 const currentPage = ref(1);
 const pageSize = ref(6);
-const totalItems = computed(() => backupList.length);
+const totalItems = computed(() => backupList.value.length);
 const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value));
 const paginatedBackups = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
   const end = start + pageSize.value;
   // 转换备份数据格式以匹配组件期望的格式
-  const formattedBackups = backupList.map((backup: any) => ({
+  const formattedBackups = backupList.value.map((backup: any) => ({
     id: backup.id,
     name: backup.name,
     createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
@@ -455,16 +455,24 @@ const handleClearDatabase = async () => {
     await clearDatabase();
 };
 
+// 监听备份列表变化
+watch(() => backupList.value.length, (newLength, oldLength) => {
+    console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
+});
+
 // 初始化
 onMounted(async () => {
+    console.log('组件挂载，开始加载数据...');
     // 加载备份列表
     await getBackupList();
+    console.log('备份列表加载完成，当前长度:', backupList.value.length);
     
     // 加载数据统计
     const stats = await getDataStatistics();
     if (stats) {
         dataStats.value = stats;
     }
+    console.log('数据统计加载完成');
 });
 </script>
 

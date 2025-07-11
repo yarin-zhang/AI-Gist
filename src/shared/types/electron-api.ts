@@ -71,20 +71,20 @@ export default interface ElectronApi {
   }
 
   data: {
-    createBackup: (description?: string, data?: any) => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }>
-    getBackupList: () => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }[]>
-    readBackup: (backupId: string) => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; data?: any; version?: string; checksum?: string }>
-    deleteBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
     selectImportFile: (format: string) => Promise<string | null>
     selectExportPath: (defaultName: string) => Promise<string | null>
-    getStats: () => Promise<{ categories: number; prompts: number; history: number; aiConfigs: number; settings: number; posts: number; users: number; totalRecords: number }>
-    getBackupDirectory: () => Promise<{ success: boolean; path?: string; error?: string; message?: string }>
+    writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+    readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   }
 
   // 文件操作
   fs: {
     readFile: (filePath: string) => Promise<string>
     writeFile: (filePath: string, content: string) => Promise<{ success: boolean }>
+    ensureDir: (dirPath: string) => Promise<{ success: boolean }>
+    stat: (filePath: string) => Promise<{ size: number; mtime: Date }>
+    readdir: (dirPath: string) => Promise<string[]>
+    unlink: (filePath: string) => Promise<{ success: boolean }>
   }
 
   // 云端备份功能

@@ -25,6 +25,7 @@ class IpcHandlers {
     this.setupAIHandlers();
     this.setupUpdateHandlers();
     this.setupShellHandlers();
+    this.setupDataHandlers();
   }
 
   /**
@@ -405,6 +406,134 @@ class IpcHandlers {
         throw new Error(`写入文件失败: ${errorMessage}`);
       }
     });
+
+    // 确保目录存在
+    ipcMain.handle('fs:ensure-dir', async (_, { dirPath }) => {
+      try {
+        await fs.mkdir(dirPath, { recursive: true });
+        return { success: true };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`创建目录失败: ${errorMessage}`);
+      }
+    });
+
+    // 获取文件状态
+    ipcMain.handle('fs:stat', async (_, { filePath }) => {
+      try {
+        const stats = await fs.stat(filePath);
+        return { 
+          size: stats.size, 
+          mtime: stats.mtime 
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`获取文件状态失败: ${errorMessage}`);
+      }
+    });
+
+    // 读取目录
+    ipcMain.handle('fs:readdir', async (_, { dirPath }) => {
+      try {
+        const files = await fs.readdir(dirPath);
+        return files;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`读取目录失败: ${errorMessage}`);
+      }
+    });
+
+    // 删除文件
+    ipcMain.handle('fs:unlink', async (_, { filePath }) => {
+      try {
+        await fs.unlink(filePath);
+        return { success: true };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`删除文件失败: ${errorMessage}`);
+      }
+    });
+  }
+
+  /**
+   * 设置数据管理处理器
+   */
+  private setupDataHandlers() {
+    // 选择导入文件
+    ipcMain.handle('data:select-import-file', async (event, { format }) => {
+      const { dialog } = require('electron');
+      const result = await dialog.showOpenDialog({
+        title: '选择导入文件',
+        filters: [
+          { name: `${format.toUpperCase()} 文件`, extensions: [format] },
+          { name: '所有文件', extensions: ['*'] },
+        ],
+        properties: ['openFile'],
+      });
+
+      return result.canceled ? null : result.filePaths[0];
+    });
+
+    // 选择导出路径
+    ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
+      const { dialog } = require('electron');
+      const fileExtension = defaultName.split('.').pop()?.toLowerCase();
+      let filters;
+      
+      if (fileExtension === 'csv') {
+        filters = [
+          { name: 'CSV 文件', extensions: ['csv'] },
+          { name: '所有文件', extensions: ['*'] },
+        ];
+      } else if (fileExtension === 'json') {
+        filters = [
+          { name: 'JSON 文件', extensions: ['json'] },
+          { name: '所有文件', extensions: ['*'] },
+        ];
+      } else {
+        filters = [
+          { name: 'CSV 文件', extensions: ['csv'] },
+          { name: 'JSON 文件', extensions: ['json'] },
+          { name: '所有文件', extensions: ['*'] },
+        ];
+      }
+      
+      const result = await dialog.showSaveDialog({
+        title: '选择导出路径',
+        defaultPath: defaultName,
+        filters: filters,
+      });
+
+      return result.canceled ? null : result.filePath;
+    });
+
+    // 写入文件
+    ipcMain.handle('data:write-file', async (event, { filePath, content }) => {
+      try {
+        await fs.writeFile(filePath, content, 'utf-8');
+        return { success: true };
+      } catch (error) {
+        console.error('写入文件失败:', error);
+        return { 
+          success: false, 
+          error: error instanceof Error ? error.message : '写入文件失败' 
+        };
+      }
+    });
+
+    // 读取文件
+    ipcMain.handle('data:read-file', async (event, { filePath }) => {
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        return { success: true, content };
+      } catch (error) {
+        console.error('读取文件失败:', error);
+        return { 
+          success: false, 
+          error: error instanceof Error ? error.message : '读取文件失败' 
+        };
+      }
+    });
   }
 
   /**
@@ -450,6 +579,16 @@ class IpcHandlers {
     ipcMain.removeHandler('shell:open-external');
     ipcMain.removeHandler('fs:read-file');
     ipcMain.removeHandler('fs:write-file');
+    ipcMain.removeHandler('fs:ensure-dir');
+    ipcMain.removeHandler('fs:stat');
+    ipcMain.removeHandler('fs:readdir');
+    ipcMain.removeHandler('fs:unlink');
+    
+    // 清理数据管理处理器
+    ipcMain.removeHandler('data:select-import-file');
+    ipcMain.removeHandler('data:select-export-path');
+    ipcMain.removeHandler('data:write-file');
+    ipcMain.removeHandler('data:read-file');
     
     // 清理活跃的生成请求
     for (const abortController of this.activeGenerations.values()) {

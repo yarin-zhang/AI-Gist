@@ -3,7 +3,7 @@
  * 所有逻辑都在渲染进程内完成，只在必要时调用主进程文件操作
  */
 
-import { ref, reactive } from 'vue';
+import { ref, reactive, toRef } from 'vue';
 import { DataManagementAPI } from '@renderer/lib/api/data-management.api';
 import { useDatabase } from './useDatabase';
 import { databaseService } from '@renderer/lib/db';
@@ -28,53 +28,98 @@ export function useDataManagement() {
   const { waitForDatabase, safeDbOperation } = useDatabase();
   
   // 状态管理
-  const state = reactive<DataManagementState>({
-    backupList: [],
-    loading: {},
-    error: null,
-    success: null
-  });
+  const backupList = ref<BackupInfo[]>([]);
+  const loading = ref<Record<string, boolean>>({});
+  const error = ref<string | null>(null);
+  const success = ref<string | null>(null);
 
   // 设置加载状态
   const setLoading = (key: string, value: boolean) => {
-    state.loading[key] = value;
+    loading.value[key] = value;
   };
 
   // 清除消息
   const clearMessages = () => {
-    state.error = null;
-    state.success = null;
+    error.value = null;
+    success.value = null;
   };
 
-  // 获取备份列表 - 从 localStorage 读取
+  // 获取备份列表 - 从文件系统读取
   const getBackupList = async (): Promise<BackupInfo[]> => {
     try {
       setLoading('refreshBackupList', true);
       clearMessages();
       
-      // 从 localStorage 读取备份列表
-      const storedBackups = localStorage.getItem('ai-gist-backups');
-      if (storedBackups) {
-        const backups = JSON.parse(storedBackups);
-        state.backupList = backups;
-        return backups;
-      } else {
-        state.backupList = [];
-        return [];
+      console.log('开始获取备份列表...');
+      
+      // 获取备份目录路径
+      const userDataPath = await window.electronAPI.app.getPath('userData');
+      const backupDir = `${userDataPath}/backups`;
+      console.log('备份目录路径:', backupDir);
+      
+      // 确保备份目录存在
+      await window.electronAPI.fs.ensureDir(backupDir);
+      console.log('备份目录已确保存在');
+      
+      // 读取备份目录中的所有文件
+      const files = await window.electronAPI.fs.readdir(backupDir);
+      console.log('目录中的所有文件:', files);
+      
+      const backupFiles = files.filter(file => file.endsWith('.json'));
+      console.log('备份文件列表:', backupFiles);
+      
+      const backups: BackupInfo[] = [];
+      
+      for (const file of backupFiles) {
+        try {
+          const filePath = `${backupDir}/${file}`;
+          console.log('正在读取备份文件:', filePath);
+          
+          const content = await window.electronAPI.fs.readFile(filePath);
+          const backupData = JSON.parse(content);
+          
+          // 获取文件状态
+          const fileStats = await window.electronAPI.fs.stat(filePath);
+          
+          const backupInfo: BackupInfo = {
+            id: backupData.id,
+            name: backupData.name,
+            description: backupData.description || '自动备份',
+            createdAt: backupData.createdAt,
+            size: fileStats.size,
+            data: backupData.data
+          };
+          
+          console.log('成功读取备份:', backupInfo);
+          backups.push(backupInfo);
+        } catch (err) {
+          console.warn(`读取备份文件失败: ${file}`, err);
+        }
       }
+      
+      // 按创建时间排序，最新的在前面
+      backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      console.log('最终备份列表:', backups);
+      // 强制触发响应式更新
+      backupList.value = [...backups];
+      return backups;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '获取备份列表失败';
+      console.error('获取备份列表失败:', err);
+      error.value = err instanceof Error ? err.message : '获取备份列表失败';
       return [];
     } finally {
       setLoading('refreshBackupList', false);
     }
   };
 
-  // 创建备份 - 完全在渲染进程内完成
+  // 创建备份 - 调用 Electron 文件系统功能
   const createBackup = async (description?: string): Promise<BackupInfo | null> => {
     try {
       setLoading('backup', true);
       clearMessages();
+      
+      console.log('开始创建备份...');
       
       // 1. 导出所有数据
       const result = await safeDbOperation(() => databaseService.exportAllData());
@@ -82,79 +127,147 @@ export function useDataManagement() {
         throw new Error('导出数据失败');
       }
       
+      console.log('数据导出成功，开始创建备份文件...');
+      
       // 2. 创建备份信息
       const backupId = crypto.randomUUID();
       const timestamp = new Date().toISOString();
       const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
+      
+      // 3. 获取备份目录路径
+      const userDataPath = await window.electronAPI.app.getPath('userData');
+      const backupDir = `${userDataPath}/backups`;
+      console.log('备份目录路径:', backupDir);
+      
+      // 4. 确保备份目录存在
+      await window.electronAPI.fs.ensureDir(backupDir);
+      console.log('备份目录已确保存在');
+      
+      // 5. 保存备份文件
+      const backupFilePath = `${backupDir}/${backupName}.json`;
+      const backupData = {
+        id: backupId,
+        name: backupName,
+        description: description || '自动备份',
+        createdAt: timestamp,
+        version: '1.0',
+        data: result.data
+      };
+      
+      console.log('正在写入备份文件:', backupFilePath);
+      const writeResult = await window.electronAPI.fs.writeFile(
+        backupFilePath, 
+        JSON.stringify(backupData, null, 2)
+      );
+      
+      if (!writeResult.success) {
+        throw new Error('备份文件写入失败');
+      }
+      
+      console.log('备份文件写入成功');
+      
+      // 6. 获取文件大小
+      const fileStats = await window.electronAPI.fs.stat(backupFilePath);
+      console.log('备份文件大小:', fileStats.size);
       
       const backupInfo: BackupInfo = {
         id: backupId,
         name: backupName,
         description: description || '自动备份',
         createdAt: timestamp,
-        size: JSON.stringify(result.data).length,
+        size: fileStats.size,
         data: result.data,
       };
 
-      // 3. 保存到 localStorage
-      const existingBackups = state.backupList;
-      existingBackups.unshift(backupInfo);
-      state.backupList = existingBackups;
-      localStorage.setItem('ai-gist-backups', JSON.stringify(existingBackups));
+      // 7. 刷新备份列表
+      console.log('刷新备份列表...');
+      await getBackupList();
 
-      state.success = '备份创建成功';
+      success.value = '备份创建成功';
+      console.log('备份创建完成');
       return backupInfo;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '创建备份失败';
+      console.error('创建备份失败:', err);
+      error.value = err instanceof Error ? err.message : '创建备份失败';
       return null;
     } finally {
       setLoading('backup', false);
     }
   };
 
-  // 恢复备份 - 完全在渲染进程内完成
+  // 恢复备份 - 从文件系统读取备份数据
   const restoreBackup = async (backupId: string): Promise<boolean> => {
     try {
       setLoading('restore', true);
       clearMessages();
       
       // 1. 查找备份
-      const backup = state.backupList.find(b => b.id === backupId);
-      if (!backup || !backup.data) {
+      const backup = backupList.value.find(b => b.id === backupId);
+      if (!backup) {
+        throw new Error('备份不存在');
+      }
+
+      // 2. 从文件系统读取备份数据
+      const userDataPath = await window.electronAPI.app.getPath('userData');
+      const backupDir = `${userDataPath}/backups`;
+      const backupFileName = `${backup.name}.json`;
+      const backupFilePath = `${backupDir}/${backupFileName}`;
+      
+      const backupContent = await window.electronAPI.fs.readFile(backupFilePath);
+      const backupData = JSON.parse(backupContent);
+      
+      if (!backupData.data) {
         throw new Error('备份数据无效');
       }
 
-      // 2. 恢复到数据库
-      const result = await safeDbOperation(() => databaseService.replaceAllData(backup.data));
+      // 3. 恢复到数据库
+      const result = await safeDbOperation(() => databaseService.replaceAllData(backupData.data));
       if (result && result.success) {
-        state.success = '备份恢复成功';
+        success.value = '备份恢复成功';
         return true;
       } else {
         throw new Error(result?.message || '恢复失败');
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '恢复备份失败';
+      error.value = err instanceof Error ? err.message : '恢复备份失败';
       return false;
     } finally {
       setLoading('restore', false);
     }
   };
 
-  // 删除备份 - 完全在渲染进程内完成
+  // 删除备份 - 从文件系统删除
   const deleteBackup = async (backupId: string): Promise<boolean> => {
     try {
       setLoading('backup', true);
       clearMessages();
       
-      // 从列表中移除
-      const updatedBackups = state.backupList.filter(b => b.id !== backupId);
-      state.backupList = updatedBackups;
-      localStorage.setItem('ai-gist-backups', JSON.stringify(updatedBackups));
+      // 查找要删除的备份
+      const backup = backupList.value.find(b => b.id === backupId);
+      if (!backup) {
+        throw new Error('备份不存在');
+      }
       
-      state.success = '备份删除成功';
+      // 获取备份目录路径
+      const userDataPath = await window.electronAPI.app.getPath('userData');
+      const backupDir = `${userDataPath}/backups`;
+      const backupFileName = `${backup.name}.json`;
+      const backupFilePath = `${backupDir}/${backupFileName}`;
+      
+      // 删除文件
+      const deleteResult = await window.electronAPI.fs.unlink(backupFilePath);
+      
+      if (!deleteResult.success) {
+        throw new Error('删除备份文件失败');
+      }
+      
+      // 刷新备份列表
+      await getBackupList();
+      
+      success.value = '备份删除成功';
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '删除备份失败';
+      error.value = err instanceof Error ? err.message : '删除备份失败';
       return false;
     } finally {
       setLoading('backup', false);
@@ -164,14 +277,17 @@ export function useDataManagement() {
   // 打开备份目录
   const openBackupDirectory = async (): Promise<void> => {
     try {
-      if (typeof window !== 'undefined' && window.electronAPI) {
-        // 获取用户数据目录作为备份目录
-        const userDataPath = await window.electronAPI.app.getPath('userData');
-        const backupPath = `${userDataPath}/backups`;
-        await window.electronAPI.shell.openPath(backupPath);
-      }
+      // 获取用户数据目录作为备份目录
+      const userDataPath = await window.electronAPI.app.getPath('userData');
+      const backupPath = `${userDataPath}/backups`;
+      
+      // 确保备份目录存在
+      await window.electronAPI.fs.ensureDir(backupPath);
+      
+      // 打开备份目录
+      await window.electronAPI.shell.openPath(backupPath);
     } catch (err) {
-      state.error = '无法打开备份目录';
+      error.value = '无法打开备份目录';
     }
   };
 
@@ -193,22 +309,22 @@ export function useDataManagement() {
       const filePath = await DataManagementAPI.selectExportPath(defaultName);
       
       if (!filePath) {
-        state.error = '未选择导出路径';
+        error.value = '未选择导出路径';
         return false;
       }
       
       // 3. 导出数据
-      const success = await DataManagementAPI.exportDataToFile(result.data, filePath, 'json');
+      const exportSuccess = await DataManagementAPI.exportDataToFile(result.data, filePath, 'json');
       
-      if (success) {
-        state.success = '完整备份导出成功';
+      if (exportSuccess) {
+        success.value = '完整备份导出成功';
         return true;
       } else {
-        state.error = '完整备份导出失败';
+        error.value = '完整备份导出失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '完整备份导出失败';
+      error.value = err instanceof Error ? err.message : '完整备份导出失败';
       return false;
     } finally {
       setLoading('export', false);
@@ -224,14 +340,14 @@ export function useDataManagement() {
       // 1. 选择导入文件
       const filePath = await DataManagementAPI.selectImportFile('json');
       if (!filePath) {
-        state.error = '未选择导入文件';
+        error.value = '未选择导入文件';
         return false;
       }
       
       // 2. 读取文件数据
       const data = await DataManagementAPI.importDataFromFile(filePath, 'json');
       if (!data) {
-        state.error = '文件读取失败';
+        error.value = '文件读取失败';
         return false;
       }
       
@@ -239,14 +355,14 @@ export function useDataManagement() {
       const result = await safeDbOperation(() => databaseService.replaceAllData(data));
       
       if (result && result.success) {
-        state.success = '完整备份导入成功';
+        success.value = '完整备份导入成功';
         return true;
       } else {
-        state.error = result?.message || '完整备份导入失败';
+        error.value = result?.message || '完整备份导入失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '完整备份导入失败';
+      error.value = err instanceof Error ? err.message : '完整备份导入失败';
       return false;
     } finally {
       setLoading('import', false);
@@ -286,22 +402,22 @@ export function useDataManagement() {
       const filePath = await DataManagementAPI.selectExportPath(defaultName);
       
       if (!filePath) {
-        state.error = '未选择导出路径';
+        error.value = '未选择导出路径';
         return false;
       }
       
       // 4. 导出数据
-      const success = await DataManagementAPI.exportDataToFile(filteredData, filePath, format);
+      const exportSuccess = await DataManagementAPI.exportDataToFile(filteredData, filePath, format);
       
-      if (success) {
-        state.success = '选择性数据导出成功';
+      if (exportSuccess) {
+        success.value = '选择性数据导出成功';
         return true;
       } else {
-        state.error = '选择性数据导出失败';
+        error.value = '选择性数据导出失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '选择性数据导出失败';
+      error.value = err instanceof Error ? err.message : '选择性数据导出失败';
       return false;
     } finally {
       setLoading('export', false);
@@ -328,14 +444,14 @@ export function useDataManagement() {
       const result = await safeDbOperation(() => databaseService.getHealthStatus());
       
       if (result && result.healthy) {
-        state.success = '数据库健康检查通过';
+        success.value = '数据库健康检查通过';
       } else {
-        state.error = `数据库存在问题: ${result?.missingStores?.join(', ') || '未知问题'}`;
+        error.value = `数据库存在问题: ${result?.missingStores?.join(', ') || '未知问题'}`;
       }
       
       return result;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '数据库健康检查失败';
+      error.value = err instanceof Error ? err.message : '数据库健康检查失败';
       return { healthy: false, missingStores: ['检查失败'] };
     } finally {
       setLoading('healthCheck', false);
@@ -351,14 +467,14 @@ export function useDataManagement() {
       const result = await safeDbOperation(() => databaseService.repairDatabase());
       
       if (result && result.success) {
-        state.success = '数据库修复成功';
+        success.value = '数据库修复成功';
         return true;
       } else {
-        state.error = result?.message || '数据库修复失败';
+        error.value = result?.message || '数据库修复失败';
         return false;
       }
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '数据库修复失败';
+      error.value = err instanceof Error ? err.message : '数据库修复失败';
       return false;
     } finally {
       setLoading('repair', false);
@@ -375,13 +491,13 @@ export function useDataManagement() {
       await safeDbOperation(() => databaseService.forceCleanAllTables());
       
       // 清空备份列表
-      state.backupList = [];
+      backupList.value = [];
       localStorage.removeItem('ai-gist-backups');
       
-      state.success = '数据库清空成功';
+      success.value = '数据库清空成功';
       return true;
     } catch (err) {
-      state.error = err instanceof Error ? err.message : '数据库清空失败';
+      error.value = err instanceof Error ? err.message : '数据库清空失败';
       return false;
     } finally {
       setLoading('clearDatabase', false);
@@ -390,10 +506,10 @@ export function useDataManagement() {
 
   return {
     // 状态
-    backupList: state.backupList,
-    loading: state.loading,
-    error: state.error,
-    success: state.success,
+    backupList,
+    loading,
+    error,
+    success,
     
     // 备份管理
     getBackupList,
