@@ -34,11 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // AI 服务管理
   ai: {
-    getConfigs: () => ipcRenderer.invoke('ai:get-configs'),
-    getEnabledConfigs: () => ipcRenderer.invoke('ai:get-enabled-configs'),
     addConfig: (config: any) => ipcRenderer.invoke('ai:add-config', config),
     updateConfig: (id: string, config: any) => ipcRenderer.invoke('ai:update-config', id, config),
-    removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
     generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => {

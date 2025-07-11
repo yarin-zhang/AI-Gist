@@ -8,13 +8,12 @@ import {
   singleInstanceManager,
 } from './electron';
 import { 
-  DataManagementService
+  dataManagementService
 } from './data';
 import { CloudBackupManager } from './cloud/cloud-backup-manager';
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
-let dataManagementService: DataManagementService;
 let cloudBackupManager: CloudBackupManager;
 
 // 防止多重启动 - 初始化单实例管理器
@@ -31,7 +30,6 @@ app.whenReady().then(async () => {
   preferencesManager.applyAllSettings();
   // 初始化主题管理器
   themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
-  dataManagementService = new DataManagementService();
   
   // 初始化云端备份管理器
   cloudBackupManager = new CloudBackupManager(dataManagementService);

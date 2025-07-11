@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron';
-import { promises as fs } from 'fs';
 import { shell } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
 import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateService } from './update-service';
+import { dataManagementService, fsService } from '../data';
 import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
@@ -114,18 +114,6 @@ class IpcHandlers {
    * 设置 AI 服务处理器
    */
   private setupAIHandlers() {
-    // 获取所有 AI 配置 - 由前端数据库处理
-    ipcMain.handle('ai:get-configs', async () => {
-      // 这里应该从前端数据库读取，暂时返回空数组
-      return [];
-    });
-
-    // 获取启用的 AI 配置 - 由前端数据库处理
-    ipcMain.handle('ai:get-enabled-configs', async () => {
-      // 这里应该从前端数据库读取，暂时返回空数组
-      return [];
-    });
-
     // 添加 AI 配置 - 返回配置数据，实际存储由前端处理
     ipcMain.handle('ai:add-config', (_, config: any) => {
       // 确保日期字段正确处理
@@ -145,11 +133,6 @@ class IpcHandlers {
         updatedAt: new Date()
       };
       return processedConfig;
-    });
-
-    // 删除 AI 配置 - 返回成功标志，实际删除由前端处理
-    ipcMain.handle('ai:remove-config', (_, id: string) => {
-      return true;
     });
 
     // 测试 AI 配置
@@ -387,71 +370,32 @@ class IpcHandlers {
     // 文件操作
     // 读取文件
     ipcMain.handle('fs:read-file', async (_, { filePath }) => {
-      try {
-        const content = await fs.readFile(filePath, 'utf-8');
-        return content;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`读取文件失败: ${errorMessage}`);
-      }
+      return await fsService.readFile(filePath);
     });
 
     // 写入文件
     ipcMain.handle('fs:write-file', async (_, { filePath, content }) => {
-      try {
-        await fs.writeFile(filePath, content, 'utf-8');
-        return { success: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`写入文件失败: ${errorMessage}`);
-      }
+      return await fsService.writeFile(filePath, content);
     });
 
     // 确保目录存在
     ipcMain.handle('fs:ensure-dir', async (_, { dirPath }) => {
-      try {
-        await fs.mkdir(dirPath, { recursive: true });
-        return { success: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`创建目录失败: ${errorMessage}`);
-      }
+      return await fsService.ensureDir(dirPath);
     });
 
     // 获取文件状态
     ipcMain.handle('fs:stat', async (_, { filePath }) => {
-      try {
-        const stats = await fs.stat(filePath);
-        return { 
-          size: stats.size, 
-          mtime: stats.mtime 
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`获取文件状态失败: ${errorMessage}`);
-      }
+      return await fsService.stat(filePath);
     });
 
     // 读取目录
     ipcMain.handle('fs:readdir', async (_, { dirPath }) => {
-      try {
-        const files = await fs.readdir(dirPath);
-        return files;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`读取目录失败: ${errorMessage}`);
-      }
+      return await fsService.readDir(dirPath);
     });
 
     // 删除文件
     ipcMain.handle('fs:unlink', async (_, { filePath }) => {
-      try {
-        await fs.unlink(filePath);
-        return { success: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
-        throw new Error(`删除文件失败: ${errorMessage}`);
-      }
+      return await fsService.unlink(filePath);
     });
   }
 
@@ -461,78 +405,22 @@ class IpcHandlers {
   private setupDataHandlers() {
     // 选择导入文件
     ipcMain.handle('data:select-import-file', async (event, { format }) => {
-      const { dialog } = require('electron');
-      const result = await dialog.showOpenDialog({
-        title: '选择导入文件',
-        filters: [
-          { name: `${format.toUpperCase()} 文件`, extensions: [format] },
-          { name: '所有文件', extensions: ['*'] },
-        ],
-        properties: ['openFile'],
-      });
-
-      return result.canceled ? null : result.filePaths[0];
+      return await dataManagementService.selectImportFile(format);
     });
 
     // 选择导出路径
     ipcMain.handle('data:select-export-path', async (event, { defaultName }) => {
-      const { dialog } = require('electron');
-      const fileExtension = defaultName.split('.').pop()?.toLowerCase();
-      let filters;
-      
-      if (fileExtension === 'csv') {
-        filters = [
-          { name: 'CSV 文件', extensions: ['csv'] },
-          { name: '所有文件', extensions: ['*'] },
-        ];
-      } else if (fileExtension === 'json') {
-        filters = [
-          { name: 'JSON 文件', extensions: ['json'] },
-          { name: '所有文件', extensions: ['*'] },
-        ];
-      } else {
-        filters = [
-          { name: 'CSV 文件', extensions: ['csv'] },
-          { name: 'JSON 文件', extensions: ['json'] },
-          { name: '所有文件', extensions: ['*'] },
-        ];
-      }
-      
-      const result = await dialog.showSaveDialog({
-        title: '选择导出路径',
-        defaultPath: defaultName,
-        filters: filters,
-      });
-
-      return result.canceled ? null : result.filePath;
+      return await dataManagementService.selectExportPath(defaultName);
     });
 
     // 写入文件
     ipcMain.handle('data:write-file', async (event, { filePath, content }) => {
-      try {
-        await fs.writeFile(filePath, content, 'utf-8');
-        return { success: true };
-      } catch (error) {
-        console.error('写入文件失败:', error);
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : '写入文件失败' 
-        };
-      }
+      return await dataManagementService.writeFile(filePath, content);
     });
 
     // 读取文件
     ipcMain.handle('data:read-file', async (event, { filePath }) => {
-      try {
-        const content = await fs.readFile(filePath, 'utf-8');
-        return { success: true, content };
-      } catch (error) {
-        console.error('读取文件失败:', error);
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : '读取文件失败' 
-        };
-      }
+      return await dataManagementService.readFile(filePath);
     });
   }
 
@@ -556,11 +444,8 @@ class IpcHandlers {
     ipcMain.removeHandler('theme:set-source');
     ipcMain.removeHandler('theme:is-dark');
     // 清理 AI 处理器
-    ipcMain.removeHandler('ai:get-configs');
-    ipcMain.removeHandler('ai:get-enabled-configs');
     ipcMain.removeHandler('ai:add-config');
     ipcMain.removeHandler('ai:update-config');
-    ipcMain.removeHandler('ai:remove-config');
     ipcMain.removeHandler('ai:test-config');
     ipcMain.removeHandler('ai:get-models');
     ipcMain.removeHandler('ai:generate-prompt');
