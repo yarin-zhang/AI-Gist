@@ -180,14 +180,18 @@ class IpcHandlers {
       return updateService.getAppPath(name as any);
     });
 
-    // 检查更新
-    ipcMain.handle('app:check-updates', async () => {
-      return await updateService.checkForUpdatesWithResult();
-    });
-
     // 打开下载页面
     ipcMain.handle('app:open-download-page', async (_, url: string) => {
-      return await updateService.openDownloadPageWithResult(url);
+      try {
+        await updateService.openDownloadPage(url);
+        return { success: true, error: null };
+      } catch (error: any) {
+        console.error('打开下载页面失败:', error);
+        return { 
+          success: false, 
+          error: error.message || '打开下载页面失败' 
+        };
+      }
     });
   }
 
@@ -295,7 +299,6 @@ class IpcHandlers {
     // 清理更新处理器
     ipcMain.removeHandler('app:get-version');
     ipcMain.removeHandler('app:get-path');
-    ipcMain.removeHandler('app:check-updates');
     ipcMain.removeHandler('app:open-download-page');
     
     // 清理 Shell 处理器

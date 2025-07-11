@@ -29,11 +29,11 @@
                         <NText depth="2">{{ t('about.currentVersion') }}</NText>
                         <NText>{{ currentVersion }}</NText>
                     </NFlex>
-                    <NFlex justify="space-between" v-if="updateInfo">
+                    <NFlex justify="space-between" v-if="latestVersion">
                         <NText depth="2">{{ t('about.latestVersion') }}</NText>
                         <NFlex align="center" :size="8">
-                            <NText>{{ updateInfo.latestVersion }}</NText>
-                            <NTag v-if="updateInfo.hasUpdate" type="warning" size="small">
+                            <NText>{{ latestVersion }}</NText>
+                            <NTag v-if="hasUpdate" type="warning" size="small">
                                 {{ t('about.hasUpdate') }}
                             </NTag>
                             <NTag v-else type="success" size="small">
@@ -41,9 +41,9 @@
                             </NTag>
                         </NFlex>
                     </NFlex>
-                    <NFlex justify="space-between" v-if="updateInfo?.publishedAt">
+                    <NFlex justify="space-between" v-if="publishedAt">
                         <NText depth="2">{{ t('about.publishedAt') }}</NText>
-                        <NText>{{ formatDate(updateInfo.publishedAt) }}</NText>
+                        <NText>{{ publishedAt }}</NText>
                     </NFlex>
                 </NFlex>
             </NFlex>
@@ -52,7 +52,7 @@
             <NFlex vertical :size="12">
                 <NFlex justify="space-between" align="center">
                     <NText strong style="font-size: 16px;">{{ t('about.updateCheck') }}</NText>
-                    <NButton @click="checkForUpdates" :loading="checking" secondary type="primary">
+                    <NButton @click="handleCheckForUpdates" :loading="checking" secondary type="primary">
                         <template #icon>
                             <NIcon>
                                 <Refresh />
@@ -63,14 +63,14 @@
                 </NFlex>
 
                 <!-- 更新信息 -->
-                <div v-if="updateInfo?.hasUpdate && updateInfo.releaseNotes">
+                <div v-if="hasUpdate && releaseNotes">
                     <NAlert type="info" :title="t('about.newVersionAvailable')" style="margin-bottom: 12px;">
                         <NFlex vertical :size="8">
                             <NText>
-                                {{ t('about.newVersionDesc', { version: updateInfo.latestVersion }) }}
+                                {{ t('about.newVersionDesc', { version: latestVersion }) }}
                             </NText>
                             <NFlex :size="8">
-                                <NButton @click="openDownloadPage" type="primary" size="small">
+                                <NButton @click="handleOpenDownloadPage" type="primary" size="small">
                                     {{ t('about.downloadNewVersion') }}
                                 </NButton>
                                 <NButton @click="showReleaseNotes = !showReleaseNotes" quaternary size="small">
@@ -84,7 +84,7 @@
                     <NCollapse v-if="showReleaseNotes" style="margin-top: 12px;">
                         <NCollapseItem :title="t('about.releaseNotes')" name="release-notes">
                             <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">
-                                {{ updateInfo.releaseNotes }}
+                                {{ releaseNotes }}
                             </div>
                         </NCollapseItem>
                     </NCollapse>
@@ -161,63 +161,55 @@ import {
     useMessage
 } from 'naive-ui';
 import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
+import { useUpdate } from '~/composables/useUpdate';
 
 const { t } = useI18n();
 
 // 应用图标
 const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href;
 
+// 使用更新服务
+const {
+    currentVersion,
+    updateInfo,
+    checking,
+    checkError,
+    hasUpdate,
+    isLatest,
+    latestVersion,
+    releaseNotes,
+    downloadUrl,
+    publishedAt,
+    checkForUpdates,
+    openDownloadPage,
+    initVersion
+} = useUpdate();
+
 // 状态管理
 const message = useMessage();
-const currentVersion = ref('');
-const updateInfo = ref<any>(null);
-const checking = ref(false);
-const checkError = ref('');
 const showReleaseNotes = ref(false);
 
-// 格式化日期
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-};
-
 // 检查更新
-const checkForUpdates = async () => {
-    if (checking.value) return;
-
-    checking.value = true;
-    checkError.value = '';
-
-    try {
-        const result = await window.electronAPI.app.checkUpdates();
-        if (result.success) {
-            updateInfo.value = result.data;
-            if (result.data.hasUpdate) {
-                message.success(`发现新版本 ${result.data.latestVersion}！`);
-            } else {
-                message.info('当前已是最新版本');
-            }
+const handleCheckForUpdates = async () => {
+    const result = await checkForUpdates();
+    if (result.success) {
+        if (result.data?.hasUpdate) {
+            message.success(`发现新版本 ${result.data.latestVersion}！`);
         } else {
-            checkError.value = result.error || '检查更新失败';
+            message.info('当前已是最新版本');
         }
-    } catch (error: any) {
-        checkError.value = error.message || '检查更新失败';
+    } else {
+        message.error(result.error || '检查更新失败');
     }
-
-    checking.value = false;
 };
 
 // 打开下载页面
-const openDownloadPage = async () => {
-    if (!updateInfo.value?.downloadUrl) return;
+const handleOpenDownloadPage = async () => {
+    if (!downloadUrl.value) return;
 
-    try {
-        await window.electronAPI.app.openDownloadPage(updateInfo.value.downloadUrl);
-    } catch (error) {
-        message.error('打开下载页面失败');
+    const result = await openDownloadPage(downloadUrl.value);
+    if (!result.success) {
+        message.error(result.error || '打开下载页面失败');
     }
 };
 
@@ -248,22 +240,12 @@ const openFeatureRequest = async () => {
     }
 };
 
-// 获取当前版本
-const getCurrentVersion = async () => {
-    try {
-        currentVersion.value = await window.electronAPI.app.getVersion();
-    } catch (error) {
-        console.error('获取版本失败:', error);
-    }
-};
-
 // 组件挂载时初始化
 onMounted(async () => {
-    await getCurrentVersion();
+    await initVersion();
 
     // 监听更新通知
     window.electronAPI.app.onUpdateAvailable((info: any) => {
-        updateInfo.value = info;
         message.info(`发现新版本 ${info.latestVersion}！`);
     });
 });
