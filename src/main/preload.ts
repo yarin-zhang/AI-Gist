@@ -5,13 +5,31 @@ const shortcutsAPI = {
   // 注册默认快捷键
   registerDefaults: () => ipcRenderer.invoke('shortcuts:register-defaults'),
   
+  // 重新注册快捷键
+  reregister: () => ipcRenderer.invoke('shortcuts:reregister'),
+  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-registered', accelerator),
+  
+  // 检查快捷键是否可用
+  isAvailable: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-available', accelerator),
+  
+  // 获取已注册的快捷键列表
+  getRegistered: () => ipcRenderer.invoke('shortcuts:get-registered'),
+  
+  // 检查权限并尝试注册快捷键
+  checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
   
   // 监听快捷键事件
   onInsertData: (callback: () => void) => {
     ipcRenderer.on('shortcut:insert-data', callback);
     return () => ipcRenderer.removeAllListeners('shortcut:insert-data');
+  },
+  
+  // 监听提示词触发器事件
+  onTriggerPrompt: (callback: (promptId: number) => void) => {
+    ipcRenderer.on('shortcut:trigger-prompt', (_, promptId: number) => callback(promptId));
+    return () => ipcRenderer.removeAllListeners('shortcut:trigger-prompt');
   }
 };
 

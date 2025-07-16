@@ -47,7 +47,7 @@ app.whenReady().then(async () => {
   // 初始化快捷键管理器
   const shortcutManager = ShortcutManager.getInstance();
   shortcutManager.setMainWindow(mainWindow);
-  shortcutManager.registerDefaultShortcuts();
+  await shortcutManager.initialize();
   
   // 创建系统托盘并设置主窗口引用
   trayManager.setMainWindow(mainWindow);

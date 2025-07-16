@@ -1,11 +1,37 @@
 <template>
     <div class="shortcut-settings">
         <NFlex vertical>
-            <NCard  size="small">
+            <!-- 权限提示 -->
+            <NCard v-if="permissionStatus && !permissionStatus.hasPermission" size="small" type="warning">
+                <NFlex vertical size="small">
+                    <NText strong style="color: #f0a020;">⚠️ {{ t('shortcuts.permissionRequired') }}</NText>
+                    <NText depth="3" style="font-size: 12px;">
+                        {{ permissionStatus.message }}
+                    </NText>
+                    <NFlex size="small">
+                        <NButton size="small" @click="openSystemPreferences">
+                            {{ t('shortcuts.openSystemPreferences') }}
+                        </NButton>
+                        <NButton size="small" @click="checkPermissions">
+                            {{ t('shortcuts.retryCheck') }}
+                        </NButton>
+                    </NFlex>
+                </NFlex>
+            </NCard>
+
+            <NCard size="small">
                 <NFlex vertical>
                     <!-- 显示界面快捷键 -->
                     <NFlex vertical size="small">
-                        <NText strong>{{ t('shortcuts.showInterface') }}</NText>
+                        <NFlex align="center" size="small">
+                            <NText strong>{{ t('shortcuts.showInterface') }}</NText>
+                            <NText v-if="permissionStatus?.hasPermission" depth="3" style="font-size: 12px; color: #18a058;">
+                                ✓ {{ t('shortcuts.registered') }}
+                            </NText>
+                            <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
+                                ✗ {{ t('shortcuts.notRegistered') }}
+                            </NText>
+                        </NFlex>
                         <NText depth="3" style="font-size: 12px;">
                             {{ t('shortcuts.showInterfaceDesc') }}
                         </NText>
@@ -16,7 +42,15 @@
 
                     <!-- 插入数据快捷键 -->
                     <NFlex vertical size="small">
-                        <NText strong>{{ t('shortcuts.insertData') }}</NText>
+                        <NFlex align="center" size="small">
+                            <NText strong>{{ t('shortcuts.insertData') }}</NText>
+                            <NText v-if="permissionStatus?.hasPermission" depth="3" style="font-size: 12px; color: #18a058;">
+                                ✓ {{ t('shortcuts.registered') }}
+                            </NText>
+                            <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
+                                ✗ {{ t('shortcuts.notRegistered') }}
+                            </NText>
+                        </NFlex>
                         <NText depth="3" style="font-size: 12px;">
                             {{ t('shortcuts.insertDataDesc') }}
                         </NText>
@@ -24,8 +58,6 @@
                             @click="startCaptureShortcut('insertData')"
                             :class="{ 'capturing': capturingType === 'insertData' }" />
                     </NFlex>
-
-
 
                     <!-- 操作按钮 -->
                     <NFlex size="small">
@@ -73,6 +105,24 @@ const showInterfaceShortcut = ref('Ctrl+Shift+G');
 const insertDataShortcut = ref('Ctrl+Shift+I');
 const saving = ref(false);
 
+// 从用户设置加载快捷键
+const loadShortcutsFromSettings = async () => {
+  try {
+    const prefs = await window.electronAPI.preferences.get();
+    if (prefs.shortcuts) {
+      // 根据平台显示正确的快捷键格式
+      const isMac = navigator.platform.includes('Mac');
+      const defaultShowKey = isMac ? 'Cmd+Shift+G' : 'Ctrl+Shift+G';
+      const defaultInsertKey = isMac ? 'Cmd+Shift+I' : 'Ctrl+Shift+I';
+      
+      showInterfaceShortcut.value = prefs.shortcuts.showInterface?.key || defaultShowKey;
+      insertDataShortcut.value = prefs.shortcuts.insertData?.key || defaultInsertKey;
+    }
+  } catch (error) {
+    console.error('加载快捷键设置失败:', error);
+  }
+};
+
 // 快捷键捕获相关
 const capturingType = ref<'showInterface' | 'insertData' | null>(null);
 const capturingShortcut = ref('');
@@ -87,7 +137,16 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
     const modifiers: string[] = [];
 
-    if (event.ctrlKey || event.metaKey) modifiers.push('Ctrl');
+    // 根据平台处理修饰键
+    const isMac = navigator.platform.includes('Mac');
+    
+    if (isMac) {
+        if (event.metaKey) modifiers.push('Cmd');
+        if (event.ctrlKey) modifiers.push('Ctrl');
+    } else {
+        if (event.ctrlKey || event.metaKey) modifiers.push('Ctrl');
+    }
+    
     if (event.shiftKey) modifiers.push('Shift');
     if (event.altKey) modifiers.push('Alt');
 
@@ -158,7 +217,7 @@ const startCaptureShortcut = (type: 'showInterface' | 'insertData') => {
 };
 
 // 确认快捷键
-const confirmCapture = () => {
+const confirmCapture = async () => {
     if (!capturingShortcut.value) return;
 
     if (capturingType.value === 'showInterface') {
@@ -168,6 +227,9 @@ const confirmCapture = () => {
     }
 
     cancelCapture();
+    
+    // 自动保存快捷键设置
+    await saveShortcuts();
 };
 
 // 取消捕获
@@ -181,12 +243,101 @@ const cancelCapture = () => {
     document.removeEventListener('keyup', handleKeyUp, true);
 };
 
-// 重置快捷键
-const resetShortcuts = () => {
-    showInterfaceShortcut.value = 'Ctrl+Shift+G';
-    insertDataShortcut.value = 'Ctrl+Shift+I';
-    message.success(t('shortcuts.resetSuccess'));
+// 保存快捷键设置
+const saveShortcuts = async () => {
+  saving.value = true;
+  try {
+    const prefs = await window.electronAPI.preferences.get();
+    
+    // 更新快捷键设置
+    const updatedPrefs = {
+      ...prefs,
+      shortcuts: {
+        ...prefs.shortcuts,
+        showInterface: {
+          key: showInterfaceShortcut.value,
+          description: t('shortcuts.showInterface'),
+          enabled: true,
+          type: 'show-interface'
+        },
+        insertData: {
+          key: insertDataShortcut.value,
+          description: t('shortcuts.insertData'),
+          enabled: true,
+          type: 'insert-data'
+        },
+        promptTriggers: prefs.shortcuts?.promptTriggers || []
+      }
+    };
+    
+    // 保存设置
+    await window.electronAPI.preferences.set(updatedPrefs);
+    
+    // 通知主进程重新注册快捷键
+    await window.electronAPI.shortcuts.reregister();
+    
+    message.success(t('shortcuts.saveSuccess'));
+  } catch (error) {
+    console.error('保存快捷键设置失败:', error);
+    message.error(t('shortcuts.saveError'));
+  } finally {
+    saving.value = false;
+  }
 };
+
+// 重置快捷键
+const resetShortcuts = async () => {
+  try {
+    // 根据平台设置正确的默认快捷键
+    const isMac = navigator.platform.includes('Mac');
+    const defaultShowKey = isMac ? 'Cmd+Shift+G' : 'Ctrl+Shift+G';
+    const defaultInsertKey = isMac ? 'Cmd+Shift+I' : 'Ctrl+Shift+I';
+    
+    showInterfaceShortcut.value = defaultShowKey;
+    insertDataShortcut.value = defaultInsertKey;
+    
+    // 保存重置的设置
+    await saveShortcuts();
+    
+    message.success(t('shortcuts.resetSuccess'));
+  } catch (error) {
+    console.error('重置快捷键失败:', error);
+    message.error(t('shortcuts.resetError'));
+  }
+};
+
+// 权限状态
+const permissionStatus = ref<{ hasPermission: boolean; message?: string } | null>(null);
+
+// 检查权限
+const checkPermissions = async () => {
+  try {
+    const result = await window.electronAPI.shortcuts.checkPermissions();
+    permissionStatus.value = result;
+    
+    if (!result.hasPermission) {
+      message.warning(result.message || '需要辅助功能权限');
+    } else {
+      // 如果权限检查通过，重新注册快捷键
+      await window.electronAPI.shortcuts.reregister();
+      message.success('快捷键已重新注册');
+    }
+  } catch (error) {
+    console.error('检查权限失败:', error);
+    permissionStatus.value = { hasPermission: false, message: '检查权限时发生错误' };
+  }
+};
+
+// 打开系统偏好设置
+const openSystemPreferences = () => {
+  window.electronAPI.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+};
+
+// 组件挂载时加载设置和检查权限
+onMounted(async () => {
+  await loadShortcutsFromSettings();
+  await checkPermissions();
+});
 
 // 组件卸载时清理事件监听
 onUnmounted(() => {

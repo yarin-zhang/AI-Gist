@@ -124,11 +124,26 @@ export interface ShortcutsAPI {
   // 注册默认快捷键
   registerDefaults: () => Promise<{ success: boolean; error?: string }>;
   
+  // 重新注册快捷键
+  reregister: () => Promise<{ success: boolean; error?: string }>;
+  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => Promise<boolean>;
   
+  // 检查快捷键是否可用
+  isAvailable: (accelerator: string) => Promise<boolean>;
+  
+  // 获取已注册的快捷键列表
+  getRegistered: () => Promise<string[]>;
+  
+  // 检查权限并尝试注册快捷键
+  checkPermissions: () => Promise<{ hasPermission: boolean; message?: string }>;
+  
   // 监听快捷键事件
   onInsertData: (callback: () => void) => () => void;
+  
+  // 监听提示词触发器事件
+  onTriggerPrompt: (callback: (promptId: number) => void) => () => void;
 }
 
 /**

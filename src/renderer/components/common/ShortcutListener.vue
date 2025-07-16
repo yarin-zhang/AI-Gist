@@ -12,14 +12,24 @@ const { t } = useI18n();
 let cleanupInsertData: (() => void) | null = null;
 
 onMounted(() => {
-  // 注册默认快捷键
-  window.electronAPI.shortcuts.registerDefaults();
-  
   // 监听插入数据快捷键
   cleanupInsertData = window.electronAPI.shortcuts.onInsertData(() => {
     console.log('快捷键触发：插入数据');
     // 这里可以添加插入预设数据的逻辑
   });
+  
+  // 监听提示词触发器快捷键
+  const cleanupTriggerPrompt = window.electronAPI.shortcuts.onTriggerPrompt((promptId: number) => {
+    console.log(`快捷键触发：提示词触发器 ${promptId}`);
+    // 这里可以添加触发特定提示词的逻辑
+  });
+  
+  // 保存清理函数
+  return () => {
+    if (cleanupTriggerPrompt) {
+      cleanupTriggerPrompt();
+    }
+  };
 });
 
 onUnmounted(() => {

@@ -763,7 +763,14 @@
     "inputShortcut": "输入快捷键",
     "pressShortcut": "请按下您想要的快捷键组合",
     "waitingInput": "等待输入...",
-    "modifierKeys": "支持 Ctrl、Shift、Alt、Cmd 等修饰键"
+    "modifierKeys": "支持 Ctrl、Shift、Alt、Cmd 等修饰键",
+    "saveError": "保存快捷键设置失败",
+    "resetError": "重置快捷键设置失败",
+    "permissionRequired": "需要辅助功能权限",
+    "openSystemPreferences": "打开系统偏好设置",
+    "retryCheck": "重新检查",
+    "registered": "已注册",
+    "notRegistered": "未注册"
   },
   "startup": {
     "autoStart": "开机自动启动",

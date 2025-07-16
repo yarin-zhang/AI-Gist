@@ -258,11 +258,40 @@ class IpcHandlers {
       }
     });
 
-
+    // 重新注册快捷键（当用户设置更改时）
+    ipcMain.handle('shortcuts:reregister', async () => {
+      try {
+        await ShortcutManager.getInstance().reregisterShortcuts();
+        return { success: true };
+      } catch (error) {
+        console.error('重新注册快捷键失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
 
     // 检查快捷键是否已注册
     ipcMain.handle('shortcuts:is-registered', (_, accelerator: string) => {
       return ShortcutManager.getInstance().isRegistered(accelerator);
+    });
+
+    // 检查快捷键是否可用
+    ipcMain.handle('shortcuts:is-available', (_, accelerator: string) => {
+      return ShortcutManager.getInstance().isShortcutAvailable(accelerator);
+    });
+
+    // 获取已注册的快捷键列表
+    ipcMain.handle('shortcuts:get-registered', () => {
+      return ShortcutManager.getInstance().getRegisteredShortcuts();
+    });
+
+    // 检查权限并尝试注册快捷键
+    ipcMain.handle('shortcuts:check-permissions', async () => {
+      try {
+        return await ShortcutManager.getInstance().checkPermissionsAndRegister();
+      } catch (error) {
+        console.error('检查快捷键权限失败:', error);
+        return { hasPermission: false, message: '检查权限时发生错误' };
+      }
     });
   }
 
