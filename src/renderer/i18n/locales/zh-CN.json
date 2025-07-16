@@ -753,7 +753,7 @@
     "save": "保存设置",
     "saveFailed": "保存快捷键设置失败",
     "saveSuccess": "快捷键设置保存成功",
-    "showInterface": "显示界面",
+    "showInterface": "切换界面",
     "showInterfaceDesc": "快速显示或隐藏应用界面",
     "title": "快捷键设置",
     "clickToInput": "点击输入快捷键",
@@ -770,7 +770,16 @@
     "openSystemPreferences": "打开系统偏好设置",
     "retryCheck": "重新检查",
     "registered": "已注册",
-    "notRegistered": "未注册"
+    "notRegistered": "未注册",
+    "selectPrompt": "选择插入的提示词",
+    "selectPromptPlaceholder": "请选择要插入的提示词",
+    "selectPromptDesc": "选择按下快捷键时要插入的提示词内容",
+    "selectedPromptPreview": "选中的提示词预览",
+    "loadPromptsError": "加载提示词列表失败",
+    "refreshPrompts": "刷新",
+    "noPromptsAvailable": "暂无可用的提示词",
+    "noPromptsMessage": "您还没有创建任何提示词。请先在提示词管理页面创建一些提示词。",
+    "testApi": "测试"
   },
   "startup": {
     "autoStart": "开机自动启动",

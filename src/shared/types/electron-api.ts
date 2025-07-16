@@ -140,7 +140,7 @@ export interface ShortcutsAPI {
   checkPermissions: () => Promise<{ hasPermission: boolean; message?: string }>;
   
   // 监听快捷键事件
-  onInsertData: (callback: () => void) => () => void;
+  onInsertData: (callback: (promptId?: number) => void) => () => void;
   
   // 监听提示词触发器事件
   onTriggerPrompt: (callback: (promptId: number) => void) => () => void;

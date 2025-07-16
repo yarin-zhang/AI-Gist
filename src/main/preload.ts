@@ -21,8 +21,8 @@ const shortcutsAPI = {
   checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
   
   // 监听快捷键事件
-  onInsertData: (callback: () => void) => {
-    ipcRenderer.on('shortcut:insert-data', callback);
+  onInsertData: (callback: (promptId?: number) => void) => {
+    ipcRenderer.on('shortcut:insert-data', (_, promptId?: number) => callback(promptId));
     return () => ipcRenderer.removeAllListeners('shortcut:insert-data');
   },
   

@@ -21,6 +21,8 @@ export interface ShortcutConfig {
   type: 'show-interface' | 'insert-data' | 'prompt-trigger';
   /** 关联的提示词ID（仅用于prompt-trigger类型） */
   promptId?: number;
+  /** 选择的提示词ID（仅用于insert-data类型） */
+  selectedPromptId?: number;
 }
 
 /**

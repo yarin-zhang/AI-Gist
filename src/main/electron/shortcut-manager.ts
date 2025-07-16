@@ -128,8 +128,8 @@ export class ShortcutManager {
     if (shortcuts.showInterface?.enabled) {
       const accelerator = this.convertShortcutFormat(shortcuts.showInterface.key);
       const success = this.registerShortcut(accelerator, () => {
-        console.log('快捷键触发：显示界面');
-        this.showMainWindow();
+        console.log('快捷键触发：切换界面显示');
+        this.toggleMainWindow();
       });
       console.log(`显示界面快捷键注册结果: ${success ? '成功' : '失败'} (${accelerator})`);
     }
@@ -168,8 +168,8 @@ export class ShortcutManager {
     // 注册显示界面的快捷键
     const showInterfaceAccelerator = process.platform === 'darwin' ? 'Cmd+Shift+G' : 'Ctrl+Shift+G';
     const showInterfaceSuccess = this.registerShortcut(showInterfaceAccelerator, () => {
-      console.log('快捷键触发：显示界面');
-      this.showMainWindow();
+      console.log('快捷键触发：切换界面显示');
+      this.toggleMainWindow();
     });
 
     // 注册插入数据的快捷键
@@ -207,25 +207,30 @@ export class ShortcutManager {
   }
 
   /**
-   * 显示主窗口
+   * 切换主窗口显示/隐藏状态
    */
-  private showMainWindow(): void {
+  private toggleMainWindow(): void {
     if (!this.mainWindow) {
       const windows = BrowserWindow.getAllWindows();
       this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
     }
     
     if (this.mainWindow) {
-      console.log('显示主窗口');
-      if (this.mainWindow.isMinimized()) {
-        this.mainWindow.restore();
-      }
-      this.mainWindow.show();
-      this.mainWindow.focus();
-      
-      // 在 macOS 下，确保应用出现在前台
-      if (process.platform === 'darwin') {
-        app.focus({ steal: true });
+      if (this.mainWindow.isVisible()) {
+        console.log('隐藏主窗口');
+        this.mainWindow.hide();
+      } else {
+        console.log('显示主窗口');
+        if (this.mainWindow.isMinimized()) {
+          this.mainWindow.restore();
+        }
+        this.mainWindow.show();
+        this.mainWindow.focus();
+        
+        // 在 macOS 下，确保应用出现在前台
+        if (process.platform === 'darwin') {
+          app.focus({ steal: true });
+        }
       }
     } else {
       console.error('找不到主窗口');
@@ -235,7 +240,7 @@ export class ShortcutManager {
   /**
    * 插入数据
    */
-  private insertData(): void {
+  private async insertData(): Promise<void> {
     if (!this.mainWindow) {
       const windows = BrowserWindow.getAllWindows();
       this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
@@ -243,7 +248,18 @@ export class ShortcutManager {
     
     if (this.mainWindow) {
       console.log('发送插入数据事件');
-      this.mainWindow.webContents.send('shortcut:insert-data');
+      
+      // 获取用户设置的提示词ID
+      const userPrefs = preferencesManager.getPreferences();
+      const selectedPromptId = userPrefs.shortcuts?.insertData?.selectedPromptId;
+      
+      this.mainWindow.webContents.send('shortcut:insert-data', selectedPromptId);
+      
+      // 确保窗口可见
+      if (!this.mainWindow.isVisible()) {
+        this.mainWindow.show();
+        this.mainWindow.focus();
+      }
     } else {
       console.error('找不到主窗口，无法发送插入数据事件');
     }

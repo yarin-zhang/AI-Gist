@@ -5,37 +5,40 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { useI18n } from '@/composables/useI18n';
+import { useShortcutInsert } from '@/composables/useShortcutInsert';
 
 const { t } = useI18n();
+const { insertPrompt } = useShortcutInsert();
 
 // 清理函数引用
 let cleanupInsertData: (() => void) | null = null;
+let cleanupTriggerPrompt: (() => void) | null = null;
 
 onMounted(() => {
   // 监听插入数据快捷键
-  cleanupInsertData = window.electronAPI.shortcuts.onInsertData(() => {
-    console.log('快捷键触发：插入数据');
-    // 这里可以添加插入预设数据的逻辑
+  cleanupInsertData = window.electronAPI.shortcuts.onInsertData(async (promptId?: number) => {
+    console.log('快捷键触发：插入数据', promptId);
+    
+    if (promptId) {
+      console.log(`插入提示词ID: ${promptId}`);
+      await insertPrompt(promptId);
+    }
   });
   
   // 监听提示词触发器快捷键
-  const cleanupTriggerPrompt = window.electronAPI.shortcuts.onTriggerPrompt((promptId: number) => {
+  cleanupTriggerPrompt = window.electronAPI.shortcuts.onTriggerPrompt(async (promptId: number) => {
     console.log(`快捷键触发：提示词触发器 ${promptId}`);
-    // 这里可以添加触发特定提示词的逻辑
+    await insertPrompt(promptId);
   });
-  
-  // 保存清理函数
-  return () => {
-    if (cleanupTriggerPrompt) {
-      cleanupTriggerPrompt();
-    }
-  };
 });
 
 onUnmounted(() => {
   // 清理事件监听器
   if (cleanupInsertData) {
     cleanupInsertData();
+  }
+  if (cleanupTriggerPrompt) {
+    cleanupTriggerPrompt();
   }
 });
 </script> 

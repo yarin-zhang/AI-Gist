@@ -57,6 +57,57 @@
                         <NInput v-model:value="insertDataShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
                             @click="startCaptureShortcut('insertData')"
                             :class="{ 'capturing': capturingType === 'insertData' }" />
+                        
+                        <!-- 选择插入的提示词 -->
+                        <NFlex vertical size="small">
+                            <NFlex align="center" size="small">
+                                <NText strong>{{ t('shortcuts.selectPrompt') }}</NText>
+                                <NButton 
+                                    size="tiny" 
+                                    type="primary" 
+                                    ghost
+                                    @click="loadPromptOptions" 
+                                    :loading="loadingPrompts"
+                                    style="margin-left: 8px;">
+                                    <template #icon>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                                            <path d="M21 3v5h-5"></path>
+                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                                            <path d="M3 21v-5h5"></path>
+                                        </svg>
+                                    </template>
+                                    {{ t('shortcuts.refreshPrompts') }}
+                                </NButton>
+                            </NFlex>
+                            <NText depth="3" style="font-size: 12px;">
+                                {{ t('shortcuts.selectPromptDesc') }}
+                            </NText>
+                            <NSelect 
+                                v-model:value="selectedPromptId" 
+                                :options="promptOptions"
+                                :placeholder="promptOptions.length === 0 ? t('shortcuts.noPromptsAvailable') : t('shortcuts.selectPromptPlaceholder')"
+                                @update:value="onPromptSelected"
+                                filterable
+                                remote
+                                :loading="loadingPrompts"
+                                clearable />
+                            
+                            <!-- 空状态提示 -->
+                            <div v-if="!loadingPrompts && promptOptions.length === 0" style="margin-top: 8px; padding: 12px; background: var(--n-color); border-radius: 4px; text-align: center;">
+                                <NText depth="3" style="font-size: 12px;">
+                                    {{ t('shortcuts.noPromptsMessage') }}
+                                </NText>
+                            </div>
+                            
+                            <!-- 显示选中的提示词预览 -->
+                            <div v-if="selectedPromptPreview" style="margin-top: 8px; padding: 8px; background: var(--n-color); border-radius: 4px;">
+                                <NText strong style="font-size: 12px;">{{ t('shortcuts.selectedPromptPreview') }}</NText>
+                                <NText depth="3" style="font-size: 11px; display: block; margin-top: 4px; white-space: pre-wrap; max-height: 60px; overflow: hidden;">
+                                    {{ selectedPromptPreview }}
+                                </NText>
+                            </div>
+                        </NFlex>
                     </NFlex>
 
                     <!-- 操作按钮 -->
@@ -94,7 +145,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { NModal, NCard, NText, NButton, NFlex, NInput, NSwitch, NEmpty, useMessage } from 'naive-ui';
+import { NModal, NCard, NText, NButton, NFlex, NInput, NSelect, useMessage } from 'naive-ui';
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const { t } = useI18n();
@@ -104,6 +155,10 @@ const message = useMessage();
 const showInterfaceShortcut = ref('Ctrl+Shift+G');
 const insertDataShortcut = ref('Ctrl+Shift+I');
 const saving = ref(false);
+const selectedPromptId = ref<number | null>(null);
+const promptOptions = ref<Array<{ label: string; value: number }>>([]);
+const loadingPrompts = ref(false);
+const selectedPromptPreview = ref<string>('');
 
 // 从用户设置加载快捷键
 const loadShortcutsFromSettings = async () => {
@@ -117,6 +172,20 @@ const loadShortcutsFromSettings = async () => {
       
       showInterfaceShortcut.value = prefs.shortcuts.showInterface?.key || defaultShowKey;
       insertDataShortcut.value = prefs.shortcuts.insertData?.key || defaultInsertKey;
+      selectedPromptId.value = prefs.shortcuts.insertData?.selectedPromptId || null;
+      
+      // 加载选中提示词的预览
+      if (selectedPromptId.value) {
+        try {
+          const { apiClientManager } = await import('@/lib/api');
+          const prompt = await apiClientManager.prompt.prompts.getById.query(selectedPromptId.value);
+          if (prompt) {
+            selectedPromptPreview.value = prompt.content;
+          }
+        } catch (error) {
+          console.error('加载提示词预览失败:', error);
+        }
+      }
     }
   } catch (error) {
     console.error('加载快捷键设置失败:', error);
@@ -264,7 +333,8 @@ const saveShortcuts = async () => {
           key: insertDataShortcut.value,
           description: t('shortcuts.insertData'),
           enabled: true,
-          type: 'insert-data'
+          type: 'insert-data',
+          selectedPromptId: selectedPromptId.value
         },
         promptTriggers: prefs.shortcuts?.promptTriggers || []
       }
@@ -333,9 +403,77 @@ const openSystemPreferences = () => {
   window.electronAPI.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
 };
 
+// 加载提示词列表
+const loadPromptOptions = async () => {
+  try {
+    loadingPrompts.value = true;
+    console.log('开始加载提示词列表...');
+    
+    // 使用API获取提示词列表
+    const { apiClientManager } = await import('@/lib/api');
+    console.log('API客户端管理器加载成功');
+    
+    // 尝试使用 getAllForTags 方法，它返回直接的数组
+    const prompts = await apiClientManager.prompt.prompts.getAllForTags.query();
+    console.log('获取到的提示词数据:', prompts);
+    
+    if (prompts && Array.isArray(prompts)) {
+      promptOptions.value = prompts
+        .filter(prompt => prompt.id !== undefined)
+        .map(prompt => ({
+          label: `${prompt.title || prompt.content.substring(0, 30)} [${prompt.category?.name || '未分类'}]`,
+          value: prompt.id!,
+          // 添加更多信息用于显示
+          content: prompt.content,
+          category: prompt.category?.name || '未分类'
+        }));
+      console.log('处理后的提示词选项:', promptOptions.value);
+    } else {
+      console.warn('未获取到提示词数据或数据格式不正确:', prompts);
+      promptOptions.value = [];
+    }
+  } catch (error) {
+    console.error('加载提示词列表失败:', error);
+    message.error(t('shortcuts.loadPromptsError'));
+    // 如果API调用失败，使用空列表
+    promptOptions.value = [];
+  } finally {
+    loadingPrompts.value = false;
+  }
+};
+
+// 处理提示词选择
+const onPromptSelected = async (promptId: number | null) => {
+  selectedPromptId.value = promptId;
+  
+  // 更新预览
+  if (promptId) {
+    try {
+      const { apiClientManager } = await import('@/lib/api');
+      const prompt = await apiClientManager.prompt.prompts.getById.query(promptId);
+      if (prompt) {
+        selectedPromptPreview.value = prompt.content;
+      } else {
+        selectedPromptPreview.value = '';
+      }
+    } catch (error) {
+      console.error('获取提示词详情失败:', error);
+      selectedPromptPreview.value = '';
+    }
+  } else {
+    selectedPromptPreview.value = '';
+  }
+  
+  // 保存选择的提示词ID到设置中
+  await saveShortcuts();
+};
+
+
+
 // 组件挂载时加载设置和检查权限
 onMounted(async () => {
   await loadShortcutsFromSettings();
+  await loadPromptOptions();
   await checkPermissions();
 });
 
