@@ -272,6 +272,11 @@
     },
     "title": "AI Gist"
   },
+  "prompt": {
+    "shortcutTriggerDisabled": "ショートカットキー挿入関数は無効になっています",
+    "shortcutTriggerEnabled": "ショートカットキー挿入関数が有効になっています",
+    "shortcutTriggerToggleError": "ショートカットキー挿入関数の切り替えに失敗しました"
+  },
   "promptManagement": {
     "addFirstVariable": "最初の変数を追加します",
     "addVariable": "手動追加",
@@ -290,6 +295,7 @@
     "batchDeleteSuccess": "{count}個のプロンプトを正常に削除",
     "cancelAdjustment": "キャンセル",
     "cancelSelection": "選択をキャンセル",
+    "cancelShortcutTrigger": "ショートカットキートリガーをキャンセルします",
     "categories": "カテゴリ",
     "category": "カテゴリ",
     "categoryAndTags": "カテゴリとタグ",
@@ -310,11 +316,8 @@
     "categoryUpdatedSuccess": "カテゴリ更新成功",
     "changeDescription": "変更説明",
     "changeDescriptionPlaceholder": "変更説明を入力してください",
-    "changeDescriptionSaved": "変更説明が保存されました",
     "changeDescriptionSaveFailed": "変更説明の保存に失敗しました",
-    "historyNotFound": "履歴レコードが見つかりません",
-    "historyChangeDescription": "変更記録説明",
-    "historyTitle": "タイトル",
+    "changeDescriptionSaved": "変更説明が保存されました",
     "characters": "文字",
     "collapse": "折りたたむ",
     "color": "色",
@@ -429,8 +432,11 @@
     "generatedChars": "{count}文字生成",
     "generating": "生成中...",
     "history": "履歴",
+    "historyChangeDescription": "変更記録説明",
     "historyDescription": "バージョン履歴を表示・ロールバック",
+    "historyNotFound": "履歴レコードが見つかりません",
     "historyPreviewDesc": "履歴バージョンの詳細を表示でき、確認後にこのバージョンにロールバックできます",
+    "historyTitle": "タイトル",
     "historyVersionPreview": "履歴バージョンプレビュー - バージョン{version}",
     "incompleteDataError": "プロンプトデータが不完全で、編集できません",
     "info": "補足情報",
@@ -490,8 +496,8 @@
     "loadPromptsFailed": "プロンプトの読み込みに失敗",
     "loadStatisticsFailed": "統計の読み込みに失敗",
     "loadTreeDataFailed": "ツリーデータの読み込みに失敗",
-    "loadingHistory": "履歴を読み込み中...",
     "loadedAllPrompts": "すべての{count}個のプロンプトを読み込みました",
+    "loadingHistory": "履歴を読み込み中...",
     "loadingMore": "さらに読み込み中...",
     "loopVariable": "ループ変数",
     "manualAdjustment": "手動調整",
@@ -539,6 +545,8 @@
     "selectModel": "モデルを選択してください",
     "selectVariable": "変数を選択します",
     "selectedPrompts": "{count}個のプロンプトが選択されています",
+    "setAsShortcutTrigger": "トリガーするショートカットキーとして設定します",
+    "shortcutTrigger": "ショートカットキートリガー",
     "showingResults": "{count}件表示",
     "sortBy": "並び替え",
     "sortOptions": {
@@ -573,6 +581,8 @@
     "updateFailed": "更新に失敗しました",
     "updateFavoriteFailed": "お気に入りステータスの更新に失敗しました",
     "updateFavoriteSuccess": "お気に入りステータスが更新されました",
+    "updateShortcutTriggerFailed": "ショートカットキートリガーステータスの更新失敗",
+    "updateShortcutTriggerSuccess": "ショートカットキートリガーステータスが更新されました",
     "updateSuccess": "プロンプトが正常に更新されました",
     "useCount": "{count}回使用",
     "variable": "変数",
@@ -650,6 +660,10 @@
         "description": "アプリケーションの表示言語を設定",
         "title": "言語設定"
       },
+      "shortcuts": {
+        "description": "グローバルショートカットキーとプロンプトワードショートカットキーを構成します",
+        "title": "ショートカットキー設定"
+      },
       "startup-behavior": {
         "description": "アプリケーションの起動と自動起動オプションを設定",
         "title": "起動時の動作設定"
@@ -662,6 +676,7 @@
       "cloudBackup": "クラウドバックアップ",
       "dataManagement": "データ管理",
       "laboratory": "研究室",
+      "shortcuts": "ショートカットキー設定",
       "startup": "起動時の動作設定"
     },
     "settingsMenu": "設定メニュー",
@@ -716,6 +731,24 @@
     "settingsUpdated": "設定が正常に更新されました：",
     "startDeleteBackup": "バックアップの削除を開始：{backupId}",
     "stillMissingStores": "まだ不足しているオブジェクトストア："
+  },
+  "shortcuts": {
+    "description": "グローバルショートカットキーと迅速な単語ショートカットキーを構成して、作業効率を向上させる",
+    "duplicateKeys": "繰り返しショートカットのキーの組み合わせが検出されました。チェックしてもう一度お試しください",
+    "enterShortcut": "入力ボックスをクリックして、ショートカットキーを押します",
+    "insertData": "データを挿入します",
+    "insertDataDesc": "プリセットデータを入力ボックスに挿入します",
+    "noPromptTriggers": "迅速な単語ショートカットキーはありません",
+    "promptTriggerDesc": "入力ボックスをクリックして、ショートカットキーの組み合わせを押して設定します",
+    "promptTriggersDesc": "一般的に使用される迅速な単語のショートカットキーを設定します。これは、トリガー時に入力ボックスに自動的に挿入されます",
+    "resetSuccess": "ショートカットキー設定はデフォルトに復元されています",
+    "resetToDefault": "デフォルトを復元します",
+    "save": "設定を保存します",
+    "saveFailed": "ショートカットキー設定を保存しました",
+    "saveSuccess": "ショートカットキー設定は正常に保存されます",
+    "showInterface": "インターフェイスを表示します",
+    "showInterfaceDesc": "アプリケーションインターフェイスをすばやく表示または非表示にします",
+    "title": "ショートカットキー設定"
   },
   "startup": {
     "autoStart": "自動起動",

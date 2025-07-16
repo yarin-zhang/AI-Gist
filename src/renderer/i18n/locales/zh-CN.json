@@ -226,6 +226,10 @@
       "重置数据库到初始状态",
       "此操作不可撤销"
     ],
+    "clearDatabaseWarningItems[0]": "自动创建当前数据的备份",
+    "clearDatabaseWarningItems[1]": "删除所有现有数据",
+    "clearDatabaseWarningItems[2]": "重置数据库到初始状态",
+    "clearDatabaseWarningItems[3]": "此操作不可撤销",
     "clearDatabaseWarningText": "清空数据库将会：",
     "confirmClearDatabase": "确定要清空整个数据库吗？",
     "confirmDeleteBackup": "确定要删除这个备份吗？",
@@ -678,6 +682,7 @@
       "cloudBackup": "云端备份",
       "dataManagement": "数据管理",
       "laboratory": "实验室",
+      "shortcuts": "快捷键设置",
       "startup": "启动行为设置"
     },
     "settingsMenu": "设置菜单",
