@@ -320,8 +320,8 @@ export class BaseDatabaseService {
     if (typeof data === 'object') {
       const cleanedObj: any = {};
       for (const [key, value] of Object.entries(data)) {
-        // 跳过函数和undefined值
-        if (typeof value !== 'function' && value !== undefined) {
+        // 跳过函数，但保留undefined值以便正确处理空值更新
+        if (typeof value !== 'function') {
           cleanedObj[key] = this.cleanDataForStorage(value);
         }
       }
