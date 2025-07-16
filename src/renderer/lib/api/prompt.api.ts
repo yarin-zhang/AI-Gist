@@ -104,6 +104,20 @@ export class PromptApiClient {
     },
 
     /**
+     * 根据UUID查询提示词
+     */
+    getByUUID: {
+      /**
+       * 根据UUID获取提示词信息
+       * @param uuid 提示词UUID
+       * @returns Promise<PromptWithRelations | null> 提示词信息（包含关联数据）
+       */
+      query: async (uuid: string): Promise<PromptWithRelations | null> => {
+        return this.promptService.getPromptByUUID(uuid);
+      }
+    },
+
+    /**
      * 更新提示词
      */
     update: {
@@ -222,6 +236,33 @@ export class PromptApiClient {
        */
       mutate: async (id: number): Promise<PromptWithRelations> => {
         return this.promptService.togglePromptFavorite(id);
+      }
+    },
+
+    /**
+     * 切换快捷键触发状态
+     */
+    toggleShortcutTrigger: {
+      /**
+       * 切换提示词快捷键触发状态
+       * @param promptId 提示词UUID
+       * @returns Promise<void>
+       */
+      mutate: async (promptId: string): Promise<void> => {
+        return this.promptService.toggleShortcutTrigger(promptId);
+      }
+    },
+
+    /**
+     * 获取快捷键触发的提示词
+     */
+    getShortcutTriggers: {
+      /**
+       * 获取所有标记为快捷键触发的提示词
+       * @returns Promise<PromptWithRelations[]> 快捷键触发的提示词列表
+       */
+      query: async (): Promise<PromptWithRelations[]> => {
+        return this.promptService.getShortcutTriggerPrompts();
       }
     },
 
@@ -393,6 +434,24 @@ export class PromptApiClient {
        */
       query: async (promptId: number): Promise<number> => {
         return this.promptService.getLatestPromptHistoryVersion(promptId);
+      }
+    },
+
+    /**
+     * 更新历史记录
+     */
+    update: {
+      /**
+       * 更新历史记录信息
+       * @param input 更新数据，包含id和要更新的字段
+       * @returns Promise<PromptHistory> 更新后的历史记录
+       */
+      mutate: async (input: { 
+        id: number; 
+        data: Partial<Omit<PromptHistory, 'id' | 'uuid' | 'promptId' | 'version' | 'createdAt'>>
+      }): Promise<PromptHistory> => {
+        const { id, data } = input;
+        return this.promptService.updatePromptHistory(id, data);
       }
     }
   };

@@ -8,6 +8,26 @@
 export type SupportedLocale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP';
 
 /**
+ * 快捷键配置
+ */
+export interface ShortcutConfig {
+  /** 快捷键组合，如 "Ctrl+Shift+G" */
+  key: string;
+  /** 快捷键描述 */
+  description: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 快捷键类型 */
+  type: 'show-interface' | 'copy-prompt' | 'prompt-trigger';
+  /** 关联的提示词ID（仅用于prompt-trigger类型） */
+  promptId?: number;
+  /** 选择的提示词ID（仅用于copy-prompt类型） */
+  selectedPromptId?: number;
+  /** 选择的提示词UUID（用于数据同步和备份） */
+  selectedPromptUUID?: string;
+}
+
+/**
  * 用户偏好设置
  */
 export interface UserPreferences {
@@ -35,6 +55,12 @@ export interface UserPreferences {
     lastSyncTime: string | null;
     autoBackup: boolean;
     backupInterval: number;
+  };
+  // 新增：快捷键配置
+  shortcuts?: {
+    showInterface: ShortcutConfig;
+    copyPrompt: ShortcutConfig;
+    promptTriggers: ShortcutConfig[];
   };
 }
 

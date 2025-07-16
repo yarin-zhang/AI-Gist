@@ -71,20 +71,20 @@ export default interface ElectronApi {
   }
 
   data: {
-    createBackup: (description?: string) => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }>
-    getBackupList: () => Promise<{ id: string; name: string; description?: string; createdAt: string; size: number; version?: string; checksum?: string }[]>
-    restoreBackup: (backupId: string) => Promise<{ success: boolean; error?: string; message?: string }>
-    restoreBackupWithReplace: (backupId: string) => Promise<{ success: boolean; error?: string; message?: string }>
-    deleteBackup: (backupId: string) => Promise<{ success: boolean; error?: string }>
-    export: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string; filePath?: string }>
-    import: (filePath: string, options: any) => Promise<{ success: boolean; error?: string; message?: string; imported?: { categories: number; prompts: number; settings: number; history: number }; errors?: string[] }>
-    exportSelected: (options: any, exportPath?: string) => Promise<{ success: boolean; error?: string; message?: string; filePath?: string }>
-    exportFullBackup: () => Promise<{ success: boolean; error?: string; message?: string; filePath?: string }>
-    importFullBackup: () => Promise<{ success: boolean; error?: string; message?: string }>
     selectImportFile: (format: string) => Promise<string | null>
     selectExportPath: (defaultName: string) => Promise<string | null>
-    getStats: () => Promise<{ categories: number; prompts: number; history: number; aiConfigs: number; settings: number; posts: number; users: number; totalRecords: number }>
-    getBackupDirectory: () => Promise<{ success: boolean; path?: string; error?: string; message?: string }>
+    writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+    readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+  }
+
+  // 文件操作
+  fs: {
+    readFile: (filePath: string) => Promise<string>
+    writeFile: (filePath: string, content: string) => Promise<{ success: boolean }>
+    ensureDir: (dirPath: string) => Promise<{ success: boolean }>
+    stat: (filePath: string) => Promise<{ size: number; mtime: Date }>
+    readdir: (dirPath: string) => Promise<string[]>
+    unlink: (filePath: string) => Promise<{ success: boolean }>
   }
 
   // 云端备份功能
@@ -104,6 +104,7 @@ export default interface ElectronApi {
   // 应用信息和更新
   app: {
     getVersion: () => Promise<string>
+    getPath: (name: string) => Promise<string>
     checkUpdates: () => Promise<{ success: boolean; data?: any; error?: string }>
     openDownloadPage: (url: string) => Promise<{ success: boolean; error?: string }>
     onUpdateAvailable: (callback: (updateInfo: any) => void) => () => void
@@ -114,6 +115,41 @@ export default interface ElectronApi {
     openPath: (path: string) => Promise<{ success: boolean; error?: string }>
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>
   }
+
+  // 快捷键管理
+  shortcuts: ShortcutsAPI
+}
+
+export interface ShortcutsAPI {
+  // 注册默认快捷键
+  registerDefaults: () => Promise<{ success: boolean; error?: string }>;
+  
+  // 重新注册快捷键
+  reregister: () => Promise<{ success: boolean; error?: string }>;
+  
+  // 临时禁用快捷键
+  temporarilyDisable: () => Promise<{ success: boolean; error?: string }>;
+  
+  // 恢复快捷键
+  restore: () => Promise<{ success: boolean; error?: string }>;
+  
+  // 检查快捷键是否已注册
+  isRegistered: (accelerator: string) => Promise<boolean>;
+  
+  // 检查快捷键是否可用
+  isAvailable: (accelerator: string) => Promise<boolean>;
+  
+  // 获取已注册的快捷键列表
+  getRegistered: () => Promise<string[]>;
+  
+  // 检查权限并尝试注册快捷键
+  checkPermissions: () => Promise<{ hasPermission: boolean; message?: string }>;
+  
+  // 监听快捷键事件
+  onInsertData: (callback: (promptId?: number) => void) => () => void;
+  
+  // 监听提示词触发器事件
+  onTriggerPrompt: (callback: (promptId: number) => void) => () => void;
 }
 
 /**

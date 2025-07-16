@@ -345,7 +345,7 @@
                                             <div>
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.title') }}</NText>
+                                                    t('promptManagement.historyTitle') }}</NText>
                                                 <NInput :value="previewHistory.title" readonly />
                                             </div>
 
@@ -361,9 +361,9 @@
                                 </NCard>
                             </template>
 
-                            <!-- 右侧：分类与标签 -->
+                            <!-- 右侧：变更记录说明 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.categoryAndTags')" size="small"
+                                <NCard :title="t('promptManagement.historyChangeDescription')" size="small"
                                     :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
@@ -387,11 +387,29 @@
                                                 </NFlex>
                                             </div>
 
-                                            <div v-if="previewHistory.changeDescription">
+                                            <div>
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
                                                     t('promptManagement.changeDescription') }}</NText>
-                                                <NInput :value="previewHistory.changeDescription" readonly />
+                                                <NFlex align="center" size="small">
+                                                    <NInput 
+                                                        v-model:value="editingChangeDescription" 
+                                                        :placeholder="t('promptManagement.changeDescriptionPlaceholder')"
+                                                        style="flex: 1;"
+                                                        :disabled="savingChangeDescription" />
+                                                    <NButton 
+                                                        size="small" 
+                                                        type="primary"
+                                                        :loading="savingChangeDescription"
+                                                        @click="saveChangeDescription">
+                                                        {{ t('common.save') }}
+                                                    </NButton>
+                                                    <NButton 
+                                                        size="small" 
+                                                        @click="cancelEditChangeDescription">
+                                                        {{ t('common.cancel') }}
+                                                    </NButton>
+                                                </NFlex>
                                             </div>
                                         </NFlex>
                                     </NScrollbar>
@@ -498,6 +516,10 @@ const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
 const previewHistory = ref<PromptHistory | null>(null);
 const isInitializing = ref(false); // 防止递归更新的标志
+
+// 编辑变更说明相关状态
+const editingChangeDescription = ref("");
+const savingChangeDescription = ref(false);
 
 // 优化相关状态
 const optimizing = ref<string | null>(null);
@@ -1167,6 +1189,7 @@ const getPreviewVariables = (variables: string | any[] | undefined) => {
 // 预览历史版本
 const openPreviewHistory = (history: PromptHistory) => {
     previewHistory.value = history;
+    editingChangeDescription.value = history.changeDescription || "";
     showPreviewModal.value = true;
 };
 
@@ -1224,6 +1247,53 @@ const getCategoryName = (categoryId: any) => {
     if (!categoryId) return t('promptManagement.noCategory');
     const category = props.categories.find((cat) => cat.id === categoryId);
     return category?.name || t('promptManagement.unknownCategory');
+};
+
+// 保存变更说明
+const saveChangeDescription = async () => {
+    if (!previewHistory.value?.id) {
+        message.error(t('promptManagement.historyNotFound'));
+        return;
+    }
+
+    try {
+        savingChangeDescription.value = true;
+        
+        const result = await api.promptHistories.update.mutate({
+            id: previewHistory.value.id,
+            data: {
+                changeDescription: editingChangeDescription.value.trim()
+            }
+        });
+
+        // 更新本地数据
+        if (previewHistory.value) {
+            previewHistory.value.changeDescription = editingChangeDescription.value.trim();
+        }
+
+        // 更新历史记录列表中的对应项
+        const historyIndex = historyList.value.findIndex(h => h.id === previewHistory.value?.id);
+        if (historyIndex !== -1) {
+            historyList.value[historyIndex].changeDescription = editingChangeDescription.value.trim();
+        }
+
+        message.success(t('promptManagement.changeDescriptionSaved'));
+        
+        // 重新加载历史记录以确保数据同步
+        if (isEdit.value && props.prompt?.id) {
+            await loadHistory();
+        }
+    } catch (error) {
+        console.error('保存变更说明失败:', error);
+        message.error(t('promptManagement.changeDescriptionSaveFailed'));
+    } finally {
+        savingChangeDescription.value = false;
+    }
+};
+
+// 取消编辑变更说明
+const cancelEditChangeDescription = () => {
+    editingChangeDescription.value = previewHistory.value?.changeDescription || "";
 };
 
 // 变量提取方法现在由子组件处理，这里只保留基础逻辑
@@ -1323,6 +1393,13 @@ watch(
                     loadHistory();
                 }
             });
+            
+            // 如果当前tab是历史记录，确保历史记录已加载
+            if (activeTab.value === 'history') {
+                nextTick(() => {
+                    loadHistory();
+                });
+            }
         } else {
             // 没有 prompt 数据，重置为新建模式
             resetForm();
@@ -1360,13 +1437,16 @@ watch(
             // 弹窗从隐藏变为显示时
             activeTab.value = "edit";
 
-
-
             // 使用 nextTick 确保 props.prompt 已经正确传递
             nextTick(() => {
                 // 只有在确实没有 prompt 且不是编辑模式时才重置表单
                 if (!props.prompt && !isEdit.value) {
                     resetForm();
+                }
+                
+                // 如果当前tab是历史记录且是编辑模式，立即加载历史记录
+                if (activeTab.value === 'history' && isEdit.value && props.prompt?.id) {
+                    loadHistory();
                 }
             });
         }
@@ -1392,6 +1472,19 @@ watch(
                     resetForm();
                 }
             }, 200);
+        }
+    }
+);
+
+// 监听tab切换，当切换到历史记录tab时立即加载数据
+watch(
+    () => activeTab.value,
+    (newTab) => {
+        if (newTab === 'history' && isEdit.value && props.prompt?.id) {
+            // 切换到历史记录tab时，立即加载历史记录
+            nextTick(() => {
+                loadHistory();
+            });
         }
     }
 );
@@ -1687,7 +1780,7 @@ const handleSave = async () => {
             message.success(t('promptManagement.updateSuccess'));
 
             // 重新加载历史记录
-            loadHistory();
+            await loadHistory();
         } else {
             // 新建模式：需要添加 uuid 字段
             const createData = {

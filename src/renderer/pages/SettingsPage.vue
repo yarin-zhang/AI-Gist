@@ -74,15 +74,8 @@
 
 
                         <!-- 数据管理设置 -->
-                        <DataManagementSettings ref="dataManagementRef" v-show="activeSettingKey === 'data-management'"
-                            :model-value="{ dataSync: { ...settings.dataSync } }"
-                            @update:model-value="(val: any) => { Object.assign(settings.dataSync, val.dataSync); }"
-                            @export-data="exportData" @import-data="importData" @export-selected-data="exportSelected"
-                            @export-full-backup="exportFullBackup" @import-full-backup="importFullBackup" @create-backup="createBackup"
-                            @restore-backup="restoreSpecificBackup" @delete-backup="deleteBackup"
-                            @refresh-backup-list="refreshBackupList" @check-database-health="checkDatabaseHealth"
-                            @repair-database="repairDatabase" @clear-database="clearDatabase" 
-                            @open-backup-directory="openBackupDirectory" /> 
+                        <DataManagementSettings 
+                            v-show="activeSettingKey === 'data-management'" />
                             
                         <!-- 云端备份设置 -->
                         <CloudBackupSettings v-show="activeSettingKey === 'cloud-backup'" />
@@ -128,6 +121,10 @@
                             :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
                             @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }" />
 
+                        <!-- 快捷键设置 -->
+                        <ShortcutSettings v-show="activeSettingKey === 'shortcuts'"
+                            :model-value="settings.shortcuts"
+                            @update:model-value="(val) => { settings.shortcuts = val; updateSetting(); }" />
 
                         <!-- 关于 -->
                         <AboutSettings v-show="activeSettingKey === 'about'" />
@@ -170,6 +167,7 @@ import {
     InfoCircle,
     Cloud,
     Globe,
+    Keyboard,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -178,8 +176,8 @@ import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettin
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
-import { DataManagementAPI } from "@/lib/api";
-import { databaseServiceManager } from "@/lib/services";
+import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
+
 
 // Props 定义
 interface Props {
@@ -201,8 +199,7 @@ const currentMode = import.meta.env.MODE;
 // 当前激活的设置项
 const activeSettingKey = ref(props.targetSection || 'data-management');
 
-// 组件引用
-const dataManagementRef = ref<InstanceType<typeof DataManagementSettings>>();
+
 
 // 状态管理
 const saving = ref(false);
@@ -214,6 +211,8 @@ const loading = reactive({
     healthCheck: false,
     backup: false,
     clearDatabase: false,
+    restore: false,
+    refreshBackupList: false
 });
 
 // 设置数据
@@ -228,6 +227,22 @@ const settings = reactive({
         lastSyncTime: null as string | null,
         autoBackup: true,
         backupInterval: 24, // 小时
+    },
+    // 快捷键设置
+    shortcuts: {
+        showInterface: {
+            key: 'Ctrl+Shift+G',
+            description: '显示界面',
+            enabled: true,
+            type: 'show-interface' as const
+        },
+        copyPrompt: {
+            key: 'Ctrl+Shift+Alt+C',
+            description: '复制提示词',
+            enabled: true,
+            type: 'copy-prompt' as const
+        },
+        promptTriggers: []
     },
 });
 
@@ -260,6 +275,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
         },
         {
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
+        },
+        {
             label: t('settings.sections.close'),
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
@@ -283,7 +303,7 @@ const menuOptions = computed(() => {
     return baseOptions;
 });
 
-// 当前设置区域信息
+        // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
     const section = {
@@ -293,6 +313,7 @@ const currentSectionInfo = computed(() => {
         language: Globe,
         "data-management": Database,
         "cloud-backup": Cloud,
+        shortcuts: Keyboard,
         about: InfoCircle,
         laboratory: Flask
     };
@@ -335,6 +356,13 @@ const loadSettings = async () => {
         settings.startMinimized = prefs.startMinimized || false;
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
+        
+        // 快捷键配置
+        if (prefs.shortcuts) {
+            settings.shortcuts.showInterface = prefs.shortcuts.showInterface || settings.shortcuts.showInterface;
+            settings.shortcuts.copyPrompt = prefs.shortcuts.copyPrompt || settings.shortcuts.copyPrompt;
+            settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
+        }
 
         console.log(t('settingsMessages.settingsLoaded'), {
             ...settings,
@@ -360,6 +388,7 @@ const updateSetting = async () => {
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
+                shortcuts: settings.shortcuts,
             })
         );
 
@@ -456,318 +485,12 @@ const resetSettings = async () => {
     loading.reset = false;
 };
 
-// 导出数据
-const exportData = async (format: 'json' | 'csv') => {
-    loading.export = true;
-    try {
-        const defaultName = `ai-gist-sync-${new Date().toISOString().split('T')[0]}.${format}`;
-        const exportPath = await DataManagementAPI.selectExportPath(defaultName);
-        
-        if (exportPath) {
-            const result = await DataManagementAPI.exportData({
-                format,
-                includeCategories: true,
-                includePrompts: true,
-                includeSettings: true,
-                includeHistory: true,
-            }, exportPath);
-            
-            if (result.success) {
-                message.success(t('settingsMessages.dataExportSuccess'));
-            } else {
-                message.error(t('settingsMessages.dataExportFailed'));
-            }
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.dataExportFailed'), error);
-        message.error(t('settingsMessages.dataExportFailed'));
-    }
-    loading.export = false;
-};
 
-// 导入数据
-const importData = async (format: 'json' | 'csv') => {
-    loading.import = true;
-    try {
-        const filePath = await DataManagementAPI.selectImportFile(format);
-        
-        if (filePath) {
-            const result = await DataManagementAPI.importData(filePath, {
-                format,
-                overwrite: false,
-                mergeStrategy: 'merge',
-            });
-            
-            if (result.success) {
-                message.success(result.message || t('settingsMessages.dataImportSuccess'));
-            } else {
-                message.error(result.message || t('settingsMessages.dataImportFailed'));
-            }
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.dataImportFailed'), error);
-        message.error(t('settingsMessages.dataImportFailed'));
-    }
-    loading.import = false;
-};
-
-// 选择性数据导出
-const exportSelected = async (format: 'json' | 'csv', options: any) => {
-    loading.export = true;
-    try {
-        const defaultName = `ai-gist-selected-${new Date().toISOString().split('T')[0]}.${format}`;
-        const exportPath = await DataManagementAPI.selectExportPath(defaultName);
-        
-        if (exportPath) {
-            const result = await DataManagementAPI.exportSelectedData(options, exportPath);
-            
-            if (result.success) {
-                message.success(result.message || t('settingsMessages.selectiveExportSuccess'));
-            } else {
-                message.error(result.message || t('settingsMessages.selectiveExportFailed'));
-            }
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.selectiveExportFailed'), error);
-        message.error(t('settingsMessages.selectiveExportFailed'));
-    }
-    loading.export = false;
-};
-
-// 完整备份导入
-const importFullBackup = async () => {
-    loading.import = true;
-    try {
-        const result = await DataManagementAPI.importFullBackup();
-        
-        if (result.success) {
-            message.success(result.message || t('settingsMessages.fullBackupImportSuccess'));
-        } else {
-            message.error(result.message || t('settingsMessages.fullBackupImportFailed'));
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.fullBackupImportFailed'), error);
-        message.error(t('settingsMessages.fullBackupImportFailed'));
-    }
-    loading.import = false;
-};
-
-// 完整备份导出
-const exportFullBackup = async () => {
-    loading.export = true;
-    try {
-        const result = await DataManagementAPI.exportFullBackup();
-        
-        if (result.success) {
-            message.success(result.message || t('settingsMessages.fullBackupExportSuccess'));
-        } else {
-            message.error(result.message || t('settingsMessages.fullBackupExportFailed'));
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.fullBackupExportFailed'), error);
-        message.error(t('settingsMessages.fullBackupExportFailed'));
-    }
-    loading.export = false;
-};
-
-// 加载数据统计
-const loadDataStats = async () => {
-    try {
-        const stats = await DataManagementAPI.getDataStats();
-        
-        // 更新子组件的数据统计
-        if (dataManagementRef.value) {
-            dataManagementRef.value.updateDataStats(stats);
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.getDataStatsFailed'), error);
-        // 不显示错误消息，因为这不是关键功能
-    }
-};
-
-// 刷新备份列表
-const refreshBackupList = async () => {
-    try {
-        const backups = await DataManagementAPI.getBackupList();
-
-        // 转换备份数据格式以匹配组件期望的格式
-        const formattedBackups = backups.map((backup: any) => ({
-            id: backup.id,
-            name: backup.name,
-            createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
-            size: `${(backup.size / 1024).toFixed(2)} KB`,
-            version: backup.description || 'v1.0'
-        }));
-
-        // 更新子组件的备份列表
-        if (dataManagementRef.value) {
-            dataManagementRef.value.updateBackupList(formattedBackups);
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.getBackupListFailed'), error);
-        message.error(t('settingsMessages.getBackupListFailed'));
-    }
-};
-
-// 创建备份
-const createBackup = async () => {
-    loading.backup = true;
-    try {
-        const timestamp = new Date().toLocaleString('zh-CN');
-        const backup = await DataManagementAPI.createBackup(t('settingsMessages.manualBackup', { timestamp }));
-        message.success(t('settingsMessages.backupCreatedSuccess', { 
-            name: backup.name, 
-            size: (backup.size / 1024).toFixed(2) 
-        }));
-
-        // 创建成功后立即刷新备份列表
-        await refreshBackupList();
-    } catch (error) {
-        console.error(t('settingsMessages.backupCreatedFailed'), error);
-        message.error(t('settingsMessages.backupCreatedFailed'));
-    } finally {
-        loading.backup = false;
-    }
-};
-
-// 恢复指定备份
-const restoreSpecificBackup = async (backupId: string) => {
-    loading.backup = true;
-    try {
-        // 步骤1: 先创建当前数据的自动备份
-        message.info(t('settingsMessages.creatingAutoBackup'));
-        const timestamp = new Date().toLocaleString('zh-CN');
-        const autoBackup = await DataManagementAPI.createBackup(t('settingsMessages.autoBackupBeforeRestore', { timestamp }));
-        console.log(t('settingsMessages.autoBackupCreated', { name: autoBackup.name }));
-
-        // 步骤2: 执行恢复操作
-        message.info(t('settingsMessages.restoringBackup'));
-        const result = await DataManagementAPI.restoreBackupWithReplace(backupId);
-
-        if (result.success) {
-            message.success(t('settingsMessages.backupRestoreSuccess', { name: autoBackup.name }));
-            // 恢复成功后刷新备份列表
-            await refreshBackupList();
-        } else {
-            message.error(t('settingsMessages.backupRestoreFailed'));
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.backupRestoreFailed'), error);
-        const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupRestoreFailed');
-        message.error(`${t('settingsMessages.backupRestoreFailed')}: ${errorMessage}`);
-    } finally {
-        loading.backup = false;
-    }
-};
-
-// 删除备份
-const deleteBackup = async (backupId: string) => {
-    try {
-        console.log(t('settingsMessages.startDeleteBackup', { backupId }));
-        await DataManagementAPI.deleteBackup(backupId);
-        message.success(t('settingsMessages.backupDeleteSuccess'));
-        // 删除成功后刷新备份列表
-        await refreshBackupList();
-    } catch (error) {
-        console.error(t('settingsMessages.backupDeleteFailed'), error);
-        const errorMessage = error instanceof Error ? error.message : t('settingsMessages.backupDeleteFailed');
-        message.error(`${t('settingsMessages.backupDeleteFailed')}: ${errorMessage}`);
-
-        // 删除失败后也刷新备份列表，以确保UI状态正确
-        try {
-            await refreshBackupList();
-        } catch (refreshError) {
-            console.error(t('settingsMessages.getBackupListFailed'), refreshError);
-        }
-    }
-};
-
-// 检查数据库健康状态
-const checkDatabaseHealth = async () => {
-    loading.healthCheck = true;
-    try {
-        const result = await databaseServiceManager.getHealthStatus();
-        
-        if (result.healthy) {
-            message.success(t('settingsMessages.databaseHealthy'));
-        } else {
-            message.warning(t('settingsMessages.databaseUnhealthy', { stores: result.missingStores.join(', ') }));
-            console.warn(t('settingsMessages.databaseHealthCheckResult'), result);
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.databaseHealthCheckFailed'), error);
-        message.error(t('settingsMessages.databaseHealthCheckFailed'));
-    }
-    loading.healthCheck = false;
-};
-
-// 清空数据库
-const clearDatabase = async () => {
-    loading.clearDatabase = true;
-    try {
-        await databaseServiceManager.forceCleanAllTables();
-        message.success(t('settingsMessages.databaseCleared'));
-    } catch (error) {
-        console.error(t('settingsMessages.databaseClearFailed'), error);
-        message.error(t('settingsMessages.databaseClearFailed'));
-    }
-    loading.clearDatabase = false;
-};
-
-// 数据库修复
-const repairDatabase = async () => {
-    loading.repair = true;
-    try {
-        const result = await databaseServiceManager.checkAndRepairDatabase();
-
-        if (result.healthy) {
-            if (result.repaired) {
-                message.success(t('settingsMessages.databaseRepairSuccess', { message: result.message }));
-            } else {
-                message.success(t('settingsMessages.databaseNoRepairNeeded'));
-            }
-        } else {
-            message.error(t('settingsMessages.databaseRepairFailed', { message: result.message }));
-            if (result.missingStores && result.missingStores.length > 0) {
-                console.error(t('settingsMessages.stillMissingStores'), result.missingStores);
-            }
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.databaseRepairFailed', { message: '' }), error);
-        message.error(t('settingsMessages.databaseRepairFailed', { message: '' }));
-    }
-    loading.repair = false;
-};
-
-// 打开备份目录
-const openBackupDirectory = async () => {
-    try {
-        const result = await DataManagementAPI.getBackupDirectory();
-        
-        if (result.success && result.path) {
-            // 使用系统默认应用打开文件夹
-            const shellResult = await window.electronAPI.shell.openPath(result.path);
-            if (shellResult.success) {
-                message.success(t('settingsMessages.backupDirectoryOpened'));
-            } else {
-                message.error(shellResult.error || t('settingsMessages.openBackupDirectoryFailed'));
-            }
-        } else {
-            message.error(result.message || t('settingsMessages.getBackupDirectoryFailed'));
-        }
-    } catch (error) {
-        console.error(t('settingsMessages.openBackupDirectoryFailed'), error);
-        message.error(t('settingsMessages.openBackupDirectoryFailed'));
-    }
-};
 
 // 组件挂载时加载设置
 onMounted(async () => {
     initLocale(); // 初始化语言设置
     await loadSettings();
-    // 加载备份列表
-    await refreshBackupList();
-    await loadDataStats();
 });
 
 // 监听 props 变化，自动跳转到对应设置页面
@@ -776,14 +499,6 @@ watch(() => props.targetSection, (newTargetSection) => {
         activeSettingKey.value = newTargetSection;
     }
 }, { immediate: true });
-
-// 监听设置页面切换，当切换到数据管理页面时刷新备份列表
-watch(activeSettingKey, async (newKey) => {
-    if (newKey === 'data-management') {
-        await refreshBackupList();
-        await loadDataStats();
-    }
-});
 </script>
 
 <style scoped>

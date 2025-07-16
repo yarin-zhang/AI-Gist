@@ -3,4 +3,5 @@
  */
 
 export * from '@shared/types';
-export * from './data-management-service';
+export { dataManagementService } from './data-management-service';
+export { fsService } from './fs-service';

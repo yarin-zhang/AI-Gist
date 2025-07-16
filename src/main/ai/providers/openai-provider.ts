@@ -14,17 +14,43 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
     console.log(`测试 ${config.type} 连接，使用 baseURL: ${config.baseURL}`);
     
     try {
-      const llm = new ChatOpenAI({
-        openAIApiKey: config.apiKey,
-        configuration: {
-          baseURL: config.baseURL || undefined
-        }
-      });
-
-      await this.withTimeout(llm.invoke('test'), 15000);
+      // 首先尝试获取可用模型列表
       const models = await this.getAvailableModels(config);
-      console.log(`${config.type} 连接测试成功，获取到模型:`, models);
-      return { success: true, models };
+      console.log(`${config.type} 获取到模型列表:`, models);
+      
+      // 如果有可用模型，使用第一个进行测试
+      if (models.length > 0) {
+        const testModel = models[0];
+        console.log(`使用模型 ${testModel} 进行连接测试`);
+        
+        const llm = new ChatOpenAI({
+          openAIApiKey: config.apiKey,
+          modelName: testModel,
+          configuration: {
+            baseURL: config.baseURL || undefined
+          }
+        });
+
+        await this.withTimeout(llm.invoke('test'), 15000);
+        console.log(`${config.type} 连接测试成功，使用模型: ${testModel}`);
+        return { success: true, models };
+      } else {
+        // 如果没有获取到模型列表，使用默认模型进行测试
+        const defaultModel = this.getDefaultModels(config.type)[0];
+        console.log(`使用默认模型 ${defaultModel} 进行连接测试`);
+        
+        const llm = new ChatOpenAI({
+          openAIApiKey: config.apiKey,
+          modelName: defaultModel,
+          configuration: {
+            baseURL: config.baseURL || undefined
+          }
+        });
+
+        await this.withTimeout(llm.invoke('test'), 15000);
+        console.log(`${config.type} 连接测试成功，使用默认模型: ${defaultModel}`);
+        return { success: true, models: this.getDefaultModels(config.type) };
+      }
     } catch (error: any) {
       console.error(`${config.type} 连接测试失败:`, error);
       const errorMessage = this.handleCommonError(error, config.type);
@@ -321,7 +347,10 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
           'gpt-3.5-turbo-16k', 'text-davinci-003', 'text-davinci-002'
         ];
       case 'deepseek':
-        return ['deepseek-chat', 'deepseek-coder'];
+        return [
+          'deepseek-chat',
+          'deepseek-coder',
+        ];
       case 'mistral':
         return [
           'mistral-large-latest',

@@ -7,14 +7,14 @@ import {
   preferencesManager,
   singleInstanceManager,
 } from './electron';
+import { ShortcutManager } from './electron/shortcut-manager';
 import { 
-  DataManagementService
+  dataManagementService
 } from './data';
 import { CloudBackupManager } from './cloud/cloud-backup-manager';
 
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
-let dataManagementService: DataManagementService;
 let cloudBackupManager: CloudBackupManager;
 
 // 防止多重启动 - 初始化单实例管理器
@@ -31,7 +31,6 @@ app.whenReady().then(async () => {
   preferencesManager.applyAllSettings();
   // 初始化主题管理器
   themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
-  dataManagementService = new DataManagementService(app.getPath('userData'));
   
   // 初始化云端备份管理器
   cloudBackupManager = new CloudBackupManager(dataManagementService);
@@ -44,6 +43,11 @@ app.whenReady().then(async () => {
   
   // 设置主题管理器的主窗口引用
   themeManager.setMainWindow(mainWindow);
+  
+  // 初始化快捷键管理器
+  const shortcutManager = ShortcutManager.getInstance();
+  shortcutManager.setMainWindow(mainWindow);
+  await shortcutManager.initialize();
   
   // 创建系统托盘并设置主窗口引用
   trayManager.setMainWindow(mainWindow);

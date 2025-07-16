@@ -27,6 +27,7 @@
         <!-- Header 额外区域 - 操作按钮 -->
         <template #header-extra>
             <NFlex size="small">
+
                 <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
                     <template #icon>
                         <NIcon>
@@ -861,6 +862,7 @@ import {
     Loader,
     Clock,
     Code,
+    Keyboard,
 } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useTagColors } from "@/composables/useTagColors";
@@ -1578,6 +1580,9 @@ const toggleFavorite = async () => {
         console.error(error);
     }
 };
+
+// 切换快捷键触发状态
+
 
 // 加载历史记录
 const loadHistoryRecord = (record: any) => {

@@ -147,6 +147,18 @@ export abstract class BaseAIProvider implements AIProvider {
     if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
       return '无法连接到服务器，请检查网络连接';
     }
+    if (error.message?.includes('Model Not Exist') || error.message?.includes('model not found')) {
+      return '指定的模型不存在，请检查模型名称或联系服务提供商';
+    }
+    if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
+      return '请求频率超限或配额不足，请稍后重试';
+    }
+    if (error.message?.includes('invalid_request_error')) {
+      return '请求参数错误，请检查配置信息';
+    }
+    if (error.message?.includes('server_error') || error.message?.includes('internal error')) {
+      return '服务器内部错误，请稍后重试';
+    }
     return error.message || '未知错误';
   }
 

@@ -1,6 +1,49 @@
 import {contextBridge, ipcRenderer} from 'electron';
 
+// 快捷键API
+const shortcutsAPI = {
+  // 注册默认快捷键
+  registerDefaults: () => ipcRenderer.invoke('shortcuts:register-defaults'),
+  
+  // 重新注册快捷键
+  reregister: () => ipcRenderer.invoke('shortcuts:reregister'),
+  
+  // 临时禁用快捷键
+  temporarilyDisable: () => ipcRenderer.invoke('shortcuts:temporarily-disable'),
+  
+  // 恢复快捷键
+  restore: () => ipcRenderer.invoke('shortcuts:restore'),
+  
+  // 检查快捷键是否已注册
+  isRegistered: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-registered', accelerator),
+  
+  // 检查快捷键是否可用
+  isAvailable: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-available', accelerator),
+  
+  // 获取已注册的快捷键列表
+  getRegistered: () => ipcRenderer.invoke('shortcuts:get-registered'),
+  
+  // 检查权限并尝试注册快捷键
+  checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
+  
+  // 获取提示词内容
+  getPromptContent: (promptId: number) => ipcRenderer.invoke('shortcuts:get-prompt-content', promptId),
+  
+  // 监听快捷键事件
+  onInsertData: (callback: (promptId?: number) => void) => {
+    ipcRenderer.on('shortcut:insert-data', (_, promptId?: number) => callback(promptId));
+    return () => ipcRenderer.removeAllListeners('shortcut:insert-data');
+  },
+  
+  // 监听提示词触发器事件
+  onTriggerPrompt: (callback: (promptId: number) => void) => {
+    ipcRenderer.on('shortcut:trigger-prompt', (_, promptId: number) => callback(promptId));
+    return () => ipcRenderer.removeAllListeners('shortcut:trigger-prompt');
+  }
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   sendMessage: (message: string) => ipcRenderer.send('message', message),
   
   // 用户偏好设置
@@ -33,11 +76,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // AI 服务管理
   ai: {
-    getConfigs: () => ipcRenderer.invoke('ai:get-configs'),
-    getEnabledConfigs: () => ipcRenderer.invoke('ai:get-enabled-configs'),
     addConfig: (config: any) => ipcRenderer.invoke('ai:add-config', config),
     updateConfig: (id: string, config: any) => ipcRenderer.invoke('ai:update-config', id, config),
-    removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
     generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => {
@@ -65,22 +105,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
   },
+
+  // 快捷键管理
+  shortcuts: shortcutsAPI,
   // 数据管理
   data: {
-    createBackup: (description?: string) => ipcRenderer.invoke('data:create-backup', { description }),
-    getBackupList: () => ipcRenderer.invoke('data:get-backup-list'),
-    restoreBackup: (backupId: string) => ipcRenderer.invoke('data:restore-backup', { backupId }),
-    restoreBackupWithReplace: (backupId: string) => ipcRenderer.invoke('data:restore-backup-replace', { backupId }),
-    deleteBackup: (backupId: string) => ipcRenderer.invoke('data:delete-backup', { backupId }),
-    export: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export', { options, exportPath }),
-    import: (filePath: string, options: any) => ipcRenderer.invoke('data:import', { filePath, options }),
-    exportSelected: (options: any, exportPath?: string) => ipcRenderer.invoke('data:export-selected', { options, exportPath }),
-    exportFullBackup: () => ipcRenderer.invoke('data:export-full-backup'),
-    importFullBackup: () => ipcRenderer.invoke('data:import-full-backup'),
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
     selectExportPath: (defaultName: string) => ipcRenderer.invoke('data:select-export-path', { defaultName }),
-    getStats: () => ipcRenderer.invoke('data:get-stats'),
-    getBackupDirectory: () => ipcRenderer.invoke('data:get-backup-directory'),
+    writeFile: (filePath: string, content: string) => ipcRenderer.invoke('data:write-file', { filePath, content }),
+    readFile: (filePath: string) => ipcRenderer.invoke('data:read-file', { filePath }),
+  },
+  // 文件操作
+  fs: {
+    readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', { filePath }),
+    writeFile: (filePath: string, content: string) => ipcRenderer.invoke('fs:write-file', { filePath, content }),
+    ensureDir: (dirPath: string) => ipcRenderer.invoke('fs:ensure-dir', { dirPath }),
+    stat: (filePath: string) => ipcRenderer.invoke('fs:stat', { filePath }),
+    readdir: (dirPath: string) => ipcRenderer.invoke('fs:readdir', { dirPath }),
+    unlink: (filePath: string) => ipcRenderer.invoke('fs:unlink', { filePath }),
   },
   // 云端备份功能
   cloud: {
@@ -98,7 +140,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 应用信息和更新
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),
-    checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
+    getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
     openDownloadPage: (url: string) => ipcRenderer.invoke('app:open-download-page', url),
     onUpdateAvailable: (callback: (updateInfo: any) => void) => {
       const listener = (_: any, updateInfo: any) => callback(updateInfo);

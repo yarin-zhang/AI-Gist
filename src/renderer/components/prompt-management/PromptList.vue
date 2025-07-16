@@ -229,6 +229,7 @@
                                             </NIcon>
                                         </template>
                                     </NButton>
+
                                     <NDropdown :options="getPromptActions(prompt)"
                                         @select="(key) => handlePromptAction(key, prompt)">
                                         <NButton size="small" text @click.stop>
@@ -347,7 +348,8 @@ import {
     ChevronUp,
     Folder,
     List,
-    GridDots
+    GridDots,
+    Keyboard
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
@@ -831,6 +833,14 @@ const tableColumns = computed(() => [
         }
     },
     {
+        title: t('promptManagement.shortcutTrigger'),
+        key: 'isShortcutTrigger',
+        width: 100,
+        render: (row: PromptWithRelations) => {
+
+        }
+    },
+    {
         title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
         width: 100,
@@ -1161,6 +1171,8 @@ const toggleFavorite = async (promptId: number) => {
         console.error(error)
     }
 }
+
+
 
 // 检查标签是否匹配搜索关键词
 const isTagMatched = (tag: string) => {

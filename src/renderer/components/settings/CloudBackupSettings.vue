@@ -108,7 +108,6 @@
                                             class="pagination-container">
                                             <NPagination :page="getPaginationData(config.id).currentPage"
                                                 @update:page="(page) => updatePaginationState(config.id, page, getPaginationData(config.id).pageSize)"
-                                                :page-count="getPaginationData(config.id).totalPages"
                                                 :page-size="getPaginationData(config.id).pageSize"
                                                 :item-count="getPaginationData(config.id).totalItems" show-size-picker
                                                 show-quick-jumper :page-sizes="[6, 12, 18]"

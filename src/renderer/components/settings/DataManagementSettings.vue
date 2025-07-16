@@ -8,7 +8,7 @@
                     <NFlex vertical :size="12">
                         <NText depth="2">{{ t('dataManagement.backupManagement') }}</NText>
                         <NFlex :size="12">
-                            <NButton type="primary" @click="createBackup" :loading="props.loading?.backup">
+                            <NButton type="primary" @click="handleCreateBackup" :loading="loading.backup">
                                 <template #icon>
                                     <NIcon>
                                         <Upload />
@@ -16,7 +16,7 @@
                                 </template>
                                 {{ t('dataManagement.createBackup') }}
                             </NButton>
-                            <NButton @click="refreshBackupList">
+                            <NButton @click="handleRefreshBackupList" :loading="loading.refreshBackupList">
                                 <template #icon>
                                     <NIcon>
                                         <Refresh />
@@ -24,7 +24,7 @@
                                 </template>
                                 {{ t('dataManagement.refreshBackupList') }}
                             </NButton>
-                            <NButton @click="openBackupDirectory">
+                            <NButton @click="handleOpenBackupDirectory">
                                 <template #icon>
                                     <NIcon>
                                         <Folder />
@@ -49,7 +49,6 @@
                                             </NFlex>
                                         </NFlex>
                                         <template #header-extra>
-
                                             <NFlex vertical :size="4">
                                                 <NFlex align="center" :size="8">
                                                     <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
@@ -59,13 +58,13 @@
 
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
-                                                <NPopconfirm @positive-click="restoreSpecificBackup(backup.id)"
+                                                <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
                                                     negative-text="取消" positive-text="确定恢复" placement="top"
                                                     :show-icon="false">
                                                     <template #trigger>
                                                         <NButton type="primary" size="small"
-                                                            :loading="props.loading?.backup"
-                                                            :disabled="props.loading?.backup">
+                                                            :loading="loading.restore"
+                                                            :disabled="loading.restore">
                                                             <template #icon>
                                                                 <NIcon>
                                                                     <Recharging />
@@ -78,7 +77,7 @@
                                                         <p>{{ t('dataManagement.restoreWarning') }}</p>
                                                     </div>
                                                 </NPopconfirm>
-                                                <NPopconfirm @positive-click="deleteBackup(backup.id)"
+                                                <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
                                                     negative-text="取消" positive-text="确定">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
@@ -100,7 +99,7 @@
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
+                                <NPagination v-model:page="currentPage" :page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
                                     :page-sizes="[6, 12, 18]" />
                             </div>
@@ -127,7 +126,7 @@
                         </NText>
 
                         <NFlex :size="12">
-                            <NButton type="primary" @click="exportFullBackup" :loading="props.loading?.export">
+                            <NButton type="primary" @click="handleExportFullBackup" :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
                                         <Archive />
@@ -135,7 +134,7 @@
                                 </template>
                                 {{ t('dataManagement.exportFullBackup') }}
                             </NButton>
-                            <NButton @click="importFullBackup" :loading="props.loading?.import">
+                            <NButton @click="handleImportFullBackup" :loading="loading.import">
                                 <template #icon>
                                     <NIcon>
                                         <Folder />
@@ -144,8 +143,6 @@
                                 {{ t('dataManagement.importFullBackup') }}
                             </NButton>
                         </NFlex>
-
-
                     </NFlex>
                 </NFlex>
             </div>
@@ -171,21 +168,21 @@
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.prompts || 0 }} 条</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.prompts }} 条</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.categories || 0 }} 个</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.categories }} 个</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.aiConfigs || 0 }} 个</NTag>
+                                            <NTag size="small" type="info">{{ dataStats.aiConfigs }} 个</NTag>
                                             <NTag size="small" type="warning">{{
                                                 t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
@@ -196,8 +193,8 @@
 
                         <NFlex :size="12">
                             <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" type="primary"
-                                @click="exportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
-                                :loading="props.loading?.export">
+                                @click="handleExportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
+                                :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -205,8 +202,8 @@
                                 </template>
                                 {{ t('dataManagement.exportToCSV') }}
                             </NButton>
-                            <NButton @click="exportSelectedData('json')" :disabled="!hasSelectedData"
-                                :loading="props.loading?.export">
+                            <NButton @click="handleExportSelectedData('json')" :disabled="!hasSelectedData"
+                                :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
                                         <FileExport />
@@ -229,7 +226,6 @@
                 </NFlex>
             </div>
 
-
             <NDivider />
 
             <!-- 数据库维护 -->
@@ -241,7 +237,7 @@
                             {{ t('dataManagement.maintenanceDescription') }}
                         </NText>
                         <NFlex :size="12">
-                            <NButton type="primary" @click="checkDatabaseHealth">
+                            <NButton type="primary" @click="handleCheckDatabaseHealth">
                                 <template #icon>
                                     <NIcon>
                                         <AlertCircle />
@@ -249,7 +245,7 @@
                                 </template>
                                 {{ t('dataManagement.checkDatabaseHealth') }}
                             </NButton>
-                            <NButton type="warning" @click="repairDatabase">
+                            <NButton type="warning" @click="handleRepairDatabase">
                                 <template #icon>
                                     <NIcon>
                                         <Database />
@@ -257,10 +253,10 @@
                                 </template>
                                 {{ t('dataManagement.repairDatabase') }}
                             </NButton>
-                            <NPopconfirm @positive-click="clearDatabase" :negative-text="t('common.cancel')"
+                            <NPopconfirm @positive-click="handleClearDatabase" :negative-text="t('common.cancel')"
                                 :positive-text="t('dataManagement.clearDatabase')" placement="top">
                                 <template #trigger>
-                                    <NButton type="error" :loading="props.loading?.clearDatabase">
+                                    <NButton type="error" :loading="loading.clearDatabase">
                                         <template #icon>
                                             <NIcon>
                                                 <DatabaseOff />
@@ -282,9 +278,17 @@
                             </NPopconfirm>
                         </NFlex>
                     </NFlex>
-
                 </NFlex>
             </div>
+
+            <!-- 消息提示 -->
+            <NAlert v-if="error" type="error" show-icon closable @close="clearMessages">
+                {{ error }}
+            </NAlert>
+            
+            <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
+                {{ success }}
+            </NAlert>
         </NFlex>
     </NCard>
 </template>
@@ -320,66 +324,64 @@ import {
     Archive,
     Folder,
 } from "@vicons/tabler";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
-import { useWindowSize } from "@/composables/useWindowSize";
-
-// Props
-const props = defineProps<{
-    loading?: {
-        backup?: boolean;
-        export?: boolean;
-        import?: boolean;
-        repair?: boolean;
-        healthCheck?: boolean;
-        clearDatabase?: boolean;
-    };
-}>();
+import { useDataManagement } from '@renderer/composables/useDataManagement';
 
 const { t } = useI18n();
 
-const emit = defineEmits<{
-    "export-data": [format: "csv" | "json"];
-    "import-data": [format: "csv" | "json"];
-    "export-selected-data": [format: "csv" | "json", options: any];
-    "export-full-backup": [];
-    "import-full-backup": [];
-    "create-backup": [];
-    "restore-backup": [backupId: string];
-    "delete-backup": [backupId: string];
-    "refresh-backup-list": [];
-    "check-database-health": [];
-    "repair-database": [];
-    "clear-database": [];
-    "open-backup-directory": [];
-}>();
-
-// 备份列表数据
-interface BackupItem {
-    id: string;
-    name: string;
-    createdAt: string;
-    size: string;
-    version: string;
-}
-
-const backupList = ref<BackupItem[]>([]);
-
-// 选择性导出选项
-const exportOptions = ref({
-    selectedType: '' as 'prompts' | 'categories' | 'aiConfigs' | '',
-});
+// 使用数据管理 composable
+const {
+    backupList,
+    loading,
+    error,
+    success,
+    getBackupList,
+    createBackup,
+    restoreBackup,
+    deleteBackup,
+    openBackupDirectory,
+    exportFullBackup,
+    importFullBackup,
+    exportSelectedData,
+    getDataStatistics,
+    checkDatabaseHealth,
+    repairDatabase,
+    clearDatabase,
+    clearMessages
+} = useDataManagement();
 
 // 数据统计
 const dataStats = ref({
     categories: 0,
     prompts: 0,
-    history: 0,
     aiConfigs: 0,
-    settings: 0,
-    posts: 0,
-    users: 0,
-    totalRecords: 0,
+    aiHistory: 0,
+    settings: 0
+});
+
+// 分页
+const currentPage = ref(1);
+const pageSize = ref(6);
+const totalItems = computed(() => backupList.value.length);
+const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value));
+const paginatedBackups = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  // 转换备份数据格式以匹配组件期望的格式
+  const formattedBackups = backupList.value.map((backup: any) => ({
+    id: backup.id,
+    name: backup.name,
+    createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
+    size: `${(backup.size / 1024).toFixed(2)} KB`,
+    version: backup.description || 'v1.0'
+  }));
+  return formattedBackups.slice(start, end);
+});
+
+// 选择性导出选项
+const exportOptions = ref({
+    selectedType: '' as 'prompts' | 'categories' | 'aiConfigs' | '',
 });
 
 // 计算是否选择了数据
@@ -401,105 +403,76 @@ const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', check
     }
 };
 
-// 分页相关状态
-const currentPage = ref(1);
-const pageSize = 6;
-
-// 计算分页数据
-const paginatedBackups = computed(() => {
-    const start = (currentPage.value - 1) * pageSize;
-    const end = start + pageSize;
-    return backupList.value.slice(start, end);
-});
-
-const totalItems = computed(() => backupList.value.length);
-const totalPages = computed(() => Math.ceil(totalItems.value / pageSize));
-
-const exportData = (format: "csv" | "json") => {
-    emit("export-data", format);
+// 事件处理函数
+const handleCreateBackup = async () => {
+    await createBackup();
 };
 
-const importData = (format: "csv" | "json") => {
-    emit("import-data", format);
+const handleRefreshBackupList = async () => {
+    await getBackupList();
 };
 
-const createBackup = () => {
-    emit("create-backup");
+const handleRestoreBackup = async (backupId: string) => {
+    await restoreBackup(backupId);
 };
 
-const restoreSpecificBackup = (backupId: string) => {
-    emit("restore-backup", backupId);
+const handleDeleteBackup = async (backupId: string) => {
+    await deleteBackup(backupId);
 };
 
-const deleteBackup = (backupId: string) => {
-    emit("delete-backup", backupId);
+const handleOpenBackupDirectory = async () => {
+    await openBackupDirectory();
 };
 
-const refreshBackupList = () => {
-    emit("refresh-backup-list");
+const handleExportFullBackup = async () => {
+    await exportFullBackup();
 };
 
-const checkDatabaseHealth = () => {
-    emit("check-database-health");
+const handleImportFullBackup = async () => {
+    await importFullBackup();
 };
 
-const repairDatabase = () => {
-    emit("repair-database");
-};
-
-const clearDatabase = () => {
-    emit("clear-database");
-};
-
-// 选择性数据导出
-const exportSelectedData = (format: "csv" | "json") => {
+const handleExportSelectedData = async (format: 'csv' | 'json') => {
     const options = {
         format,
-        includePrompts: exportOptions.value.selectedType === 'prompts',
+        selectedType: exportOptions.value.selectedType,
         includeCategories: exportOptions.value.selectedType === 'categories',
+        includePrompts: exportOptions.value.selectedType === 'prompts',
         includeAIConfigs: exportOptions.value.selectedType === 'aiConfigs',
     };
-    emit("export-selected-data", format, options);
+    await exportSelectedData(format, options);
 };
 
-// 完整备份导出
-const exportFullBackup = () => {
-    emit("export-full-backup");
+const handleCheckDatabaseHealth = async () => {
+    await checkDatabaseHealth();
 };
 
-// 完整备份导入
-const importFullBackup = () => {
-    emit("import-full-backup");
+const handleRepairDatabase = async () => {
+    await repairDatabase();
 };
 
-// 打开备份目录
-const openBackupDirectory = () => {
-    emit("open-backup-directory");
+const handleClearDatabase = async () => {
+    await clearDatabase();
 };
 
-// 更新备份列表
-const updateBackupList = (backups: BackupItem[]) => {
-    backupList.value = backups;
-};
+// 监听备份列表变化
+watch(() => backupList.value.length, (newLength, oldLength) => {
+    console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
+});
 
-// 更新数据统计
-const updateDataStats = (stats: any) => {
-    dataStats.value = {
-        categories: stats.categories || 0,
-        prompts: stats.prompts || 0,
-        history: stats.history || 0,
-        aiConfigs: stats.aiConfigs || 0,
-        settings: stats.settings || 0,
-        posts: stats.posts || 0,
-        users: stats.users || 0,
-        totalRecords: stats.totalRecords || 0,
-    };
-};
-
-// 暴露方法供父组件调用
-defineExpose({
-    updateBackupList,
-    updateDataStats,
+// 初始化
+onMounted(async () => {
+    console.log('组件挂载，开始加载数据...');
+    // 加载备份列表
+    await getBackupList();
+    console.log('备份列表加载完成，当前长度:', backupList.value.length);
+    
+    // 加载数据统计
+    const stats = await getDataStatistics();
+    if (stats) {
+        dataStats.value = stats;
+    }
+    console.log('数据统计加载完成');
 });
 </script>
 
