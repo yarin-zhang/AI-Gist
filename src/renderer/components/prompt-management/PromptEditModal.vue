@@ -345,7 +345,7 @@
                                             <div>
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.title') }}</NText>
+                                                    t('promptManagement.historyTitle') }}</NText>
                                                 <NInput :value="previewHistory.title" readonly />
                                             </div>
 
@@ -361,9 +361,9 @@
                                 </NCard>
                             </template>
 
-                            <!-- 右侧：分类与标签 -->
+                            <!-- 右侧：变更记录说明 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.categoryAndTags')" size="small"
+                                <NCard :title="t('promptManagement.historyChangeDescription')" size="small"
                                     :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">

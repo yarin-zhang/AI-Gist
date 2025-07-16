@@ -313,6 +313,8 @@
     "changeDescriptionSaved": "變更說明已保存",
     "changeDescriptionSaveFailed": "保存變更說明失敗",
     "historyNotFound": "歷史記錄不存在",
+    "historyChangeDescription": "變更記錄說明",
+    "historyTitle": "標題",
     "characters": "字符",
     "collapse": "收起",
     "color": "顏色",

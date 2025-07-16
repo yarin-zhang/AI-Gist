@@ -314,6 +314,8 @@
     "changeDescriptionSaved": "变更说明已保存",
     "changeDescriptionSaveFailed": "保存变更说明失败",
     "historyNotFound": "历史记录不存在",
+    "historyChangeDescription": "变更记录说明",
+    "historyTitle": "标题",
     "characters": "字符",
     "collapse": "收起",
     "color": "颜色",
