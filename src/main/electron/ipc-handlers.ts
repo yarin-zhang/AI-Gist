@@ -293,6 +293,81 @@ class IpcHandlers {
         return { hasPermission: false, message: '检查权限时发生错误' };
       }
     });
+
+    // 获取提示词内容（用于快捷键插入）
+    ipcMain.handle('shortcuts:get-prompt-content', async (event, promptId: number) => {
+      try {
+        // 通过渲染进程的数据库API获取提示词内容
+        const result = await event.sender.executeJavaScript(`
+          (async () => {
+            try {
+              if (window.databaseAPI && window.databaseAPI.databaseServiceManager) {
+                const promptService = window.databaseAPI.databaseServiceManager.prompt;
+                if (promptService) {
+                  const prompt = await promptService.getPromptById(${promptId});
+                  if (prompt) {
+                    return { success: true, content: prompt.content };
+                  } else {
+                    return { success: false, error: '提示词不存在' };
+                  }
+                } else {
+                  return { success: false, error: '提示词服务不可用' };
+                }
+              } else {
+                return { success: false, error: '数据库API不可用' };
+              }
+            } catch (error) {
+              return { success: false, error: error.message };
+            }
+          })()
+        `);
+        
+        return result;
+      } catch (error) {
+        console.error('获取提示词内容失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 自动粘贴内容到当前输入框
+    ipcMain.handle('shortcuts:auto-paste', async (event) => {
+      try {
+        // 等待一小段时间确保剪贴板内容已更新
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 使用 Electron 的内置功能发送粘贴快捷键
+        if (process.platform === 'darwin') {
+          // macOS: Cmd+V
+          event.sender.sendInputEvent({
+            type: 'keyDown',
+            keyCode: 'V',
+            modifiers: ['cmd']
+          });
+          event.sender.sendInputEvent({
+            type: 'keyUp',
+            keyCode: 'V',
+            modifiers: ['cmd']
+          });
+        } else {
+          // Windows/Linux: Ctrl+V
+          event.sender.sendInputEvent({
+            type: 'keyDown',
+            keyCode: 'V',
+            modifiers: ['ctrl']
+          });
+          event.sender.sendInputEvent({
+            type: 'keyUp',
+            keyCode: 'V',
+            modifiers: ['ctrl']
+          });
+        }
+        
+        return { success: true };
+      } catch (error) {
+        console.error('自动粘贴失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
   }
 
   /**
@@ -370,6 +445,16 @@ class IpcHandlers {
     ipcMain.removeHandler('data:select-export-path');
     ipcMain.removeHandler('data:write-file');
     ipcMain.removeHandler('data:read-file');
+    
+    // 清理快捷键处理器
+    ipcMain.removeHandler('shortcuts:register-defaults');
+    ipcMain.removeHandler('shortcuts:reregister');
+    ipcMain.removeHandler('shortcuts:is-registered');
+    ipcMain.removeHandler('shortcuts:is-available');
+    ipcMain.removeHandler('shortcuts:get-registered');
+    ipcMain.removeHandler('shortcuts:check-permissions');
+    ipcMain.removeHandler('shortcuts:get-prompt-content');
+    ipcMain.removeHandler('shortcuts:auto-paste');
     
     // 清理 AI 服务管理器的活跃生成请求
     aiServiceManager.stopAllGenerations();

@@ -20,6 +20,12 @@ const shortcutsAPI = {
   // 检查权限并尝试注册快捷键
   checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
   
+  // 获取提示词内容
+  getPromptContent: (promptId: number) => ipcRenderer.invoke('shortcuts:get-prompt-content', promptId),
+  
+  // 自动粘贴内容
+  autoPaste: () => ipcRenderer.invoke('shortcuts:auto-paste'),
+  
   // 监听快捷键事件
   onInsertData: (callback: (promptId?: number) => void) => {
     ipcRenderer.on('shortcut:insert-data', (_, promptId?: number) => callback(promptId));

@@ -23,6 +23,8 @@ export interface ShortcutConfig {
   promptId?: number;
   /** 选择的提示词ID（仅用于insert-data类型） */
   selectedPromptId?: number;
+  /** 选择的提示词UUID（用于数据同步和备份） */
+  selectedPromptUUID?: string;
 }
 
 /**

@@ -22,6 +22,7 @@ import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 import AppInitializer from '~/components/common/AppInitializer.vue'
 import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 import ShortcutListener from '~/components/common/ShortcutListener.vue'
+import NotificationHandler from '~/components/common/NotificationHandler.vue'
 
 // 使用主题管理
 const { naiveTheme, getThemeOverrides, initTheme } = useTheme()
@@ -73,6 +74,8 @@ onMounted(async () => {
                     <DatabaseStatusBanner />
                     <!-- 快捷键监听器 -->
                     <ShortcutListener />
+                    <!-- 通知处理器 -->
+                    <NotificationHandler />
                     <MainPage />
                 </AppInitializer>
             </NDialogProvider>

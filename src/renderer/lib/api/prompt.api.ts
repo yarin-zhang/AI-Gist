@@ -104,6 +104,20 @@ export class PromptApiClient {
     },
 
     /**
+     * 根据UUID查询提示词
+     */
+    getByUUID: {
+      /**
+       * 根据UUID获取提示词信息
+       * @param uuid 提示词UUID
+       * @returns Promise<PromptWithRelations | null> 提示词信息（包含关联数据）
+       */
+      query: async (uuid: string): Promise<PromptWithRelations | null> => {
+        return this.promptService.getPromptByUUID(uuid);
+      }
+    },
+
+    /**
      * 更新提示词
      */
     update: {

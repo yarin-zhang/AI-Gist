@@ -241,27 +241,114 @@ export class ShortcutManager {
    * 插入数据
    */
   private async insertData(): Promise<void> {
-    if (!this.mainWindow) {
-      const windows = BrowserWindow.getAllWindows();
-      this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
-    }
-    
-    if (this.mainWindow) {
-      console.log('发送插入数据事件');
+    try {
+      console.log('开始执行全局插入数据操作');
       
-      // 获取用户设置的提示词ID
+      // 获取用户设置的提示词配置
       const userPrefs = preferencesManager.getPreferences();
-      const selectedPromptId = userPrefs.shortcuts?.insertData?.selectedPromptId;
+      const insertDataConfig = userPrefs.shortcuts?.insertData;
       
-      this.mainWindow.webContents.send('shortcut:insert-data', selectedPromptId);
-      
-      // 确保窗口可见
-      if (!this.mainWindow.isVisible()) {
-        this.mainWindow.show();
-        this.mainWindow.focus();
+      if (!insertDataConfig?.selectedPromptId && !insertDataConfig?.selectedPromptUUID) {
+        console.log('未配置提示词，无法插入数据');
+        return;
       }
-    } else {
-      console.error('找不到主窗口，无法发送插入数据事件');
+
+      // 获取提示词内容，优先使用UUID
+      const promptContent = await this.getPromptContent(
+        insertDataConfig.selectedPromptId || 0, 
+        insertDataConfig.selectedPromptUUID
+      );
+      
+      if (!promptContent) {
+        console.error('无法获取提示词内容');
+        return;
+      }
+
+      // 将提示词内容复制到剪贴板
+      const { clipboard } = require('electron');
+      clipboard.writeText(promptContent);
+      
+      console.log('提示词内容已复制到剪贴板:', promptContent.substring(0, 50) + '...');
+      
+      // 只复制到剪贴板，不自动粘贴
+      console.log('提示词内容已复制到剪贴板，请手动粘贴 (Ctrl+V 或 Cmd+V)');
+      
+      // 显示系统通知
+      const { Notification } = require('electron');
+      new Notification({
+        title: '已复制到剪贴板',
+        body: '请在合适的位置使用 Ctrl+V (或 Cmd+V) 进行粘贴'
+      }).show();
+      
+    } catch (error) {
+      console.error('插入数据操作失败:', error);
+    }
+  }
+
+  /**
+   * 获取提示词内容
+   */
+  private async getPromptContent(promptId: number, promptUUID?: string): Promise<string | null> {
+    try {
+      // 通过IPC调用渲染进程的API来获取提示词内容
+      console.log('获取提示词内容:', promptId, promptUUID ? `(UUID: ${promptUUID})` : '');
+      
+      if (!this.mainWindow) {
+        const windows = BrowserWindow.getAllWindows();
+        this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
+      }
+      
+      if (!this.mainWindow) {
+        console.error('找不到主窗口');
+        return null;
+      }
+      
+      // 通过IPC获取提示词内容，优先使用UUID
+      const result = await this.mainWindow.webContents.executeJavaScript(`
+        (async () => {
+          try {
+            if (window.databaseAPI && window.databaseAPI.databaseServiceManager) {
+              const promptService = window.databaseAPI.databaseServiceManager.prompt;
+              if (promptService) {
+                let prompt = null;
+                
+                // 优先使用UUID查找，如果UUID存在且有效
+                if ('${promptUUID}' && '${promptUUID}' !== 'undefined') {
+                  prompt = await promptService.getPromptByUUID('${promptUUID}');
+                }
+                
+                // 如果UUID查找失败，回退到ID查找
+                if (!prompt && ${promptId}) {
+                  prompt = await promptService.getPromptById(${promptId});
+                }
+                
+                if (prompt) {
+                  return { success: true, content: prompt.content };
+                } else {
+                  return { success: false, error: '提示词不存在' };
+                }
+              } else {
+                return { success: false, error: '提示词服务不可用' };
+              }
+            } else {
+              return { success: false, error: '数据库API不可用' };
+            }
+          } catch (error) {
+            return { success: false, error: error.message };
+          }
+        })()
+      `);
+      
+      if (result && result.success) {
+        return result.content;
+      } else {
+        console.error('获取提示词内容失败:', result?.error || '未知错误');
+        return null;
+      }
+      
+    } catch (error) {
+      console.error('获取提示词内容失败:', error);
+      return null;
     }
   }
 

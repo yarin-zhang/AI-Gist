@@ -156,7 +156,8 @@ const showInterfaceShortcut = ref('Ctrl+Shift+G');
 const insertDataShortcut = ref('Ctrl+Shift+I');
 const saving = ref(false);
 const selectedPromptId = ref<number | null>(null);
-const promptOptions = ref<Array<{ label: string; value: number }>>([]);
+const selectedPromptUUID = ref<string | null>(null);
+const promptOptions = ref<Array<{ label: string; value: number; uuid?: string; content?: string }>>([]);
 const loadingPrompts = ref(false);
 const selectedPromptPreview = ref<string>('');
 
@@ -164,6 +165,8 @@ const selectedPromptPreview = ref<string>('');
 const loadShortcutsFromSettings = async () => {
   try {
     const prefs = await window.electronAPI.preferences.get();
+    console.log('加载的用户偏好设置:', prefs);
+    
     if (prefs.shortcuts) {
       // 根据平台显示正确的快捷键格式
       const isMac = navigator.platform.includes('Mac');
@@ -173,14 +176,34 @@ const loadShortcutsFromSettings = async () => {
       showInterfaceShortcut.value = prefs.shortcuts.showInterface?.key || defaultShowKey;
       insertDataShortcut.value = prefs.shortcuts.insertData?.key || defaultInsertKey;
       selectedPromptId.value = prefs.shortcuts.insertData?.selectedPromptId || null;
+      selectedPromptUUID.value = prefs.shortcuts.insertData?.selectedPromptUUID || null;
       
-      // 加载选中提示词的预览
-      if (selectedPromptId.value) {
+      console.log('加载的提示词设置:', {
+        selectedPromptId: selectedPromptId.value,
+        selectedPromptUUID: selectedPromptUUID.value
+      });
+      
+      // 加载选中提示词的预览，优先使用UUID
+      if (selectedPromptUUID.value || selectedPromptId.value) {
         try {
           const { apiClientManager } = await import('@/lib/api');
-          const prompt = await apiClientManager.prompt.prompts.getById.query(selectedPromptId.value);
+          let prompt = null;
+          
+          // 优先使用UUID查找
+          if (selectedPromptUUID.value) {
+            prompt = await apiClientManager.prompt.prompts.getByUUID.query(selectedPromptUUID.value);
+          }
+          
+          // 如果UUID查找失败，回退到ID查找
+          if (!prompt && selectedPromptId.value) {
+            prompt = await apiClientManager.prompt.prompts.getById.query(selectedPromptId.value);
+          }
+          
           if (prompt) {
             selectedPromptPreview.value = prompt.content;
+            // 确保UUID和ID都正确设置
+            selectedPromptId.value = prompt.id || selectedPromptId.value;
+            selectedPromptUUID.value = prompt.uuid || selectedPromptUUID.value;
           }
         } catch (error) {
           console.error('加载提示词预览失败:', error);
@@ -318,6 +341,11 @@ const saveShortcuts = async () => {
   try {
     const prefs = await window.electronAPI.preferences.get();
     
+    console.log('保存前的提示词设置:', {
+      selectedPromptId: selectedPromptId.value,
+      selectedPromptUUID: selectedPromptUUID.value
+    });
+    
     // 更新快捷键设置
     const updatedPrefs = {
       ...prefs,
@@ -334,11 +362,14 @@ const saveShortcuts = async () => {
           description: t('shortcuts.insertData'),
           enabled: true,
           type: 'insert-data',
-          selectedPromptId: selectedPromptId.value
+          selectedPromptId: selectedPromptId.value,
+          selectedPromptUUID: selectedPromptUUID.value
         },
         promptTriggers: prefs.shortcuts?.promptTriggers || []
       }
     };
+    
+    console.log('保存的快捷键设置:', updatedPrefs.shortcuts);
     
     // 保存设置
     await window.electronAPI.preferences.set(updatedPrefs);
@@ -365,6 +396,11 @@ const resetShortcuts = async () => {
     
     showInterfaceShortcut.value = defaultShowKey;
     insertDataShortcut.value = defaultInsertKey;
+    
+    // 清空选中的提示词
+    selectedPromptId.value = null;
+    selectedPromptUUID.value = null;
+    selectedPromptPreview.value = '';
     
     // 保存重置的设置
     await saveShortcuts();
@@ -423,11 +459,27 @@ const loadPromptOptions = async () => {
         .map(prompt => ({
           label: `${prompt.title || prompt.content.substring(0, 30)} [${prompt.category?.name || '未分类'}]`,
           value: prompt.id!,
+          uuid: prompt.uuid,
           // 添加更多信息用于显示
           content: prompt.content,
           category: prompt.category?.name || '未分类'
         }));
       console.log('处理后的提示词选项:', promptOptions.value);
+      
+      // 如果有选中的提示词，确保UUID正确设置并加载预览
+      if (selectedPromptId.value) {
+        const selectedOption = promptOptions.value.find(option => option.value === selectedPromptId.value);
+        if (selectedOption && selectedOption.uuid) {
+          selectedPromptUUID.value = selectedOption.uuid;
+          // 加载预览
+          selectedPromptPreview.value = selectedOption.content || '';
+          console.log('在loadPromptOptions中设置选中提示词:', {
+            id: selectedPromptId.value,
+            uuid: selectedPromptUUID.value,
+            content: selectedPromptPreview.value
+          });
+        }
+      }
     } else {
       console.warn('未获取到提示词数据或数据格式不正确:', prompts);
       promptOptions.value = [];
@@ -444,15 +496,40 @@ const loadPromptOptions = async () => {
 
 // 处理提示词选择
 const onPromptSelected = async (promptId: number | null) => {
+  console.log('提示词选择变化:', { promptId, currentOptions: promptOptions.value });
+  
   selectedPromptId.value = promptId;
+  
+  // 同时设置UUID
+  if (promptId) {
+    const selectedOption = promptOptions.value.find(option => option.value === promptId);
+    selectedPromptUUID.value = selectedOption?.uuid || null;
+    console.log('选中的提示词选项:', selectedOption);
+  } else {
+    selectedPromptUUID.value = null;
+  }
   
   // 更新预览
   if (promptId) {
     try {
       const { apiClientManager } = await import('@/lib/api');
-      const prompt = await apiClientManager.prompt.prompts.getById.query(promptId);
+      let prompt = null;
+      
+      // 优先使用UUID查找
+      if (selectedPromptUUID.value) {
+        prompt = await apiClientManager.prompt.prompts.getByUUID.query(selectedPromptUUID.value);
+      }
+      
+      // 如果UUID查找失败，回退到ID查找
+      if (!prompt) {
+        prompt = await apiClientManager.prompt.prompts.getById.query(promptId);
+      }
+      
       if (prompt) {
         selectedPromptPreview.value = prompt.content;
+        // 确保UUID和ID都正确设置
+        selectedPromptId.value = prompt.id || selectedPromptId.value;
+        selectedPromptUUID.value = prompt.uuid || selectedPromptUUID.value;
       } else {
         selectedPromptPreview.value = '';
       }
@@ -464,7 +541,7 @@ const onPromptSelected = async (promptId: number | null) => {
     selectedPromptPreview.value = '';
   }
   
-  // 保存选择的提示词ID到设置中
+  // 保存选择的提示词ID和UUID到设置中
   await saveShortcuts();
 };
 
@@ -472,8 +549,28 @@ const onPromptSelected = async (promptId: number | null) => {
 
 // 组件挂载时加载设置和检查权限
 onMounted(async () => {
+  // 先加载用户设置
   await loadShortcutsFromSettings();
+  
+  // 然后加载提示词选项
   await loadPromptOptions();
+  
+  // 在加载提示词选项后，确保选中的提示词正确显示
+  if (selectedPromptId.value && promptOptions.value.length > 0) {
+    const selectedOption = promptOptions.value.find(option => option.value === selectedPromptId.value);
+    if (selectedOption) {
+      // 确保UUID正确设置
+      selectedPromptUUID.value = selectedOption.uuid || selectedPromptUUID.value;
+      console.log('找到选中的提示词选项:', selectedOption);
+    } else {
+      // 如果选中的提示词不在当前列表中，清空选择
+      console.log('选中的提示词不在当前列表中，清空选择');
+      selectedPromptId.value = null;
+      selectedPromptUUID.value = null;
+      selectedPromptPreview.value = '';
+    }
+  }
+  
   await checkPermissions();
 });
 
