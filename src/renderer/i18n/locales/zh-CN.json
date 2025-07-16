@@ -210,6 +210,7 @@
     "save": "保存",
     "unknownError": "未知错误",
     "update": "更新",
+    "confirm": "确认",
     "yes": "是"
   },
   "dataManagement": {
@@ -754,7 +755,15 @@
     "saveSuccess": "快捷键设置保存成功",
     "showInterface": "显示界面",
     "showInterfaceDesc": "快速显示或隐藏应用界面",
-    "title": "快捷键设置"
+    "title": "快捷键设置",
+    "clickToInput": "点击输入快捷键",
+    "trigger": "快捷键触发器",
+    "triggerDesc": "用于触发选中提示词的快捷键 (Ctrl+Shift+P)",
+    "triggerFixed": "此快捷键固定为 Ctrl+Shift+P，不可修改",
+    "inputShortcut": "输入快捷键",
+    "pressShortcut": "请按下您想要的快捷键组合",
+    "waitingInput": "等待输入...",
+    "modifierKeys": "支持 Ctrl、Shift、Alt、Cmd 等修饰键"
   },
   "startup": {
     "autoStart": "开机自动启动",

@@ -124,22 +124,11 @@ export interface ShortcutsAPI {
   // 注册默认快捷键
   registerDefaults: () => Promise<{ success: boolean; error?: string }>;
   
-  // 注册快捷键触发器
-  registerTrigger: (promptId: string, content: string) => Promise<{ success: boolean; error?: string }>;
-  
-  // 取消快捷键触发器
-  unregisterTrigger: () => Promise<{ success: boolean; error?: string }>;
-  
-  // 获取当前快捷键触发器
-  getCurrentTrigger: () => Promise<{ success: boolean; data?: string; error?: string }>;
-  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => Promise<boolean>;
   
   // 监听快捷键事件
   onInsertData: (callback: () => void) => () => void;
-  
-  onTriggerPrompt: (callback: (data: { promptId: string; content: string }) => void) => () => void;
 }
 
 /**

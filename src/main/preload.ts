@@ -5,16 +5,6 @@ const shortcutsAPI = {
   // 注册默认快捷键
   registerDefaults: () => ipcRenderer.invoke('shortcuts:register-defaults'),
   
-  // 注册快捷键触发器
-  registerTrigger: (promptId: string, content: string) => 
-    ipcRenderer.invoke('shortcuts:register-trigger', { promptId, content }),
-  
-  // 取消快捷键触发器
-  unregisterTrigger: () => ipcRenderer.invoke('shortcuts:unregister-trigger'),
-  
-  // 获取当前快捷键触发器
-  getCurrentTrigger: () => ipcRenderer.invoke('shortcuts:get-current-trigger'),
-  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-registered', accelerator),
   
@@ -22,11 +12,6 @@ const shortcutsAPI = {
   onInsertData: (callback: () => void) => {
     ipcRenderer.on('shortcut:insert-data', callback);
     return () => ipcRenderer.removeAllListeners('shortcut:insert-data');
-  },
-  
-  onTriggerPrompt: (callback: (data: { promptId: string; content: string }) => void) => {
-    ipcRenderer.on('shortcut:trigger-prompt', (_, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('shortcut:trigger-prompt');
   }
 };
 

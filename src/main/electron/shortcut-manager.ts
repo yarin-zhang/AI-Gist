@@ -3,13 +3,13 @@
  * 负责注册和管理全局快捷键，包括显示界面和插入数据的快捷键
  */
 
-import { globalShortcut, BrowserWindow } from 'electron';
+import { globalShortcut, BrowserWindow, app } from 'electron';
 import { ipcMain } from 'electron';
 
 export class ShortcutManager {
   private static instance: ShortcutManager;
   private registeredShortcuts: Set<string> = new Set();
-  private currentShortcutTrigger: string | null = null;
+  private mainWindow: BrowserWindow | null = null;
 
   static getInstance(): ShortcutManager {
     if (!ShortcutManager.instance) {
@@ -19,18 +19,37 @@ export class ShortcutManager {
   }
 
   /**
+   * 设置主窗口引用
+   */
+  setMainWindow(window: BrowserWindow) {
+    this.mainWindow = window;
+  }
+
+  /**
    * 注册默认快捷键
    */
   registerDefaultShortcuts(): void {
+    console.log('开始注册全局快捷键...');
+    
+    // 检查是否有权限注册全局快捷键
+    // 在 macOS 上，全局快捷键需要特殊权限
+    if (process.platform === 'darwin') {
+      console.log('在 macOS 上注册全局快捷键，可能需要权限');
+    }
+
     // 注册显示界面的快捷键
-    this.registerShortcut('CommandOrControl+Shift+G', () => {
+    const showInterfaceSuccess = this.registerShortcut('CommandOrControl+Shift+G', () => {
+      console.log('快捷键触发：显示界面');
       this.showMainWindow();
     });
 
     // 注册插入数据的快捷键
-    this.registerShortcut('CommandOrControl+Shift+I', () => {
+    const insertDataSuccess = this.registerShortcut('CommandOrControl+Shift+I', () => {
+      console.log('快捷键触发：插入数据');
       this.insertData();
     });
+
+    console.log(`快捷键注册结果：显示界面=${showInterfaceSuccess}, 插入数据=${insertDataSuccess}`);
   }
 
   /**
@@ -42,61 +61,46 @@ export class ShortcutManager {
       return false;
     }
 
-    const success = globalShortcut.register(accelerator, callback);
-    if (success) {
-      this.registeredShortcuts.add(accelerator);
-      console.log(`快捷键 ${accelerator} 注册成功`);
-    } else {
-      console.error(`快捷键 ${accelerator} 注册失败`);
-    }
-    return success;
-  }
-
-  /**
-   * 注册快捷键触发器
-   * 只注册一个快捷键触发器，避免重复注册
-   */
-  registerShortcutTrigger(promptId: string, content: string): void {
-    // 先取消之前的快捷键触发器
-    this.unregisterShortcutTrigger();
-
-    const accelerator = 'CommandOrControl+Shift+P';
-    const success = this.registerShortcut(accelerator, () => {
-      this.triggerShortcutPrompt(promptId, content);
-    });
-
-    if (success) {
-      this.currentShortcutTrigger = promptId;
-      console.log(`快捷键触发器注册成功: ${promptId}`);
+    try {
+      const success = globalShortcut.register(accelerator, callback);
+      if (success) {
+        this.registeredShortcuts.add(accelerator);
+        console.log(`快捷键 ${accelerator} 注册成功`);
+      } else {
+        console.error(`快捷键 ${accelerator} 注册失败 - 可能被其他应用占用`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`注册快捷键 ${accelerator} 时发生错误:`, error);
+      return false;
     }
   }
 
-  /**
-   * 取消快捷键触发器
-   */
-  unregisterShortcutTrigger(): void {
-    const accelerator = 'CommandOrControl+Shift+P';
-    if (this.registeredShortcuts.has(accelerator)) {
-      globalShortcut.unregister(accelerator);
-      this.registeredShortcuts.delete(accelerator);
-      this.currentShortcutTrigger = null;
-      console.log('快捷键触发器已取消');
-    }
-  }
+
 
   /**
    * 显示主窗口
    */
   private showMainWindow(): void {
-    const windows = BrowserWindow.getAllWindows();
-    const mainWindow = windows.find(win => !win.isDestroyed());
+    if (!this.mainWindow) {
+      const windows = BrowserWindow.getAllWindows();
+      this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
+    }
     
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
+    if (this.mainWindow) {
+      console.log('显示主窗口');
+      if (this.mainWindow.isMinimized()) {
+        this.mainWindow.restore();
       }
-      mainWindow.show();
-      mainWindow.focus();
+      this.mainWindow.show();
+      this.mainWindow.focus();
+      
+      // 在 macOS 下，确保应用出现在前台
+      if (process.platform === 'darwin') {
+        app.focus({ steal: true });
+      }
+    } else {
+      console.error('找不到主窗口');
     }
   }
 
@@ -104,33 +108,20 @@ export class ShortcutManager {
    * 插入数据
    */
   private insertData(): void {
-    const windows = BrowserWindow.getAllWindows();
-    const mainWindow = windows.find(win => !win.isDestroyed());
+    if (!this.mainWindow) {
+      const windows = BrowserWindow.getAllWindows();
+      this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
+    }
     
-    if (mainWindow) {
-      mainWindow.webContents.send('shortcut:insert-data');
+    if (this.mainWindow) {
+      console.log('发送插入数据事件');
+      this.mainWindow.webContents.send('shortcut:insert-data');
+    } else {
+      console.error('找不到主窗口，无法发送插入数据事件');
     }
   }
 
-  /**
-   * 触发快捷键提示词
-   */
-  private triggerShortcutPrompt(promptId: string, content: string): void {
-    const windows = BrowserWindow.getAllWindows();
-    const mainWindow = windows.find(win => !win.isDestroyed());
-    
-    if (mainWindow) {
-      // 显示窗口
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.show();
-      mainWindow.focus();
-      
-      // 发送快捷键触发事件
-      mainWindow.webContents.send('shortcut:trigger-prompt', { promptId, content });
-    }
-  }
+
 
   /**
    * 注销所有快捷键
@@ -138,7 +129,6 @@ export class ShortcutManager {
   unregisterAllShortcuts(): void {
     globalShortcut.unregisterAll();
     this.registeredShortcuts.clear();
-    this.currentShortcutTrigger = null;
     console.log('所有快捷键已注销');
   }
 
@@ -149,10 +139,19 @@ export class ShortcutManager {
     return this.registeredShortcuts.has(accelerator);
   }
 
+
+
   /**
-   * 获取当前快捷键触发器
+   * 获取已注册的快捷键列表
    */
-  getCurrentShortcutTrigger(): string | null {
-    return this.currentShortcutTrigger;
+  getRegisteredShortcuts(): string[] {
+    return Array.from(this.registeredShortcuts);
+  }
+
+  /**
+   * 检查快捷键是否可用
+   */
+  isShortcutAvailable(accelerator: string): boolean {
+    return !globalShortcut.isRegistered(accelerator);
   }
 } 

@@ -181,8 +181,23 @@ class WindowManager {
   showMainWindow(): void {
     if (!this.mainWindow) return;
 
-    this.restoreWindowIfMinimized();
-    this.showAndFocusWindow();
+    // 如果窗口被最小化，先恢复
+    if (this.mainWindow.isMinimized()) {
+      this.mainWindow.restore();
+    }
+
+    // 如果窗口被隐藏，显示它
+    if (!this.mainWindow.isVisible()) {
+      this.mainWindow.show();
+    }
+
+    // 确保窗口获得焦点
+    this.mainWindow.focus();
+
+    // 在 macOS 下，确保应用出现在前台
+    if (process.platform === 'darwin') {
+      app.focus({ steal: true });
+    }
   }
 
   /**

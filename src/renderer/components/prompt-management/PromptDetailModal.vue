@@ -27,15 +27,7 @@
         <!-- Header 额外区域 - 操作按钮 -->
         <template #header-extra>
             <NFlex size="small">
-                <NButton @click="toggleShortcutTrigger" :type="prompt.isShortcutTrigger ? 'success' : 'default'">
-                    <template #icon>
-                        <NIcon>
-                            <Keyboard />
-                        </NIcon>
-                    </template>
-                    {{ prompt.isShortcutTrigger ? t('promptManagement.cancelShortcutTrigger') :
-                        t('promptManagement.setAsShortcutTrigger') }}
-                </NButton>
+
                 <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
                     <template #icon>
                         <NIcon>
@@ -1590,25 +1582,7 @@ const toggleFavorite = async () => {
 };
 
 // 切换快捷键触发状态
-const toggleShortcutTrigger = async () => {
-    try {
-        await api.prompts.toggleShortcutTrigger.mutate(props.prompt.id);
 
-        // 立即更新当前 prompt 对象的快捷键触发状态
-        if (props.prompt) {
-            props.prompt.isShortcutTrigger = !props.prompt.isShortcutTrigger;
-        }
-
-        // 刷新快捷键注册
-        await window.electronAPI.shortcuts.refresh();
-
-        message.success("快捷键触发状态已更新");
-        emit("updated"); // 通知父组件重新加载数据
-    } catch (error) {
-        message.error("更新快捷键触发状态失败");
-        console.error(error);
-    }
-};
 
 // 加载历史记录
 const loadHistoryRecord = (record: any) => {

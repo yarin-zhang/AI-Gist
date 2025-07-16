@@ -258,38 +258,7 @@ class IpcHandlers {
       }
     });
 
-    // 注册快捷键触发器
-    ipcMain.handle('shortcuts:register-trigger', async (event, { promptId, content }) => {
-      try {
-        ShortcutManager.getInstance().registerShortcutTrigger(promptId, content);
-        return { success: true };
-      } catch (error) {
-        console.error('注册快捷键触发器失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
 
-    // 取消快捷键触发器
-    ipcMain.handle('shortcuts:unregister-trigger', () => {
-      try {
-        ShortcutManager.getInstance().unregisterShortcutTrigger();
-        return { success: true };
-      } catch (error) {
-        console.error('取消快捷键触发器失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
-
-    // 获取当前快捷键触发器
-    ipcMain.handle('shortcuts:get-current-trigger', () => {
-      try {
-        const currentTrigger = ShortcutManager.getInstance().getCurrentShortcutTrigger();
-        return { success: true, data: currentTrigger };
-      } catch (error) {
-        console.error('获取当前快捷键触发器失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
 
     // 检查快捷键是否已注册
     ipcMain.handle('shortcuts:is-registered', (_, accelerator: string) => {
