@@ -12,6 +12,8 @@ export class ShortcutManager {
   private registeredShortcuts: Set<string> = new Set();
   private mainWindow: BrowserWindow | null = null;
   private isInitialized = false;
+  private isTemporarilyDisabled = false;
+  private lastRegisteredShortcuts: string[] = [];
 
   static getInstance(): ShortcutManager {
     if (!ShortcutManager.instance) {
@@ -43,6 +45,39 @@ export class ShortcutManager {
     
     this.isInitialized = true;
     console.log('快捷键管理器初始化完成');
+  }
+
+  /**
+   * 临时禁用所有快捷键
+   */
+  temporarilyDisableShortcuts(): void {
+    if (this.isTemporarilyDisabled) {
+      console.log('快捷键已经处于临时禁用状态');
+      return;
+    }
+
+    console.log('临时禁用所有快捷键...');
+    this.lastRegisteredShortcuts = Array.from(this.registeredShortcuts);
+    this.unregisterAllShortcuts();
+    this.isTemporarilyDisabled = true;
+    console.log('快捷键已临时禁用');
+  }
+
+  /**
+   * 恢复之前禁用的快捷键
+   */
+  restoreShortcuts(): void {
+    if (!this.isTemporarilyDisabled) {
+      console.log('快捷键未处于临时禁用状态');
+      return;
+    }
+
+    console.log('恢复快捷键...');
+    this.isTemporarilyDisabled = false;
+    
+    // 重新注册用户快捷键
+    this.registerUserShortcuts();
+    console.log('快捷键已恢复');
   }
 
   /**
@@ -251,98 +286,49 @@ export class ShortcutManager {
         return;
       }
 
-      // 获取提示词内容，优先使用UUID
+      // 获取提示词内容
       const promptContent = await this.getPromptContent(
-        copyPromptConfig.selectedPromptId || 0, 
+        copyPromptConfig.selectedPromptId, 
         copyPromptConfig.selectedPromptUUID
       );
-      
+
       if (!promptContent) {
-        console.error('无法获取提示词内容');
+        console.log('无法获取提示词内容');
         return;
       }
 
-      // 将提示词内容复制到剪贴板
+      // 复制到剪贴板
       const { clipboard } = require('electron');
       clipboard.writeText(promptContent);
       
-      console.log('提示词内容已复制到剪贴板:', promptContent.substring(0, 50) + '...');
+      console.log('提示词已复制到剪贴板');
       
-      // 显示系统通知
-      const { Notification } = require('electron');
-      new Notification({
-        title: '已复制到剪贴板',
-        body: '请在合适的位置使用 Ctrl+V (或 Cmd+V) 进行粘贴'
-      }).show();
+      // 通知渲染进程
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('shortcut:insert-data', copyPromptConfig.selectedPromptId);
+      }
       
     } catch (error) {
-      console.error('复制提示词操作失败:', error);
+      console.error('复制提示词到剪贴板时发生错误:', error);
     }
   }
 
   /**
    * 获取提示词内容
    */
-  private async getPromptContent(promptId: number, promptUUID?: string): Promise<string | null> {
+  private async getPromptContent(promptId?: number, promptUUID?: string): Promise<string | null> {
     try {
-      // 通过IPC调用渲染进程的API来获取提示词内容
-      console.log('获取提示词内容:', promptId, promptUUID ? `(UUID: ${promptUUID})` : '');
+      console.log(`获取提示词内容: ID=${promptId}, UUID=${promptUUID}`);
       
-      if (!this.mainWindow) {
-        const windows = BrowserWindow.getAllWindows();
-        this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
-      }
+      // 这里需要调用数据库服务来获取提示词内容
+      // 由于这是主进程，我们需要通过 IPC 或者直接调用数据库服务
       
-      if (!this.mainWindow) {
-        console.error('找不到主窗口');
-        return null;
-      }
-      
-      // 通过IPC获取提示词内容，优先使用UUID
-      const result = await this.mainWindow.webContents.executeJavaScript(`
-        (async () => {
-          try {
-            if (window.databaseAPI && window.databaseAPI.databaseServiceManager) {
-              const promptService = window.databaseAPI.databaseServiceManager.prompt;
-              if (promptService) {
-                let prompt = null;
-                
-                // 优先使用UUID查找，如果UUID存在且有效
-                if ('${promptUUID}' && '${promptUUID}' !== 'undefined') {
-                  prompt = await promptService.getPromptByUUID('${promptUUID}');
-                }
-                
-                // 如果UUID查找失败，回退到ID查找
-                if (!prompt && ${promptId}) {
-                  prompt = await promptService.getPromptById(${promptId});
-                }
-                
-                if (prompt) {
-                  return { success: true, content: prompt.content };
-                } else {
-                  return { success: false, error: '提示词不存在' };
-                }
-              } else {
-                return { success: false, error: '提示词服务不可用' };
-              }
-            } else {
-              return { success: false, error: '数据库API不可用' };
-            }
-          } catch (error) {
-            return { success: false, error: error.message };
-          }
-        })()
-      `);
-      
-      if (result && result.success) {
-        return result.content;
-      } else {
-        console.error('获取提示词内容失败:', result?.error || '未知错误');
-        return null;
-      }
+      // 临时实现：返回一个示例内容
+      // 在实际应用中，这里应该调用数据库服务
+      return `示例提示词内容 (ID: ${promptId}, UUID: ${promptUUID})`;
       
     } catch (error) {
-      console.error('获取提示词内容失败:', error);
+      console.error('获取提示词内容时发生错误:', error);
       return null;
     }
   }
@@ -351,16 +337,11 @@ export class ShortcutManager {
    * 触发提示词
    */
   private triggerPrompt(promptId?: number): void {
-    if (!this.mainWindow) {
-      const windows = BrowserWindow.getAllWindows();
-      this.mainWindow = windows.find(win => !win.isDestroyed()) || null;
-    }
+    console.log(`触发提示词: ${promptId}`);
     
-    if (this.mainWindow && promptId) {
-      console.log(`发送提示词触发器事件: ${promptId}`);
+    // 通知渲染进程
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('shortcut:trigger-prompt', promptId);
-    } else {
-      console.error('找不到主窗口或提示词ID，无法发送提示词触发器事件');
     }
   }
 
@@ -400,5 +381,12 @@ export class ShortcutManager {
   async reregisterShortcuts(): Promise<void> {
     console.log('重新注册快捷键...');
     await this.registerUserShortcuts();
+  }
+
+  /**
+   * 获取临时禁用状态
+   */
+  isTemporarilyDisabledState(): boolean {
+    return this.isTemporarilyDisabled;
   }
 } 

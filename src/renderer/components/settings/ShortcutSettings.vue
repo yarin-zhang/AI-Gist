@@ -160,6 +160,7 @@ const selectedPromptUUID = ref<string | null>(null);
 const promptOptions = ref<Array<{ label: string; value: number; uuid?: string; content?: string }>>([]);
 const loadingPrompts = ref(false);
 const selectedPromptPreview = ref<string>('');
+const shortcutsTemporarilyDisabled = ref(false);
 
 // 从用户设置加载快捷键
 const loadShortcutsFromSettings = async () => {
@@ -228,13 +229,12 @@ const handleKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
 
     const modifiers: string[] = [];
-
-    // 根据平台处理修饰键
     const isMac = navigator.platform.includes('Mac');
-    
+
+    // 处理修饰键，避免重复识别
     if (isMac) {
         if (event.metaKey) modifiers.push('Cmd');
-        if (event.ctrlKey) modifiers.push('Ctrl');
+        if (event.ctrlKey && !event.metaKey) modifiers.push('Ctrl');
     } else {
         if (event.ctrlKey || event.metaKey) modifiers.push('Ctrl');
     }
@@ -242,42 +242,98 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (event.shiftKey) modifiers.push('Shift');
     if (event.altKey) modifiers.push('Alt');
 
-    // 获取按键名称
-    let key = event.key.toUpperCase();
+    // 获取按键名称，处理Mac下Alt键产生特殊字符的问题
+    let key = event.key;
+    
+    // 在Mac下，如果按下了Alt键，需要特殊处理
+    if (isMac && event.altKey) {
+        // 使用code属性来获取原始按键，避免Alt键产生的特殊字符
+        const keyCode = event.code;
+        if (keyCode.startsWith('Key')) {
+            key = keyCode.replace('Key', '');
+        } else if (keyCode.startsWith('Digit')) {
+            key = keyCode.replace('Digit', '');
+        } else {
+            // 对于其他按键，使用code属性
+            const codeMap: Record<string, string> = {
+                'Minus': '-',
+                'Equal': '=',
+                'BracketLeft': '[',
+                'BracketRight': ']',
+                'Backslash': '\\',
+                'Semicolon': ';',
+                'Quote': "'",
+                'Comma': ',',
+                'Period': '.',
+                'Slash': '/',
+                'Backquote': '`',
+                'Space': 'Space',
+                'Enter': 'Enter',
+                'Tab': 'Tab',
+                'Backspace': 'Backspace',
+                'Delete': 'Delete',
+                'ArrowUp': '↑',
+                'ArrowDown': '↓',
+                'ArrowLeft': '←',
+                'ArrowRight': '→',
+                'Home': 'Home',
+                'End': 'End',
+                'PageUp': 'PageUp',
+                'PageDown': 'PageDown',
+                'Insert': 'Insert',
+                'F1': 'F1',
+                'F2': 'F2',
+                'F3': 'F3',
+                'F4': 'F4',
+                'F5': 'F5',
+                'F6': 'F6',
+                'F7': 'F7',
+                'F8': 'F8',
+                'F9': 'F9',
+                'F10': 'F10',
+                'F11': 'F11',
+                'F12': 'F12',
+            };
+            key = codeMap[keyCode] || keyCode;
+        }
+    } else {
+        // 非Mac或没有Alt键的情况，使用正常的key处理
+        key = key.toUpperCase();
+        
+        // 特殊按键映射
+        const keyMap: Record<string, string> = {
+            ' ': 'Space',
+            'Escape': 'Esc',
+            'Enter': 'Enter',
+            'Tab': 'Tab',
+            'Backspace': 'Backspace',
+            'Delete': 'Delete',
+            'ArrowUp': '↑',
+            'ArrowDown': '↓',
+            'ArrowLeft': '←',
+            'ArrowRight': '→',
+            'Home': 'Home',
+            'End': 'End',
+            'PageUp': 'PageUp',
+            'PageDown': 'PageDown',
+            'Insert': 'Insert',
+            'F1': 'F1',
+            'F2': 'F2',
+            'F3': 'F3',
+            'F4': 'F4',
+            'F5': 'F5',
+            'F6': 'F6',
+            'F7': 'F7',
+            'F8': 'F8',
+            'F9': 'F9',
+            'F10': 'F10',
+            'F11': 'F11',
+            'F12': 'F12',
+        };
 
-    // 特殊按键映射
-    const keyMap: Record<string, string> = {
-        ' ': 'Space',
-        'Escape': 'Esc',
-        'Enter': 'Enter',
-        'Tab': 'Tab',
-        'Backspace': 'Backspace',
-        'Delete': 'Delete',
-        'ArrowUp': '↑',
-        'ArrowDown': '↓',
-        'ArrowLeft': '←',
-        'ArrowRight': '→',
-        'Home': 'Home',
-        'End': 'End',
-        'PageUp': 'PageUp',
-        'PageDown': 'PageDown',
-        'Insert': 'Insert',
-        'F1': 'F1',
-        'F2': 'F2',
-        'F3': 'F3',
-        'F4': 'F4',
-        'F5': 'F5',
-        'F6': 'F6',
-        'F7': 'F7',
-        'F8': 'F8',
-        'F9': 'F9',
-        'F10': 'F10',
-        'F11': 'F11',
-        'F12': 'F12',
-    };
-
-    if (keyMap[key]) {
-        key = keyMap[key];
+        if (keyMap[key]) {
+            key = keyMap[key];
+        }
     }
 
     // 组合快捷键
@@ -302,6 +358,10 @@ const startCaptureShortcut = (type: 'showInterface' | 'copyPrompt') => {
     capturingType.value = type;
     capturingShortcut.value = '';
     showCaptureModal.value = true;
+
+    // 临时禁用快捷键
+    window.electronAPI.shortcuts.temporarilyDisable();
+    shortcutsTemporarilyDisabled.value = true;
 
     // 添加键盘事件监听
     document.addEventListener('keydown', handleKeyDown, true);
@@ -333,6 +393,12 @@ const cancelCapture = () => {
     // 移除键盘事件监听
     document.removeEventListener('keydown', handleKeyDown, true);
     document.removeEventListener('keyup', handleKeyUp, true);
+
+    // 恢复快捷键
+    if (shortcutsTemporarilyDisabled.value) {
+        window.electronAPI.shortcuts.restore();
+        shortcutsTemporarilyDisabled.value = false;
+    }
 };
 
 // 保存快捷键设置
@@ -573,10 +639,21 @@ onMounted(async () => {
   await checkPermissions();
 });
 
-// 组件卸载时清理事件监听
-onUnmounted(() => {
+// 组件卸载时清理事件监听和恢复快捷键
+onUnmounted(async () => {
     document.removeEventListener('keydown', handleKeyDown, true);
     document.removeEventListener('keyup', handleKeyUp, true);
+    
+    // 如果Modal还在打开状态，恢复快捷键
+    if (shortcutsTemporarilyDisabled.value) {
+        try {
+            await window.electronAPI.shortcuts.restore();
+            shortcutsTemporarilyDisabled.value = false;
+            console.log('已恢复快捷键');
+        } catch (error) {
+            console.error('恢复快捷键失败:', error);
+        }
+    }
 });
 </script>
 

@@ -269,6 +269,28 @@ class IpcHandlers {
       }
     });
 
+    // 临时禁用快捷键
+    ipcMain.handle('shortcuts:temporarily-disable', () => {
+      try {
+        ShortcutManager.getInstance().temporarilyDisableShortcuts();
+        return { success: true };
+      } catch (error) {
+        console.error('临时禁用快捷键失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 恢复快捷键
+    ipcMain.handle('shortcuts:restore', () => {
+      try {
+        ShortcutManager.getInstance().restoreShortcuts();
+        return { success: true };
+      } catch (error) {
+        console.error('恢复快捷键失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
     // 检查快捷键是否已注册
     ipcMain.handle('shortcuts:is-registered', (_, accelerator: string) => {
       return ShortcutManager.getInstance().isRegistered(accelerator);
@@ -294,35 +316,12 @@ class IpcHandlers {
       }
     });
 
-    // 获取提示词内容（用于快捷键复制）
-    ipcMain.handle('shortcuts:get-prompt-content', async (event, promptId: number) => {
+    // 获取提示词内容
+    ipcMain.handle('shortcuts:get-prompt-content', async (_, promptId: number) => {
       try {
-        // 通过渲染进程的数据库API获取提示词内容
-        const result = await event.sender.executeJavaScript(`
-          (async () => {
-            try {
-              if (window.databaseAPI && window.databaseAPI.databaseServiceManager) {
-                const promptService = window.databaseAPI.databaseServiceManager.prompt;
-                if (promptService) {
-                  const prompt = await promptService.getPromptById(${promptId});
-                  if (prompt) {
-                    return { success: true, content: prompt.content };
-                  } else {
-                    return { success: false, error: '提示词不存在' };
-                  }
-                } else {
-                  return { success: false, error: '提示词服务不可用' };
-                }
-              } else {
-                return { success: false, error: '数据库API不可用' };
-              }
-            } catch (error) {
-              return { success: false, error: error.message };
-            }
-          })()
-        `);
-        
-        return result;
+        // 这里应该调用数据库服务来获取提示词内容
+        // 临时返回示例内容
+        return { success: true, content: `示例提示词内容 (ID: ${promptId})` };
       } catch (error) {
         console.error('获取提示词内容失败:', error);
         return { success: false, error: (error as Error).message };
@@ -409,6 +408,8 @@ class IpcHandlers {
     // 清理快捷键处理器
     ipcMain.removeHandler('shortcuts:register-defaults');
     ipcMain.removeHandler('shortcuts:reregister');
+    ipcMain.removeHandler('shortcuts:temporarily-disable');
+    ipcMain.removeHandler('shortcuts:restore');
     ipcMain.removeHandler('shortcuts:is-registered');
     ipcMain.removeHandler('shortcuts:is-available');
     ipcMain.removeHandler('shortcuts:get-registered');

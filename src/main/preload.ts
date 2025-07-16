@@ -8,6 +8,12 @@ const shortcutsAPI = {
   // 重新注册快捷键
   reregister: () => ipcRenderer.invoke('shortcuts:reregister'),
   
+  // 临时禁用快捷键
+  temporarilyDisable: () => ipcRenderer.invoke('shortcuts:temporarily-disable'),
+  
+  // 恢复快捷键
+  restore: () => ipcRenderer.invoke('shortcuts:restore'),
+  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => ipcRenderer.invoke('shortcuts:is-registered', accelerator),
   

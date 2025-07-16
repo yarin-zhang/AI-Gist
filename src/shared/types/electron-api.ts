@@ -127,6 +127,12 @@ export interface ShortcutsAPI {
   // 重新注册快捷键
   reregister: () => Promise<{ success: boolean; error?: string }>;
   
+  // 临时禁用快捷键
+  temporarilyDisable: () => Promise<{ success: boolean; error?: string }>;
+  
+  // 恢复快捷键
+  restore: () => Promise<{ success: boolean; error?: string }>;
+  
   // 检查快捷键是否已注册
   isRegistered: (accelerator: string) => Promise<boolean>;
   
