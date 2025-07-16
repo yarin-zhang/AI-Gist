@@ -46,6 +46,8 @@ export interface Prompt {
   version?: number;
   isActive: boolean;
   isJinjaTemplate?: boolean; // 是否为 Jinja 模板
+  isShortcutTrigger?: boolean; // 是否为快捷键触发
+  shortcutKey?: string; // 快捷键组合
   createdAt: Date;
   updatedAt: Date;
 }

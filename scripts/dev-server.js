@@ -95,13 +95,6 @@ function restartElectron() {
 }
 
 /**
- * 复制静态文件到构建目录
- */
-function copyStaticFiles() {
-    copy('static');
-}
-
-/**
  * 复制指定路径的文件或目录
  * 工作目录是 build/main 而不是 src/main，因为需要编译 TS
  * tsc 不会复制静态文件，所以需要手动复制给开发服务器使用
@@ -140,9 +133,6 @@ async function start() {
     const devServer = await startRenderer();
     rendererPort = devServer.config.server.port;
 
-    // 复制静态文件
-    copyStaticFiles();
-    
     // 启动 Electron 主进程
     startElectron();
 
@@ -152,11 +142,6 @@ async function start() {
         cwd: watchPath,
     }).on('change', (filePath) => {
         console.log(Chalk.blueBright(`[electron] `) + `检测到文件变化: ${filePath}，正在重新加载... 🚀`);
-
-        // 修复路径比较逻辑：检查是否为静态文件目录下的文件
-        if (filePath.includes('static')) {
-            copy(filePath);
-        }
 
         restartElectron();
     });

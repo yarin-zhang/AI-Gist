@@ -496,6 +496,67 @@ export class PromptService extends BaseDatabaseService {
   }
 
   /**
+   * 切换提示词快捷键触发状态
+   * 切换指定提示词的快捷键触发状态，如果已启用则禁用，如果未启用则启用
+   * 实现互斥逻辑：只能有一个提示词被标记为快捷键触发
+   * @param id number 提示词ID
+   * @returns Promise<PromptWithRelations> 更新后的提示词记录（包含关联数据）
+   */
+  async toggleShortcutTrigger(promptId: string): Promise<void> {
+    // 获取当前prompt
+    const currentPrompt = await this.getByUUID<Prompt>('prompts', promptId);
+    if (!currentPrompt) {
+      throw new Error('Prompt not found');
+    }
+
+    // 如果当前prompt已经是快捷键触发器，则取消它
+    if (currentPrompt.isShortcutTrigger) {
+      await this.update<Prompt>('prompts', currentPrompt.id!, {
+        isShortcutTrigger: false
+      });
+      return;
+    }
+
+    // 否则，先取消其他prompt的快捷键触发器，再设置当前prompt
+    const allPrompts = await this.getAll<Prompt>('prompts');
+    const shortcutPrompts = allPrompts.filter(p => p.isShortcutTrigger);
+    
+    // 批量更新：取消所有其他prompt的快捷键触发器
+    const updatePromises = shortcutPrompts.map(prompt => 
+      this.update<Prompt>('prompts', prompt.id!, {
+        isShortcutTrigger: false
+      })
+    );
+    
+    await Promise.all(updatePromises);
+    
+    // 设置当前prompt为快捷键触发器
+    await this.update<Prompt>('prompts', currentPrompt.id!, {
+      isShortcutTrigger: true
+    });
+  }
+
+  /**
+   * 获取所有标记为快捷键触发的提示词
+   * 查询所有被标记为快捷键触发的提示词
+   * @returns Promise<PromptWithRelations[]> 快捷键触发的提示词列表
+   */
+  async getShortcutTriggerPrompts(): Promise<PromptWithRelations[]> {
+    const prompts = await this.getAll<Prompt>('prompts');
+    const shortcutPrompts = prompts.filter(prompt => prompt.isShortcutTrigger);
+    
+    // 获取关联数据
+    const categories = await this.getAll<Category>('categories');
+    const variables = await this.getAll<PromptVariable>('promptVariables');
+    
+    return shortcutPrompts.map(prompt => ({
+      ...prompt,
+      category: categories.find(c => c.id === prompt.categoryId),
+      variables: variables.filter(v => v.promptId === prompt.id),
+    }));
+  }
+
+  /**
    * 填充提示词变量
    * 将提示词中的变量占位符替换为实际值，并增加使用次数
    * @param promptId number 提示词ID

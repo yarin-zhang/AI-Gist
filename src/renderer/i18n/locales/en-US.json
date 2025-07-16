@@ -582,6 +582,11 @@
     "updateFavoriteFailed": "Failed to update favorite status",
     "updateFavoriteSuccess": "Favorite status updated",
     "updateSuccess": "Prompt updated successfully",
+    "shortcutTrigger": "Shortcut Trigger",
+    "updateShortcutTriggerSuccess": "Shortcut trigger status updated",
+    "updateShortcutTriggerFailed": "Failed to update shortcut trigger status",
+    "setAsShortcutTrigger": "Set as Shortcut Trigger",
+    "cancelShortcutTrigger": "Cancel Shortcut Trigger",
     "useCount": "Used {count} times",
     "variable": "Variable",
     "variableConfig": "Variable Configuration",
@@ -658,6 +663,10 @@
         "description": "Configure the display language of the application",
         "title": "Language settings"
       },
+      "shortcuts": {
+        "description": "Configure global shortcuts and prompt shortcuts",
+        "title": "Shortcut Settings"
+      },
       "startup-behavior": {
         "description": "Configure application startup and self-start options",
         "title": "Start behavior settings"
@@ -670,11 +679,30 @@
       "cloudBackup": "Cloud Backup",
       "dataManagement": "Data Management",
       "laboratory": "Laboratory",
+      "shortcuts": "Shortcuts",
       "startup": "Startup"
     },
     "settingsMenu": "Settings menu",
     "subtitle": "Manage application configuration and preferences",
     "title": "Settings"
+  },
+  "shortcuts": {
+    "title": "Shortcut Settings",
+    "description": "Configure global shortcuts and prompt shortcuts to improve work efficiency",
+    "showInterface": "Show Interface",
+    "showInterfaceDesc": "Quickly show or hide the application interface",
+    "insertData": "Insert Data",
+    "insertDataDesc": "Insert preset data into input fields",
+    "promptTriggersDesc": "Set shortcuts for commonly used prompts, automatically insert into input fields when triggered",
+    "promptTriggerDesc": "Click the input box and press the shortcut key combination to set",
+    "enterShortcut": "Click input box and press shortcut",
+    "noPromptTriggers": "No prompt shortcuts",
+    "resetToDefault": "Reset to Default",
+    "save": "Save Settings",
+    "resetSuccess": "Shortcut settings have been reset to default",
+    "saveSuccess": "Shortcut settings saved successfully",
+    "saveFailed": "Failed to save shortcut settings",
+    "duplicateKeys": "Duplicate shortcut combinations found, please check and try again"
   },
   "settingsMessages": {
     "autoBackupBeforeRestore": "Automatic backup before recovery - {timestamp}",

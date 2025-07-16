@@ -78,6 +78,22 @@ class PreferencesManager {
       autoBackup: true,
       backupInterval: 24,
     },
+    // 新增：快捷键配置
+    shortcuts: {
+      showInterface: {
+        key: 'Ctrl+Shift+G',
+        description: '显示界面',
+        enabled: true,
+        type: 'show-interface'
+      },
+      insertData: {
+        key: 'Ctrl+Shift+I',
+        description: '插入数据',
+        enabled: true,
+        type: 'insert-data'
+      },
+      promptTriggers: []
+    },
   };
 
   // ==================== 构造函数 ====================
@@ -169,6 +185,21 @@ class PreferencesManager {
         autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
         backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
       },
+      shortcuts: {
+        showInterface: {
+          key: loadedPrefs.shortcuts?.showInterface?.key ?? this.defaultPreferences.shortcuts!.showInterface.key,
+          description: loadedPrefs.shortcuts?.showInterface?.description ?? this.defaultPreferences.shortcuts!.showInterface.description,
+          enabled: loadedPrefs.shortcuts?.showInterface?.enabled ?? this.defaultPreferences.shortcuts!.showInterface.enabled,
+          type: loadedPrefs.shortcuts?.showInterface?.type ?? this.defaultPreferences.shortcuts!.showInterface.type,
+        },
+        insertData: {
+          key: loadedPrefs.shortcuts?.insertData?.key ?? this.defaultPreferences.shortcuts!.insertData.key,
+          description: loadedPrefs.shortcuts?.insertData?.description ?? this.defaultPreferences.shortcuts!.insertData.description,
+          enabled: loadedPrefs.shortcuts?.insertData?.enabled ?? this.defaultPreferences.shortcuts!.insertData.enabled,
+          type: loadedPrefs.shortcuts?.insertData?.type ?? this.defaultPreferences.shortcuts!.insertData.type,
+        },
+        promptTriggers: loadedPrefs.shortcuts?.promptTriggers ?? this.defaultPreferences.shortcuts!.promptTriggers,
+      },
     };
   }
 
@@ -232,10 +263,13 @@ class PreferencesManager {
     if (newPrefs.dataSync) {
       this.userPrefs.dataSync = { ...this.userPrefs.dataSync, ...newPrefs.dataSync };
     }
+    if (newPrefs.shortcuts) {
+      this.userPrefs.shortcuts = { ...this.userPrefs.shortcuts, ...newPrefs.shortcuts };
+    }
     
     // 合并其他属性
     for (const key in newPrefs) {
-      if (key !== 'dataSync') {
+      if (key !== 'dataSync' && key !== 'shortcuts') {
         (this.userPrefs as any)[key] = (newPrefs as any)[key];
       }
     }

@@ -121,6 +121,10 @@
                             :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
                             @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }" />
 
+                        <!-- 快捷键设置 -->
+                        <ShortcutSettings v-show="activeSettingKey === 'shortcuts'"
+                            :model-value="settings.shortcuts"
+                            @update:model-value="(val) => { settings.shortcuts = val; updateSetting(); }" />
 
                         <!-- 关于 -->
                         <AboutSettings v-show="activeSettingKey === 'about'" />
@@ -163,6 +167,7 @@ import {
     InfoCircle,
     Cloud,
     Globe,
+    Keyboard,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -171,6 +176,7 @@ import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettin
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
 import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
+import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 
 
 // Props 定义
@@ -222,6 +228,22 @@ const settings = reactive({
         autoBackup: true,
         backupInterval: 24, // 小时
     },
+    // 快捷键设置
+    shortcuts: {
+        showInterface: {
+            key: 'Ctrl+Shift+G',
+            description: '显示界面',
+            enabled: true,
+            type: 'show-interface' as const
+        },
+        insertData: {
+            key: 'Ctrl+Shift+I',
+            description: '插入数据',
+            enabled: true,
+            type: 'insert-data' as const
+        },
+        promptTriggers: []
+    },
 });
 
 // 菜单选项
@@ -253,6 +275,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
         },
         {
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
+        },
+        {
             label: t('settings.sections.close'),
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
@@ -276,7 +303,7 @@ const menuOptions = computed(() => {
     return baseOptions;
 });
 
-// 当前设置区域信息
+        // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
     const section = {
@@ -286,6 +313,7 @@ const currentSectionInfo = computed(() => {
         language: Globe,
         "data-management": Database,
         "cloud-backup": Cloud,
+        shortcuts: Keyboard,
         about: InfoCircle,
         laboratory: Flask
     };
@@ -328,6 +356,13 @@ const loadSettings = async () => {
         settings.startMinimized = prefs.startMinimized || false;
         settings.autoLaunch = prefs.autoLaunch || false;
         settings.themeSource = prefs.themeSource || "system";
+        
+        // 快捷键配置
+        if (prefs.shortcuts) {
+            settings.shortcuts.showInterface = prefs.shortcuts.showInterface || settings.shortcuts.showInterface;
+            settings.shortcuts.insertData = prefs.shortcuts.insertData || settings.shortcuts.insertData;
+            settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
+        }
 
         console.log(t('settingsMessages.settingsLoaded'), {
             ...settings,
@@ -353,6 +388,7 @@ const updateSetting = async () => {
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
+                shortcuts: settings.shortcuts,
             })
         );
 

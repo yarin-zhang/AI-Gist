@@ -7,6 +7,7 @@ import {
   preferencesManager,
   singleInstanceManager,
 } from './electron';
+import { ShortcutManager } from './electron/shortcut-manager';
 import { 
   dataManagementService
 } from './data';
@@ -42,6 +43,10 @@ app.whenReady().then(async () => {
   
   // 设置主题管理器的主窗口引用
   themeManager.setMainWindow(mainWindow);
+  
+  // 初始化快捷键管理器
+  const shortcutManager = ShortcutManager.getInstance();
+  shortcutManager.registerDefaultShortcuts();
   
   // 创建系统托盘并设置主窗口引用
   trayManager.setMainWindow(mainWindow);

@@ -226,6 +226,33 @@ export class PromptApiClient {
     },
 
     /**
+     * 切换快捷键触发状态
+     */
+    toggleShortcutTrigger: {
+      /**
+       * 切换提示词快捷键触发状态
+       * @param promptId 提示词UUID
+       * @returns Promise<void>
+       */
+      mutate: async (promptId: string): Promise<void> => {
+        return this.promptService.toggleShortcutTrigger(promptId);
+      }
+    },
+
+    /**
+     * 获取快捷键触发的提示词
+     */
+    getShortcutTriggers: {
+      /**
+       * 获取所有标记为快捷键触发的提示词
+       * @returns Promise<PromptWithRelations[]> 快捷键触发的提示词列表
+       */
+      query: async (): Promise<PromptWithRelations[]> => {
+        return this.promptService.getShortcutTriggerPrompts();
+      }
+    },
+
+    /**
      * 获取统计信息
      */
     getStats: {

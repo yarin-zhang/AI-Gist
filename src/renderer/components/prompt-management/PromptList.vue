@@ -229,6 +229,14 @@
                                             </NIcon>
                                         </template>
                                     </NButton>
+                                    <NButton size="small" text @click.stop="toggleShortcutTrigger(prompt)"
+                                        :type="prompt.isShortcutTrigger ? 'success' : 'default'">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Keyboard />
+                                            </NIcon>
+                                        </template>
+                                    </NButton>
                                     <NDropdown :options="getPromptActions(prompt)"
                                         @select="(key) => handlePromptAction(key, prompt)">
                                         <NButton size="small" text @click.stop>
@@ -347,7 +355,8 @@ import {
     ChevronUp,
     Folder,
     List,
-    GridDots
+    GridDots,
+    Keyboard
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
@@ -831,6 +840,28 @@ const tableColumns = computed(() => [
         }
     },
     {
+        title: t('promptManagement.shortcutTrigger'),
+        key: 'isShortcutTrigger',
+        width: 100,
+        render: (row: PromptWithRelations) => {
+            return h(
+                NButton,
+                {
+                    size: 'small',
+                    text: true,
+                    type: row.isShortcutTrigger ? 'success' : 'default',
+                    onClick: (e: Event) => {
+                        e.stopPropagation()
+                        toggleShortcutTrigger(row)
+                    }
+                },
+                {
+                    icon: () => h(NIcon, null, { default: () => h(Keyboard) })
+                }
+            )
+        }
+    },
+    {
         title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
         width: 100,
@@ -1161,6 +1192,35 @@ const toggleFavorite = async (promptId: number) => {
         console.error(error)
     }
 }
+
+// 切换快捷键触发器
+const toggleShortcutTrigger = async (prompt: PromptWithRelations) => {
+  try {
+    if (prompt.isShortcutTrigger) {
+      // 取消快捷键触发器
+      await api.prompts.toggleShortcutTrigger.mutate(prompt.uuid);
+      await window.electronAPI.shortcuts.unregisterTrigger();
+      message.success(t('prompt.shortcutTriggerDisabled'));
+    } else {
+      // 设置快捷键触发器
+      await api.prompts.toggleShortcutTrigger.mutate(prompt.uuid);
+      await window.electronAPI.shortcuts.registerTrigger(prompt.uuid, prompt.content);
+      message.success(t('prompt.shortcutTriggerEnabled'));
+    }
+    
+    // 刷新列表
+    if (viewMode.value === 'table') {
+      await loadPromptsForTable();
+    } else if (viewMode.value === 'tree') {
+      await loadTreeData();
+    } else {
+      await loadPrompts(true);
+    }
+  } catch (error) {
+    console.error('切换快捷键触发器失败:', error);
+    message.error(t('prompt.shortcutTriggerToggleError'));
+  }
+};
 
 // 检查标签是否匹配搜索关键词
 const isTagMatched = (tag: string) => {

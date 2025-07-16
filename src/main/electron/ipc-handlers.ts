@@ -3,6 +3,7 @@ import { shell } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
+import { ShortcutManager } from './shortcut-manager';
 import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
@@ -20,6 +21,7 @@ class IpcHandlers {
     this.setupPreferencesHandlers();
     this.setupWindowHandlers();
     this.setupThemeHandlers();
+    this.setupShortcutHandlers();
     this.setupAIHandlers();
     this.setupUpdateHandlers();
     this.setupShellHandlers();
@@ -238,6 +240,60 @@ class IpcHandlers {
     // 删除文件
     ipcMain.handle('fs:unlink', async (_, { filePath }) => {
       return await fsService.unlink(filePath);
+    });
+  }
+
+  /**
+   * 设置快捷键处理器
+   */
+  private setupShortcutHandlers() {
+    // 注册默认快捷键
+    ipcMain.handle('shortcuts:register-defaults', () => {
+      try {
+        ShortcutManager.getInstance().registerDefaultShortcuts();
+        return { success: true };
+      } catch (error) {
+        console.error('注册默认快捷键失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 注册快捷键触发器
+    ipcMain.handle('shortcuts:register-trigger', async (event, { promptId, content }) => {
+      try {
+        ShortcutManager.getInstance().registerShortcutTrigger(promptId, content);
+        return { success: true };
+      } catch (error) {
+        console.error('注册快捷键触发器失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 取消快捷键触发器
+    ipcMain.handle('shortcuts:unregister-trigger', () => {
+      try {
+        ShortcutManager.getInstance().unregisterShortcutTrigger();
+        return { success: true };
+      } catch (error) {
+        console.error('取消快捷键触发器失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 获取当前快捷键触发器
+    ipcMain.handle('shortcuts:get-current-trigger', () => {
+      try {
+        const currentTrigger = ShortcutManager.getInstance().getCurrentShortcutTrigger();
+        return { success: true, data: currentTrigger };
+      } catch (error) {
+        console.error('获取当前快捷键触发器失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 检查快捷键是否已注册
+    ipcMain.handle('shortcuts:is-registered', (_, accelerator: string) => {
+      return ShortcutManager.getInstance().isRegistered(accelerator);
     });
   }
 
