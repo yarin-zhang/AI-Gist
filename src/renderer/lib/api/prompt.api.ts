@@ -394,6 +394,24 @@ export class PromptApiClient {
       query: async (promptId: number): Promise<number> => {
         return this.promptService.getLatestPromptHistoryVersion(promptId);
       }
+    },
+
+    /**
+     * 更新历史记录
+     */
+    update: {
+      /**
+       * 更新历史记录信息
+       * @param input 更新数据，包含id和要更新的字段
+       * @returns Promise<PromptHistory> 更新后的历史记录
+       */
+      mutate: async (input: { 
+        id: number; 
+        data: Partial<Omit<PromptHistory, 'id' | 'uuid' | 'promptId' | 'version' | 'createdAt'>>
+      }): Promise<PromptHistory> => {
+        const { id, data } = input;
+        return this.promptService.updatePromptHistory(id, data);
+      }
     }
   };
 }

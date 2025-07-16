@@ -695,6 +695,58 @@ export class PromptService extends BaseDatabaseService {
   }
 
   /**
+   * 更新历史记录
+   * 更新指定的历史记录信息
+   * @param id number 历史记录ID
+   * @param data 更新数据
+   * @returns Promise<PromptHistory> 更新后的历史记录
+   */
+  async updatePromptHistory(
+    id: number, 
+    data: Partial<Omit<PromptHistory, 'id' | 'uuid' | 'promptId' | 'version' | 'createdAt'>>
+  ): Promise<PromptHistory> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['promptHistories'], 'readwrite');
+      const store = transaction.objectStore('promptHistories');
+      
+      // 先获取现有记录
+      const getRequest = store.get(id);
+      
+      getRequest.onsuccess = () => {
+        const existingHistory = getRequest.result as PromptHistory;
+        if (!existingHistory) {
+          reject(new Error('历史记录不存在'));
+          return;
+        }
+
+        // 合并数据，保留不可修改的字段
+        const updatedHistory = {
+          ...existingHistory,
+          ...data,
+          updatedAt: new Date()
+        };
+
+        // 在同一个事务中执行更新
+        const putRequest = store.put(updatedHistory);
+        
+        putRequest.onsuccess = () => {
+          resolve(updatedHistory);
+        };
+        
+        putRequest.onerror = () => {
+          reject(putRequest.error);
+        };
+      };
+      
+      getRequest.onerror = () => {
+        reject(getRequest.error);
+      };
+    });
+  }
+
+  /**
    * 获取提示词统计信息
    * 返回提示词相关的统计数据
    * @returns Promise<提示词统计信息> 包含总数量、收藏数量、分类分布等统计信息

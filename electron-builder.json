@@ -32,13 +32,6 @@
             ]
         },
         {
-            "from": "src/main/static",
-            "to": "./static",
-            "filter": [
-                "**/*"
-            ]
-        },
-        {
             "from": "src/assets",
             "to": "./assets",
             "filter": [
