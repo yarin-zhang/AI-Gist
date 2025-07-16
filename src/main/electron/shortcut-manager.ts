@@ -1,6 +1,6 @@
 /**
  * 全局快捷键管理器
- * 负责注册和管理全局快捷键，包括显示界面和插入数据的快捷键
+ * 负责注册和管理全局快捷键，包括显示界面和复制提示词到剪贴板的快捷键
  */
 
 import { globalShortcut, BrowserWindow, app, dialog } from 'electron';
@@ -81,8 +81,6 @@ export class ShortcutManager {
     }
   }
 
-
-
   /**
    * 转换快捷键格式为 Electron 支持的格式
    */
@@ -134,14 +132,14 @@ export class ShortcutManager {
       console.log(`显示界面快捷键注册结果: ${success ? '成功' : '失败'} (${accelerator})`);
     }
 
-    // 注册插入数据快捷键
-    if (shortcuts.insertData?.enabled) {
-      const accelerator = this.convertShortcutFormat(shortcuts.insertData.key);
+    // 注册复制提示词快捷键
+    if (shortcuts.copyPrompt?.enabled) {
+      const accelerator = this.convertShortcutFormat(shortcuts.copyPrompt.key);
       const success = this.registerShortcut(accelerator, () => {
-        console.log('快捷键触发：插入数据');
-        this.insertData();
+        console.log('快捷键触发：复制提示词');
+        this.copyPromptToClipboard();
       });
-      console.log(`插入数据快捷键注册结果: ${success ? '成功' : '失败'} (${accelerator})`);
+      console.log(`复制提示词快捷键注册结果: ${success ? '成功' : '失败'} (${accelerator})`);
     }
 
     // 注册提示词触发器快捷键
@@ -172,14 +170,14 @@ export class ShortcutManager {
       this.toggleMainWindow();
     });
 
-    // 注册插入数据的快捷键
-    const insertDataAccelerator = process.platform === 'darwin' ? 'Cmd+Shift+I' : 'Ctrl+Shift+I';
-    const insertDataSuccess = this.registerShortcut(insertDataAccelerator, () => {
-      console.log('快捷键触发：插入数据');
-      this.insertData();
+    // 注册复制提示词的快捷键
+    const copyPromptAccelerator = process.platform === 'darwin' ? 'Cmd+Shift+Alt+C' : 'Ctrl+Shift+Alt+C';
+    const copyPromptSuccess = this.registerShortcut(copyPromptAccelerator, () => {
+      console.log('快捷键触发：复制提示词');
+      this.copyPromptToClipboard();
     });
 
-    console.log(`默认快捷键注册结果：显示界面=${showInterfaceSuccess} (${showInterfaceAccelerator}), 插入数据=${insertDataSuccess} (${insertDataAccelerator})`);
+    console.log(`默认快捷键注册结果：显示界面=${showInterfaceSuccess} (${showInterfaceAccelerator}), 复制提示词=${copyPromptSuccess} (${copyPromptAccelerator})`);
   }
 
   /**
@@ -238,25 +236,25 @@ export class ShortcutManager {
   }
 
   /**
-   * 插入数据
+   * 复制提示词到剪贴板
    */
-  private async insertData(): Promise<void> {
+  private async copyPromptToClipboard(): Promise<void> {
     try {
-      console.log('开始执行全局插入数据操作');
+      console.log('开始执行复制提示词到剪贴板操作');
       
       // 获取用户设置的提示词配置
       const userPrefs = preferencesManager.getPreferences();
-      const insertDataConfig = userPrefs.shortcuts?.insertData;
+      const copyPromptConfig = userPrefs.shortcuts?.copyPrompt;
       
-      if (!insertDataConfig?.selectedPromptId && !insertDataConfig?.selectedPromptUUID) {
-        console.log('未配置提示词，无法插入数据');
+      if (!copyPromptConfig?.selectedPromptId && !copyPromptConfig?.selectedPromptUUID) {
+        console.log('未配置提示词，无法复制');
         return;
       }
 
       // 获取提示词内容，优先使用UUID
       const promptContent = await this.getPromptContent(
-        insertDataConfig.selectedPromptId || 0, 
-        insertDataConfig.selectedPromptUUID
+        copyPromptConfig.selectedPromptId || 0, 
+        copyPromptConfig.selectedPromptUUID
       );
       
       if (!promptContent) {
@@ -270,9 +268,6 @@ export class ShortcutManager {
       
       console.log('提示词内容已复制到剪贴板:', promptContent.substring(0, 50) + '...');
       
-      // 只复制到剪贴板，不自动粘贴
-      console.log('提示词内容已复制到剪贴板，请手动粘贴 (Ctrl+V 或 Cmd+V)');
-      
       // 显示系统通知
       const { Notification } = require('electron');
       new Notification({
@@ -281,7 +276,7 @@ export class ShortcutManager {
       }).show();
       
     } catch (error) {
-      console.error('插入数据操作失败:', error);
+      console.error('复制提示词操作失败:', error);
     }
   }
 

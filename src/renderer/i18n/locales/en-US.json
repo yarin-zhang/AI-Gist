@@ -742,8 +742,8 @@
     "description": "Configure global shortcuts and prompt shortcuts to improve work efficiency",
     "duplicateKeys": "Duplicate shortcut combinations found, please check and try again",
     "enterShortcut": "Click input box and press shortcut",
-    "insertData": "Insert Data",
-    "insertDataDesc": "Insert preset data into input fields",
+    "copyPrompt": "Copy Prompt",
+    "copyPromptDesc": "Copy preset prompt to clipboard",
     "noPromptTriggers": "No prompt shortcuts",
     "promptTriggerDesc": "Click the input box and press the shortcut key combination to set",
     "promptTriggersDesc": "Set shortcuts for commonly used prompts, automatically insert into input fields when triggered",
@@ -754,7 +754,9 @@
     "saveSuccess": "Shortcut settings saved successfully",
     "showInterface": "Show Interface",
     "showInterfaceDesc": "Quickly show or hide the application interface",
-    "title": "Shortcut Settings"
+    "title": "Shortcut Settings",
+    "copyPrompt": "Copy Prompt",
+    "copyPromptDesc": "Copy preset prompt to clipboard"
   },
   "startup": {
     "autoStart": "Auto launch on system startup",

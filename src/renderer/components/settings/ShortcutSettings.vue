@@ -40,10 +40,10 @@
                             :class="{ 'capturing': capturingType === 'showInterface' }" />
                     </NFlex>
 
-                    <!-- 插入数据快捷键 -->
+                    <!-- 复制提示词快捷键 -->
                     <NFlex vertical size="small">
                         <NFlex align="center" size="small">
-                            <NText strong>{{ t('shortcuts.insertData') }}</NText>
+                            <NText strong>{{ t('shortcuts.copyPrompt') }}</NText>
                             <NText v-if="permissionStatus?.hasPermission" depth="3" style="font-size: 12px; color: #18a058;">
                                 ✓ {{ t('shortcuts.registered') }}
                             </NText>
@@ -52,13 +52,13 @@
                             </NText>
                         </NFlex>
                         <NText depth="3" style="font-size: 12px;">
-                            {{ t('shortcuts.insertDataDesc') }}
+                            {{ t('shortcuts.copyPromptDesc') }}
                         </NText>
-                        <NInput v-model:value="insertDataShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
-                            @click="startCaptureShortcut('insertData')"
-                            :class="{ 'capturing': capturingType === 'insertData' }" />
+                        <NInput v-model:value="copyPromptShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
+                            @click="startCaptureShortcut('copyPrompt')"
+                            :class="{ 'capturing': capturingType === 'copyPrompt' }" />
                         
-                        <!-- 选择插入的提示词 -->
+                        <!-- 选择复制的提示词 -->
                         <NFlex vertical size="small">
                             <NFlex align="center" size="small">
                                 <NText strong>{{ t('shortcuts.selectPrompt') }}</NText>
@@ -153,7 +153,7 @@ const message = useMessage();
 
 // 响应式数据
 const showInterfaceShortcut = ref('Ctrl+Shift+G');
-const insertDataShortcut = ref('Ctrl+Shift+I');
+const copyPromptShortcut = ref('Ctrl+Shift+Alt+C');
 const saving = ref(false);
 const selectedPromptId = ref<number | null>(null);
 const selectedPromptUUID = ref<string | null>(null);
@@ -171,12 +171,12 @@ const loadShortcutsFromSettings = async () => {
       // 根据平台显示正确的快捷键格式
       const isMac = navigator.platform.includes('Mac');
       const defaultShowKey = isMac ? 'Cmd+Shift+G' : 'Ctrl+Shift+G';
-      const defaultInsertKey = isMac ? 'Cmd+Shift+I' : 'Ctrl+Shift+I';
+      const defaultCopyKey = isMac ? 'Cmd+Shift+Alt+C' : 'Ctrl+Shift+Alt+C';
       
       showInterfaceShortcut.value = prefs.shortcuts.showInterface?.key || defaultShowKey;
-      insertDataShortcut.value = prefs.shortcuts.insertData?.key || defaultInsertKey;
-      selectedPromptId.value = prefs.shortcuts.insertData?.selectedPromptId || null;
-      selectedPromptUUID.value = prefs.shortcuts.insertData?.selectedPromptUUID || null;
+      copyPromptShortcut.value = prefs.shortcuts.copyPrompt?.key || defaultCopyKey;
+      selectedPromptId.value = prefs.shortcuts.copyPrompt?.selectedPromptId || null;
+      selectedPromptUUID.value = prefs.shortcuts.copyPrompt?.selectedPromptUUID || null;
       
       console.log('加载的提示词设置:', {
         selectedPromptId: selectedPromptId.value,
@@ -216,7 +216,7 @@ const loadShortcutsFromSettings = async () => {
 };
 
 // 快捷键捕获相关
-const capturingType = ref<'showInterface' | 'insertData' | null>(null);
+const capturingType = ref<'showInterface' | 'copyPrompt' | null>(null);
 const capturingShortcut = ref('');
 const showCaptureModal = ref(false);
 
@@ -298,7 +298,7 @@ const handleKeyUp = (event: KeyboardEvent) => {
 };
 
 // 开始捕获快捷键
-const startCaptureShortcut = (type: 'showInterface' | 'insertData') => {
+const startCaptureShortcut = (type: 'showInterface' | 'copyPrompt') => {
     capturingType.value = type;
     capturingShortcut.value = '';
     showCaptureModal.value = true;
@@ -314,8 +314,8 @@ const confirmCapture = async () => {
 
     if (capturingType.value === 'showInterface') {
         showInterfaceShortcut.value = capturingShortcut.value;
-    } else if (capturingType.value === 'insertData') {
-        insertDataShortcut.value = capturingShortcut.value;
+    } else if (capturingType.value === 'copyPrompt') {
+        copyPromptShortcut.value = capturingShortcut.value;
     }
 
     cancelCapture();
@@ -357,11 +357,11 @@ const saveShortcuts = async () => {
           enabled: true,
           type: 'show-interface'
         },
-        insertData: {
-          key: insertDataShortcut.value,
-          description: t('shortcuts.insertData'),
+        copyPrompt: {
+          key: copyPromptShortcut.value,
+          description: t('shortcuts.copyPrompt'),
           enabled: true,
-          type: 'insert-data',
+          type: 'copy-prompt',
           selectedPromptId: selectedPromptId.value,
           selectedPromptUUID: selectedPromptUUID.value
         },
@@ -392,10 +392,10 @@ const resetShortcuts = async () => {
     // 根据平台设置正确的默认快捷键
     const isMac = navigator.platform.includes('Mac');
     const defaultShowKey = isMac ? 'Cmd+Shift+G' : 'Ctrl+Shift+G';
-    const defaultInsertKey = isMac ? 'Cmd+Shift+I' : 'Ctrl+Shift+I';
+    const defaultCopyKey = isMac ? 'Cmd+Shift+Alt+C' : 'Ctrl+Shift+Alt+C';
     
     showInterfaceShortcut.value = defaultShowKey;
-    insertDataShortcut.value = defaultInsertKey;
+    copyPromptShortcut.value = defaultCopyKey;
     
     // 清空选中的提示词
     selectedPromptId.value = null;
@@ -426,7 +426,6 @@ const checkPermissions = async () => {
     } else {
       // 如果权限检查通过，重新注册快捷键
       await window.electronAPI.shortcuts.reregister();
-      message.success('快捷键已重新注册');
     }
   } catch (error) {
     console.error('检查权限失败:', error);

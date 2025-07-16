@@ -82,15 +82,15 @@ class PreferencesManager {
     shortcuts: {
       showInterface: {
         key: 'Ctrl+Shift+G',
-        description: '显示界面',
+        description: '切换界面',
         enabled: true,
         type: 'show-interface'
       },
-      insertData: {
-        key: 'Ctrl+Shift+I',
-        description: '插入数据',
+      copyPrompt: {
+        key: 'Ctrl+Shift+Alt+C',
+        description: '复制提示词',
         enabled: true,
-        type: 'insert-data'
+        type: 'copy-prompt'
       },
       promptTriggers: []
     },
@@ -192,11 +192,11 @@ class PreferencesManager {
           enabled: loadedPrefs.shortcuts?.showInterface?.enabled ?? this.defaultPreferences.shortcuts!.showInterface.enabled,
           type: loadedPrefs.shortcuts?.showInterface?.type ?? this.defaultPreferences.shortcuts!.showInterface.type,
         },
-        insertData: {
-          key: loadedPrefs.shortcuts?.insertData?.key ?? this.defaultPreferences.shortcuts!.insertData.key,
-          description: loadedPrefs.shortcuts?.insertData?.description ?? this.defaultPreferences.shortcuts!.insertData.description,
-          enabled: loadedPrefs.shortcuts?.insertData?.enabled ?? this.defaultPreferences.shortcuts!.insertData.enabled,
-          type: loadedPrefs.shortcuts?.insertData?.type ?? this.defaultPreferences.shortcuts!.insertData.type,
+        copyPrompt: {
+          key: loadedPrefs.shortcuts?.copyPrompt?.key ?? this.defaultPreferences.shortcuts!.copyPrompt.key,
+          description: loadedPrefs.shortcuts?.copyPrompt?.description ?? this.defaultPreferences.shortcuts!.copyPrompt.description,
+          enabled: loadedPrefs.shortcuts?.copyPrompt?.enabled ?? this.defaultPreferences.shortcuts!.copyPrompt.enabled,
+          type: loadedPrefs.shortcuts?.copyPrompt?.type ?? this.defaultPreferences.shortcuts!.copyPrompt.type,
         },
         promptTriggers: loadedPrefs.shortcuts?.promptTriggers ?? this.defaultPreferences.shortcuts!.promptTriggers,
       },

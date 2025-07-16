@@ -236,11 +236,11 @@ const settings = reactive({
             enabled: true,
             type: 'show-interface' as const
         },
-        insertData: {
-            key: 'Ctrl+Shift+I',
-            description: '插入数据',
+        copyPrompt: {
+            key: 'Ctrl+Shift+Alt+C',
+            description: '复制提示词',
             enabled: true,
-            type: 'insert-data' as const
+            type: 'copy-prompt' as const
         },
         promptTriggers: []
     },
@@ -360,7 +360,7 @@ const loadSettings = async () => {
         // 快捷键配置
         if (prefs.shortcuts) {
             settings.shortcuts.showInterface = prefs.shortcuts.showInterface || settings.shortcuts.showInterface;
-            settings.shortcuts.insertData = prefs.shortcuts.insertData || settings.shortcuts.insertData;
+            settings.shortcuts.copyPrompt = prefs.shortcuts.copyPrompt || settings.shortcuts.copyPrompt;
             settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
         }
 

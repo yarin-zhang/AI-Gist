@@ -18,10 +18,10 @@ export interface ShortcutConfig {
   /** 是否启用 */
   enabled: boolean;
   /** 快捷键类型 */
-  type: 'show-interface' | 'insert-data' | 'prompt-trigger';
+  type: 'show-interface' | 'copy-prompt' | 'prompt-trigger';
   /** 关联的提示词ID（仅用于prompt-trigger类型） */
   promptId?: number;
-  /** 选择的提示词ID（仅用于insert-data类型） */
+  /** 选择的提示词ID（仅用于copy-prompt类型） */
   selectedPromptId?: number;
   /** 选择的提示词UUID（用于数据同步和备份） */
   selectedPromptUUID?: string;
@@ -59,7 +59,7 @@ export interface UserPreferences {
   // 新增：快捷键配置
   shortcuts?: {
     showInterface: ShortcutConfig;
-    insertData: ShortcutConfig;
+    copyPrompt: ShortcutConfig;
     promptTriggers: ShortcutConfig[];
   };
 }
