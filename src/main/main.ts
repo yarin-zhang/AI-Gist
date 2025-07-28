@@ -6,6 +6,7 @@ import {
   themeManager,
   preferencesManager,
   singleInstanceManager,
+  NetworkProxyManager,
 } from './electron';
 import { ShortcutManager } from './electron/shortcut-manager';
 import { 
@@ -20,9 +21,14 @@ let cloudBackupManager: CloudBackupManager;
 // 防止多重启动 - 初始化单实例管理器
 singleInstanceManager.initialize();
 
+
+
 // 应用准备就绪时的初始化流程
 app.whenReady().then(async () => {
   console.log('应用启动中...');
+
+  // 配置网络代理设置
+  await NetworkProxyManager.configure();
 
   // 移除应用菜单栏
   Menu.setApplicationMenu(null);
