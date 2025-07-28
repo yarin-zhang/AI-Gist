@@ -732,6 +732,9 @@
     "stillMissingStores": "Still missing object storage:"
   },
   "shortcuts": {
+    "clear": "Clear",
+    "clearError": "Failed to clear shortcut settings",
+    "clearSuccess": "Shortcuts cleared successfully",
     "clickToInput": "Click to input shortcut",
     "copyPrompt": "Copy Prompt",
     "copyPromptDesc": "Copy preset prompt to clipboard",

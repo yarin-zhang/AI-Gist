@@ -25,7 +25,7 @@
                     <NFlex vertical size="small">
                         <NFlex align="center" size="small">
                             <NText strong>{{ t('shortcuts.showInterface') }}</NText>
-                            <NText v-if="permissionStatus?.hasPermission" depth="3" style="font-size: 12px; color: #18a058;">
+                            <NText v-if="permissionStatus?.hasPermission && showInterfaceShortcut" depth="3" style="font-size: 12px; color: #18a058;">
                                 ✓ {{ t('shortcuts.registered') }}
                             </NText>
                             <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
@@ -35,16 +35,21 @@
                         <NText depth="3" style="font-size: 12px;">
                             {{ t('shortcuts.showInterfaceDesc') }}
                         </NText>
-                        <NInput v-model:value="showInterfaceShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
-                            @click="startCaptureShortcut('showInterface')"
-                            :class="{ 'capturing': capturingType === 'showInterface' }" />
+                        <NFlex align="center" size="small">
+                            <NInput v-model:value="showInterfaceShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
+                                @click="startCaptureShortcut('showInterface')"
+                                :class="{ 'capturing': capturingType === 'showInterface' }" style="width: 50%;"/>
+                            <NButton size="small" type="warning" ghost @click="clearShortcut('showInterface')">
+                                {{ t('shortcuts.clear') }}
+                            </NButton>
+                        </NFlex>
                     </NFlex>
 
                     <!-- 复制提示词快捷键 -->
                     <NFlex vertical size="small">
                         <NFlex align="center" size="small">
                             <NText strong>{{ t('shortcuts.copyPrompt') }}</NText>
-                            <NText v-if="permissionStatus?.hasPermission" depth="3" style="font-size: 12px; color: #18a058;">
+                            <NText v-if="permissionStatus?.hasPermission && copyPromptShortcut" depth="3" style="font-size: 12px; color: #18a058;">
                                 ✓ {{ t('shortcuts.registered') }}
                             </NText>
                             <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
@@ -54,9 +59,14 @@
                         <NText depth="3" style="font-size: 12px;">
                             {{ t('shortcuts.copyPromptDesc') }}
                         </NText>
-                        <NInput v-model:value="copyPromptShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
-                            @click="startCaptureShortcut('copyPrompt')"
-                            :class="{ 'capturing': capturingType === 'copyPrompt' }" />
+                        <NFlex align="center" size="small">
+                            <NInput v-model:value="copyPromptShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
+                                @click="startCaptureShortcut('copyPrompt')"
+                                :class="{ 'capturing': capturingType === 'copyPrompt' }" style="width: 50%;"/>
+                            <NButton size="small" type="warning" ghost @click="clearShortcut('copyPrompt')">
+                                {{ t('shortcuts.clear') }}
+                            </NButton>
+                        </NFlex>
                         
                         <!-- 选择复制的提示词 -->
                         <NFlex vertical size="small">
@@ -420,13 +430,13 @@ const saveShortcuts = async () => {
         showInterface: {
           key: showInterfaceShortcut.value,
           description: t('shortcuts.showInterface'),
-          enabled: true,
+          enabled: showInterfaceShortcut.value !== '',
           type: 'show-interface'
         },
         copyPrompt: {
           key: copyPromptShortcut.value,
           description: t('shortcuts.copyPrompt'),
-          enabled: true,
+          enabled: copyPromptShortcut.value !== '',
           type: 'copy-prompt',
           selectedPromptId: selectedPromptId.value,
           selectedPromptUUID: selectedPromptUUID.value
@@ -477,6 +487,8 @@ const resetShortcuts = async () => {
     message.error(t('shortcuts.resetError'));
   }
 };
+
+
 
 // 权限状态
 const permissionStatus = ref<{ hasPermission: boolean; message?: string } | null>(null);
@@ -610,6 +622,26 @@ const onPromptSelected = async (promptId: number | null) => {
   await saveShortcuts();
 };
 
+// 单独清空快捷键
+const clearShortcut = async (type: 'showInterface' | 'copyPrompt') => {
+  try {
+    if (type === 'showInterface') {
+      showInterfaceShortcut.value = '';
+    } else if (type === 'copyPrompt') {
+      copyPromptShortcut.value = '';
+      selectedPromptId.value = null;
+      selectedPromptUUID.value = null;
+      selectedPromptPreview.value = '';
+    }
+    
+    // 保存设置
+    await saveShortcuts();
+    message.success(t('shortcuts.clearSuccess'));
+  } catch (error) {
+    console.error('清空快捷键失败:', error);
+    message.error(t('shortcuts.clearError'));
+  }
+};
 
 
 // 组件挂载时加载设置和检查权限

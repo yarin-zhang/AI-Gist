@@ -732,6 +732,9 @@
     "stillMissingStores": "仍缺失的對象存儲:"
   },
   "shortcuts": {
+    "clear": "清空",
+    "clearError": "清空快捷鍵設置失敗",
+    "clearSuccess": "快捷鍵已清空",
     "clickToInput": "點擊輸入快捷鍵",
     "copyPrompt": "複製提示詞",
     "copyPromptDesc": "複製預設提示詞到剪貼板",

@@ -732,6 +732,9 @@
     "stillMissingStores": "まだ不足しているオブジェクトストア："
   },
   "shortcuts": {
+    "clear": "クリア",
+    "clearError": "ショートカットキー設定をクリアできませんでした",
+    "clearSuccess": "ショートカットキーがクリアされています",
     "clickToInput": "入力ショートカットキーをクリックします",
     "copyPrompt": "プロンプトをコピー",
     "copyPromptDesc": "プリセットプロンプトをクリップボードにコピー",
