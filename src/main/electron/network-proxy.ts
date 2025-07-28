@@ -27,13 +27,43 @@ export class NetworkProxyManager {
           mode: 'system'
         });
         
-        console.log('✅ 已配置 Electron 使用系统代理');
+        // 为 LangChain 等 Node.js 模块设置代理环境变量
+        await this.configureNodeProxyEnvironment(proxyConfig);
+        
+        console.log('✅ 已配置 Electron 和 Node.js 使用系统代理');
       } else {
         console.log('未检测到系统代理，使用直连');
       }
     } catch (error) {
       console.error('配置网络代理时出错:', error);
       // 即使配置失败也不应该阻止应用启动
+    }
+  }
+
+  /**
+   * 为 Node.js 模块配置代理环境变量
+   */
+  private static async configureNodeProxyEnvironment(proxyConfig: string): Promise<void> {
+    try {
+      // 解析代理配置
+      if (proxyConfig.includes('PROXY')) {
+        // 提取代理地址，格式通常是 "PROXY 127.0.0.1:7890"
+        const proxyMatch = proxyConfig.match(/PROXY\s+([^;]+)/);
+        if (proxyMatch) {
+          const proxyAddress = proxyMatch[1].trim();
+          const proxyUrl = `http://${proxyAddress}`;
+          
+          // 设置环境变量
+          process.env.HTTP_PROXY = proxyUrl;
+          process.env.HTTPS_PROXY = proxyUrl;
+          process.env.http_proxy = proxyUrl;
+          process.env.https_proxy = proxyUrl;
+          
+          console.log(`✅ 已设置 Node.js 代理环境变量: ${proxyUrl}`);
+        }
+      }
+    } catch (error) {
+      console.error('配置 Node.js 代理环境变量失败:', error);
     }
   }
 
