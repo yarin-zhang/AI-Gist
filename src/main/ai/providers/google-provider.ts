@@ -13,12 +13,12 @@ export class GoogleProvider extends BaseAIProvider {
    * 测试配置连接
    */
     async testConfig(config: AIConfig): Promise<AITestResult> {
-    console.log(`测试 Google 连接（通过代理），API Key: ${config.apiKey ? config.apiKey.substring(0, 10) + '...' : '未设置'}`);
+    console.log(`测试 Google 连接（自动使用系统代理），API Key: ${config.apiKey ? config.apiKey.substring(0, 10) + '...' : '未设置'}`);
     
     try {
       // 尝试获取可用模型列表
       const models = await this.getAvailableModels(config);
-      console.log(`Google 获取模型列表成功（通过代理）:`, models);
+      console.log(`Google 获取模型列表成功（自动代理）:`, models);
       
       // 检查是否成功获取到真实的模型列表
       const defaultModels = this.getDefaultModels();
@@ -62,7 +62,7 @@ export class GoogleProvider extends BaseAIProvider {
    * 获取可用模型列表
    */
   async getAvailableModels(config: AIConfig): Promise<string[]> {
-    console.log(`获取 Google 模型列表 - 使用 Electron net 模块（支持代理）`);
+    console.log(`获取 Google 模型列表 - 使用 Electron net 模块（自动支持系统代理）`);
     
     try {
       if (!config.apiKey) {
@@ -71,10 +71,10 @@ export class GoogleProvider extends BaseAIProvider {
       
       const baseUrl = config.baseURL || 'https://generativelanguage.googleapis.com';
       const url = `${baseUrl}/v1beta/models?key=${config.apiKey}`;
-      console.log(`Google 请求URL (通过代理): ${url.replace(config.apiKey, config.apiKey.substring(0, 10) + '...')}`);
+      console.log(`Google 请求URL (自动代理): ${url.replace(config.apiKey, config.apiKey.substring(0, 10) + '...')}`);
       
-      const proxyAwareRequest = this.createProxyAwareRequest(20000); // 使用支持代理的请求
-      const response = await proxyAwareRequest(url, {
+      const timeoutFetch = this.createTimeoutFetch(20000); // 统一使用 net 模块，自动支持代理
+      const response = await timeoutFetch(url, {
         headers: {
           'Content-Type': 'application/json'
         }

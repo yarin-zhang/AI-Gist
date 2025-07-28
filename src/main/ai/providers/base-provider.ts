@@ -63,7 +63,7 @@ export interface AIProvider {
 export abstract class BaseAIProvider implements AIProvider {
   
   /**
-   * 创建支持代理的网络请求（使用 Electron net 模块）
+   * 创建网络请求（使用 Electron net 模块，自动支持系统代理）
    */
   protected createProxyAwareRequest(timeoutMs = 15000) {
     return (url: string, options: any = {}): Promise<Response> => {
@@ -130,10 +130,10 @@ export abstract class BaseAIProvider implements AIProvider {
   }
 
   /**
-   * 创建带超时的 fetch 请求（保留向后兼容）
+   * 创建带超时的网络请求（统一使用 Electron net 模块，自动支持代理）
    */
   protected createTimeoutFetch(timeoutMs = 15000) {
-    // 优先使用支持代理的请求方法
+    // 统一使用支持代理的 net 模块实现
     return this.createProxyAwareRequest(timeoutMs);
   }
 
