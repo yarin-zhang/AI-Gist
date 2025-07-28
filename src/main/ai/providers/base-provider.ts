@@ -1,3 +1,4 @@
+import { net } from 'electron';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
 import { buildPrompts } from './prompt-templates';
 
@@ -62,16 +63,97 @@ export interface AIProvider {
 export abstract class BaseAIProvider implements AIProvider {
   
   /**
-   * 创建带超时的 fetch 请求
+   * 创建网络请求（使用 Electron net 模块，自动支持系统代理）
+   */
+  protected createProxyAwareRequest(timeoutMs = 15000) {
+    return (url: string, options: any = {}): Promise<Response> => {
+      return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('请求超时'));
+        }, timeoutMs);
+
+        try {
+          const request = net.request({
+            method: options.method || 'GET',
+            url: url,
+            headers: options.headers || {}
+          });
+
+          request.on('response', (response) => {
+            clearTimeout(timeoutId);
+            
+            const chunks: Buffer[] = [];
+            
+            response.on('data', (chunk) => {
+              chunks.push(chunk);
+            });
+            
+            response.on('end', () => {
+              const body = Buffer.concat(chunks).toString();
+              
+              // 创建类似 fetch Response 的对象
+              const mockResponse = {
+                ok: response.statusCode >= 200 && response.statusCode < 300,
+                status: response.statusCode,
+                statusText: response.statusMessage || '',
+                headers: response.headers,
+                json: () => Promise.resolve(JSON.parse(body)),
+                text: () => Promise.resolve(body)
+              } as unknown as Response;
+              
+              resolve(mockResponse);
+            });
+            
+            response.on('error', (error) => {
+              clearTimeout(timeoutId);
+              reject(error);
+            });
+          });
+          
+          request.on('error', (error) => {
+            clearTimeout(timeoutId);
+            reject(error);
+          });
+          
+          // 发送请求体（如果有）
+          if (options.body) {
+            request.write(options.body);
+          }
+          
+          request.end();
+        } catch (error) {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      });
+    };
+  }
+
+  /**
+   * 创建带超时的网络请求（智能选择 fetch 或 net 模块）
    */
   protected createTimeoutFetch(timeoutMs = 15000) {
-    return (url: string, options: any = {}) => {
-      return Promise.race([
-        fetch(url, options),
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('请求超时')), timeoutMs)
-        )
-      ]);
+    return (url: string, options: any = {}): Promise<Response> => {
+      // 判断是否为本地服务
+      const isLocalService = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+      
+      if (isLocalService) {
+        // 本地服务使用标准 fetch（不需要代理）
+        console.log(`使用标准 fetch 请求本地服务: ${url}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        return fetch(url, {
+          ...options,
+          signal: controller.signal
+        }).finally(() => {
+          clearTimeout(timeoutId);
+        });
+      } else {
+        // 远程服务使用支持代理的 net 模块
+        console.log(`使用 Electron net 模块请求远程服务（自动代理）: ${url}`);
+        return this.createProxyAwareRequest(timeoutMs)(url, options);
+      }
     };
   }
 

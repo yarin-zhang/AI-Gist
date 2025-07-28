@@ -12,6 +12,7 @@ export * from './tray-manager';
 export * from './window-manager';
 export * from './theme-manager';
 export * from './single-instance-manager';
+export * from './network-proxy';
 
 // 导出快捷键管理器实例，但不在这里初始化
 export { ShortcutManager };
