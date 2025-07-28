@@ -50,7 +50,15 @@ export class OllamaProvider extends BaseAIProvider {
         
         const models = data.models?.map((model: any) => model.name) || [];
         console.log(`Ollama 解析出的模型列表:`, models);
-        return models.length > 0 ? models : [];
+        
+        // 确保返回完整的模型名称（包含版本后缀）
+        if (models.length > 0) {
+          console.log('✅ Ollama 模型列表解析成功，返回完整模型名称');
+          return models;
+        } else {
+          console.warn('⚠️ Ollama 返回空模型列表');
+          return [];
+        }
       }
     } catch (error) {
       console.error('获取 Ollama 模型列表失败:', error);
@@ -112,6 +120,15 @@ export class OllamaProvider extends BaseAIProvider {
     }
 
     const model = request.model || config.defaultModel || config.customModel;
+    console.log('🔍 Ollama 生成调试信息:', {
+      requestModel: request.model,
+      configDefaultModel: config.defaultModel,
+      configCustomModel: config.customModel,
+      finalModel: model,
+      configId: config.configId,
+      configName: config.name
+    });
+    
     if (!model) {
       throw new Error('未指定模型');
     }

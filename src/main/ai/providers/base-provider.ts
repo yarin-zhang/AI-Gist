@@ -130,11 +130,31 @@ export abstract class BaseAIProvider implements AIProvider {
   }
 
   /**
-   * 创建带超时的网络请求（统一使用 Electron net 模块，自动支持代理）
+   * 创建带超时的网络请求（智能选择 fetch 或 net 模块）
    */
   protected createTimeoutFetch(timeoutMs = 15000) {
-    // 统一使用支持代理的 net 模块实现
-    return this.createProxyAwareRequest(timeoutMs);
+    return (url: string, options: any = {}): Promise<Response> => {
+      // 判断是否为本地服务
+      const isLocalService = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+      
+      if (isLocalService) {
+        // 本地服务使用标准 fetch（不需要代理）
+        console.log(`使用标准 fetch 请求本地服务: ${url}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        return fetch(url, {
+          ...options,
+          signal: controller.signal
+        }).finally(() => {
+          clearTimeout(timeoutId);
+        });
+      } else {
+        // 远程服务使用支持代理的 net 模块
+        console.log(`使用 Electron net 模块请求远程服务（自动代理）: ${url}`);
+        return this.createProxyAwareRequest(timeoutMs)(url, options);
+      }
+    };
   }
 
   /**

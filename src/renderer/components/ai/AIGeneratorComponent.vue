@@ -343,7 +343,9 @@ const loadConfigs = async () => {
             if (defaultModel) {
                 currentModel.value = defaultModel
                 currentConfigId.value = defaultConfig.value.configId
+                // 确保模型名称包含冒号时也能正确处理
                 selectedModelKey.value = `${defaultConfig.value.configId}:${defaultModel}`
+                console.log('设置默认模型 key:', selectedModelKey.value)
             }
             
             const configLabel = defaultConfig.value === preferred ? '首选配置' : '默认配置'
@@ -397,7 +399,17 @@ const onModelSelect = (config: AIConfig | null) => {
     
     // 更新当前使用的配置
     currentConfigId.value = config.configId
-    currentModel.value = config.defaultModel || ''
+    // 从 selectedModelKey 中正确解析模型名称
+    if (selectedModelKey.value) {
+        const firstColonIndex = selectedModelKey.value.indexOf(':')
+        if (firstColonIndex !== -1) {
+            currentModel.value = selectedModelKey.value.substring(firstColonIndex + 1)
+        } else {
+            currentModel.value = config.defaultModel || ''
+        }
+    } else {
+        currentModel.value = config.defaultModel || ''
+    }
     
     console.log('切换到配置:', config.name, '模型:', currentModel.value)
 }
@@ -499,6 +511,19 @@ const generatePrompt = async () => {
         // 获取当前选中的配置 - 使用AIModelSelector组件
         const selectedConfig = modelSelectorRef.value?.selectedConfig
         const selectedModel = modelSelectorRef.value?.selectedModel
+
+        console.log('🔍 生成请求调试信息:', {
+            selectedConfig: selectedConfig ? {
+                configId: selectedConfig.configId,
+                name: selectedConfig.name,
+                type: selectedConfig.type,
+                defaultModel: selectedConfig.defaultModel,
+                customModel: selectedConfig.customModel,
+                models: selectedConfig.models
+            } : null,
+            selectedModel,
+            modelSelectorRef: !!modelSelectorRef.value
+        })
 
         if (!selectedConfig) {
             throw new Error('没有可用的 AI 配置')

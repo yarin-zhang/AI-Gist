@@ -110,14 +110,20 @@ const modelDropdownOptions = computed(() => {
 // 获取当前选中的配置
 const selectedConfig = computed(() => {
     if (!selectedModelKey.value) return null
-    const [configId] = selectedModelKey.value.split(':')
+    // 使用第一个冒号分割，因为模型名称可能包含冒号
+    const firstColonIndex = selectedModelKey.value.indexOf(':')
+    if (firstColonIndex === -1) return null
+    const configId = selectedModelKey.value.substring(0, firstColonIndex)
     return configs.value.find(c => c.configId === configId) || null
 })
 
 // 获取当前选中的模型
 const selectedModel = computed(() => {
     if (!selectedModelKey.value) return ''
-    const [, model] = selectedModelKey.value.split(':')
+    // 使用第一个冒号分割，因为模型名称可能包含冒号
+    const firstColonIndex = selectedModelKey.value.indexOf(':')
+    if (firstColonIndex === -1) return ''
+    const model = selectedModelKey.value.substring(firstColonIndex + 1)
     return model || ''
 })
 
@@ -168,7 +174,12 @@ const onModelSelect = (modelKey: string) => {
     selectedModelKey.value = modelKey
 
     // 解析选择的模型key，格式为 "configId:model"
-    const [configId, model] = modelKey.split(':')
+    // 使用第一个冒号分割，因为模型名称可能包含冒号
+    const firstColonIndex = modelKey.indexOf(':')
+    if (firstColonIndex === -1) return
+    
+    const configId = modelKey.substring(0, firstColonIndex)
+    const model = modelKey.substring(firstColonIndex + 1)
 
     // 更新当前使用的配置
     const config = configs.value.find(c => c.configId === configId)
