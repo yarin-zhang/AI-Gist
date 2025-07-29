@@ -147,6 +147,7 @@ import {
     Cloud,
     Globe,
     Keyboard,
+    Wifi,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -246,9 +247,9 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
         },
         {
-            label: t('language.title'),
-            key: "language",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
         },
         {
             label: t('settings.sections.startup'),
@@ -256,19 +257,19 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
         },
         {
-            label: t('settings.sections.shortcuts'),
-            key: "shortcuts",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
+            label: t('settings.sections.close'),
+            key: "close-behavior",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
         },
         {
             label: t('settings.sections.networkProxy'),
             key: "network-proxy",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Wifi) }),
         },
         {
-            label: t('settings.sections.close'),
-            key: "close-behavior",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
+            label: t('language.title'),
+            key: "language",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
         },
         {
             label: t('settings.sections.about'),
@@ -300,7 +301,7 @@ const currentSectionInfo = computed(() => {
             "data-management": Database,
             "cloud-backup": Cloud,
             shortcuts: Keyboard,
-            "network-proxy": Globe,
+            "network-proxy": Wifi,
             about: InfoCircle,
             laboratory: Flask
         };
