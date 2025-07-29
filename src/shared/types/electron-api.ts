@@ -116,6 +116,44 @@ export default interface ElectronApi {
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>
   }
 
+  // 网络代理管理
+  proxy: {
+    getSystemProxyInfo: () => Promise<{
+      hasProxy: boolean;
+      proxyConfig?: string;
+      proxyAddress?: string;
+    }>
+    testConnectionRealTime: () => Promise<{
+      overall: {
+        success: boolean;
+        totalSites: number;
+        successSites: number;
+        failedSites: number;
+      };
+      results: Array<{
+        name: string;
+        url: string;
+        description: string;
+        success: boolean;
+        responseTime?: number;
+        error?: string;
+      }>;
+    }>
+    getProxyInfo: (url?: string) => Promise<string>
+    setProxyMode: (mode: 'direct' | 'system' | 'manual', config?: any) => Promise<{
+      success: boolean;
+      error?: string;
+    }>
+    onTestProgress: (callback: (result: {
+      name: string;
+      url: string;
+      description: string;
+      success: boolean;
+      responseTime?: number;
+      error?: string;
+    }) => void) => () => void
+  }
+
   // 快捷键管理
   shortcuts: ShortcutsAPI
 }

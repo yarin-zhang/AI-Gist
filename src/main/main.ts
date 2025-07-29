@@ -28,7 +28,21 @@ app.whenReady().then(async () => {
   console.log('应用启动中...');
 
   // 配置网络代理设置
-  await NetworkProxyManager.configure();
+  try {
+    const userPrefs = preferencesManager.getPreferences();
+    const proxyConfig = userPrefs.networkProxy;
+    
+    if (proxyConfig) {
+      await NetworkProxyManager.initialize(proxyConfig);
+    } else {
+      // 如果没有用户配置，使用系统代理
+      await NetworkProxyManager.initialize({ mode: 'system' });
+    }
+  } catch (error) {
+    console.error('初始化网络代理配置失败:', error);
+    // 如果配置失败，使用系统代理作为后备
+    await NetworkProxyManager.initialize({ mode: 'system' });
+  }
 
   // 移除应用菜单栏
   Menu.setApplicationMenu(null);

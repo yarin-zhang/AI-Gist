@@ -62,6 +62,15 @@ export interface UserPreferences {
     copyPrompt: ShortcutConfig;
     promptTriggers: ShortcutConfig[];
   };
+  // 新增：网络代理配置
+  networkProxy?: {
+    mode: 'direct' | 'system' | 'manual';
+    manualConfig?: {
+      httpProxy?: string;
+      httpsProxy?: string;
+      noProxy?: string;
+    };
+  };
 }
 
 /**

@@ -666,6 +666,10 @@
       "startup-behavior": {
         "description": "配置應用啟動和自啟動選項",
         "title": "啟動行為設置"
+      },
+      "network-proxy": {
+        "description": "配置網絡代理設置，解決網絡連接問題",
+        "title": "網絡代理設置"
       }
     },
     "sections": {
@@ -675,6 +679,7 @@
       "cloudBackup": "雲端備份",
       "dataManagement": "數據管理",
       "laboratory": "實驗室",
+      "networkProxy": "網絡代理設置",
       "shortcuts": "快捷鍵設置",
       "startup": "啟動行為設置"
     },
@@ -775,6 +780,34 @@
     "triggerDesc": "用於觸發選中提示詞的快捷鍵 (Ctrl Shift P)",
     "triggerFixed": "此快捷鍵固定為 Ctrl Shift P，不可修改",
     "waitingInput": "等待輸入..."
+  },
+  "networkProxy": {
+    "title": "網絡代理設置",
+    "description": "配置網絡代理設置，解決網絡連接問題",
+    "proxyMode": "代理模式",
+    "directMode": "直連模式",
+    "directModeDesc": "不使用任何代理，直接連接網絡",
+    "systemMode": "系統代理",
+    "systemModeDesc": "使用系統設置的代理配置",
+    "manualMode": "手動配置",
+    "manualModeDesc": "手動設置代理服務器地址",
+    "manualConfig": "手動配置",
+    "httpProxy": "HTTP 代理",
+    "httpsProxy": "HTTPS 代理",
+    "noProxy": "不使用代理的地址",
+    "noProxyDesc": "用逗號分隔的地址列表，如：localhost,127.0.0.1",
+    "testConnection": "測試連接",
+    "testConnectionDesc": "測試當前代理配置是否正常工作",
+    "connectionTest": "連接測試",
+    "connectionSuccess": "連接成功",
+    "connectionFailed": "連接失敗",
+    "responseTime": "響應時間",
+    "currentProxy": "當前代理",
+    "systemProxyInfo": "系統代理信息",
+    "noProxyDetected": "未檢測到系統代理",
+    "proxyDetected": "檢測到系統代理",
+    "proxyAddress": "代理地址",
+    "connectionTest": "連接測試"
   },
   "startup": {
     "autoStart": "開機自動啟動",

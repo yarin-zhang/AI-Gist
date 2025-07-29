@@ -270,6 +270,33 @@
     },
     "title": "AI Gist"
   },
+  "networkProxy": {
+    "connectionFailed": "Connection Failed",
+    "connectionSuccess": "Connection Successful",
+    "connectionTest": "Connection Test",
+    "currentProxy": "Current Proxy",
+    "description": "Configure network proxy settings to resolve connection issues",
+    "directMode": "Direct Connection",
+    "directModeDesc": "No proxy, connect directly to the network",
+    "httpProxy": "HTTP Proxy",
+    "httpsProxy": "HTTPS Proxy",
+    "manualConfig": "Manual Configuration",
+    "manualMode": "Manual Configuration",
+    "manualModeDesc": "Manually set proxy server address",
+    "noProxy": "No Proxy Addresses",
+    "noProxyDesc": "Comma-separated address list, e.g.: localhost,127.0.0.1",
+    "noProxyDetected": "No system proxy detected",
+    "proxyAddress": "Proxy Address",
+    "proxyDetected": "System proxy detected",
+    "proxyMode": "Proxy Mode",
+    "responseTime": "Response Time",
+    "systemMode": "System Proxy",
+    "systemModeDesc": "Use system proxy settings",
+    "systemProxyInfo": "System Proxy Information",
+    "testConnection": "Test Connection",
+    "testConnectionDesc": "Test if the current proxy configuration works properly",
+    "title": "Network Proxy Settings"
+  },
   "prompt": {
     "shortcutTriggerDisabled": "Shortcut key insertion function has been disabled",
     "shortcutTriggerEnabled": "Shortcut key insertion function enabled",
@@ -355,7 +382,7 @@
       "contentEmpty": "Content is empty",
       "copyAIResponse": "Copy AI response",
       "copyPrompt": "Copy prompt",
-      "copyPromptDesc": "",
+      "copyPromptDesc": "Copy prompt words",
       "copyRecord": "Copy record",
       "copyResult": "Copy result",
       "debugConfig": "Debug configuration:",
@@ -659,6 +686,10 @@
         "description": "Configure the display language of the application",
         "title": "Language settings"
       },
+      "network-proxy": {
+        "description": "Configure network proxy settings to resolve connection issues",
+        "title": "Network Proxy Settings"
+      },
       "shortcuts": {
         "description": "Configure global shortcuts and prompt shortcuts",
         "title": "Shortcut Settings"
@@ -675,6 +706,7 @@
       "cloudBackup": "Cloud Backup",
       "dataManagement": "Data Management",
       "laboratory": "Laboratory",
+      "networkProxy": "Network Proxy",
       "shortcuts": "Shortcuts",
       "startup": "Startup"
     },

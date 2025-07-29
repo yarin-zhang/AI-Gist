@@ -666,6 +666,10 @@
       "startup-behavior": {
         "description": "アプリケーションの起動と自動起動オプションを設定",
         "title": "起動時の動作設定"
+      },
+      "network-proxy": {
+        "description": "ネットワークプロキシ設定を構成し、接続問題を解決",
+        "title": "ネットワークプロキシ設定"
       }
     },
     "sections": {
@@ -675,6 +679,7 @@
       "cloudBackup": "クラウドバックアップ",
       "dataManagement": "データ管理",
       "laboratory": "研究室",
+      "networkProxy": "ネットワークプロキシ設定",
       "shortcuts": "ショートカットキー設定",
       "startup": "起動時の動作設定"
     },
@@ -775,6 +780,34 @@
     "triggerDesc": "選択したプロンプトワードをトリガーするためのショートカットキー（Ctrl Shift P）",
     "triggerFixed": "このショートカットキーはCTRLシフトPに固定されており、変更できません",
     "waitingInput": "入力を待っています..."
+  },
+  "networkProxy": {
+    "title": "ネットワークプロキシ設定",
+    "description": "ネットワークプロキシ設定を構成し、接続問題を解決",
+    "proxyMode": "プロキシモード",
+    "directMode": "直接接続",
+    "directModeDesc": "プロキシを使用せず、ネットワークに直接接続",
+    "systemMode": "システムプロキシ",
+    "systemModeDesc": "システム設定のプロキシ設定を使用",
+    "manualMode": "手動設定",
+    "manualModeDesc": "プロキシサーバーアドレスを手動で設定",
+    "manualConfig": "手動設定",
+    "httpProxy": "HTTPプロキシ",
+    "httpsProxy": "HTTPSプロキシ",
+    "noProxy": "プロキシを使用しないアドレス",
+    "noProxyDesc": "カンマ区切りのアドレスリスト、例：localhost,127.0.0.1",
+    "testConnection": "接続テスト",
+    "testConnectionDesc": "現在のプロキシ設定が正常に動作するかテスト",
+    "connectionTest": "接続テスト",
+    "connectionSuccess": "接続成功",
+    "connectionFailed": "接続失敗",
+    "responseTime": "応答時間",
+    "currentProxy": "現在のプロキシ",
+    "systemProxyInfo": "システムプロキシ情報",
+    "noProxyDetected": "システムプロキシが検出されません",
+    "proxyDetected": "システムプロキシが検出されました",
+    "proxyAddress": "プロキシアドレス",
+    "connectionTest": "接続テスト"
   },
   "startup": {
     "autoStart": "自動起動",

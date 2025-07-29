@@ -7,6 +7,7 @@ import { ShortcutManager } from './shortcut-manager';
 import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
+import { NetworkProxyManager } from './network-proxy';
 import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
@@ -26,6 +27,7 @@ class IpcHandlers {
     this.setupUpdateHandlers();
     this.setupShellHandlers();
     this.setupDataHandlers();
+    this.setupProxyHandlers();
   }
 
   /**
@@ -355,6 +357,58 @@ class IpcHandlers {
   }
 
   /**
+   * 设置网络代理处理器
+   */
+  private setupProxyHandlers() {
+    // 获取系统代理信息
+    ipcMain.handle('proxy:get-system-info', async () => {
+      return await NetworkProxyManager.getSystemProxyInfo();
+    });
+
+    // 测试代理连接（实时版本）
+    ipcMain.handle('proxy:test-connection-real-time', async (event) => {
+      const results: Array<{
+        name: string;
+        url: string;
+        description: string;
+        success: boolean;
+        responseTime?: number;
+        error?: string;
+      }> = [];
+      
+      const testResult = await NetworkProxyManager.testProxyConnectionRealTime((result) => {
+        results.push(result);
+        // 实时发送结果到渲染进程
+        event.sender.send('proxy:test-progress', result);
+      });
+      
+      return {
+        overall: testResult.overall,
+        results
+      };
+    });
+
+    // 获取代理信息
+    ipcMain.handle('proxy:get-info', async (event, url?: string) => {
+      return await NetworkProxyManager.getProxyInfo(url);
+    });
+
+    // 设置代理模式
+    ipcMain.handle('proxy:set-mode', async (event, mode: 'direct' | 'system' | 'manual', config?: any) => {
+      try {
+        await NetworkProxyManager.initialize({
+          mode,
+          manualConfig: config?.manualConfig
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('设置代理模式失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -404,6 +458,12 @@ class IpcHandlers {
     ipcMain.removeHandler('data:select-export-path');
     ipcMain.removeHandler('data:write-file');
     ipcMain.removeHandler('data:read-file');
+    
+    // 清理网络代理处理器
+    ipcMain.removeHandler('proxy:get-system-info');
+    ipcMain.removeHandler('proxy:test-connection-real-time');
+    ipcMain.removeHandler('proxy:get-info');
+    ipcMain.removeHandler('proxy:set-mode');
     
     // 清理快捷键处理器
     ipcMain.removeHandler('shortcuts:register-defaults');

@@ -126,6 +126,9 @@
                             :model-value="settings.shortcuts"
                             @update:model-value="(val) => { settings.shortcuts = val; updateSetting(); }" />
 
+                        <!-- 网络代理设置 -->
+                        <NetworkProxySettings v-show="activeSettingKey === 'network-proxy'" />
+
                         <!-- 关于 -->
                         <AboutSettings v-show="activeSettingKey === 'about'" />
 
@@ -177,6 +180,7 @@ import DataManagementSettings from "@/components/settings/DataManagementSettings
 import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
+import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
 
 
 // Props 定义
@@ -280,6 +284,11 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
         },
         {
+            label: t('settings.sections.networkProxy'),
+            key: "network-proxy",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
+        },
+        {
             label: t('settings.sections.close'),
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
@@ -306,17 +315,18 @@ const menuOptions = computed(() => {
         // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
-    const section = {
-        "close-behavior": Power,
-        "startup-behavior": Rocket,
-        appearance: Sun,
-        language: Globe,
-        "data-management": Database,
-        "cloud-backup": Cloud,
-        shortcuts: Keyboard,
-        about: InfoCircle,
-        laboratory: Flask
-    };
+            const section = {
+            "close-behavior": Power,
+            "startup-behavior": Rocket,
+            appearance: Sun,
+            language: Globe,
+            "data-management": Database,
+            "cloud-backup": Cloud,
+            shortcuts: Keyboard,
+            "network-proxy": Globe,
+            about: InfoCircle,
+            laboratory: Flask
+        };
     return {
         title: t(`settings.sectionDescriptions.${key}.title`),
         icon: section[key as keyof typeof section] || Database,
