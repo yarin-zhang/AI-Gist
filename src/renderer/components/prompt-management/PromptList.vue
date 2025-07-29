@@ -232,6 +232,14 @@
 
                             <template #header-extra>
                                 <NFlex size="small">
+                                    <NButton size="small" text @click.stop="handleCopyPrompt(prompt)"
+                                        type="default">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Copy />
+                                            </NIcon>
+                                        </template>
+                                    </NButton>
                                     <NButton size="small" text @click.stop="toggleFavorite(prompt.id!)"
                                         :type="prompt.isFavorite ? 'error' : 'default'">
                                         <template #icon>
