@@ -281,6 +281,24 @@ export class ICloudProvider implements CloudStorageProvider {
   // ==================== 公共方法 ====================
 
   /**
+   * 初始化目录结构
+   * 为iCloud Drive创建必要的目录
+   */
+  async initializeDirectories(): Promise<void> {
+    try {
+      const basePath = await this.getICloudBasePath();
+      const fullPath = this.buildFullPath(basePath);
+      
+      // 确保目录存在
+      await fs.mkdir(fullPath, { recursive: true });
+      console.log('iCloud Drive 目录初始化成功');
+    } catch (error) {
+      console.warn('iCloud Drive 目录初始化失败，可能目录已存在:', error);
+      // 不抛出错误，因为目录可能已经存在
+    }
+  }
+
+  /**
    * 测试连接
    * @returns 连接是否成功
    */

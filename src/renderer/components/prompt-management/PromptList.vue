@@ -63,22 +63,32 @@
                     </NButtonGroup>
                 </NFlex>
                 <!-- 搜索提示信息 -->
-                <div v-if="searchText.trim() || selectedCategory || showFavoritesOnly"
+                <div v-if="searchText.trim() || selectedTag || selectedCategory || showFavoritesOnly"
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
-                    <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
-                        <Search />
-                    </NIcon> <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', {
-                        text:
-                        searchText.trim() }) }}</span>
-                    <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
-                        name:
-                            getCategoryName(selectedCategory) })
-                        }}</span>
-                    <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
-                    <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
-                            < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
+                    <NFlex justify="space-between" align="center">
+                        <NFlex align="center">
+                            <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
+                                <Search />
+                            </NIcon>
+                            <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', {
+                                text: searchText.trim() }) }}</span>
+                            <span v-if="selectedTag && !searchText.trim()">{{ t('promptManagement.searchingForTag', {
+                                tag: selectedTag }) }}</span>
+                            <span v-if="selectedTag && searchText.trim()">{{ t('promptManagement.searchingForTag', {
+                                tag: selectedTag }) }} + {{ t('promptManagement.searchingFor', {
+                                text: searchText.trim() }) }}</span>
+                            <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
+                                name: getCategoryName(selectedCategory) }) }}</span>
+                            <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
+                            <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
+                                ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
+                                    < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
                             </span>
+                        </NFlex>
+                        <NButton text size="small" @click="clearAllFilters">
+                            {{ t('common.clear') }}
+                        </NButton>
+                    </NFlex>
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
@@ -145,6 +155,7 @@
                                 <NTag v-for="tag in (tagsExpanded ? popularTags : popularTags.slice(0, 6))"
                                     :key="tag.name" size="small" :bordered="false" clickable
                                     :color="getTagColor(tag.name)" @click="handleTagQuickSearch(tag.name)"
+                                    :checked="selectedTag === tag.name"
                                     style="cursor: pointer;" :class="{ 'highlighted-tag': isTagMatched(tag.name) }">
                                     <template #icon>
                                         <NIcon>
@@ -198,7 +209,7 @@
             <div v-if="viewMode === 'tree'" style="margin-top: 16px;">
                 <NDataTable :columns="treeTableColumns" :data="treeData" :loading="initialLoading"
                     :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
-                    v-model:checked-row-keys="selectedRowKeys" :max-height="600" :scroll-x="1200"
+                    v-model:checked-row-keys="selectedRowKeys" :max-height="600" :scroll-x="1280"
                     :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" default-expand-all />
             </div>
 
@@ -206,7 +217,7 @@
             <div v-else-if="viewMode === 'table'" style="margin-top: 16px;">
                 <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" :max-height="600" :scroll-x="1200" remote />
+                    :pagination="tablePagination" :max-height="600" :scroll-x="1280" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
@@ -221,6 +232,14 @@
 
                             <template #header-extra>
                                 <NFlex size="small">
+                                    <NButton size="small" text @click.stop="handleCopyPrompt(prompt)"
+                                        type="default">
+                                        <template #icon>
+                                            <NIcon>
+                                                <Copy />
+                                            </NIcon>
+                                        </template>
+                                    </NButton>
                                     <NButton size="small" text @click.stop="toggleFavorite(prompt.id!)"
                                         :type="prompt.isFavorite ? 'error' : 'default'">
                                         <template #icon>
@@ -355,6 +374,7 @@ import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
 import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
+import { jinjaService } from '@/lib/utils/jinja.service'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
 
 interface Emits {
@@ -397,6 +417,7 @@ const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
 const selectedCategory = ref<number | null>(null)
 const showFavoritesOnly = ref(false)
+const selectedTag = ref<string>('') // 添加专门的标签搜索状态
 
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
@@ -619,6 +640,33 @@ const treeTableColumns = computed(() => [
         }
     },
     {
+        title: t('common.copy'),
+        key: 'copy',
+        width: 80,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                return h(
+                    NButton,
+                    {
+                        size: 'small',
+                        text: true,
+                        type: 'default',
+                        onClick: (e: Event) => {
+                            e.stopPropagation()
+                            handleCopyPrompt(prompt)
+                        }
+                    },
+                    {
+                        icon: () => h(NIcon, null, { default: () => h(Copy) })
+                    }
+                )
+            }
+        }
+    },
+    {
         title: t('promptManagement.favorites'),
         key: 'isFavorite',
         width: 80,
@@ -811,6 +859,28 @@ const tableColumns = computed(() => [
         }
     },
     {
+        title: t('common.copy'),
+        key: 'copy',
+        width: 80,
+        render: (row: PromptWithRelations) => {
+            return h(
+                NButton,
+                {
+                    size: 'small',
+                    text: true,
+                    type: 'default',
+                    onClick: (e: Event) => {
+                        e.stopPropagation()
+                        handleCopyPrompt(row)
+                    }
+                },
+                {
+                    icon: () => h(NIcon, null, { default: () => h(Copy) })
+                }
+            )
+        }
+    },
+    {
         title: t('promptManagement.favorites'),
         key: 'isFavorite',
         width: 80,
@@ -914,7 +984,8 @@ const loadPrompts = async (reset = true) => {
         }// 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
-            search: searchText.value || undefined,
+            search: searchText.value || undefined, // 文本搜索和标签搜索可以同时使用
+            tags: selectedTag.value || undefined, // 使用专门的标签搜索
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
             limit: gridPageSize.value, // 网格视图使用专门的页面大小
@@ -930,7 +1001,9 @@ const loadPrompts = async (reset = true) => {
             total: result.total,
             hasNextPage: result.hasNextPage,
             currentPage: currentPage.value,
-            reset
+            reset,
+            selectedTag: selectedTag.value,
+            searchText: searchText.value
         })        // 如果是重置加载，直接替换数据；否则追加数据
         if (reset) {
             prompts.value = result.data || []
@@ -1026,7 +1099,8 @@ const loadPromptsForTable = async () => {
         // 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
-            search: searchText.value || undefined,
+            search: searchText.value || undefined, // 文本搜索和标签搜索可以同时使用
+            tags: selectedTag.value || undefined, // 使用专门的标签搜索
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
             limit: pageSize.value,
@@ -1047,7 +1121,9 @@ const loadPromptsForTable = async () => {
             pageSize: pageSize.value,
             dataLength: prompts.value.length,
             totalCount: totalCount.value,
-            filters
+            filters,
+            selectedTag: selectedTag.value,
+            searchText: searchText.value
         })
 
     } catch (error) {
@@ -1150,6 +1226,15 @@ const toggleAdvancedFilter = () => {
     }
 }
 
+// 清除所有筛选条件
+const clearAllFilters = () => {
+    searchText.value = ''
+    selectedTag.value = ''
+    selectedCategory.value = null
+    showFavoritesOnly.value = false
+    handleSearch()
+}
+
 const toggleFavorite = async (promptId: number) => {
     try {
         // 先乐观更新UI
@@ -1176,13 +1261,26 @@ const toggleFavorite = async (promptId: number) => {
 
 // 检查标签是否匹配搜索关键词
 const isTagMatched = (tag: string) => {
-    if (!searchText.value.trim()) return false
-    return tag.toLowerCase().includes(searchText.value.toLowerCase())
+    // 如果是当前选中的标签，高亮显示
+    if (selectedTag.value && tag.toLowerCase() === selectedTag.value.toLowerCase()) {
+        return true
+    }
+    // 如果是文本搜索匹配，也高亮显示
+    if (searchText.value.trim() && tag.toLowerCase().includes(searchText.value.toLowerCase())) {
+        return true
+    }
+    return false
 }
 
 // 快速标签搜索
 const handleTagQuickSearch = (tagName: string) => {
-    searchText.value = tagName
+    // 如果点击的是当前选中的标签，则取消选择
+    if (selectedTag.value === tagName) {
+        selectedTag.value = ''
+    } else {
+        selectedTag.value = tagName
+    }
+    // 不清除文本搜索，允许同时使用
     handleSearch()
 }
 
@@ -1193,8 +1291,8 @@ const getPromptActions = (prompt: PromptWithRelations) => [
         icon: () => h(NIcon, null, { default: () => h(Edit) })
     },
     {
-        label: t('common.copy'),
-        key: 'copy',
+        label: t('promptManagement.copyOriginalContent'),
+        key: 'copyOriginal',
         icon: () => h(NIcon, null, { default: () => h(Copy) })
     },
     {
@@ -1209,8 +1307,8 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
         case 'edit':
             emit('edit', prompt)
             break
-        case 'copy':
-            handleCopyPrompt(prompt)
+        case 'copyOriginal':
+            handleCopyOriginalPrompt(prompt)
             break
         case 'delete':
             handleDeletePrompt(prompt)
@@ -1220,10 +1318,61 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
 
 const handleCopyPrompt = async (prompt: PromptWithRelations) => {
     try {
-        await navigator.clipboard.writeText(prompt.content)
+        let contentToCopy = prompt.content;
+
+        // 检查是否为 Jinja 模板
+        if (prompt.isJinjaTemplate) {
+            try {
+                // 生成默认变量值
+                const defaultVariables: Record<string, any> = {};
+                if (prompt.variables && prompt.variables.length > 0) {
+                    // 使用存储的变量配置
+                    prompt.variables.forEach((variable: any) => {
+                        defaultVariables[variable.name] = variable.defaultValue || `[${variable.name}]`;
+                    });
+                } else {
+                    // 从模板内容中提取变量
+                    const templateVariables = jinjaService.extractVariables(prompt.content);
+                    templateVariables.forEach(variableName => {
+                        defaultVariables[variableName] = `[${variableName}]`;
+                    });
+                }
+                
+                // 使用 Jinja 服务渲染模板
+                contentToCopy = jinjaService.render(prompt.content, defaultVariables);
+            } catch (error) {
+                console.error('Jinja 模板渲染失败:', error);
+                // 渲染失败时返回原始内容
+                contentToCopy = prompt.content;
+            }
+        } else {
+            // 变量模式：检查是否有变量配置
+            if (prompt.variables && prompt.variables.length > 0) {
+                // 变量替换逻辑
+                Object.entries(prompt.variables).forEach(([key, variable]: [string, any]) => {
+                    const regex = new RegExp(`\\{\\{${variable.name}\\}\\}`, "g");
+                    // 使用默认值替换变量，如果没有默认值则使用变量名
+                    const replacement = variable.defaultValue || `[${variable.name}]`;
+                    contentToCopy = contentToCopy.replace(regex, replacement);
+                });
+            }
+        }
+
+        await navigator.clipboard.writeText(contentToCopy)
         message.success(t('promptManagement.copyPromptSuccess'))
     } catch (error) {
         message.error(t('promptManagement.copyFailed'))
+        console.error('复制提示词失败:', error)
+    }
+}
+
+const handleCopyOriginalPrompt = async (prompt: PromptWithRelations) => {
+    try {
+        await navigator.clipboard.writeText(prompt.content)
+        message.success(t('promptManagement.copyOriginalContentSuccess'))
+    } catch (error) {
+        message.error(t('promptManagement.copyFailed'))
+        console.error('复制原始提示词失败:', error)
     }
 }
 

@@ -153,5 +153,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path),
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+  },
+  // 网络代理管理
+  proxy: {
+    getSystemProxyInfo: () => ipcRenderer.invoke('proxy:get-system-info'),
+    refreshSystemProxyInfo: () => ipcRenderer.invoke('proxy:refresh-system-info'),
+    testConnectionRealTime: (proxyConfig?: any) => ipcRenderer.invoke('proxy:test-connection-real-time', proxyConfig),
+    getProxyInfo: (url?: string) => ipcRenderer.invoke('proxy:get-info', url),
+    setProxyMode: (mode: 'direct' | 'system' | 'manual', config?: any) => ipcRenderer.invoke('proxy:set-mode', mode, config),
+    onTestProgress: (callback: (result: any) => void) => {
+      const listener = (_: any, result: any) => callback(result);
+      ipcRenderer.on('proxy:test-progress', listener);
+      return () => ipcRenderer.removeListener('proxy:test-progress', listener);
+    }
   }
 });

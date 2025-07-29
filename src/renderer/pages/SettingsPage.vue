@@ -86,30 +86,7 @@
                             @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
 
                         <!-- 语言设置 -->
-                        <NCard v-show="activeSettingKey === 'language'">
-                            <NFlex vertical :size="16">
-                                <NFlex vertical :size="12">
-                                    <NText depth="2">{{ t('language.title') }}</NText>
-                                    <NText depth="3" style="font-size: 12px;">
-                                        {{ t('language.description') }}
-                                    </NText>
-                                </NFlex>
-                                
-                                <NFlex vertical :size="12">
-                                    <NText depth="2" style="font-size: 14px;">{{ t('language.selectLanguage') }}：</NText>
-                                    <NSelect
-                                        v-model:value="currentLocale"
-                                        :options="supportedLocales.map(locale => ({
-                                            label: locale.name,
-                                            value: locale.code
-                                        }))"
-                                        :placeholder="t('language.selectLanguage')"
-                                        style="max-width: 200px;"
-                                        @update:value="switchLocale"
-                                    />
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
+                        <LanguageSettings v-show="activeSettingKey === 'language'" />
 
                         <!-- 关闭行为设置 -->
                         <CloseBehaviorSettings v-show="activeSettingKey === 'close-behavior'"
@@ -124,7 +101,16 @@
                         <!-- 快捷键设置 -->
                         <ShortcutSettings v-show="activeSettingKey === 'shortcuts'"
                             :model-value="settings.shortcuts"
-                            @update:model-value="(val) => { settings.shortcuts = val; updateSetting(); }" />
+                            @update:model-value="(val: any) => { settings.shortcuts = val; updateSetting(); }" />
+
+                        <!-- 网络代理设置 -->
+                        <NetworkProxySettings v-show="activeSettingKey === 'network-proxy'"
+                            :model-value="settings.networkProxy"
+                            @update:model-value="(val) => { 
+                                console.log('SettingsPage: networkProxy updated:', val); 
+                                settings.networkProxy = val; 
+                                updateSetting(); 
+                            }" />
 
                         <!-- 关于 -->
                         <AboutSettings v-show="activeSettingKey === 'about'" />
@@ -152,7 +138,6 @@ import {
     NButton,
     NText,
     NMenu,
-    NSelect,
     useMessage,
 } from "naive-ui";
 import {
@@ -168,6 +153,7 @@ import {
     Cloud,
     Globe,
     Keyboard,
+    Wifi,
 } from "@vicons/tabler";
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -177,6 +163,8 @@ import DataManagementSettings from "@/components/settings/DataManagementSettings
 import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
+import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
+import LanguageSettings from "@/components/settings/LanguageSettings.vue";
 
 
 // Props 定义
@@ -190,7 +178,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // 消息提示
 const message = useMessage();
-const { t, currentLocale, supportedLocales, switchLocale, initLocale } = useI18n()
+const { t, initLocale } = useI18n()
 
 // 检测是否为开发环境
 const isDevelopment = import.meta.env.DEV;
@@ -244,6 +232,15 @@ const settings = reactive({
         },
         promptTriggers: []
     },
+    // 网络代理设置
+    networkProxy: {
+        mode: 'system' as 'direct' | 'system' | 'manual',
+        manualConfig: {
+            httpProxy: '',
+            httpsProxy: '',
+            noProxy: ''
+        }
+    },
 });
 
 // 菜单选项
@@ -265,9 +262,9 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
         },
         {
-            label: t('language.title'),
-            key: "language",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
         },
         {
             label: t('settings.sections.startup'),
@@ -275,14 +272,19 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Rocket) }),
         },
         {
-            label: t('settings.sections.shortcuts'),
-            key: "shortcuts",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
-        },
-        {
             label: t('settings.sections.close'),
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
+        },
+        {
+            label: t('settings.sections.networkProxy'),
+            key: "network-proxy",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Wifi) }),
+        },
+        {
+            label: t('language.title'),
+            key: "language",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
         },
         {
             label: t('settings.sections.about'),
@@ -306,17 +308,18 @@ const menuOptions = computed(() => {
         // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
-    const section = {
-        "close-behavior": Power,
-        "startup-behavior": Rocket,
-        appearance: Sun,
-        language: Globe,
-        "data-management": Database,
-        "cloud-backup": Cloud,
-        shortcuts: Keyboard,
-        about: InfoCircle,
-        laboratory: Flask
-    };
+            const section = {
+            "close-behavior": Power,
+            "startup-behavior": Rocket,
+            appearance: Sun,
+            language: Globe,
+            "data-management": Database,
+            "cloud-backup": Cloud,
+            shortcuts: Keyboard,
+            "network-proxy": Wifi,
+            about: InfoCircle,
+            laboratory: Flask
+        };
     return {
         title: t(`settings.sectionDescriptions.${key}.title`),
         icon: section[key as keyof typeof section] || Database,
@@ -364,6 +367,16 @@ const loadSettings = async () => {
             settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
         }
 
+        // 网络代理配置
+        if (prefs.networkProxy) {
+            settings.networkProxy.mode = prefs.networkProxy.mode || 'system';
+            if (prefs.networkProxy.manualConfig) {
+                settings.networkProxy.manualConfig.httpProxy = prefs.networkProxy.manualConfig.httpProxy || '';
+                settings.networkProxy.manualConfig.httpsProxy = prefs.networkProxy.manualConfig.httpsProxy || '';
+                settings.networkProxy.manualConfig.noProxy = prefs.networkProxy.manualConfig.noProxy || '';
+            }
+        }
+
         console.log(t('settingsMessages.settingsLoaded'), {
             ...settings,
         });
@@ -389,9 +402,11 @@ const updateSetting = async () => {
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
                 shortcuts: settings.shortcuts,
+                networkProxy: settings.networkProxy,
             })
         );
 
+        console.log('SettingsPage: saving settings data:', settingsData);
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
         console.log(t('settingsMessages.settingsUpdated'), updatedPrefs);
 
@@ -437,6 +452,7 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
                     autoLaunch: settings.autoLaunch,
                     themeSource: settings.themeSource,
                     dataSync: settings.dataSync,
+                    networkProxy: settings.networkProxy,
                 })
             );
         }

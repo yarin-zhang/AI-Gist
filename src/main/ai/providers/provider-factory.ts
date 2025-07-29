@@ -34,6 +34,9 @@ export class AIProviderFactory {
       case 'openai':
       case 'deepseek':
       case 'mistral':
+      case 'siliconflow':
+      case 'tencent':
+      case 'aliyun':
         provider = new OpenAICompatibleProvider();
         break;
       case 'ollama':
@@ -75,6 +78,9 @@ export class AIProviderFactory {
       'openai',
       'deepseek', 
       'mistral',
+      'siliconflow',
+      'tencent',
+      'aliyun',
       'ollama',
       'lmstudio',
       'anthropic',

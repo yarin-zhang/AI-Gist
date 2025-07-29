@@ -94,6 +94,10 @@ class PreferencesManager {
       },
       promptTriggers: []
     },
+    // 网络代理配置
+    networkProxy: {
+      mode: 'system'
+    },
   };
 
   // ==================== 构造函数 ====================

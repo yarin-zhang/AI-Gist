@@ -1,6 +1,8 @@
 import { net } from 'electron';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
 import { buildPrompts } from './prompt-templates';
+import { NetworkProxyManager } from '../../electron/network-proxy';
+import { preferencesManager } from '../../electron/preferences-manager';
 
 /**
  * AI供应商测试结果
@@ -19,6 +21,18 @@ export interface AIIntelligentTestResult {
   response?: string;
   error?: string;
   inputPrompt?: string;
+}
+
+/**
+ * 网络代理配置类型
+ */
+export interface NetworkProxyConfig {
+  mode: 'direct' | 'system' | 'manual';
+  manualConfig?: {
+    httpProxy?: string;
+    httpsProxy?: string;
+    noProxy?: string;
+  };
 }
 
 /**
@@ -62,6 +76,69 @@ export interface AIProvider {
  */
 export abstract class BaseAIProvider implements AIProvider {
   
+  /**
+   * 获取当前网络代理配置
+   */
+  protected getCurrentProxyConfig(): NetworkProxyConfig {
+    try {
+      const userPrefs = preferencesManager.getPreferences();
+      const proxyConfig = userPrefs.networkProxy;
+      
+      if (proxyConfig) {
+        return {
+          mode: proxyConfig.mode || 'system',
+          manualConfig: proxyConfig.manualConfig
+        };
+      }
+      
+      // 默认使用系统代理
+      return {
+        mode: 'system'
+      };
+    } catch (error) {
+      console.error('获取网络代理配置失败:', error);
+      // 出错时使用系统代理作为后备
+      return {
+        mode: 'system'
+      };
+    }
+  }
+
+  /**
+   * 判断是否应该使用代理
+   * 根据网络代理配置和目标URL来决定
+   */
+  protected shouldUseProxy(url: string): boolean {
+    const proxyConfig = this.getCurrentProxyConfig();
+    
+    // 如果是直连模式，不使用代理
+    if (proxyConfig.mode === 'direct') {
+      return false;
+    }
+    
+    // 如果是本地服务，不使用代理
+    const isLocalService = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+    if (isLocalService) {
+      return false;
+    }
+    
+    // 检查是否在 noProxy 列表中
+    if (proxyConfig.manualConfig?.noProxy) {
+      const noProxyList = proxyConfig.manualConfig.noProxy.split(',').map(item => item.trim());
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
+      for (const noProxyItem of noProxyList) {
+        if (noProxyItem && (hostname === noProxyItem || hostname.endsWith(`.${noProxyItem}`))) {
+          return false;
+        }
+      }
+    }
+    
+    // 其他情况使用代理
+    return true;
+  }
+
   /**
    * 创建网络请求（使用 Electron net 模块，自动支持系统代理）
    */
@@ -130,16 +207,22 @@ export abstract class BaseAIProvider implements AIProvider {
   }
 
   /**
-   * 创建带超时的网络请求（智能选择 fetch 或 net 模块）
+   * 创建带超时的网络请求（根据网络代理配置智能选择）
    */
   protected createTimeoutFetch(timeoutMs = 15000) {
     return (url: string, options: any = {}): Promise<Response> => {
-      // 判断是否为本地服务
-      const isLocalService = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+      const proxyConfig = this.getCurrentProxyConfig();
+      const shouldUseProxy = this.shouldUseProxy(url);
       
-      if (isLocalService) {
-        // 本地服务使用标准 fetch（不需要代理）
-        console.log(`使用标准 fetch 请求本地服务: ${url}`);
+      console.log(`网络请求配置 - URL: ${url}, 代理模式: ${proxyConfig.mode}, 使用代理: ${shouldUseProxy}`);
+      
+      if (shouldUseProxy) {
+        // 使用支持代理的 net 模块
+        console.log(`使用 Electron net 模块请求远程服务（代理模式: ${proxyConfig.mode}）: ${url}`);
+        return this.createProxyAwareRequest(timeoutMs)(url, options);
+      } else {
+        // 使用标准 fetch（直连模式或本地服务）
+        console.log(`使用标准 fetch 请求（直连模式）: ${url}`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -149,10 +232,6 @@ export abstract class BaseAIProvider implements AIProvider {
         }).finally(() => {
           clearTimeout(timeoutId);
         });
-      } else {
-        // 远程服务使用支持代理的 net 模块
-        console.log(`使用 Electron net 模块请求远程服务（自动代理）: ${url}`);
-        return this.createProxyAwareRequest(timeoutMs)(url, options);
       }
     };
   }
@@ -220,28 +299,51 @@ export abstract class BaseAIProvider implements AIProvider {
    * 处理常见错误并返回用户友好的错误消息
    */
   protected handleCommonError(error: any, providerName: string): string {
-    if (error.message?.includes('请求超时')) {
+    const errorMessage = error.message || error.toString();
+    
+    if (errorMessage?.includes('请求超时') || errorMessage?.includes('timeout')) {
       return '连接超时，请检查网络或服务器状态';
     }
-    if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+    if (errorMessage?.includes('API key') || errorMessage?.includes('authentication') || errorMessage?.includes('401')) {
       return 'API Key 无效或已过期';
     }
-    if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+    if (errorMessage?.includes('network') || errorMessage?.includes('ECONNREFUSED') || errorMessage?.includes('ENOTFOUND')) {
       return '无法连接到服务器，请检查网络连接';
     }
-    if (error.message?.includes('Model Not Exist') || error.message?.includes('model not found')) {
-      return '指定的模型不存在，请检查模型名称或联系服务提供商';
+    if (errorMessage?.includes('Model Not Exist') || errorMessage?.includes('model not found') || errorMessage?.includes('400')) {
+      return '指定的模型不存在或不支持，请检查模型名称或联系服务提供商';
     }
-    if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
+    if (errorMessage?.includes('rate limit') || errorMessage?.includes('quota') || errorMessage?.includes('429')) {
       return '请求频率超限或配额不足，请稍后重试';
     }
-    if (error.message?.includes('invalid_request_error')) {
+    if (errorMessage?.includes('invalid_request_error') || errorMessage?.includes('400')) {
       return '请求参数错误，请检查配置信息';
     }
-    if (error.message?.includes('server_error') || error.message?.includes('internal error')) {
+    if (errorMessage?.includes('server_error') || errorMessage?.includes('internal error') || errorMessage?.includes('500')) {
       return '服务器内部错误，请稍后重试';
     }
-    return error.message || '未知错误';
+    if (errorMessage?.includes('403')) {
+      return '访问被拒绝，请检查API Key权限或服务状态';
+    }
+    if (errorMessage?.includes('404')) {
+      return '服务端点不存在，请检查Base URL配置';
+    }
+    if (errorMessage?.includes('502') || errorMessage?.includes('503') || errorMessage?.includes('504')) {
+      return '服务暂时不可用，请稍后重试';
+    }
+    
+    // 针对特定服务商的错误处理
+    if (providerName === 'siliconflow' && errorMessage?.includes('400')) {
+      return '硅基流动：模型不支持当前操作，请尝试其他模型';
+    }
+    if (providerName === 'tencent' && errorMessage?.includes('400')) {
+      return '腾讯云：请求参数错误，请检查模型名称和API配置';
+    }
+    if (providerName === 'aliyun' && errorMessage?.includes('400')) {
+      return '阿里云：请求参数错误，请检查模型名称和API配置';
+    }
+    
+    return errorMessage || '未知错误';
   }
 
   /**
