@@ -573,6 +573,7 @@
     "rolledBackToVersion": "Rolled back to version {version}",
     "searchPrompt": "Search prompts",
     "searchingFor": "Searching for: prompts containing \"{text}\"",
+    "searchingForTag": "Searching for: prompts with tag \"{tag}\"",
     "select": "Select",
     "selectDefaultOption": "Select Default Option (optional)",
     "selectModel": "Please select a model",

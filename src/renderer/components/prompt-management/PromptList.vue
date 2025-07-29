@@ -63,22 +63,32 @@
                     </NButtonGroup>
                 </NFlex>
                 <!-- 搜索提示信息 -->
-                <div v-if="searchText.trim() || selectedCategory || showFavoritesOnly"
+                <div v-if="searchText.trim() || selectedTag || selectedCategory || showFavoritesOnly"
                     style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
-                    <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
-                        <Search />
-                    </NIcon> <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', {
-                        text:
-                        searchText.trim() }) }}</span>
-                    <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
-                        name:
-                            getCategoryName(selectedCategory) })
-                        }}</span>
-                    <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
-                    <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                        ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
-                            < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
+                    <NFlex justify="space-between" align="center">
+                        <NFlex align="center">
+                            <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
+                                <Search />
+                            </NIcon>
+                            <span v-if="searchText.trim()">{{ t('promptManagement.searchingFor', {
+                                text: searchText.trim() }) }}</span>
+                            <span v-if="selectedTag && !searchText.trim()">{{ t('promptManagement.searchingForTag', {
+                                tag: selectedTag }) }}</span>
+                            <span v-if="selectedTag && searchText.trim()">{{ t('promptManagement.searchingForTag', {
+                                tag: selectedTag }) }} + {{ t('promptManagement.searchingFor', {
+                                text: searchText.trim() }) }}</span>
+                            <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
+                                name: getCategoryName(selectedCategory) }) }}</span>
+                            <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
+                            <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
+                                ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
+                                    < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
                             </span>
+                        </NFlex>
+                        <NButton text size="small" @click="clearAllFilters">
+                            {{ t('common.clear') }}
+                        </NButton>
+                    </NFlex>
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
@@ -145,6 +155,7 @@
                                 <NTag v-for="tag in (tagsExpanded ? popularTags : popularTags.slice(0, 6))"
                                     :key="tag.name" size="small" :bordered="false" clickable
                                     :color="getTagColor(tag.name)" @click="handleTagQuickSearch(tag.name)"
+                                    :checked="selectedTag === tag.name"
                                     style="cursor: pointer;" :class="{ 'highlighted-tag': isTagMatched(tag.name) }">
                                     <template #icon>
                                         <NIcon>
@@ -397,6 +408,7 @@ const loadingMore = ref(false) // 加载更多状态
 const searchText = ref('')
 const selectedCategory = ref<number | null>(null)
 const showFavoritesOnly = ref(false)
+const selectedTag = ref<string>('') // 添加专门的标签搜索状态
 
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
@@ -914,7 +926,8 @@ const loadPrompts = async (reset = true) => {
         }// 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
-            search: searchText.value || undefined,
+            search: searchText.value || undefined, // 文本搜索和标签搜索可以同时使用
+            tags: selectedTag.value || undefined, // 使用专门的标签搜索
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
             limit: gridPageSize.value, // 网格视图使用专门的页面大小
@@ -930,7 +943,9 @@ const loadPrompts = async (reset = true) => {
             total: result.total,
             hasNextPage: result.hasNextPage,
             currentPage: currentPage.value,
-            reset
+            reset,
+            selectedTag: selectedTag.value,
+            searchText: searchText.value
         })        // 如果是重置加载，直接替换数据；否则追加数据
         if (reset) {
             prompts.value = result.data || []
@@ -1026,7 +1041,8 @@ const loadPromptsForTable = async () => {
         // 根据过滤条件加载显示的提示词（分页）
         const filters = {
             categoryId: selectedCategory.value || undefined,
-            search: searchText.value || undefined,
+            search: searchText.value || undefined, // 文本搜索和标签搜索可以同时使用
+            tags: selectedTag.value || undefined, // 使用专门的标签搜索
             isFavorite: showFavoritesOnly.value || undefined,
             page: currentPage.value,
             limit: pageSize.value,
@@ -1047,7 +1063,9 @@ const loadPromptsForTable = async () => {
             pageSize: pageSize.value,
             dataLength: prompts.value.length,
             totalCount: totalCount.value,
-            filters
+            filters,
+            selectedTag: selectedTag.value,
+            searchText: searchText.value
         })
 
     } catch (error) {
@@ -1150,6 +1168,15 @@ const toggleAdvancedFilter = () => {
     }
 }
 
+// 清除所有筛选条件
+const clearAllFilters = () => {
+    searchText.value = ''
+    selectedTag.value = ''
+    selectedCategory.value = null
+    showFavoritesOnly.value = false
+    handleSearch()
+}
+
 const toggleFavorite = async (promptId: number) => {
     try {
         // 先乐观更新UI
@@ -1176,13 +1203,26 @@ const toggleFavorite = async (promptId: number) => {
 
 // 检查标签是否匹配搜索关键词
 const isTagMatched = (tag: string) => {
-    if (!searchText.value.trim()) return false
-    return tag.toLowerCase().includes(searchText.value.toLowerCase())
+    // 如果是当前选中的标签，高亮显示
+    if (selectedTag.value && tag.toLowerCase() === selectedTag.value.toLowerCase()) {
+        return true
+    }
+    // 如果是文本搜索匹配，也高亮显示
+    if (searchText.value.trim() && tag.toLowerCase().includes(searchText.value.toLowerCase())) {
+        return true
+    }
+    return false
 }
 
 // 快速标签搜索
 const handleTagQuickSearch = (tagName: string) => {
-    searchText.value = tagName
+    // 如果点击的是当前选中的标签，则取消选择
+    if (selectedTag.value === tagName) {
+        selectedTag.value = ''
+    } else {
+        selectedTag.value = tagName
+    }
+    // 不清除文本搜索，允许同时使用
     handleSearch()
 }
 

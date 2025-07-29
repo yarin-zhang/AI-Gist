@@ -573,6 +573,7 @@
     "rolledBackToVersion": "已回滚到版本 {version}",
     "searchPrompt": "搜索提示词",
     "searchingFor": "正在搜索: 包含 \"{text}\" 的提示词",
+    "searchingForTag": "正在搜索: 包含标签 \"{tag}\" 的提示词",
     "select": "选择",
     "selectDefaultOption": "选择默认选项（可选）",
     "selectModel": "请选择一个模型",

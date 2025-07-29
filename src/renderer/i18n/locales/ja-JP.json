@@ -573,6 +573,7 @@
     "rolledBackToVersion": "バージョン{version}にロールバックしました",
     "searchPrompt": "プロンプトを検索",
     "searchingFor": "検索：「{text}」を含むプロンプト",
+    "searchingForTag": "検索：タグ「{tag}」を含むプロンプト",
     "select": "選択",
     "selectDefaultOption": "デフォルトオプションを選択（オプション）",
     "selectModel": "モデルを選択してください",

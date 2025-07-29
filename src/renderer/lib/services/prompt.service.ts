@@ -113,7 +113,9 @@ export class PromptService extends BaseDatabaseService {
           prompt.content.toLowerCase().includes(searchQuery) ||
           (prompt.description && prompt.description.toLowerCase().includes(searchQuery))
         );
-      }      if (filters.tags) {
+      }
+
+      if (filters.tags) {
         const searchTags = filters.tags.toLowerCase().split(',').map((tag: string) => tag.trim());
         filteredPrompts = filteredPrompts.filter(prompt => {
           // 处理 tags 字段，确保能正确处理字符串和数组两种格式

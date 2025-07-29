@@ -88,6 +88,52 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 - 先添加 AI 模型
 - 在编辑提示词页面对现有提示词进行快速润色，例如“提取变量”、“更具体”等。也可以自定义润色提示词。
 
+## 开发说明
+
+### 安装依赖
+
+```bash
+yarn install
+```
+
+### 启动开发环境
+
+```bash
+yarn dev
+```
+
+### 其他常用命令
+
+```bash
+# 开发相关
+yarn dev            # 启动应用并开启热重载
+yarn build          # 打包应用，输出目录为 "dist"
+
+# 跨平台构建
+yarn build:win      # 构建 Windows 安装包
+yarn build:mac      # 构建 macOS 安装包
+yarn build:linux    # 构建 Linux 安装包
+```
+
+### 开发指南
+
+详细的开发指南请参阅 [docs](./docs) 目录：
+
+- [项目架构指南](./docs/project-architecture.md)
+- [GitHub Actions 自动构建与发布](./docs/github-actions.md)
+
+## 贡献
+
+本项目主要由个人开发，所有代码完全开源。如果你喜欢这个项目，请点击右上角的 Star ⭐️ 来支持我！这将激励我继续改进和维护这个项目。
+
+如果有问题或建议，欢迎在 GitHub 上提交 Issue 或 Pull Request。
+
+欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
+
+<p align="center">
+  <img src="docs/images/QQ-QRCode.png?v=202507031628" alt="QQ 群" width="200" />
+</p>
+
 ## 应用截图
 
 <div align="center">
@@ -142,51 +188,9 @@ AI 快速调整
 
 </div>
 
-## 开发说明
+## Star History
 
-### 安装依赖
-
-```bash
-yarn install
-```
-
-### 启动开发环境
-
-```bash
-yarn dev
-```
-
-### 其他常用命令
-
-```bash
-# 开发相关
-yarn dev            # 启动应用并开启热重载
-yarn build          # 打包应用，输出目录为 "dist"
-
-# 跨平台构建
-yarn build:win      # 构建 Windows 安装包
-yarn build:mac      # 构建 macOS 安装包
-yarn build:linux    # 构建 Linux 安装包
-```
-
-### 开发指南
-
-详细的开发指南请参阅 [docs](./docs) 目录：
-
-- [项目架构指南](./docs/project-architecture.md)
-- [GitHub Actions 自动构建与发布](./docs/github-actions.md)
-
-## 贡献
-
-本项目主要由个人开发，如果你喜欢这个项目，请考虑点击右上角的 Star ⭐️ 来支持我！这将激励我继续改进和维护这个项目。
-
-如果有问题或建议，欢迎在 GitHub 上提交 Issue 或 Pull Request。
-
-欢迎加入 QQ 群，与开发者和其他用户交流使用心得、反馈问题和获取最新动态。
-
-<p align="center">
-  <img src="docs/images/QQ-QRCode.png?v=202507031628" alt="QQ 群" width="200" />
-</p>
+[![Star History Chart](https://api.star-history.com/svg?repos=yarin-zhang/AI-Gist&type=Date)](https://www.star-history.com/#yarin-zhang/AI-Gist&Date)
 
 ## 许可证
 
