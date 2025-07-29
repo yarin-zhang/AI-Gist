@@ -11,7 +11,7 @@
                         </NText>
                     </NFlex>
 
-                    <NRadioGroup v-model:value="proxyMode" @update:value="handleModeChange">
+                    <NRadioGroup v-model:value="proxyConfig.mode" @update:value="handleModeChange">
                         <NFlex vertical :size="12">
                             <NRadio value="direct">
                                 <NFlex align="center" :size="8">
@@ -49,32 +49,29 @@
             </NCard>
 
             <!-- 手动配置 -->
-            <NCard v-if="proxyMode === 'manual'">
+            <NCard v-if="proxyConfig.mode === 'manual'">
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
                         <NText depth="2">{{ t('networkProxy.manualConfig') }}</NText>
                     </NFlex>
 
-                    <NForm ref="formRef" :model="manualConfig" :rules="formRules">
+                    <NForm ref="formRef" :model="proxyConfig.manualConfig" :rules="formRules">
                         <NFormItem :label="t('networkProxy.httpProxy')" path="httpProxy">
                             <NInput 
-                                v-model:value="manualConfig.httpProxy" 
-                                :placeholder="'127.0.0.1:7890'"
-                                @update:value="handleManualConfigChange" />
+                                v-model:value="proxyConfig.manualConfig.httpProxy" 
+                                :placeholder="'127.0.0.1:7890'" />
                         </NFormItem>
 
                         <NFormItem :label="t('networkProxy.httpsProxy')" path="httpsProxy">
                             <NInput 
-                                v-model:value="manualConfig.httpsProxy" 
-                                :placeholder="'127.0.0.1:7890'"
-                                @update:value="handleManualConfigChange" />
+                                v-model:value="proxyConfig.manualConfig.httpsProxy" 
+                                :placeholder="'127.0.0.1:7890'" />
                         </NFormItem>
 
                         <NFormItem :label="t('networkProxy.noProxy')" path="noProxy">
                             <NInput 
-                                v-model:value="manualConfig.noProxy" 
-                                :placeholder="'localhost,127.0.0.1'"
-                                @update:value="handleManualConfigChange" />
+                                v-model:value="proxyConfig.manualConfig.noProxy" 
+                                :placeholder="'localhost,127.0.0.1'" />
                             <NText depth="3" style="font-size: 12px; margin-top: 4px;">
                                 {{ t('networkProxy.noProxyDesc') }}
                             </NText>
@@ -84,10 +81,25 @@
             </NCard>
 
             <!-- 系统代理信息 -->
-            <NCard v-if="proxyMode === 'system'">
+            <NCard v-if="proxyConfig.mode === 'system'">
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('networkProxy.systemProxyInfo') }}</NText>
+                        <NFlex align="center" justify="space-between">
+                            <NText depth="2">{{ t('networkProxy.systemProxyInfo') }}</NText>
+                            <NButton 
+                                size="small" 
+                                @click="refreshSystemProxyInfo" 
+                                :loading="loading.refresh"
+                                type="primary" 
+                                ghost>
+                                <template #icon>
+                                    <NIcon>
+                                        <Refresh />
+                                    </NIcon>
+                                </template>
+                                刷新
+                            </NButton>
+                        </NFlex>
                     </NFlex>
 
                     <NFlex vertical :size="8">
@@ -104,6 +116,11 @@
                         <NFlex v-if="systemProxyInfo.proxyAddress" align="center" :size="8">
                             <NText>{{ t('networkProxy.proxyAddress') }}:</NText>
                             <NText depth="3">{{ systemProxyInfo.proxyAddress }}</NText>
+                        </NFlex>
+                        
+                        <NFlex v-if="systemProxyInfo.lastRefreshTime" align="center" :size="8">
+                            <NText>{{ t('networkProxy.lastRefresh') }}:</NText>
+                            <NText depth="3">{{ systemProxyInfo.lastRefreshTime }}</NText>
                         </NFlex>
                     </NFlex>
                 </NFlex>
@@ -202,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
     NCard,
@@ -221,22 +238,56 @@ import {
 import {
     Wifi,
     Check,
-    AlertCircle
+    AlertCircle,
+    Refresh
 } from '@vicons/tabler';
 
 const { t } = useI18n();
 
-// 响应式数据
-const proxyMode = ref<'direct' | 'system' | 'manual'>('system');
-const manualConfig = reactive({
-    httpProxy: '',
-    httpsProxy: '',
-    noProxy: ''
+// 定义网络代理配置接口
+interface NetworkProxyConfig {
+    mode: 'direct' | 'system' | 'manual';
+    manualConfig: {
+        httpProxy: string;
+        httpsProxy: string;
+        noProxy: string;
+    };
+}
+
+// Props 定义
+const props = withDefaults(defineProps<{
+    modelValue?: NetworkProxyConfig;
+}>(), {
+    modelValue: () => ({
+        mode: 'system',
+        manualConfig: {
+            httpProxy: '',
+            httpsProxy: '',
+            noProxy: ''
+        }
+    })
 });
+
+// Emits 定义
+const emit = defineEmits<{
+    "update:modelValue": [value: NetworkProxyConfig];
+}>();
+
+// 响应式数据
+const proxyConfig = reactive<NetworkProxyConfig>({
+    mode: props.modelValue?.mode || 'system',
+    manualConfig: {
+        httpProxy: props.modelValue?.manualConfig?.httpProxy || '',
+        httpsProxy: props.modelValue?.manualConfig?.httpsProxy || '',
+        noProxy: props.modelValue?.manualConfig?.noProxy || ''
+    }
+});
+
 const systemProxyInfo = ref<{
     hasProxy: boolean;
     proxyConfig?: string;
     proxyAddress?: string;
+    lastRefreshTime?: string;
 }>({
     hasProxy: false
 });
@@ -258,7 +309,8 @@ const testResults = ref<Array<{
 }>>([]);
 const isTesting = ref(false);
 const loading = reactive({
-    test: false
+    test: false,
+    refresh: false
 });
 
 // 表单规则
@@ -287,16 +339,49 @@ let cleanupProgressListener: (() => void) | null = null;
 
 // 处理模式变化
 const handleModeChange = (mode: 'direct' | 'system' | 'manual') => {
-    proxyMode.value = mode;
+    proxyConfig.mode = mode;
     testResult.value = null;
     testResults.value = [];
+    updateParentConfig();
 };
 
-// 处理手动配置变化
-const handleManualConfigChange = () => {
-    testResult.value = null;
-    testResults.value = [];
+
+
+// 更新父组件配置
+const updateParentConfig = () => {
+    const config = {
+        mode: proxyConfig.mode,
+        manualConfig: {
+            httpProxy: proxyConfig.manualConfig.httpProxy,
+            httpsProxy: proxyConfig.manualConfig.httpsProxy,
+            noProxy: proxyConfig.manualConfig.noProxy
+        }
+    };
+    console.log('NetworkProxySettings: updating parent config:', config);
+    emit("update:modelValue", config);
 };
+
+// 监听 props 变化，同步到本地状态
+watch(() => props.modelValue, (newValue) => {
+    if (newValue) {
+        console.log('NetworkProxySettings: props.modelValue changed:', newValue);
+        proxyConfig.mode = newValue.mode || 'system';
+        proxyConfig.manualConfig.httpProxy = newValue.manualConfig?.httpProxy || '';
+        proxyConfig.manualConfig.httpsProxy = newValue.manualConfig?.httpsProxy || '';
+        proxyConfig.manualConfig.noProxy = newValue.manualConfig?.noProxy || '';
+    }
+}, { deep: true, immediate: true });
+
+// 监听手动配置变化
+watch(() => proxyConfig.manualConfig, (newValue) => {
+    console.log('NetworkProxySettings: manualConfig changed:', newValue);
+    if (proxyConfig.mode === 'manual') {
+        // 延迟一下确保值已经更新
+        setTimeout(() => {
+            updateParentConfig();
+        }, 100);
+    }
+}, { deep: true });
 
 // 测试连接
 const testConnection = async () => {
@@ -308,6 +393,15 @@ const testConnection = async () => {
     testResults.value = [];
     
     try {
+        console.log('开始测试连接，当前代理配置:', {
+            mode: proxyConfig.mode,
+            manualConfig: {
+                httpProxy: proxyConfig.manualConfig.httpProxy,
+                httpsProxy: proxyConfig.manualConfig.httpsProxy,
+                noProxy: proxyConfig.manualConfig.noProxy
+            }
+        });
+        
         // 设置进度监听器
         cleanupProgressListener = window.electronAPI.proxy.onTestProgress((result) => {
             // 查找是否已存在该网站的结果
@@ -321,11 +415,30 @@ const testConnection = async () => {
             }
         });
         
-        const result = await window.electronAPI.proxy.testConnectionRealTime();
-        testResult.value = result;
-        // 如果实时进度没有收集到所有结果，使用最终结果
-        if (result.results && testResults.value.length < result.results.length) {
-            testResults.value = result.results;
+        // 创建一个纯对象副本，避免序列化问题
+        const proxyConfigCopy = {
+            mode: proxyConfig.mode,
+            ...(proxyConfig.mode === 'manual' ? {
+                manualConfig: {
+                    httpProxy: proxyConfig.manualConfig.httpProxy,
+                    httpsProxy: proxyConfig.manualConfig.httpsProxy,
+                    noProxy: proxyConfig.manualConfig.noProxy
+                }
+            } : {})
+        };
+        
+        console.log('传递的代理配置:', JSON.stringify(proxyConfigCopy, null, 2));
+        
+        try {
+            const result = await window.electronAPI.proxy.testConnectionRealTime(proxyConfigCopy);
+            testResult.value = result;
+            // 如果实时进度没有收集到所有结果，使用最终结果
+            if (result.results && testResults.value.length < result.results.length) {
+                testResults.value = result.results;
+            }
+        } catch (error) {
+            console.error('测试连接调用失败:', error);
+            throw error;
         }
         
         // 不再显示消息提示
@@ -354,30 +467,26 @@ const getSystemProxyInfo = async () => {
     }
 };
 
-// 加载用户保存的代理设置
-const loadUserProxySettings = async () => {
+// 刷新系统代理信息
+const refreshSystemProxyInfo = async () => {
+    if (loading.refresh) return;
+    
+    loading.refresh = true;
     try {
-        const prefs = await window.electronAPI.preferences.get();
-        const savedProxyConfig = prefs.networkProxy;
-        
-        if (savedProxyConfig) {
-            proxyMode.value = savedProxyConfig.mode;
-            
-            if (savedProxyConfig.manualConfig) {
-                manualConfig.httpProxy = savedProxyConfig.manualConfig.httpProxy || '';
-                manualConfig.httpsProxy = savedProxyConfig.manualConfig.httpsProxy || '';
-                manualConfig.noProxy = savedProxyConfig.manualConfig.noProxy || '';
-            }
-        }
+        console.log('刷新系统代理信息...');
+        const info = await window.electronAPI.proxy.refreshSystemProxyInfo();
+        systemProxyInfo.value = info;
+        console.log('系统代理信息已刷新:', info);
     } catch (error) {
-        console.error('加载用户代理设置失败:', error);
+        console.error('刷新系统代理信息失败:', error);
+    } finally {
+        loading.refresh = false;
     }
 };
 
 // 组件挂载时初始化
 onMounted(async () => {
     await getSystemProxyInfo();
-    await loadUserProxySettings();
 });
 
 // 组件卸载时清理

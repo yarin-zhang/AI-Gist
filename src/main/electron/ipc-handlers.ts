@@ -365,8 +365,15 @@ class IpcHandlers {
       return await NetworkProxyManager.getSystemProxyInfo();
     });
 
+    // 刷新系统代理信息
+    ipcMain.handle('proxy:refresh-system-info', async () => {
+      return await NetworkProxyManager.refreshSystemProxyInfo();
+    });
+
     // 测试代理连接（实时版本）
-    ipcMain.handle('proxy:test-connection-real-time', async (event) => {
+    ipcMain.handle('proxy:test-connection-real-time', async (event, proxyConfig?: any) => {
+      console.log('收到测试连接请求，代理配置:', proxyConfig);
+      
       const results: Array<{
         name: string;
         url: string;
@@ -380,7 +387,7 @@ class IpcHandlers {
         results.push(result);
         // 实时发送结果到渲染进程
         event.sender.send('proxy:test-progress', result);
-      });
+      }, proxyConfig);
       
       return {
         overall: testResult.overall,
@@ -461,6 +468,7 @@ class IpcHandlers {
     
     // 清理网络代理处理器
     ipcMain.removeHandler('proxy:get-system-info');
+    ipcMain.removeHandler('proxy:refresh-system-info');
     ipcMain.removeHandler('proxy:test-connection-real-time');
     ipcMain.removeHandler('proxy:get-info');
     ipcMain.removeHandler('proxy:set-mode');

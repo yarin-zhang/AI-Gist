@@ -123,7 +123,20 @@ export default interface ElectronApi {
       proxyConfig?: string;
       proxyAddress?: string;
     }>
-    testConnectionRealTime: () => Promise<{
+    refreshSystemProxyInfo: () => Promise<{
+      hasProxy: boolean;
+      proxyConfig?: string;
+      proxyAddress?: string;
+      lastRefreshTime: string;
+    }>
+    testConnectionRealTime: (proxyConfig?: {
+      mode: 'direct' | 'system' | 'manual';
+      manualConfig?: {
+        httpProxy?: string;
+        httpsProxy?: string;
+        noProxy?: string;
+      };
+    }) => Promise<{
       overall: {
         success: boolean;
         totalSites: number;

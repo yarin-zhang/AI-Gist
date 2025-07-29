@@ -104,7 +104,13 @@
                             @update:model-value="(val: any) => { settings.shortcuts = val; updateSetting(); }" />
 
                         <!-- 网络代理设置 -->
-                        <NetworkProxySettings v-show="activeSettingKey === 'network-proxy'" />
+                        <NetworkProxySettings v-show="activeSettingKey === 'network-proxy'"
+                            :model-value="settings.networkProxy"
+                            @update:model-value="(val) => { 
+                                console.log('SettingsPage: networkProxy updated:', val); 
+                                settings.networkProxy = val; 
+                                updateSetting(); 
+                            }" />
 
                         <!-- 关于 -->
                         <AboutSettings v-show="activeSettingKey === 'about'" />
@@ -225,6 +231,15 @@ const settings = reactive({
             type: 'copy-prompt' as const
         },
         promptTriggers: []
+    },
+    // 网络代理设置
+    networkProxy: {
+        mode: 'system' as 'direct' | 'system' | 'manual',
+        manualConfig: {
+            httpProxy: '',
+            httpsProxy: '',
+            noProxy: ''
+        }
     },
 });
 
@@ -352,6 +367,16 @@ const loadSettings = async () => {
             settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
         }
 
+        // 网络代理配置
+        if (prefs.networkProxy) {
+            settings.networkProxy.mode = prefs.networkProxy.mode || 'system';
+            if (prefs.networkProxy.manualConfig) {
+                settings.networkProxy.manualConfig.httpProxy = prefs.networkProxy.manualConfig.httpProxy || '';
+                settings.networkProxy.manualConfig.httpsProxy = prefs.networkProxy.manualConfig.httpsProxy || '';
+                settings.networkProxy.manualConfig.noProxy = prefs.networkProxy.manualConfig.noProxy || '';
+            }
+        }
+
         console.log(t('settingsMessages.settingsLoaded'), {
             ...settings,
         });
@@ -377,9 +402,11 @@ const updateSetting = async () => {
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
                 shortcuts: settings.shortcuts,
+                networkProxy: settings.networkProxy,
             })
         );
 
+        console.log('SettingsPage: saving settings data:', settingsData);
         const updatedPrefs = await window.electronAPI.preferences.set(settingsData);
         console.log(t('settingsMessages.settingsUpdated'), updatedPrefs);
 
@@ -425,6 +452,7 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
                     autoLaunch: settings.autoLaunch,
                     themeSource: settings.themeSource,
                     dataSync: settings.dataSync,
+                    networkProxy: settings.networkProxy,
                 })
             );
         }

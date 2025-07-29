@@ -270,6 +270,34 @@
     },
     "title": "AI Gist"
   },
+  "networkProxy": {
+    "connectionFailed": "連接失敗",
+    "connectionSuccess": "連接成功",
+    "connectionTest": "連接測試",
+    "currentProxy": "當前代理",
+    "description": "配置網絡代理設置，解決網絡連接問題",
+    "directMode": "直連模式",
+    "directModeDesc": "不使用任何代理，直接連接網絡",
+    "httpProxy": "HTTP 代理",
+    "httpsProxy": "HTTPS 代理",
+    "lastRefresh": "最後刷新",
+    "manualConfig": "手動配置",
+    "manualMode": "手動配置",
+    "manualModeDesc": "手動設置代理服務器地址",
+    "noProxy": "不使用代理的地址",
+    "noProxyDesc": "用逗號分隔的地址列表，如：localhost,127.0.0.1",
+    "noProxyDetected": "未檢測到系統代理",
+    "proxyAddress": "代理地址",
+    "proxyDetected": "檢測到系統代理",
+    "proxyMode": "代理模式",
+    "responseTime": "響應時間",
+    "systemMode": "系統代理",
+    "systemModeDesc": "使用系統設置的代理配置",
+    "systemProxyInfo": "系統代理信息",
+    "testConnection": "測試連接",
+    "testConnectionDesc": "測試當前代理配置是否正常工作",
+    "title": "網絡代理設置"
+  },
   "prompt": {
     "shortcutTriggerDisabled": "已禁用快捷鍵插入功能",
     "shortcutTriggerEnabled": "已啟用快捷鍵插入功能",
@@ -659,6 +687,10 @@
         "description": "配置應用的顯示語言",
         "title": "語言設置"
       },
+      "network-proxy": {
+        "description": "配置網絡代理設置，解決網絡連接問題",
+        "title": "網絡代理設置"
+      },
       "shortcuts": {
         "description": "配置全局快捷鍵和提示詞快捷鍵",
         "title": "快捷鍵設置"
@@ -666,10 +698,6 @@
       "startup-behavior": {
         "description": "配置應用啟動和自啟動選項",
         "title": "啟動行為設置"
-      },
-      "network-proxy": {
-        "description": "配置網絡代理設置，解決網絡連接問題",
-        "title": "網絡代理設置"
       }
     },
     "sections": {
@@ -780,34 +808,6 @@
     "triggerDesc": "用於觸發選中提示詞的快捷鍵 (Ctrl Shift P)",
     "triggerFixed": "此快捷鍵固定為 Ctrl Shift P，不可修改",
     "waitingInput": "等待輸入..."
-  },
-  "networkProxy": {
-    "title": "網絡代理設置",
-    "description": "配置網絡代理設置，解決網絡連接問題",
-    "proxyMode": "代理模式",
-    "directMode": "直連模式",
-    "directModeDesc": "不使用任何代理，直接連接網絡",
-    "systemMode": "系統代理",
-    "systemModeDesc": "使用系統設置的代理配置",
-    "manualMode": "手動配置",
-    "manualModeDesc": "手動設置代理服務器地址",
-    "manualConfig": "手動配置",
-    "httpProxy": "HTTP 代理",
-    "httpsProxy": "HTTPS 代理",
-    "noProxy": "不使用代理的地址",
-    "noProxyDesc": "用逗號分隔的地址列表，如：localhost,127.0.0.1",
-    "testConnection": "測試連接",
-    "testConnectionDesc": "測試當前代理配置是否正常工作",
-    "connectionTest": "連接測試",
-    "connectionSuccess": "連接成功",
-    "connectionFailed": "連接失敗",
-    "responseTime": "響應時間",
-    "currentProxy": "當前代理",
-    "systemProxyInfo": "系統代理信息",
-    "noProxyDetected": "未檢測到系統代理",
-    "proxyDetected": "檢測到系統代理",
-    "proxyAddress": "代理地址",
-    "connectionTest": "連接測試"
   },
   "startup": {
     "autoStart": "開機自動啟動",

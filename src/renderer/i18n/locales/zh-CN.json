@@ -270,6 +270,34 @@
     },
     "title": "AI Gist"
   },
+  "networkProxy": {
+    "connectionFailed": "连接失败",
+    "connectionSuccess": "连接成功",
+    "connectionTest": "连接测试",
+    "currentProxy": "当前代理",
+    "description": "配置网络代理设置，解决网络连接问题",
+    "directMode": "直连模式",
+    "directModeDesc": "不使用任何代理，直接连接网络",
+    "httpProxy": "HTTP 代理",
+    "httpsProxy": "HTTPS 代理",
+    "lastRefresh": "最后刷新",
+    "manualConfig": "手动配置",
+    "manualMode": "手动配置",
+    "manualModeDesc": "手动设置代理服务器地址",
+    "noProxy": "不使用代理的地址",
+    "noProxyDesc": "用逗号分隔的地址列表，如：localhost,127.0.0.1",
+    "noProxyDetected": "未检测到系统代理",
+    "proxyAddress": "代理地址",
+    "proxyDetected": "检测到系统代理",
+    "proxyMode": "代理模式",
+    "responseTime": "响应时间",
+    "systemMode": "系统代理",
+    "systemModeDesc": "使用系统设置的代理配置",
+    "systemProxyInfo": "系统代理信息",
+    "testConnection": "测试连接",
+    "testConnectionDesc": "测试当前代理配置是否正常工作",
+    "title": "网络代理设置"
+  },
   "prompt": {
     "shortcutTriggerDisabled": "已禁用快捷键插入功能",
     "shortcutTriggerEnabled": "已启用快捷键插入功能",
@@ -659,6 +687,10 @@
         "description": "配置应用的显示语言",
         "title": "语言设置"
       },
+      "network-proxy": {
+        "description": "配置网络代理设置，解决网络连接问题",
+        "title": "网络代理设置"
+      },
       "shortcuts": {
         "description": "配置全局快捷键和提示词快捷键",
         "title": "快捷键设置"
@@ -666,10 +698,6 @@
       "startup-behavior": {
         "description": "配置应用启动和自启动选项",
         "title": "启动行为设置"
-      },
-      "network-proxy": {
-        "description": "配置网络代理设置，解决网络连接问题",
-        "title": "网络代理设置"
       }
     },
     "sections": {
@@ -737,6 +765,9 @@
     "stillMissingStores": "仍缺失的对象存储:"
   },
   "shortcuts": {
+    "clear": "清空",
+    "clearError": "清空快捷键设置失败",
+    "clearSuccess": "快捷键已清空",
     "clickToInput": "点击输入快捷键",
     "copyPrompt": "复制提示词",
     "copyPromptDesc": "复制预设提示词到剪贴板",
@@ -757,9 +788,6 @@
     "promptTriggersDesc": "设置常用提示词的快捷键，触发时自动插入到输入框",
     "refreshPrompts": "刷新",
     "registered": "已注册",
-    "clear": "清空",
-    "clearError": "清空快捷键设置失败",
-    "clearSuccess": "快捷键已清空",
     "resetError": "重置快捷键设置失败",
     "resetSuccess": "快捷键设置已恢复默认",
     "resetToDefault": "恢复默认",
@@ -780,34 +808,6 @@
     "triggerDesc": "用于触发选中提示词的快捷键 (Ctrl+Shift+P)",
     "triggerFixed": "此快捷键固定为 Ctrl+Shift+P，不可修改",
     "waitingInput": "等待输入..."
-  },
-  "networkProxy": {
-    "title": "网络代理设置",
-    "description": "配置网络代理设置，解决网络连接问题",
-    "proxyMode": "代理模式",
-    "directMode": "直连模式",
-    "directModeDesc": "不使用任何代理，直接连接网络",
-    "systemMode": "系统代理",
-    "systemModeDesc": "使用系统设置的代理配置",
-    "manualMode": "手动配置",
-    "manualModeDesc": "手动设置代理服务器地址",
-    "manualConfig": "手动配置",
-    "httpProxy": "HTTP 代理",
-    "httpsProxy": "HTTPS 代理",
-    "noProxy": "不使用代理的地址",
-    "noProxyDesc": "用逗号分隔的地址列表，如：localhost,127.0.0.1",
-    "testConnection": "测试连接",
-    "testConnectionDesc": "测试当前代理配置是否正常工作",
-    "connectionTest": "连接测试",
-    "connectionSuccess": "连接成功",
-    "connectionFailed": "连接失败",
-    "responseTime": "响应时间",
-    "currentProxy": "当前代理",
-    "systemProxyInfo": "系统代理信息",
-    "noProxyDetected": "未检测到系统代理",
-    "proxyDetected": "检测到系统代理",
-    "proxyAddress": "代理地址",
-    "connectionTest": "连接测试"
   },
   "startup": {
     "autoStart": "开机自动启动",

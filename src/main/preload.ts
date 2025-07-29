@@ -157,7 +157,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 网络代理管理
   proxy: {
     getSystemProxyInfo: () => ipcRenderer.invoke('proxy:get-system-info'),
-    testConnectionRealTime: () => ipcRenderer.invoke('proxy:test-connection-real-time'),
+    refreshSystemProxyInfo: () => ipcRenderer.invoke('proxy:refresh-system-info'),
+    testConnectionRealTime: (proxyConfig?: any) => ipcRenderer.invoke('proxy:test-connection-real-time', proxyConfig),
     getProxyInfo: (url?: string) => ipcRenderer.invoke('proxy:get-info', url),
     setProxyMode: (mode: 'direct' | 'system' | 'manual', config?: any) => ipcRenderer.invoke('proxy:set-mode', mode, config),
     onTestProgress: (callback: (result: any) => void) => {

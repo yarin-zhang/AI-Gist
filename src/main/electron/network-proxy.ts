@@ -92,14 +92,17 @@ export class NetworkProxyManager {
     try {
       console.log('配置使用系统代理...');
       
-      // 获取系统代理配置
-      const proxyConfig = await session.defaultSession.resolveProxy('https://www.google.com');
-      console.log('系统代理配置:', proxyConfig);
-      
       // 设置 Electron 使用系统代理
       await session.defaultSession.setProxy({
         mode: 'system'
       });
+      
+      // 等待一下确保代理配置生效
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 获取系统代理配置
+      const proxyConfig = await session.defaultSession.resolveProxy('https://www.google.com');
+      console.log('系统代理配置:', proxyConfig);
       
       // 为 Node.js 模块设置代理环境变量
       if (proxyConfig && proxyConfig !== 'DIRECT') {
@@ -145,34 +148,65 @@ export class NetworkProxyManager {
     try {
       console.log('配置手动代理:', config);
       
-      const proxyRules: string[] = [];
+      // 确定要使用的代理地址
+      // 如果只配置了 httpProxy，则 https 也使用相同的代理
+      const httpProxy = config.httpProxy;
+      const httpsProxy = config.httpsProxy || config.httpProxy;
       
-      if (config.httpProxy) {
-        proxyRules.push(`http=${config.httpProxy}`);
+      if (!httpProxy && !httpsProxy) {
+        throw new Error('至少需要配置 HTTP 或 HTTPS 代理');
       }
       
-      if (config.httpsProxy) {
-        proxyRules.push(`https=${config.httpsProxy}`);
+      const proxyRules: string[] = [];
+      
+      if (httpProxy) {
+        proxyRules.push(`http=${httpProxy}`);
+      }
+      
+      if (httpsProxy) {
+        proxyRules.push(`https=${httpsProxy}`);
       }
       
       if (config.noProxy) {
         proxyRules.push(`bypass-list=${config.noProxy}`);
       }
       
-      await session.defaultSession.setProxy({
-        mode: 'fixed_servers',
-        proxyRules: proxyRules.join(';')
-      });
+      const proxyRulesString = proxyRules.join(';');
+      console.log('代理规则:', proxyRulesString);
       
-      // 设置环境变量
-      if (config.httpProxy) {
-        process.env.HTTP_PROXY = `http://${config.httpProxy}`;
-        process.env.http_proxy = `http://${config.httpProxy}`;
+      // 确保至少有一个代理规则
+      if (proxyRules.length === 0) {
+        throw new Error('没有配置有效的代理规则');
       }
       
-      if (config.httpsProxy) {
-        process.env.HTTPS_PROXY = `http://${config.httpsProxy}`;
-        process.env.https_proxy = `http://${config.httpsProxy}`;
+      // 设置代理配置
+      await session.defaultSession.setProxy({
+        mode: 'fixed_servers',
+        proxyRules: proxyRulesString
+      });
+      
+      console.log('✅ 代理配置已设置');
+      
+      // 等待一下确保代理配置生效
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 验证代理配置是否生效
+      const validation = await this.validateProxyConfiguration();
+      console.log('代理配置验证结果:', validation);
+      
+      if (!validation.isValid) {
+        console.warn('代理配置可能未正确应用:', validation.error);
+      }
+      
+      // 设置环境变量
+      if (httpProxy) {
+        process.env.HTTP_PROXY = `http://${httpProxy}`;
+        process.env.http_proxy = `http://${httpProxy}`;
+      }
+      
+      if (httpsProxy) {
+        process.env.HTTPS_PROXY = `http://${httpsProxy}`;
+        process.env.https_proxy = `http://${httpsProxy}`;
       }
       
       if (config.noProxy) {
@@ -181,6 +215,11 @@ export class NetworkProxyManager {
       }
       
       console.log('✅ 已配置手动代理');
+      console.log('环境变量:', {
+        HTTP_PROXY: process.env.HTTP_PROXY,
+        HTTPS_PROXY: process.env.HTTPS_PROXY,
+        NO_PROXY: process.env.NO_PROXY
+      });
     } catch (error) {
       console.error('配置手动代理失败:', error);
       throw error;
@@ -233,7 +272,9 @@ export class NetworkProxyManager {
    */
   static async getProxyInfo(url: string = 'https://www.google.com'): Promise<string> {
     try {
-      return await session.defaultSession.resolveProxy(url);
+      const proxyInfo = await session.defaultSession.resolveProxy(url);
+      console.log(`获取代理信息 (${url}):`, proxyInfo);
+      return proxyInfo;
     } catch (error) {
       console.error('获取代理信息失败:', error);
       return 'DIRECT';
@@ -241,16 +282,77 @@ export class NetworkProxyManager {
   }
 
   /**
+   * 验证代理配置是否正确应用
+   */
+  static async validateProxyConfiguration(): Promise<{
+    isValid: boolean;
+    proxyInfo: string;
+    error?: string;
+  }> {
+    try {
+      const proxyInfo = await this.getProxyInfo();
+      console.log('当前代理配置验证:', proxyInfo);
+      
+      // 检查代理配置是否有效
+      if (proxyInfo === 'DIRECT') {
+        return {
+          isValid: true,
+          proxyInfo,
+          error: '使用直连模式'
+        };
+      }
+      
+      if (proxyInfo.includes('PROXY')) {
+        return {
+          isValid: true,
+          proxyInfo
+        };
+      }
+      
+      // 对于手动配置的代理，可能不会显示 PROXY 前缀
+      // 检查是否有代理相关的配置
+      if (proxyInfo && proxyInfo !== 'DIRECT') {
+        return {
+          isValid: true,
+          proxyInfo
+        };
+      }
+      
+      return {
+        isValid: false,
+        proxyInfo,
+        error: '代理配置格式无效'
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        proxyInfo: 'UNKNOWN',
+        error: error instanceof Error ? error.message : '验证失败'
+      };
+    }
+  }
+
+  /**
    * 测试代理连接（实时版本）
    */
-  static async testProxyConnectionRealTime(onProgress: (result: {
-    name: string;
-    url: string;
-    description: string;
-    success: boolean;
-    responseTime?: number;
-    error?: string;
-  }) => void): Promise<{
+  static async testProxyConnectionRealTime(
+    onProgress: (result: {
+      name: string;
+      url: string;
+      description: string;
+      success: boolean;
+      responseTime?: number;
+      error?: string;
+    }) => void,
+    proxyConfig?: {
+      mode: 'direct' | 'system' | 'manual';
+      manualConfig?: {
+        httpProxy?: string;
+        httpsProxy?: string;
+        noProxy?: string;
+      };
+    }
+  ): Promise<{
     overall: {
       success: boolean;
       totalSites: number;
@@ -260,6 +362,20 @@ export class NetworkProxyManager {
   }> {
     try {
       console.log('开始测试代理连接...');
+      
+      // 如果提供了代理配置，先应用它
+      if (proxyConfig) {
+        console.log('应用代理配置进行测试:', proxyConfig);
+        await this.initialize(proxyConfig);
+      }
+      
+      // 验证当前代理配置
+      const validation = await this.validateProxyConfiguration();
+      console.log('代理配置验证结果:', validation);
+      
+      if (!validation.isValid) {
+        console.warn('代理配置验证失败:', validation.error);
+      }
       
       let successCount = 0;
       let failedCount = 0;
@@ -347,12 +463,14 @@ export class NetworkProxyManager {
         const isApiEndpoint = url.includes('/v1/') || url.includes('/api/');
         const method = isApiEndpoint ? 'GET' : 'HEAD';
         
+        // 确保使用正确的 session（已配置代理的 session）
         const request = net.request({
           method: method,
           protocol: urlObj.protocol as 'http:' | 'https:',
           hostname: urlObj.hostname,
           port: urlObj.port ? parseInt(urlObj.port) : (urlObj.protocol === 'https:' ? 443 : 80),
-          path: urlObj.pathname + urlObj.search
+          path: urlObj.pathname + urlObj.search,
+          session: session.defaultSession // 明确指定使用 defaultSession
         });
 
         // 添加 User-Agent 头，避免被某些网站拒绝
@@ -388,6 +506,7 @@ export class NetworkProxyManager {
 
         request.on('error', (error) => {
           clearTimeout(timeout);
+          console.error(`网络请求错误 (${url}):`, error);
           resolve({
             success: false,
             error: error.message || '网络错误'
@@ -404,6 +523,7 @@ export class NetworkProxyManager {
 
         request.end();
       } catch (error) {
+        console.error(`URL 解析错误 (${url}):`, error);
         resolve({
           success: false,
           error: error instanceof Error ? error.message : 'URL 解析错误'
@@ -441,6 +561,55 @@ export class NetworkProxyManager {
       console.error('获取系统代理信息失败:', error);
       return {
         hasProxy: false
+      };
+    }
+  }
+
+  /**
+   * 刷新系统代理信息
+   */
+  static async refreshSystemProxyInfo(): Promise<{
+    hasProxy: boolean;
+    proxyConfig?: string;
+    proxyAddress?: string;
+    lastRefreshTime: string;
+  }> {
+    try {
+      console.log('刷新系统代理信息...');
+      
+      // 先设置系统代理模式
+      await session.defaultSession.setProxy({
+        mode: 'system'
+      });
+      
+      // 等待一下确保代理配置生效
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 获取最新的系统代理信息
+      const proxyConfig = await this.getProxyInfo();
+      console.log('刷新后的系统代理配置:', proxyConfig);
+      
+      if (proxyConfig && proxyConfig !== 'DIRECT') {
+        const proxyMatch = proxyConfig.match(/PROXY\s+([^;]+)/);
+        const proxyAddress = proxyMatch ? proxyMatch[1].trim() : undefined;
+        
+        return {
+          hasProxy: true,
+          proxyConfig,
+          proxyAddress,
+          lastRefreshTime: new Date().toLocaleString()
+        };
+      }
+      
+      return {
+        hasProxy: false,
+        lastRefreshTime: new Date().toLocaleString()
+      };
+    } catch (error) {
+      console.error('刷新系统代理信息失败:', error);
+      return {
+        hasProxy: false,
+        lastRefreshTime: new Date().toLocaleString()
       };
     }
   }

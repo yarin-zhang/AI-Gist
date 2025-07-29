@@ -280,6 +280,7 @@
     "directModeDesc": "No proxy, connect directly to the network",
     "httpProxy": "HTTP Proxy",
     "httpsProxy": "HTTPS Proxy",
+    "lastRefresh": "Last refresh",
     "manualConfig": "Manual Configuration",
     "manualMode": "Manual Configuration",
     "manualModeDesc": "Manually set proxy server address",
