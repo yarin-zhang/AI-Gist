@@ -68,6 +68,7 @@ export class CloudBackupManager {
   private storageConfigs = new Map<string, CloudStorageConfig>();
   private dataManagementService: DataManagementService;
   private configPath: string;
+  private backupDir: string;
 
   // ==================== 构造函数和初始化 ====================
 
@@ -78,16 +79,25 @@ export class CloudBackupManager {
   constructor(dataManagementService: DataManagementService) {
     this.dataManagementService = dataManagementService;
     this.configPath = this.buildConfigPath();
+    this.backupDir = this.buildBackupDir();
     this.setupIpcHandlers();
   }
 
   /**
    * 构建配置文件路径
-   * @returns 配置文件完整路径
    */
   private buildConfigPath(): string {
     const baseDir = process.env.APPDATA || process.env.HOME || '';
     return path.join(baseDir, CONSTANTS.CONFIG_DIR, CONSTANTS.CONFIG_FILE);
+  }
+
+  /**
+   * 构建备份目录路径
+   */
+  private buildBackupDir(): string {
+    const userDataPath = process.env.APPDATA || 
+      (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : process.env.HOME + '/.config');
+    return path.join(userDataPath, 'ai-gist', 'backups');
   }
 
   // ==================== IPC 处理器设置 ====================
@@ -493,8 +503,13 @@ export class CloudBackupManager {
       try {
         const data = await provider.readFile(file.path);
         const backupInfo: CloudBackupInfo = JSON.parse(data.toString());
+        
+        // 计算文件大小（优先使用文件的实际大小，如果没有则使用数据长度）
+        const size = file.size || data.length || backupInfo.size || 0;
+        
         backups.push({
           ...backupInfo,
+          size,
           cloudPath: file.path,
           storageId,
         });
@@ -562,6 +577,7 @@ export class CloudBackupManager {
 
     return {
       ...localBackup,
+      size: Buffer.byteLength(backupData, 'utf-8'), // 设置正确的文件大小
       cloudPath,
       storageId: config.id,
     };
@@ -572,9 +588,38 @@ export class CloudBackupManager {
    * @param backupInfo 备份信息
    */
   private async restoreBackupData(backupInfo: any): Promise<void> {
-    const localBackupPath = path.join(this.dataManagementService['backupDir'], `${backupInfo.name}.json`);
+    // 确保备份目录存在
+    await fs.mkdir(this.backupDir, { recursive: true });
+    
+    const localBackupPath = path.join(this.backupDir, `${backupInfo.name}.json`);
     await fs.writeFile(localBackupPath, JSON.stringify(backupInfo, null, 2));
-    await this.dataManagementService['restoreAllDataWithReplace'](backupInfo.data);
+    
+    // 通过渲染进程恢复数据
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (!mainWindow) {
+      throw new Error('没有找到主窗口，无法访问数据库');
+    }
+    
+    const restoreResult = await mainWindow.webContents.executeJavaScript(`
+      (async () => {
+        try {
+          if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+            throw new Error('数据库API未初始化');
+          }
+          const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+          return await databaseServiceManager.replaceAllData(${JSON.stringify(backupInfo.data)});
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message || '未知错误'
+          };
+        }
+      })()
+    `);
+    
+    if (!restoreResult.success) {
+      throw new Error(`恢复数据失败: ${restoreResult.error}`);
+    }
   }
 
   // ==================== 存储提供者管理 ====================
