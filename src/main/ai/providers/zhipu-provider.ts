@@ -196,69 +196,41 @@ export class ZhipuAIProvider extends BaseAIProvider {
       }
       
       try {
-        // 智谱API的流式请求
-        const streamResponse = await this.makeZhipuStreamRequest(config, model, messages, abortSignal);
+        // 智谱AI暂时使用普通请求，因为流式请求在代理环境下有问题
+        console.log('智谱AI使用普通请求模式');
+        const response = await this.makeZhipuRequest(config, model, messages);
+        accumulatedContent = response;
         
-        for await (const chunk of streamResponse) {
-          if (abortSignal?.aborted || shouldStop) {
-            console.log('检测到中断信号，停止流式生成');
-            break;
-          }
-          
-          if (chunk.content) {
-            accumulatedContent += chunk.content;
-            lastContentUpdate = Date.now();
-            
-            const continueGeneration = onProgress(accumulatedContent.length, accumulatedContent);
-            if (continueGeneration === false) {
-              console.log('前端请求停止生成');
-              shouldStop = true;
-              break;
-            }
-          }
-        }
+        // 模拟流式效果
+        const totalChars = accumulatedContent.length;
+        const chunkSize = Math.max(1, Math.ceil(totalChars / 50)); // 分成50个块
         
-      } catch (streamError) {
-        if (shouldStop || abortSignal?.aborted) {
-          throw new Error('用户中断生成');
-        }
-        
-        console.warn('流式传输失败，回退到普通调用:', streamError);
-        if (streamError instanceof Error && streamError.message?.includes('请求超时')) {
-          const now = Date.now();
-          const timeSinceLastUpdate = now - lastContentUpdate;
-          if (timeSinceLastUpdate > 10000 && accumulatedContent.length === 0) {
-            throw new Error('生成超时，AI服务可能无响应，请检查网络连接或服务状态');
-          } else if (timeSinceLastUpdate > 30000) {
-            console.warn('检测到生成可能已完成，但连接未正常关闭，使用已有内容');
-          } else {
-            throw new Error(`生成中断，已生成${accumulatedContent.length}字符，请重试或检查网络连接`);
-          }
-        }
-        
-        if (accumulatedContent.length === 0) {
+        for (let i = 0; i <= totalChars; i += chunkSize) {
           if (abortSignal?.aborted || shouldStop) {
             throw new Error('用户中断生成');
           }
           
-          const response = await this.makeZhipuRequest(config, model, messages);
-          accumulatedContent = response;
+          const currentCharCount = Math.min(i + chunkSize, totalChars);
+          const partialContent = accumulatedContent.substring(0, currentCharCount);
+          const continueGeneration = onProgress(currentCharCount, partialContent);
           
-          const totalChars = accumulatedContent.length;
-          for (let i = 0; i <= totalChars; i += Math.ceil(totalChars / 20)) {
-            if (abortSignal?.aborted || shouldStop) {
-              throw new Error('用户中断生成');
-            }
-            
-            const currentCharCount = Math.min(i, totalChars);
-            const partialContent = accumulatedContent.substring(0, currentCharCount);
-            const continueGeneration = onProgress(currentCharCount, partialContent);
-            if (continueGeneration === false) {
-              throw new Error('用户中断生成');
-            }
-            await new Promise(resolve => setTimeout(resolve, 50));
+          if (continueGeneration === false) {
+            console.log('前端请求停止生成');
+            shouldStop = true;
+            break;
           }
+          
+          // 添加小延迟模拟流式效果
+          await new Promise(resolve => setTimeout(resolve, 30));
         }
+        
+      } catch (requestError: any) {
+        if (shouldStop || abortSignal?.aborted) {
+          throw new Error('用户中断生成');
+        }
+        
+        console.error('智谱AI请求失败:', requestError);
+        throw new Error(`生成失败: ${requestError.message}`);
       }
 
       if (shouldStop || abortSignal?.aborted) {
@@ -289,7 +261,7 @@ export class ZhipuAIProvider extends BaseAIProvider {
       max_tokens: 4096
     };
 
-    const timeoutFetch = this.createTimeoutFetch(30000);
+    const timeoutFetch = this.createTimeoutFetch(60000); // 智谱AI可能需要更长时间
     const response = await timeoutFetch(url, {
       method: 'POST',
       headers: {
@@ -327,7 +299,7 @@ export class ZhipuAIProvider extends BaseAIProvider {
       max_tokens: 4096
     };
 
-    const timeoutFetch = this.createTimeoutFetch(30000);
+    const timeoutFetch = this.createTimeoutFetch(60000); // 智谱AI可能需要更长时间
     const response = await timeoutFetch(url, {
       method: 'POST',
       headers: {
@@ -342,46 +314,47 @@ export class ZhipuAIProvider extends BaseAIProvider {
       throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    // 处理流式响应
-    const reader = response.body?.getReader();
-    if (!reader) {
+    // 处理流式响应 - 适配 Electron net 模块
+    if (!response.body) {
       throw new Error('无法获取响应流');
     }
 
     return {
       [Symbol.asyncIterator]: async function* () {
         try {
-          while (true) {
+          let buffer = '';
+          
+          // 对于 Electron net 模块，我们需要手动处理响应流
+          const responseText = await response.text();
+          const lines = responseText.split('\n');
+          
+          for (const line of lines) {
             if (abortSignal?.aborted) {
               break;
             }
+            
+            if (line.trim() === '') continue;
+            
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                return;
+              }
 
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') {
-                  return;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.choices?.[0]?.delta?.content) {
+                  yield { content: parsed.choices[0].delta.content };
                 }
-
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.choices?.[0]?.delta?.content) {
-                    yield { content: parsed.choices[0].delta.content };
-                  }
-                } catch (e) {
-                  // 忽略解析错误
-                }
+              } catch (e) {
+                // 忽略解析错误，继续处理下一行
+                console.warn('智谱AI流式响应解析错误:', e, '原始数据:', data);
               }
             }
           }
-        } finally {
-          reader.releaseLock();
+        } catch (error) {
+          console.error('智谱AI流式响应处理错误:', error);
+          throw error;
         }
       }
     };
