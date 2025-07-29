@@ -86,30 +86,7 @@
                             @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
 
                         <!-- 语言设置 -->
-                        <NCard v-show="activeSettingKey === 'language'">
-                            <NFlex vertical :size="16">
-                                <NFlex vertical :size="12">
-                                    <NText depth="2">{{ t('language.title') }}</NText>
-                                    <NText depth="3" style="font-size: 12px;">
-                                        {{ t('language.description') }}
-                                    </NText>
-                                </NFlex>
-                                
-                                <NFlex vertical :size="12">
-                                    <NText depth="2" style="font-size: 14px;">{{ t('language.selectLanguage') }}：</NText>
-                                    <NSelect
-                                        v-model:value="currentLocale"
-                                        :options="supportedLocales.map(locale => ({
-                                            label: locale.name,
-                                            value: locale.code
-                                        }))"
-                                        :placeholder="t('language.selectLanguage')"
-                                        style="max-width: 200px;"
-                                        @update:value="switchLocale"
-                                    />
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
+                        <LanguageSettings v-show="activeSettingKey === 'language'" />
 
                         <!-- 关闭行为设置 -->
                         <CloseBehaviorSettings v-show="activeSettingKey === 'close-behavior'"
@@ -124,7 +101,7 @@
                         <!-- 快捷键设置 -->
                         <ShortcutSettings v-show="activeSettingKey === 'shortcuts'"
                             :model-value="settings.shortcuts"
-                            @update:model-value="(val) => { settings.shortcuts = val; updateSetting(); }" />
+                            @update:model-value="(val: any) => { settings.shortcuts = val; updateSetting(); }" />
 
                         <!-- 网络代理设置 -->
                         <NetworkProxySettings v-show="activeSettingKey === 'network-proxy'" />
@@ -155,7 +132,6 @@ import {
     NButton,
     NText,
     NMenu,
-    NSelect,
     useMessage,
 } from "naive-ui";
 import {
@@ -181,6 +157,7 @@ import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
+import LanguageSettings from "@/components/settings/LanguageSettings.vue";
 
 
 // Props 定义
@@ -194,7 +171,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // 消息提示
 const message = useMessage();
-const { t, currentLocale, supportedLocales, switchLocale, initLocale } = useI18n()
+const { t, initLocale } = useI18n()
 
 // 检测是否为开发环境
 const isDevelopment = import.meta.env.DEV;
