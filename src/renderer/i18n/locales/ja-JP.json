@@ -277,7 +277,7 @@
     "currentProxy": "現在のプロキシ",
     "description": "ネットワークプロキシ設定を構成し、接続問題を解決",
     "directMode": "直接接続",
-    "directModeDesc": "プロキシを使用せず、ネットワークに直接接続",
+    "directModeDesc": "追加のプロキシは構成されていません。システムデフォルトネットワーク接続を使用します",
     "httpProxy": "HTTPプロキシ",
     "httpsProxy": "HTTPSプロキシ",
     "lastRefresh": "最後の更新",

@@ -277,7 +277,7 @@
     "currentProxy": "当前代理",
     "description": "配置网络代理设置，解决网络连接问题",
     "directMode": "直连模式",
-    "directModeDesc": "不使用任何代理，直接连接网络",
+    "directModeDesc": "不配置额外代理，使用系统默认网络连接",
     "httpProxy": "HTTP 代理",
     "httpsProxy": "HTTPS 代理",
     "lastRefresh": "最后刷新",

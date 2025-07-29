@@ -277,7 +277,7 @@
     "currentProxy": "Current Proxy",
     "description": "Configure network proxy settings to resolve connection issues",
     "directMode": "Direct Connection",
-    "directModeDesc": "No proxy, connect directly to the network",
+    "directModeDesc": "No additional proxy is configured, use the system default network connection",
     "httpProxy": "HTTP Proxy",
     "httpsProxy": "HTTPS Proxy",
     "lastRefresh": "Last refresh",
