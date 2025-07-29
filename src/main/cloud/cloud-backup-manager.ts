@@ -216,10 +216,43 @@ export class CloudBackupManager {
     ipcMain.handle('cloud:get-backup-list', async (_, storageId: string) => {
       try {
         const config = this.getStorageConfig(storageId);
+        console.log(`开始获取云端备份列表，存储类型: ${config.type}, 存储ID: ${storageId}`);
+        
         const provider = this.createProvider(config);
+        
+        // 对于WebDAV，确保目录已初始化
+        if (config.type === 'webdav' && provider.initializeDirectories) {
+          try {
+            console.log('正在初始化WebDAV目录...');
+            await provider.initializeDirectories();
+            console.log('WebDAV目录初始化完成');
+          } catch (error) {
+            console.warn('WebDAV 目录初始化失败，继续尝试列出文件:', error);
+          }
+        }
+        
+        console.log('正在列出文件...');
         const files = await provider.listFiles();
-        const backupFiles = this.filterBackupFiles(files);
+        console.log(`找到 ${files.length} 个文件`);
+        
+        // 对于WebDAV，尝试从备份目录列出文件
+        let backupFiles = this.filterBackupFiles(files);
+        if (config.type === 'webdav' && backupFiles.length === 0) {
+          console.log('从根目录未找到备份文件，尝试从备份目录列出...');
+          try {
+            const backupDirFiles = await provider.listFiles('/AI-Gist-Backup');
+            backupFiles = this.filterBackupFiles(backupDirFiles);
+            console.log(`从备份目录找到 ${backupFiles.length} 个备份文件`);
+          } catch (error) {
+            console.warn('从备份目录列出文件失败:', error);
+          }
+        }
+        
+        console.log(`过滤后找到 ${backupFiles.length} 个备份文件`);
+        
         const backups = await this.parseBackupFiles(provider, backupFiles, storageId);
+        console.log(`解析完成，共 ${backups.length} 个备份`);
+        
         return this.sortBackupsByDate(backups);
       } catch (error) {
         console.error(CONSTANTS.LOG_MESSAGES.GET_BACKUP_LIST_FAILED, error);
@@ -537,11 +570,25 @@ export class CloudBackupManager {
    * @returns 备份文件对象
    */
   private async findBackupFile(provider: any, backupId: string): Promise<any> {
-    const files = await provider.listFiles();
-    const backupFile = files.find((file: any) => 
+    // 首先从根目录搜索
+    let files = await provider.listFiles();
+    let backupFile = files.find((file: any) => 
       file.name.includes(backupId) && 
       file.name.endsWith(CONSTANTS.BACKUP_FILE_EXTENSION)
     );
+
+    // 如果没找到，尝试从备份目录搜索（适用于WebDAV）
+    if (!backupFile) {
+      try {
+        const backupDirFiles = await provider.listFiles('/AI-Gist-Backup');
+        backupFile = backupDirFiles.find((file: any) => 
+          file.name.includes(backupId) && 
+          file.name.endsWith(CONSTANTS.BACKUP_FILE_EXTENSION)
+        );
+      } catch (error) {
+        console.warn('从备份目录搜索文件失败:', error);
+      }
+    }
 
     if (!backupFile) {
       throw new Error(CONSTANTS.ERROR_MESSAGES.BACKUP_FILE_NOT_FOUND);
@@ -569,6 +616,15 @@ export class CloudBackupManager {
    * @returns 云端备份信息
    */
   private async uploadBackupToCloud(provider: any, config: CloudStorageConfig, localBackup: any): Promise<CloudBackupInfo> {
+    // 对于WebDAV，确保目录已初始化
+    if (config.type === 'webdav' && provider.initializeDirectories) {
+      try {
+        await provider.initializeDirectories();
+      } catch (error) {
+        console.warn('WebDAV 目录初始化失败，继续尝试写入文件:', error);
+      }
+    }
+
     const cloudFileName = `${CONSTANTS.BACKUP_FILE_PREFIX}${localBackup.id}${CONSTANTS.BACKUP_FILE_EXTENSION}`;
     const cloudPath = this.getCloudPath(config, cloudFileName);
     
@@ -649,7 +705,8 @@ export class CloudBackupManager {
   private getCloudPath(config: CloudStorageConfig, fileName: string): string {
     switch (config.type) {
       case 'webdav':
-        return fileName;
+        // 对于WebDAV，使用我们创建的备份目录
+        return `/AI-Gist-Backup/${fileName}`;
       case 'icloud':
         return fileName;
       default:

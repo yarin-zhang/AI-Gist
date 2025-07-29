@@ -87,6 +87,23 @@ export class WebDAVProvider implements CloudStorageProvider {
     await this.clientReady;
   }
 
+  /**
+   * 初始化目录结构
+   * 为坚果云等服务创建必要的目录
+   */
+  async initializeDirectories(): Promise<void> {
+    await this.ensureClient();
+    try {
+      // 创建默认的备份目录
+      const defaultBackupDir = '/AI-Gist-Backup';
+      await this.createDirectory(defaultBackupDir);
+      console.log('WebDAV 目录初始化成功');
+    } catch (error) {
+      console.warn('WebDAV 目录初始化失败，可能目录已存在:', error);
+      // 不抛出错误，因为目录可能已经存在
+    }
+  }
+
   // ==================== 连接测试 ====================
 
   /**
@@ -96,9 +113,26 @@ export class WebDAVProvider implements CloudStorageProvider {
   async testConnection(): Promise<boolean> {
     await this.ensureClient();
     try {
-      // 使用默认路径 / 进行连接测试
-      await this.client.getDirectoryContents(CONSTANTS.DEFAULT_PATHS.ROOT);
-      return true;
+      // 首先尝试访问根目录
+      try {
+        await this.client.getDirectoryContents(CONSTANTS.DEFAULT_PATHS.ROOT);
+        return true;
+      } catch (rootError) {
+        // 如果根目录访问失败，尝试创建默认目录（适用于坚果云等服务）
+        console.log('根目录访问失败，尝试创建默认目录...');
+        
+        // 创建默认的备份目录
+        const defaultBackupDir = '/AI-Gist-Backup';
+        try {
+          await this.createDirectory(defaultBackupDir);
+          console.log('默认备份目录创建成功');
+          return true;
+        } catch (createError) {
+          console.error('创建默认目录失败:', createError);
+          // 如果创建目录也失败，返回false
+          return false;
+        }
+      }
     } catch (error) {
       console.error(CONSTANTS.LOG_MESSAGES.CONNECTION_TEST_FAILED, error);
       return false;
@@ -229,8 +263,12 @@ export class WebDAVProvider implements CloudStorageProvider {
         await this.client.createDirectory(currentPath);
       } catch (error: any) {
         // 忽略目录已存在的错误
-        if (!error.message?.includes('already exists')) {
-          throw error;
+        if (!error.message?.includes('already exists') && 
+            !error.message?.includes('405') && // Method Not Allowed
+            !error.message?.includes('409')) { // Conflict
+          console.warn(`创建目录失败: ${currentPath}`, error);
+          // 对于坚果云等服务，可能需要特殊处理
+          // 尝试继续，因为目录可能已经存在
         }
       }
     }

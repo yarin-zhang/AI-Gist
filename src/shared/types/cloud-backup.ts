@@ -43,6 +43,9 @@ export interface CloudStorageProvider {
   // 测试连接
   testConnection(): Promise<boolean>;
   
+  // 初始化目录结构（可选方法）
+  initializeDirectories?(): Promise<void>;
+  
   // 列出文件
   listFiles(path?: string): Promise<CloudFileInfo[]>;
   
