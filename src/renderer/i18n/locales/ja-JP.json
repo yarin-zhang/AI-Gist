@@ -92,7 +92,7 @@
     "siliconflowAPIAddress": "SiliconFlow APIアドレス：",
     "siliconflowExample": "例：https://api.siliconflow.cn/v1",
     "tencentAPIAddress": "Tencent Cloud APIアドレス：",
-    "tencentExample": "例：https://hunyuan.tencentcloudapi.com",
+    "tencentExample": "例：https://api.hunyuan.cloud.tencent.com/v1",
     "aliyunAPIAddress": "Alibaba Cloud APIアドレス：",
     "aliyunExample": "例：https://dashscope.aliyuncs.com/api/v1",
     "modelConfig": "モデル設定",

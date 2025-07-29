@@ -299,28 +299,51 @@ export abstract class BaseAIProvider implements AIProvider {
    * 处理常见错误并返回用户友好的错误消息
    */
   protected handleCommonError(error: any, providerName: string): string {
-    if (error.message?.includes('请求超时')) {
+    const errorMessage = error.message || error.toString();
+    
+    if (errorMessage?.includes('请求超时') || errorMessage?.includes('timeout')) {
       return '连接超时，请检查网络或服务器状态';
     }
-    if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+    if (errorMessage?.includes('API key') || errorMessage?.includes('authentication') || errorMessage?.includes('401')) {
       return 'API Key 无效或已过期';
     }
-    if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+    if (errorMessage?.includes('network') || errorMessage?.includes('ECONNREFUSED') || errorMessage?.includes('ENOTFOUND')) {
       return '无法连接到服务器，请检查网络连接';
     }
-    if (error.message?.includes('Model Not Exist') || error.message?.includes('model not found')) {
-      return '指定的模型不存在，请检查模型名称或联系服务提供商';
+    if (errorMessage?.includes('Model Not Exist') || errorMessage?.includes('model not found') || errorMessage?.includes('400')) {
+      return '指定的模型不存在或不支持，请检查模型名称或联系服务提供商';
     }
-    if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
+    if (errorMessage?.includes('rate limit') || errorMessage?.includes('quota') || errorMessage?.includes('429')) {
       return '请求频率超限或配额不足，请稍后重试';
     }
-    if (error.message?.includes('invalid_request_error')) {
+    if (errorMessage?.includes('invalid_request_error') || errorMessage?.includes('400')) {
       return '请求参数错误，请检查配置信息';
     }
-    if (error.message?.includes('server_error') || error.message?.includes('internal error')) {
+    if (errorMessage?.includes('server_error') || errorMessage?.includes('internal error') || errorMessage?.includes('500')) {
       return '服务器内部错误，请稍后重试';
     }
-    return error.message || '未知错误';
+    if (errorMessage?.includes('403')) {
+      return '访问被拒绝，请检查API Key权限或服务状态';
+    }
+    if (errorMessage?.includes('404')) {
+      return '服务端点不存在，请检查Base URL配置';
+    }
+    if (errorMessage?.includes('502') || errorMessage?.includes('503') || errorMessage?.includes('504')) {
+      return '服务暂时不可用，请稍后重试';
+    }
+    
+    // 针对特定服务商的错误处理
+    if (providerName === 'siliconflow' && errorMessage?.includes('400')) {
+      return '硅基流动：模型不支持当前操作，请尝试其他模型';
+    }
+    if (providerName === 'tencent' && errorMessage?.includes('400')) {
+      return '腾讯云：请求参数错误，请检查模型名称和API配置';
+    }
+    if (providerName === 'aliyun' && errorMessage?.includes('400')) {
+      return '阿里云：请求参数错误，请检查模型名称和API配置';
+    }
+    
+    return errorMessage || '未知错误';
   }
 
   /**

@@ -129,7 +129,7 @@
     "systemPromptTip": "💡 此提示詞用於指導 AI 如何生成新的提示詞。\n留空將使用默認的系統提示詞。",
     "systemPromptUpdateSuccess": "系統提示詞更新成功",
     "tencentAPIAddress": "騰訊雲 API 地址：",
-    "tencentExample": "例如: https://hunyuan.tencentcloudapi.com",
+    "tencentExample": "例如: https://api.hunyuan.cloud.tencent.com/v1",
     "testConnectionAndGetModels": "測試連接並獲取模型列表",
     "testFailed": "測試失敗",
     "testFailedTitle": "測試失敗",

@@ -92,7 +92,7 @@
     "siliconflowAPIAddress": "硅基流动 API 地址：",
     "siliconflowExample": "例如: https://api.siliconflow.cn/v1",
     "tencentAPIAddress": "腾讯云 API 地址：",
-    "tencentExample": "例如: https://hunyuan.tencentcloudapi.com",
+    "tencentExample": "例如: https://api.hunyuan.cloud.tencent.com/v1",
     "aliyunAPIAddress": "阿里云 API 地址：",
     "aliyunExample": "例如: https://dashscope.aliyuncs.com/api/v1",
     "modelConfig": "模型配置",

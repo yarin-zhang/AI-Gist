@@ -18,9 +18,9 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
       const models = await this.getAvailableModels(config);
       console.log(`${config.type} 获取到模型列表:`, models);
       
-      // 如果有可用模型，使用第一个进行测试
+      // 如果有可用模型，尝试找到一个合适的测试模型
       if (models.length > 0) {
-        const testModel = models[0];
+        const testModel = this.findSuitableTestModel(models, config.type);
         console.log(`使用模型 ${testModel} 进行连接测试`);
         
         const llm = new ChatOpenAI({
@@ -31,7 +31,7 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
           }
         });
 
-        await this.withTimeout(llm.invoke('test'), 15000);
+        await this.withTimeout(llm.invoke('Hello'), 15000);
         console.log(`${config.type} 连接测试成功，使用模型: ${testModel}`);
         return { success: true, models };
       } else {
@@ -47,7 +47,7 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
           }
         });
 
-        await this.withTimeout(llm.invoke('test'), 15000);
+        await this.withTimeout(llm.invoke('Hello'), 15000);
         console.log(`${config.type} 连接测试成功，使用默认模型: ${defaultModel}`);
         return { success: true, models: this.getDefaultModels(config.type) };
       }
@@ -337,6 +337,92 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
 
 
   /**
+   * 查找适合测试的模型
+   * 优先选择文本对话模型，避免图像生成等特殊模型
+   */
+  private findSuitableTestModel(models: string[], providerType: string): string {
+    // 定义适合测试的模型关键词
+    const suitableKeywords = [
+      'chat', 'instruct', 'text', 'gpt', 'claude', 'gemini', 'qwen', 'glm', 'deepseek', 'mistral', 'hunyuan'
+    ];
+    
+    // 定义不适合测试的模型关键词
+    const unsuitableKeywords = [
+      'stable-diffusion', 'dall-e', 'midjourney', 'image', 'vision', 'embedding', 'reranker', 'speech', 'audio', 'tts', 'fish-speech', 'cosyvoice', 'moss-ttsd', 'gpt-sovits'
+    ];
+    
+    // 针对特定服务商的模型优先级
+    const providerSpecificModels: Record<string, string[]> = {
+      'siliconflow': [
+        'Qwen/Qwen2.5-7B-Instruct',
+        'THUDM/glm-4-9b-chat',
+        'Qwen/Qwen2.5-14B-Instruct',
+        'Qwen/Qwen2.5-32B-Instruct',
+        'Qwen/Qwen3-8B',
+        'Qwen/Qwen3-14B',
+        'Qwen/Qwen3-32B'
+      ],
+      'tencent': [
+        'tencent/Hunyuan-A13B-Instruct'
+      ],
+      'aliyun': [
+        'qwen-turbo',
+        'qwen-plus',
+        'qwen-max',
+        'qwen-max-longcontext'
+      ]
+    };
+    
+    // 首先尝试使用服务商特定的推荐模型
+    const providerModels = providerSpecificModels[providerType];
+    if (providerModels) {
+      for (const recommendedModel of providerModels) {
+        if (models.includes(recommendedModel)) {
+          return recommendedModel;
+        }
+      }
+    }
+    
+    // 然后尝试找到包含合适关键词的模型
+    for (const model of models) {
+      const lowerModel = model.toLowerCase();
+      
+      // 检查是否包含不适合的关键词
+      const hasUnsuitableKeyword = unsuitableKeywords.some(keyword => 
+        lowerModel.includes(keyword)
+      );
+      
+      if (hasUnsuitableKeyword) {
+        continue;
+      }
+      
+      // 检查是否包含合适的关键词
+      const hasSuitableKeyword = suitableKeywords.some(keyword => 
+        lowerModel.includes(keyword)
+      );
+      
+      if (hasSuitableKeyword) {
+        return model;
+      }
+    }
+    
+    // 如果没有找到合适的模型，尝试找到不包含不适合关键词的模型
+    for (const model of models) {
+      const lowerModel = model.toLowerCase();
+      const hasUnsuitableKeyword = unsuitableKeywords.some(keyword => 
+        lowerModel.includes(keyword)
+      );
+      
+      if (!hasUnsuitableKeyword) {
+        return model;
+      }
+    }
+    
+    // 如果都找不到，返回第一个模型
+    return models[0];
+  }
+
+  /**
    * 获取默认模型列表
    */
   private getDefaultModels(providerType: string): string[] {
@@ -350,6 +436,24 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
         return [
           'deepseek-chat',
           'deepseek-coder',
+        ];
+      case 'siliconflow':
+        return [
+          'Qwen/Qwen2.5-7B-Instruct',
+          'THUDM/glm-4-9b-chat',
+          'Qwen/Qwen2.5-14B-Instruct',
+          'Qwen/Qwen2.5-32B-Instruct'
+        ];
+      case 'tencent':
+        return [
+          'tencent/Hunyuan-A13B-Instruct'
+        ];
+      case 'aliyun':
+        return [
+          'qwen-turbo',
+          'qwen-plus',
+          'qwen-max',
+          'qwen-max-longcontext'
         ];
       case 'mistral':
         return [

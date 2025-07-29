@@ -92,7 +92,7 @@
     "siliconflowAPIAddress": "SiliconFlow API Address:",
     "siliconflowExample": "For example: https://api.siliconflow.cn/v1",
     "tencentAPIAddress": "Tencent Cloud API Address:",
-    "tencentExample": "For example: https://hunyuan.tencentcloudapi.com",
+    "tencentExample": "For example: https://api.hunyuan.cloud.tencent.com/v1",
     "aliyunAPIAddress": "Alibaba Cloud API Address:",
     "aliyunExample": "For example: https://dashscope.aliyuncs.com/api/v1",
     "modelConfig": "Model Configuration",
