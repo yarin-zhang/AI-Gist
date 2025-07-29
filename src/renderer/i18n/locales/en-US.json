@@ -35,6 +35,8 @@
     "aiResponse": "AI Response:",
     "aliyunAPIAddress": "Alibaba Cloud API Address:",
     "aliyunExample": "For example: https://dashscope.aliyuncs.com/api/v1",
+    "zhipuAPIAddress": "Zhipu AI API Address:",
+    "zhipuExample": "For example: https://open.bigmodel.cn/api/paas/v4",
     "alreadyPreferred": "Already Set as Preferred",
     "attemptedPrompt": "Prompt attempted to send:",
     "availableModels": "Available Models",

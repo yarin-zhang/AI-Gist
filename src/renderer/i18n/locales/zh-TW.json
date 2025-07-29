@@ -35,6 +35,8 @@
     "aiResponse": "AI 回覆:",
     "aliyunAPIAddress": "阿里雲 API 地址：",
     "aliyunExample": "例如: https://dashscope.aliyuncs.com/api/v1",
+    "zhipuAPIAddress": "智譜AI API 地址：",
+    "zhipuExample": "例如: https://open.bigmodel.cn/api/paas/v4",
     "alreadyPreferred": "已設為首選",
     "attemptedPrompt": "嘗試發送的 Prompt:",
     "availableModels": "可用模型",

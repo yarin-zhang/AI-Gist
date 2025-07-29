@@ -81,7 +81,7 @@
                         <div class="config-header">
                             <div class="config-info">
                                 <NIcon size="24">
-                                    <Server v-if="['openai', 'azure', 'deepseek', 'mistral', 'siliconflow', 'tencent', 'aliyun'].includes(config.type)" />
+                                    <Server v-if="['openai', 'azure', 'deepseek', 'mistral', 'siliconflow', 'tencent', 'aliyun', 'zhipu'].includes(config.type)" />
                                     <Robot v-else />
                                 </NIcon>
                                 <h3>{{ config.name }}</h3>
@@ -550,7 +550,7 @@ const showQuickOptimizationModal = ref(false);
 
 // 表单数据
 const formData = reactive({
-    type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "mistral" | "siliconflow" | "tencent" | "aliyun",
+    type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "mistral" | "siliconflow" | "tencent" | "aliyun" | "zhipu",
     name: "",
     baseURL: "",
     apiKey: "",
@@ -609,6 +609,8 @@ const getApiKeyLabel = computed(() => {
             return '阿里云 API Key：';
         case 'mistral':
             return 'Mistral API Key：';
+        case 'zhipu':
+            return '智谱AI API Key：';
         case 'openai':
         default:
             return 'API Key：';
@@ -658,6 +660,11 @@ const getBaseURLInfo = computed(() => {
                 label: t('aiConfig.mistralAPIAddress'),
                 placeholder: t('aiConfig.mistralExample')
             };
+        case 'zhipu':
+            return {
+                label: t('aiConfig.zhipuAPIAddress'),
+                placeholder: t('aiConfig.zhipuExample')
+            };
         case 'anthropic':
             return {
                 label: t('aiConfig.customEndpoint'),
@@ -703,6 +710,7 @@ const typeOptions = [
             { label: "腾讯云", value: "tencent" },
             { label: "阿里云", value: "aliyun" },
             { label: "Mistral AI", value: "mistral" },
+            { label: "智谱AI", value: "zhipu" },
         ]
     }
 ];
@@ -1104,6 +1112,10 @@ const onTypeChange = (type: typeof formData.type) => {
             formData.baseURL = "https://api.mistral.ai/v1";
             formData.apiKey = "";
             break;
+        case 'zhipu':
+            formData.baseURL = "https://open.bigmodel.cn/api/paas/v4";
+            formData.apiKey = "";
+            break;
     }
 
     // 自动填充配置名称（仅在新建模式下，且名称为空或为之前的自动名称时）
@@ -1126,7 +1138,8 @@ const onTypeChange = (type: typeof formData.type) => {
             'siliconflow': '硅基流动',
             'tencent': '腾讯云',
             'aliyun': '阿里云',
-            'mistral': 'Mistral AI'
+            'mistral': 'Mistral AI',
+            'zhipu': '智谱AI'
         };
             formData.name = nameMap[type];
         }
@@ -1151,7 +1164,8 @@ const getConfigTypeLabel = (type: string) => {
         'siliconflow': '硅基流动',
         'tencent': '腾讯云',
         'aliyun': '阿里云',
-        'mistral': 'Mistral AI'
+        'mistral': 'Mistral AI',
+        'zhipu': '智谱 AI'
     };
     return typeLabels[type] || type;
 };
@@ -1169,7 +1183,8 @@ const getConfigTagType = (type: string): 'success' | 'error' | 'default' | 'warn
         'siliconflow': 'primary',
         'tencent': 'success',
         'aliyun': 'warning',
-        'mistral': 'warning'
+        'mistral': 'warning',
+        'zhipu': 'primary'
     };
     return tagTypes[type] || 'default';
 };
