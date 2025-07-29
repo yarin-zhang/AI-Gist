@@ -95,6 +95,8 @@
     "tencentExample": "例如: https://api.hunyuan.cloud.tencent.com/v1",
     "aliyunAPIAddress": "阿里云 API 地址：",
     "aliyunExample": "例如: https://dashscope.aliyuncs.com/api/v1",
+    "zhipuAPIAddress": "智谱AI API 地址：",
+    "zhipuExample": "例如: https://open.bigmodel.cn/api/paas/v4",
     "modelConfig": "模型配置",
     "modelList": "模型列表",
     "modelsAutoFilled": "已自动填充 {count} 个可用模型",

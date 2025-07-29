@@ -13,6 +13,7 @@ export { LMStudioProvider } from './lmstudio-provider';
 export { AnthropicProvider } from './anthropic-provider';
 export { GoogleProvider } from './google-provider';
 export { AzureProvider } from './azure-provider';
+export { ZhipuAIProvider } from './zhipu-provider';
 
 // 工厂类
 export { AIProviderFactory } from './provider-factory';

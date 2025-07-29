@@ -6,6 +6,7 @@ import { LMStudioProvider } from './lmstudio-provider';
 import { AnthropicProvider } from './anthropic-provider';
 import { GoogleProvider } from './google-provider';
 import { AzureProvider } from './azure-provider';
+import { ZhipuAIProvider } from './zhipu-provider';
 
 /**
  * AI供应商工厂
@@ -54,6 +55,9 @@ export class AIProviderFactory {
       case 'azure':
         provider = new AzureProvider();
         break;
+      case 'zhipu':
+        provider = new ZhipuAIProvider();
+        break;
       default:
         throw new Error(`不支持的AI供应商类型: ${providerType}`);
     }
@@ -81,6 +85,7 @@ export class AIProviderFactory {
       'siliconflow',
       'tencent',
       'aliyun',
+      'zhipu',
       'ollama',
       'lmstudio',
       'anthropic',
