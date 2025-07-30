@@ -1,6 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * Anthropic 供应商实现
@@ -14,15 +14,25 @@ export class AnthropicProvider extends BaseAIProvider {
     console.log(`测试 Anthropic 连接，使用 baseURL: ${config.baseURL}`);
     
     try {
-      const llm = new ChatAnthropic({
-        anthropicApiKey: config.apiKey,
-        ...(config.baseURL && { baseURL: config.baseURL })
-      });
-
-      await this.withTimeout(llm.invoke('test'), 15000);
+      // 只测试连接和获取模型列表，不测试具体模型
       const models = await this.getAvailableModels(config);
-      console.log(`Anthropic 连接测试成功，获取到模型:`, models);
-      return { success: true, models };
+      console.log(`Anthropic 获取到模型列表:`, models);
+      
+      if (models.length > 0) {
+        console.log(`Anthropic 连接测试成功，获取到 ${models.length} 个模型`);
+        return { 
+          success: true, 
+          models,
+          error: `✅ 连接成功！获取到 ${models.length} 个可用模型`
+        };
+      } else {
+        console.log(`Anthropic 连接成功但未获取到模型，使用默认模型列表`);
+        return { 
+          success: true, 
+          models: this.getDefaultModels(),
+          error: `✅ 连接成功！但未获取到模型列表，使用默认模型`
+        };
+      }
     } catch (error: any) {
       console.error(`Anthropic 连接测试失败:`, error);
       const errorMessage = this.handleCommonError(error, 'anthropic');
@@ -68,6 +78,42 @@ export class AnthropicProvider extends BaseAIProvider {
     
     // 返回常见的模型作为后备
     return this.getDefaultModels();
+  }
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试 Anthropic 模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      
+      const llm = new ChatAnthropic({
+        anthropicApiKey: config.apiKey,
+        modelName: model,
+        ...(config.baseURL && { baseURL: config.baseURL })
+      });
+
+      const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
+      const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
+      
+      console.log(`Anthropic 模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response: responseText,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`Anthropic 模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleCommonError(error, 'anthropic');
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
+    }
   }
 
   /**

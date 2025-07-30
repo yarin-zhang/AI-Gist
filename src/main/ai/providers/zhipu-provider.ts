@@ -1,5 +1,5 @@
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * 智谱AI提供商
@@ -29,27 +29,24 @@ export class ZhipuAIProvider extends BaseAIProvider {
     console.log(`测试智谱AI连接，使用 baseURL: ${config.baseURL}`);
     
     try {
-      // 首先尝试获取可用模型列表
+      // 只测试连接和获取模型列表，不测试具体模型
       const models = await this.getAvailableModels(config);
       console.log(`智谱AI获取到模型列表:`, models);
       
-      // 如果有可用模型，尝试找到一个合适的测试模型
       if (models.length > 0) {
-        const testModel = this.findSuitableTestModel(models);
-        console.log(`使用模型 ${testModel} 进行连接测试`);
-        
-        // 使用智谱API的特殊格式进行测试
-        const testResponse = await this.makeZhipuRequest(config, testModel, 'Hello');
-        console.log(`智谱AI连接测试成功，使用模型: ${testModel}`);
-        return { success: true, models };
+        console.log(`智谱AI连接测试成功，获取到 ${models.length} 个模型`);
+        return { 
+          success: true, 
+          models,
+          error: `✅ 连接成功！获取到 ${models.length} 个可用模型`
+        };
       } else {
-        // 如果没有获取到模型列表，使用默认模型进行测试
-        const defaultModel = 'glm-4';
-        console.log(`使用默认模型 ${defaultModel} 进行连接测试`);
-        
-        const testResponse = await this.makeZhipuRequest(config, defaultModel, 'Hello');
-        console.log(`智谱AI连接测试成功，使用默认模型: ${defaultModel}`);
-        return { success: true, models: this.getDefaultModels() };
+        console.log(`智谱AI连接成功但未获取到模型，使用默认模型列表`);
+        return { 
+          success: true, 
+          models: this.getDefaultModels(),
+          error: `✅ 连接成功！但未获取到模型列表，使用默认模型`
+        };
       }
     } catch (error: any) {
       console.error(`智谱AI连接测试失败:`, error);
@@ -96,6 +93,34 @@ export class ZhipuAIProvider extends BaseAIProvider {
     
     // 返回智谱AI的默认模型列表
     return this.getDefaultModels();
+  }
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试智谱AI模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const response = await this.makeZhipuRequest(config, model, testPrompt);
+      
+      console.log(`智谱AI模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`智谱AI模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleCommonError(error, 'zhipu');
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
+    }
   }
 
   /**

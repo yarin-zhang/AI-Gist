@@ -329,6 +329,42 @@
                                                 </template>
                                             </NTag>
                                         </NFlex>
+
+                                        <!-- 模型测试区域 -->
+                                        <n-form-item :label="t('aiConfig.modelTest')" style="margin-top: 16px;">
+                                            <NFlex vertical size="medium" style="width: 100%;">
+                                                <n-select 
+                                                    v-model:value="selectedTestModel" 
+                                                    :options="modelTestOptions"
+                                                    :placeholder="t('aiConfig.selectModelToTest')"
+                                                    :disabled="formData.models.length === 0"
+                                                />
+                                                <n-button
+                                                    @click="testSelectedModel" 
+                                                    :loading="testingSelectedModel"
+                                                    :disabled="!selectedTestModel || !canTestConnection"
+                                                    type="info" 
+                                                    block
+                                                >
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Robot />
+                                                        </NIcon>
+                                                    </template>
+                                                    {{ t('aiConfig.testSelectedModel') }}
+                                                </n-button>
+
+                                                <!-- 模型测试结果显示 -->
+                                                <n-alert v-if="modelTestResult"
+                                                    :type="modelTestResult.success ? 'success' : 'error'"
+                                                    :title="modelTestResult.success ? t('aiConfig.modelTestSuccess') : t('aiConfig.modelTestFailed')">
+                                                    {{ modelTestResult.error }}
+                                                    <div v-if="modelTestResult.response" style="margin-top: 8px; padding: 8px; background: var(--code-color); border-radius: 4px; font-family: monospace;">
+                                                        {{ modelTestResult.response }}
+                                                    </div>
+                                                </n-alert>
+                                            </NFlex>
+                                        </n-form-item>
                                     </div>
                                 </NFlex>
                             </NScrollbar>
@@ -531,6 +567,16 @@ const formTestResult = ref<{
     models?: string[];
     error?: string;
 } | null>(null);
+
+// 模型测试相关状态
+const selectedTestModel = ref<string>('');
+const testingSelectedModel = ref(false);
+const modelTestResult = ref<{
+    success: boolean;
+    error?: string;
+    model?: string;
+    response?: string;
+} | null>(null);
 const showIntelligentTestResult = ref(false);
 const intelligentTestResult = ref<{
     success: boolean;
@@ -727,6 +773,14 @@ const modelOptions = computed(() => {
     }));
 });
 
+// 计算属性：模型测试选项
+const modelTestOptions = computed(() => {
+    return formData.models.map((model) => ({
+        label: model,
+        value: model,
+    }));
+});
+
 // 计算属性：是否可以测试连接
 const canTestConnection = computed(() => {
     // 如果需要API Key但没有提供，则不能测试
@@ -822,6 +876,14 @@ const editConfig = (config: AIConfig) => {
     formData.defaultModel = config.defaultModel || "";
     formData.customModel = config.customModel || "";
     formData.systemPrompt = config.systemPrompt || "";
+    
+    // 清空测试状态
+    formTestResult.value = null;
+    modelTestResult.value = null;
+    selectedTestModel.value = '';
+    testingSelectedModel.value = false;
+    testingFormConnection.value = false;
+    
     showAddModal.value = true;
 };
 
@@ -932,7 +994,10 @@ const testFormConnection = async () => {
             updatedAt: new Date(),
         };
 
-        const result = await window.electronAPI.ai.testConfig(tempConfig);
+        // 使用 serializeConfig 确保对象可以被序列化
+        const serializedConfig = serializeConfig(tempConfig);
+
+        const result = await window.electronAPI.ai.testConfig(serializedConfig);
         formTestResult.value = result;
 
         if (result.success) {
@@ -959,6 +1024,50 @@ const testFormConnection = async () => {
         formTestResult.value = { success: false, error: (error as Error).message };
     } finally {
         testingFormConnection.value = false;
+    }
+};
+
+// 测试选中的模型
+const testSelectedModel = async () => {
+    if (!selectedTestModel.value) return;
+    
+    testingSelectedModel.value = true;
+    modelTestResult.value = null;
+
+    try {
+        // 构建临时配置对象进行测试
+        const tempConfig = {
+            configId: "temp_test",
+            name: formData.name || "Test",
+            type: formData.type,
+            baseURL: formData.baseURL,
+            apiKey: formData.apiKey,
+            models: [...formData.models], // 创建新数组确保可序列化
+            enabled: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        // 使用 serializeConfig 确保对象可以被序列化
+        const serializedConfig = serializeConfig(tempConfig);
+
+        const result = await window.electronAPI.ai.testModel(serializedConfig, selectedTestModel.value);
+        modelTestResult.value = result;
+
+        if (result.success) {
+            message.success(t('aiConfig.modelTestSuccess'));
+        } else {
+            message.error(t('aiConfig.modelTestFailed') + result.error);
+        }
+    } catch (error) {
+        message.error(t('aiConfig.testFailed') + (error as Error).message);
+        modelTestResult.value = { 
+            success: false, 
+            model: selectedTestModel.value,
+            error: (error as Error).message 
+        };
+    } finally {
+        testingSelectedModel.value = false;
     }
 };
 
@@ -1048,6 +1157,10 @@ const closeModal = () => {
     showAddModal.value = false;
     editingConfig.value = null;
     formTestResult.value = null;
+    modelTestResult.value = null;
+    selectedTestModel.value = '';
+    testingSelectedModel.value = false;
+    testingFormConnection.value = false;
     resetForm();
 };
 
@@ -1062,6 +1175,10 @@ const resetForm = () => {
     formData.customModel = "";
     formData.systemPrompt = "";
     formTestResult.value = null;
+    modelTestResult.value = null;
+    selectedTestModel.value = '';
+    testingSelectedModel.value = false;
+    testingFormConnection.value = false;
 };
 
 // 类型变化处理
@@ -1147,6 +1264,10 @@ const onTypeChange = (type: typeof formData.type) => {
 
     // 清空之前的测试结果和模型列表
     formTestResult.value = null;
+    modelTestResult.value = null;
+    selectedTestModel.value = '';
+    testingSelectedModel.value = false;
+    testingFormConnection.value = false;
     formData.models = [];
     formData.defaultModel = "";
 };

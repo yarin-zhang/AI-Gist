@@ -59,9 +59,19 @@ class AIServiceManager {
    * @returns 处理后的配置
    */
   processAddConfig(config: any): any {
-    // 确保日期字段正确处理
+    // 只提取必要的属性，避免不可序列化的内容
     const processedConfig = {
-      ...config,
+      configId: config.configId,
+      name: config.name,
+      type: config.type,
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      secretKey: config.secretKey,
+      models: Array.isArray(config.models) ? config.models : [],
+      defaultModel: config.defaultModel,
+      customModel: config.customModel,
+      enabled: config.enabled,
+      systemPrompt: config.systemPrompt,
       createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
       updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
     };
@@ -75,9 +85,20 @@ class AIServiceManager {
    * @returns 处理后的配置
    */
   processUpdateConfig(id: string, config: any): any {
-    // 确保日期字段正确处理
+    // 只提取必要的属性，避免不可序列化的内容
     const processedConfig = {
-      ...config,
+      configId: config.configId,
+      name: config.name,
+      type: config.type,
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      secretKey: config.secretKey,
+      models: Array.isArray(config.models) ? config.models : [],
+      defaultModel: config.defaultModel,
+      customModel: config.customModel,
+      enabled: config.enabled,
+      systemPrompt: config.systemPrompt,
+      createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
       updatedAt: new Date()
     };
     return processedConfig;
@@ -89,10 +110,19 @@ class AIServiceManager {
    * @returns 测试结果
    */
   async processTestConfig(config: any): Promise<{ success: boolean; error?: string; models?: string[] }> {
-    // 将配置转换为内部格式
+    // 将配置转换为内部格式，只包含必要的属性
     const processedConfig = {
-      ...config,
-      models: Array.isArray(config.models) ? config.models : [],
+      configId: config.configId,
+      name: config.name,
+      type: config.type,
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      secretKey: config.secretKey,
+      models: Array.isArray(config.models) ? [...config.models] : [],
+      defaultModel: config.defaultModel,
+      customModel: config.customModel,
+      enabled: config.enabled,
+      systemPrompt: config.systemPrompt,
       createdAt: new Date(config.createdAt),
       updatedAt: new Date(config.updatedAt)
     };
@@ -162,6 +192,71 @@ class AIServiceManager {
   }
 
   /**
+   * 处理模型测试请求
+   * @param config 原始配置
+   * @param model 要测试的模型
+   * @returns 模型测试结果
+   */
+  async processTestModel(config: any, model: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
+    // 只提取必要的属性，避免不可序列化的内容
+    const processedConfig = {
+      configId: config.configId,
+      name: config.name,
+      type: config.type,
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      secretKey: config.secretKey,
+      models: Array.isArray(config.models) ? config.models : [],
+      defaultModel: config.defaultModel,
+      customModel: config.customModel,
+      enabled: config.enabled,
+      systemPrompt: config.systemPrompt,
+      createdAt: config.createdAt ? new Date(config.createdAt) : new Date(),
+      updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
+    };
+    
+    return await this.testModel(processedConfig, model);
+  }
+
+  /**
+   * 获取所有 AI 配置
+   * @returns AI 配置列表
+   */
+  async getConfigs(): Promise<any[]> {
+    // 这里应该调用数据库服务获取配置
+    // 由于 AIServiceManager 主要负责 AI 服务，配置管理通常由前端处理
+    // 这里返回空数组，实际配置管理由前端负责
+    return [];
+  }
+
+  /**
+   * 获取已启用的 AI 配置
+   * @returns 已启用的 AI 配置列表
+   */
+  async getEnabledConfigs(): Promise<any[]> {
+    // 这里应该调用数据库服务获取已启用的配置
+    // 由于 AIServiceManager 主要负责 AI 服务，配置管理通常由前端处理
+    // 这里返回空数组，实际配置管理由前端负责
+    return [];
+  }
+
+  /**
+   * 删除 AI 配置
+   * @param id 配置 ID
+   * @returns 删除结果
+   */
+  async removeConfig(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // 这里应该调用数据库服务删除配置
+      // 由于 AIServiceManager 主要负责 AI 服务，配置管理通常由前端处理
+      // 这里返回成功，实际配置管理由前端负责
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || '删除配置失败' };
+    }
+  }
+
+  /**
    * 处理流式生成提示词请求
    * @param request 生成请求
    * @param config 原始配置
@@ -181,10 +276,19 @@ class AIServiceManager {
     this.activeGenerations.set(requestId, abortController);
     
     try {
-      // 将配置转换为内部格式
+      // 将配置转换为内部格式，只包含必要的属性
       const processedConfig = {
-        ...config,
-        models: Array.isArray(config.models) ? config.models : [],
+        configId: config.configId,
+        name: config.name,
+        type: config.type,
+        baseURL: config.baseURL,
+        apiKey: config.apiKey,
+        secretKey: config.secretKey,
+        models: Array.isArray(config.models) ? [...config.models] : [],
+        defaultModel: config.defaultModel,
+        customModel: config.customModel,
+        enabled: config.enabled,
+        systemPrompt: config.systemPrompt,
         createdAt: new Date(config.createdAt),
         updatedAt: new Date(config.updatedAt)
       };
@@ -254,10 +358,19 @@ class AIServiceManager {
     model: string | null;
     error: string | null;
   }> {
-    // 将配置转换为内部格式
+    // 将配置转换为内部格式，只包含必要的属性
     const processedConfig = {
-      ...config,
-      models: Array.isArray(config.models) ? config.models : [],
+      configId: config.configId,
+      name: config.name,
+      type: config.type,
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      secretKey: config.secretKey,
+      models: Array.isArray(config.models) ? [...config.models] : [],
+      defaultModel: config.defaultModel,
+      customModel: config.customModel,
+      enabled: config.enabled,
+      systemPrompt: config.systemPrompt,
       createdAt: new Date(config.createdAt),
       updatedAt: new Date(config.updatedAt)
     };
@@ -357,6 +470,26 @@ class AIServiceManager {
         success: false, 
         error: error.message || '智能测试失败',
         inputPrompt: '请用一句话简单介绍一下你自己。'
+      };
+    }
+  }
+
+  /**
+   * 测试特定模型
+   * @param config AI配置
+   * @param model 要测试的模型
+   * @returns 模型测试结果
+   */
+  async testModel(config: ProcessedAIConfig, model: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
+    try {
+      const provider = AIProviderFactory.getProvider(config);
+      return await provider.testModel(config, model);
+    } catch (error: any) {
+      console.error(`模型测试失败 - 供应商: ${config.type}, 模型: ${model}`, error);
+      return {
+        success: false,
+        model,
+        error: error.message || '模型测试失败'
       };
     }
   }

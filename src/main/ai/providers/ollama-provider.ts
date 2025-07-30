@@ -1,6 +1,6 @@
 import { Ollama } from '@langchain/ollama';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * Ollama 供应商实现
@@ -67,6 +67,41 @@ export class OllamaProvider extends BaseAIProvider {
       }
     }
     return [];
+  }
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试 Ollama 模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      
+      const llm = new Ollama({
+        baseUrl: config.baseURL,
+        model: model
+      });
+
+      const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
+      const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
+      
+      console.log(`Ollama 模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response: responseText,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`Ollama 模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleCommonError(error, 'ollama');
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
+    }
   }
 
   /**

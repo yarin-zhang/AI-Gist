@@ -1,6 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * LM Studio 供应商实现
@@ -73,6 +73,47 @@ export class LMStudioProvider extends BaseAIProvider {
         return ['连接超时，请检查 LM Studio 状态'];
       }
       return ['无法连接到 LM Studio'];
+    }
+  }
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试 LM Studio 模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      
+      const baseUrl = config.baseURL || 'http://localhost:1234';
+      const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+      
+      const llm = new ChatOpenAI({
+        openAIApiKey: 'not-needed', // LM Studio 本地不需要 API key
+        modelName: model,
+        configuration: {
+          baseURL: finalBaseUrl
+        }
+      });
+
+      const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
+      const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
+      
+      console.log(`LM Studio 模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response: responseText,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`LM Studio 模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleCommonError(error, 'lmstudio');
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
     }
   }
 

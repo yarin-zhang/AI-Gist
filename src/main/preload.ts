@@ -76,11 +76,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // AI 服务管理
   ai: {
+    getConfigs: () => ipcRenderer.invoke('ai:get-configs'),
+    getEnabledConfigs: () => ipcRenderer.invoke('ai:get-enabled-configs'),
     addConfig: (config: any) => ipcRenderer.invoke('ai:add-config', config),
     updateConfig: (id: string, config: any) => ipcRenderer.invoke('ai:update-config', id, config),
+    removeConfig: (id: string) => ipcRenderer.invoke('ai:remove-config', id),
     testConfig: (config: any) => ipcRenderer.invoke('ai:test-config', config),
+    testModel: (config: any, model: string) => ipcRenderer.invoke('ai:test-model', config, model),
     getModels: (config: any) => ipcRenderer.invoke('ai:get-models', config),
-    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => {
+    generatePrompt: (request: any, config: any) => ipcRenderer.invoke('ai:generate-prompt', request, config),
+    generatePromptStream: (request: any, config: any, onProgress: (charCount: number, partialContent?: string) => boolean) => {
       // 监听流式进度，接收字符数和部分内容
       const progressListener = (_: any, charCount: number, partialContent?: string) => {
         const shouldContinue = onProgress(charCount, partialContent);
@@ -104,6 +109,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
+    debugPrompt: (prompt: string, config: any) => ipcRenderer.invoke('ai:debug-prompt', prompt, config),
   },
 
   // 快捷键管理

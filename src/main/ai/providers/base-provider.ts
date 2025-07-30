@@ -36,6 +36,16 @@ export interface NetworkProxyConfig {
 }
 
 /**
+ * AI模型测试结果
+ */
+export interface AIModelTestResult {
+  success: boolean;
+  error?: string;
+  model?: string;
+  response?: string;
+}
+
+/**
  * AI供应商基础接口
  */
 export interface AIProvider {
@@ -48,6 +58,11 @@ export interface AIProvider {
    * 获取可用模型列表
    */
   getAvailableModels(config: AIConfig): Promise<string[]>;
+  
+  /**
+   * 测试特定模型
+   */
+  testModel(config: AIConfig, model: string): Promise<AIModelTestResult>;
   
   /**
    * 智能测试 - 发送真实提示词并获取AI响应
@@ -310,13 +325,13 @@ export abstract class BaseAIProvider implements AIProvider {
     if (errorMessage?.includes('network') || errorMessage?.includes('ECONNREFUSED') || errorMessage?.includes('ENOTFOUND')) {
       return '无法连接到服务器，请检查网络连接';
     }
-    if (errorMessage?.includes('Model Not Exist') || errorMessage?.includes('model not found') || errorMessage?.includes('400')) {
+    if (errorMessage?.includes('Model Not Exist') || errorMessage?.includes('model not found')) {
       return '指定的模型不存在或不支持，请检查模型名称或联系服务提供商';
     }
     if (errorMessage?.includes('rate limit') || errorMessage?.includes('quota') || errorMessage?.includes('429')) {
       return '请求频率超限或配额不足，请稍后重试';
     }
-    if (errorMessage?.includes('invalid_request_error') || errorMessage?.includes('400')) {
+    if (errorMessage?.includes('invalid_request_error')) {
       return '请求参数错误，请检查配置信息';
     }
     if (errorMessage?.includes('server_error') || errorMessage?.includes('internal error') || errorMessage?.includes('500')) {
@@ -377,6 +392,7 @@ export abstract class BaseAIProvider implements AIProvider {
   // 抽象方法，子类必须实现
   abstract testConfig(config: AIConfig): Promise<AITestResult>;
   abstract getAvailableModels(config: AIConfig): Promise<string[]>;
+  abstract testModel(config: AIConfig, model: string): Promise<AIModelTestResult>;
   abstract intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult>;
   abstract generatePrompt(request: AIGenerationRequest & { config: AIConfig }): Promise<AIGenerationResult>;
   abstract generatePromptWithStream(
