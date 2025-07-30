@@ -236,7 +236,7 @@
                             <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                                 <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
                                     require-mark-placement="right-hanging" style="padding-right: 12px;">
-                                    <NFlex vertical size="large">
+                                    <NFlex vertical size="small">
                                         <n-form-item :label="t('aiConfig.serviceType')" path="type">
                                             <n-select v-model:value="formData.type" :options="typeOptions"
                                                 @update:value="onTypeChange" />
@@ -281,6 +281,48 @@
                                                 </n-alert>
                                             </NFlex>
                                         </n-form-item>
+
+                                        <!-- 服务商特点说明 -->
+                                        <div v-if="getServiceInfo.description" style="margin-bottom: 16px;">
+                                            <NAlert type="success" :show-icon="false" size="small">
+                                                <NFlex align="start" size="small">
+                                                    <NFlex vertical size="small">
+                                                        <NText strong >
+                                                            {{ getServiceInfo.name }} 介绍
+                                                        </NText>
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            {{ getServiceInfo.description }}
+                                                        </NText>
+                                                    </NFlex>
+                                                </NFlex>
+                                                <!-- 只有在有URL时才显示按钮区域 -->
+                                                <div v-if="getApiKeyInfo.apiKeyUrl || getApiKeyInfo.docUrl">
+                                                    <NFlex align="center" justify="space-between">
+                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.apiKeyUrl">
+                                                            <NButton size="small" type="info" text @click="openApiKeyUrl">
+                                                                <template #icon>
+                                                                    <NIcon size="12">
+                                                                        <ExternalLink />
+                                                                    </NIcon>
+                                                                </template>
+                                                                获取API Key
+                                                            </NButton>
+                                                        </NFlex>
+                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.docUrl">
+                                                            <NButton size="small" type="info" text @click="openDocumentationUrl">
+                                                                <template #icon>
+                                                                    <NIcon size="12">
+                                                                        <Book />
+                                                                    </NIcon>
+                                                                </template>
+                                                                查看文档
+                                                            </NButton>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </div>
+                                            </NAlert>
+                                        </div>
+
                                     </NFlex>
                                 </n-form>
                             </NScrollbar>
@@ -538,7 +580,7 @@ import {
     NSplit,
     useMessage,
 } from "naive-ui";
-import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint } from "@vicons/tabler";
+import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint, ExternalLink, Book, InfoCircle } from "@vicons/tabler";
 import type { AIConfig } from "~/lib/db";
 import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
@@ -734,6 +776,172 @@ const getBaseURLInfo = computed(() => {
             return {
                 label: t('aiConfig.baseURL') + '：',
                 placeholder: t('aiConfig.openaiExample')
+            };
+    }
+});
+
+// 计算属性：API Key 信息
+const getApiKeyInfo = computed(() => {
+    switch (formData.type) {
+        case 'openai':
+            return {
+                name: 'OpenAI',
+                apiKeyUrl: 'https://platform.openai.com/api-keys',
+                docUrl: 'https://platform.openai.com/docs'
+            };
+        case 'anthropic':
+            return {
+                name: 'Anthropic',
+                apiKeyUrl: 'https://console.anthropic.com/',
+                docUrl: 'https://docs.anthropic.com/'
+            };
+        case 'google':
+            return {
+                name: 'Google AI Studio',
+                apiKeyUrl: 'https://makersuite.google.com/app/apikey',
+                docUrl: 'https://ai.google.dev/docs'
+            };
+        case 'azure':
+            return {
+                name: 'Azure OpenAI',
+                apiKeyUrl: 'https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesBrowse/~/OpenAI',
+                docUrl: 'https://learn.microsoft.com/en-us/azure/ai-services/openai/'
+            };
+        case 'deepseek':
+            return {
+                name: 'DeepSeek',
+                apiKeyUrl: 'https://platform.deepseek.com/api_keys',
+                docUrl: 'https://platform.deepseek.com/docs'
+            };
+        case 'siliconflow':
+            return {
+                name: '硅基流动',
+                apiKeyUrl: 'https://cloud.siliconflow.cn/me/account/ak',
+                docUrl: 'https://docs.siliconflow.cn/'
+            };
+        case 'tencent':
+            return {
+                name: '腾讯云',
+                apiKeyUrl: 'https://console.cloud.tencent.com/hunyuan',
+                docUrl: 'https://cloud.tencent.com/document/product/1729'
+            };
+        case 'aliyun':
+            return {
+                name: '阿里云',
+                apiKeyUrl: 'https://bailian.console.aliyun.com/',
+                docUrl: 'https://bailian.console.aliyun.com/?tab=doc#/doc'
+            };
+        case 'mistral':
+            return {
+                name: 'Mistral AI',
+                apiKeyUrl: 'https://console.mistral.ai/api-keys/',
+                docUrl: 'https://docs.mistral.ai/'
+            };
+        case 'zhipu':
+            return {
+                name: '智谱AI',
+                apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+                docUrl: 'https://docs.bigmodel.cn/cn/guide/start/model-overview'
+            };
+        case 'openrouter':
+            return {
+                name: 'OpenRouter',
+                apiKeyUrl: 'https://openrouter.ai/keys',
+                docUrl: 'https://openrouter.ai/docs'
+            };
+        case 'ollama':
+            return {
+                name: 'Ollama',
+                apiKeyUrl: '',
+                docUrl: 'https://github.com/ollama/ollama'
+            };
+        case 'lmstudio':
+            return {
+                name: 'LM Studio',
+                apiKeyUrl: '',
+                docUrl: 'https://lmstudio.ai/docs/app/basics'
+            };
+        default:
+            return {
+                name: 'N/A',
+                apiKeyUrl: '',
+                docUrl: ''
+            };
+    }
+});
+
+// 计算属性：服务商信息
+const getServiceInfo = computed(() => {
+    switch (formData.type) {
+        case 'openai':
+            return {
+                name: 'OpenAI',
+                description: '全球领先的AI研究公司，提供GPT-4、GPT-3.5等先进模型。支持流式输出，响应速度快，适合各种AI应用场景。'
+            };
+        case 'anthropic':
+            return {
+                name: 'Anthropic Claude',
+                description: '专注于安全、有益的AI系统，Claude模型在推理、写作和代码生成方面表现优异。注重AI安全性和可控性。'
+            };
+        case 'google':
+            return {
+                name: 'Google Gemini AI',
+                description: '谷歌最新多模态AI模型，支持文本、图像、音频等多种输入。在理解和生成多模态内容方面表现突出。'
+            };
+        case 'azure':
+            return {
+                name: 'Azure OpenAI',
+                description: '微软云平台提供的OpenAI服务，企业级安全性和合规性。适合企业用户，提供私有化部署选项。'
+            };
+        case 'deepseek':
+            return {
+                name: 'DeepSeek',
+                description: '专注于代码生成和编程任务的AI模型，在代码理解、生成和调试方面表现优秀。支持多种编程语言。'
+            };
+        case 'siliconflow':
+            return {
+                name: '硅基流动',
+                description: '国内领先的AI计算平台，提供高性能GPU资源和多种AI模型。适合大规模AI训练和推理任务。'
+            };
+        case 'tencent':
+            return {
+                name: '腾讯云',
+                description: '腾讯云提供的AI服务，包括混元大模型。集成腾讯生态，适合国内企业用户，提供本地化服务。'
+            };
+        case 'aliyun':
+            return {
+                name: '阿里云',
+                description: '阿里云通义千问大模型服务，在中文理解和生成方面表现优秀。提供企业级AI解决方案和定制化服务。'
+            };
+        case 'mistral':
+            return {
+                name: 'Mistral AI',
+                description: '欧洲领先的AI公司，提供高效的开源和商业模型。在推理速度和成本效益方面表现突出。'
+            };
+        case 'zhipu':
+            return {
+                name: '智谱AI',
+                description: '清华大学背景的AI公司，提供GLM系列大模型。在中文理解和学术研究方面有独特优势。'
+            };
+        case 'openrouter':
+            return {
+                name: 'OpenRouter',
+                description: 'AI模型聚合平台，提供多种主流AI模型的统一访问接口。支持模型对比和成本优化，适合多模型应用场景。'
+            };
+        case 'ollama':
+            return {
+                name: 'Ollama',
+                description: '本地AI模型运行框架，支持在个人设备上运行各种开源模型。保护隐私，无需网络连接，适合离线使用。'
+            };
+        case 'lmstudio':
+            return {
+                name: 'LM Studio',
+                description: '本地AI模型管理工具，提供图形化界面运行各种开源模型。支持模型下载、管理和本地推理。'
+            };
+        default:
+            return {
+                name: '',
+                description: ''
             };
     }
 });
@@ -1367,6 +1575,22 @@ watch(autoShowAddModal, (show) => {
 // 处理快速优化配置更新
 const handleQuickOptimizationConfigsUpdated = () => {
     message.success("快速优化配置已更新");
+};
+
+// 打开API Key获取页面
+const openApiKeyUrl = () => {
+    const info = getApiKeyInfo.value;
+    if (info.apiKeyUrl) {
+        window.electronAPI.shell.openExternal(info.apiKeyUrl);
+    }
+};
+
+// 打开文档页面
+const openDocumentationUrl = () => {
+    const info = getApiKeyInfo.value;
+    if (info.docUrl) {
+        window.electronAPI.shell.openExternal(info.docUrl);
+    }
 };
 
 // 导出方法供父组件调用
