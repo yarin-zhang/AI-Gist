@@ -1,5 +1,5 @@
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * Google Gemini 供应商实现
@@ -14,31 +14,28 @@ export class GoogleProvider extends BaseAIProvider {
     console.log(`测试 Google Gemini 连接，使用 baseURL: ${config.baseURL}`);
     
     try {
-      // 首先尝试获取可用模型列表
+      // 只测试连接和获取模型列表，不测试具体模型
       const models = await this.getAvailableModels(config);
       console.log(`Google Gemini 获取到模型列表:`, models);
       
-      // 如果有可用模型，尝试找到一个合适的测试模型
       if (models.length > 0) {
-        const testModel = this.findSuitableTestModel(models);
-        console.log(`使用模型 ${testModel} 进行连接测试`);
-        
-        // 使用 Google Gemini API 进行测试
-        const testResponse = await this.makeGoogleRequest(config, testModel, 'Hello');
-        console.log(`Google Gemini 连接测试成功，使用模型: ${testModel}`);
-        return { success: true, models };
+        console.log(`Google Gemini 连接测试成功，获取到 ${models.length} 个模型`);
+        return { 
+          success: true, 
+          models,
+          error: `✅ 连接成功！获取到 ${models.length} 个可用模型`
+        };
       } else {
-        // 如果没有获取到模型列表，使用默认模型进行测试
-        const defaultModel = 'gemini-1.5-pro';
-        console.log(`使用默认模型 ${defaultModel} 进行连接测试`);
-        
-        const testResponse = await this.makeGoogleRequest(config, defaultModel, 'Hello');
-        console.log(`Google Gemini 连接测试成功，使用默认模型: ${defaultModel}`);
-        return { success: true, models: this.getDefaultModels() };
+        console.log(`Google Gemini 连接成功但未获取到模型，使用默认模型列表`);
+        return { 
+          success: true, 
+          models: this.getDefaultModels(),
+          error: `✅ 连接成功！但未获取到模型列表，使用默认模型`
+        };
       }
     } catch (error: any) {
       console.error(`Google Gemini 连接测试失败:`, error);
-      const errorMessage = this.handleCommonError(error, 'google');
+      const errorMessage = this.handleGoogleError(error);
       return { success: false, error: errorMessage };
     }
   }
@@ -56,7 +53,7 @@ export class GoogleProvider extends BaseAIProvider {
       
       const baseUrl = config.baseURL || 'https://generativelanguage.googleapis.com';
       const url = `${baseUrl}/v1beta/models?key=${config.apiKey}`;
-      console.log(`Google Gemini 请求URL: ${url.replace(config.apiKey, config.apiKey.substring(0, 10) + '...')}`);
+      console.log(`Google Gemini 请求URL: ${url.replace(config.apiKey || '', (config.apiKey || '').substring(0, 10) + '...')}`);
       
       const timeoutFetch = this.createTimeoutFetch(20000);
       const response = await timeoutFetch(url, {
@@ -144,7 +141,7 @@ export class GoogleProvider extends BaseAIProvider {
       };
     } catch (error: any) {
       console.error(`Google Gemini 智能测试失败:`, error);
-      const errorMessage = this.handleCommonError(error, 'google');
+      const errorMessage = this.handleGoogleError(error);
       return { 
         success: false, 
         error: errorMessage,
@@ -271,15 +268,17 @@ export class GoogleProvider extends BaseAIProvider {
     const baseUrl = config.baseURL || 'https://generativelanguage.googleapis.com';
     const url = `${baseUrl}/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
     
+    // Google Gemini 使用不同的消息格式
+    let promptText = userPrompt;
+    if (systemPrompt) {
+      // 将系统提示词和用户提示词合并
+      promptText = `${systemPrompt}\n\n${userPrompt}`;
+    }
+    
     const requestBody = {
       contents: [
-        ...(systemPrompt ? [{
-          role: 'user',
-          parts: [{ text: systemPrompt }]
-        }] : []),
         {
-          role: 'user',
-          parts: [{ text: userPrompt }]
+          parts: [{ text: promptText }]
         }
       ],
       generationConfig: {
@@ -287,6 +286,9 @@ export class GoogleProvider extends BaseAIProvider {
         maxOutputTokens: 4096
       }
     };
+
+    console.log(`Google Gemini 请求 URL: ${url.replace(config.apiKey || '', (config.apiKey || '').substring(0, 10) + '...')}`);
+    console.log(`Google Gemini 请求体:`, JSON.stringify(requestBody, null, 2));
 
     const timeoutFetch = this.createTimeoutFetch(60000); // Google Gemini 可能需要更长时间
     const response = await timeoutFetch(url, {
@@ -297,13 +299,38 @@ export class GoogleProvider extends BaseAIProvider {
       body: JSON.stringify(requestBody)
     });
 
+    console.log(`Google Gemini 响应状态: ${response.status}`);
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+      console.error(`Google Gemini API 错误:`, errorData);
+      
+      // 更精确的错误处理
+      if (response.status === 400) {
+        throw new Error(`请求参数错误: ${errorData.error?.message || '请检查模型名称和请求格式'}`);
+      } else if (response.status === 401) {
+        throw new Error('API Key 认证失败，请检查 API Key 是否有效');
+      } else if (response.status === 403) {
+        throw new Error('API Key 权限不足，请检查 API Key 权限');
+      } else if (response.status === 429) {
+        throw new Error('请求频率超限，请稍后重试');
+      } else if (response.status === 500) {
+        throw new Error('Google 服务器内部错误，请稍后重试');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${errorData.error?.message || response.statusText}`);
+      }
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log(`Google Gemini 响应数据:`, data);
+    
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      console.warn('Google Gemini 响应中没有找到文本内容:', data);
+      throw new Error('API 响应格式异常，请重试');
+    }
+    
+    return responseText;
   }
 
   /**
@@ -331,7 +358,87 @@ export class GoogleProvider extends BaseAIProvider {
     return models[0];
   }
 
+  /**
+   * 处理 Google Gemini 特定错误
+   */
+  private handleGoogleError(error: any): string {
+    const errorMessage = error.message || error.toString();
+    
+    // 检查是否是网络相关错误
+    if (errorMessage?.includes('请求超时') || errorMessage?.includes('timeout')) {
+      return '连接超时，请检查网络或服务器状态';
+    }
+    if (errorMessage?.includes('network') || errorMessage?.includes('ECONNREFUSED') || errorMessage?.includes('ENOTFOUND')) {
+      return '无法连接到服务器，请检查网络连接';
+    }
+    
+    // 检查是否是 API 相关错误
+    if (errorMessage?.includes('API Key 认证失败')) {
+      return 'API Key 认证失败，请检查 API Key 是否有效';
+    }
+    if (errorMessage?.includes('API Key 权限不足')) {
+      return 'API Key 权限不足，请检查 API Key 权限';
+    }
+    if (errorMessage?.includes('请求频率超限')) {
+      return '请求频率超限，请稍后重试';
+    }
+    if (errorMessage?.includes('请求参数错误')) {
+      return '请求参数错误，请检查模型名称和请求格式';
+    }
+    if (errorMessage?.includes('Google 服务器内部错误')) {
+      return 'Google 服务器内部错误，请稍后重试';
+    }
+    
+    // 检查 HTTP 状态码
+    if (errorMessage?.includes('HTTP 400')) {
+      return '请求参数错误，请检查模型名称和请求格式';
+    }
+    if (errorMessage?.includes('HTTP 401')) {
+      return 'API Key 认证失败，请检查 API Key 是否有效';
+    }
+    if (errorMessage?.includes('HTTP 403')) {
+      return 'API Key 权限不足，请检查 API Key 权限';
+    }
+    if (errorMessage?.includes('HTTP 429')) {
+      return '请求频率超限，请稍后重试';
+    }
+    if (errorMessage?.includes('HTTP 500')) {
+      return 'Google 服务器内部错误，请稍后重试';
+    }
+    
+    // 如果没有匹配到特定错误，返回原始错误信息
+    return errorMessage || '未知错误';
+  }
 
+
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试 Google Gemini 模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const response = await this.makeGoogleRequest(config, model, testPrompt);
+      
+      console.log(`Google Gemini 模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`Google Gemini 模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleGoogleError(error);
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
+    }
+  }
 
   /**
    * 获取默认模型列表

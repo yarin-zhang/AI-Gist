@@ -1,6 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
-import { BaseAIProvider, AITestResult, AIIntelligentTestResult } from './base-provider';
+import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
 /**
  * Azure OpenAI 供应商实现
@@ -14,21 +14,25 @@ export class AzureProvider extends BaseAIProvider {
     console.log(`测试 Azure OpenAI 连接，使用 baseURL: ${config.baseURL}`);
     
     try {
-      const llm = new ChatOpenAI({
-        openAIApiKey: config.apiKey,
-        modelName: config.defaultModel || 'gpt-35-turbo',
-        configuration: {
-          baseURL: config.baseURL || undefined,
-          defaultHeaders: {
-            'api-key': config.apiKey
-          }
-        }
-      });
-
-      await this.withTimeout(llm.invoke('test'), 15000);
+      // 只测试连接和获取模型列表，不测试具体模型
       const models = await this.getAvailableModels(config);
-      console.log(`Azure OpenAI 连接测试成功，获取到模型:`, models);
-      return { success: true, models };
+      console.log(`Azure OpenAI 获取到模型列表:`, models);
+      
+      if (models.length > 0) {
+        console.log(`Azure OpenAI 连接测试成功，获取到 ${models.length} 个模型`);
+        return { 
+          success: true, 
+          models,
+          error: `✅ 连接成功！获取到 ${models.length} 个可用模型`
+        };
+      } else {
+        console.log(`Azure OpenAI 连接成功但未获取到模型，使用默认模型列表`);
+        return { 
+          success: true, 
+          models: this.getDefaultModels(),
+          error: `✅ 连接成功！但未获取到模型列表，使用默认模型`
+        };
+      }
     } catch (error: any) {
       console.error(`Azure OpenAI 连接测试失败:`, error);
       const errorMessage = this.handleCommonError(error, 'azure');
@@ -73,6 +77,47 @@ export class AzureProvider extends BaseAIProvider {
     
     // 返回常见的模型作为后备
     return this.getDefaultModels();
+  }
+
+  /**
+   * 测试特定模型
+   */
+  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+    console.log(`测试 Azure OpenAI 模型: ${model}`);
+    
+    try {
+      const testPrompt = '请用一句话简单介绍一下你自己。';
+      
+      const llm = new ChatOpenAI({
+        openAIApiKey: config.apiKey,
+        modelName: model,
+        configuration: {
+          baseURL: config.baseURL || undefined,
+          defaultHeaders: {
+            'api-key': config.apiKey
+          }
+        }
+      });
+
+      const response = await this.withTimeout(llm.invoke(testPrompt), 20000);
+      const responseText = typeof response === 'string' ? response : (response as any)?.content || '测试成功';
+      
+      console.log(`Azure OpenAI 模型 ${model} 测试成功`);
+      return {
+        success: true,
+        model,
+        response: responseText,
+        error: `✅ 模型 ${model} 测试成功！AI 响应正常`
+      };
+    } catch (error: any) {
+      console.error(`Azure OpenAI 模型 ${model} 测试失败:`, error);
+      const errorMessage = this.handleCommonError(error, 'azure');
+      return {
+        success: false,
+        model,
+        error: `❌ 模型 ${model} 测试失败: ${errorMessage}`
+      };
+    }
   }
 
   /**

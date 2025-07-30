@@ -116,6 +116,16 @@ class IpcHandlers {
    * 设置 AI 服务处理器
    */
   private setupAIHandlers() {
+    // 获取所有 AI 配置
+    ipcMain.handle('ai:get-configs', async () => {
+      return await aiServiceManager.getConfigs();
+    });
+
+    // 获取已启用的 AI 配置
+    ipcMain.handle('ai:get-enabled-configs', async () => {
+      return await aiServiceManager.getEnabledConfigs();
+    });
+
     // 添加 AI 配置 - 返回配置数据，实际存储由前端处理
     ipcMain.handle('ai:add-config', (_, config: any) => {
       return aiServiceManager.processAddConfig(config);
@@ -124,6 +134,11 @@ class IpcHandlers {
     // 更新 AI 配置 - 返回配置数据，实际存储由前端处理
     ipcMain.handle('ai:update-config', (_, id: string, config: any) => {
       return aiServiceManager.processUpdateConfig(id, config);
+    });
+
+    // 删除 AI 配置
+    ipcMain.handle('ai:remove-config', async (_, id: string) => {
+      return await aiServiceManager.removeConfig(id);
     });
 
     // 测试 AI 配置
@@ -144,6 +159,11 @@ class IpcHandlers {
     // 智能测试 - 发送真实提示词并获取AI响应
     ipcMain.handle('ai:intelligent-test', async (_, config: any) => {
       return await aiServiceManager.processIntelligentTest(config);
+    });
+
+    // 测试特定模型
+    ipcMain.handle('ai:test-model', async (_, config: any, model: string) => {
+      return await aiServiceManager.processTestModel(config, model);
     });
 
     // 流式生成 Prompt
@@ -435,9 +455,13 @@ class IpcHandlers {
     ipcMain.removeHandler('theme:set-source');
     ipcMain.removeHandler('theme:is-dark');
     // 清理 AI 处理器
+    ipcMain.removeHandler('ai:get-configs');
+    ipcMain.removeHandler('ai:get-enabled-configs');
     ipcMain.removeHandler('ai:add-config');
     ipcMain.removeHandler('ai:update-config');
+    ipcMain.removeHandler('ai:remove-config');
     ipcMain.removeHandler('ai:test-config');
+    ipcMain.removeHandler('ai:test-model');
     ipcMain.removeHandler('ai:get-models');
     ipcMain.removeHandler('ai:generate-prompt');
     ipcMain.removeHandler('ai:intelligent-test');

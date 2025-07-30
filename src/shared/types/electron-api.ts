@@ -62,6 +62,7 @@ export default interface ElectronApi {
     updateConfig: (id: string, config: Partial<AIConfig>) => Promise<AIConfig | null>
     removeConfig: (id: string) => Promise<boolean>
     testConfig: (config: AIConfig) => Promise<AIConfigTestResult>
+    testModel: (config: AIConfig, model: string) => Promise<{ success: boolean; error?: string; model?: string; response?: string }>
     getModels: (config: AIConfig) => Promise<string[]>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
     generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
