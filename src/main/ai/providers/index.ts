@@ -14,6 +14,7 @@ export { AnthropicProvider } from './anthropic-provider';
 export { GoogleProvider } from './google-provider';
 export { AzureProvider } from './azure-provider';
 export { ZhipuAIProvider } from './zhipu-provider';
+export { OpenRouterProvider } from './openrouter-provider';
 
 // 工厂类
 export { AIProviderFactory } from './provider-factory';

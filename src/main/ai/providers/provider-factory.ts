@@ -7,6 +7,7 @@ import { AnthropicProvider } from './anthropic-provider';
 import { GoogleProvider } from './google-provider';
 import { AzureProvider } from './azure-provider';
 import { ZhipuAIProvider } from './zhipu-provider';
+import { OpenRouterProvider } from './openrouter-provider';
 
 /**
  * AI供应商工厂
@@ -58,6 +59,9 @@ export class AIProviderFactory {
       case 'zhipu':
         provider = new ZhipuAIProvider();
         break;
+      case 'openrouter':
+        provider = new OpenRouterProvider();
+        break;
       default:
         throw new Error(`不支持的AI供应商类型: ${providerType}`);
     }
@@ -86,6 +90,7 @@ export class AIProviderFactory {
       'tencent',
       'aliyun',
       'zhipu',
+      'openrouter',
       'ollama',
       'lmstudio',
       'anthropic',

@@ -236,7 +236,7 @@
                             <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
                                 <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
                                     require-mark-placement="right-hanging" style="padding-right: 12px;">
-                                    <NFlex vertical size="large">
+                                    <NFlex vertical size="small">
                                         <n-form-item :label="t('aiConfig.serviceType')" path="type">
                                             <n-select v-model:value="formData.type" :options="typeOptions"
                                                 @update:value="onTypeChange" />
@@ -281,6 +281,48 @@
                                                 </n-alert>
                                             </NFlex>
                                         </n-form-item>
+
+                                        <!-- 服务商特点说明 -->
+                                        <div v-if="getServiceInfo.description" style="margin-bottom: 16px;">
+                                            <NAlert type="success" :show-icon="false" size="small">
+                                                <NFlex align="start" size="small">
+                                                    <NFlex vertical size="small">
+                                                        <NText strong >
+                                                            {{ getServiceInfo.name }} {{ t('aiConfig.serviceIntroduction') }}
+                                                        </NText>
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            {{ getServiceInfo.description }}
+                                                        </NText>
+                                                    </NFlex>
+                                                </NFlex>
+                                                <!-- 只有在有URL时才显示按钮区域 -->
+                                                <div v-if="getApiKeyInfo.apiKeyUrl || getApiKeyInfo.docUrl">
+                                                    <NFlex align="center" justify="space-between">
+                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.apiKeyUrl">
+                                                            <NButton size="small" type="info" text @click="openApiKeyUrl">
+                                                                <template #icon>
+                                                                    <NIcon size="12">
+                                                                        <ExternalLink />
+                                                                    </NIcon>
+                                                                </template>
+                                                                {{ t('aiConfig.getApiKey') }}
+                                                            </NButton>
+                                                        </NFlex>
+                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.docUrl">
+                                                            <NButton size="small" type="info" text @click="openDocumentationUrl">
+                                                                <template #icon>
+                                                                    <NIcon size="12">
+                                                                        <Book />
+                                                                    </NIcon>
+                                                                </template>
+                                                                {{ t('aiConfig.viewDocumentation') }}
+                                                            </NButton>
+                                                        </NFlex>
+                                                    </NFlex>
+                                                </div>
+                                            </NAlert>
+                                        </div>
+
                                     </NFlex>
                                 </n-form>
                             </NScrollbar>
@@ -538,7 +580,7 @@ import {
     NSplit,
     useMessage,
 } from "naive-ui";
-import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint } from "@vicons/tabler";
+import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint, ExternalLink, Book, InfoCircle } from "@vicons/tabler";
 import type { AIConfig } from "~/lib/db";
 import { databaseService } from "~/lib/db";
 import { useDatabase } from "~/composables/useDatabase";
@@ -596,7 +638,7 @@ const showQuickOptimizationModal = ref(false);
 
 // 表单数据
 const formData = reactive({
-    type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "mistral" | "siliconflow" | "tencent" | "aliyun" | "zhipu",
+            type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "mistral" | "siliconflow" | "tencent" | "aliyun" | "zhipu" | "openrouter",
     name: "",
     baseURL: "",
     apiKey: "",
@@ -657,6 +699,8 @@ const getApiKeyLabel = computed(() => {
             return 'Mistral API Key：';
         case 'zhipu':
             return '智谱AI API Key：';
+        case 'openrouter':
+            return 'OpenRouter API Key：';
         case 'openai':
         default:
             return 'API Key：';
@@ -721,12 +765,183 @@ const getBaseURLInfo = computed(() => {
                 label: t('aiConfig.customEndpoint'),
                 placeholder: t('aiConfig.useOfficialEndpoint')
             };
+        case 'openrouter':
+            return {
+                label: t('aiConfig.baseURL') + '：',
+                placeholder: 'https://openrouter.ai/api/v1'
+            };
 
         case 'openai':
         default:
             return {
                 label: t('aiConfig.baseURL') + '：',
                 placeholder: t('aiConfig.openaiExample')
+            };
+    }
+});
+
+// 计算属性：API Key 信息
+const getApiKeyInfo = computed(() => {
+    switch (formData.type) {
+        case 'openai':
+            return {
+                name: 'OpenAI',
+                apiKeyUrl: 'https://platform.openai.com/api-keys',
+                docUrl: 'https://platform.openai.com/docs'
+            };
+        case 'anthropic':
+            return {
+                name: 'Anthropic',
+                apiKeyUrl: 'https://console.anthropic.com/',
+                docUrl: 'https://docs.anthropic.com/'
+            };
+        case 'google':
+            return {
+                name: 'Google AI Studio',
+                apiKeyUrl: 'https://makersuite.google.com/app/apikey',
+                docUrl: 'https://ai.google.dev/docs'
+            };
+        case 'azure':
+            return {
+                name: 'Azure OpenAI',
+                apiKeyUrl: 'https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesBrowse/~/OpenAI',
+                docUrl: 'https://learn.microsoft.com/en-us/azure/ai-services/openai/'
+            };
+        case 'deepseek':
+            return {
+                name: 'DeepSeek',
+                apiKeyUrl: 'https://platform.deepseek.com/api_keys',
+                docUrl: 'https://platform.deepseek.com/docs'
+            };
+        case 'siliconflow':
+            return {
+                name: '硅基流动',
+                apiKeyUrl: 'https://cloud.siliconflow.cn/me/account/ak',
+                docUrl: 'https://docs.siliconflow.cn/'
+            };
+        case 'tencent':
+            return {
+                name: '腾讯云',
+                apiKeyUrl: 'https://console.cloud.tencent.com/hunyuan',
+                docUrl: 'https://cloud.tencent.com/document/product/1729'
+            };
+        case 'aliyun':
+            return {
+                name: '阿里云',
+                apiKeyUrl: 'https://bailian.console.aliyun.com/',
+                docUrl: 'https://bailian.console.aliyun.com/?tab=doc#/doc'
+            };
+        case 'mistral':
+            return {
+                name: 'Mistral AI',
+                apiKeyUrl: 'https://console.mistral.ai/api-keys/',
+                docUrl: 'https://docs.mistral.ai/'
+            };
+        case 'zhipu':
+            return {
+                name: '智谱AI',
+                apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+                docUrl: 'https://docs.bigmodel.cn/cn/guide/start/model-overview'
+            };
+        case 'openrouter':
+            return {
+                name: 'OpenRouter',
+                apiKeyUrl: 'https://openrouter.ai/keys',
+                docUrl: 'https://openrouter.ai/docs'
+            };
+        case 'ollama':
+            return {
+                name: 'Ollama',
+                apiKeyUrl: '',
+                docUrl: 'https://github.com/ollama/ollama'
+            };
+        case 'lmstudio':
+            return {
+                name: 'LM Studio',
+                apiKeyUrl: '',
+                docUrl: 'https://lmstudio.ai/docs/app/basics'
+            };
+        default:
+            return {
+                name: 'N/A',
+                apiKeyUrl: '',
+                docUrl: ''
+            };
+    }
+});
+
+// 计算属性：服务商信息
+const getServiceInfo = computed(() => {
+    switch (formData.type) {
+        case 'openai':
+            return {
+                name: 'OpenAI',
+                description: t('aiConfig.serviceDescriptions.openai')
+            };
+        case 'anthropic':
+            return {
+                name: 'Anthropic Claude',
+                description: t('aiConfig.serviceDescriptions.anthropic')
+            };
+        case 'google':
+            return {
+                name: 'Google Gemini AI',
+                description: t('aiConfig.serviceDescriptions.google')
+            };
+        case 'azure':
+            return {
+                name: 'Azure OpenAI',
+                description: t('aiConfig.serviceDescriptions.azure')
+            };
+        case 'deepseek':
+            return {
+                name: 'DeepSeek',
+                description: t('aiConfig.serviceDescriptions.deepseek')
+            };
+        case 'siliconflow':
+            return {
+                name: '硅基流动',
+                description: t('aiConfig.serviceDescriptions.siliconflow')
+            };
+        case 'tencent':
+            return {
+                name: '腾讯云',
+                description: t('aiConfig.serviceDescriptions.tencent')
+            };
+        case 'aliyun':
+            return {
+                name: '阿里云',
+                description: t('aiConfig.serviceDescriptions.aliyun')
+            };
+        case 'mistral':
+            return {
+                name: 'Mistral AI',
+                description: t('aiConfig.serviceDescriptions.mistral')
+            };
+        case 'zhipu':
+            return {
+                name: '智谱AI',
+                description: t('aiConfig.serviceDescriptions.zhipu')
+            };
+        case 'openrouter':
+            return {
+                name: 'OpenRouter',
+                description: t('aiConfig.serviceDescriptions.openrouter')
+            };
+        case 'ollama':
+            return {
+                name: 'Ollama',
+                description: t('aiConfig.serviceDescriptions.ollama')
+            };
+        case 'lmstudio':
+            return {
+                name: 'LM Studio',
+                description: t('aiConfig.serviceDescriptions.lmstudio')
+            };
+        default:
+            return {
+                name: '',
+                description: ''
             };
     }
 });
@@ -751,12 +966,13 @@ const typeOptions = [
             { label: "Anthropic Claude", value: "anthropic" },
             { label: "Google Gemini AI", value: "google" },
             { label: "Azure OpenAI", value: "azure" },
+            { label: "Mistral AI", value: "mistral" },
+            { label: "OpenRouter", value: "openrouter" },
             { label: "DeepSeek", value: "deepseek" },
-            { label: "硅基流动", value: "siliconflow" },
             { label: "腾讯云", value: "tencent" },
             { label: "阿里云", value: "aliyun" },
-            { label: "Mistral AI", value: "mistral" },
-            { label: "智谱AI", value: "zhipu" },
+            { label: "智谱 AI", value: "zhipu" },
+            { label: "硅基流动", value: "siliconflow" },
         ]
     }
 ];
@@ -1233,30 +1449,35 @@ const onTypeChange = (type: typeof formData.type) => {
             formData.baseURL = "https://open.bigmodel.cn/api/paas/v4";
             formData.apiKey = "";
             break;
+        case 'openrouter':
+            formData.baseURL = "https://openrouter.ai/api/v1";
+            formData.apiKey = "";
+            break;
     }
 
     // 自动填充配置名称（仅在新建模式下，且名称为空或为之前的自动名称时）
     if (!editingConfig.value) {
         const currentName = formData.name.trim();
         const autoGeneratedNames = [
-            "", "OpenAI", "Ollama", "Anthropic Claude", "Google Gemini AI",
-            "Azure OpenAI", "LM Studio", "DeepSeek", "硅基流动", "腾讯云", "阿里云", "Mistral AI"
+            "", "OpenAI", "Ollama", "LM Studio", "Anthropic Claude", "Google Gemini AI",
+            "Azure OpenAI", "Mistral AI", "OpenRouter", "DeepSeek", "腾讯云", "阿里云", "智谱AI", "硅基流动"
         ];
 
         if (autoGeneratedNames.includes(currentName)) {
                     const nameMap: Record<typeof type, string> = {
             'openai': 'OpenAI',
             'ollama': 'Ollama',
+            'lmstudio': 'LM Studio',
             'anthropic': 'Anthropic Claude',
             'google': 'Google Gemini AI',
             'azure': 'Azure OpenAI',
-            'lmstudio': 'LM Studio',
+            'openrouter': 'OpenRouter',
+            'mistral': 'Mistral AI',
             'deepseek': 'DeepSeek',
-            'siliconflow': '硅基流动',
             'tencent': '腾讯云',
             'aliyun': '阿里云',
-            'mistral': 'Mistral AI',
-            'zhipu': '智谱AI'
+            'zhipu': '智谱AI',
+            'siliconflow': '硅基流动',
         };
             formData.name = nameMap[type];
         }
@@ -1277,16 +1498,17 @@ const getConfigTypeLabel = (type: string) => {
     const typeLabels: Record<string, string> = {
         'openai': 'OpenAI',
         'ollama': 'Ollama',
+        'lmstudio': 'LM Studio',
         'anthropic': 'Anthropic Claude',
         'google': 'Google Gemini AI',
         'azure': 'Azure OpenAI',
-        'lmstudio': 'LM Studio',
+        'openrouter': 'OpenRouter',
+        'mistral': 'Mistral AI',
         'deepseek': 'DeepSeek',
-        'siliconflow': '硅基流动',
         'tencent': '腾讯云',
         'aliyun': '阿里云',
-        'mistral': 'Mistral AI',
-        'zhipu': '智谱 AI'
+        'zhipu': '智谱AI',
+        'siliconflow': '硅基流动',
     };
     return typeLabels[type] || type;
 };
@@ -1353,6 +1575,22 @@ watch(autoShowAddModal, (show) => {
 // 处理快速优化配置更新
 const handleQuickOptimizationConfigsUpdated = () => {
     message.success("快速优化配置已更新");
+};
+
+// 打开API Key获取页面
+const openApiKeyUrl = () => {
+    const info = getApiKeyInfo.value;
+    if (info.apiKeyUrl) {
+        window.electronAPI.shell.openExternal(info.apiKeyUrl);
+    }
+};
+
+// 打开文档页面
+const openDocumentationUrl = () => {
+    const info = getApiKeyInfo.value;
+    if (info.docUrl) {
+        window.electronAPI.shell.openExternal(info.docUrl);
+    }
 };
 
 // 导出方法供父组件调用
