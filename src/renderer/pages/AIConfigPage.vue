@@ -288,7 +288,7 @@
                                                 <NFlex align="start" size="small">
                                                     <NFlex vertical size="small">
                                                         <NText strong >
-                                                            {{ getServiceInfo.name }} 介绍
+                                                            {{ getServiceInfo.name }} {{ t('aiConfig.serviceIntroduction') }}
                                                         </NText>
                                                         <NText depth="3" style="font-size: 12px;">
                                                             {{ getServiceInfo.description }}
@@ -305,7 +305,7 @@
                                                                         <ExternalLink />
                                                                     </NIcon>
                                                                 </template>
-                                                                获取API Key
+                                                                {{ t('aiConfig.getApiKey') }}
                                                             </NButton>
                                                         </NFlex>
                                                         <NFlex align="center" size="small" v-if="getApiKeyInfo.docUrl">
@@ -315,7 +315,7 @@
                                                                         <Book />
                                                                     </NIcon>
                                                                 </template>
-                                                                查看文档
+                                                                {{ t('aiConfig.viewDocumentation') }}
                                                             </NButton>
                                                         </NFlex>
                                                     </NFlex>
@@ -876,67 +876,67 @@ const getServiceInfo = computed(() => {
         case 'openai':
             return {
                 name: 'OpenAI',
-                description: '全球领先的AI研究公司，提供GPT-4、GPT-3.5等先进模型。支持流式输出，响应速度快，适合各种AI应用场景。'
+                description: t('aiConfig.serviceDescriptions.openai')
             };
         case 'anthropic':
             return {
                 name: 'Anthropic Claude',
-                description: '专注于安全、有益的AI系统，Claude模型在推理、写作和代码生成方面表现优异。注重AI安全性和可控性。'
+                description: t('aiConfig.serviceDescriptions.anthropic')
             };
         case 'google':
             return {
                 name: 'Google Gemini AI',
-                description: '谷歌最新多模态AI模型，支持文本、图像、音频等多种输入。在理解和生成多模态内容方面表现突出。'
+                description: t('aiConfig.serviceDescriptions.google')
             };
         case 'azure':
             return {
                 name: 'Azure OpenAI',
-                description: '微软云平台提供的OpenAI服务，企业级安全性和合规性。适合企业用户，提供私有化部署选项。'
+                description: t('aiConfig.serviceDescriptions.azure')
             };
         case 'deepseek':
             return {
                 name: 'DeepSeek',
-                description: '专注于代码生成和编程任务的AI模型，在代码理解、生成和调试方面表现优秀。支持多种编程语言。'
+                description: t('aiConfig.serviceDescriptions.deepseek')
             };
         case 'siliconflow':
             return {
                 name: '硅基流动',
-                description: '国内领先的AI计算平台，提供高性能GPU资源和多种AI模型。适合大规模AI训练和推理任务。'
+                description: t('aiConfig.serviceDescriptions.siliconflow')
             };
         case 'tencent':
             return {
                 name: '腾讯云',
-                description: '腾讯云提供的AI服务，包括混元大模型。集成腾讯生态，适合国内企业用户，提供本地化服务。'
+                description: t('aiConfig.serviceDescriptions.tencent')
             };
         case 'aliyun':
             return {
                 name: '阿里云',
-                description: '阿里云通义千问大模型服务，在中文理解和生成方面表现优秀。提供企业级AI解决方案和定制化服务。'
+                description: t('aiConfig.serviceDescriptions.aliyun')
             };
         case 'mistral':
             return {
                 name: 'Mistral AI',
-                description: '欧洲领先的AI公司，提供高效的开源和商业模型。在推理速度和成本效益方面表现突出。'
+                description: t('aiConfig.serviceDescriptions.mistral')
             };
         case 'zhipu':
             return {
                 name: '智谱AI',
-                description: '清华大学背景的AI公司，提供GLM系列大模型。在中文理解和学术研究方面有独特优势。'
+                description: t('aiConfig.serviceDescriptions.zhipu')
             };
         case 'openrouter':
             return {
                 name: 'OpenRouter',
-                description: 'AI模型聚合平台，提供多种主流AI模型的统一访问接口。支持模型对比和成本优化，适合多模型应用场景。'
+                description: t('aiConfig.serviceDescriptions.openrouter')
             };
         case 'ollama':
             return {
                 name: 'Ollama',
-                description: '本地AI模型运行框架，支持在个人设备上运行各种开源模型。保护隐私，无需网络连接，适合离线使用。'
+                description: t('aiConfig.serviceDescriptions.ollama')
             };
         case 'lmstudio':
             return {
                 name: 'LM Studio',
-                description: '本地AI模型管理工具，提供图形化界面运行各种开源模型。支持模型下载、管理和本地推理。'
+                description: t('aiConfig.serviceDescriptions.lmstudio')
             };
         default:
             return {
