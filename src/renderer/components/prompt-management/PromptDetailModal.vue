@@ -249,18 +249,64 @@
                                     <NFlex vertical size="medium" style="padding-right: 12px" v-if="hasVariables">
                                         <!-- Jinja 模板模式：显示动态提取的变量 -->
                                         <template v-if="prompt.isJinjaTemplate">
-                                            <NFormItem v-for="variableName in getJinjaTemplateVariables()"
-                                                :key="variableName" :label="variableName" :required="true">
-                                                <NInput v-model:value="variableValues[variableName]" type="textarea"
-                                                    :placeholder="`请输入 ${variableName} 的值`" :rows="1"
-                                                    :autosize="{ minRows: 1, maxRows: 5 }" />
-                                            </NFormItem>
+                                            <!-- 如果有存储的变量配置，使用配置的变量 -->
+                                            <template v-if="prompt.variables && prompt.variables.length > 0">
+                                                <NFormItem v-for="variable in prompt.variables" :key="variable.name"
+                                                    :label="variable.name" :required="variable.required">
+                                                    <!-- 根据变量类型显示不同的输入控件 -->
+                                                    <NInput v-if="variable.type === 'text' || variable.type === 'textarea' || variable.type === 'str' || !variable.type"
+                                                        v-model:value="variableValues[variable.name]" type="textarea"
+                                                        :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
+                                                        :autosize="{ minRows: 1, maxRows: 5 }" />
+                                                    <NSelect v-else-if="variable.type === 'select'"
+                                                        v-model:value="variableValues[variable.name]"
+                                                        :options="getVariableOptions(variable)"
+                                                        :placeholder="`请选择 ${variable.name}`"
+                                                        clearable />
+                                                    <NInputNumber v-else-if="variable.type === 'number' || variable.type === 'int' || variable.type === 'float'"
+                                                        v-model:value="variableValues[variable.name]"
+                                                        :placeholder="`请输入 ${variable.name} 的数值`"
+                                                        clearable />
+                                                    <NSwitch v-else-if="variable.type === 'boolean' || variable.type === 'bool'"
+                                                        v-model:value="variableValues[variable.name]" />
+                                                    <NInput v-else
+                                                        v-model:value="variableValues[variable.name]" type="textarea"
+                                                        :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
+                                                        :autosize="{ minRows: 1, maxRows: 5 }" />
+                                                </NFormItem>
+                                            </template>
+                                            <!-- 如果没有存储的变量配置，从模板内容中提取变量 -->
+                                            <template v-else>
+                                                <NFormItem v-for="variableName in getJinjaTemplateVariables()"
+                                                    :key="variableName" :label="variableName" :required="true">
+                                                    <NInput v-model:value="variableValues[variableName]" type="textarea"
+                                                        :placeholder="`请输入 ${variableName} 的值`" :rows="1"
+                                                        :autosize="{ minRows: 1, maxRows: 5 }" />
+                                                </NFormItem>
+                                            </template>
                                         </template>
                                         <!-- 变量模式：显示配置的变量 -->
                                         <template v-else>
                                             <NFormItem v-for="variable in prompt.variables" :key="variable.name"
                                                 :label="variable.name" :required="variable.required">
-                                                <NInput v-model:value="variableValues[variable.name]" type="textarea"
+                                                <!-- 根据变量类型显示不同的输入控件 -->
+                                                <NInput v-if="variable.type === 'text' || variable.type === 'textarea' || !variable.type"
+                                                    v-model:value="variableValues[variable.name]" type="textarea"
+                                                    :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
+                                                    :autosize="{ minRows: 1, maxRows: 5 }" />
+                                                <NSelect v-else-if="variable.type === 'select'"
+                                                    v-model:value="variableValues[variable.name]"
+                                                    :options="getVariableOptions(variable)"
+                                                    :placeholder="`请选择 ${variable.name}`"
+                                                    clearable />
+                                                <NInputNumber v-else-if="variable.type === 'number' || variable.type === 'int' || variable.type === 'float'"
+                                                    v-model:value="variableValues[variable.name]"
+                                                    :placeholder="`请输入 ${variable.name} 的数值`"
+                                                    clearable />
+                                                <NSwitch v-else-if="variable.type === 'boolean' || variable.type === 'bool'"
+                                                    v-model:value="variableValues[variable.name]" />
+                                                <NInput v-else
+                                                    v-model:value="variableValues[variable.name]" type="textarea"
                                                     :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
                                                     :autosize="{ minRows: 1, maxRows: 5 }" />
                                             </NFormItem>
@@ -831,6 +877,8 @@ import {
     NInput,
     NFormItem,
     NSelect,
+    NInputNumber,
+    NSwitch,
     NEmpty,
     NScrollbar,
     NPagination,
@@ -1177,6 +1225,17 @@ const getJinjaTemplateVariables = () => {
         }
     }
 
+    return [];
+};
+
+// 获取变量选项
+const getVariableOptions = (variable: any) => {
+    if (variable.type === 'select' && variable.options && Array.isArray(variable.options)) {
+        return variable.options.map((option: string) => ({
+            label: option,
+            value: option
+        }));
+    }
     return [];
 };
 
