@@ -69,7 +69,9 @@
                                                     :disabled="saving" 
                                                     :multiple="true">
                                                     <NUploadDragger>
-                                                        {{ t('promptManagement.uploadImage') }}
+                                                        <NText style="font-size: 10px; ">
+                                                            {{ t('promptManagement.uploadImage') }}
+                                                        </NText>
                                                     </NUploadDragger>
                                                 </NUpload>
                                             </NFormItem>

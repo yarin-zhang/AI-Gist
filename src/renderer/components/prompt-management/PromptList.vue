@@ -276,21 +276,31 @@
                                 </div>
                                 
                                 <!-- 右侧：图片预览 -->
-                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;">
+                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;" @click.stop>
                                     <NCarousel
+                                        autoplay
+                                        :show-dots="false"
+                                        :touchable="true"
+                                        mousewheel
                                         v-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1"
-                                        direction="horizontal"
+                                        direction="vertical"
                                         dot-placement="bottom"
-                                        show-arrow
                                         style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden;"
+                                        @click.stop
                                     >
-                                        <img
+                                        <NImage
                                             v-for="(blob, index) in prompt.imageBlobs"
                                             :key="index"
-                                            class="carousel-img"
                                             :src="getImageUrlFromBlob(blob)"
-                                            style="width: 100%; height: 100%; object-fit: cover;"
+                                            width="60"
+                                            height="60"
+                                            object-fit="cover"
+                                            style="border-radius: 6px;"
+                                            :preview-disabled="false"
+                                            :lazy="true"
                                             @error="handleImageError"
+                                            fallback-src=""
+                                            @click.stop
                                         />
                                     </NCarousel>
                                     <NImage
@@ -304,6 +314,7 @@
                                         :lazy="true"
                                         @error="handleImageError"
                                         fallback-src=""
+                                        @click.stop
                                     />
                                 </div>
                             </NFlex>
@@ -1621,10 +1632,5 @@ defineExpose({
     word-break: break-word;
 }
 
-/* 轮播图样式 */
-.carousel-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
+/* 轮播图样式 - 已移除，现在使用NImage组件 */
 </style>
