@@ -46,6 +46,7 @@ export interface Prompt {
   version?: number;
   isActive: boolean;
   isJinjaTemplate?: boolean; // 是否为 Jinja 模板
+  imageBlobs?: Blob[]; // 图片数据数组，支持多张图片
 
   shortcutKey?: string; // 快捷键组合
   createdAt: Date;
@@ -164,6 +165,7 @@ export interface PromptHistory {
   tags?: string;
   variables?: string;
   isJinjaTemplate?: boolean; // 是否为 Jinja 模板
+  imageBlobs?: Blob[]; // 图片数据数组，支持多张图片
   version: number;
   changeDescription?: string; // 变更描述
   createdAt: Date;

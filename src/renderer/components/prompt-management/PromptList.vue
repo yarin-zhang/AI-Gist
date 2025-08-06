@@ -262,20 +262,61 @@
                                 </NFlex>
                             </template>
 
-                            <NFlex vertical size="small">
-                                <!-- 更新时间 -->
-                                <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
-                                    {{ new Date(prompt.updatedAt).toLocaleDateString() }}
-                                </NText> -->
-                                <!-- 描述或内容预览 -->
-                                <NText depth="3" v-if="prompt.description" class="description-text">
-                                    {{ prompt.description }}
-                                </NText>
-                                <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
-                                    class="content-preview-text">
-                                    {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
-                                </NText>
-
+                            <!-- 描述和图片并排显示 -->
+                            <NFlex align="start" size="medium" style="min-height: 80px;">
+                                <!-- 左侧：描述或内容预览 -->
+                                <div style="flex: 1; min-width: 0;">
+                                    <NText depth="3" v-if="prompt.description" class="description-text">
+                                        {{ prompt.description }}
+                                    </NText>
+                                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
+                                        class="content-preview-text">
+                                        {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
+                                    </NText>
+                                </div>
+                                
+                                <!-- 右侧：图片预览 -->
+                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;" @click.stop>
+                                    <NCarousel
+                                        autoplay
+                                        :show-dots="false"
+                                        :touchable="true"
+                                        mousewheel
+                                        v-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1"
+                                        direction="vertical"
+                                        dot-placement="bottom"
+                                        style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden;"
+                                        @click.stop
+                                    >
+                                        <NImage
+                                            v-for="(blob, index) in prompt.imageBlobs"
+                                            :key="index"
+                                            :src="getImageUrlFromBlob(blob)"
+                                            width="60"
+                                            height="60"
+                                            object-fit="cover"
+                                            style="border-radius: 6px;"
+                                            :preview-disabled="false"
+                                            :lazy="true"
+                                            @error="handleImageError"
+                                            fallback-src=""
+                                            @click.stop
+                                        />
+                                    </NCarousel>
+                                    <NImage
+                                        v-else-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1"
+                                        :src="getImageUrl(prompt.imageBlobs)"
+                                        width="60"
+                                        height="60"
+                                        object-fit="cover"
+                                        style="border-radius: 6px;"
+                                        :preview-disabled="false"
+                                        :lazy="true"
+                                        @error="handleImageError"
+                                        fallback-src=""
+                                        @click.stop
+                                    />
+                                </div>
                             </NFlex>
 
                             <template #footer>
@@ -335,7 +376,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, h, watch } from 'vue'
 import {
     NCard,
     NFlex,
@@ -352,6 +393,8 @@ import {
     NDataTable,
     NPopconfirm,
     NButtonGroup,
+    NImage,
+    NCarousel,
     useMessage
 } from 'naive-ui'
 import {
@@ -559,6 +602,71 @@ const treeTableColumns = computed(() => [
                     },
                     { default: () => prompt.title }
                 )
+            }
+        }
+    },
+    {
+        title: t('promptManagement.preview'),
+        key: 'preview',
+        width: 80,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                if (!hasValidImage(prompt)) {
+                    return '-'
+                }
+                
+                if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1) {
+                    return h(
+                        NCarousel,
+                        {
+                            autoplay: true,
+                            showDots: false,
+                            touchable: true,
+                            mousewheel: true,
+                            direction: 'vertical',
+                            dotPlacement: 'bottom',
+                            style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                        },
+                        {
+                            default: () => prompt.imageBlobs!.map((blob: Blob, index: number) =>
+                                h(
+                                    NImage,
+                                    {
+                                        src: getImageUrlFromBlob(blob),
+                                        width: 50,
+                                        height: 50,
+                                        objectFit: 'cover',
+                                        style: 'border-radius: 4px;',
+                                        previewDisabled: false,
+                                        lazy: true,
+                                        onError: handleImageError,
+                                        fallbackSrc: ''
+                                    }
+                                )
+                            )
+                        }
+                    )
+                } else if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1) {
+                    return h(
+                        NImage,
+                        {
+                            src: getImageUrl(prompt.imageBlobs),
+                            width: 50,
+                            height: 50,
+                            objectFit: 'cover',
+                            style: 'border-radius: 4px;',
+                            previewDisabled: false,
+                            lazy: true,
+                            onError: handleImageError,
+                            fallbackSrc: ''
+                        }
+                    )
+                }
+                
+                return '-'
             }
         }
     },
@@ -776,6 +884,66 @@ const tableColumns = computed(() => [
                 },
                 { default: () => row.title }
             )
+        }
+    },
+    {
+        title: t('promptManagement.preview'),
+        key: 'preview',
+        width: 80,
+        render: (row: PromptWithRelations) => {
+            if (!hasValidImage(row)) {
+                return '-'
+            }
+            
+            if (row.imageBlobs && Array.isArray(row.imageBlobs) && row.imageBlobs.length > 1) {
+                return h(
+                    NCarousel,
+                    {
+                        autoplay: true,
+                        showDots: false,
+                        touchable: true,
+                        mousewheel: true,
+                        direction: 'vertical',
+                        dotPlacement: 'bottom',
+                        style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                    },
+                    {
+                        default: () => row.imageBlobs!.map((blob: Blob, index: number) =>
+                            h(
+                                NImage,
+                                {
+                                    src: getImageUrlFromBlob(blob),
+                                    width: 50,
+                                    height: 50,
+                                    objectFit: 'cover',
+                                    style: 'border-radius: 4px;',
+                                    previewDisabled: false,
+                                    lazy: true,
+                                    onError: handleImageError,
+                                    fallbackSrc: ''
+                                }
+                            )
+                        )
+                    }
+                )
+            } else if (row.imageBlobs && Array.isArray(row.imageBlobs) && row.imageBlobs.length === 1) {
+                return h(
+                    NImage,
+                    {
+                        src: getImageUrl(row.imageBlobs),
+                        width: 50,
+                        height: 50,
+                        objectFit: 'cover',
+                        style: 'border-radius: 4px;',
+                        previewDisabled: false,
+                        lazy: true,
+                        onError: handleImageError,
+                        fallbackSrc: ''
+                    }
+                )
+            }
+            
+            return '-'
         }
     },
     {
@@ -1305,6 +1473,12 @@ const getPromptActions = (prompt: PromptWithRelations) => [
 const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
     switch (action) {
         case 'edit':
+            console.log('🔄 PromptList 发送编辑事件:', {
+                promptId: prompt.id,
+                hasImageBlobs: !!prompt.imageBlobs,
+                imageBlobsCount: prompt.imageBlobs?.length || 0,
+                imageBlobsType: typeof prompt.imageBlobs
+            });
             emit('edit', prompt)
             break
         case 'copyOriginal':
@@ -1431,6 +1605,96 @@ onMounted(async () => {
     }
 })
 
+// 图片处理函数
+const imageUrlCache = new Map<Blob, string>();
+
+const getImageUrl = (imageBlobs: any) => {
+    // 检查是否为有效的Blob数组
+    if (!imageBlobs || 
+        !Array.isArray(imageBlobs) ||
+        imageBlobs.length === 0) {
+        return '';
+    }
+    
+    // 获取第一张图片用于显示
+    const firstImage = imageBlobs[0];
+    if (!firstImage || 
+        typeof firstImage !== 'object' ||
+        !(firstImage instanceof Blob) ||
+        firstImage.size === 0) {
+        return '';
+    }
+    
+    // 使用缓存避免重复创建URL
+    if (imageUrlCache.has(firstImage)) {
+        return imageUrlCache.get(firstImage)!;
+    }
+    
+    try {
+        const url = URL.createObjectURL(firstImage);
+        imageUrlCache.set(firstImage, url);
+        return url;
+    } catch (error) {
+        console.error('创建图片URL失败:', error, firstImage);
+        return '';
+    }
+};
+
+const getImageUrlFromBlob = (blob: Blob) => {
+    if (!blob || 
+        !(blob instanceof Blob) ||
+        blob.size === 0) {
+        return '';
+    }
+
+    if (imageUrlCache.has(blob)) {
+        return imageUrlCache.get(blob)!;
+    }
+
+    try {
+        const url = URL.createObjectURL(blob);
+        imageUrlCache.set(blob, url);
+        return url;
+    } catch (error) {
+        console.error('创建图片URL失败:', error, blob);
+        return '';
+    }
+};
+
+const handleImageError = (event: Event) => {
+    console.warn('图片加载失败:', event);
+    // 可以设置默认图片或其他错误处理
+};
+
+const hasValidImage = (prompt: PromptWithRelations) => {
+    if (!prompt.imageBlobs || !Array.isArray(prompt.imageBlobs) || prompt.imageBlobs.length === 0) {
+        return false;
+    }
+    
+    // 检查第一张图片是否有效
+    const firstImage = prompt.imageBlobs[0];
+    if (!firstImage || !(firstImage instanceof Blob)) {
+        console.warn('提示词包含无效的图片数据:', {
+            promptId: prompt.id,
+            imageBlobs: prompt.imageBlobs,
+            type: typeof prompt.imageBlobs,
+            constructor: (prompt.imageBlobs as any)?.constructor?.name
+        });
+        return false;
+    }
+    
+    return firstImage instanceof Blob && firstImage.size > 0;
+};
+
+// 组件卸载时清理URL缓存
+onBeforeUnmount(() => {
+    // 清理所有创建的Blob URL
+    imageUrlCache.forEach(url => {
+        URL.revokeObjectURL(url);
+    });
+    imageUrlCache.clear();
+});
+
 // 暴露方法给父组件
 defineExpose({
     loadPrompts: () => {
@@ -1492,4 +1756,6 @@ defineExpose({
     /* 限制最大高度为3行 */
     word-break: break-word;
 }
+
+/* 轮播图样式 - 已移除，现在使用NImage组件 */
 </style>

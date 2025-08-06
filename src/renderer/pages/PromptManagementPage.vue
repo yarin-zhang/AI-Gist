@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
     NFlex,
@@ -152,11 +152,32 @@ const handleCreatePrompt = () => {
 }
 
 const handleEditPrompt = (prompt: any) => {
-    selectedPrompt.value = prompt
+    console.log('🔄 handleEditPrompt 被调用:', {
+        hasPrompt: !!prompt,
+        promptId: prompt?.id,
+        hasImageBlobs: !!prompt?.imageBlobs,
+        imageBlobsCount: prompt?.imageBlobs?.length || 0
+    });
+    
+    // 确保数据完整性，特别是图片数据
+    const editPrompt = {
+        ...prompt,
+        imageBlobs: prompt.imageBlobs || [] // 确保图片数据被正确传递
+    };
+    
+    selectedPrompt.value = editPrompt
     showEditModal.value = true
 }
 
 const handleViewPrompt = (prompt: any) => {
+    console.log('🔄 handleViewPrompt 设置详情数据:', {
+        hasPrompt: !!prompt,
+        promptId: prompt?.id,
+        hasImageBlobs: !!prompt?.imageBlobs,
+        imageBlobsCount: prompt?.imageBlobs?.length || 0,
+        imageBlobsType: typeof prompt?.imageBlobs
+    });
+    
     selectedPrompt.value = prompt
     showDetailModal.value = true
 }
@@ -183,11 +204,16 @@ const handleEditFromDetail = (prompt: any) => {
         isFavorite: prompt.isFavorite || false,
         useCount: prompt.useCount || 0,
         isJinjaTemplate: prompt.isJinjaTemplate || false,
+        imageBlobs: prompt.imageBlobs || [], // 确保图片数据被正确传递
         createdAt: prompt.createdAt,
         updatedAt: prompt.updatedAt
     };
     
-
+    console.log('🔄 handleEditFromDetail 设置编辑数据:', {
+        hasImageBlobs: !!editPrompt.imageBlobs,
+        imageBlobsCount: editPrompt.imageBlobs?.length || 0,
+        imageBlobsType: typeof editPrompt.imageBlobs
+    });
     
     // 关闭详情模态框
     showDetailModal.value = false;
@@ -198,14 +224,18 @@ const handleEditFromDetail = (prompt: any) => {
 }
 
 const handlePromptSaved = () => {
-    // 刷新 PromptList 组件的数据
-    if (promptListRef.value?.loadPrompts && promptListRef.value?.loadCategories && promptListRef.value?.loadStatistics) {
-        promptListRef.value.loadPrompts()
-        promptListRef.value.loadCategories()
-        promptListRef.value.loadStatistics() // 刷新统计信息
-    }
-    // 同时刷新页面统计数据
-    loadStatistics()
+    console.log('🔄 handlePromptSaved 被调用');
+    // 延迟刷新数据，避免图片数据丢失
+    setTimeout(() => {
+        // 刷新 PromptList 组件的数据
+        if (promptListRef.value?.loadPrompts && promptListRef.value?.loadCategories && promptListRef.value?.loadStatistics) {
+            promptListRef.value.loadPrompts()
+            promptListRef.value.loadCategories()
+            promptListRef.value.loadStatistics() // 刷新统计信息
+        }
+        // 同时刷新页面统计数据
+        loadStatistics()
+    }, 500); // 延迟500ms，确保编辑模态框完全关闭
 }
 
 const handlePromptGenerated = (generatedPrompt: any) => {
@@ -256,6 +286,16 @@ onMounted(async () => {
     await waitForDatabase()
     loadStatistics()
 })
+
+// 监听selectedPrompt的变化
+watch(selectedPrompt, (newPrompt) => {
+    console.log('🔄 selectedPrompt 发生变化:', {
+        hasPrompt: !!newPrompt,
+        promptId: newPrompt?.id,
+        hasImageBlobs: !!newPrompt?.imageBlobs,
+        imageBlobsSize: newPrompt?.imageBlobs?.length
+    });
+});
 </script>
 
 <style scoped>
