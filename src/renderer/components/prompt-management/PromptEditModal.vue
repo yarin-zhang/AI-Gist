@@ -1422,7 +1422,22 @@ watch(
             oldPrompt.id === newPrompt.id && 
             oldPrompt.imageBlob && newPrompt.imageBlob &&
             oldPrompt.imageBlob.size === newPrompt.imageBlob.size) {
-            console.log('🔄 跳过相同数据的更新');
+            console.log('🔄 跳过相同数据的更新，但确保 imageFileList 正确设置');
+            
+            // 即使跳过更新，也要确保 imageFileList 正确设置
+            if (newPrompt.imageBlob instanceof Blob && newPrompt.imageBlob.size > 0) {
+                const fileId = `image_${Date.now()}`;
+                const fileName = 'uploaded-image.png';
+                
+                imageFileList.value = [{
+                    id: fileId,
+                    name: fileName,
+                    status: 'finished' as const,
+                    url: URL.createObjectURL(newPrompt.imageBlob),
+                    file: new File([newPrompt.imageBlob], fileName, { type: newPrompt.imageBlob.type })
+                }];
+                console.log('✅ 在跳过更新时设置 imageFileList，文件列表长度:', imageFileList.value.length);
+            }
             return;
         }
 
@@ -1494,14 +1509,16 @@ watch(
 
             // 设置NUpload的默认值
             if (imageBlob && imageBlob instanceof Blob && imageBlob.size > 0) {
-                // 将Blob转换为File对象
-                const file = new File([imageBlob], 'uploaded-image', { type: imageBlob.type });
+                // 创建符合 UploadFileInfo 格式的文件对象
+                const fileId = `image_${Date.now()}`;
+                const fileName = 'uploaded-image.png'; // 或者根据 MIME 类型设置正确的扩展名
+                
                 imageFileList.value = [{
-                    id: Date.now().toString(),
-                    name: 'uploaded-image',
+                    id: fileId,
+                    name: fileName,
                     status: 'finished' as const,
                     url: URL.createObjectURL(imageBlob),
-                    file: file
+                    file: new File([imageBlob], fileName, { type: imageBlob.type })
                 }];
                 console.log('✅ 设置NUpload默认值成功，文件列表长度:', imageFileList.value.length);
             } else {
@@ -1790,8 +1807,29 @@ const handleBeforeUpload = async (data: { file: any, fileList: any[] }) => {
 
 const handleCustomRequest = async ({ file, onFinish, onError }: any) => {
     try {
-        // 存储图片数据
+        // 存储图片数据到 formData
         formData.value.imageBlob = file.file;
+        
+        // 同时更新 imageFileList 以保持一致性
+        const fileId = `image_${Date.now()}`;
+        const fileName = file.file.name || 'uploaded-image.png';
+        
+        const fileInfo = {
+            id: fileId,
+            name: fileName,
+            status: 'finished' as const,
+            url: URL.createObjectURL(file.file),
+            file: file.file
+        };
+        
+        // 替换或添加到文件列表
+        const existingIndex = imageFileList.value.findIndex(f => f.id === fileInfo.id);
+        if (existingIndex >= 0) {
+            imageFileList.value[existingIndex] = fileInfo;
+        } else {
+            imageFileList.value = [fileInfo];
+        }
+        
         onFinish();
         message.success(t('promptManagement.imageUploadSuccess'));
     } catch (error) {
@@ -1804,6 +1842,8 @@ const handleCustomRequest = async ({ file, onFinish, onError }: any) => {
 const handleRemoveImage = (file: any) => {
     // 清除图片数据
     formData.value.imageBlob = undefined;
+    // 同时清空文件列表
+    imageFileList.value = [];
     message.success(t('promptManagement.imageRemoveSuccess'));
 };
 
@@ -1921,8 +1961,12 @@ const handleSave = async () => {
             .filter(file => file.file && file.status === 'finished')
             .map(file => file.file)[0]; // 只取第一张图片
 
-        // 将File转换为Blob
-        const imageBlob = imageFile ? new Blob([imageFile], { type: imageFile.type }) : undefined;
+        // 优先使用 formData 中的 imageBlob，如果没有则从 imageFileList 中获取
+        let imageBlob = formData.value.imageBlob;
+        if (!imageBlob && imageFile) {
+            // 将File转换为Blob
+            imageBlob = new Blob([imageFile], { type: imageFile.type });
+        }
 
         const data = {
             title: finalTitle,
@@ -1944,7 +1988,9 @@ const handleSave = async () => {
             isBlob: imageBlob instanceof Blob,
             size: imageBlob?.size,
             constructor: imageBlob?.constructor?.name,
-            mimeType: imageBlob?.type
+            mimeType: imageBlob?.type,
+            fromFormData: !!formData.value.imageBlob,
+            fromFileList: !!imageFile
         });
 
 
@@ -2159,6 +2205,29 @@ const handlePreviewImage = (file: any) => {
     }
 };
 
+// 调试函数：检查图片数据一致性
+const checkImageDataConsistency = () => {
+    const formDataHasImage = !!formData.value.imageBlob;
+    const fileListHasImage = imageFileList.value.length > 0;
+    
+    console.log('🔄 图片数据一致性检查:', {
+        formDataHasImage,
+        formDataImageSize: formData.value.imageBlob?.size,
+        fileListHasImage,
+        fileListLength: imageFileList.value.length,
+        fileListFiles: imageFileList.value.map(f => ({
+            name: f.name,
+            status: f.status,
+            hasFile: !!f.file,
+            fileSize: f.file?.size
+        }))
+    });
+    
+    if (formDataHasImage !== fileListHasImage) {
+        console.warn('⚠️ 图片数据不一致！formData 和 imageFileList 状态不匹配');
+    }
+};
+
 // 监听formData.imageBlob的变化
 watch(
     () => formData.value.imageBlob,
@@ -2168,6 +2237,7 @@ watch(
             size: newImageBlob?.size,
             type: newImageBlob?.type
         });
+        checkImageDataConsistency();
     }
 );
 
@@ -2183,6 +2253,7 @@ watch(
                 hasFile: !!f.file
             }))
         });
+        checkImageDataConsistency();
     },
     { deep: true }
 );
