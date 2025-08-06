@@ -606,6 +606,71 @@ const treeTableColumns = computed(() => [
         }
     },
     {
+        title: t('promptManagement.preview'),
+        key: 'preview',
+        width: 80,
+        render: (row: TreeNode) => {
+            if (row.type === 'category') {
+                return '-'
+            } else {
+                const prompt = row.data as PromptWithRelations
+                if (!hasValidImage(prompt)) {
+                    return '-'
+                }
+                
+                if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1) {
+                    return h(
+                        NCarousel,
+                        {
+                            autoplay: true,
+                            showDots: false,
+                            touchable: true,
+                            mousewheel: true,
+                            direction: 'vertical',
+                            dotPlacement: 'bottom',
+                            style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                        },
+                        {
+                            default: () => prompt.imageBlobs!.map((blob: Blob, index: number) =>
+                                h(
+                                    NImage,
+                                    {
+                                        src: getImageUrlFromBlob(blob),
+                                        width: 50,
+                                        height: 50,
+                                        objectFit: 'cover',
+                                        style: 'border-radius: 4px;',
+                                        previewDisabled: false,
+                                        lazy: true,
+                                        onError: handleImageError,
+                                        fallbackSrc: ''
+                                    }
+                                )
+                            )
+                        }
+                    )
+                } else if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1) {
+                    return h(
+                        NImage,
+                        {
+                            src: getImageUrl(prompt.imageBlobs),
+                            width: 50,
+                            height: 50,
+                            objectFit: 'cover',
+                            style: 'border-radius: 4px;',
+                            previewDisabled: false,
+                            lazy: true,
+                            onError: handleImageError,
+                            fallbackSrc: ''
+                        }
+                    )
+                }
+                
+                return '-'
+            }
+        }
+    },
+    {
         title: t('promptManagement.description'),
         key: 'description',
         width: 300,
@@ -819,6 +884,66 @@ const tableColumns = computed(() => [
                 },
                 { default: () => row.title }
             )
+        }
+    },
+    {
+        title: t('promptManagement.preview'),
+        key: 'preview',
+        width: 80,
+        render: (row: PromptWithRelations) => {
+            if (!hasValidImage(row)) {
+                return '-'
+            }
+            
+            if (row.imageBlobs && Array.isArray(row.imageBlobs) && row.imageBlobs.length > 1) {
+                return h(
+                    NCarousel,
+                    {
+                        autoplay: true,
+                        showDots: false,
+                        touchable: true,
+                        mousewheel: true,
+                        direction: 'vertical',
+                        dotPlacement: 'bottom',
+                        style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                    },
+                    {
+                        default: () => row.imageBlobs!.map((blob: Blob, index: number) =>
+                            h(
+                                NImage,
+                                {
+                                    src: getImageUrlFromBlob(blob),
+                                    width: 50,
+                                    height: 50,
+                                    objectFit: 'cover',
+                                    style: 'border-radius: 4px;',
+                                    previewDisabled: false,
+                                    lazy: true,
+                                    onError: handleImageError,
+                                    fallbackSrc: ''
+                                }
+                            )
+                        )
+                    }
+                )
+            } else if (row.imageBlobs && Array.isArray(row.imageBlobs) && row.imageBlobs.length === 1) {
+                return h(
+                    NImage,
+                    {
+                        src: getImageUrl(row.imageBlobs),
+                        width: 50,
+                        height: 50,
+                        objectFit: 'cover',
+                        style: 'border-radius: 4px;',
+                        previewDisabled: false,
+                        lazy: true,
+                        onError: handleImageError,
+                        fallbackSrc: ''
+                    }
+                )
+            }
+            
+            return '-'
         }
     },
     {
