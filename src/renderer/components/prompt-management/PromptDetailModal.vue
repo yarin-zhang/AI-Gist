@@ -1706,10 +1706,10 @@ const handleClose = () => {
 watch(
     () => props.prompt,
     (newPrompt) => {
-
+        
         if (newPrompt) {
+            // 初始化变量值
             initializeVariables();
-
             // 加载使用历史
             const history = localStorage.getItem(`prompt_history_${newPrompt.id}`);
             if (history) {
@@ -1841,9 +1841,17 @@ const handleEdit = () => {
         isFavorite: props.prompt.isFavorite,
         useCount: props.prompt.useCount,
         isJinjaTemplate: props.prompt.isJinjaTemplate || false,
+        imageBlob: props.prompt.imageBlob, // 添加图片数据
         createdAt: props.prompt.createdAt,
         updatedAt: props.prompt.updatedAt
     };
+
+    console.log('🔄 PromptDetailModal 发送编辑事件:', {
+        promptId: editPrompt.id,
+        hasImageBlob: !!editPrompt.imageBlob,
+        imageBlobSize: editPrompt.imageBlob?.size,
+        imageBlobType: editPrompt.imageBlob?.type
+    });
 
     emit("edit", editPrompt);
 };

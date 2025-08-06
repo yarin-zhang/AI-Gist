@@ -55,7 +55,37 @@
                                             <NFormItem :label="t('promptManagement.description')" path="description">
                                                 <NInput v-model:value="formData.description" type="textarea"
                                                     :placeholder="t('promptManagement.descriptionPlaceholder')"
-                                                    :rows="8" />
+                                                    :rows="6" />
+                                            </NFormItem>
+
+                                            <NFormItem :label="t('promptManagement.image')" path="imageUrl">
+                                                <NUpload 
+                                                    v-model:file-list="imageFileList" 
+                                                    :max="5"
+                                                    list-type="image-card" 
+                                                    accept="image/*"
+                                                    :on-before-upload="handleBeforeUpload"
+                                                    :on-remove="handleRemoveImage" 
+                                                    :custom-request="handleCustomRequest"
+                                                    :show-preview-button="true" 
+                                                    :show-remove-button="true"
+                                                    :show-retry-button="false" 
+                                                    :show-cancel-button="false"
+                                                    :disabled="saving" 
+                                                    :multiple="true" 
+                                                    :drag="true"
+                                                    :show-file-list="true" 
+                                                    :show-upload-button="true"
+                                                    :show-download-button="false"
+                                                    :preview-file="handlePreviewFile"
+                                                    :on-preview="handlePreviewImage"
+                                                    :default-file-list="imageFileList">
+                                                    <NUploadDragger>
+                                                        <NText style="font-size: 8px">
+                                                            {{ t('promptManagement.uploadImage') }}
+                                                        </NText>
+                                                    </NUploadDragger>
+                                                </NUpload>
                                             </NFormItem>
                                         </NFlex>
                                     </NScrollbar>
@@ -85,19 +115,19 @@
                     </NTabPane>
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
-                    <NTabPane v-if="isEdit" name="history"
-                        :tab="t('promptManagement.history')">
+                    <NTabPane v-if="isEdit" name="history" :tab="t('promptManagement.history')">
                         <NCard :title="t('promptManagement.versionHistory')" size="small">
                             <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
                                 <!-- 加载状态 -->
-                                <div v-if="loadingHistory" style="display: flex; justify-content: center; align-items: center; height: 200px;">
+                                <div v-if="loadingHistory"
+                                    style="display: flex; justify-content: center; align-items: center; height: 200px;">
                                     <NSpin size="medium">
                                         <template #description>
                                             <NText depth="3">{{ t('promptManagement.loadingHistory') }}</NText>
                                         </template>
                                     </NSpin>
                                 </div>
-                                
+
                                 <!-- 历史记录列表 -->
                                 <NFlex vertical size="medium" style="padding-right: 12px;"
                                     v-else-if="historyList.length > 0">
@@ -106,7 +136,7 @@
                                             <NFlex justify="space-between" align="center">
                                                 <NFlex align="center" size="small">
                                                     <NText strong>{{ t('promptManagement.version') }} {{ history.version
-                                                        }}</NText>
+                                                    }}</NText>
                                                     <NTag size="small" type="info">
                                                         {{ formatDate(history.createdAt) }}
                                                     </NTag>
@@ -136,11 +166,11 @@
                                             <NText depth="3">{{ history.title }}</NText>
                                             <NText depth="3" v-if="history.changeDescription">
                                                 {{ t('promptManagement.changeDescription') }}: {{
-                                                history.changeDescription }}
+                                                    history.changeDescription }}
                                             </NText>
                                             <NText depth="3" style="font-size: 12px;">
                                                 {{ t('promptManagement.contentPreview') }}: {{
-                                                getContentPreview(history.content) }}
+                                                    getContentPreview(history.content) }}
                                             </NText>
                                         </NFlex>
                                     </NCard>
@@ -271,7 +301,7 @@
                                                             <NTag size="small"
                                                                 :type="variable.type === 'text' ? 'default' : 'info'">
                                                                 {{ variable.type === 'text' ? t('promptManagement.text')
-                                                                : t('promptManagement.select') }}
+                                                                    : t('promptManagement.select') }}
                                                             </NTag>
                                                         </NFlex>
                                                         <NFlex>
@@ -345,14 +375,14 @@
                                             <div>
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.historyTitle') }}</NText>
+                                                        t('promptManagement.historyTitle') }}</NText>
                                                 <NInput :value="previewHistory.title" readonly />
                                             </div>
 
                                             <div v-if="previewHistory.description">
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.description') }}</NText>
+                                                        t('promptManagement.description') }}</NText>
                                                 <NInput :value="previewHistory.description" type="textarea" readonly
                                                     :rows="8" />
                                             </div>
@@ -370,14 +400,14 @@
                                             <div v-if="previewHistory.categoryId">
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.category') }}</NText>
+                                                        t('promptManagement.category') }}</NText>
                                                 <NInput :value="getCategoryName(previewHistory.categoryId)" readonly />
                                             </div>
 
                                             <div v-if="previewHistory.tags">
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 8px; display: block;">{{
-                                                    t('promptManagement.tags') }}</NText>
+                                                        t('promptManagement.tags') }}</NText>
                                                 <NFlex size="small" wrap>
                                                     <NTag
                                                         v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
@@ -390,23 +420,17 @@
                                             <div>
                                                 <NText depth="3"
                                                     style="font-size: 12px; margin-bottom: 4px; display: block;">{{
-                                                    t('promptManagement.changeDescription') }}</NText>
+                                                        t('promptManagement.changeDescription') }}</NText>
                                                 <NFlex align="center" size="small">
-                                                    <NInput 
-                                                        v-model:value="editingChangeDescription" 
+                                                    <NInput v-model:value="editingChangeDescription"
                                                         :placeholder="t('promptManagement.changeDescriptionPlaceholder')"
-                                                        style="flex: 1;"
-                                                        :disabled="savingChangeDescription" />
-                                                    <NButton 
-                                                        size="small" 
-                                                        type="primary"
+                                                        style="flex: 1;" :disabled="savingChangeDescription" />
+                                                    <NButton size="small" type="primary"
                                                         :loading="savingChangeDescription"
                                                         @click="saveChangeDescription">
                                                         {{ t('common.save') }}
                                                     </NButton>
-                                                    <NButton 
-                                                        size="small" 
-                                                        @click="cancelEditChangeDescription">
+                                                    <NButton size="small" @click="cancelEditChangeDescription">
                                                         {{ t('common.cancel') }}
                                                     </NButton>
                                                 </NFlex>
@@ -439,11 +463,45 @@
             </NFlex>
         </template>
     </CommonModal>
+
+    <!-- 图片预览模态框 -->
+    <CommonModal :show="showImagePreview" @update:show="showImagePreview = false" @close="showImagePreview = false">
+        <template #header>
+            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
+                {{ t('promptManagement.imagePreview') }}
+            </NText>
+        </template>
+
+        <template #content="{ contentHeight }">
+            <div :style="{ height: `${contentHeight}px`, display: 'flex', justifyContent: 'center', alignItems: 'center' }">
+                <NImage
+                    :src="currentPreviewImage"
+                    :style="{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }"
+                    :preview-disabled="false"
+                    :show-toolbar="true"
+                    :show-close-button="true"
+                    :show-download-button="true"
+                    :show-rotate-button="true"
+                    :show-zoom-button="true"
+                    :show-reset-button="true"
+                />
+            </div>
+        </template>
+
+        <template #footer>
+            <NFlex justify="center">
+                <NButton @click="showImagePreview = false">
+                    {{ t('common.close') }}
+                </NButton>
+            </NFlex>
+        </template>
+    </CommonModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive } from "vue";
 import { useI18n } from 'vue-i18n'
+import type { UploadFileInfo } from 'naive-ui'
 import {
     NForm,
     NFormItem,
@@ -466,9 +524,13 @@ import {
     NTabPane,
     NTooltip,
     NSpin,
+    NUpload,
+    NUploadDragger,
+    NImage,
+    NP,
     useMessage,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import CommonModal from "@/components/common/CommonModal.vue";
@@ -558,6 +620,12 @@ const { modalWidth } = useWindowSize();
 const debounceTimer = ref<number | null>(null);
 const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 
+// 图片上传相关
+const imageFileList = ref<UploadFileInfo[]>([]);
+const imagePreviewUrl = ref<string>('');
+const showImagePreview = ref(false);
+const currentPreviewImage = ref<string>('');
+
 // 表单数据
 const formData = ref<{
     title: string;
@@ -567,6 +635,7 @@ const formData = ref<{
     tags: string[];
     variables: Variable[];
     isJinjaTemplate?: boolean;
+    imageBlob?: Blob;
 }>({
     title: "",
     description: "",
@@ -575,6 +644,7 @@ const formData = ref<{
     tags: [],
     variables: [],
     isJinjaTemplate: false,
+    imageBlob: undefined,
 });
 
 // 计算属性
@@ -674,6 +744,19 @@ const resetForm = () => {
     // 设置初始化标志，防止递归更新
     isInitializing.value = true;
 
+    // 清理图片相关数据
+    if (imagePreviewUrl.value) {
+        URL.revokeObjectURL(imagePreviewUrl.value);
+        imagePreviewUrl.value = '';
+    }
+    // 清理所有图片文件的URL
+    imageFileList.value.forEach(file => {
+        if (file.url) {
+            URL.revokeObjectURL(file.url);
+        }
+    });
+    imageFileList.value = [];
+
     // 重置表单数据到初始状态
     formData.value = {
         title: "",
@@ -683,6 +766,7 @@ const resetForm = () => {
         tags: [],
         variables: [],
         isJinjaTemplate: false,
+        imageBlob: undefined,
     };
     activeTab.value = "edit";
     historyList.value = [];
@@ -764,7 +848,7 @@ const createHistoryRecord = async (currentPrompt: any) => {
             title: currentPrompt.title,
             variables: currentPrompt.variables
         });
-        
+
         const latestVersion = await api.promptHistories.getLatestVersion.query(currentPrompt.id);
         console.log('获取最新版本号:', latestVersion);
 
@@ -1258,7 +1342,7 @@ const saveChangeDescription = async () => {
 
     try {
         savingChangeDescription.value = true;
-        
+
         const result = await api.promptHistories.update.mutate({
             id: previewHistory.value.id,
             data: {
@@ -1278,7 +1362,7 @@ const saveChangeDescription = async () => {
         }
 
         message.success(t('promptManagement.changeDescriptionSaved'));
-        
+
         // 重新加载历史记录以确保数据同步
         if (isEdit.value && props.prompt?.id) {
             await loadHistory();
@@ -1320,14 +1404,53 @@ const generateAutoTitle = () => {
 // 监听 prompt 变化，初始化表单
 watch(
     () => props.prompt,
-    (newPrompt) => {
+    (newPrompt, oldPrompt) => {
+        console.log('🔄 props.prompt 发生变化:', {
+            hasPrompt: !!newPrompt,
+            promptId: newPrompt?.id,
+            hasImageBlob: !!newPrompt?.imageBlob,
+            imageBlobSize: newPrompt?.imageBlob?.size,
+            oldPromptId: oldPrompt?.id,
+            oldHasImageBlob: !!oldPrompt?.imageBlob
+        });
+        
         // 防止递归更新
         if (newPrompt === undefined || isInitializing.value) return;
+
+        // 如果新数据和旧数据基本相同，且都有图片数据，则跳过更新
+        if (oldPrompt && newPrompt && 
+            oldPrompt.id === newPrompt.id && 
+            oldPrompt.imageBlob && newPrompt.imageBlob &&
+            oldPrompt.imageBlob.size === newPrompt.imageBlob.size) {
+            console.log('🔄 跳过相同数据的更新');
+            return;
+        }
 
         isInitializing.value = true;
 
         if (newPrompt) {
-            // 有 prompt 数据，初始化为编辑模式
+            // 处理图片数据
+            console.log('加载提示词图片数据:', {
+                hasImageBlob: !!newPrompt.imageBlob,
+                imageBlobType: typeof newPrompt.imageBlob,
+                isBlob: newPrompt.imageBlob instanceof Blob,
+                size: newPrompt.imageBlob?.size,
+                constructor: newPrompt.imageBlob?.constructor?.name,
+                mimeType: newPrompt.imageBlob?.type
+            });
+
+            // 兼容旧版本的单个图片数据
+            let imageBlob: Blob | undefined = undefined;
+            if (newPrompt.imageBlob) {
+                if (newPrompt.imageBlob instanceof Blob) {
+                    imageBlob = newPrompt.imageBlob;
+                    console.log('✅ 成功获取图片数据:', {
+                        size: imageBlob?.size,
+                        type: imageBlob?.type
+                    });
+                }
+            }
+
             formData.value = {
                 title: newPrompt.title || "",
                 description: newPrompt.description || "",
@@ -1360,7 +1483,34 @@ watch(
                         placeholder: v.placeholder || "",
                     })) || [],
                 isJinjaTemplate: newPrompt.isJinjaTemplate || false,
+                imageBlob: imageBlob,
             };
+
+            console.log('✅ 设置表单数据后的imageBlob:', {
+                hasImageBlob: !!formData.value.imageBlob,
+                size: formData.value.imageBlob?.size,
+                type: formData.value.imageBlob?.type
+            });
+
+            // 设置NUpload的默认值
+            if (imageBlob && imageBlob instanceof Blob && imageBlob.size > 0) {
+                // 将Blob转换为File对象
+                const file = new File([imageBlob], 'uploaded-image', { type: imageBlob.type });
+                imageFileList.value = [{
+                    id: Date.now().toString(),
+                    name: 'uploaded-image',
+                    status: 'finished' as const,
+                    url: URL.createObjectURL(imageBlob),
+                    file: file
+                }];
+                console.log('✅ 设置NUpload默认值成功，文件列表长度:', imageFileList.value.length);
+            } else {
+                // 只有在确实没有图片数据时才清空文件列表
+                if (imageFileList.value.length > 0) {
+                    console.log('❌ 没有有效的图片数据，清空文件列表');
+                    imageFileList.value = [];
+                }
+            }
 
             // 设置 Jinja 模式状态
             isJinjaEnabled.value = newPrompt.isJinjaTemplate || false;
@@ -1393,7 +1543,7 @@ watch(
                     loadHistory();
                 }
             });
-            
+
             // 如果当前tab是历史记录，确保历史记录已加载
             if (activeTab.value === 'history') {
                 nextTick(() => {
@@ -1419,36 +1569,31 @@ watch(
     { immediate: true }
 );
 
-// 监听弹窗显示状态，加载快速优化配置
-watch(
-    () => props.show,
-    (newShow) => {
-        if (newShow) {
-            loadQuickOptimizationConfigs();
-        }
-    }
-);
-
 // 监听弹窗显示状态
 watch(
     () => props.show,
     (newShow, oldShow) => {
-        if (newShow && !oldShow) {
-            // 弹窗从隐藏变为显示时
-            activeTab.value = "edit";
+        if (newShow) {
+            // 加载快速优化配置
+            loadQuickOptimizationConfigs();
+            
+            if (!oldShow) {
+                // 弹窗从隐藏变为显示时
+                activeTab.value = "edit";
 
-            // 使用 nextTick 确保 props.prompt 已经正确传递
-            nextTick(() => {
-                // 只有在确实没有 prompt 且不是编辑模式时才重置表单
-                if (!props.prompt && !isEdit.value) {
-                    resetForm();
-                }
-                
-                // 如果当前tab是历史记录且是编辑模式，立即加载历史记录
-                if (activeTab.value === 'history' && isEdit.value && props.prompt?.id) {
-                    loadHistory();
-                }
-            });
+                // 使用 nextTick 确保 props.prompt 已经正确传递
+                nextTick(() => {
+                    // 只有在确实没有 prompt 且不是编辑模式时才重置表单
+                    if (!props.prompt && !isEdit.value) {
+                        resetForm();
+                    }
+
+                    // 如果当前tab是历史记录且是编辑模式，立即加载历史记录
+                    if (activeTab.value === 'history' && isEdit.value && props.prompt?.id) {
+                        loadHistory();
+                    }
+                });
+            }
         }
         if (oldShow && !newShow) {
             // 弹窗从显示变为隐藏时，清理定时器
@@ -1624,6 +1769,44 @@ const removeVariable = (index: number) => {
     formData.value.variables.splice(index, 1);
 };
 
+// 图片上传处理函数
+const handleBeforeUpload = async (data: { file: any, fileList: any[] }) => {
+    const file = data.file.file as File; // 获取原始File对象
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+        message.error(t('promptManagement.invalidImageType'));
+        return false;
+    }
+
+    // 检查文件大小 (限制为5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        message.error(t('promptManagement.imageTooLarge'));
+        return false;
+    }
+
+    return true;
+};
+
+const handleCustomRequest = async ({ file, onFinish, onError }: any) => {
+    try {
+        // 存储图片数据
+        formData.value.imageBlob = file.file;
+        onFinish();
+        message.success(t('promptManagement.imageUploadSuccess'));
+    } catch (error) {
+        console.error('图片上传失败:', error);
+        onError();
+        message.error(t('promptManagement.imageUploadFailed'));
+    }
+};
+
+const handleRemoveImage = (file: any) => {
+    // 清除图片数据
+    formData.value.imageBlob = undefined;
+    message.success(t('promptManagement.imageRemoveSuccess'));
+};
+
 const handleCancel = () => {
     // 取消时清理防抖定时器
     if (debounceTimer.value) {
@@ -1733,6 +1916,14 @@ const handleSave = async () => {
                 }));
         }
 
+        // 从imageFileList中获取图片数据
+        const imageFile = imageFileList.value
+            .filter(file => file.file && file.status === 'finished')
+            .map(file => file.file)[0]; // 只取第一张图片
+
+        // 将File转换为Blob
+        const imageBlob = imageFile ? new Blob([imageFile], { type: imageFile.type }) : undefined;
+
         const data = {
             title: finalTitle,
             description: formData.value.description || undefined,
@@ -1744,7 +1935,17 @@ const handleSave = async () => {
             isActive: true,
             isJinjaTemplate: isJinjaEnabled.value,
             variables: variablesData,
+            imageBlob: imageBlob,
         };
+
+        console.log('保存提示词数据:', {
+            hasImageBlob: !!imageBlob,
+            imageBlobType: typeof imageBlob,
+            isBlob: imageBlob instanceof Blob,
+            size: imageBlob?.size,
+            constructor: imageBlob?.constructor?.name,
+            mimeType: imageBlob?.type
+        });
 
 
 
@@ -1760,8 +1961,9 @@ const handleSave = async () => {
                 tags: formData.value.tags.length > 0 ? formData.value.tags : [],
                 isJinjaTemplate: isJinjaEnabled.value,
                 variables: variablesData, // 这里保持为数组，createHistoryRecord 会处理 JSON.stringify
+                imageBlob: formData.value.imageBlob,
             };
-            
+
             console.log('创建历史记录 - 当前数据:', {
                 promptId: currentPromptData.id,
                 title: currentPromptData.title,
@@ -1770,7 +1972,7 @@ const handleSave = async () => {
                 variables: currentPromptData.variables,
                 variablesCount: currentPromptData.variables?.length || 0
             });
-            
+
             await createHistoryRecord(currentPromptData);
 
             await api.prompts.update.mutate({
@@ -1940,6 +2142,50 @@ const updateVariables = (newVariables: any[]) => {
 defineExpose({
     refreshQuickOptimizationConfigs
 });
+
+// 图片预览处理函数
+const handlePreviewFile = (file: any) => {
+    if (file.file) {
+        return URL.createObjectURL(file.file);
+    }
+    return file.url || '';
+};
+
+const handlePreviewImage = (file: any) => {
+    const imageUrl = handlePreviewFile(file);
+    if (imageUrl) {
+        currentPreviewImage.value = imageUrl;
+        showImagePreview.value = true;
+    }
+};
+
+// 监听formData.imageBlob的变化
+watch(
+    () => formData.value.imageBlob,
+    (newImageBlob) => {
+        console.log('🔄 formData.imageBlob 发生变化:', {
+            hasImageBlob: !!newImageBlob,
+            size: newImageBlob?.size,
+            type: newImageBlob?.type
+        });
+    }
+);
+
+// 监听imageFileList的变化
+watch(
+    () => imageFileList.value,
+    (newFileList) => {
+        console.log('🔄 imageFileList 发生变化:', {
+            length: newFileList.length,
+            files: newFileList.map(f => ({
+                name: f.name,
+                status: f.status,
+                hasFile: !!f.file
+            }))
+        });
+    },
+    { deep: true }
+);
 </script>
 
 <style scoped></style>

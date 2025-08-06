@@ -262,20 +262,33 @@
                                 </NFlex>
                             </template>
 
-                            <NFlex vertical size="small">
-                                <!-- 更新时间 -->
-                                <!-- <NText depth="3" style="font-size: 12px; color: var(--n-text-color-disabled);">
-                                    {{ new Date(prompt.updatedAt).toLocaleDateString() }}
-                                </NText> -->
-                                <!-- 描述或内容预览 -->
-                                <NText depth="3" v-if="prompt.description" class="description-text">
-                                    {{ prompt.description }}
-                                </NText>
-                                <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
-                                    class="content-preview-text">
-                                    {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
-                                </NText>
-
+                            <!-- 描述和图片并排显示 -->
+                            <NFlex align="start" size="medium" style="min-height: 80px;">
+                                <!-- 左侧：描述或内容预览 -->
+                                <div style="flex: 1; min-width: 0;">
+                                    <NText depth="3" v-if="prompt.description" class="description-text">
+                                        {{ prompt.description }}
+                                    </NText>
+                                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
+                                        class="content-preview-text">
+                                        {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
+                                    </NText>
+                                </div>
+                                
+                                <!-- 右侧：图片预览 -->
+                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;">
+                                    <NImage
+                                        :src="getImageUrl(prompt.imageBlob)"
+                                        width="60"
+                                        height="60"
+                                        object-fit="cover"
+                                        style="border-radius: 6px;"
+                                        :preview-disabled="false"
+                                        :lazy="true"
+                                        @error="handleImageError"
+                                        fallback-src=""
+                                    />
+                                </div>
                             </NFlex>
 
                             <template #footer>
@@ -335,7 +348,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, h, watch } from 'vue'
 import {
     NCard,
     NFlex,
@@ -352,6 +365,7 @@ import {
     NDataTable,
     NPopconfirm,
     NButtonGroup,
+    NImage,
     useMessage
 } from 'naive-ui'
 import {
@@ -1305,6 +1319,12 @@ const getPromptActions = (prompt: PromptWithRelations) => [
 const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
     switch (action) {
         case 'edit':
+            console.log('🔄 PromptList 发送编辑事件:', {
+                promptId: prompt.id,
+                hasImageBlob: !!prompt.imageBlob,
+                imageBlobSize: prompt.imageBlob?.size,
+                imageBlobType: prompt.imageBlob?.type
+            });
             emit('edit', prompt)
             break
         case 'copyOriginal':
@@ -1430,6 +1450,66 @@ onMounted(async () => {
         await loadPrompts(true) // 初始加载
     }
 })
+
+// 图片处理函数
+const imageUrlCache = new Map<Blob, string>();
+
+const getImageUrl = (imageBlob: any) => {
+    // 严格检查是否为有效的Blob对象
+    if (!imageBlob || 
+        typeof imageBlob !== 'object' ||
+        !(imageBlob instanceof Blob) ||
+        imageBlob.size === 0) {
+        return '';
+    }
+    
+    // 使用缓存避免重复创建URL
+    if (imageUrlCache.has(imageBlob)) {
+        return imageUrlCache.get(imageBlob)!;
+    }
+    
+    try {
+        const url = URL.createObjectURL(imageBlob);
+        imageUrlCache.set(imageBlob, url);
+        return url;
+    } catch (error) {
+        console.error('创建图片URL失败:', error, imageBlob);
+        return '';
+    }
+};
+
+const handleImageError = (event: Event) => {
+    console.warn('图片加载失败:', event);
+    // 可以设置默认图片或其他错误处理
+};
+
+const hasValidImage = (prompt: PromptWithRelations) => {
+    if (!prompt.imageBlob) {
+        return false;
+    }
+    
+    // 调试信息
+    if (prompt.imageBlob && !(prompt.imageBlob instanceof Blob)) {
+        console.warn('提示词包含无效的图片数据:', {
+            promptId: prompt.id,
+            imageBlob: prompt.imageBlob,
+            type: typeof prompt.imageBlob,
+            constructor: (prompt.imageBlob as any)?.constructor?.name
+        });
+        return false;
+    }
+    
+    return prompt.imageBlob instanceof Blob && prompt.imageBlob.size > 0;
+};
+
+// 组件卸载时清理URL缓存
+onBeforeUnmount(() => {
+    // 清理所有创建的Blob URL
+    imageUrlCache.forEach(url => {
+        URL.revokeObjectURL(url);
+    });
+    imageUrlCache.clear();
+});
 
 // 暴露方法给父组件
 defineExpose({
