@@ -1841,16 +1841,16 @@ const handleEdit = () => {
         isFavorite: props.prompt.isFavorite,
         useCount: props.prompt.useCount,
         isJinjaTemplate: props.prompt.isJinjaTemplate || false,
-        imageBlob: props.prompt.imageBlob, // 添加图片数据
+        imageBlobs: props.prompt.imageBlobs || [], // 添加图片数据
         createdAt: props.prompt.createdAt,
         updatedAt: props.prompt.updatedAt
     };
 
     console.log('🔄 PromptDetailModal 发送编辑事件:', {
         promptId: editPrompt.id,
-        hasImageBlob: !!editPrompt.imageBlob,
-        imageBlobSize: editPrompt.imageBlob?.size,
-        imageBlobType: editPrompt.imageBlob?.type
+        hasImageBlobs: !!editPrompt.imageBlobs,
+        imageBlobsCount: editPrompt.imageBlobs?.length || 0,
+        imageBlobsType: typeof editPrompt.imageBlobs
     });
 
     emit("edit", editPrompt);

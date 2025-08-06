@@ -12,10 +12,10 @@ import { generateUUID } from '../utils/uuid';
 export class BaseDatabaseService {
   protected db: IDBDatabase | null = null;
   protected readonly dbName = 'AIGistDB';
-  protected readonly dbVersion = 9; // 增加版本号以支持提示词图片字段
+  protected readonly dbVersion = 10; // 增加版本号以支持提示词图片数组字段
   protected initializationPromise: Promise<void> | null = null;
   protected isInitialized = false;
-  private currentDbVersion = 9; // 添加一个可变的版本号变量
+  private currentDbVersion = 10; // 添加一个可变的版本号变量
 
   /**
    * 初始化数据库连接

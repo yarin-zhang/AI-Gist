@@ -277,8 +277,25 @@
                                 
                                 <!-- 右侧：图片预览 -->
                                 <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;">
+                                    <NCarousel
+                                        v-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1"
+                                        direction="horizontal"
+                                        dot-placement="bottom"
+                                        show-arrow
+                                        style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden;"
+                                    >
+                                        <img
+                                            v-for="(blob, index) in prompt.imageBlobs"
+                                            :key="index"
+                                            class="carousel-img"
+                                            :src="getImageUrlFromBlob(blob)"
+                                            style="width: 100%; height: 100%; object-fit: cover;"
+                                            @error="handleImageError"
+                                        />
+                                    </NCarousel>
                                     <NImage
-                                        :src="getImageUrl(prompt.imageBlob)"
+                                        v-else-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1"
+                                        :src="getImageUrl(prompt.imageBlobs)"
                                         width="60"
                                         height="60"
                                         object-fit="cover"
@@ -366,6 +383,7 @@ import {
     NPopconfirm,
     NButtonGroup,
     NImage,
+    NCarousel,
     useMessage
 } from 'naive-ui'
 import {
@@ -1321,9 +1339,9 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
         case 'edit':
             console.log('🔄 PromptList 发送编辑事件:', {
                 promptId: prompt.id,
-                hasImageBlob: !!prompt.imageBlob,
-                imageBlobSize: prompt.imageBlob?.size,
-                imageBlobType: prompt.imageBlob?.type
+                hasImageBlobs: !!prompt.imageBlobs,
+                imageBlobsCount: prompt.imageBlobs?.length || 0,
+                imageBlobsType: typeof prompt.imageBlobs
             });
             emit('edit', prompt)
             break
@@ -1454,26 +1472,55 @@ onMounted(async () => {
 // 图片处理函数
 const imageUrlCache = new Map<Blob, string>();
 
-const getImageUrl = (imageBlob: any) => {
-    // 严格检查是否为有效的Blob对象
-    if (!imageBlob || 
-        typeof imageBlob !== 'object' ||
-        !(imageBlob instanceof Blob) ||
-        imageBlob.size === 0) {
+const getImageUrl = (imageBlobs: any) => {
+    // 检查是否为有效的Blob数组
+    if (!imageBlobs || 
+        !Array.isArray(imageBlobs) ||
+        imageBlobs.length === 0) {
+        return '';
+    }
+    
+    // 获取第一张图片用于显示
+    const firstImage = imageBlobs[0];
+    if (!firstImage || 
+        typeof firstImage !== 'object' ||
+        !(firstImage instanceof Blob) ||
+        firstImage.size === 0) {
         return '';
     }
     
     // 使用缓存避免重复创建URL
-    if (imageUrlCache.has(imageBlob)) {
-        return imageUrlCache.get(imageBlob)!;
+    if (imageUrlCache.has(firstImage)) {
+        return imageUrlCache.get(firstImage)!;
     }
     
     try {
-        const url = URL.createObjectURL(imageBlob);
-        imageUrlCache.set(imageBlob, url);
+        const url = URL.createObjectURL(firstImage);
+        imageUrlCache.set(firstImage, url);
         return url;
     } catch (error) {
-        console.error('创建图片URL失败:', error, imageBlob);
+        console.error('创建图片URL失败:', error, firstImage);
+        return '';
+    }
+};
+
+const getImageUrlFromBlob = (blob: Blob) => {
+    if (!blob || 
+        !(blob instanceof Blob) ||
+        blob.size === 0) {
+        return '';
+    }
+
+    if (imageUrlCache.has(blob)) {
+        return imageUrlCache.get(blob)!;
+    }
+
+    try {
+        const url = URL.createObjectURL(blob);
+        imageUrlCache.set(blob, url);
+        return url;
+    } catch (error) {
+        console.error('创建图片URL失败:', error, blob);
         return '';
     }
 };
@@ -1484,22 +1531,23 @@ const handleImageError = (event: Event) => {
 };
 
 const hasValidImage = (prompt: PromptWithRelations) => {
-    if (!prompt.imageBlob) {
+    if (!prompt.imageBlobs || !Array.isArray(prompt.imageBlobs) || prompt.imageBlobs.length === 0) {
         return false;
     }
     
-    // 调试信息
-    if (prompt.imageBlob && !(prompt.imageBlob instanceof Blob)) {
+    // 检查第一张图片是否有效
+    const firstImage = prompt.imageBlobs[0];
+    if (!firstImage || !(firstImage instanceof Blob)) {
         console.warn('提示词包含无效的图片数据:', {
             promptId: prompt.id,
-            imageBlob: prompt.imageBlob,
-            type: typeof prompt.imageBlob,
-            constructor: (prompt.imageBlob as any)?.constructor?.name
+            imageBlobs: prompt.imageBlobs,
+            type: typeof prompt.imageBlobs,
+            constructor: (prompt.imageBlobs as any)?.constructor?.name
         });
         return false;
     }
     
-    return prompt.imageBlob instanceof Blob && prompt.imageBlob.size > 0;
+    return firstImage instanceof Blob && firstImage.size > 0;
 };
 
 // 组件卸载时清理URL缓存
@@ -1571,5 +1619,12 @@ defineExpose({
     max-height: calc(1.4em * 3);
     /* 限制最大高度为3行 */
     word-break: break-word;
+}
+
+/* 轮播图样式 */
+.carousel-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 </style>

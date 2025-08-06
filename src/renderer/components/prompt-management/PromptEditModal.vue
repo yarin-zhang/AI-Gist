@@ -61,29 +61,15 @@
                                             <NFormItem :label="t('promptManagement.image')" path="imageUrl">
                                                 <NUpload 
                                                     v-model:file-list="imageFileList" 
-                                                    :max="5"
                                                     list-type="image-card" 
                                                     accept="image/*"
                                                     :on-before-upload="handleBeforeUpload"
                                                     :on-remove="handleRemoveImage" 
                                                     :custom-request="handleCustomRequest"
-                                                    :show-preview-button="true" 
-                                                    :show-remove-button="true"
-                                                    :show-retry-button="false" 
-                                                    :show-cancel-button="false"
                                                     :disabled="saving" 
-                                                    :multiple="true" 
-                                                    :drag="true"
-                                                    :show-file-list="true" 
-                                                    :show-upload-button="true"
-                                                    :show-download-button="false"
-                                                    :preview-file="handlePreviewFile"
-                                                    :on-preview="handlePreviewImage"
-                                                    :default-file-list="imageFileList">
+                                                    :multiple="true">
                                                     <NUploadDragger>
-                                                        <NText style="font-size: 8px">
-                                                            {{ t('promptManagement.uploadImage') }}
-                                                        </NText>
+                                                        {{ t('promptManagement.uploadImage') }}
                                                     </NUploadDragger>
                                                 </NUpload>
                                             </NFormItem>
@@ -465,37 +451,7 @@
     </CommonModal>
 
     <!-- 图片预览模态框 -->
-    <CommonModal :show="showImagePreview" @update:show="showImagePreview = false" @close="showImagePreview = false">
-        <template #header>
-            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
-                {{ t('promptManagement.imagePreview') }}
-            </NText>
-        </template>
-
-        <template #content="{ contentHeight }">
-            <div :style="{ height: `${contentHeight}px`, display: 'flex', justifyContent: 'center', alignItems: 'center' }">
-                <NImage
-                    :src="currentPreviewImage"
-                    :style="{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }"
-                    :preview-disabled="false"
-                    :show-toolbar="true"
-                    :show-close-button="true"
-                    :show-download-button="true"
-                    :show-rotate-button="true"
-                    :show-zoom-button="true"
-                    :show-reset-button="true"
-                />
-            </div>
-        </template>
-
-        <template #footer>
-            <NFlex justify="center">
-                <NButton @click="showImagePreview = false">
-                    {{ t('common.close') }}
-                </NButton>
-            </NFlex>
-        </template>
-    </CommonModal>
+    <!-- 移除复杂的图片预览功能 -->
 </template>
 
 <script setup lang="ts">
@@ -622,9 +578,6 @@ const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 
 // 图片上传相关
 const imageFileList = ref<UploadFileInfo[]>([]);
-const imagePreviewUrl = ref<string>('');
-const showImagePreview = ref(false);
-const currentPreviewImage = ref<string>('');
 
 // 表单数据
 const formData = ref<{
@@ -635,7 +588,7 @@ const formData = ref<{
     tags: string[];
     variables: Variable[];
     isJinjaTemplate?: boolean;
-    imageBlob?: Blob;
+    imageBlobs?: Blob[];
 }>({
     title: "",
     description: "",
@@ -644,7 +597,7 @@ const formData = ref<{
     tags: [],
     variables: [],
     isJinjaTemplate: false,
-    imageBlob: undefined,
+    imageBlobs: [],
 });
 
 // 计算属性
@@ -744,11 +697,7 @@ const resetForm = () => {
     // 设置初始化标志，防止递归更新
     isInitializing.value = true;
 
-    // 清理图片相关数据
-    if (imagePreviewUrl.value) {
-        URL.revokeObjectURL(imagePreviewUrl.value);
-        imagePreviewUrl.value = '';
-    }
+
     // 清理所有图片文件的URL
     imageFileList.value.forEach(file => {
         if (file.url) {
@@ -766,7 +715,7 @@ const resetForm = () => {
         tags: [],
         variables: [],
         isJinjaTemplate: false,
-        imageBlob: undefined,
+        imageBlobs: [],
     };
     activeTab.value = "edit";
     historyList.value = [];
@@ -1408,10 +1357,10 @@ watch(
         console.log('🔄 props.prompt 发生变化:', {
             hasPrompt: !!newPrompt,
             promptId: newPrompt?.id,
-            hasImageBlob: !!newPrompt?.imageBlob,
-            imageBlobSize: newPrompt?.imageBlob?.size,
+            hasImageBlobs: !!newPrompt?.imageBlobs,
+            imageBlobsSize: newPrompt?.imageBlobs?.length,
             oldPromptId: oldPrompt?.id,
-            oldHasImageBlob: !!oldPrompt?.imageBlob
+            oldHasImageBlobs: !!oldPrompt?.imageBlobs
         });
         
         // 防止递归更新
@@ -1420,22 +1369,24 @@ watch(
         // 如果新数据和旧数据基本相同，且都有图片数据，则跳过更新
         if (oldPrompt && newPrompt && 
             oldPrompt.id === newPrompt.id && 
-            oldPrompt.imageBlob && newPrompt.imageBlob &&
-            oldPrompt.imageBlob.size === newPrompt.imageBlob.size) {
+            oldPrompt.imageBlobs && newPrompt.imageBlobs &&
+            oldPrompt.imageBlobs.length === newPrompt.imageBlobs.length) {
             console.log('🔄 跳过相同数据的更新，但确保 imageFileList 正确设置');
             
             // 即使跳过更新，也要确保 imageFileList 正确设置
-            if (newPrompt.imageBlob instanceof Blob && newPrompt.imageBlob.size > 0) {
-                const fileId = `image_${Date.now()}`;
-                const fileName = 'uploaded-image.png';
-                
-                imageFileList.value = [{
-                    id: fileId,
-                    name: fileName,
-                    status: 'finished' as const,
-                    url: URL.createObjectURL(newPrompt.imageBlob),
-                    file: new File([newPrompt.imageBlob], fileName, { type: newPrompt.imageBlob.type })
-                }];
+            if (newPrompt.imageBlobs && Array.isArray(newPrompt.imageBlobs) && newPrompt.imageBlobs.length > 0) {
+                imageFileList.value = newPrompt.imageBlobs.map((blob: Blob, index: number) => {
+                    const fileId = `image_${Date.now()}_${index}`;
+                    const fileName = `uploaded-image-${index + 1}.png`;
+                    
+                    return {
+                        id: fileId,
+                        name: fileName,
+                        status: 'finished' as const,
+                        url: URL.createObjectURL(blob),
+                        file: new File([blob], fileName, { type: blob.type })
+                    };
+                });
                 console.log('✅ 在跳过更新时设置 imageFileList，文件列表长度:', imageFileList.value.length);
             }
             return;
@@ -1446,25 +1397,14 @@ watch(
         if (newPrompt) {
             // 处理图片数据
             console.log('加载提示词图片数据:', {
-                hasImageBlob: !!newPrompt.imageBlob,
-                imageBlobType: typeof newPrompt.imageBlob,
-                isBlob: newPrompt.imageBlob instanceof Blob,
-                size: newPrompt.imageBlob?.size,
-                constructor: newPrompt.imageBlob?.constructor?.name,
-                mimeType: newPrompt.imageBlob?.type
+                hasImageBlobs: !!newPrompt.imageBlobs,
+                imageBlobsType: typeof newPrompt.imageBlobs,
+                isArray: Array.isArray(newPrompt.imageBlobs),
+                count: newPrompt.imageBlobs?.length || 0
             });
 
-            // 兼容旧版本的单个图片数据
-            let imageBlob: Blob | undefined = undefined;
-            if (newPrompt.imageBlob) {
-                if (newPrompt.imageBlob instanceof Blob) {
-                    imageBlob = newPrompt.imageBlob;
-                    console.log('✅ 成功获取图片数据:', {
-                        size: imageBlob?.size,
-                        type: imageBlob?.type
-                    });
-                }
-            }
+            // 直接使用图片数组
+            const imageBlobs = newPrompt.imageBlobs && Array.isArray(newPrompt.imageBlobs) ? newPrompt.imageBlobs : [];
 
             formData.value = {
                 title: newPrompt.title || "",
@@ -1498,28 +1438,30 @@ watch(
                         placeholder: v.placeholder || "",
                     })) || [],
                 isJinjaTemplate: newPrompt.isJinjaTemplate || false,
-                imageBlob: imageBlob,
+                imageBlobs: imageBlobs,
             };
 
-            console.log('✅ 设置表单数据后的imageBlob:', {
-                hasImageBlob: !!formData.value.imageBlob,
-                size: formData.value.imageBlob?.size,
-                type: formData.value.imageBlob?.type
+            console.log('✅ 设置表单数据后的imageBlobs:', {
+                hasImageBlobs: !!formData.value.imageBlobs,
+                count: formData.value.imageBlobs?.length || 0,
+                isArray: Array.isArray(formData.value.imageBlobs)
             });
 
             // 设置NUpload的默认值
-            if (imageBlob && imageBlob instanceof Blob && imageBlob.size > 0) {
-                // 创建符合 UploadFileInfo 格式的文件对象
-                const fileId = `image_${Date.now()}`;
-                const fileName = 'uploaded-image.png'; // 或者根据 MIME 类型设置正确的扩展名
-                
-                imageFileList.value = [{
-                    id: fileId,
-                    name: fileName,
-                    status: 'finished' as const,
-                    url: URL.createObjectURL(imageBlob),
-                    file: new File([imageBlob], fileName, { type: imageBlob.type })
-                }];
+            if (imageBlobs && imageBlobs.length > 0) {
+                // 创建符合 UploadFileInfo 格式的文件对象数组
+                imageFileList.value = imageBlobs.map((blob: Blob, index: number) => {
+                    const fileId = `image_${Date.now()}_${index}`;
+                    const fileName = `uploaded-image-${index + 1}.png`;
+                    
+                    return {
+                        id: fileId,
+                        name: fileName,
+                        status: 'finished' as const,
+                        url: URL.createObjectURL(blob),
+                        file: new File([blob], fileName, { type: blob.type })
+                    };
+                });
                 console.log('✅ 设置NUpload默认值成功，文件列表长度:', imageFileList.value.length);
             } else {
                 // 只有在确实没有图片数据时才清空文件列表
@@ -1787,9 +1729,9 @@ const removeVariable = (index: number) => {
 };
 
 // 图片上传处理函数
-const handleBeforeUpload = async (data: { file: any, fileList: any[] }) => {
-    const file = data.file.file as File; // 获取原始File对象
-
+const handleBeforeUpload = (data: { file: any }) => {
+    const file = data.file.file as File;
+    
     // 检查文件类型
     if (!file.type.startsWith('image/')) {
         message.error(t('promptManagement.invalidImageType'));
@@ -1805,46 +1747,27 @@ const handleBeforeUpload = async (data: { file: any, fileList: any[] }) => {
     return true;
 };
 
-const handleCustomRequest = async ({ file, onFinish, onError }: any) => {
-    try {
-        // 存储图片数据到 formData
-        formData.value.imageBlob = file.file;
-        
-        // 同时更新 imageFileList 以保持一致性
-        const fileId = `image_${Date.now()}`;
-        const fileName = file.file.name || 'uploaded-image.png';
-        
-        const fileInfo = {
-            id: fileId,
-            name: fileName,
-            status: 'finished' as const,
-            url: URL.createObjectURL(file.file),
-            file: file.file
-        };
-        
-        // 替换或添加到文件列表
-        const existingIndex = imageFileList.value.findIndex(f => f.id === fileInfo.id);
-        if (existingIndex >= 0) {
-            imageFileList.value[existingIndex] = fileInfo;
-        } else {
-            imageFileList.value = [fileInfo];
-        }
-        
-        onFinish();
-        message.success(t('promptManagement.imageUploadSuccess'));
-    } catch (error) {
-        console.error('图片上传失败:', error);
-        onError();
-        message.error(t('promptManagement.imageUploadFailed'));
+const handleCustomRequest = ({ file, onFinish }: any) => {
+    // 直接添加到 formData.imageBlobs
+    if (!formData.value.imageBlobs) {
+        formData.value.imageBlobs = [];
     }
+    formData.value.imageBlobs.push(file.file);
+    
+    // 完成上传
+    onFinish();
 };
 
 const handleRemoveImage = (file: any) => {
-    // 清除图片数据
-    formData.value.imageBlob = undefined;
-    // 同时清空文件列表
-    imageFileList.value = [];
-    message.success(t('promptManagement.imageRemoveSuccess'));
+    // 从 formData.imageBlobs 中移除对应的文件
+    if (formData.value.imageBlobs) {
+        const index = formData.value.imageBlobs.findIndex(blob => 
+            blob.size === file.file?.size && blob.type === file.file?.type
+        );
+        if (index >= 0) {
+            formData.value.imageBlobs.splice(index, 1);
+        }
+    }
 };
 
 const handleCancel = () => {
@@ -1956,17 +1879,18 @@ const handleSave = async () => {
                 }));
         }
 
-        // 从imageFileList中获取图片数据
-        const imageFile = imageFileList.value
-            .filter(file => file.file && file.status === 'finished')
-            .map(file => file.file)[0]; // 只取第一张图片
-
-        // 优先使用 formData 中的 imageBlob，如果没有则从 imageFileList 中获取
-        let imageBlob = formData.value.imageBlob;
-        if (!imageBlob && imageFile) {
-            // 将File转换为Blob
-            imageBlob = new Blob([imageFile], { type: imageFile.type });
+        // 直接使用 formData 中的 imageBlobs，确保数据一致性
+        let imageBlobs = formData.value.imageBlobs;
+        if (!imageBlobs || !Array.isArray(imageBlobs)) {
+            imageBlobs = [];
         }
+        
+        console.log('保存时的图片数据:', {
+            imageBlobsCount: imageBlobs.length,
+            imageFileListCount: imageFileList.value.length,
+            imageBlobsTypes: imageBlobs.map(blob => blob.type),
+            imageFileListFiles: imageFileList.value.map(f => ({ name: f.name, size: f.file?.size }))
+        });
 
         const data = {
             title: finalTitle,
@@ -1979,25 +1903,21 @@ const handleSave = async () => {
             isActive: true,
             isJinjaTemplate: isJinjaEnabled.value,
             variables: variablesData,
-            imageBlob: imageBlob,
+            imageBlobs: imageBlobs,
         };
 
         console.log('保存提示词数据:', {
-            hasImageBlob: !!imageBlob,
-            imageBlobType: typeof imageBlob,
-            isBlob: imageBlob instanceof Blob,
-            size: imageBlob?.size,
-            constructor: imageBlob?.constructor?.name,
-            mimeType: imageBlob?.type,
-            fromFormData: !!formData.value.imageBlob,
-            fromFileList: !!imageFile
+            hasImageBlobs: !!imageBlobs,
+            imageBlobsType: typeof imageBlobs,
+            isArray: Array.isArray(imageBlobs),
+            count: imageBlobs?.length || 0,
+            constructor: imageBlobs?.constructor?.name,
+            fromFormData: !!formData.value.imageBlobs,
+            fromFileList: imageFileList.value.length > 0
         });
-
-
 
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新
-            // 构建当前提示词的完整数据用于历史记录
             const currentPromptData = {
                 ...props.prompt,
                 title: finalTitle,
@@ -2006,31 +1926,19 @@ const handleSave = async () => {
                 categoryId: formData.value.categoryId || undefined,
                 tags: formData.value.tags.length > 0 ? formData.value.tags : [],
                 isJinjaTemplate: isJinjaEnabled.value,
-                variables: variablesData, // 这里保持为数组，createHistoryRecord 会处理 JSON.stringify
-                imageBlob: formData.value.imageBlob,
+                variables: variablesData,
+                imageBlobs: formData.value.imageBlobs || [],
             };
 
-            console.log('创建历史记录 - 当前数据:', {
-                promptId: currentPromptData.id,
-                title: currentPromptData.title,
-                content: currentPromptData.content,
-                isJinjaTemplate: currentPromptData.isJinjaTemplate,
-                variables: currentPromptData.variables,
-                variablesCount: currentPromptData.variables?.length || 0
-            });
-
             await createHistoryRecord(currentPromptData);
-
             await api.prompts.update.mutate({
                 id: props.prompt.id,
                 data,
             });
             message.success(t('promptManagement.updateSuccess'));
-
-            // 重新加载历史记录
             await loadHistory();
         } else {
-            // 新建模式：需要添加 uuid 字段
+            // 新建模式
             const createData = {
                 ...data,
                 uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -2189,74 +2097,11 @@ defineExpose({
     refreshQuickOptimizationConfigs
 });
 
-// 图片预览处理函数
-const handlePreviewFile = (file: any) => {
-    if (file.file) {
-        return URL.createObjectURL(file.file);
-    }
-    return file.url || '';
-};
 
-const handlePreviewImage = (file: any) => {
-    const imageUrl = handlePreviewFile(file);
-    if (imageUrl) {
-        currentPreviewImage.value = imageUrl;
-        showImagePreview.value = true;
-    }
-};
 
-// 调试函数：检查图片数据一致性
-const checkImageDataConsistency = () => {
-    const formDataHasImage = !!formData.value.imageBlob;
-    const fileListHasImage = imageFileList.value.length > 0;
-    
-    console.log('🔄 图片数据一致性检查:', {
-        formDataHasImage,
-        formDataImageSize: formData.value.imageBlob?.size,
-        fileListHasImage,
-        fileListLength: imageFileList.value.length,
-        fileListFiles: imageFileList.value.map(f => ({
-            name: f.name,
-            status: f.status,
-            hasFile: !!f.file,
-            fileSize: f.file?.size
-        }))
-    });
-    
-    if (formDataHasImage !== fileListHasImage) {
-        console.warn('⚠️ 图片数据不一致！formData 和 imageFileList 状态不匹配');
-    }
-};
 
-// 监听formData.imageBlob的变化
-watch(
-    () => formData.value.imageBlob,
-    (newImageBlob) => {
-        console.log('🔄 formData.imageBlob 发生变化:', {
-            hasImageBlob: !!newImageBlob,
-            size: newImageBlob?.size,
-            type: newImageBlob?.type
-        });
-        checkImageDataConsistency();
-    }
-);
 
-// 监听imageFileList的变化
-watch(
-    () => imageFileList.value,
-    (newFileList) => {
-        console.log('🔄 imageFileList 发生变化:', {
-            length: newFileList.length,
-            files: newFileList.map(f => ({
-                name: f.name,
-                status: f.status,
-                hasFile: !!f.file
-            }))
-        });
-        checkImageDataConsistency();
-    },
-    { deep: true }
-);
+
 </script>
 
 <style scoped></style>
