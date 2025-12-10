@@ -269,6 +269,9 @@
                                                         clearable />
                                                     <NSwitch v-else-if="variable.type === 'boolean' || variable.type === 'bool'"
                                                         v-model:value="variableValues[variable.name]" />
+                                                    <ListInput v-else-if="variable.type === 'list'"
+                                                        :value="Array.isArray(variableValues[variable.name]) ? variableValues[variable.name] : []"
+                                                        @update:value="(val) => variableValues[variable.name] = val" />
                                                     <NInput v-else
                                                         v-model:value="variableValues[variable.name]" type="textarea"
                                                         :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
@@ -305,6 +308,9 @@
                                                     clearable />
                                                 <NSwitch v-else-if="variable.type === 'boolean' || variable.type === 'bool'"
                                                     v-model:value="variableValues[variable.name]" />
+                                                <ListInput v-else-if="variable.type === 'list'"
+                                                    :value="Array.isArray(variableValues[variable.name]) ? variableValues[variable.name] : []"
+                                                    @update:value="(val) => variableValues[variable.name] = val" />
                                                 <NInput v-else
                                                     v-model:value="variableValues[variable.name]" type="textarea"
                                                     :placeholder="`请输入 ${variable.name} 的值`" :rows="1"
@@ -917,6 +923,7 @@ import { useTagColors } from "@/composables/useTagColors";
 import { useI18n } from "@/composables/useI18n";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
+import ListInput from "@/components/common/ListInput.vue";
 import type { AIGenerationHistory } from "../../../shared/types/ai";
 import { jinjaService } from "@/lib/utils/jinja.service";
 
