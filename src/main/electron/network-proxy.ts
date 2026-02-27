@@ -203,17 +203,22 @@ export class NetworkProxyManager {
         process.env.HTTP_PROXY = `http://${httpProxy}`;
         process.env.http_proxy = `http://${httpProxy}`;
       }
-      
+
       if (httpsProxy) {
         process.env.HTTPS_PROXY = `http://${httpsProxy}`;
         process.env.https_proxy = `http://${httpsProxy}`;
       }
-      
-      if (config.noProxy) {
-        process.env.NO_PROXY = config.noProxy;
-        process.env.no_proxy = config.noProxy;
-      }
-      
+
+      // 设置 NO_PROXY 环境变量
+      // 始终包含本地地址，避免本地服务（如 ollama）通过代理访问
+      const localAddresses = 'localhost,127.0.0.1,::1,0.0.0.0';
+      const noProxyValue = config.noProxy
+        ? `${localAddresses},${config.noProxy}`
+        : localAddresses;
+
+      process.env.NO_PROXY = noProxyValue;
+      process.env.no_proxy = noProxyValue;
+
       console.log('✅ 已配置手动代理');
       console.log('环境变量:', {
         HTTP_PROXY: process.env.HTTP_PROXY,
@@ -238,14 +243,21 @@ export class NetworkProxyManager {
         if (proxyMatch) {
           const proxyAddress = proxyMatch[1].trim();
           const proxyUrl = `http://${proxyAddress}`;
-          
+
           // 设置环境变量
           process.env.HTTP_PROXY = proxyUrl;
           process.env.HTTPS_PROXY = proxyUrl;
           process.env.http_proxy = proxyUrl;
           process.env.https_proxy = proxyUrl;
-          
+
+          // 设置 NO_PROXY 环境变量，排除本地地址
+          // 这样本地 ollama 等服务就不会通过代理访问
+          const noProxyList = 'localhost,127.0.0.1,::1,0.0.0.0';
+          process.env.NO_PROXY = noProxyList;
+          process.env.no_proxy = noProxyList;
+
           console.log(`✅ 已设置 Node.js 代理环境变量: ${proxyUrl}`);
+          console.log(`✅ 已设置 NO_PROXY: ${noProxyList}`);
         }
       }
     } catch (error) {

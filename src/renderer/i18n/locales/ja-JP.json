@@ -572,7 +572,7 @@
     "manualAdjustmentPlaceholder": "調整指示を入力",
     "manualAdjustmentTip": "自然言語の指示でプロンプトを微調整できます",
     "manualAdjustmentTitle": "手動調整",
-    "maxTagsError": "最大5つのタグしか追加できません",
+    "maxTagsError": "最大50つのタグしか追加できません",
     "noAIConfigAvailable": "利用可能なAI設定がありません。先にAI設定ページで設定を追加してください",
     "noCategories": "カテゴリがありません。左側に新しいカテゴリを作成してください",
     "noCategory": "未分類",

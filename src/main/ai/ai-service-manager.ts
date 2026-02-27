@@ -269,7 +269,7 @@ class AIServiceManager {
     onProgress: (charCount: number, partialContent?: string) => boolean
   ): Promise<AIGenerationResult> {
     // 生成唯一的请求ID
-    const requestId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `gen_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     
     // 创建 AbortController
     const abortController = new AbortController();

@@ -573,7 +573,7 @@
     "manualAdjustmentPlaceholder": "Enter instructions on how to adjust the prompt, e.g., 'Add more details', 'Simplify language'...",
     "manualAdjustmentTip": "AI will adjust the current prompt content based on your instructions",
     "manualAdjustmentTitle": "Manual Adjustment Instructions",
-    "maxTagsError": "You can add up to 5 tags only",
+    "maxTagsError": "You can add up to 50 tags only",
     "noAIConfigAvailable": "No AI configuration available, please add configuration in AI Config page first",
     "noCategories": "No categories, please create a new category on the left",
     "noCategory": "Uncategorized",

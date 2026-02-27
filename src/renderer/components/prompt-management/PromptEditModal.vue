@@ -92,8 +92,16 @@
                                                     clearable />
                                             </NFormItem>
                                             <NFormItem :label="t('promptManagement.tags')" path="tags">
-                                                <NDynamicTags v-model:value="formData.tags"
-                                                    :placeholder="t('promptManagement.tagsPlaceholder')" :max="5" />
+                                                <NSelect
+                                                    v-model:value="formData.tags"
+                                                    :options="tagOptions"
+                                                    :placeholder="t('promptManagement.tagsPlaceholder')"
+                                                    multiple
+                                                    filterable
+                                                    tag
+                                                    :max-tag-count="50"
+                                                    :loading="loadingTags"
+                                                />
                                             </NFormItem>
                                         </NFlex>
                                     </NScrollbar>
@@ -581,6 +589,10 @@ const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 // 图片上传相关
 const imageFileList = ref<UploadFileInfo[]>([]);
 
+// 标签相关
+const tagOptions = ref<{ label: string; value: string }[]>([]);
+const loadingTags = ref(false);
+
 // 表单数据
 const formData = ref<{
     title: string;
@@ -642,7 +654,7 @@ const rules = {
     tags: {
         trigger: ['change'],
         validator(rule: unknown, value: string[]) {
-            if (value.length > 5) {
+            if (value.length > 50) {
                 return new Error(t('promptManagement.maxTagsError'));
             }
             return true;
@@ -672,6 +684,24 @@ const loadQuickOptimizationConfigs = async () => {
         console.error("加载快速优化配置失败:", error);
         // 如果加载失败，使用默认配置
         quickOptimizationConfigs.value = [];
+    }
+};
+
+// 加载已有标签
+const loadExistingTags = async () => {
+    try {
+        loadingTags.value = true;
+        const stats = await api.prompts.getStatistics.query();
+        // 将标签转换为选项格式，按使用次数排序
+        tagOptions.value = stats.popularTags.map(tag => ({
+            label: `${tag.name} (${tag.count})`,
+            value: tag.name
+        }));
+    } catch (error) {
+        console.error("加载标签失败:", error);
+        tagOptions.value = [];
+    } finally {
+        loadingTags.value = false;
     }
 };
 
@@ -1537,7 +1567,9 @@ watch(
         if (newShow) {
             // 加载快速优化配置
             loadQuickOptimizationConfigs();
-            
+            // 加载已有标签
+            loadExistingTags();
+
             if (!oldShow) {
                 // 弹窗从隐藏变为显示时
                 activeTab.value = "edit";
@@ -1760,16 +1792,30 @@ const handleCustomRequest = ({ file, onFinish }: any) => {
     onFinish();
 };
 
-const handleRemoveImage = (file: any) => {
+const handleRemoveImage = (options: { file: UploadFileInfo; fileList: UploadFileInfo[] }) => {
+    const { file } = options;
+
     // 从 formData.imageBlobs 中移除对应的文件
     if (formData.value.imageBlobs) {
-        const index = formData.value.imageBlobs.findIndex(blob => 
-            blob.size === file.file?.size && blob.type === file.file?.type
-        );
-        if (index >= 0) {
-            formData.value.imageBlobs.splice(index, 1);
+        // file.file 是实际的 File 对象
+        const actualFile = file.file;
+
+        if (actualFile) {
+            const index = formData.value.imageBlobs.findIndex(blob =>
+                blob.size === actualFile.size &&
+                blob.type === actualFile.type &&
+                blob.name === actualFile.name
+            );
+            if (index >= 0) {
+                formData.value.imageBlobs.splice(index, 1);
+                console.log('成功删除图片，剩余图片数量:', formData.value.imageBlobs.length);
+            } else {
+                console.warn('未找到匹配的图片进行删除');
+            }
         }
     }
+
+    return true;
 };
 
 const handleCancel = () => {
