@@ -129,7 +129,7 @@
       "lmstudio": "Local AI model management tool provides a graphical interface to run various open source models. \nSupports model download, management and local reasoning.",
       "mistral": "Europe's leading AI company, providing efficient open source and business models. \nOutstanding performance in terms of speed of reasoning and cost-effectiveness.",
       "ollama": "The local AI model running framework supports running various open source models on personal devices. \nProtect privacy without internet connection, suitable for offline use.",
-      "openai": "The world's leading AI research company provides advanced models such as GPT-4 and GPT-3.5. \nSupports streaming output, fast response speed, suitable for various AI application scenarios.",
+      "openai": "The world's leading AI research company provides advanced models. \nSupports streaming output, fast response speed, suitable for various AI application scenarios.",
       "openrouter": "AI model aggregation platform, providing a unified access interface for a variety of mainstream AI models. \nSupports model comparison and cost optimization, suitable for multi-model application scenarios.",
       "siliconflow": "The leading AI computing platform in China provides high-performance GPU resources and a variety of AI models. \nSuitable for large-scale AI training and reasoning tasks.",
       "tencent": "AI services provided by Tencent Cloud include Hunyuan big model. \nIntegrate Tencent ecosystem, suitable for domestic corporate users and provide localized services.",
