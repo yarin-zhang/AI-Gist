@@ -573,7 +573,7 @@
     "manualAdjustmentPlaceholder": "请输入调整指令",
     "manualAdjustmentTip": "可输入自然语言指令对提示词进行微调",
     "manualAdjustmentTitle": "手动调整",
-    "maxTagsError": "你最多只能添加 5 个标签",
+    "maxTagsError": "你最多只能添加 50 个标签",
     "noAIConfigAvailable": "没有可用的AI配置，请先在AI配置页面添加配置",
     "noCategories": "暂无分类，请在左侧创建新分类",
     "noCategory": "未分类",

@@ -99,7 +99,7 @@
                                                     multiple
                                                     filterable
                                                     tag
-                                                    :max-tag-count="5"
+                                                    :max-tag-count="50"
                                                     :loading="loadingTags"
                                                 />
                                             </NFormItem>
@@ -654,7 +654,7 @@ const rules = {
     tags: {
         trigger: ['change'],
         validator(rule: unknown, value: string[]) {
-            if (value.length > 5) {
+            if (value.length > 50) {
                 return new Error(t('promptManagement.maxTagsError'));
             }
             return true;
