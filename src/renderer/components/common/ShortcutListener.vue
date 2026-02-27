@@ -13,16 +13,21 @@ let cleanupCopyPrompt: (() => void) | null = null;
 let cleanupTriggerPrompt: (() => void) | null = null;
 
 onMounted(() => {
+  // 只在 Electron 环境下监听快捷键
+  if (!window.electronAPI?.shortcuts) {
+    return;
+  }
+
   // 监听复制提示词快捷键
   cleanupCopyPrompt = window.electronAPI.shortcuts.onInsertData(async (promptId?: number) => {
     console.log('快捷键触发：复制提示词', promptId);
-    
+
     if (promptId) {
       console.log(`复制提示词ID: ${promptId}`);
       // 这里不需要做任何操作，因为主进程已经处理了复制到剪贴板
     }
   });
-  
+
   // 监听提示词触发器快捷键
   cleanupTriggerPrompt = window.electronAPI.shortcuts.onTriggerPrompt(async (promptId: number) => {
     console.log(`快捷键触发：提示词触发器 ${promptId}`);

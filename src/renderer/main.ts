@@ -5,6 +5,10 @@ import { initDatabase, databaseService } from './lib/services'
 import type { SupportedLocale } from '@shared/types/preferences'
 import './tailwind.css'
 import './assets/scss/index.scss'
+import { setupMobileDebug } from './utils/mobile-debug'
+
+// 设置移动端调试
+setupMobileDebug()
 
 // 初始化语言设置
 function initLocale() {

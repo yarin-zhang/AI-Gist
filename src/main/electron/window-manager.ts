@@ -15,7 +15,7 @@ const CONSTANTS = {
   WINDOW_DIMENSIONS: {
     DEFAULT_WIDTH: 1080,
     DEFAULT_HEIGHT: 720,
-    MIN_WIDTH: 800,
+    MIN_WIDTH: 375, // 调整为移动端宽度，支持预览移动端效果
     MIN_HEIGHT: 660
   },
   BACKGROUND_COLORS: {
