@@ -1792,16 +1792,30 @@ const handleCustomRequest = ({ file, onFinish }: any) => {
     onFinish();
 };
 
-const handleRemoveImage = (file: any) => {
+const handleRemoveImage = (options: { file: UploadFileInfo; fileList: UploadFileInfo[] }) => {
+    const { file } = options;
+
     // 从 formData.imageBlobs 中移除对应的文件
     if (formData.value.imageBlobs) {
-        const index = formData.value.imageBlobs.findIndex(blob => 
-            blob.size === file.file?.size && blob.type === file.file?.type
-        );
-        if (index >= 0) {
-            formData.value.imageBlobs.splice(index, 1);
+        // file.file 是实际的 File 对象
+        const actualFile = file.file;
+
+        if (actualFile) {
+            const index = formData.value.imageBlobs.findIndex(blob =>
+                blob.size === actualFile.size &&
+                blob.type === actualFile.type &&
+                blob.name === actualFile.name
+            );
+            if (index >= 0) {
+                formData.value.imageBlobs.splice(index, 1);
+                console.log('成功删除图片，剩余图片数量:', formData.value.imageBlobs.length);
+            } else {
+                console.warn('未找到匹配的图片进行删除');
+            }
         }
     }
+
+    return true;
 };
 
 const handleCancel = () => {
