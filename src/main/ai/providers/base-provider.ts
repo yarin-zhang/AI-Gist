@@ -370,19 +370,51 @@ export abstract class BaseAIProvider implements AIProvider {
   }
 
   /**
+   * 移除思考过程标签
+   * 支持多种常见的思考过程标记格式
+   */
+  protected removeThinkingProcess(content: string): string {
+    if (!content) return content;
+
+    // 移除 XML 风格的思考标签: <thinking>...</thinking>, <think>...</think>
+    let cleaned = content.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    // 移除 Markdown 风格的思考块: ```thinking ... ```
+    cleaned = cleaned.replace(/```thinking[\s\S]*?```/gi, '');
+
+    // 移除特殊标记的思考过程: [THINKING]...[/THINKING]
+    cleaned = cleaned.replace(/\[THINKING\][\s\S]*?\[\/THINKING\]/gi, '');
+
+    // 移除中文标记: 【思考】...【/思考】
+    cleaned = cleaned.replace(/【思考】[\s\S]*?【\/思考】/g, '');
+
+    // 清理多余的空行（超过2个连续换行符）
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+    // 清理首尾空白
+    cleaned = cleaned.trim();
+
+    return cleaned;
+  }
+
+  /**
    * 创建生成结果
    */
   protected createGenerationResult(
-    request: AIGenerationRequest, 
-    config: AIConfig, 
-    model: string, 
+    request: AIGenerationRequest,
+    config: AIConfig,
+    model: string,
     generatedPrompt: string
   ): AIGenerationResult {
+    // 移除思考过程后再存储
+    const cleanedPrompt = this.removeThinkingProcess(generatedPrompt);
+
     return {
-      id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `gen_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       configId: config.configId,
       topic: request.topic,
-      generatedPrompt: generatedPrompt,
+      generatedPrompt: cleanedPrompt,
       model: model,
       customPrompt: request.customPrompt,
       createdAt: new Date()
