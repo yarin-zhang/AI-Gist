@@ -16,13 +16,18 @@ import {
 } from 'naive-ui'
 import { useTheme } from '~/composables/useTheme'
 import { useI18n } from '~/composables/useI18n'
+import { PlatformDetector } from '@shared/platform'
 import i18n from '~/i18n'
 import MainPage from '~/pages/MainPage.vue'
+import MobileMainPage from '~/pages/MobileMainPage.vue'
 import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 import AppInitializer from '~/components/common/AppInitializer.vue'
 import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 import ShortcutListener from '~/components/common/ShortcutListener.vue'
 import NotificationHandler from '~/components/common/NotificationHandler.vue'
+
+// 检测平台
+const isDesktop = PlatformDetector.isDesktop()
 
 // 使用主题管理
 const { naiveTheme, getThemeOverrides, initTheme } = useTheme()
@@ -64,7 +69,8 @@ onMounted(async () => {
 </script>
 
 <template>
-    <NConfigProvider :theme="naiveTheme" :theme-overrides="getThemeOverrides()" :locale="naiveLocale" :date-locale="naiveDateLocale">
+    <!-- 桌面端：使用 Naive UI -->
+    <NConfigProvider v-if="isDesktop" :theme="naiveTheme" :theme-overrides="getThemeOverrides()" :locale="naiveLocale" :date-locale="naiveDateLocale">
         <NMessageProvider>
             <NDialogProvider>
                 <AppInitializer>
@@ -81,4 +87,11 @@ onMounted(async () => {
             </NDialogProvider>
         </NMessageProvider>
     </NConfigProvider>
+
+    <!-- 移动端：使用 Ionic -->
+    <div v-else>
+        <AppInitializer>
+            <MobileMainPage />
+        </AppInitializer>
+    </div>
 </template>

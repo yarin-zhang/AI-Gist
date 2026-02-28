@@ -3,6 +3,7 @@ import App from './App.vue'
 import i18n from './i18n'
 import { initDatabase, databaseService } from './lib/services'
 import type { SupportedLocale } from '@shared/types/preferences'
+import { PlatformDetector } from '@shared/platform'
 import './tailwind.css'
 import './assets/scss/index.scss'
 import { setupMobileDebug } from './utils/mobile-debug'
@@ -149,11 +150,18 @@ async function startApp() {
       }
     };
     console.log('数据库服务已暴露到 window.databaseAPI');
-    
+
     // 数据库服务已经暴露，不再需要单独的 IPC 处理器
 
     const app = createApp(App);
     app.use(i18n);
+
+    // 条件注册 Ionic（仅移动端）
+    if (PlatformDetector.isMobile()) {
+      const { setupIonic } = await import('./setup-ionic');
+      setupIonic(app);
+    }
+
     app.mount('#app');
     
     // Vue 应用挂载完成后移除加载屏幕
@@ -163,6 +171,13 @@ async function startApp() {
     // 即使数据库初始化失败，也要启动应用
     const app = createApp(App);
     app.use(i18n);
+
+    // 条件注册 Ionic（仅移动端）
+    if (PlatformDetector.isMobile()) {
+      const { setupIonic } = await import('./setup-ionic');
+      setupIonic(app);
+    }
+
     app.mount('#app');
     
     // 移除加载屏幕
