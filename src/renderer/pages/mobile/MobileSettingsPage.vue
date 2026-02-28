@@ -55,11 +55,6 @@
           <ion-label>{{ t('dataManagement.importFullBackup') }}</ion-label>
         </ion-item>
 
-        <ion-item button @click="handleBackup">
-          <ion-icon :icon="saveOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('dataManagement.createBackup') }}</ion-label>
-        </ion-item>
-
         <!-- 关于 -->
         <ion-list-header>
           <ion-label>{{ t('about.projectInfo') }}</ion-label>
@@ -70,11 +65,6 @@
             <h3>{{ t('about.currentVersion') }}</h3>
             <p>{{ appVersion }}</p>
           </ion-label>
-        </ion-item>
-
-        <ion-item button @click="handleCheckUpdate">
-          <ion-icon :icon="refreshOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.checkForUpdates') }}</ion-label>
         </ion-item>
       </ion-list>
     </ion-content>
@@ -97,19 +87,18 @@ import {
   IonSelectOption,
   IonIcon,
   toastController,
-  actionSheetController
+  alertController,
+  loadingController
 } from '@ionic/vue'
 import {
   downloadOutline,
-  cloudUploadOutline,
-  saveOutline,
-  refreshOutline
+  cloudUploadOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useTheme } from '~/composables/useTheme'
-import { api } from '~/lib/api'
-import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
+import { databaseService } from '~/lib/db'
 
 const { t, currentLocale, setLocale } = useI18n()
 const { currentTheme: themeMode, setTheme } = useTheme()
@@ -135,9 +124,27 @@ const handleThemeChange = (event: any) => {
 
 // 导出数据
 const handleExport = async () => {
+  const loading = await loadingController.create({
+    message: t('common.loading')
+  })
+
   try {
-    const data = await api.appSettings.exportData.query()
-    const jsonString = JSON.stringify(data, null, 2)
+    await loading.present()
+
+    // 从数据库导出所有数据
+    const result = await databaseService.exportAllData()
+
+    if (!result || !result.success) {
+      throw new Error('导出数据失败')
+    }
+
+    const exportData = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      data: result.data
+    }
+
+    const jsonString = JSON.stringify(exportData, null, 2)
     const fileName = `ai-gist-backup-${new Date().toISOString().split('T')[0]}.json`
 
     // 保存到文件系统
@@ -145,8 +152,10 @@ const handleExport = async () => {
       path: fileName,
       data: jsonString,
       directory: Directory.Documents,
-      encoding: 'utf8'
+      encoding: Encoding.UTF8
     })
+
+    await loading.dismiss()
 
     // 分享文件
     await Share.share({
@@ -158,6 +167,7 @@ const handleExport = async () => {
 
     showToast(t('settingsMessages.dataExportSuccess'))
   } catch (error) {
+    await loading.dismiss()
     console.error('Export error:', error)
     showToast(t('settingsMessages.dataExportFailed'), 'danger')
   }
@@ -165,34 +175,81 @@ const handleExport = async () => {
 
 // 导入数据
 const handleImport = async () => {
-  const actionSheet = await actionSheetController.create({
-    header: t('dataManagement.importFullBackup'),
-    buttons: [
-      {
-        text: t('common.cancel'),
-        role: 'cancel'
-      }
-    ]
-  })
-
-  await actionSheet.present()
-  showToast(t('settingsMessages.dataImportFailed'), 'warning')
-}
-
-// 备份
-const handleBackup = async () => {
   try {
-    await api.appSettings.backupData.mutate()
-    showToast(t('settingsMessages.backupCreatedSuccess'))
+    // 创建文件输入元素
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+
+    input.onchange = async (e: any) => {
+      const file = e.target?.files?.[0]
+      if (!file) return
+
+      // 确认导入操作
+      const alert = await alertController.create({
+        header: t('common.confirm'),
+        message: t('dataManagement.fullBackupDescription'),
+        buttons: [
+          {
+            text: t('common.cancel'),
+            role: 'cancel'
+          },
+          {
+            text: t('common.confirm'),
+            handler: async () => {
+              await performImport(file)
+            }
+          }
+        ]
+      })
+
+      await alert.present()
+    }
+
+    input.click()
   } catch (error) {
-    console.error('Backup error:', error)
-    showToast(t('settingsMessages.backupCreatedFailed'), 'danger')
+    console.error('Import error:', error)
+    showToast(t('settingsMessages.dataImportFailed'), 'danger')
   }
 }
 
-// 检查更新
-const handleCheckUpdate = () => {
-  showToast(t('about.isLatest'))
+// 执行导入
+const performImport = async (file: File) => {
+  const loading = await loadingController.create({
+    message: t('common.loading')
+  })
+
+  try {
+    await loading.present()
+
+    // 读取文件内容
+    const text = await file.text()
+    const importData = JSON.parse(text)
+
+    // 验证数据格式
+    if (!importData.data) {
+      throw new Error('无效的备份文件格式')
+    }
+
+    // 导入到数据库
+    const result = await databaseService.replaceAllData(importData.data)
+
+    if (!result || !result.success) {
+      throw new Error(result?.message || '导入失败')
+    }
+
+    await loading.dismiss()
+    showToast(t('settingsMessages.dataImportSuccess'))
+
+    // 延迟刷新页面以确保数据同步
+    setTimeout(() => {
+      window.location.reload()
+    }, 1000)
+  } catch (error) {
+    await loading.dismiss()
+    console.error('Import error:', error)
+    showToast(t('settingsMessages.dataImportFailed'), 'danger')
+  }
 }
 
 // 显示提示
