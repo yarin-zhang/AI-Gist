@@ -7,7 +7,7 @@
             <ion-icon :icon="arrowBack"></ion-icon>
           </ion-button>
         </ion-buttons>
-        <ion-title>{{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}</ion-title>
+        <ion-title>{{ isEdit ? t('promptManagement.edit') : t('promptManagement.createPrompt') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="handleSave" :disabled="saving">
             {{ t('common.save') }}
@@ -59,7 +59,7 @@
           <ion-item button @click="showCategoryPicker = true">
             <ion-label>{{ t('promptManagement.category') }}</ion-label>
             <ion-note slot="end">
-              {{ selectedCategoryName || t('promptManagement.uncategorized') }}
+              {{ selectedCategoryName || t('promptManagement.noCategory') }}
             </ion-note>
           </ion-item>
 
@@ -67,13 +67,13 @@
           <ion-item button @click="showTagsModal = true">
             <ion-label>{{ t('promptManagement.tags') }}</ion-label>
             <ion-note slot="end">
-              {{ formData.tags?.length || 0 }} {{ t('promptManagement.tagsSelected') }}
+              {{ formData.tags?.length || 0 }} {{ t('promptManagement.tags') }}
             </ion-note>
           </ion-item>
 
           <!-- 收藏 -->
           <ion-item>
-            <ion-label>{{ t('promptManagement.favorite') }}</ion-label>
+            <ion-label>{{ t('promptManagement.detailModal.favorite') }}</ion-label>
             <ion-toggle v-model="formData.isFavorite"></ion-toggle>
           </ion-item>
         </ion-list>
@@ -95,7 +95,7 @@
       <ion-content>
         <ion-list>
           <ion-item button @click="selectCategory(null)">
-            <ion-label>{{ t('promptManagement.uncategorized') }}</ion-label>
+            <ion-label>{{ t('promptManagement.noCategory') }}</ion-label>
             <ion-icon
               v-if="!formData.categoryId"
               :icon="checkmark"
@@ -128,14 +128,14 @@
           <ion-title>{{ t('promptManagement.selectTags') }}</ion-title>
           <ion-buttons slot="end">
             <ion-button @click="showTagsModal = false">
-              {{ t('common.done') }}
+              {{ t('common.close') }}
             </ion-button>
           </ion-buttons>
         </ion-toolbar>
         <ion-toolbar>
           <ion-searchbar
             v-model="tagSearchText"
-            :placeholder="t('promptManagement.searchOrCreateTag')"
+            :placeholder="t('promptManagement.searchOrAddTag')"
             @ionInput="handleTagSearch"
           ></ion-searchbar>
         </ion-toolbar>
@@ -161,7 +161,7 @@
             v-if="!formData.tags?.includes(tagSearchText.trim())"
           >
             <ion-icon :icon="add" slot="start"></ion-icon>
-            <ion-label>{{ t('promptManagement.createTag', { tag: tagSearchText.trim() }) }}</ion-label>
+            <ion-label>{{ t('promptManagement.addTag', { tag: tagSearchText.trim() }) }}</ion-label>
           </ion-item>
         </ion-list>
 
@@ -293,7 +293,7 @@ const loadData = async () => {
     }
   } catch (error) {
     console.error('加载数据失败:', error)
-    showToast(t('common.loadFailed'), 'danger')
+    showToast(t('promptManagement.loadFailed'), 'danger')
   }
 }
 
@@ -373,7 +373,7 @@ const handleSave = async () => {
     router.back()
   } catch (error) {
     console.error('保存失败:', error)
-    showToast(t('common.saveFailed'), 'danger')
+    showToast(t('promptManagement.saveFailed'), 'danger')
   } finally {
     saving.value = false
   }
@@ -394,7 +394,7 @@ const handleCancel = async () => {
           role: 'cancel'
         },
         {
-          text: t('common.discard'),
+          text: t('promptManagement.discardChanges'),
           role: 'destructive',
           handler: () => {
             router.back()

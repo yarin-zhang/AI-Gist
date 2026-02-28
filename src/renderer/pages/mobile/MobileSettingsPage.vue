@@ -10,11 +10,11 @@
       <ion-list>
         <!-- 外观设置 -->
         <ion-list-header>
-          <ion-label>{{ t('settings.appearance') }}</ion-label>
+          <ion-label>{{ t('appearance.theme') }}</ion-label>
         </ion-list-header>
 
         <ion-item>
-          <ion-label>{{ t('settings.language') }}</ion-label>
+          <ion-label>{{ t('language.selectLanguage') }}</ion-label>
           <ion-select
             v-model="currentLanguage"
             interface="action-sheet"
@@ -28,53 +28,53 @@
         </ion-item>
 
         <ion-item>
-          <ion-label>{{ t('settings.theme') }}</ion-label>
+          <ion-label>{{ t('appearance.theme') }}</ion-label>
           <ion-select
             v-model="currentTheme"
             interface="action-sheet"
             @ionChange="handleThemeChange"
           >
-            <ion-select-option value="light">{{ t('settings.lightTheme') }}</ion-select-option>
-            <ion-select-option value="dark">{{ t('settings.darkTheme') }}</ion-select-option>
-            <ion-select-option value="auto">{{ t('settings.autoTheme') }}</ion-select-option>
+            <ion-select-option value="light">{{ t('appearance.light') }}</ion-select-option>
+            <ion-select-option value="dark">{{ t('appearance.dark') }}</ion-select-option>
+            <ion-select-option value="auto">{{ t('appearance.auto') }}</ion-select-option>
           </ion-select>
         </ion-item>
 
         <!-- 数据管理 -->
         <ion-list-header>
-          <ion-label>{{ t('settings.dataManagement') }}</ion-label>
+          <ion-label>{{ t('dataManagement.backupManagement') }}</ion-label>
         </ion-list-header>
 
         <ion-item button @click="handleExport">
           <ion-icon :icon="downloadOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('settings.exportData') }}</ion-label>
+          <ion-label>{{ t('dataManagement.exportFullBackup') }}</ion-label>
         </ion-item>
 
         <ion-item button @click="handleImport">
           <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('settings.importData') }}</ion-label>
+          <ion-label>{{ t('dataManagement.importFullBackup') }}</ion-label>
         </ion-item>
 
         <ion-item button @click="handleBackup">
           <ion-icon :icon="saveOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('settings.backup') }}</ion-label>
+          <ion-label>{{ t('dataManagement.createBackup') }}</ion-label>
         </ion-item>
 
         <!-- 关于 -->
         <ion-list-header>
-          <ion-label>{{ t('settings.about') }}</ion-label>
+          <ion-label>{{ t('about.projectInfo') }}</ion-label>
         </ion-list-header>
 
         <ion-item>
           <ion-label>
-            <h3>{{ t('settings.version') }}</h3>
+            <h3>{{ t('about.currentVersion') }}</h3>
             <p>{{ appVersion }}</p>
           </ion-label>
         </ion-item>
 
         <ion-item button @click="handleCheckUpdate">
           <ion-icon :icon="refreshOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('settings.checkUpdate') }}</ion-label>
+          <ion-label>{{ t('about.checkForUpdates') }}</ion-label>
         </ion-item>
       </ion-list>
     </ion-content>
@@ -123,14 +123,14 @@ const handleLanguageChange = (event: any) => {
   const newLocale = event.detail.value
   setLocale(newLocale)
   localStorage.setItem('locale', newLocale)
-  showToast(t('settings.languageChanged'))
+  showToast(t('language.description'))
 }
 
 // 主题切换
 const handleThemeChange = (event: any) => {
   const newTheme = event.detail.value
   setTheme(newTheme)
-  showToast(t('settings.themeChanged'))
+  showToast(t('appearance.theme'))
 }
 
 // 导出数据
@@ -150,23 +150,23 @@ const handleExport = async () => {
 
     // 分享文件
     await Share.share({
-      title: t('settings.exportData'),
-      text: t('settings.exportSuccess'),
+      title: t('dataManagement.exportFullBackup'),
+      text: t('settingsMessages.dataExportSuccess'),
       url: savedFile.uri,
-      dialogTitle: t('settings.exportData')
+      dialogTitle: t('dataManagement.exportFullBackup')
     })
 
-    showToast(t('settings.exportSuccess'))
+    showToast(t('settingsMessages.dataExportSuccess'))
   } catch (error) {
     console.error('Export error:', error)
-    showToast(t('settings.exportFailed'), 'danger')
+    showToast(t('settingsMessages.dataExportFailed'), 'danger')
   }
 }
 
 // 导入数据
 const handleImport = async () => {
   const actionSheet = await actionSheetController.create({
-    header: t('settings.importData'),
+    header: t('dataManagement.importFullBackup'),
     buttons: [
       {
         text: t('common.cancel'),
@@ -176,23 +176,23 @@ const handleImport = async () => {
   })
 
   await actionSheet.present()
-  showToast(t('settings.importNotImplemented'), 'warning')
+  showToast(t('settingsMessages.dataImportFailed'), 'warning')
 }
 
 // 备份
 const handleBackup = async () => {
   try {
     await api.appSettings.backupData.mutate()
-    showToast(t('settings.backupSuccess'))
+    showToast(t('settingsMessages.backupCreatedSuccess'))
   } catch (error) {
     console.error('Backup error:', error)
-    showToast(t('settings.backupFailed'), 'danger')
+    showToast(t('settingsMessages.backupCreatedFailed'), 'danger')
   }
 }
 
 // 检查更新
 const handleCheckUpdate = () => {
-  showToast(t('settings.alreadyLatest'))
+  showToast(t('about.isLatest'))
 }
 
 // 显示提示

@@ -22,7 +22,7 @@
         <ion-icon :icon="sparklesOutline" class="empty-icon"></ion-icon>
         <p class="empty-text">{{ t('aiConfig.noConfigs') }}</p>
         <ion-button @click="handleCreate">
-          {{ t('aiConfig.createConfig') }}
+          {{ t('aiConfig.addConfig') }}
         </ion-button>
       </div>
 
@@ -38,7 +38,7 @@
               <div class="config-meta">
                 <ion-chip size="small" :color="config.isDefault ? 'primary' : 'medium'">
                   <ion-label>
-                    {{ config.isDefault ? t('aiConfig.default') : t('aiConfig.custom') }}
+                    {{ config.isDefault ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
                   </ion-label>
                 </ion-chip>
               </div>
@@ -102,7 +102,8 @@ import {
   IonItemOptions,
   IonItemOption,
   alertController,
-  toastController
+  toastController,
+  onIonViewWillEnter
 } from '@ionic/vue'
 import {
   add,
@@ -227,6 +228,11 @@ const showToast = async (message: string, color: string = 'success') => {
 // 初始化
 onMounted(async () => {
   await loadConfigs()
+})
+
+// 页面进入时刷新
+onIonViewWillEnter(() => {
+  loadConfigs()
 })
 </script>
 

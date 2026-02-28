@@ -53,7 +53,7 @@
         <ion-icon :icon="documentTextOutline" class="empty-icon"></ion-icon>
         <p class="empty-text">{{ t('promptManagement.noPrompts') }}</p>
         <ion-button @click="handleCreate">
-          {{ t('promptManagement.createPrompt') }}
+          {{ t('promptManagement.create') }}
         </ion-button>
       </div>
 
@@ -63,7 +63,7 @@
           <ion-item button @click="handleView(prompt)">
             <ion-label>
               <h2>{{ prompt.title }}</h2>
-              <p class="prompt-description">{{ prompt.description || t('promptManagement.noDescription') }}</p>
+              <p class="prompt-description">{{ prompt.description || t('promptManagement.detailModal.noDescription') }}</p>
               <div class="prompt-meta">
                 <ion-chip v-if="prompt.categoryId" size="small" outline>
                   <ion-label>{{ getCategoryName(prompt.categoryId) }}</ion-label>
@@ -214,7 +214,8 @@ import {
   IonItemOptions,
   IonItemOption,
   alertController,
-  toastController
+  toastController,
+  onIonViewWillEnter
 } from '@ionic/vue'
 import {
   add,
@@ -312,9 +313,9 @@ const loadCategories = async () => {
 
 // 获取分类名称
 const getCategoryName = (categoryId: string | null) => {
-  if (!categoryId) return t('promptManagement.uncategorized')
+  if (!categoryId) return t('promptManagement.noCategory')
   const category = categories.value.find(c => c.id === categoryId)
-  return category?.name || t('promptManagement.uncategorized')
+  return category?.name || t('promptManagement.noCategory')
 }
 
 // 搜索处理
@@ -375,7 +376,7 @@ const handleCreate = () => {
 const handleDelete = async (prompt: Prompt) => {
   const alert = await alertController.create({
     header: t('common.confirm'),
-    message: t('promptManagement.deleteConfirm', { title: prompt.title }),
+    message: t('promptManagement.confirmDeletePrompt', { title: prompt.title }),
     buttons: [
       {
         text: t('common.cancel'),
@@ -421,6 +422,11 @@ watch([showFavoritesOnly, selectedTag], () => {
 onMounted(async () => {
   await loadCategories()
   await loadPrompts()
+})
+
+// 页面进入时刷新（从编辑页返回时会触发）
+onIonViewWillEnter(() => {
+  loadPrompts()
 })
 </script>
 
