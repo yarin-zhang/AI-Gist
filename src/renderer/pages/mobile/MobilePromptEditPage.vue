@@ -1,0 +1,441 @@
+<template>
+  <ion-page>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button @click="handleCancel">
+            <ion-icon :icon="arrowBack"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+        <ion-title>{{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="handleSave" :disabled="saving">
+            {{ t('common.save') }}
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content :fullscreen="true">
+      <form @submit.prevent="handleSave">
+        <ion-list>
+          <!-- 标题 -->
+          <ion-item>
+            <ion-input
+              v-model="formData.title"
+              :label="t('promptManagement.title')"
+              label-placement="stacked"
+              :placeholder="t('promptManagement.titlePlaceholder')"
+              required
+            ></ion-input>
+          </ion-item>
+
+          <!-- 描述 -->
+          <ion-item>
+            <ion-textarea
+              v-model="formData.description"
+              :label="t('promptManagement.description')"
+              label-placement="stacked"
+              :placeholder="t('promptManagement.descriptionPlaceholder')"
+              :rows="3"
+              :auto-grow="true"
+            ></ion-textarea>
+          </ion-item>
+
+          <!-- 内容 -->
+          <ion-item>
+            <ion-textarea
+              v-model="formData.content"
+              :label="t('promptManagement.content')"
+              label-placement="stacked"
+              :placeholder="t('promptManagement.contentPlaceholder')"
+              :rows="8"
+              :auto-grow="true"
+              required
+            ></ion-textarea>
+          </ion-item>
+
+          <!-- 分类 -->
+          <ion-item button @click="showCategoryPicker = true">
+            <ion-label>{{ t('promptManagement.category') }}</ion-label>
+            <ion-note slot="end">
+              {{ selectedCategoryName || t('promptManagement.uncategorized') }}
+            </ion-note>
+          </ion-item>
+
+          <!-- 标签 -->
+          <ion-item button @click="showTagsModal = true">
+            <ion-label>{{ t('promptManagement.tags') }}</ion-label>
+            <ion-note slot="end">
+              {{ formData.tags?.length || 0 }} {{ t('promptManagement.tagsSelected') }}
+            </ion-note>
+          </ion-item>
+
+          <!-- 收藏 -->
+          <ion-item>
+            <ion-label>{{ t('promptManagement.favorite') }}</ion-label>
+            <ion-toggle v-model="formData.isFavorite"></ion-toggle>
+          </ion-item>
+        </ion-list>
+      </form>
+    </ion-content>
+
+    <!-- 分类选择器 -->
+    <ion-modal :is-open="showCategoryPicker" @didDismiss="showCategoryPicker = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('promptManagement.selectCategory') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showCategoryPicker = false">
+              {{ t('common.close') }}
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <ion-list>
+          <ion-item button @click="selectCategory(null)">
+            <ion-label>{{ t('promptManagement.uncategorized') }}</ion-label>
+            <ion-icon
+              v-if="!formData.categoryId"
+              :icon="checkmark"
+              slot="end"
+              color="primary"
+            ></ion-icon>
+          </ion-item>
+          <ion-item
+            v-for="category in categories"
+            :key="category.id"
+            button
+            @click="selectCategory(category.id)"
+          >
+            <ion-label>{{ category.name }}</ion-label>
+            <ion-icon
+              v-if="formData.categoryId === category.id"
+              :icon="checkmark"
+              slot="end"
+              color="primary"
+            ></ion-icon>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ion-modal>
+
+    <!-- 标签选择器 -->
+    <ion-modal :is-open="showTagsModal" @didDismiss="showTagsModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('promptManagement.selectTags') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showTagsModal = false">
+              {{ t('common.done') }}
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+        <ion-toolbar>
+          <ion-searchbar
+            v-model="tagSearchText"
+            :placeholder="t('promptManagement.searchOrCreateTag')"
+            @ionInput="handleTagSearch"
+          ></ion-searchbar>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <!-- 已选标签 -->
+        <div v-if="formData.tags && formData.tags.length > 0" class="selected-tags">
+          <ion-chip
+            v-for="tag in formData.tags"
+            :key="tag"
+            @click="removeTag(tag)"
+          >
+            <ion-label>{{ tag }}</ion-label>
+            <ion-icon :icon="closeCircle"></ion-icon>
+          </ion-chip>
+        </div>
+
+        <!-- 添加新标签 -->
+        <ion-list v-if="tagSearchText.trim()">
+          <ion-item
+            button
+            @click="addTag(tagSearchText.trim())"
+            v-if="!formData.tags?.includes(tagSearchText.trim())"
+          >
+            <ion-icon :icon="add" slot="start"></ion-icon>
+            <ion-label>{{ t('promptManagement.createTag', { tag: tagSearchText.trim() }) }}</ion-label>
+          </ion-item>
+        </ion-list>
+
+        <!-- 热门标签 -->
+        <ion-list>
+          <ion-list-header>
+            <ion-label>{{ t('promptManagement.popularTags') }}</ion-label>
+          </ion-list-header>
+          <ion-item
+            v-for="tag in filteredPopularTags"
+            :key="tag"
+            button
+            @click="toggleTag(tag)"
+          >
+            <ion-label>{{ tag }}</ion-label>
+            <ion-checkbox
+              :checked="formData.tags?.includes(tag)"
+              slot="end"
+            ></ion-checkbox>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ion-modal>
+  </ion-page>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonButtons,
+  IonButton,
+  IonIcon,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonTextarea,
+  IonToggle,
+  IonNote,
+  IonModal,
+  IonSearchbar,
+  IonChip,
+  IonCheckbox,
+  IonListHeader,
+  toastController,
+  alertController
+} from '@ionic/vue'
+import {
+  arrowBack,
+  checkmark,
+  closeCircle,
+  add
+} from 'ionicons/icons'
+import { useI18n } from '~/composables/useI18n'
+import { api } from '~/lib/api'
+import type { Prompt, Category } from '@shared/types'
+
+const { t } = useI18n()
+const router = useRouter()
+const route = useRoute()
+
+// 状态
+const isEdit = computed(() => !!route.params.id)
+const promptId = computed(() => route.params.id as string)
+const saving = ref(false)
+const categories = ref<Category[]>([])
+const popularTags = ref<string[]>([])
+const showCategoryPicker = ref(false)
+const showTagsModal = ref(false)
+const tagSearchText = ref('')
+
+// 表单数据
+const formData = ref<Partial<Prompt>>({
+  title: '',
+  description: '',
+  content: '',
+  categoryId: null,
+  tags: [],
+  isFavorite: false
+})
+
+// 选中的分类名称
+const selectedCategoryName = computed(() => {
+  if (!formData.value.categoryId) return ''
+  const category = categories.value.find(c => c.id === formData.value.categoryId)
+  return category?.name || ''
+})
+
+// 过滤后的热门标签
+const filteredPopularTags = computed(() => {
+  if (!tagSearchText.value.trim()) return popularTags.value
+  return popularTags.value.filter(tag =>
+    tag.toLowerCase().includes(tagSearchText.value.toLowerCase())
+  )
+})
+
+// 加载数据
+const loadData = async () => {
+  try {
+    // 加载分类
+    categories.value = await api.categories.getAll.query()
+
+    // 加载热门标签
+    const allPrompts = await api.prompts.getAllForTags.query()
+    const tagCounts = new Map<string, number>()
+    allPrompts.forEach(prompt => {
+      prompt.tags?.forEach(tag => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
+      })
+    })
+    popularTags.value = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([tag]) => tag)
+
+    // 如果是编辑模式，加载提示词数据
+    if (isEdit.value) {
+      const prompt = await api.prompts.getById.query(promptId.value)
+      formData.value = {
+        ...prompt,
+        tags: prompt.tags || []
+      }
+    }
+  } catch (error) {
+    console.error('加载数据失败:', error)
+    showToast(t('common.loadFailed'), 'danger')
+  }
+}
+
+// 选择分类
+const selectCategory = (categoryId: string | null) => {
+  formData.value.categoryId = categoryId
+  showCategoryPicker.value = false
+}
+
+// 切换标签
+const toggleTag = (tag: string) => {
+  if (!formData.value.tags) {
+    formData.value.tags = []
+  }
+  const index = formData.value.tags.indexOf(tag)
+  if (index > -1) {
+    formData.value.tags.splice(index, 1)
+  } else {
+    formData.value.tags.push(tag)
+  }
+}
+
+// 添加标签
+const addTag = (tag: string) => {
+  if (!tag.trim()) return
+  if (!formData.value.tags) {
+    formData.value.tags = []
+  }
+  if (!formData.value.tags.includes(tag)) {
+    formData.value.tags.push(tag)
+  }
+  tagSearchText.value = ''
+}
+
+// 移除标签
+const removeTag = (tag: string) => {
+  if (!formData.value.tags) return
+  const index = formData.value.tags.indexOf(tag)
+  if (index > -1) {
+    formData.value.tags.splice(index, 1)
+  }
+}
+
+// 标签搜索
+const handleTagSearch = () => {
+  // 搜索逻辑已在 computed 中处理
+}
+
+// 保存
+const handleSave = async () => {
+  // 验证
+  if (!formData.value.title?.trim()) {
+    showToast(t('promptManagement.titleRequired'), 'warning')
+    return
+  }
+  if (!formData.value.content?.trim()) {
+    showToast(t('promptManagement.contentRequired'), 'warning')
+    return
+  }
+
+  saving.value = true
+
+  try {
+    if (isEdit.value) {
+      // 更新
+      await api.prompts.update.mutate({
+        id: promptId.value,
+        data: formData.value as Prompt
+      })
+      showToast(t('promptManagement.updateSuccess'))
+    } else {
+      // 创建
+      await api.prompts.create.mutate(formData.value as any)
+      showToast(t('promptManagement.createSuccess'))
+    }
+
+    router.back()
+  } catch (error) {
+    console.error('保存失败:', error)
+    showToast(t('common.saveFailed'), 'danger')
+  } finally {
+    saving.value = false
+  }
+}
+
+// 取消
+const handleCancel = async () => {
+  // 检查是否有未保存的更改
+  const hasChanges = formData.value.title || formData.value.content
+
+  if (hasChanges) {
+    const alert = await alertController.create({
+      header: t('common.confirm'),
+      message: t('promptManagement.unsavedChanges'),
+      buttons: [
+        {
+          text: t('common.cancel'),
+          role: 'cancel'
+        },
+        {
+          text: t('common.discard'),
+          role: 'destructive',
+          handler: () => {
+            router.back()
+          }
+        }
+      ]
+    })
+    await alert.present()
+  } else {
+    router.back()
+  }
+}
+
+// 显示提示
+const showToast = async (message: string, color: string = 'success') => {
+  const toast = await toastController.create({
+    message,
+    duration: 2000,
+    color
+  })
+  await toast.present()
+}
+
+// 初始化
+onMounted(() => {
+  loadData()
+})
+</script>
+
+<style scoped>
+.selected-tags {
+  padding: 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--ion-background-color);
+  border-bottom: 1px solid var(--ion-border-color);
+}
+
+ion-textarea {
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+}
+</style>

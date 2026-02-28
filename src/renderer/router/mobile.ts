@@ -27,6 +27,14 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/mobile/MobileSettingsPage.vue')
       }
     ]
+  },
+  {
+    path: '/prompt/create',
+    component: () => import('../pages/mobile/MobilePromptEditPage.vue')
+  },
+  {
+    path: '/prompt/edit/:id',
+    component: () => import('../pages/mobile/MobilePromptEditPage.vue')
   }
 ]
 
