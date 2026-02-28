@@ -103,23 +103,27 @@ export function useTheme() {
 	 */
 	const setCssGlobalVars = () => {
 		if (typeof document !== 'undefined') {
-			const html = document.documentElement
-			const styleObject = getCssVars(themeName.value)
-			
-			// 设置主题类名
-			html.classList.remove('theme-light', 'theme-dark')
-			html.classList.add(`theme-${themeName.value}`)
-			
-			// 设置暗色模式类名
-			if (isDark.value) {
-				html.classList.add('dark')
-			} else {
-				html.classList.remove('dark')
-			}
-			
-			// 设置 CSS 变量
-			for (const [key, value] of Object.entries(styleObject)) {
-				html.style.setProperty(`--${key}`, value)
+			try {
+				const html = document.documentElement
+				const styleObject = getCssVars(themeName.value)
+
+				// 设置主题类名
+				html.classList.remove('theme-light', 'theme-dark')
+				html.classList.add(`theme-${themeName.value}`)
+
+				// 设置暗色模式类名
+				if (isDark.value) {
+					html.classList.add('dark')
+				} else {
+					html.classList.remove('dark')
+				}
+
+				// 设置 CSS 变量
+				for (const [key, value] of Object.entries(styleObject)) {
+					html.style.setProperty(`--${key}`, value)
+				}
+			} catch (error) {
+				console.error('设置 CSS 变量失败:', error)
 			}
 		}
 	}
@@ -289,19 +293,23 @@ export function useTheme() {
 	 * 更新页面根元素的主题类名
 	 */
 	const updateBodyTheme = () => {
-		const html = document.documentElement
-		const body = document.body
-		
-		// 移除之前的主题类
-		html.classList.remove('light', 'dark')
-		body.classList.remove('light', 'dark')
-		
-		// 添加新的主题类
-		html.classList.add(themeClass.value)
-		body.classList.add(themeClass.value)
-		
-		// 设置CSS自定义属性
-		body.style.setProperty('--theme-mode', themeClass.value)
+		try {
+			const html = document.documentElement
+			const body = document.body
+
+			// 移除之前的主题类
+			html.classList.remove('light', 'dark')
+			body.classList.remove('light', 'dark')
+
+			// 添加新的主题类
+			html.classList.add(themeClass.value)
+			body.classList.add(themeClass.value)
+
+			// 设置CSS自定义属性
+			body.style.setProperty('--theme-mode', themeClass.value)
+		} catch (error) {
+			console.error('更新主题类名失败:', error)
+		}
 	}
 
 	/**

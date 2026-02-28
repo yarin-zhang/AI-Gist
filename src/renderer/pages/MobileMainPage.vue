@@ -1,139 +1,71 @@
 <template>
   <ion-page>
-    <!-- 主内容区 -->
-    <ion-content :fullscreen="true">
-      <!-- 提示词页面 -->
-      <div v-show="currentTab === 'prompts'" class="tab-content">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ t('mainPage.menu.prompts') }}</ion-title>
-          </ion-toolbar>
-        </ion-header>
-        <div class="content-padding">
-          <h2>提示词管理</h2>
-          <p>移动端提示词列表即将推出...</p>
-        </div>
-      </div>
+    <ion-tabs>
+      <ion-router-outlet></ion-router-outlet>
 
-      <!-- AI 配置页面 -->
-      <div v-show="currentTab === 'ai-config'" class="tab-content">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ t('mainPage.menu.aiConfig') }}</ion-title>
-          </ion-toolbar>
-        </ion-header>
-        <div class="content-padding">
-          <h2>AI 配置</h2>
-          <p>移动端 AI 配置即将推出...</p>
-        </div>
-      </div>
+      <ion-tab-bar slot="bottom">
+        <ion-tab-button tab="prompts" href="/tabs/prompts">
+          <ion-icon :icon="listOutline" />
+          <ion-label>{{ t('mainPage.menu.prompts') }}</ion-label>
+        </ion-tab-button>
 
-      <!-- 设置页面 -->
-      <div v-show="currentTab === 'settings'" class="tab-content">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ t('mainPage.menu.settings') }}</ion-title>
-          </ion-toolbar>
-        </ion-header>
-        <div class="content-padding">
-          <h2>设置</h2>
-          <p>移动端设置即将推出...</p>
-        </div>
-      </div>
-    </ion-content>
+        <ion-tab-button tab="ai-config" href="/tabs/ai-config">
+          <ion-icon :icon="sparklesOutline" />
+          <ion-label>{{ t('mainPage.menu.aiConfig') }}</ion-label>
+        </ion-tab-button>
 
-    <!-- 底部导航栏 -->
-    <ion-footer>
-      <ion-toolbar>
-        <ion-segment :value="currentTab" @ionChange="handleTabChange">
-          <ion-segment-button value="prompts">
-            <ion-icon :icon="listOutline"></ion-icon>
-            <ion-label>{{ t('mainPage.menu.prompts') }}</ion-label>
-          </ion-segment-button>
-
-          <ion-segment-button value="ai-config">
-            <ion-icon :icon="sparklesOutline"></ion-icon>
-            <ion-label>{{ t('mainPage.menu.aiConfig') }}</ion-label>
-          </ion-segment-button>
-
-          <ion-segment-button value="settings">
-            <ion-icon :icon="settingsOutline"></ion-icon>
-            <ion-label>{{ t('mainPage.menu.settings') }}</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </ion-toolbar>
-    </ion-footer>
+        <ion-tab-button tab="settings" href="/tabs/settings">
+          <ion-icon :icon="settingsOutline" />
+          <ion-label>{{ t('mainPage.menu.settings') }}</ion-label>
+        </ion-tab-button>
+      </ion-tab-bar>
+    </ion-tabs>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onBeforeMount } from 'vue'
 import {
   IonPage,
-  IonContent,
-  IonFooter,
-  IonToolbar,
-  IonSegment,
-  IonSegmentButton,
+  IonTabs,
+  IonTabBar,
+  IonTabButton,
   IonIcon,
   IonLabel,
-  IonHeader,
-  IonTitle
+  IonRouterOutlet
 } from '@ionic/vue'
 import { listOutline, sparklesOutline, settingsOutline } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
-const currentTab = ref('prompts')
 
-const handleTabChange = (event: CustomEvent) => {
-  currentTab.value = event.detail.value
-}
+console.log('📱 [MobileMainPage] 组件脚本开始执行')
+
+onBeforeMount(() => {
+  console.log('📱 [MobileMainPage] onBeforeMount - 组件即将挂载')
+})
+
+onMounted(() => {
+  console.log('📱 [MobileMainPage] onMounted - 组件已挂载')
+  console.log('📱 [MobileMainPage] 当前 DOM:', document.querySelector('ion-page'))
+})
 </script>
 
 <style scoped>
-.tab-content {
-  height: 100%;
-  padding-bottom: 60px; /* 为底部导航栏留出空间 */
+ion-tab-bar {
+  --background: var(--ion-background-color);
+  border-top: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.1));
 }
 
-.content-padding {
-  padding: 16px;
-}
-
-ion-footer {
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-}
-
-ion-segment {
-  --background: var(--ion-background-color, #fff);
-}
-
-ion-segment-button {
-  --color: var(--ion-color-medium, #92949c);
-  --color-checked: var(--ion-color-primary, #3880ff);
-  --indicator-color: transparent;
-  min-height: 50px;
-}
-
-ion-segment-button ion-icon {
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-ion-segment-button ion-label {
-  font-size: 12px;
-  margin-top: 4px;
+ion-tab-button {
+  --color: var(--ion-color-medium);
+  --color-selected: var(--ion-color-primary);
 }
 
 /* 暗色主题适配 */
 @media (prefers-color-scheme: dark) {
-  ion-segment {
-    --background: var(--ion-background-color, #1e1e1e);
-  }
-
-  ion-footer {
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  ion-tab-bar {
+    border-top-color: rgba(255, 255, 255, 0.1);
   }
 }
 </style>
