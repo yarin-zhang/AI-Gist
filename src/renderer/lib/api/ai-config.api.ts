@@ -329,6 +329,79 @@ export class AIConfigApiClient {
       }> => {
         return this.aiConfigService.getAIConfigStats();
       }
+    },
+
+    /**
+     * 测试AI配置连接
+     */
+    test: {
+      /**
+       * 测试AI配置的连接和可用性
+       * @param config 测试配置参数
+       * @returns Promise<测试结果> 测试结果
+       */
+      mutate: async (config: {
+        type: AIConfig['type'];
+        baseURL: string;
+        apiKey?: string
+      }): Promise<{
+        success: boolean;
+        error?: string;
+        models?: string[]
+      }> => {
+        // 调用 electron API 进行测试
+        const testConfig: Partial<AIConfig> = {
+          type: config.type,
+          baseURL: config.baseURL,
+          apiKey: config.apiKey,
+          name: 'test',
+          configId: 'test',
+          models: [],
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        const result = await window.electron.ai.testConfig(testConfig as AIConfig);
+        return {
+          success: result.success,
+          error: result.error,
+          models: result.models
+        };
+      }
+    },
+
+    /**
+     * 智能测试AI配置
+     */
+    intelligentTest: {
+      /**
+       * 使用真实提示词测试AI配置
+       * @param id AI配置ID
+       * @returns Promise<测试结果> 测试结果
+       */
+      mutate: async (id: number): Promise<{
+        success: boolean;
+        error?: string;
+        response?: string;
+        inputPrompt?: string;
+      }> => {
+        const config = await this.aiConfigService.getAIConfigById(id);
+        if (!config) {
+          return {
+            success: false,
+            error: 'Configuration not found'
+          };
+        }
+
+        const result = await window.electron.ai.intelligentTest(config);
+        return {
+          success: result.success,
+          error: result.error,
+          response: result.response,
+          inputPrompt: 'Test prompt' // 可以从结果中获取
+        };
+      }
     }
   };
 }

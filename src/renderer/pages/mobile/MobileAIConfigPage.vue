@@ -26,47 +26,78 @@
         </ion-button>
       </div>
 
-      <!-- AI 配置列表 -->
-      <ion-list v-else>
-        <ion-item-sliding v-for="config in configs" :key="config.id">
-          <ion-item button @click="handleView(config)">
-            <ion-label>
-              <h2>{{ config.name }}</h2>
-              <p class="config-description">
-                {{ config.provider }} - {{ config.model }}
-              </p>
-              <div class="config-meta">
-                <ion-chip size="small" :color="config.isDefault ? 'primary' : 'medium'">
-                  <ion-label>
-                    {{ config.isDefault ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
-                  </ion-label>
-                </ion-chip>
+      <!-- 配置内容 -->
+      <div v-else>
+        <!-- 全局首选项状态显示 -->
+        <ion-card v-if="preferredConfig" color="primary">
+          <ion-card-content>
+            <div class="preferred-alert">
+              <div class="preferred-info">
+                <ion-icon :icon="starOutline"></ion-icon>
+                <div>
+                  <strong>{{ t('aiConfig.currentPreferredConfig') }}</strong>
+                  <p>{{ preferredConfig.name }}</p>
+                </div>
               </div>
-            </ion-label>
-            <ion-toggle
-              slot="end"
-              :checked="config.enabled"
-              @ionChange="handleToggle(config, $event)"
-              @click.stop
-            ></ion-toggle>
-          </ion-item>
+              <ion-button fill="clear" size="small" @click="handleClearPreferred">
+                {{ t('aiConfig.cancelPreferred') }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
 
-          <ion-item-options side="end">
-            <ion-item-option color="primary" @click="handleEdit(config)">
-              <ion-icon :icon="createOutline"></ion-icon>
-              {{ t('common.edit') }}
-            </ion-item-option>
-            <ion-item-option
-              v-if="!config.isDefault"
-              color="danger"
-              @click="handleDelete(config)"
-            >
-              <ion-icon :icon="trashOutline"></ion-icon>
-              {{ t('common.delete') }}
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
-      </ion-list>
+        <!-- 多配置无首选项警告 -->
+        <ion-card v-else-if="configs.length > 1" color="warning">
+          <ion-card-content>
+            <div class="warning-alert">
+              <ion-icon :icon="warningOutline"></ion-icon>
+              <p>{{ t('aiConfig.multipleConfigsWarning') }}</p>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- AI 配置列表 -->
+        <ion-list>
+          <ion-item-sliding v-for="config in configs" :key="config.id">
+            <ion-item button @click="handleView(config)">
+              <ion-label>
+                <h2>{{ config.name }}</h2>
+                <p class="config-description">
+                  {{ config.provider }} - {{ config.model }}
+                </p>
+                <div class="config-meta">
+                  <ion-chip size="small" :color="config.isPreferred ? 'primary' : 'medium'">
+                    <ion-label>
+                      {{ config.isPreferred ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
+                    </ion-label>
+                  </ion-chip>
+                </div>
+              </ion-label>
+              <ion-toggle
+                slot="end"
+                :checked="config.enabled"
+                @ionChange="handleToggle(config, $event)"
+                @click.stop
+              ></ion-toggle>
+            </ion-item>
+
+            <ion-item-options side="end">
+              <ion-item-option color="primary" @click="handleEdit(config)">
+                <ion-icon :icon="createOutline"></ion-icon>
+                {{ t('common.edit') }}
+              </ion-item-option>
+              <ion-item-option
+                v-if="!config.isPreferred"
+                color="danger"
+                @click="handleDelete(config)"
+              >
+                <ion-icon :icon="trashOutline"></ion-icon>
+                {{ t('common.delete') }}
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        </ion-list>
+      </div>
     </ion-content>
 
     <!-- 浮动操作按钮 -->
@@ -80,6 +111,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   IonPage,
   IonHeader,
@@ -101,6 +133,8 @@ import {
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
+  IonCard,
+  IonCardContent,
   alertController,
   toastController,
   onIonViewWillEnter
@@ -109,16 +143,20 @@ import {
   add,
   sparklesOutline,
   createOutline,
-  trashOutline
+  trashOutline,
+  starOutline,
+  warningOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { AIConfig } from '@shared/types'
 
 const { t } = useI18n()
+const router = useRouter()
 
 // 状态
 const configs = ref<AIConfig[]>([])
+const preferredConfig = ref<AIConfig | null>(null)
 const loading = ref(true)
 
 // 加载 AI 配置列表
@@ -127,6 +165,8 @@ const loadConfigs = async () => {
 
   try {
     configs.value = await api.aiConfigs.getAll.query()
+    // 查找首选配置
+    preferredConfig.value = configs.value.find(c => c.isPreferred) || null
   } catch (error) {
     console.error('加载 AI 配置失败:', error)
     showToast(t('aiConfig.loadFailed'), 'danger')
@@ -156,8 +196,8 @@ const handleToggle = async (config: AIConfig, event: any) => {
 
     config.enabled = enabled
     const message = enabled
-      ? t('aiConfig.enableSuccess')
-      : t('aiConfig.disableSuccess')
+      ? t('aiConfig.configEnabled')
+      : t('aiConfig.configDisabled')
     showToast(message)
   } catch (error) {
     console.error('更新 AI 配置失败:', error)
@@ -169,20 +209,46 @@ const handleToggle = async (config: AIConfig, event: any) => {
 
 // 查看配置
 const handleView = (config: AIConfig) => {
-  // TODO: 导航到详情页
-  console.log('View config:', config)
+  router.push(`/ai-config/${config.id}`)
 }
 
 // 编辑配置
 const handleEdit = (config: AIConfig) => {
-  // TODO: 导航到编辑页
-  console.log('Edit config:', config)
+  router.push(`/ai-config/edit/${config.id}`)
 }
 
 // 创建配置
 const handleCreate = () => {
-  // TODO: 导航到创建页
-  console.log('Create config')
+  router.push('/ai-config/create')
+}
+
+// 清除首选配置
+const handleClearPreferred = async () => {
+  const alert = await alertController.create({
+    header: t('common.confirm'),
+    message: t('aiConfig.preferredCleared'),
+    buttons: [
+      {
+        text: t('common.cancel'),
+        role: 'cancel'
+      },
+      {
+        text: t('common.confirm'),
+        handler: async () => {
+          try {
+            await api.aiConfigs.clearPreferred.mutate()
+            showToast(t('aiConfig.globalPreferredCleared'))
+            loadConfigs()
+          } catch (error) {
+            console.error('清除首选配置失败:', error)
+            showToast(t('aiConfig.clearFailed'), 'danger')
+          }
+        }
+      }
+    ]
+  })
+
+  await alert.present()
 }
 
 // 删除配置
@@ -201,7 +267,7 @@ const handleDelete = async (config: AIConfig) => {
         handler: async () => {
           try {
             await api.aiConfigs.delete.mutate(config.id!)
-            showToast(t('aiConfig.deleteSuccess'))
+            showToast(t('aiConfig.configDeleteSuccess'))
             loadConfigs()
           } catch (error) {
             console.error('删除 AI 配置失败:', error)
@@ -280,5 +346,50 @@ onIonViewWillEnter(() => {
 
 ion-chip {
   margin: 0;
+}
+
+ion-card {
+  margin: 16px;
+}
+
+.preferred-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.preferred-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.preferred-info ion-icon {
+  font-size: 24px;
+}
+
+.preferred-info p {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.warning-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.warning-alert ion-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.warning-alert p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 </style>

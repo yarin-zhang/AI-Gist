@@ -39,6 +39,22 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/prompt/detail/:id',
     component: () => import('../pages/mobile/MobilePromptDetailPage.vue')
+  },
+  {
+    path: '/ai-config/create',
+    component: () => import('../pages/mobile/MobileAIConfigEditPage.vue')
+  },
+  {
+    path: '/ai-config/edit/:id',
+    component: () => import('../pages/mobile/MobileAIConfigEditPage.vue')
+  },
+  {
+    path: '/ai-config/:id',
+    component: () => import('../pages/mobile/MobileAIConfigDetailPage.vue')
+  },
+  {
+    path: '/ai-config/:id/system-prompt',
+    component: () => import('../pages/mobile/MobileSystemPromptEditPage.vue')
   }
 ]
 
