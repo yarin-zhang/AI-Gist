@@ -15,6 +15,9 @@ import '@ionic/vue/css/text-transformation.css'
 import '@ionic/vue/css/flex-utils.css'
 import '@ionic/vue/css/display.css'
 
+// 导入 Ionic 暗色模式调色板
+import '@ionic/vue/css/palettes/dark.class.css'
+
 import { IonicVue } from '@ionic/vue'
 import type { App } from 'vue'
 

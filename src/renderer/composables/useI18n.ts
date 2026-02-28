@@ -18,10 +18,22 @@ export function useI18n() {
   
   // 切换语言
   const switchLocale = (newLocale: SupportedLocale) => {
+    console.log('[useI18n] switchLocale 调用:', {
+      from: locale.value,
+      to: newLocale
+    })
+
     locale.value = newLocale
     currentLocale.value = newLocale
+
     // 保存到本地存储
     localStorage.setItem('locale', newLocale)
+
+    console.log('[useI18n] 语言切换完成:', {
+      locale: locale.value,
+      currentLocale: currentLocale.value,
+      saved: localStorage.getItem('locale')
+    })
   }
   
   // 初始化语言设置

@@ -65,7 +65,14 @@ const naiveDateLocale = computed(() => {
 
 // 初始化主题
 onMounted(async () => {
+    // 只在桌面端初始化主题，移动端由设置页面管理
+    if (!isDesktop) {
+        console.log('[App] 移动端环境，跳过 initTheme')
+        return
+    }
+
     try {
+        console.log('[App] 桌面端环境，初始化主题')
         await initTheme()
     } catch (error) {
         console.error('❌ [App] 主题初始化失败:', error)

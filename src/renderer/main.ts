@@ -45,18 +45,39 @@ function initLocale() {
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
+  console.log('[Main] setInitialTheme 开始')
+
   const html = document.documentElement
-  const body = document.body
-  
-  // 检查系统主题偏好
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const themeClass = prefersDark ? 'dark' : 'light'
-  
-  // 立即应用主题类
-  html.classList.add(themeClass)
-  body.classList.add(themeClass)
-  
-  console.log(`预设主题: ${themeClass}`)
+
+  // 检查保存的主题设置
+  const savedTheme = localStorage.getItem('theme') as 'system' | 'light' | 'dark' | null
+  console.log('[Main] localStorage 中的主题:', savedTheme)
+
+  let isDark = false
+
+  if (savedTheme === 'dark') {
+    isDark = true
+    console.log('[Main] 使用保存的暗色主题')
+  } else if (savedTheme === 'light') {
+    isDark = false
+    console.log('[Main] 使用保存的亮色主题')
+  } else {
+    // 默认或 system：检查系统主题偏好
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    console.log('[Main] 使用系统主题，检测到:', isDark ? 'dark' : 'light')
+  }
+
+  console.log('[Main] 应用主题前 html.classList:', html.classList.toString())
+
+  // 根据 Ionic 官方文档，只需要在 html 元素上添加/移除 ion-palette-dark 类
+  if (isDark) {
+    html.classList.add('ion-palette-dark')
+  } else {
+    html.classList.remove('ion-palette-dark')
+  }
+
+  console.log('[Main] 应用主题后 html.classList:', html.classList.toString())
+  console.log(`[Main] 预设主题完成: ${isDark ? 'dark' : 'light'} (来源: ${savedTheme || 'system'})`)
 }
 
 // 移除初始加载屏幕

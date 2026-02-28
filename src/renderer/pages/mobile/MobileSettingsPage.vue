@@ -36,7 +36,7 @@
           >
             <ion-select-option value="light">{{ t('appearance.light') }}</ion-select-option>
             <ion-select-option value="dark">{{ t('appearance.dark') }}</ion-select-option>
-            <ion-select-option value="auto">{{ t('appearance.auto') }}</ion-select-option>
+            <ion-select-option value="system">{{ t('appearance.auto') }}</ion-select-option>
           </ion-select>
         </ion-item>
 
@@ -100,26 +100,74 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { databaseService } from '~/lib/db'
 
-const { t, currentLocale, setLocale } = useI18n()
-const { currentTheme: themeMode, setTheme } = useTheme()
+const { t, currentLocale, switchLocale } = useI18n()
+const { setThemeSource, themeSource } = useTheme()
 
 const currentLanguage = ref(currentLocale.value)
-const currentTheme = ref(themeMode.value || 'auto')
+const currentTheme = ref(themeSource.value || 'system')
 const appVersion = ref('1.0.0')
 
 // 语言切换
 const handleLanguageChange = (event: any) => {
   const newLocale = event.detail.value
-  setLocale(newLocale)
-  localStorage.setItem('locale', newLocale)
-  showToast(t('language.description'))
+  console.log('[Settings] 语言切换:', {
+    from: currentLanguage.value,
+    to: newLocale
+  })
+
+  switchLocale(newLocale)
+  currentLanguage.value = newLocale
+
+  console.log('[Settings] 语言切换完成，当前语言:', currentLanguage.value)
 }
 
 // 主题切换
-const handleThemeChange = (event: any) => {
-  const newTheme = event.detail.value
-  setTheme(newTheme)
-  showToast(t('appearance.theme'))
+const handleThemeChange = async (event: any) => {
+  const newTheme = event.detail.value as 'system' | 'light' | 'dark'
+
+  console.log('[Settings] 主题切换开始:', {
+    from: currentTheme.value,
+    to: newTheme
+  })
+
+  // 保存到本地存储
+  localStorage.setItem('theme', newTheme)
+  currentTheme.value = newTheme
+
+  console.log('[Settings] 主题已保存到 localStorage')
+
+  // 应用主题
+  applyTheme(newTheme)
+}
+
+// 应用主题函数
+const applyTheme = (theme: 'system' | 'light' | 'dark') => {
+  console.log('[Settings] applyTheme 调用，参数:', theme)
+
+  const html = document.documentElement
+
+  let isDark = false
+
+  if (theme === 'system') {
+    // 使用系统主题
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    console.log('[Settings] 使用系统主题，检测到:', isDark ? 'dark' : 'light')
+  } else {
+    isDark = theme === 'dark'
+    console.log('[Settings] 使用指定主题:', theme)
+  }
+
+  console.log('[Settings] 应用主题前 html.classList:', html.classList.toString())
+
+  // 根据 Ionic 官方文档，只需要在 html 元素上添加/移除 ion-palette-dark 类
+  if (isDark) {
+    html.classList.add('ion-palette-dark')
+  } else {
+    html.classList.remove('ion-palette-dark')
+  }
+
+  console.log('[Settings] 应用主题后 html.classList:', html.classList.toString())
+  console.log('[Settings] 主题应用完成，isDark:', isDark)
 }
 
 // 导出数据
@@ -263,8 +311,27 @@ const showToast = async (message: string, color: string = 'success') => {
 }
 
 onMounted(() => {
+  console.log('[Settings] 组件挂载')
+
   // 加载应用版本
   // appVersion.value = window.electronAPI?.getAppVersion() || '1.0.0'
+
+  // 从本地存储加载主题设置
+  const savedTheme = localStorage.getItem('theme') as 'system' | 'light' | 'dark' | null
+  console.log('[Settings] 从 localStorage 读取主题:', savedTheme)
+
+  if (savedTheme) {
+    currentTheme.value = savedTheme
+    console.log('[Settings] 应用保存的主题:', savedTheme)
+    applyTheme(savedTheme)
+  } else {
+    // 默认使用系统主题
+    console.log('[Settings] 没有保存的主题，使用系统默认')
+    applyTheme('system')
+  }
+
+  console.log('[Settings] 当前语言:', currentLanguage.value)
+  console.log('[Settings] 当前主题:', currentTheme.value)
 })
 </script>
 
