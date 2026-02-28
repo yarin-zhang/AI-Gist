@@ -162,23 +162,13 @@ async function startApp() {
       const { setupIonic } = await import('./setup-ionic');
       setupIonic(app);
 
-      // 注册移动端路由
-      console.log('📱 [Main] 开始加载移动端路由')
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);
-      console.log('✅ 移动端路由已注册');
-
-      // 等待路由准备完成
       await mobileRouter.default.isReady();
-      console.log('✅ [Main] 路由已准备就绪，当前路由:', mobileRouter.default.currentRoute.value.path);
-    } else {
-      console.log('🖥️ [Main] 检测到桌面端环境')
     }
 
-    console.log('🚀 [Main] 开始挂载 Vue 应用')
     app.mount('#app');
-    console.log('✅ [Main] Vue 应用已挂载')
-    
+
     // Vue 应用挂载完成后移除加载屏幕
     removeInitialLoading();
   } catch (error) {
@@ -189,27 +179,17 @@ async function startApp() {
 
     // 条件注册 Ionic 和路由（仅移动端）
     if (PlatformDetector.isMobile()) {
-      console.log('📱 [Main] 检测到移动端环境，开始加载 Ionic')
+      // console.log('📱 [Main] 检测到移动端环境，开始加载 Ionic')
       const { setupIonic } = await import('./setup-ionic');
       setupIonic(app);
 
-      // 注册移动端路由
-      console.log('📱 [Main] 开始加载移动端路由')
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);
-      console.log('✅ 移动端路由已注册');
-
-      // 等待路由准备完成
       await mobileRouter.default.isReady();
-      console.log('✅ [Main] 路由已准备就绪，当前路由:', mobileRouter.default.currentRoute.value.path);
-    } else {
-      console.log('🖥️ [Main] 检测到桌面端环境')
     }
 
-    console.log('🚀 [Main] 开始挂载 Vue 应用')
     app.mount('#app');
-    console.log('✅ [Main] Vue 应用已挂载')
-    
+
     // 移除加载屏幕
     removeInitialLoading();
   }

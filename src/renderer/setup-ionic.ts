@@ -23,5 +23,4 @@ import type { App } from 'vue'
  */
 export function setupIonic(app: App) {
   app.use(IonicVue)
-  console.log('✅ Ionic Vue 已注册')
 }

@@ -23,7 +23,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeMount } from 'vue'
 import {
   IonPage,
   IonHeader,
@@ -34,16 +33,6 @@ import {
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
-
-console.log('📱 [MobilePromptPage] 组件脚本开始执行')
-
-onBeforeMount(() => {
-  console.log('📱 [MobilePromptPage] onBeforeMount')
-})
-
-onMounted(() => {
-  console.log('📱 [MobilePromptPage] onMounted - 提示词页面已挂载')
-})
 </script>
 
 <style scoped>

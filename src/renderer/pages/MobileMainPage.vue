@@ -24,7 +24,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeMount } from 'vue'
 import {
   IonPage,
   IonTabs,
@@ -38,17 +37,6 @@ import { listOutline, sparklesOutline, settingsOutline } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 
 const { t } = useI18n()
-
-console.log('📱 [MobileMainPage] 组件脚本开始执行')
-
-onBeforeMount(() => {
-  console.log('📱 [MobileMainPage] onBeforeMount - 组件即将挂载')
-})
-
-onMounted(() => {
-  console.log('📱 [MobileMainPage] onMounted - 组件已挂载')
-  console.log('📱 [MobileMainPage] 当前 DOM:', document.querySelector('ion-page'))
-})
 </script>
 
 <style scoped>
