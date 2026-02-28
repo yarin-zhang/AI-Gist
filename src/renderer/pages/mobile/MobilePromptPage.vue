@@ -358,8 +358,7 @@ const handleSortChange = (value: string) => {
 
 // 查看提示词
 const handleView = (prompt: Prompt) => {
-  // TODO: 导航到详情页
-  console.log('View prompt:', prompt)
+  router.push(`/prompt/detail/${prompt.id}`)
 }
 
 // 编辑提示词

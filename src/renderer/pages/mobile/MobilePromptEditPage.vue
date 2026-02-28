@@ -231,7 +231,10 @@ const route = useRoute()
 
 // 状态
 const isEdit = computed(() => !!route.params.id)
-const promptId = computed(() => route.params.id as string)
+const promptId = computed(() => {
+  const id = route.params.id as string
+  return id ? parseInt(id, 10) : null
+})
 const saving = ref(false)
 const categories = ref<Category[]>([])
 const popularTags = ref<string[]>([])
@@ -284,7 +287,7 @@ const loadData = async () => {
       .map(([tag]) => tag)
 
     // 如果是编辑模式，加载提示词数据
-    if (isEdit.value) {
+    if (isEdit.value && promptId.value) {
       const prompt = await api.prompts.getById.query(promptId.value)
       formData.value = {
         ...prompt,
@@ -357,7 +360,7 @@ const handleSave = async () => {
   saving.value = true
 
   try {
-    if (isEdit.value) {
+    if (isEdit.value && promptId.value) {
       // 更新
       await api.prompts.update.mutate({
         id: promptId.value,
