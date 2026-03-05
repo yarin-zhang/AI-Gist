@@ -256,6 +256,7 @@
     "save": "保存",
     "unknownError": "未知錯誤",
     "update": "更新",
+    "warning": "警告",
     "yes": "是"
   },
   "dataManagement": {
@@ -679,6 +680,7 @@
     "unsavedChanges": "您有未儲存的更改，確定要離開嗎？",
     "untitledPrompt": "未命名提示詞",
     "update": "更新",
+    "warning": "警告",
     "updateFailed": "更新失敗",
     "updateFavoriteFailed": "更新收藏狀態失敗",
     "updateFavoriteSuccess": "收藏狀態已更新",

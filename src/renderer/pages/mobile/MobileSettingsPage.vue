@@ -57,6 +57,11 @@
           <ion-label>{{ t('dataManagement.importFullBackup') }}</ion-label>
         </ion-item>
 
+        <ion-item button @click="navigateToCloudBackup">
+          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
+          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
+        </ion-item>
+
         <!-- 关于 -->
         <ion-list-header>
           <ion-label>{{ t('about.projectInfo') }}</ion-label>
@@ -75,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   IonPage,
   IonHeader,
@@ -94,7 +100,8 @@ import {
 } from '@ionic/vue'
 import {
   downloadOutline,
-  cloudUploadOutline
+  cloudUploadOutline,
+  cloudOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useTheme } from '~/composables/useTheme'
@@ -102,6 +109,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { databaseService } from '~/lib/db'
 
+const router = useRouter()
 const { t, currentLocale, switchLocale } = useI18n()
 const { setThemeSource, themeSource } = useTheme()
 
@@ -174,6 +182,29 @@ const applyTheme = (theme: 'system' | 'light' | 'dark') => {
 
 // 导出数据
 const handleExport = async () => {
+  // 先显示警告提示
+  const alert = await alertController.create({
+    header: t('common.warning'),
+    message: t('dataManagement.exportWarning'),
+    buttons: [
+      {
+        text: t('common.cancel'),
+        role: 'cancel'
+      },
+      {
+        text: t('common.confirm'),
+        handler: async () => {
+          await performExport()
+        }
+      }
+    ]
+  })
+
+  await alert.present()
+}
+
+// 执行导出
+const performExport = async () => {
   const loading = await loadingController.create({
     message: t('common.loading')
   })
@@ -188,13 +219,8 @@ const handleExport = async () => {
       throw new Error('导出数据失败')
     }
 
-    const exportData = {
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      data: result.data
-    }
-
-    const jsonString = JSON.stringify(exportData, null, 2)
+    // 直接导出数据，与桌面端格式保持一致
+    const jsonString = JSON.stringify(result.data, null, 2)
     const fileName = `ai-gist-backup-${new Date().toISOString().split('T')[0]}.json`
 
     // 保存到文件系统
@@ -237,8 +263,8 @@ const handleImport = async () => {
 
       // 确认导入操作
       const alert = await alertController.create({
-        header: t('common.confirm'),
-        message: t('dataManagement.fullBackupDescription'),
+        header: t('common.warning'),
+        message: t('dataManagement.importWarning'),
         buttons: [
           {
             text: t('common.cancel'),
@@ -276,13 +302,13 @@ const performImport = async (file: File) => {
     const text = await file.text()
     const importData = JSON.parse(text)
 
-    // 验证数据格式
-    if (!importData.data) {
+    // 验证数据格式（与桌面端一致）
+    if (!importData || typeof importData !== 'object') {
       throw new Error('无效的备份文件格式')
     }
 
     // 导入到数据库
-    const result = await databaseService.replaceAllData(importData.data)
+    const result = await databaseService.replaceAllData(importData)
 
     if (!result || !result.success) {
       throw new Error(result?.message || '导入失败')
@@ -310,6 +336,11 @@ const showToast = async (message: string, color: string = 'success') => {
     color
   })
   await toast.present()
+}
+
+// 导航到云端备份页面
+const navigateToCloudBackup = () => {
+  router.push('/mobile/cloud-backup')
 }
 
 onMounted(() => {

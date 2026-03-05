@@ -256,6 +256,7 @@
     "save": "Save",
     "unknownError": "Unknown error",
     "update": "Update",
+    "warning": "Warning",
     "yes": "Yes"
   },
   "dataManagement": {
@@ -278,11 +279,13 @@
     "exportFullBackup": "Export Full Backup",
     "exportToCSV": "Export as CSV",
     "exportToJSON": "Export as JSON",
+    "exportWarning": "⚠️ The exported data will contain all prompts, categories, AI configurations (including API keys) and other sensitive information. Please keep the exported file safe to avoid leakage.",
     "formatNote": "Format Note",
     "formatNoteText": "AI configuration data contains complex object structures so headers are not uniform, only supports export as JSON format.",
     "fullBackupDescription": "Export complete backup package, or import complete backup from package. Exported data will contain sensitive information such as API keys in AI configuration. Please keep export files safe to avoid leakage.",
     "fullBackupManagement": "Full Backup Management",
     "importFullBackup": "Import Full Backup",
+    "importWarning": "⚠️ Importing backup will completely overwrite all existing data (including prompts, categories, AI configurations, etc.), this operation cannot be undone! It is recommended to create a backup of current data first.",
     "maintenanceDescription": "When encountering data anomalies, you can try to repair the database",
     "noBackups": "No backup versions yet, please create a backup first",
     "openBackupDirectory": "Open Backup Directory",
