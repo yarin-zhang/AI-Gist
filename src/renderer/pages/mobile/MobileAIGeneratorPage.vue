@@ -282,8 +282,15 @@ const generatePrompt = async () => {
     // 保存当前主题，用于后续保存
     generatedTopic.value = formData.topic
 
-    // 使用统一的 AI 生成服务
-    const result = await AIGeneratorService.generatePrompt(request, selectedConfig)
+    // 使用统一的 AI 生成服务，支持流式传输
+    const result = await AIGeneratorService.generatePrompt(
+      request,
+      selectedConfig,
+      (content: string) => {
+        // 流式更新生成结果
+        generatedResult.value = content
+      }
+    )
 
     generatedResult.value = result.generatedPrompt
 
