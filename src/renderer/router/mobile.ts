@@ -55,6 +55,10 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/ai-config/:id/system-prompt',
     component: () => import('../pages/mobile/MobileSystemPromptEditPage.vue')
+  },
+  {
+    path: '/mobile/cloud-backup',
+    component: () => import('../pages/mobile/MobileCloudBackupPage.vue')
   }
 ]
 
