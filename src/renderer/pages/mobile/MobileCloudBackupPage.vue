@@ -16,16 +16,29 @@
           <ion-label>{{ t('cloudBackup.storageConfiguration') }}</ion-label>
         </ion-list-header>
 
-        <ion-item v-for="config in storageConfigs" :key="config.id" button @click="selectStorage(config)">
-          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
-          <ion-label>
-            <h3>{{ config.name }}</h3>
-            <p>{{ getConfigDescription(config) }}</p>
-          </ion-label>
-          <ion-badge :color="config.enabled ? 'success' : 'warning'" slot="end">
-            {{ config.enabled ? t('cloudBackup.enabled') : t('cloudBackup.disabled') }}
-          </ion-badge>
-        </ion-item>
+        <ion-item-sliding v-for="config in storageConfigs" :key="config.id">
+          <ion-item button @click="selectStorage(config)">
+            <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
+            <ion-label>
+              <h3>{{ config.name }}</h3>
+              <p>{{ getConfigDescription(config) }}</p>
+            </ion-label>
+            <ion-badge :color="config.enabled ? 'success' : 'warning'" slot="end">
+              {{ config.enabled ? t('cloudBackup.enabled') : t('cloudBackup.disabled') }}
+            </ion-badge>
+          </ion-item>
+
+          <ion-item-options side="end">
+            <ion-item-option color="primary" @click="editConfig(config)">
+              <ion-icon :icon="createOutline"></ion-icon>
+              {{ t('common.edit') }}
+            </ion-item-option>
+            <ion-item-option color="danger" @click="deleteConfig(config)">
+              <ion-icon :icon="trashOutline"></ion-icon>
+              {{ t('common.delete') }}
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
       </ion-list>
 
       <!-- 无配置提示 -->
@@ -42,11 +55,11 @@
       </ion-fab>
 
       <!-- 添加/编辑配置模态框 -->
-      <ion-modal :is-open="showAddConfigModal" @didDismiss="showAddConfigModal = false">
+      <ion-modal :is-open="showAddConfigModal" @didDismiss="closeConfigModal">
         <ion-header>
           <ion-toolbar>
             <ion-buttons slot="start">
-              <ion-button @click="showAddConfigModal = false">{{ t('common.cancel') }}</ion-button>
+              <ion-button @click="closeConfigModal">{{ t('common.cancel') }}</ion-button>
             </ion-buttons>
             <ion-title>{{ editingConfig ? t('cloudBackup.editConfig') : t('cloudBackup.addStorageConfig') }}</ion-title>
             <ion-buttons slot="end">
@@ -228,7 +241,8 @@ import {
   trashOutline,
   documentOutline,
   folderOpenOutline,
-  refreshOutline
+  refreshOutline,
+  createOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { mobileCloudBackupService } from '~/lib/services/mobile-cloud-backup.service'
@@ -310,6 +324,75 @@ const selectStorage = async (config: CloudStorageConfig) => {
   await loadBackupList(config.id)
 }
 
+// 编辑配置
+const editConfig = (config: CloudStorageConfig) => {
+  editingConfig.value = config
+  configForm.value = {
+    name: config.name,
+    type: config.type,
+    enabled: config.enabled,
+    url: (config as any).url || '',
+    username: (config as any).username || '',
+    password: (config as any).password || '',
+    path: (config as any).path || 'AI-Gist-Backup'
+  }
+  showAddConfigModal.value = true
+}
+
+// 删除配置
+const deleteConfig = async (config: CloudStorageConfig) => {
+  const alert = await alertController.create({
+    header: t('common.confirm'),
+    message: t('cloudBackup.confirmDeleteConfig'),
+    buttons: [
+      {
+        text: t('common.cancel'),
+        role: 'cancel'
+      },
+      {
+        text: t('common.delete'),
+        role: 'destructive',
+        handler: async () => {
+          await performDeleteConfig(config)
+        }
+      }
+    ]
+  })
+
+  await alert.present()
+}
+
+// 执行删除配置
+const performDeleteConfig = async (config: CloudStorageConfig) => {
+  try {
+    const result = await mobileCloudBackupService.deleteStorageConfig(config.id)
+
+    if (result.success) {
+      showToast(t('cloudBackup.deleteConfigSuccess'))
+      await loadStorageConfigs()
+    } else {
+      showToast(result.error || t('cloudBackup.deleteConfigFailed'), 'danger')
+    }
+  } catch (error) {
+    console.error('删除配置失败:', error)
+    showToast(t('cloudBackup.deleteConfigFailed'), 'danger')
+  }
+}
+
+// 重置配置表单
+const resetConfigForm = () => {
+  editingConfig.value = null
+  configForm.value = {
+    name: '',
+    type: 'webdav',
+    enabled: true,
+    url: '',
+    username: '',
+    password: '',
+    path: 'AI-Gist-Backup'
+  }
+}
+
 // 加载备份列表
 const loadBackupList = async (storageId: string) => {
   try {
@@ -371,7 +454,7 @@ const saveConfig = async () => {
 
     if (result.success) {
       showToast(editingConfig.value ? t('cloudBackup.updateSuccess') : t('cloudBackup.addSuccess'))
-      showAddConfigModal.value = false
+      closeConfigModal()
       await loadStorageConfigs()
     } else {
       showToast(result.error || t('cloudBackup.saveFailed'), 'danger')
@@ -382,6 +465,12 @@ const saveConfig = async () => {
   } finally {
     await loadingEl.dismiss()
   }
+}
+
+// 关闭配置模态框
+const closeConfigModal = () => {
+  showAddConfigModal.value = false
+  resetConfigForm()
 }
 
 // 创建备份
