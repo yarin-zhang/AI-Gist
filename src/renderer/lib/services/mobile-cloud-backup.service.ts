@@ -444,16 +444,33 @@ export class MobileCloudBackupService {
 
       const dirPath = config.path || 'AI-Gist-Backup'
 
-      // 确保目录存在
+      // 检查目录是否存在
+      let dirExists = false
       try {
-        await Filesystem.mkdir({
+        await Filesystem.stat({
           path: dirPath,
-          directory: Directory.Documents,
-          recursive: true
+          directory: Directory.Documents
         })
+        dirExists = true
+        console.log('iCloud 目录已存在:', dirPath)
       } catch (error) {
-        // 目录可能已存在，忽略错误
-        console.log('创建 iCloud 目录:', error)
+        console.log('iCloud 目录不存在，需要创建:', dirPath)
+      }
+
+      // 只在目录不存在时创建
+      if (!dirExists) {
+        try {
+          await Filesystem.mkdir({
+            path: dirPath,
+            directory: Directory.Documents,
+            recursive: true
+          })
+          console.log('iCloud 目录创建成功:', dirPath)
+        } catch (error: any) {
+          console.error('创建 iCloud 目录失败:', error)
+          // 如果创建失败，可能是权限问题或其他错误
+          throw new Error(`无法创建 iCloud 目录: ${error.message || error}`)
+        }
       }
 
       // 读取 iCloud 目录
@@ -463,9 +480,10 @@ export class MobileCloudBackupService {
           path: dirPath,
           directory: Directory.Documents
         })
-      } catch (error) {
-        // 目录为空或不存在
-        console.log('读取 iCloud 目录失败:', error)
+        console.log('读取 iCloud 目录成功，文件数量:', result.files.length)
+      } catch (error: any) {
+        console.error('读取 iCloud 目录失败:', error)
+        // 如果目录为空或刚创建，返回空数组
         return []
       }
 
@@ -496,6 +514,8 @@ export class MobileCloudBackupService {
           }
         }
       }
+
+      console.log('iCloud 备份列表加载完成，数量:', backups.length)
 
       return backups.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -749,15 +769,36 @@ export class MobileCloudBackupService {
 
       const dirPath = config.path || 'AI-Gist-Backup'
 
-      // 确保目录存在
+      // 检查目录是否存在
+      let dirExists = false
       try {
-        await Filesystem.mkdir({
+        await Filesystem.stat({
           path: dirPath,
-          directory: Directory.Documents,
-          recursive: true
+          directory: Directory.Documents
         })
+        dirExists = true
+        console.log('iCloud 目录已存在:', dirPath)
       } catch (error) {
-        // 目录可能已存在，忽略错误
+        console.log('iCloud 目录不存在，需要创建:', dirPath)
+      }
+
+      // 只在目录不存在时创建
+      if (!dirExists) {
+        try {
+          await Filesystem.mkdir({
+            path: dirPath,
+            directory: Directory.Documents,
+            recursive: true
+          })
+          console.log('iCloud 目录创建成功:', dirPath)
+        } catch (error: any) {
+          console.error('创建 iCloud 目录失败:', error)
+          return {
+            success: false,
+            message: '无法创建 iCloud 目录',
+            error: error.message || String(error)
+          }
+        }
       }
 
       // 写入备份文件
@@ -785,7 +826,11 @@ export class MobileCloudBackupService {
       }
     } catch (error) {
       console.error('创建 iCloud 备份失败:', error)
-      throw error
+      return {
+        success: false,
+        message: '创建 iCloud 备份失败',
+        error: error instanceof Error ? error.message : String(error)
+      }
     }
   }
 

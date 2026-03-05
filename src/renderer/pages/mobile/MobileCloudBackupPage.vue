@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')"></ion-back-button>
+          <ion-back-button :text="t('common.back')" default-href="/tabs/settings"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ t('cloudBackup.title') }}</ion-title>
       </ion-toolbar>
