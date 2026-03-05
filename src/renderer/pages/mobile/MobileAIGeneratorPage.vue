@@ -3,9 +3,16 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button :default-href="'/tabs/prompts'"></ion-back-button>
+          <ion-button @click="handleCancel">
+            <ion-icon :icon="arrowBack"></ion-icon>
+          </ion-button>
         </ion-buttons>
         <ion-title>{{ t('promptManagement.aiGenerate') }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="generatePrompt" :disabled="!formData.topic || !selectedModelKey || generating">
+            {{ generating ? t('aiGenerator.generating') : t('aiGenerator.generate') }}
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -20,118 +27,110 @@
         </ion-button>
       </div>
 
-      <!-- 有AI配置时显示的生成工具 -->
-      <div v-else class="generator-container">
-        <!-- 输入区域 -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ t('aiGenerator.requirement') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
+      <!-- 有AI配置时显示的生成表单 -->
+      <form v-else @submit.prevent="generatePrompt">
+        <ion-list>
+          <!-- 需求描述 -->
+          <ion-item>
             <ion-textarea
               v-model="formData.topic"
+              :label="t('aiGenerator.requirement')"
+              label-placement="stacked"
               :placeholder="t('aiGenerator.requirementPlaceholder')"
-              :rows="4"
+              :rows="6"
               :auto-grow="true"
+              required
             ></ion-textarea>
-          </ion-card-content>
-        </ion-card>
+          </ion-item>
 
-        <!-- 模型选择 -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ t('aiGenerator.selectModel') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
-                <ion-select
-                  v-model="selectedModelKey"
-                  :placeholder="t('aiGenerator.selectModel')"
-                  interface="action-sheet"
-                  @ionChange="handleModelChange"
-                >
-                  <template v-for="config in configs" :key="config.configId">
-                    <ion-select-option
-                      v-for="model in getConfigModels(config)"
-                      :key="`${config.configId}:${model}`"
-                      :value="`${config.configId}:${model}`"
-                    >
-                      {{ config.name }} - {{ model }}
-                      <span v-if="config.isPreferred"> ⭐</span>
-                    </ion-select-option>
-                  </template>
-                </ion-select>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
+          <!-- 模型选择 -->
+          <ion-item button @click="showModelPicker = true">
+            <ion-label>{{ t('aiGenerator.selectModel') }}</ion-label>
+            <ion-note slot="end">
+              {{ selectedModelName || t('aiGenerator.selectModel') }}
+            </ion-note>
+          </ion-item>
 
-        <!-- 生成结果 -->
-        <ion-card v-if="generatedResult || generating">
-          <ion-card-header>
-            <ion-card-title>{{ t('aiGenerator.result') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div v-if="generating" class="generating-status">
-              <ion-spinner></ion-spinner>
-              <p>{{ t('aiGenerator.generating') }}</p>
-            </div>
+          <!-- 自动保存选项 -->
+          <ion-item>
+            <ion-label>{{ t('aiGenerator.autoSave') }}</ion-label>
+            <ion-toggle v-model="autoSaveEnabled" slot="end"></ion-toggle>
+          </ion-item>
+
+          <!-- 生成结果 -->
+          <ion-item v-if="generatedResult || generating">
             <ion-textarea
-              v-else
               v-model="generatedResult"
-              :rows="8"
+              :label="t('aiGenerator.result')"
+              label-placement="stacked"
+              :placeholder="generating ? t('aiGenerator.generating') : t('aiGenerator.resultPlaceholder')"
+              :rows="10"
               :auto-grow="true"
-              :readonly="autoSaveEnabled"
+              :readonly="generating || autoSaveEnabled"
             ></ion-textarea>
-          </ion-card-content>
-        </ion-card>
+          </ion-item>
 
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <ion-button
-            expand="block"
-            @click="generatePrompt"
-            :disabled="!formData.topic || !selectedModelKey || generating"
-          >
-            <ion-icon slot="start" :icon="sparklesOutline"></ion-icon>
-            {{ t('aiGenerator.generate') }}
-          </ion-button>
-
-          <ion-button
-            v-if="generating"
-            expand="block"
-            color="danger"
-            @click="stopGeneration"
-          >
-            <ion-icon slot="start" :icon="closeCircle"></ion-icon>
-            {{ t('aiGenerator.stop') }}
-          </ion-button>
-
-          <div v-if="generatedResult && !generating" class="result-actions">
-            <ion-item lines="none">
-              <ion-label>{{ t('aiGenerator.autoSave') }}</ion-label>
-              <ion-toggle v-model="autoSaveEnabled"></ion-toggle>
-            </ion-item>
-
-            <ion-button
-              v-if="!autoSaveEnabled"
-              expand="block"
-              color="success"
-              @click="manualSavePrompt"
-            >
+          <!-- 手动保存按钮 -->
+          <ion-item v-if="generatedResult && !generating && !autoSaveEnabled" lines="none">
+            <ion-button expand="block" color="success" @click="savePrompt" style="width: 100%; margin: 8px 0;">
               <ion-icon slot="start" :icon="saveOutline"></ion-icon>
               {{ t('common.save') }}
             </ion-button>
-          </div>
-        </div>
+          </ion-item>
+        </ion-list>
+      </form>
+
+      <!-- 加载指示器 -->
+      <div v-if="generating" class="generating-overlay">
+        <ion-spinner></ion-spinner>
+        <p>{{ t('aiGenerator.generating') }}</p>
       </div>
     </ion-content>
+
+    <!-- 模型选择器模态框 -->
+    <ion-modal :is-open="showModelPicker" @didDismiss="showModelPicker = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('aiGenerator.selectModel') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showModelPicker = false">
+              {{ t('common.close') }}
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <ion-list>
+          <template v-for="config in configs" :key="config.configId">
+            <ion-list-header v-if="configs.length > 1">
+              <ion-label>
+                {{ config.name }}
+                <ion-icon v-if="config.isPreferred" :icon="star" color="warning" style="margin-left: 4px;"></ion-icon>
+              </ion-label>
+            </ion-list-header>
+            <ion-item
+              v-for="model in getConfigModels(config)"
+              :key="`${config.configId}:${model}`"
+              button
+              @click="selectModel(config.configId, model, config.name)"
+            >
+              <ion-label>{{ model }}</ion-label>
+              <ion-icon
+                v-if="selectedModelKey === `${config.configId}:${model}`"
+                :icon="checkmark"
+                slot="end"
+                color="primary"
+              ></ion-icon>
+            </ion-item>
+          </template>
+        </ion-list>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
@@ -140,27 +139,26 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonTextarea,
   IonButton,
   IonIcon,
-  IonSpinner,
   IonList,
   IonItem,
   IonLabel,
-  IonSelect,
-  IonSelectOption,
+  IonTextarea,
   IonToggle,
-  toastController
+  IonNote,
+  IonModal,
+  IonListHeader,
+  IonSpinner,
+  toastController,
+  alertController
 } from '@ionic/vue'
 import {
+  arrowBack,
   sparklesOutline,
-  closeCircle,
-  saveOutline
+  saveOutline,
+  checkmark,
+  star
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
@@ -176,12 +174,24 @@ const configs = ref<AIConfig[]>([])
 const loading = ref(true)
 const generating = ref(false)
 const selectedModelKey = ref<string>('')
+const selectedConfigName = ref<string>('')
 const generatedResult = ref<string>('')
 const autoSaveEnabled = ref<boolean>(true)
+const showModelPicker = ref(false)
+const generatedTopic = ref<string>('') // 保存生成时使用的主题
 
 // 表单数据
 const formData = reactive({
   topic: ''
+})
+
+// 选中的模型显示名称
+const selectedModelName = computed(() => {
+  if (!selectedModelKey.value) return ''
+  const [configId, model] = selectedModelKey.value.split(':')
+  const config = configs.value.find(c => c.configId === configId)
+  if (!config) return model
+  return configs.value.length > 1 ? `${config.name} - ${model}` : model
 })
 
 // 获取配置的所有模型
@@ -217,8 +227,10 @@ const loadConfigs = async () => {
     const preferred = await databaseService.aiConfig.getPreferredAIConfig()
     if (preferred && preferred.defaultModel) {
       selectedModelKey.value = `${preferred.configId}:${preferred.defaultModel}`
+      selectedConfigName.value = preferred.name
     } else if (result.length > 0 && result[0].defaultModel) {
       selectedModelKey.value = `${result[0].configId}:${result[0].defaultModel}`
+      selectedConfigName.value = result[0].name
     }
   } catch (error) {
     console.error('加载 AI 配置失败:', error)
@@ -233,9 +245,11 @@ const navigateToAIConfig = () => {
   router.push('/tabs/ai-config')
 }
 
-// 模型选择变化
-const handleModelChange = () => {
-  console.log('选择的模型:', selectedModelKey.value)
+// 选择模型
+const selectModel = (configId: string, model: string, configName: string) => {
+  selectedModelKey.value = `${configId}:${model}`
+  selectedConfigName.value = configName
+  showModelPicker.value = false
 }
 
 // 生成提示词
@@ -265,6 +279,9 @@ const generatePrompt = async () => {
       topic: formData.topic
     }
 
+    // 保存当前主题，用于后续保存
+    generatedTopic.value = formData.topic
+
     // 使用统一的 AI 生成服务
     const result = await AIGeneratorService.generatePrompt(request, selectedConfig)
 
@@ -285,12 +302,13 @@ const generatePrompt = async () => {
     if (autoSaveEnabled.value) {
       await saveGeneratedPrompt(result)
       showToast(t('aiGenerator.generateAndSaveSuccess'), 'success')
+      // 自动保存后返回列表
+      setTimeout(() => {
+        router.push('/tabs/prompts')
+      }, 1000)
     } else {
       showToast(t('aiGenerator.generateSuccess'), 'success')
     }
-
-    // 清空输入框
-    formData.topic = ''
   } catch (error) {
     console.error('生成失败:', error)
     showToast(t('aiGenerator.generateFailed') + ': ' + (error as Error).message, 'danger')
@@ -300,19 +318,8 @@ const generatePrompt = async () => {
   }
 }
 
-// 停止生成
-const stopGeneration = async () => {
-  try {
-    generating.value = false
-    showToast(t('aiGenerator.stopped'), 'warning')
-  } catch (error) {
-    console.error('停止生成失败:', error)
-    generating.value = false
-  }
-}
-
 // 手动保存提示词
-const manualSavePrompt = async () => {
+const savePrompt = async () => {
   if (!generatedResult.value.trim()) {
     showToast(t('aiGenerator.noContentToSave'), 'warning')
     return
@@ -320,10 +327,10 @@ const manualSavePrompt = async () => {
 
   try {
     const promptData = {
-      title: `AI生成: ${formData.topic || '提示词生成'}`,
+      title: `AI生成: ${generatedTopic.value || '提示词生成'}`,
       content: generatedResult.value,
       description: '',
-      tags: ['AI生成', '手动保存'],
+      tags: ['AI生成'],
       categoryId: undefined,
       isFavorite: false,
       useCount: 0,
@@ -335,21 +342,23 @@ const manualSavePrompt = async () => {
     showToast(t('aiGenerator.saveSuccess'), 'success')
 
     // 保存后返回提示词列表
-    router.push('/tabs/prompts')
+    setTimeout(() => {
+      router.push('/tabs/prompts')
+    }, 1000)
   } catch (error) {
     console.error('保存提示词失败:', error)
     showToast(t('aiGenerator.saveFailed') + ': ' + (error as Error).message, 'danger')
   }
 }
 
-// 直接保存生成的提示词
+// 直接保存生成的提示词（自动保存使用）
 const saveGeneratedPrompt = async (result: any) => {
   try {
     const promptData = {
       title: `AI生成: ${result.topic}`,
       content: result.generatedPrompt,
       description: '',
-      tags: ['AI生成', '自动保存'],
+      tags: ['AI生成'],
       categoryId: undefined,
       isFavorite: false,
       useCount: 0,
@@ -364,6 +373,44 @@ const saveGeneratedPrompt = async (result: any) => {
   }
 }
 
+// 取消
+const handleCancel = async () => {
+  // 检查是否有未保存的内容
+  const hasUnsavedContent = generatedResult.value && !autoSaveEnabled.value
+
+  if (hasUnsavedContent) {
+    const alert = await alertController.create({
+      header: t('common.confirm'),
+      message: t('promptManagement.unsavedChanges'),
+      buttons: [
+        {
+          text: t('common.cancel'),
+          role: 'cancel'
+        },
+        {
+          text: t('promptManagement.discardChanges'),
+          role: 'destructive',
+          handler: () => {
+            resetForm()
+            router.back()
+          }
+        }
+      ]
+    })
+    await alert.present()
+  } else {
+    resetForm()
+    router.back()
+  }
+}
+
+// 重置表单
+const resetForm = () => {
+  formData.topic = ''
+  generatedResult.value = ''
+  generatedTopic.value = ''
+}
+
 // 显示提示
 const showToast = async (message: string, color: string = 'success') => {
   const toast = await toastController.create({
@@ -376,6 +423,8 @@ const showToast = async (message: string, color: string = 'success') => {
 
 // 初始化
 onMounted(async () => {
+  // 每次进入页面时重置表单
+  resetForm()
   await loadConfigs()
 })
 </script>
@@ -410,37 +459,26 @@ onMounted(async () => {
   font-size: 14px;
 }
 
-.generator-container {
-  padding: 16px;
-}
-
-ion-card {
-  margin-bottom: 16px;
-}
-
-.generating-status {
+.generating-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
   gap: 12px;
+  z-index: 1000;
 }
 
-.generating-status p {
+.generating-overlay p {
   margin: 0;
   color: var(--ion-color-medium);
+  font-size: 14px;
 }
 
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.result-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+ion-textarea {
+  --padding-top: 12px;
+  --padding-bottom: 12px;
 }
 </style>
