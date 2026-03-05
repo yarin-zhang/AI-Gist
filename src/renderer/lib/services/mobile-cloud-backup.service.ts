@@ -21,8 +21,6 @@ const STORAGE_KEYS = {
   CONFIGS: 'cloud_backup_configs'
 }
 
-const WEBDAV_BACKUP_DIR = '/AI-Gist-Backup'
-
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
 
@@ -310,9 +308,11 @@ export class MobileCloudBackupService {
    */
   private async listWebDAVBackups(config: any): Promise<CloudBackupInfo[]> {
     try {
-      const url = `${config.url}${WEBDAV_BACKUP_DIR}`
+      // 直接从配置的 URL 列出文件（不添加子目录）
+      const url = config.url
 
       console.log('列出 WebDAV 备份，URL:', url)
+      console.log('config.url 完整值:', config.url)
 
       // 使用 PROPFIND 列出目录内容
       const response = await CapacitorHttp.request({
@@ -328,9 +328,8 @@ export class MobileCloudBackupService {
       console.log('WebDAV PROPFIND 响应状态:', response.status)
 
       if (response.status === 404) {
-        // 目录不存在，尝试创建
-        console.log('备份目录不存在，尝试创建...')
-        await this.createWebDAVDirectory(config, WEBDAV_BACKUP_DIR)
+        // 目录不存在
+        console.log('备份目录不存在')
         return []
       }
 
@@ -339,8 +338,8 @@ export class MobileCloudBackupService {
         return []
       }
 
-      // 解析 WebDAV 响应
-      const files = this.parseWebDAVResponse(response.data)
+      // 解析 WebDAV 响应，传入 config.url 用于路径标准化
+      const files = this.parseWebDAVResponse(response.data, config.url)
       console.log('解析到的文件:', files)
 
       const backups: CloudBackupInfo[] = []
@@ -356,21 +355,18 @@ export class MobileCloudBackupService {
       for (const file of backupFiles) {
         try {
           // 构建完整的文件 URL
-          // file.path 是相对路径或绝对路径，需要正确拼接
+          // file.path 是相对于 config.url 的路径
           let fileUrl: string
-          if (file.path.startsWith('http')) {
-            // 已经是完整 URL
-            fileUrl = file.path
-          } else if (file.path.startsWith('/')) {
-            // 绝对路径，需要提取 config.url 的协议和域名部分
-            const urlObj = new URL(config.url)
-            fileUrl = `${urlObj.protocol}//${urlObj.host}${file.path}`
+          if (file.path.startsWith('/')) {
+            // 如果是绝对路径（如 /backup-xxx.json），直接拼接
+            fileUrl = `${config.url}${file.path}`
           } else {
-            // 相对路径
-            fileUrl = `${config.url}${WEBDAV_BACKUP_DIR}/${file.path}`
+            // 如果是相对路径（如 backup-xxx.json），添加斜杠
+            fileUrl = `${config.url}/${file.path}`
           }
 
-          console.log('读取备份文件:', fileUrl)
+          console.log('读取备份文件 URL:', fileUrl)
+          console.log('file.path:', file.path)
 
           const fileResponse = await CapacitorHttp.request({
             url: fileUrl,
@@ -407,8 +403,8 @@ export class MobileCloudBackupService {
               name: backupData.name,
               description: backupData.description,
               createdAt: backupData.createdAt,
-              size: actualSize, // 使用实际读取的文件大小
-              cloudPath: file.path,
+              size: actualSize,
+              cloudPath: file.path, // 使用相对路径
               storageId: config.id
             })
             console.log('成功读取备份:', backupData.name)
@@ -528,11 +524,29 @@ export class MobileCloudBackupService {
 
   /**
    * 解析 WebDAV PROPFIND 响应
+   * @param xmlData XML 响应数据
+   * @param baseUrl WebDAV 服务器基础 URL
    */
-  private parseWebDAVResponse(xmlData: string): CloudFileInfo[] {
+  private parseWebDAVResponse(xmlData: string, baseUrl: string): CloudFileInfo[] {
     const files: CloudFileInfo[] = []
 
     try {
+      // 从 baseUrl 中提取路径前缀，用于后续路径标准化
+      let baseUrlPath = ''
+      try {
+        const urlObj = new URL(baseUrl)
+        baseUrlPath = urlObj.pathname
+        // 移除末尾的斜杠
+        if (baseUrlPath.endsWith('/')) {
+          baseUrlPath = baseUrlPath.slice(0, -1)
+        }
+      } catch (e) {
+        console.warn('解析 baseUrl 失败:', baseUrl)
+      }
+
+      console.log('baseUrl:', baseUrl)
+      console.log('baseUrl 路径前缀:', baseUrlPath)
+
       // 简单的 XML 解析
       const parser = new DOMParser()
       const doc = parser.parseFromString(xmlData, 'text/xml')
@@ -559,7 +573,7 @@ export class MobileCloudBackupService {
         if (!hrefElement) continue
 
         const href = hrefElement.textContent || ''
-        console.log('处理文件:', href)
+        console.log('处理文件 href:', href)
 
         // 获取 propstat
         let propstat = response.getElementsByTagName('d:propstat')[0] ||
@@ -588,8 +602,42 @@ export class MobileCloudBackupService {
           isDirectory = !!collection
         }
 
-        // 提取文件名（需要在获取大小之前，因为日志需要用到）
-        const name = decodeURIComponent(href.split('/').filter(Boolean).pop() || '')
+        // 标准化路径：提取相对于 baseUrl 的路径
+        let normalizedPath = href
+
+        // 如果是完整 URL，提取路径部分
+        if (href.startsWith('http://') || href.startsWith('https://')) {
+          try {
+            const hrefUrl = new URL(href)
+            normalizedPath = hrefUrl.pathname
+          } catch (e) {
+            console.warn('解析 href URL 失败:', href)
+          }
+        }
+
+        // 确保路径以 / 开头
+        if (!normalizedPath.startsWith('/')) {
+          normalizedPath = '/' + normalizedPath
+        }
+
+        // URL 解码
+        normalizedPath = decodeURIComponent(normalizedPath)
+
+        console.log('解码后的路径:', normalizedPath)
+        console.log('baseUrlPath:', baseUrlPath)
+
+        // 移除 baseUrl 的路径前缀，得到相对路径
+        if (baseUrlPath && normalizedPath.startsWith(baseUrlPath)) {
+          normalizedPath = normalizedPath.substring(baseUrlPath.length)
+          console.log('移除前缀后的路径:', normalizedPath)
+          // 确保以 / 开头
+          if (!normalizedPath.startsWith('/')) {
+            normalizedPath = '/' + normalizedPath
+          }
+        }
+
+        // 提取文件名
+        const name = normalizedPath.split('/').filter(Boolean).pop() || ''
 
         // 获取文件大小
         let contentlength = prop.getElementsByTagName('d:getcontentlength')[0] ||
@@ -611,11 +659,11 @@ export class MobileCloudBackupService {
         const modifiedAt = lastmodified ? (lastmodified.textContent || '') : new Date().toISOString()
 
         // 跳过目录本身和空文件名
-        if (name && !isDirectory && !href.endsWith(WEBDAV_BACKUP_DIR + '/')) {
-          console.log('添加文件:', name, 'size:', size)
+        if (name && !isDirectory && normalizedPath !== '/' && normalizedPath !== '') {
+          console.log('添加文件:', name, 'path:', normalizedPath, 'size:', size)
           files.push({
             name,
-            path: href,
+            path: normalizedPath, // 使用标准化的相对路径
             size,
             isDirectory,
             modifiedAt
@@ -697,13 +745,10 @@ export class MobileCloudBackupService {
     backupData: any
   ): Promise<CloudBackupResult> {
     try {
-      // 确保备份目录存在
-      await this.createWebDAVDirectory(config, WEBDAV_BACKUP_DIR)
       console.log('创建 WebDAV 备份，文件名:', fileName)
 
-
-      // 上传备份文件
-      const fileUrl = `${config.url}${WEBDAV_BACKUP_DIR}/${fileName}`
+      // 上传备份文件到配置的 URL（不添加子目录）
+      const fileUrl = `${config.url}/${fileName}`
       console.log('上传到 URL:', fileUrl)
       const response = await CapacitorHttp.request({
         url: fileUrl,
@@ -715,7 +760,6 @@ export class MobileCloudBackupService {
         data: jsonString
       })
 
-
       console.log('上传响应状态:', response.status)
       if (response.status >= 200 && response.status < 300) {
         const backupInfo: CloudBackupInfo = {
@@ -724,7 +768,7 @@ export class MobileCloudBackupService {
           description: backupData.description,
           createdAt: backupData.createdAt,
           size: new Blob([jsonString]).size,
-          cloudPath: `${WEBDAV_BACKUP_DIR}/${fileName}`,
+          cloudPath: `/${fileName}`, // 相对路径
           storageId: config.id
         }
 
@@ -913,16 +957,8 @@ export class MobileCloudBackupService {
       }
 
       // 下载备份文件
-      // backup.cloudPath 是相对路径或绝对路径，需要正确拼接
-      let fileUrl: string
-      if (backup.cloudPath.startsWith('http')) {
-        fileUrl = backup.cloudPath
-      } else if (backup.cloudPath.startsWith('/')) {
-        const urlObj = new URL(config.url)
-        fileUrl = `${urlObj.protocol}//${urlObj.host}${backup.cloudPath}`
-      } else {
-        fileUrl = `${config.url}/${backup.cloudPath}`
-      }
+      // backup.cloudPath 现在是标准化的路径，如 /AI-Gist-Backup/backup-xxx.json
+      const fileUrl = `${config.url}${backup.cloudPath}`
 
       const response = await CapacitorHttp.request({
         url: fileUrl,
@@ -957,11 +993,9 @@ export class MobileCloudBackupService {
       return {
         success: true,
         message: '云端备份恢复成功',
-        backupInfo: {
-          ...backup,
-          data: backupData.data
-        }
-      }
+        backupInfo: backup,
+        data: backupData.data
+      } as any
     } catch (error) {
       console.error('恢复 WebDAV 备份失败:', error)
       throw error
@@ -1006,11 +1040,9 @@ export class MobileCloudBackupService {
       return {
         success: true,
         message: '云端备份恢复成功',
-        backupInfo: {
-          ...backup,
-          data: backupData.data
-        }
-      }
+        backupInfo: backup,
+        data: backupData.data
+      } as any
     } catch (error) {
       console.error('恢复 iCloud 备份失败:', error)
       throw error
@@ -1067,16 +1099,8 @@ export class MobileCloudBackupService {
       }
 
       // 删除文件
-      // backup.cloudPath 是相对路径或绝对路径，需要正确拼接
-      let fileUrl: string
-      if (backup.cloudPath.startsWith('http')) {
-        fileUrl = backup.cloudPath
-      } else if (backup.cloudPath.startsWith('/')) {
-        const urlObj = new URL(config.url)
-        fileUrl = `${urlObj.protocol}//${urlObj.host}${backup.cloudPath}`
-      } else {
-        fileUrl = `${config.url}/${backup.cloudPath}`
-      }
+      // backup.cloudPath 现在是标准化的路径，如 /AI-Gist-Backup/backup-xxx.json
+      const fileUrl = `${config.url}${backup.cloudPath}`
 
       const response = await CapacitorHttp.request({
         url: fileUrl,
@@ -1148,7 +1172,7 @@ export class MobileCloudBackupService {
    * 生成唯一ID
    */
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   }
 }
 
