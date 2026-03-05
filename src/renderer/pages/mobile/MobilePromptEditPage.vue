@@ -259,7 +259,9 @@ const formData = ref<Partial<Prompt>>({
   content: '',
   categoryId: null,
   tags: [],
-  isFavorite: false
+  isFavorite: false,
+  isActive: true,
+  useCount: 0
 })
 
 // 选中的分类名称
@@ -287,7 +289,16 @@ const loadData = async () => {
     const allPrompts = await api.prompts.getAllForTags.query()
     const tagCounts = new Map<string, number>()
     allPrompts.forEach(prompt => {
-      prompt.tags?.forEach(tag => {
+      // 处理 tags 字段，支持字符串和数组两种格式
+      let promptTags: string[] = []
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          promptTags = prompt.tags
+        } else if (typeof prompt.tags === 'string') {
+          promptTags = prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        }
+      }
+      promptTags.forEach(tag => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
       })
     })
@@ -299,14 +310,38 @@ const loadData = async () => {
     // 如果是编辑模式，加载提示词数据
     if (isEdit.value && promptId.value) {
       const prompt = await api.prompts.getById.query(promptId.value)
+      if (!prompt) {
+        console.error('提示词不存在，ID:', promptId.value)
+        showToast(t('promptManagement.loadFailed'), 'danger')
+        router.back()
+        return
+      }
+      console.log('成功加载提示词:', prompt)
+      // 确保 tags 是数组格式
+      let normalizedTags: string[] = []
+      if (prompt.tags) {
+        if (Array.isArray(prompt.tags)) {
+          normalizedTags = prompt.tags
+        } else if (typeof prompt.tags === 'string') {
+          normalizedTags = prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        }
+      }
       formData.value = {
         ...prompt,
-        tags: prompt.tags || []
+        tags: normalizedTags,
+        // 确保必需字段存在
+        isActive: prompt.isActive ?? true,
+        isFavorite: prompt.isFavorite ?? false,
+        useCount: prompt.useCount ?? 0
       }
     }
   } catch (error) {
     console.error('加载数据失败:', error)
     showToast(t('promptManagement.loadFailed'), 'danger')
+    // 如果是编辑模式且加载失败，返回上一页
+    if (isEdit.value) {
+      router.back()
+    }
   }
 }
 

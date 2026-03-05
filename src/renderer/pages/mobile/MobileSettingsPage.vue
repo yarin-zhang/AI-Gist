@@ -42,6 +42,16 @@
           </ion-select>
         </ion-item>
 
+        <!-- 云端备份 -->
+        <ion-list-header>
+          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
+        </ion-list-header>
+
+        <ion-item button @click="navigateToCloudBackup">
+          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
+          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
+        </ion-item>
+
         <!-- 数据管理 -->
         <ion-list-header>
           <ion-label>{{ t('dataManagement.backupManagement') }}</ion-label>
@@ -55,11 +65,6 @@
         <ion-item button @click="handleImport">
           <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
           <ion-label>{{ t('dataManagement.importFullBackup') }}</ion-label>
-        </ion-item>
-
-        <ion-item button @click="navigateToCloudBackup">
-          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
         </ion-item>
 
         <!-- 关于 -->

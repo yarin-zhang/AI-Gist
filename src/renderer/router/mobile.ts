@@ -59,6 +59,10 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/mobile/cloud-backup',
     component: () => import('../pages/mobile/MobileCloudBackupPage.vue')
+  },
+  {
+    path: '/ai-generator',
+    component: () => import('../pages/mobile/MobileAIGeneratorPage.vue')
   }
 ]
 

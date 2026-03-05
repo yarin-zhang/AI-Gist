@@ -4,6 +4,9 @@
       <ion-toolbar>
         <ion-title>{{ t('mainPage.menu.prompts') }}</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="hasAIConfig" @click="navigateToAIGenerator">
+            <ion-icon :icon="sparklesOutline"></ion-icon>
+          </ion-button>
           <ion-button @click="showFilterModal = true">
             <ion-icon :icon="funnelOutline"></ion-icon>
           </ion-button>
@@ -225,12 +228,14 @@ import {
   closeCircle,
   checkmark,
   createOutline,
-  trashOutline
+  trashOutline,
+  sparklesOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { Prompt, Category } from '@shared/types'
 import { useRouter } from 'vue-router'
+import { databaseService } from '~/lib/db'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -249,6 +254,7 @@ const currentPage = ref(1)
 const pageSize = 20
 const hasNextPage = ref(false)
 const totalCount = ref(0)
+const hasAIConfig = ref(false)
 
 // 排序选项
 const sortOptions = computed(() => [
@@ -378,6 +384,22 @@ const handleCreate = () => {
   router.push('/prompt/create')
 }
 
+// 检查是否有AI配置
+const checkAIConfig = async () => {
+  try {
+    const configs = await databaseService.aiConfig.getEnabledAIConfigs()
+    hasAIConfig.value = configs.length > 0
+  } catch (error) {
+    console.error('检查AI配置失败:', error)
+    hasAIConfig.value = false
+  }
+}
+
+// 导航到AI生成器
+const navigateToAIGenerator = () => {
+  router.push('/ai-generator')
+}
+
 // 删除提示词
 const handleDelete = async (prompt: Prompt) => {
   const alert = await alertController.create({
@@ -428,11 +450,13 @@ watch([showFavoritesOnly, selectedTag], () => {
 onMounted(async () => {
   await loadCategories()
   await loadPrompts()
+  await checkAIConfig()
 })
 
 // 页面进入时刷新（从编辑页返回时会触发）
 onIonViewWillEnter(() => {
   loadPrompts()
+  checkAIConfig()
 })
 </script>
 
