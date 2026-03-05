@@ -35,6 +35,7 @@
               <ion-item lines="none">
                 <ion-label>{{ t('aiConfig.enabled') }}</ion-label>
                 <ion-toggle
+                  slot="end"
                   :checked="config.enabled"
                   @ionChange="handleToggleEnabled"
                 ></ion-toggle>
@@ -104,6 +105,8 @@
                       v-for="model in config.models"
                       :key="model"
                       :color="model === config.defaultModel ? 'primary' : 'medium'"
+                      @click="handleSelectModel(model)"
+                      class="clickable-chip"
                     >
                       <ion-label>{{ model }}</ion-label>
                     </ion-chip>
@@ -279,6 +282,27 @@ const handleTogglePreferred = async () => {
   } catch (error) {
     console.error('更新首选状态失败:', error)
     showToast(t('aiConfig.setFailed'), 'danger')
+  }
+}
+
+// 选择模型
+const handleSelectModel = async (model: string) => {
+  if (!config.value || model === config.value.defaultModel) return
+
+  try {
+    await api.aiConfigs.update.mutate({
+      id: config.value.id!,
+      data: {
+        ...config.value,
+        defaultModel: model
+      }
+    })
+
+    config.value.defaultModel = model
+    showToast(t('aiConfig.modelSelected', { model }))
+  } catch (error) {
+    console.error('更新默认模型失败:', error)
+    showToast(t('aiConfig.updateFailed'), 'danger')
   }
 }
 
@@ -562,5 +586,13 @@ ion-chip {
   flex-direction: column;
   gap: 12px;
   margin-top: 8px;
+}
+
+.clickable-chip {
+  cursor: pointer;
+}
+
+.clickable-chip:hover {
+  opacity: 0.8;
 }
 </style>

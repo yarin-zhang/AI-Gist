@@ -63,7 +63,7 @@
               <ion-label>
                 <h2>{{ config.name }}</h2>
                 <p class="config-description">
-                  {{ config.provider }} - {{ config.model }}
+                  {{ config.provider }} {{ config.model }}
                 </p>
                 <div class="config-meta">
                   <ion-chip size="small" :color="config.isPreferred ? 'primary' : 'medium'">

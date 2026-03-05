@@ -36,27 +36,6 @@
           <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
         </div>
 
-        <!-- 元信息 -->
-        <ion-list>
-          <ion-item v-if="prompt.categoryId">
-            <ion-label>
-              <p>{{ t('promptManagement.category') }}</p>
-              <h3>{{ getCategoryName(prompt.categoryId) }}</h3>
-            </ion-label>
-          </ion-item>
-
-          <ion-item v-if="prompt.tags && prompt.tags.length > 0">
-            <ion-label>
-              <p>{{ t('promptManagement.tags') }}</p>
-              <div class="tags-container">
-                <ion-chip v-for="tag in prompt.tags" :key="tag">
-                  <ion-label>{{ tag }}</ion-label>
-                </ion-chip>
-              </div>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-
         <!-- 提示词内容 -->
         <div class="content-section">
           <div class="section-header">
