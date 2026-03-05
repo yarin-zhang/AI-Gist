@@ -19,30 +19,7 @@
     <ion-content :fullscreen="true">
       <form @submit.prevent="handleSave">
         <ion-list>
-          <!-- 标题 -->
-          <ion-item>
-            <ion-input
-              v-model="formData.title"
-              :label="t('promptManagement.title')"
-              label-placement="stacked"
-              :placeholder="t('promptManagement.titlePlaceholder')"
-              required
-            ></ion-input>
-          </ion-item>
-
-          <!-- 描述 -->
-          <ion-item>
-            <ion-textarea
-              v-model="formData.description"
-              :label="t('promptManagement.description')"
-              label-placement="stacked"
-              :placeholder="t('promptManagement.descriptionPlaceholder')"
-              :rows="3"
-              :auto-grow="true"
-            ></ion-textarea>
-          </ion-item>
-
-          <!-- 内容 -->
+          <!-- 内容 - 放在最前面 -->
           <ion-item>
             <ion-textarea
               v-model="formData.content"
@@ -55,27 +32,57 @@
             ></ion-textarea>
           </ion-item>
 
-          <!-- 分类 -->
-          <ion-item button @click="showCategoryPicker = true">
-            <ion-label>{{ t('promptManagement.category') }}</ion-label>
-            <ion-note slot="end">
-              {{ selectedCategoryName || t('promptManagement.noCategory') }}
-            </ion-note>
-          </ion-item>
-
-          <!-- 标签 -->
-          <ion-item button @click="showTagsModal = true">
-            <ion-label>{{ t('promptManagement.tags') }}</ion-label>
-            <ion-note slot="end">
-              {{ formData.tags?.length || 0 }} {{ t('promptManagement.tags') }}
-            </ion-note>
-          </ion-item>
-
           <!-- 收藏 -->
           <ion-item>
             <ion-label>{{ t('promptManagement.detailModal.favorite') }}</ion-label>
-            <ion-toggle v-model="formData.isFavorite"></ion-toggle>
+            <ion-toggle v-model="formData.isFavorite" slot="end"></ion-toggle>
           </ion-item>
+
+          <!-- 其他信息折叠区域 -->
+          <ion-item button @click="showMoreOptions = !showMoreOptions" lines="full">
+            <ion-label>{{ t('promptManagement.moreOptions') }}</ion-label>
+            <ion-icon :icon="showMoreOptions ? chevronUp : chevronDown" slot="end"></ion-icon>
+          </ion-item>
+
+          <div v-show="showMoreOptions">
+            <!-- 标题 -->
+            <ion-item>
+              <ion-input
+                v-model="formData.title"
+                :label="t('promptManagement.title')"
+                label-placement="stacked"
+                :placeholder="t('promptManagement.titlePlaceholder')"
+              ></ion-input>
+            </ion-item>
+
+            <!-- 描述 -->
+            <ion-item>
+              <ion-textarea
+                v-model="formData.description"
+                :label="t('promptManagement.description')"
+                label-placement="stacked"
+                :placeholder="t('promptManagement.descriptionPlaceholder')"
+                :rows="3"
+                :auto-grow="true"
+              ></ion-textarea>
+            </ion-item>
+
+            <!-- 分类 -->
+            <ion-item button @click="showCategoryPicker = true">
+              <ion-label>{{ t('promptManagement.category') }}</ion-label>
+              <ion-note slot="end">
+                {{ selectedCategoryName || t('promptManagement.noCategory') }}
+              </ion-note>
+            </ion-item>
+
+            <!-- 标签 -->
+            <ion-item button @click="showTagsModal = true">
+              <ion-label>{{ t('promptManagement.tags') }}</ion-label>
+              <ion-note slot="end">
+                {{ formData.tags?.length || 0 }} {{ t('promptManagement.tags') }}
+              </ion-note>
+            </ion-item>
+          </div>
         </ion-list>
       </form>
     </ion-content>
@@ -219,7 +226,9 @@ import {
   arrowBack,
   checkmark,
   closeCircle,
-  add
+  add,
+  chevronDown,
+  chevronUp
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
@@ -241,6 +250,7 @@ const popularTags = ref<string[]>([])
 const showCategoryPicker = ref(false)
 const showTagsModal = ref(false)
 const tagSearchText = ref('')
+const showMoreOptions = ref(false)
 
 // 表单数据
 const formData = ref<Partial<Prompt>>({
@@ -348,10 +358,6 @@ const handleTagSearch = () => {
 // 保存
 const handleSave = async () => {
   // 验证
-  if (!formData.value.title?.trim()) {
-    showToast(t('promptManagement.titleRequired'), 'warning')
-    return
-  }
   if (!formData.value.content?.trim()) {
     showToast(t('promptManagement.contentRequired'), 'warning')
     return

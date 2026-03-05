@@ -99,6 +99,7 @@
     "modelConfig": "模型配置",
     "modelList": "模型列表",
     "modelNamePlaceholder": "請輸入模型名稱",
+    "modelSelected": "已選擇模型 {model}",
     "modelTest": "模型測試",
     "modelTestFailed": "模型測試失敗",
     "modelTestSuccess": "模型測試成功",
@@ -158,6 +159,7 @@
     "systemPromptUpdateSuccess": "系統提示詞更新成功",
     "tencentAPIAddress": "騰訊雲 API 地址：",
     "tencentExample": "例如: https://api.hunyuan.cloud.tencent.com/v1",
+    "testConnection": "測試連接",
     "testConnectionAndGetModels": "測試連接並獲取模型列表",
     "testFailed": "測試失敗",
     "testFailedTitle": "測試失敗",
@@ -237,6 +239,7 @@
     "testConnection": "測試連接"
   },
   "common": {
+    "actions": "操作",
     "add": "添加",
     "back": "返回",
     "cancel": "取消",
@@ -593,6 +596,7 @@
     "manualAdjustmentTip": "可輸入自然語言指令對提示詞進行微調",
     "manualAdjustmentTitle": "手動調整",
     "maxTagsError": "你最多只能添加 50 個標籤",
+    "moreOptions": "更多選項",
     "noAIConfigAvailable": "沒有可用的AI配置，請先在AI配置頁面添加配置",
     "noCategories": "暫無分類，請在左側創建新分類",
     "noCategory": "未分類",

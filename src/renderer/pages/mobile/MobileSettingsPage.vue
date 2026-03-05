@@ -16,6 +16,7 @@
         <ion-item>
           <ion-label>{{ t('language.selectLanguage') }}</ion-label>
           <ion-select
+            slot="end"
             v-model="currentLanguage"
             interface="action-sheet"
             @ionChange="handleLanguageChange"
@@ -30,6 +31,7 @@
         <ion-item>
           <ion-label>{{ t('appearance.theme') }}</ion-label>
           <ion-select
+            slot="end"
             v-model="currentTheme"
             interface="action-sheet"
             @ionChange="handleThemeChange"

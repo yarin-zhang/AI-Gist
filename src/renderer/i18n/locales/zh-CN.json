@@ -108,6 +108,7 @@
     "modelList": "模型列表",
     "modelsAutoFilled": "已自动填充 {count} 个可用模型",
     "modelsFound": "发现 {count} 个可用模型",
+    "modelSelected": "已选择模型 {model}",
     "multipleConfigsWarning": "您有多个已启用的 AI 配置，建议设置一个全局首选配置",
     "noConfigs": "暂无AI配置，快来添加第一个吧！",
     "normalConfig": "普通配置",
@@ -428,6 +429,7 @@
     "deleteSuccess": "提示词已删除",
     "description": "描述",
     "descriptionPlaceholder": "请输入提示词描述（可选）",
+    "moreOptions": "更多选项",
     "detailModal": {
       "aiResponse": "AI 响应",
       "aiResponseResult": "AI 响应：",

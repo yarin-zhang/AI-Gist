@@ -62,8 +62,8 @@
         <ion-item-sliding v-for="prompt in prompts" :key="prompt.id">
           <ion-item button @click="handleView(prompt)">
             <ion-label>
-              <h2>{{ prompt.title }}</h2>
-              <p class="prompt-description">{{ prompt.description || t('promptManagement.detailModal.noDescription') }}</p>
+              <h2>{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h2>
+              <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
               <div class="prompt-meta">
                 <ion-chip v-if="prompt.categoryId" size="small" outline>
                   <ion-label>{{ getCategoryName(prompt.categoryId) }}</ion-label>
@@ -316,6 +316,13 @@ const getCategoryName = (categoryId: string | null) => {
   if (!categoryId) return t('promptManagement.noCategory')
   const category = categories.value.find(c => c.id === categoryId)
   return category?.name || t('promptManagement.noCategory')
+}
+
+// 获取内容的第一行
+const getFirstLineOfContent = (content: string | undefined) => {
+  if (!content) return t('promptManagement.detailModal.noDescription')
+  const firstLine = content.split('\n')[0].trim()
+  return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine
 }
 
 // 搜索处理

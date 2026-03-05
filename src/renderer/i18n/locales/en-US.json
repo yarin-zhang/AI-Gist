@@ -99,6 +99,7 @@
     "modelConfig": "Model Configuration",
     "modelList": "Model List",
     "modelNamePlaceholder": "Please enter model name",
+    "modelSelected": "Model {model} selected",
     "modelTest": "Model testing",
     "modelTestFailed": "Model test failed",
     "modelTestSuccess": "Model test succeeded",
@@ -158,6 +159,7 @@
     "systemPromptUpdateSuccess": "System prompt updated successfully",
     "tencentAPIAddress": "Tencent Cloud API Address:",
     "tencentExample": "For example: https://api.hunyuan.cloud.tencent.com/v1",
+    "testConnection": "test connection",
     "testConnectionAndGetModels": "Test connection and get model list",
     "testFailed": "Test failed",
     "testFailedTitle": "Test failed",
@@ -237,6 +239,7 @@
     "testConnection": "Test Connection"
   },
   "common": {
+    "actions": "operate",
     "add": "Add to",
     "back": "return",
     "cancel": "Cancel",
@@ -593,6 +596,7 @@
     "manualAdjustmentTip": "AI will adjust the current prompt content based on your instructions",
     "manualAdjustmentTitle": "Manual Adjustment Instructions",
     "maxTagsError": "You can add up to 50 tags only",
+    "moreOptions": "More Options",
     "noAIConfigAvailable": "No AI configuration available, please add configuration in AI Config page first",
     "noCategories": "No categories, please create a new category on the left",
     "noCategory": "Uncategorized",
