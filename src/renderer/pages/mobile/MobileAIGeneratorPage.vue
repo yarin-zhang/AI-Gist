@@ -51,14 +51,16 @@
                   interface="action-sheet"
                   @ionChange="handleModelChange"
                 >
-                  <ion-select-option
-                    v-for="config in configs"
-                    :key="config.configId"
-                    :value="`${config.configId}:${config.defaultModel}`"
-                  >
-                    {{ config.name }} - {{ config.defaultModel }}
-                    <span v-if="config.isPreferred"> ⭐</span>
-                  </ion-select-option>
+                  <template v-for="config in configs" :key="config.configId">
+                    <ion-select-option
+                      v-for="model in getConfigModels(config)"
+                      :key="`${config.configId}:${model}`"
+                      :value="`${config.configId}:${model}`"
+                    >
+                      {{ config.name }} - {{ model }}
+                      <span v-if="config.isPreferred"> ⭐</span>
+                    </ion-select-option>
+                  </template>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -164,6 +166,7 @@ import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { databaseService } from '~/lib/db'
 import type { AIConfig } from '@shared/types'
+import { AIGeneratorService } from '~/lib/services/mobile-ai-generator.service'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -180,6 +183,28 @@ const autoSaveEnabled = ref<boolean>(true)
 const formData = reactive({
   topic: ''
 })
+
+// 获取配置的所有模型
+const getConfigModels = (config: AIConfig) => {
+  const models: string[] = []
+
+  // 添加所有可用模型
+  if (config.models && config.models.length > 0) {
+    models.push(...config.models)
+  }
+
+  // 如果有自定义模型，也添加进去
+  if (config.customModel && !models.includes(config.customModel)) {
+    models.push(config.customModel)
+  }
+
+  // 如果没有任何模型，至少添加默认模型
+  if (models.length === 0 && config.defaultModel) {
+    models.push(config.defaultModel)
+  }
+
+  return models
+}
 
 // 加载 AI 配置
 const loadConfigs = async () => {
@@ -232,17 +257,16 @@ const generatePrompt = async () => {
       throw new Error('未找到选中的配置')
     }
 
+    console.log('生成请求参数:', { configId, model, topic: formData.topic })
+
     const request = {
       configId: selectedConfig.configId,
       model: model,
       topic: formData.topic
     }
 
-    // 序列化配置
-    const serializedConfig = serializeConfig(selectedConfig)
-
-    // 调用生成API
-    const result = await window.electronAPI.ai.generatePrompt(request, serializedConfig)
+    // 使用统一的 AI 生成服务
+    const result = await AIGeneratorService.generatePrompt(request, selectedConfig)
 
     generatedResult.value = result.generatedPrompt
 
@@ -279,7 +303,6 @@ const generatePrompt = async () => {
 // 停止生成
 const stopGeneration = async () => {
   try {
-    await window.electronAPI.ai.stopGeneration()
     generating.value = false
     showToast(t('aiGenerator.stopped'), 'warning')
   } catch (error) {
@@ -339,26 +362,6 @@ const saveGeneratedPrompt = async (result: any) => {
     console.error('保存提示词失败:', error)
     throw new Error('保存提示词失败: ' + (error as Error).message)
   }
-}
-
-// 序列化配置对象
-const serializeConfig = (config: AIConfig) => {
-  return {
-    id: config.id,
-    configId: config.configId,
-    name: config.name,
-    type: config.type,
-    baseURL: config.baseURL,
-    apiKey: config.apiKey,
-    secretKey: config.secretKey,
-    models: [...(config.models || [])],
-    defaultModel: config.defaultModel,
-    customModel: config.customModel,
-    enabled: config.enabled,
-    systemPrompt: config.systemPrompt,
-    createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
-    updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt
-  } as unknown as AIConfig
 }
 
 // 显示提示
