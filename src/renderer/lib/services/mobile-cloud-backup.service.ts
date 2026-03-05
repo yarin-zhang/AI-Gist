@@ -701,6 +701,7 @@ export class MobileCloudBackupService {
 
       const backupId = this.generateId()
       const timestamp = new Date().toISOString()
+      // 使用与桌面端一致的命名格式：backup-YYYY-MM-DD-xxxxxxxx
       const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`
 
       const backupData = {
@@ -712,7 +713,8 @@ export class MobileCloudBackupService {
       }
 
       const jsonString = JSON.stringify(backupData, null, 2)
-      const fileName = `${backupName}.json`
+      // 文件名使用完整的 backup-{id}.json 格式
+      const fileName = `backup-${backupId}.json`
 
       if (config.type === 'webdav') {
         return await this.createWebDAVBackup(config as any, fileName, jsonString, backupData)
@@ -878,30 +880,6 @@ export class MobileCloudBackupService {
     }
   }
 
-  /**
-   * 创建 WebDAV 目录
-   */
-  private async createWebDAVDirectory(config: any, dirPath: string): Promise<void> {
-    try {
-      const url = `${config.url}${dirPath}`
-      console.log('创建 WebDAV 目录:', url)
-      const response = await CapacitorHttp.request({
-        url,
-        method: 'MKCOL',
-        headers: {
-          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
-        }
-      })
-      console.log('创建目录响应状态:', response.status)
-    } catch (error: any) {
-      // 目录可能已存在（405 Method Not Allowed 或 409 Conflict）
-      if (error.status === 405 || error.status === 409) {
-        console.log('目录已存在')
-      } else {
-        console.log('创建 WebDAV 目录失败:', error)
-      }
-    }
-  }
   /**
    * 恢复云端备份
    */
