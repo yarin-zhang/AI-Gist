@@ -7,8 +7,8 @@
         </ion-buttons>
         <ion-title>{{ config?.name }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="handleEdit">
-            <ion-icon slot="icon-only" :icon="createOutline"></ion-icon>
+          <ion-button @click="showActionMenu">
+            <ion-icon slot="icon-only" :icon="ellipsisVertical"></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -28,20 +28,18 @@
       <!-- 配置详情 -->
       <div v-else-if="config" class="detail-container">
         <!-- 状态卡片 -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ t('aiConfig.preferredStatus') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
+        <div class="detail-section">
+          <div class="section-title">{{ t('aiConfig.preferredStatus') }}</div>
+          <div class="section-content">
+            <ion-list lines="none">
+              <ion-item lines="none">
                 <ion-label>{{ t('aiConfig.enabled') }}</ion-label>
                 <ion-toggle
                   :checked="config.enabled"
                   @ionChange="handleToggleEnabled"
                 ></ion-toggle>
               </ion-item>
-              <ion-item>
+              <ion-item lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.globalPreferred') }}</h3>
                   <p>{{ t('aiConfig.multipleConfigsWarning') }}</p>
@@ -57,52 +55,48 @@
                 </ion-button>
               </ion-item>
             </ion-list>
-          </ion-card-content>
-        </ion-card>
+          </div>
+        </div>
 
         <!-- 基本信息 -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ t('aiConfig.basicConfig') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
+        <div class="detail-section">
+          <div class="section-title">{{ t('aiConfig.basicConfig') }}</div>
+          <div class="section-content">
+            <ion-list lines="none">
+              <ion-item lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.serviceType') }}</h3>
                   <p>{{ getServiceTypeName(config.type) }}</p>
                 </ion-label>
               </ion-item>
-              <ion-item v-if="config.baseURL">
+              <ion-item v-if="config.baseURL" lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.baseURL') }}</h3>
                   <p class="url-text">{{ config.baseURL }}</p>
                 </ion-label>
               </ion-item>
-              <ion-item v-if="config.apiKey">
+              <ion-item v-if="config.apiKey" lines="none">
                 <ion-label>
                   <h3>API Key</h3>
                   <p class="masked-text">{{ maskApiKey(config.apiKey) }}</p>
                 </ion-label>
               </ion-item>
-              <ion-item>
+              <ion-item lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.createdAt') }}</h3>
                   <p>{{ formatDate(config.createdAt) }}</p>
                 </ion-label>
               </ion-item>
             </ion-list>
-          </ion-card-content>
-        </ion-card>
+          </div>
+        </div>
 
         <!-- 模型配置 -->
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ t('aiConfig.modelConfig') }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
+        <div class="detail-section">
+          <div class="section-title">{{ t('aiConfig.modelConfig') }}</div>
+          <div class="section-content">
+            <ion-list lines="none">
+              <ion-item lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.modelList') }}</h3>
                   <div class="models-chips">
@@ -116,38 +110,36 @@
                   </div>
                 </ion-label>
               </ion-item>
-              <ion-item v-if="config.defaultModel">
+              <ion-item v-if="config.defaultModel" lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.defaultModel') }}</h3>
                   <p>{{ config.defaultModel }}</p>
                 </ion-label>
               </ion-item>
-              <ion-item v-if="config.customModel">
+              <ion-item v-if="config.customModel" lines="none">
                 <ion-label>
                   <h3>{{ t('aiConfig.customModel') }}</h3>
                   <p>{{ config.customModel }}</p>
                 </ion-label>
               </ion-item>
             </ion-list>
-          </ion-card-content>
-        </ion-card>
+          </div>
+        </div>
 
         <!-- 系统提示词 -->
-        <ion-card>
-          <ion-card-header>
-            <div class="card-header-with-action">
-              <ion-card-title>{{ t('aiConfig.systemPrompt') }}</ion-card-title>
-              <ion-button fill="clear" @click="handleEditSystemPrompt">
-                <ion-icon slot="icon-only" :icon="createOutline"></ion-icon>
-              </ion-button>
-            </div>
-          </ion-card-header>
-          <ion-card-content>
+        <div class="detail-section">
+          <div class="section-title-with-action">
+            <div class="section-title">{{ t('aiConfig.systemPrompt') }}</div>
+            <ion-button fill="clear" size="small" @click="handleEditSystemPrompt">
+              <ion-icon slot="icon-only" :icon="createOutline"></ion-icon>
+            </ion-button>
+          </div>
+          <div class="section-content">
             <div class="system-prompt-content">
               {{ config.systemPrompt || t('aiConfig.systemPromptDefault') }}
             </div>
-          </ion-card-content>
-        </ion-card>
+          </div>
+        </div>
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
@@ -161,16 +153,6 @@
             <ion-spinner v-if="testingIntelligent" slot="start"></ion-spinner>
             <ion-icon v-else slot="start" :icon="sparklesOutline"></ion-icon>
             {{ t('aiConfig.requestTest') }}
-          </ion-button>
-
-          <ion-button
-            expand="block"
-            color="danger"
-            @click="handleDelete"
-            v-if="!config.isPreferred"
-          >
-            <ion-icon slot="start" :icon="trashOutline"></ion-icon>
-            {{ t('common.delete') }}
           </ion-button>
         </div>
       </div>
@@ -190,10 +172,6 @@ import {
   IonButtons,
   IonButton,
   IonBackButton,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
   IonList,
   IonItem,
   IonLabel,
@@ -205,13 +183,15 @@ import {
   IonRefresherContent,
   alertController,
   toastController,
+  actionSheetController,
   onIonViewWillEnter
 } from '@ionic/vue'
 import {
   createOutline,
   flashOutline,
   sparklesOutline,
-  trashOutline
+  trashOutline,
+  ellipsisVertical
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
@@ -439,6 +419,45 @@ const showToast = async (message: string, color: string = 'success') => {
   await toast.present()
 }
 
+// 显示操作菜单
+const showActionMenu = async () => {
+  if (!config.value) return
+
+  const buttons = [
+    {
+      text: t('common.edit'),
+      icon: createOutline,
+      handler: () => {
+        handleEdit()
+      }
+    }
+  ]
+
+  // 只有非首选配置才能删除
+  if (!config.value.isPreferred) {
+    buttons.push({
+      text: t('common.delete'),
+      icon: trashOutline,
+      role: 'destructive',
+      handler: () => {
+        handleDelete()
+      }
+    })
+  }
+
+  buttons.push({
+    text: t('common.cancel'),
+    role: 'cancel'
+  })
+
+  const actionSheet = await actionSheetController.create({
+    header: t('common.actions'),
+    buttons
+  })
+
+  await actionSheet.present()
+}
+
 // 初始化
 onMounted(() => {
   loadConfig()
@@ -462,14 +481,48 @@ onIonViewWillEnter(() => {
   padding: 16px;
 }
 
-ion-card {
-  margin-bottom: 16px;
+.detail-section {
+  margin-bottom: 24px;
 }
 
-.card-header-with-action {
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.section-title-with-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.section-title-with-action .section-title {
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.section-content {
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  border: 1px solid var(--ion-color-light-shade);
+  overflow: hidden;
+}
+
+ion-list {
+  background: transparent;
+  padding: 0;
+}
+
+ion-item {
+  --background: transparent;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 0;
 }
 
 .url-text {
@@ -498,7 +551,8 @@ ion-chip {
   font-family: monospace;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--ion-color-medium);
+  color: var(--ion-text-color);
+  padding: 16px;
   max-height: 200px;
   overflow-y: auto;
 }
@@ -507,6 +561,6 @@ ion-chip {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 0 16px 16px;
+  margin-top: 8px;
 }
 </style>

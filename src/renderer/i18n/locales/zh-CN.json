@@ -144,6 +144,7 @@
     "systemPromptPlaceholder": "请输入自定义的系统提示词...",
     "systemPromptTip": "💡 此提示词用于指导 AI 如何生成新的提示词。留空将使用默认的系统提示词。",
     "systemPromptUpdateSuccess": "系统提示词更新成功",
+    "testConnection": "测试连接",
     "testConnectionAndGetModels": "测试连接并获取模型列表",
     "testFailed": "测试失败",
     "testFailedTitle": "测试失败",
@@ -237,6 +238,7 @@
     "testConnection": "测试连接"
   },
   "common": {
+    "actions": "操作",
     "add": "添加",
     "back": "返回",
     "cancel": "取消",

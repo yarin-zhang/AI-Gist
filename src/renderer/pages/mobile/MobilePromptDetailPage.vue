@@ -12,8 +12,8 @@
           <ion-button @click="toggleFavorite">
             <ion-icon :icon="prompt?.isFavorite ? heart : heartOutline"></ion-icon>
           </ion-button>
-          <ion-button @click="handleEdit">
-            <ion-icon :icon="createOutline"></ion-icon>
+          <ion-button @click="showActionMenu">
+            <ion-icon :icon="ellipsisVertical"></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -62,11 +62,9 @@
           <div class="section-header">
             <h2>{{ t('promptManagement.detailModal.promptContent') }}</h2>
           </div>
-          <ion-card>
-            <ion-card-content>
-              <div class="prompt-content">{{ prompt.content }}</div>
-            </ion-card-content>
-          </ion-card>
+          <div class="prompt-content-wrapper">
+            <div class="prompt-content">{{ prompt.content }}</div>
+          </div>
         </div>
 
         <!-- 操作按钮 -->
@@ -74,10 +72,6 @@
           <ion-button expand="block" @click="copyContent">
             <ion-icon slot="start" :icon="copyOutline"></ion-icon>
             {{ t('promptManagement.detailModal.copyContent') }}
-          </ion-button>
-          <ion-button expand="block" color="danger" @click="handleDelete">
-            <ion-icon slot="start" :icon="trashOutline"></ion-icon>
-            {{ t('common.delete') }}
           </ion-button>
         </div>
       </div>
@@ -100,12 +94,11 @@ import {
   IonList,
   IonItem,
   IonLabel,
-  IonCard,
-  IonCardContent,
   IonChip,
   IonSpinner,
   toastController,
-  alertController
+  alertController,
+  actionSheetController
 } from '@ionic/vue'
 import {
   arrowBack,
@@ -114,7 +107,8 @@ import {
   createOutline,
   documentTextOutline,
   copyOutline,
-  trashOutline
+  trashOutline,
+  ellipsisVertical
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
@@ -197,6 +191,38 @@ const copyContent = async () => {
     console.error('复制失败:', error)
     showToast(t('promptManagement.detailModal.copyFailed'), 'danger')
   }
+}
+
+// 显示操作菜单
+const showActionMenu = async () => {
+  if (!prompt.value) return
+
+  const actionSheet = await actionSheetController.create({
+    header: t('common.actions'),
+    buttons: [
+      {
+        text: t('common.edit'),
+        icon: createOutline,
+        handler: () => {
+          handleEdit()
+        }
+      },
+      {
+        text: t('common.delete'),
+        icon: trashOutline,
+        role: 'destructive',
+        handler: () => {
+          handleDelete()
+        }
+      },
+      {
+        text: t('common.cancel'),
+        role: 'cancel'
+      }
+    ]
+  })
+
+  await actionSheet.present()
 }
 
 // 编辑
@@ -326,6 +352,13 @@ onMounted(async () => {
   font-weight: 600;
   margin: 0;
   color: var(--ion-text-color);
+}
+
+.prompt-content-wrapper {
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid var(--ion-color-light-shade);
 }
 
 .prompt-content {

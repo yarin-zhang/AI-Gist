@@ -16,18 +16,19 @@
 
     <ion-content :fullscreen="true">
       <div class="form-container">
-        <!-- 服务类型 -->
-        <ion-list>
-          <ion-list-header>
-            <ion-label>{{ t('aiConfig.basicConfig') }}</ion-label>
-          </ion-list-header>
+        <!-- 基本配置 -->
+        <div class="form-section">
+          <div class="section-title">{{ t('aiConfig.basicConfig') }}</div>
+          <div class="form-content">
+            <ion-list lines="none">
 
-          <ion-item>
+          <!-- 服务类型 -->
+          <ion-item lines="none">
             <ion-select
               v-model="formData.type"
               :label="t('aiConfig.serviceType')"
               :placeholder="t('aiConfig.pleaseSelectType')"
-              @ionChange="handleTypeChange"
+              @ionChange="onTypeChange"
             >
               <ion-select-option disabled>{{ t('aiConfig.localServices') }}</ion-select-option>
               <ion-select-option value="ollama">Ollama</ion-select-option>
@@ -47,8 +48,8 @@
             </ion-select>
           </ion-item>
 
-          <!-- 配置名称 -->
-          <ion-item>
+          <!-- 配置名称 - 选择服务类型后显示 -->
+          <ion-item v-if="formData.type" lines="none">
             <ion-input
               v-model="formData.name"
               :label="t('aiConfig.configName')"
@@ -58,7 +59,7 @@
           </ion-item>
 
           <!-- Base URL -->
-          <ion-item v-if="needsBaseURL">
+          <ion-item v-if="formData.type && needsBaseURL" lines="none">
             <ion-input
               v-model="formData.baseURL"
               :label="getBaseURLInfo.label"
@@ -68,7 +69,7 @@
           </ion-item>
 
           <!-- API Key -->
-          <ion-item v-if="needsApiKey">
+          <ion-item v-if="formData.type && needsApiKey" lines="none">
             <ion-input
               v-model="formData.apiKey"
               :label="getApiKeyLabel"
@@ -78,7 +79,7 @@
           </ion-item>
 
           <!-- 服务信息 -->
-          <ion-item v-if="getServiceInfo.description" lines="none">
+          <ion-item v-if="formData.type && getServiceInfo.description" lines="none">
             <div class="service-info">
               <p class="service-description">{{ getServiceInfo.description }}</p>
               <div class="service-links">
@@ -102,12 +103,18 @@
             </div>
           </ion-item>
 
-          <!-- 连接测试 -->
-          <ion-item lines="none">
-            <ion-button expand="block" @click="handleTestConnection" :disabled="testingConnection">
-              <ion-spinner v-if="testingConnection" slot="start"></ion-spinner>
-              {{ t('aiConfig.testConnection') }}
-            </ion-button>
+          <!-- 测试连接按钮 -->
+          <ion-item v-if="formData.type" lines="none">
+            <div class="action-buttons">
+              <ion-button
+                expand="block"
+                @click="handleTestConnection"
+                :disabled="testingConnection || !canTestConnection"
+              >
+                <ion-spinner v-if="testingConnection" slot="start"></ion-spinner>
+                {{ t('aiConfig.testConnection') }}
+              </ion-button>
+            </div>
           </ion-item>
 
           <!-- 测试结果 -->
@@ -117,19 +124,27 @@
                 :icon="testResult.success ? checkmarkCircle : closeCircle"
                 :color="testResult.success ? 'success' : 'danger'"
               ></ion-icon>
-              <span>{{ testResult.message }}</span>
+              <div class="test-result-content">
+                <div class="test-result-message">{{ testResult.message }}</div>
+                <!-- 显示详细错误信息 -->
+                <div v-if="!testResult.success && testResult.message" class="test-result-detail">
+                  {{ testResult.message }}
+                </div>
+              </div>
             </div>
           </ion-item>
-        </ion-list>
+            </ion-list>
+          </div>
+        </div>
 
-        <!-- 模型配置 -->
-        <ion-list>
-          <ion-list-header>
-            <ion-label>{{ t('aiConfig.modelConfig') }}</ion-label>
-          </ion-list-header>
+        <!-- 模型配置 - 测试成功后显示 -->
+        <div v-if="testResult?.success" class="form-section">
+          <div class="section-title">{{ t('aiConfig.modelConfig') }}</div>
+          <div class="form-content">
+            <ion-list lines="none">
 
           <!-- 模型列表 -->
-          <ion-item>
+          <ion-item lines="none">
             <div class="models-container">
               <ion-label position="stacked">{{ t('aiConfig.modelList') }}</ion-label>
               <div class="models-chips">
@@ -150,7 +165,7 @@
           </ion-item>
 
           <!-- 默认模型 -->
-          <ion-item v-if="formData.models.length > 0">
+          <ion-item v-if="formData.models.length > 0" lines="none">
             <ion-select
               v-model="formData.defaultModel"
               :label="t('aiConfig.defaultModel')"
@@ -163,21 +178,23 @@
           </ion-item>
 
           <!-- 自定义模型 -->
-          <ion-item>
+          <ion-item lines="none">
             <ion-input
               v-model="formData.customModel"
               :label="t('aiConfig.customModel')"
               :placeholder="t('aiConfig.customModelPlaceholder')"
             ></ion-input>
           </ion-item>
-        </ion-list>
+            </ion-list>
+          </div>
+        </div>
       </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
@@ -189,7 +206,6 @@ import {
   IonButton,
   IonBackButton,
   IonList,
-  IonListHeader,
   IonItem,
   IonLabel,
   IonInput,
@@ -208,167 +224,34 @@ import {
   closeCircle
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
+import { useAIConfigForm } from '~/composables/useAIConfigForm'
 import { api } from '~/lib/api'
-import type { AIConfig, AIProviderType } from '@shared/types'
+import type { AIConfig } from '@shared/types'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
+// 使用 composable
+const {
+  formData,
+  needsBaseURL,
+  needsApiKey,
+  canTestConnection,
+  handleTypeChange,
+  getApiKeyLabel,
+  getBaseURLInfo,
+  getApiKeyInfo,
+  resetForm
+} = useAIConfigForm()
+
 // 状态
 const saving = ref(false)
 const testingConnection = ref(false)
-const testResult = ref<{ success: boolean; message: string } | null>(null)
+const testResult = ref<{ success: boolean; message: string; models?: string[] } | null>(null)
 
 // 判断是否为编辑模式
 const isEditMode = computed(() => !!route.params.id)
-
-// 表单数据
-const formData = reactive({
-  type: 'openai' as AIProviderType,
-  name: '',
-  baseURL: '',
-  apiKey: '',
-  models: [] as string[],
-  defaultModel: '',
-  customModel: ''
-})
-
-// 计算属性：是否需要Base URL
-const needsBaseURL = computed(() => {
-  return !['anthropic', 'google'].includes(formData.type)
-})
-
-// 计算属性：是否需要API Key
-const needsApiKey = computed(() => {
-  return !['ollama', 'lmstudio'].includes(formData.type)
-})
-
-// 计算属性：API Key标签
-const getApiKeyLabel = computed(() => {
-  const labels: Record<string, string> = {
-    anthropic: 'Anthropic API Key',
-    google: 'Google Gemini AI API Key',
-    azure: 'Azure OpenAI API Key',
-    deepseek: 'DeepSeek API Key',
-    siliconflow: '硅基流动 API Key',
-    tencent: '腾讯云 API Key',
-    aliyun: '阿里云 API Key',
-    mistral: 'Mistral API Key',
-    zhipu: '智谱AI API Key',
-    openrouter: 'OpenRouter API Key'
-  }
-  return labels[formData.type] || 'API Key'
-})
-
-// 计算属性：Base URL标签和placeholder
-const getBaseURLInfo = computed(() => {
-  const info: Record<string, { label: string; placeholder: string }> = {
-    ollama: {
-      label: t('aiConfig.ollamaServiceAddress'),
-      placeholder: t('aiConfig.ollamaExample')
-    },
-    lmstudio: {
-      label: t('aiConfig.lmstudioServiceAddress'),
-      placeholder: t('aiConfig.lmstudioExample')
-    },
-    azure: {
-      label: t('aiConfig.azureOpenAIEndpoint'),
-      placeholder: t('aiConfig.azureExample')
-    },
-    deepseek: {
-      label: t('aiConfig.deepseekAPIAddress'),
-      placeholder: t('aiConfig.deepseekExample')
-    },
-    siliconflow: {
-      label: t('aiConfig.siliconflowAPIAddress'),
-      placeholder: t('aiConfig.siliconflowExample')
-    },
-    tencent: {
-      label: t('aiConfig.tencentAPIAddress'),
-      placeholder: t('aiConfig.tencentExample')
-    },
-    aliyun: {
-      label: t('aiConfig.aliyunAPIAddress'),
-      placeholder: t('aiConfig.aliyunExample')
-    },
-    mistral: {
-      label: t('aiConfig.mistralAPIAddress'),
-      placeholder: t('aiConfig.mistralExample')
-    },
-    zhipu: {
-      label: t('aiConfig.zhipuAPIAddress'),
-      placeholder: t('aiConfig.zhipuExample')
-    },
-    openrouter: {
-      label: t('aiConfig.baseURL'),
-      placeholder: 'https://openrouter.ai/api/v1'
-    }
-  }
-  return info[formData.type] || {
-    label: t('aiConfig.baseURL'),
-    placeholder: t('aiConfig.openaiExample')
-  }
-})
-
-// 计算属性：API Key 信息
-const getApiKeyInfo = computed(() => {
-  const info: Record<string, { apiKeyUrl: string; docUrl: string }> = {
-    openai: {
-      apiKeyUrl: 'https://platform.openai.com/api-keys',
-      docUrl: 'https://platform.openai.com/docs'
-    },
-    anthropic: {
-      apiKeyUrl: 'https://console.anthropic.com/',
-      docUrl: 'https://docs.anthropic.com/'
-    },
-    google: {
-      apiKeyUrl: 'https://makersuite.google.com/app/apikey',
-      docUrl: 'https://ai.google.dev/docs'
-    },
-    azure: {
-      apiKeyUrl: 'https://portal.azure.com/',
-      docUrl: 'https://learn.microsoft.com/en-us/azure/ai-services/openai/'
-    },
-    deepseek: {
-      apiKeyUrl: 'https://platform.deepseek.com/api_keys',
-      docUrl: 'https://platform.deepseek.com/docs'
-    },
-    siliconflow: {
-      apiKeyUrl: 'https://cloud.siliconflow.cn/me/account/ak',
-      docUrl: 'https://docs.siliconflow.cn/'
-    },
-    tencent: {
-      apiKeyUrl: 'https://console.cloud.tencent.com/hunyuan',
-      docUrl: 'https://cloud.tencent.com/document/product/1729'
-    },
-    aliyun: {
-      apiKeyUrl: 'https://bailian.console.aliyun.com/',
-      docUrl: 'https://bailian.console.aliyun.com/?tab=doc#/doc'
-    },
-    mistral: {
-      apiKeyUrl: 'https://console.mistral.ai/api-keys/',
-      docUrl: 'https://docs.mistral.ai/'
-    },
-    zhipu: {
-      apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
-      docUrl: 'https://docs.bigmodel.cn/cn/guide/start/model-overview'
-    },
-    openrouter: {
-      apiKeyUrl: 'https://openrouter.ai/keys',
-      docUrl: 'https://openrouter.ai/docs'
-    },
-    ollama: {
-      apiKeyUrl: '',
-      docUrl: 'https://github.com/ollama/ollama'
-    },
-    lmstudio: {
-      apiKeyUrl: '',
-      docUrl: 'https://lmstudio.ai/docs/app/basics'
-    }
-  }
-  return info[formData.type] || { apiKeyUrl: '', docUrl: '' }
-})
 
 // 计算属性：服务商信息
 const getServiceInfo = computed(() => {
@@ -453,15 +336,9 @@ const loadConfig = async () => {
 }
 
 // 处理服务类型变化
-const handleTypeChange = () => {
+const onTypeChange = () => {
+  handleTypeChange(formData.type, isEditMode.value)
   testResult.value = null
-  // 清空不需要的字段
-  if (!needsBaseURL.value) {
-    formData.baseURL = ''
-  }
-  if (!needsApiKey.value) {
-    formData.apiKey = ''
-  }
 }
 
 // 测试连接
@@ -484,33 +361,63 @@ const handleTestConnection = async () => {
   testResult.value = null
 
   try {
+    console.log('[Page] 准备测试连接，formData:', {
+      type: formData.type,
+      baseURL: formData.baseURL,
+      hasApiKey: !!formData.apiKey,
+      apiKeyLength: formData.apiKey?.length || 0
+    })
+
+    // 使用统一的 API 调用（会自动根据平台选择实现）
     const result = await api.aiConfigs.test.mutate({
       type: formData.type,
       baseURL: formData.baseURL,
       apiKey: formData.apiKey
     })
 
-    if (result.success && result.models) {
-      formData.models = result.models
-      testResult.value = {
-        success: true,
-        message: t('aiConfig.foundModels', { count: result.models.length })
+    console.log('[Page] 测试结果:', result)
+
+    if (result.success) {
+      // 如果获取到模型，自动填充
+      if (result.models && result.models.length > 0) {
+        formData.models = result.models
+
+        // 如果还没有设置默认模型，自动设置第一个
+        if (!formData.defaultModel) {
+          formData.defaultModel = result.models[0]
+        }
+
+        testResult.value = {
+          success: true,
+          message: t('aiConfig.foundModels', { count: result.models.length }),
+          models: result.models
+        }
+        showToast(t('aiConfig.connectionTestSuccess'))
+      } else {
+        // 连接成功但没有获取到模型
+        testResult.value = {
+          success: true,
+          message: t('aiConfig.connectionSuccessNoModels') || '连接成功，但未获取到模型列表，请手动添加'
+        }
+        showToast(t('aiConfig.connectionSuccessNoModels') || '连接成功，请手动添加模型', 'warning')
       }
-      showToast(t('aiConfig.connectionTestSuccess'))
     } else {
+      // 显示详细的错误信息
+      const errorMessage = result.error || t('aiConfig.connectionTestFailed')
       testResult.value = {
         success: false,
-        message: result.error || t('aiConfig.connectionTestFailed')
+        message: errorMessage
       }
-      showToast(result.error || t('aiConfig.connectionTestFailed'), 'danger')
+      showToast(errorMessage, 'danger')
     }
   } catch (error) {
-    console.error('测试连接失败:', error)
+    console.error('[Page] 测试连接失败:', error)
+    const errorMessage = (error as Error).message || t('aiConfig.testFailed')
     testResult.value = {
       success: false,
-      message: t('aiConfig.testFailed')
+      message: errorMessage
     }
-    showToast(t('aiConfig.testFailed'), 'danger')
+    showToast(errorMessage, 'danger')
   } finally {
     testingConnection.value = false
   }
@@ -548,9 +455,10 @@ const showAddModelAlert = async () => {
 
 // 移除模型
 const removeModel = (index: number) => {
+  const removedModel = formData.models[index]
   formData.models.splice(index, 1)
   // 如果删除的是默认模型，清空默认模型
-  if (formData.defaultModel === formData.models[index]) {
+  if (formData.defaultModel === removedModel) {
     formData.defaultModel = ''
   }
 }
@@ -631,11 +539,39 @@ onMounted(() => {
 
 <style scoped>
 .form-container {
+  padding: 16px;
   padding-bottom: 20px;
 }
 
+.form-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.form-content {
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  border: 1px solid var(--ion-color-light-shade);
+  overflow: hidden;
+}
+
 ion-list {
-  margin-bottom: 16px;
+  background: transparent;
+  padding: 0;
+}
+
+ion-item {
+  --background: transparent;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 0;
 }
 
 .service-info {
@@ -653,11 +589,24 @@ ion-list {
 .service-links {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0;
+}
+
+.action-buttons ion-button {
+  flex: 1;
+  margin: 0;
 }
 
 .test-result {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 12px;
   border-radius: 8px;
@@ -670,6 +619,23 @@ ion-list {
 
 .test-result.error {
   background-color: var(--ion-color-danger-tint);
+}
+
+.test-result-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-result-message {
+  font-weight: 500;
+}
+
+.test-result-detail {
+  font-size: 13px;
+  opacity: 0.8;
+  word-break: break-word;
 }
 
 .models-container {
