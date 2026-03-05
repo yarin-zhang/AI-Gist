@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onActivated, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
@@ -430,9 +430,12 @@ const showToast = async (message: string, color: string = 'success') => {
 
 // 初始化
 onMounted(async () => {
-  // 每次进入页面时重置表单
-  resetForm()
   await loadConfigs()
+})
+
+// 每次页面激活时重置表单（处理路由缓存的情况）
+onActivated(() => {
+  resetForm()
 })
 </script>
 
