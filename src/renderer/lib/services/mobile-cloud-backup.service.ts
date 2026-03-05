@@ -386,21 +386,28 @@ export class MobileCloudBackupService {
 
             // CapacitorHttp 可能返回字符串或对象
             let backupData
+            let actualSize = 0
+
             if (typeof fileResponse.data === 'string') {
+              actualSize = new Blob([fileResponse.data]).size
               backupData = JSON.parse(fileResponse.data)
             } else if (typeof fileResponse.data === 'object') {
+              const jsonString = JSON.stringify(fileResponse.data)
+              actualSize = new Blob([jsonString]).size
               backupData = fileResponse.data
             } else {
               console.warn('未知的响应数据类型:', typeof fileResponse.data)
               continue
             }
 
+            console.log('实际文件大小:', actualSize, 'bytes')
+
             backups.push({
               id: backupData.id,
               name: backupData.name,
               description: backupData.description,
               createdAt: backupData.createdAt,
-              size: file.size,
+              size: actualSize, // 使用实际读取的文件大小
               cloudPath: file.path,
               storageId: config.id
             })
@@ -561,20 +568,27 @@ export class MobileCloudBackupService {
           isDirectory = !!collection
         }
 
+        // 提取文件名（需要在获取大小之前，因为日志需要用到）
+        const name = decodeURIComponent(href.split('/').filter(Boolean).pop() || '')
+
         // 获取文件大小
         let contentlength = prop.getElementsByTagName('d:getcontentlength')[0] ||
           prop.getElementsByTagName('D:getcontentlength')[0] ||
-          prop.getElementsByTagName('getcontentlength')[0]
-        const size = contentlength ? parseInt(contentlength.textContent || '0', 10) : 0
+          prop.getElementsByTagName('getcontentlength')[0] ||
+          prop.getElementsByTagName('lp1:getcontentlength')[0] ||
+          prop.getElementsByTagName('lp2:getcontentlength')[0]
+
+        let size = 0
+        if (contentlength && contentlength.textContent) {
+          size = parseInt(contentlength.textContent, 10)
+          console.log('从 XML 解析文件大小:', name, size)
+        }
 
         // 获取修改时间
         let lastmodified = prop.getElementsByTagName('d:getlastmodified')[0] ||
           prop.getElementsByTagName('D:getlastmodified')[0] ||
           prop.getElementsByTagName('getlastmodified')[0]
         const modifiedAt = lastmodified ? (lastmodified.textContent || '') : new Date().toISOString()
-
-        // 提取文件名
-        const name = decodeURIComponent(href.split('/').filter(Boolean).pop() || '')
 
         // 跳过目录本身和空文件名
         if (name && !isDirectory && !href.endsWith(WEBDAV_BACKUP_DIR + '/')) {

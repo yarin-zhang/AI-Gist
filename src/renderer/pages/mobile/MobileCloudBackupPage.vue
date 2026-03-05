@@ -159,13 +159,13 @@
                   <p>{{ backup.description }}</p>
                   <p>{{ formatDate(backup.createdAt) }} · {{ formatSize(backup.size) }}</p>
                 </ion-label>
+                <ion-button slot="end" color="primary" @click="restoreBackup(backup)">
+                  <ion-icon :icon="downloadOutline" slot="start"></ion-icon>
+                  {{ t('cloudBackup.restore') }}
+                </ion-button>
               </ion-item>
 
               <ion-item-options side="end">
-                <ion-item-option color="primary" @click="restoreBackup(backup)">
-                  <ion-icon :icon="downloadOutline"></ion-icon>
-                  {{ t('cloudBackup.restore') }}
-                </ion-item-option>
                 <ion-item-option color="danger" @click="deleteBackup(backup)">
                   <ion-icon :icon="trashOutline"></ion-icon>
                   {{ t('cloudBackup.delete') }}
