@@ -677,6 +677,7 @@
     "prompt": "提示词",
     "promptContent": "提示词内容",
     "promptNotFound": "提示词不存在",
+    "images": "图片",
     "quickInsertVariables": "快速插入变量",
     "quickOptimization": "快速优化提示词",
     "regularMode": "常规模式",

@@ -486,8 +486,8 @@ const createBackup = async () => {
   try {
     await loadingEl.present()
 
-    // 导出数据
-    const exportResult = await databaseService.exportAllData()
+    // 导出数据（备份专用，含图片序列化）
+    const exportResult = await databaseService.exportAllDataForBackup()
     if (!exportResult.success) {
       throw new Error(exportResult.error || t('cloudBackup.exportFailed'))
     }
@@ -558,12 +558,12 @@ const performRestore = async (backup: CloudBackupInfo) => {
       backup.id
     )
 
-    if (!result.success || !result.backupInfo?.data) {
+    if (!result.success || !result.data) {
       throw new Error(result.error || t('cloudBackup.restoreFailed'))
     }
 
     // 恢复到数据库
-    const restoreResult = await databaseService.replaceAllData(result.backupInfo.data)
+    const restoreResult = await databaseService.replaceAllData(result.data)
 
     if (!restoreResult.success) {
       throw new Error(restoreResult.error || t('cloudBackup.restoreFailed'))

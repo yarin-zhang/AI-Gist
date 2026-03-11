@@ -622,6 +622,7 @@
     "prompt": "Prompt",
     "promptContent": "Prompt Content",
     "promptNotFound": "Prompt not found",
+    "images": "Images",
     "quickInsertVariables": "Quick Insert Variables",
     "quickOptimization": "Quick Optimize Prompt",
     "regularMode": "Regular Mode",

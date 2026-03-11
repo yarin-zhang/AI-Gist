@@ -36,6 +36,21 @@
           <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
         </div>
 
+        <!-- 图片 -->
+        <div v-if="imageUrls.length > 0" class="content-section">
+          <div class="section-header">
+            <h2>{{ t('promptManagement.images') }}</h2>
+          </div>
+          <div class="images-grid">
+            <img
+              v-for="(url, index) in imageUrls"
+              :key="index"
+              :src="url"
+              class="prompt-image"
+            />
+          </div>
+        </div>
+
         <!-- 提示词内容 -->
         <div class="content-section">
           <div class="section-header">
@@ -59,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   IonPage,
@@ -101,6 +116,15 @@ const route = useRoute()
 const prompt = ref<Prompt | null>(null)
 const categories = ref<Category[]>([])
 const loading = ref(true)
+const imageUrls = ref<string[]>([])
+
+const updateImageUrls = () => {
+  imageUrls.value.forEach(url => URL.revokeObjectURL(url))
+  imageUrls.value = []
+  if (prompt.value?.imageBlobs?.length) {
+    imageUrls.value = prompt.value.imageBlobs.map((blob: Blob) => URL.createObjectURL(blob))
+  }
+}
 
 // 加载提示词详情
 const loadPrompt = async () => {
@@ -111,6 +135,7 @@ const loadPrompt = async () => {
       throw new Error('Invalid prompt ID')
     }
     prompt.value = await api.prompts.getById.query(promptId)
+    updateImageUrls()
   } catch (error) {
     console.error('加载提示词失败:', error)
     showToast(t('promptManagement.loadFailed'), 'danger')
@@ -262,6 +287,10 @@ onMounted(async () => {
   await loadCategories()
   await loadPrompt()
 })
+
+onUnmounted(() => {
+  imageUrls.value.forEach(url => URL.revokeObjectURL(url))
+})
 </script>
 
 <style scoped>
@@ -358,5 +387,19 @@ onMounted(async () => {
 
 ion-chip {
   margin: 0;
+}
+
+.images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-image {
+  width: calc(50% - 4px);
+  border-radius: 8px;
+  object-fit: cover;
+  aspect-ratio: 1;
+  background: var(--ion-color-light);
 }
 </style>

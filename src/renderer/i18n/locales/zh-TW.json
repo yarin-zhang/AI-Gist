@@ -620,6 +620,7 @@
     "prompt": "提示詞",
     "promptContent": "提示詞內容",
     "promptNotFound": "提示詞不存在",
+    "images": "圖片",
     "quickInsertVariables": "快速插入變量",
     "quickOptimization": "快速優化提示詞",
     "regularMode": "常規模式",

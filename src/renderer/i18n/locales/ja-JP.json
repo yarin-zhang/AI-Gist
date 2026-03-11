@@ -622,6 +622,7 @@
     "prompt": "プロンプト",
     "promptContent": "プロンプト内容",
     "promptNotFound": "プロンプトワードは存在しません",
+    "images": "画像",
     "quickInsertVariables": "変数をすばやく挿入します",
     "quickOptimization": "クイック最適化プロンプト",
     "regularMode": "通常モード",

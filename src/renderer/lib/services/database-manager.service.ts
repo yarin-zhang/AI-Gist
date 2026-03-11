@@ -221,6 +221,57 @@ export class DatabaseServiceManager {
   }
   
   /**
+   * Blob 转 base64 data URL
+   */
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  /**
+   * base64 data URL 转 Blob
+   */
+  private async base64ToBlob(dataUrl: string): Promise<Blob> {
+    const response = await fetch(dataUrl)
+    return response.blob()
+  }
+
+  /**
+   * 序列化 prompt 的 imageBlobs（Blob[] → base64 string[]）
+   */
+  private async serializeImageBlobs(prompts: any[]): Promise<any[]> {
+    return Promise.all(prompts.map(async (prompt) => {
+      if (!prompt.imageBlobs?.length) return prompt
+      const serialized = await Promise.all(
+        prompt.imageBlobs
+          .filter((b: any) => b instanceof Blob)
+          .map((b: Blob) => this.blobToBase64(b))
+      )
+      return { ...prompt, imageBlobs: serialized }
+    }))
+  }
+
+  /**
+   * 反序列化 prompt 的 imageBlobs（base64 string[] → Blob[]）
+   */
+  private async deserializeImageBlobs(promptData: any): Promise<any> {
+    if (!promptData.imageBlobs?.length) return promptData
+    const blobs = (await Promise.all(
+      promptData.imageBlobs.map(async (item: any) => {
+        if (typeof item === 'string' && item.startsWith('data:')) {
+          return this.base64ToBlob(item)
+        }
+        return item instanceof Blob ? item : null
+      })
+    )).filter(Boolean)
+    return { ...promptData, imageBlobs: blobs }
+  }
+
+  /**
    * 导出所有数据
    */
   async exportAllData(): Promise<DataExportResult> {
@@ -304,7 +355,23 @@ export class DatabaseServiceManager {
       };
     }
   }
-  
+
+  /**
+   * 导出所有数据（备份专用，包含图片 base64 序列化）
+   * 移动端备份时使用此方法，确保 imageBlobs 能正确序列化为 JSON
+   */
+  async exportAllDataForBackup(): Promise<DataExportResult> {
+    const result = await this.exportAllData();
+    if (!result.success || !result.data) return result;
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        prompts: await this.serializeImageBlobs(result.data.prompts)
+      }
+    };
+  }
+
   /**
    * 导入数据
    */
@@ -366,10 +433,11 @@ export class DatabaseServiceManager {
               promptDataWithoutId.categoryId = undefined;
             }
           }
-          
+
           try {
-            const newPrompt = await this.prompt.createPrompt(promptDataWithoutId);
-            
+            const promptToCreate = await this.deserializeImageBlobs(promptDataWithoutId);
+            const newPrompt = await this.prompt.createPrompt(promptToCreate);
+
             // 记录提示词ID映射：旧ID -> 新ID
             if (oldPromptId !== undefined) {
               idMapping[`prompt_${oldPromptId}`] = newPrompt.id!;
@@ -536,10 +604,11 @@ export class DatabaseServiceManager {
               promptDataWithoutId.categoryId = undefined;
             }
           }
-          
+
           try {
-            const newPrompt = await this.prompt.createPrompt(promptDataWithoutId);
-            
+            const promptToCreate = await this.deserializeImageBlobs(promptDataWithoutId);
+            const newPrompt = await this.prompt.createPrompt(promptToCreate);
+
             // 记录提示词ID映射：旧ID -> 新ID
             if (oldPromptId !== undefined) {
               idMapping[`prompt_${oldPromptId}`] = newPrompt.id!;
