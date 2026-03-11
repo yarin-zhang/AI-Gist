@@ -43,6 +43,41 @@
                 "focus": false,
                 "panel": "shared"
             }
+        },
+        {
+            "label": "构建移动端",
+            "type": "shell",
+            "command": "yarn",
+            "args": ["build:mobile"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "打开 iOS 项目",
+            "type": "shell",
+            "command": "yarn",
+            "args": ["cap:ios"],
+            "group": "build",
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "打开 Android 项目",
+            "type": "shell",
+            "command": "yarn",
+            "args": ["cap:android"],
+            "group": "build",
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared"
+            }
         }
     ]
 }
