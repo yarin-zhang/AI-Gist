@@ -130,8 +130,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onActivated, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
   IonPage,
   IonHeader,
@@ -168,6 +168,7 @@ import { AIGeneratorService } from '~/lib/services/mobile-ai-generator.service'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 // 状态
 const configs = ref<AIConfig[]>([])
@@ -433,10 +434,12 @@ onMounted(async () => {
   await loadConfigs()
 })
 
-// 每次页面激活时重置表单（处理路由缓存的情况）
-onActivated(() => {
-  resetForm()
-})
+// 监听路由变化，每次进入页面时重置表单
+watch(() => route.path, (newPath) => {
+  if (newPath === '/ai-generator') {
+    resetForm()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
