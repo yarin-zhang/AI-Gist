@@ -188,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onActivated } from 'vue'
 import {
   IonPage,
   IonHeader,
@@ -234,11 +234,12 @@ import {
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { Prompt, Category } from '@shared/types'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { databaseService } from '~/lib/db'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 // 状态
 const prompts = ref<Prompt[]>([])
@@ -455,6 +456,20 @@ onMounted(async () => {
 
 // 页面进入时刷新（从编辑页返回时会触发）
 onIonViewWillEnter(() => {
+  loadPrompts()
+  checkAIConfig()
+})
+
+// 监听路由变化，当从创建/编辑页返回时刷新列表
+watch(() => route.path, (newPath) => {
+  if (newPath === '/tabs/prompts') {
+    loadPrompts()
+    checkAIConfig()
+  }
+})
+
+// keep-alive 激活时刷新
+onActivated(() => {
   loadPrompts()
   checkAIConfig()
 })
