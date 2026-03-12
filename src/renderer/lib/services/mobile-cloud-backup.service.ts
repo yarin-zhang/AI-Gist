@@ -783,10 +783,15 @@ export class MobileCloudBackupService {
         }
       }
 
+      const uploadErrMsg = response.status === 401 || response.status === 403
+        ? '认证失败，请检查用户名和密码'
+        : response.status === 404 || response.status === 409
+          ? '目标目录不存在，请确认 WebDAV 服务器路径配置正确'
+          : `上传备份失败（HTTP ${response.status}）`
       return {
         success: false,
-        message: '上传备份失败',
-        error: `HTTP ${response.status}`
+        message: uploadErrMsg,
+        error: uploadErrMsg
       }
     } catch (error) {
       console.error('创建 WebDAV 备份失败:', error)
@@ -947,10 +952,15 @@ export class MobileCloudBackupService {
       })
 
       if (response.status !== 200) {
+        const statusMsg = response.status === 401 || response.status === 403
+          ? '认证失败，请检查用户名和密码'
+          : response.status === 404
+            ? '备份文件不存在，请刷新列表后重试'
+            : `下载备份失败（HTTP ${response.status}）`
         return {
           success: false,
-          message: '下载备份失败',
-          error: `HTTP ${response.status}`
+          message: statusMsg,
+          error: statusMsg
         }
       }
 
@@ -973,7 +983,7 @@ export class MobileCloudBackupService {
         message: '云端备份恢复成功',
         backupInfo: backup,
         data: backupData.data
-      } as any
+      }
     } catch (error) {
       console.error('恢复 WebDAV 备份失败:', error)
       throw error
@@ -1020,7 +1030,7 @@ export class MobileCloudBackupService {
         message: '云端备份恢复成功',
         backupInfo: backup,
         data: backupData.data
-      } as any
+      }
     } catch (error) {
       console.error('恢复 iCloud 备份失败:', error)
       throw error
@@ -1095,9 +1105,14 @@ export class MobileCloudBackupService {
         }
       }
 
+      const deleteErrMsg = response.status === 401 || response.status === 403
+        ? '认证失败，请检查用户名和密码'
+        : response.status === 404
+          ? '备份文件不存在，可能已被删除'
+          : `删除失败（HTTP ${response.status}）`
       return {
         success: false,
-        error: `删除失败: HTTP ${response.status}`
+        error: deleteErrMsg
       }
     } catch (error) {
       console.error('删除 WebDAV 备份失败:', error)

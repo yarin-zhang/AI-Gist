@@ -682,11 +682,11 @@ const createCloudBackup = async (storageId?: string) => {
             // 创建成功后刷新对应存储的备份列表
             await refreshCloudBackupList(targetStorageId);
         } else {
-            message.error(result.error || '创建云端备份失败');
+            message.error(getFriendlyBackupError(result.error));
         }
     } catch (error) {
         console.error('创建云端备份失败:', error);
-        message.error('创建云端备份失败');
+        message.error(getFriendlyBackupError(error instanceof Error ? error.message : String(error)));
     } finally {
         loading.value.createBackup = false;
     }
@@ -702,11 +702,11 @@ const restoreCloudBackup = async (storageId: string, backupId: string) => {
             // 恢复成功后刷新页面或通知父组件
             window.location.reload();
         } else {
-            message.error(result.error || '恢复云端备份失败');
+            message.error(getFriendlyRestoreError(result.error));
         }
     } catch (error) {
         console.error('恢复云端备份失败:', error);
-        message.error('恢复云端备份失败');
+        message.error(getFriendlyRestoreError(error instanceof Error ? error.message : String(error)));
     } finally {
         loading.value.restoreBackup = false;
     }
@@ -726,6 +726,49 @@ const deleteCloudBackup = async (storageId: string, backupId: string) => {
         console.error('删除云端备份失败:', error);
         message.error('删除云端备份失败');
     }
+};
+
+const getFriendlyBackupError = (error?: string): string => {
+    if (!error) return '备份创建失败，请稍后重试';
+    if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
+        return '存储服务认证失败，请检查用户名和密码是否正确';
+    }
+    if (error.includes('404') || error.includes('Not Found')) {
+        return '备份目录不存在，请确认 WebDAV 服务器上的路径配置正确';
+    }
+    if (error.includes('ECONNREFUSED') || error.includes('ENOTFOUND') || error.includes('Network') || error.includes('network')) {
+        return '无法连接到存储服务器，请检查网络连接和服务器地址';
+    }
+    if (error.includes('timeout') || error.includes('Timeout') || error.includes('ETIMEDOUT')) {
+        return '连接超时，请检查网络状态或稍后重试';
+    }
+    if (error.includes('数据库') || error.includes('database') || error.includes('API未初始化')) {
+        return '读取本地数据失败，请尝试重启应用后再备份';
+    }
+    return `备份失败：${error}`;
+};
+
+const getFriendlyRestoreError = (error?: string): string => {
+    if (!error) return '恢复失败，请稍后重试';
+    if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
+        return '存储服务认证失败，请检查用户名和密码是否正确';
+    }
+    if (error.includes('备份文件不存在') || error.includes('Backup file not found')) {
+        return '备份文件不存在，可能已被删除。请刷新列表后重试';
+    }
+    if (error.includes('ECONNREFUSED') || error.includes('ENOTFOUND') || error.includes('Network') || error.includes('network')) {
+        return '无法连接到存储服务器，请检查网络连接和服务器地址';
+    }
+    if (error.includes('timeout') || error.includes('Timeout') || error.includes('ETIMEDOUT')) {
+        return '下载超时，请检查网络状态或稍后重试';
+    }
+    if (error.includes('JSON') || error.includes('parse') || error.includes('解析备份文件失败')) {
+        return '备份文件格式损坏，无法恢复。请尝试其他备份';
+    }
+    if (error.includes('数据库') || error.includes('database') || error.includes('API未初始化')) {
+        return '写入本地数据库失败，请尝试重启应用后再恢复';
+    }
+    return `恢复失败：${error}`;
 };
 
 const getConfigDescription = (config: CloudStorageConfig) => {

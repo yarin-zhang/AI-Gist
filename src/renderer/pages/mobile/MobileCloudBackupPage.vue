@@ -504,11 +504,13 @@ const createBackup = async () => {
       showToast(t('cloudBackup.createSuccess'))
       await loadBackupList(selectedConfig.value.id)
     } else {
-      showToast(result.error || t('cloudBackup.createFailed'), 'danger')
+      const friendlyError = getFriendlyBackupError(result.error)
+      showToast(friendlyError, 'danger')
     }
   } catch (error) {
     console.error('创建备份失败:', error)
-    showToast(t('cloudBackup.createFailed'), 'danger')
+    const friendlyError = getFriendlyBackupError(error instanceof Error ? error.message : String(error))
+    showToast(friendlyError, 'danger')
   } finally {
     await loadingEl.dismiss()
     loading.value.createBackup = false
@@ -579,7 +581,8 @@ const performRestore = async (backup: CloudBackupInfo) => {
   } catch (error) {
     await loadingEl.dismiss()
     console.error('恢复备份失败:', error)
-    showToast(t('cloudBackup.restoreFailed'), 'danger')
+    const friendlyError = getFriendlyRestoreError(error instanceof Error ? error.message : String(error))
+    showToast(friendlyError, 'danger')
   } finally {
     loading.value.restoreBackup = false
   }
@@ -649,6 +652,51 @@ const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// 将技术错误转换为用户友好的备份错误提示
+const getFriendlyBackupError = (error?: string): string => {
+  if (!error) return '备份创建失败，请稍后重试'
+  if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
+    return '存储服务认证失败，请检查用户名和密码是否正确'
+  }
+  if (error.includes('404') || error.includes('Not Found')) {
+    return '备份目录不存在，请确认 WebDAV 服务器上的路径配置正确'
+  }
+  if (error.includes('ECONNREFUSED') || error.includes('Network') || error.includes('network') || error.includes('fetch')) {
+    return '无法连接到存储服务器，请检查网络连接和服务器地址'
+  }
+  if (error.includes('timeout') || error.includes('Timeout')) {
+    return '连接超时，请检查网络状态或稍后重试'
+  }
+  if (error.includes('数据库') || error.includes('database')) {
+    return '读取本地数据失败，请尝试重启应用后再备份'
+  }
+  return `备份失败：${error}`
+}
+
+// 将技术错误转换为用户友好的恢复错误提示
+const getFriendlyRestoreError = (error?: string): string => {
+  if (!error) return '恢复失败，请稍后重试'
+  if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
+    return '存储服务认证失败，请检查用户名和密码是否正确'
+  }
+  if (error.includes('404') || error.includes('Not Found') || error.includes('备份不存在')) {
+    return '备份文件不存在，可能已被删除。请刷新列表后重试'
+  }
+  if (error.includes('ECONNREFUSED') || error.includes('Network') || error.includes('network') || error.includes('fetch')) {
+    return '无法连接到存储服务器，请检查网络连接和服务器地址'
+  }
+  if (error.includes('timeout') || error.includes('Timeout')) {
+    return '下载超时，请检查网络状态或稍后重试'
+  }
+  if (error.includes('JSON') || error.includes('parse') || error.includes('格式')) {
+    return '备份文件格式损坏，无法恢复。请尝试其他备份'
+  }
+  if (error.includes('数据库') || error.includes('database')) {
+    return '写入本地数据库失败，请尝试重启应用后再恢复'
+  }
+  return `恢复失败：${error}`
 }
 
 // 显示提示
