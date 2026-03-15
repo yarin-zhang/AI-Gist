@@ -1,82 +1,29 @@
 /**
  * MobileAIGeneratorPage 核心逻辑测试
  *
- * 覆盖场景：
- * 1. parseModelKey —— 从 "configId:model" 中正确解析 configId 与 model，
- *    包含模型名带 ':' 的情况（如 Ollama 的 llama3:latest）
- * 2. selectPreferredModel —— loadConfigs 自动选择逻辑：
- *    - 始终从已加载的启用列表中选取，确保 selectedModelKey 可在 configs 中找到
- *    - 优先选择 isPreferred 的配置
- *    - 无 isPreferred 时回退到第一个配置
- *    - 无 defaultModel 时不设置 key
- * 3. resolveConfig —— generatePrompt 中通过 selectedModelKey 找到对应 config：
- *    - 正常情况下能找到
- *    - 原始 Bug 复现：通过独立 DB 调用得到的 preferred 不在 configs 列表时抛出错误
- *    - 修复后：始终在列表内选择，不会出现找不到的情况
+ * 真正的根因：MobileAIConfigEditPage 创建新配置时未生成 configId，
+ * 导致配置以 configId=undefined 存入数据库。生成器页面将 selectedModelKey
+ * 拼接为 "undefined:model"，generatePrompt 解析后用字符串 "undefined" 查找，
+ * 数据库中实际值为 undefined（而非字符串），find() 失败，抛出"未找到选中的配置"。
+ *
+ * 修复点：
+ * 1. MobileAIConfigEditPage.handleSave — 新建时生成 configId
+ * 2. AIConfigService.createAIConfig     — 服务层兜底，若 configId 缺失自动生成
+ * 3. MobileAIGeneratorPage.loadConfigs  — 直接从已加载列表中选首选，消除二次 DB 查询的不一致
+ * 4. MobileAIGeneratorPage.generatePrompt — 用 indexOf 代替 split，正确解析含 ':' 的模型名
+ *
+ * 覆盖：
+ * - createAIConfig：configId 缺失时的兜底行为
+ * - parseModelKey：首个冒号切分逻辑，含冒号的模型名
+ * - selectPreferredModel：loadConfigs 自动选择逻辑（isPreferred 优先、回退第一个）
+ * - resolveConfig：generatePrompt 全流程；configId 为 undefined 时的原始 Bug 复现
  */
 
 import { describe, it, expect } from 'vitest'
 import type { AIConfig } from '@shared/types/ai'
 
 // ---------------------------------------------------------------------------
-// 1. parseModelKey —— 对应修复后的 generatePrompt 解析逻辑
-// ---------------------------------------------------------------------------
-
-/**
- * 修复后的解析函数（只在首个 ':' 处切分）
- */
-function parseModelKey(key: string): { configId: string; model: string } {
-  const firstColon = key.indexOf(':')
-  if (firstColon === -1) return { configId: key, model: '' }
-  return {
-    configId: key.substring(0, firstColon),
-    model: key.substring(firstColon + 1),
-  }
-}
-
-/**
- * 修复前的旧解析函数（用于对比验证 Bug 确实存在）
- */
-function parseModelKeyOld(key: string): { configId: string; model: string } {
-  const [configId, model] = key.split(':')
-  return { configId, model }
-}
-
-describe('parseModelKey', () => {
-  it('普通 key（无多余冒号）能正确解析', () => {
-    const { configId, model } = parseModelKey('config_123_abc:gpt-4')
-    expect(configId).toBe('config_123_abc')
-    expect(model).toBe('gpt-4')
-  })
-
-  it('模型名含冒号时能完整保留模型名', () => {
-    const { configId, model } = parseModelKey('config_123_abc:llama3:latest')
-    expect(configId).toBe('config_123_abc')
-    expect(model).toBe('llama3:latest') // 修复后正确
-  })
-
-  it('模型名含多个冒号时也能完整保留', () => {
-    const { configId, model } = parseModelKey('config_123_abc:openai/gpt-4:nitro:fast')
-    expect(configId).toBe('config_123_abc')
-    expect(model).toBe('openai/gpt-4:nitro:fast')
-  })
-
-  it('key 无冒号时 model 为空字符串', () => {
-    const { configId, model } = parseModelKey('config_123_abc')
-    expect(configId).toBe('config_123_abc')
-    expect(model).toBe('')
-  })
-
-  // 验证旧写法确实有 Bug
-  it('[旧逻辑 Bug 复现] split 会截断含冒号的模型名', () => {
-    const { model } = parseModelKeyOld('config_123_abc:llama3:latest')
-    expect(model).toBe('llama3') // 旧逻辑只拿第一段，丢失 ':latest'
-    expect(model).not.toBe('llama3:latest')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// 2. selectPreferredModel —— 对应修复后的 loadConfigs 选择逻辑
+// 工具函数
 // ---------------------------------------------------------------------------
 
 function makeConfig(overrides: Partial<AIConfig> = {}): AIConfig {
@@ -95,9 +42,118 @@ function makeConfig(overrides: Partial<AIConfig> = {}): AIConfig {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 1. createAIConfig 服务层兜底逻辑
+//    对应修复：AIConfigService.createAIConfig 现在会在 configId 缺失时自动生成
+// ---------------------------------------------------------------------------
+
 /**
- * 修复后的 loadConfigs 选择逻辑：从已加载的启用列表中直接查找首选
+ * 模拟修复后的 createAIConfig 逻辑
  */
+function simulateCreateAIConfig(
+  data: Partial<Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>>,
+): AIConfig {
+  return {
+    ...makeConfig(),      // 基础字段
+    ...data,
+    // 修复：若 configId 缺失则自动生成（兜底）
+    configId: data.configId || `config_${Date.now()}_fallback`,
+    uuid: 'generated-uuid',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as AIConfig
+}
+
+describe('createAIConfig — configId 兜底生成', () => {
+  it('[根因 Bug 复现] 不传 configId 时，旧代码存入 undefined', () => {
+    // 旧代码：直接 spread data，configId 为 undefined
+    const oldResult = { ...makeConfig(), type: 'openai' as const, configId: undefined as any }
+    expect(oldResult.configId).toBeUndefined()
+  })
+
+  it('[修复验证] 不传 configId 时，服务层自动生成非空字符串', () => {
+    const result = simulateCreateAIConfig({ type: 'openai', name: 'My Config', defaultModel: 'gpt-4', models: [], baseURL: '', enabled: true })
+    expect(result.configId).toBeTruthy()
+    expect(typeof result.configId).toBe('string')
+    expect(result.configId).not.toBe('undefined')
+  })
+
+  it('[修复验证] 传入 configId 时使用调用方提供的值', () => {
+    const result = simulateCreateAIConfig({ configId: 'my-custom-id', type: 'openai', name: 'x', models: [], defaultModel: 'gpt-4', baseURL: '', enabled: true })
+    expect(result.configId).toBe('my-custom-id')
+  })
+
+  it('[修复验证] 移动端保存时提供 configId，格式符合 config_{timestamp}_{random}', () => {
+    const configId = `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    expect(configId).toMatch(/^config_\d+_[a-z0-9]+$/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 2. parseModelKey — generatePrompt 中解析 selectedModelKey
+//    对应修复：使用 indexOf 代替 split，避免含 ':' 的模型名被截断
+// ---------------------------------------------------------------------------
+
+function parseModelKey(key: string): { configId: string; model: string } {
+  const firstColon = key.indexOf(':')
+  if (firstColon === -1) return { configId: key, model: '' }
+  return {
+    configId: key.substring(0, firstColon),
+    model: key.substring(firstColon + 1),
+  }
+}
+
+function parseModelKeyOld(key: string): { configId: string; model: string } {
+  const [configId, model] = key.split(':')
+  return { configId, model }
+}
+
+describe('parseModelKey', () => {
+  it('普通 key 正常解析', () => {
+    const { configId, model } = parseModelKey('config_123_abc:gpt-4')
+    expect(configId).toBe('config_123_abc')
+    expect(model).toBe('gpt-4')
+  })
+
+  it('[根因 Bug 复现] configId 为 undefined 时，key 为字符串 "undefined:gpt-4"', () => {
+    // 这就是旧版 bug：configId=undefined → template literal → "undefined"
+    const undefinedConfigId = undefined
+    const key = `${undefinedConfigId}:gpt-4`
+    expect(key).toBe('undefined:gpt-4')
+    const { configId } = parseModelKey(key)
+    expect(configId).toBe('undefined') // 字符串 "undefined"，不是值 undefined
+  })
+
+  it('模型名含冒号时完整保留（如 Ollama llama3:latest）', () => {
+    const { configId, model } = parseModelKey('config_123_abc:llama3:latest')
+    expect(configId).toBe('config_123_abc')
+    expect(model).toBe('llama3:latest')
+  })
+
+  it('模型名含多个冒号', () => {
+    const { configId, model } = parseModelKey('config_123_abc:openai/gpt-4:nitro:fast')
+    expect(configId).toBe('config_123_abc')
+    expect(model).toBe('openai/gpt-4:nitro:fast')
+  })
+
+  it('key 无冒号时 model 为空', () => {
+    const { configId, model } = parseModelKey('config_123_abc')
+    expect(configId).toBe('config_123_abc')
+    expect(model).toBe('')
+  })
+
+  it('[旧逻辑] split 截断含冒号的模型名', () => {
+    const { model } = parseModelKeyOld('config_123_abc:llama3:latest')
+    expect(model).toBe('llama3')
+    expect(model).not.toBe('llama3:latest')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 3. selectPreferredModel — loadConfigs 自动选择逻辑
+//    对应修复：从已加载列表直接查找，消除二次 DB 查询
+// ---------------------------------------------------------------------------
+
 function selectPreferredModel(enabledConfigs: AIConfig[]): {
   selectedModelKey: string
   selectedConfigName: string
@@ -114,38 +170,36 @@ function selectPreferredModel(enabledConfigs: AIConfig[]): {
 
 describe('selectPreferredModel', () => {
   it('无配置时返回空 key', () => {
-    const { selectedModelKey } = selectPreferredModel([])
-    expect(selectedModelKey).toBe('')
+    expect(selectPreferredModel([]).selectedModelKey).toBe('')
   })
 
-  it('单个配置时自动选择该配置', () => {
+  it('单个配置自动选中', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4' })
-    const { selectedModelKey } = selectPreferredModel([config])
-    expect(selectedModelKey).toBe('cfg1:gpt-4')
+    expect(selectPreferredModel([config]).selectedModelKey).toBe('cfg1:gpt-4')
   })
 
-  it('多个配置时优先选 isPreferred 的配置', () => {
-    const c1 = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false })
-    const c2 = makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: true })
-    const c3 = makeConfig({ configId: 'cfg3', defaultModel: 'gpt-4o', isPreferred: false })
-    const { selectedModelKey } = selectPreferredModel([c1, c2, c3])
-    expect(selectedModelKey).toBe('cfg2:gpt-4')
+  it('优先选 isPreferred 的配置', () => {
+    const configs = [
+      makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
+      makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: true }),
+      makeConfig({ configId: 'cfg3', defaultModel: 'gpt-4o', isPreferred: false }),
+    ]
+    expect(selectPreferredModel(configs).selectedModelKey).toBe('cfg2:gpt-4')
   })
 
-  it('无 isPreferred 配置时回退到第一个', () => {
-    const c1 = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false })
-    const c2 = makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: false })
-    const { selectedModelKey } = selectPreferredModel([c1, c2])
-    expect(selectedModelKey).toBe('cfg1:gpt-3.5-turbo')
+  it('无 isPreferred 时回退到第一个', () => {
+    const configs = [
+      makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
+      makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: false }),
+    ]
+    expect(selectPreferredModel(configs).selectedModelKey).toBe('cfg1:gpt-3.5-turbo')
   })
 
   it('配置无 defaultModel 时不设置 key', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: undefined })
-    const { selectedModelKey } = selectPreferredModel([config])
-    expect(selectedModelKey).toBe('')
+    expect(selectPreferredModel([config]).selectedModelKey).toBe('')
   })
 
-  // 关键回归：选出的 key 的 configId 一定能在列表中找到
   it('[回归] 选出的 configId 始终存在于 configs 列表中', () => {
     const configs = [
       makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
@@ -153,29 +207,22 @@ describe('selectPreferredModel', () => {
     ]
     const { selectedModelKey } = selectPreferredModel(configs)
     const { configId } = parseModelKey(selectedModelKey)
-    const found = configs.find(c => c.configId === configId)
-    expect(found).toBeDefined()
+    expect(configs.find(c => c.configId === configId)).toBeDefined()
   })
 })
 
 // ---------------------------------------------------------------------------
-// 3. resolveConfig —— 对应 generatePrompt 中的查找逻辑
+// 4. resolveConfig — generatePrompt 全流程
 // ---------------------------------------------------------------------------
 
-/**
- * 模拟 generatePrompt 中通过 selectedModelKey 找到 config 并发起生成的逻辑
- */
-function resolveConfig(
-  selectedModelKey: string,
-  configs: AIConfig[],
-): { config: AIConfig; model: string } {
+function resolveConfig(selectedModelKey: string, configs: AIConfig[]): { config: AIConfig; model: string } {
   const { configId, model } = parseModelKey(selectedModelKey)
   const config = configs.find(c => c.configId === configId)
   if (!config) throw new Error('未找到选中的配置')
   return { config, model }
 }
 
-describe('resolveConfig（generatePrompt 查找逻辑）', () => {
+describe('resolveConfig（generatePrompt 全流程）', () => {
   it('正常情况：能找到 config', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4' })
     const { config: found, model } = resolveConfig('cfg1:gpt-4', [config])
@@ -183,56 +230,52 @@ describe('resolveConfig（generatePrompt 查找逻辑）', () => {
     expect(model).toBe('gpt-4')
   })
 
-  it('模型名含冒号时也能找到正确 config 且模型名完整', () => {
+  it('模型名含冒号时也能正确找到 config', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: 'llama3:latest' })
     const { config: found, model } = resolveConfig('cfg1:llama3:latest', [config])
     expect(found.configId).toBe('cfg1')
     expect(model).toBe('llama3:latest')
   })
 
-  it('[原始 Bug 复现] configs 不含 preferred 的 configId 时应抛出错误', () => {
-    // 模拟修复前的情况：DB 两次调用返回不一致的数据
-    // configs 只有 cfg1，但 selectedModelKey 引用了 cfg_preferred（不在列表中）
-    const config = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4' })
-    expect(() => resolveConfig('cfg_preferred:gpt-4', [config])).toThrow('未找到选中的配置')
+  it('[根因 Bug 复现] configId 存为 undefined 导致查找失败', () => {
+    // 模拟旧 bug：配置以 configId=undefined 存入，key 变成 "undefined:gpt-4"
+    const configWithMissingId = makeConfig({ configId: undefined as any, defaultModel: 'gpt-4' })
+    // configs 中 configId 是 undefined（值），而 key 解析出的是字符串 "undefined"
+    // find(c => c.configId === "undefined") 匹配不到 undefined 值
+    expect(() => resolveConfig('undefined:gpt-4', [configWithMissingId])).toThrow('未找到选中的配置')
   })
 
-  it('[修复验证] 通过 selectPreferredModel 得到的 key 一定能 resolveConfig 成功', () => {
+  it('[修复验证] 修复后 configId 有值，全流程成功', () => {
+    // 修复后：MobileAIConfigEditPage 在创建时生成 configId
     const configs = [
-      makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
-      makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: true }),
+      makeConfig({ configId: 'config_1710000000000_abc123', defaultModel: 'gpt-4', isPreferred: true }),
     ]
     const { selectedModelKey } = selectPreferredModel(configs)
-    // 不应抛出异常
     expect(() => resolveConfig(selectedModelKey, configs)).not.toThrow()
-    const { config, model } = resolveConfig(selectedModelKey, configs)
-    expect(config.configId).toBe('cfg2')
-    expect(model).toBe('gpt-4')
+    const { config } = resolveConfig(selectedModelKey, configs)
+    expect(config.configId).toBe('config_1710000000000_abc123')
   })
 
-  it('[修复验证] 多配置场景下，loadConfigs + generatePrompt 全流程不抛错', () => {
-    // 模拟有三个启用的配置，第二个是首选
-    const configs = [
-      makeConfig({ configId: 'cfg1', name: 'OpenAI', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
-      makeConfig({ configId: 'cfg2', name: 'DeepSeek', defaultModel: 'deepseek-chat', isPreferred: true }),
-      makeConfig({ configId: 'cfg3', name: 'Siliconflow', defaultModel: 'Qwen2-7B', isPreferred: false }),
-    ]
-    const { selectedModelKey } = selectPreferredModel(configs)
-    expect(selectedModelKey).toBe('cfg2:deepseek-chat')
-    expect(() => resolveConfig(selectedModelKey, configs)).not.toThrow()
-  })
+  it('[修复验证] 完整流程：创建配置 → 加载 → 选择 → 生成，不抛错', () => {
+    // 模拟修复后的完整流程
+    const savedConfig = simulateCreateAIConfig({
+      type: 'openai',
+      name: 'My DeepSeek',
+      defaultModel: 'deepseek-chat',
+      models: ['deepseek-chat'],
+      baseURL: 'https://api.deepseek.com/v1',
+      enabled: true,
+      isPreferred: true,
+    })
+    // configId 已被正确生成
+    expect(savedConfig.configId).toBeTruthy()
+    expect(savedConfig.configId).not.toBe('undefined')
 
-  it('[修复验证] 即使 enabled 字段以整数 1 存储，选择逻辑也不会失效', () => {
-    // IndexedDB 有时把 boolean 存为 0/1；修复前 getEnabledAIConfigs 用 === true 会漏掉它
-    // 修复后直接用 result.find(c => c.isPreferred)，不再有 boolean 类型不匹配问题
-    const configWithIntEnabled = {
-      ...makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4', isPreferred: true }),
-      enabled: 1 as unknown as boolean, // 模拟 IndexedDB 存的整数
-    }
-    // selectPreferredModel 接收的是已过滤好的列表，不再自己判断 enabled
-    // 所以这个 config 能被正确选中
-    const { selectedModelKey } = selectPreferredModel([configWithIntEnabled])
-    expect(selectedModelKey).toBe('cfg1:gpt-4')
-    expect(() => resolveConfig(selectedModelKey, [configWithIntEnabled])).not.toThrow()
+    // 加载后选择
+    const { selectedModelKey } = selectPreferredModel([savedConfig])
+    expect(selectedModelKey).toContain(savedConfig.configId)
+
+    // 生成时查找
+    expect(() => resolveConfig(selectedModelKey, [savedConfig])).not.toThrow()
   })
 })

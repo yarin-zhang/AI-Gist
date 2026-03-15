@@ -505,6 +505,8 @@ const handleSave = async () => {
       })
       showToast(t('aiConfig.configUpdateSuccess'))
     } else {
+      // 新建时必须生成 configId，否则生成器页面无法通过 configId 查找配置
+      configData.configId = `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       await api.aiConfigs.create.mutate(configData as AIConfig)
       showToast(t('aiConfig.configAddSuccess'))
     }

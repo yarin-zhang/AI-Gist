@@ -35,6 +35,8 @@ export class AIConfigService extends BaseDatabaseService {
   async createAIConfig(data: Omit<AIConfig, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<AIConfig> {
     const configWithUUID = {
       ...data,
+      // 兜底：若调用方未提供 configId（如旧版移动端代码），自动生成，避免存入 undefined
+      configId: data.configId || `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       uuid: generateUUID(),
       createdAt: new Date(),
       updatedAt: new Date()
