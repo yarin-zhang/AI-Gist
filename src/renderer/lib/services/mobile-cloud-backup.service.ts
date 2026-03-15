@@ -21,6 +21,8 @@ const STORAGE_KEYS = {
   CONFIGS: 'cloud_backup_configs'
 }
 
+const WEBDAV_MANIFEST_FILE = 'backup-manifest.json'
+
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
 
@@ -229,15 +231,19 @@ export class MobileCloudBackupService {
         return { success: false, error: 'WebDAV 配置不完整' }
       }
 
-      // 使用 PROPFIND 方法测试连接
+      // 使用 OPTIONS 测试连接（Android CapacitorHttp 不支持 PROPFIND）
       const response = await CapacitorHttp.request({
         url: this.normalizeBaseUrl(config.url),
-        method: 'PROPFIND',
+        method: 'OPTIONS',
         headers: {
-          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
-          'Depth': '0'
+          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
         }
       })
+
+      // 401/403 → 凭据错误；2xx / 多数 WebDAV 服务会返回 200
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, error: '认证失败，请检查用户名和密码' }
+      }
 
       if (response.status >= 200 && response.status < 300) {
         return { success: true }
@@ -305,8 +311,26 @@ export class MobileCloudBackupService {
 
   /**
    * 列出 WebDAV 备份
+   * iOS/桌面：使用 PROPFIND 标准协议
+   * Android：使用 manifest 文件（HttpURLConnection 不支持 PROPFIND）
    */
   private async listWebDAVBackups(config: any): Promise<CloudBackupInfo[]> {
+    const platform = Capacitor.getPlatform()
+    if (platform === 'android') {
+      // Android 不支持 PROPFIND，改用 manifest 文件
+      try {
+        const baseUrl = this.normalizeBaseUrl(config.url)
+        const manifest = await this.readWebDAVManifest(config, baseUrl)
+        return manifest.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      } catch (error) {
+        console.error('获取备份列表失败:', error)
+        throw error
+      }
+    }
+
+    // iOS / 桌面：使用标准 PROPFIND
     try {
       // 直接从配置的 URL 列出文件（不添加子目录）
       const url = this.normalizeBaseUrl(config.url)
@@ -344,9 +368,9 @@ export class MobileCloudBackupService {
 
       const backups: CloudBackupInfo[] = []
 
-      // 过滤出备份文件
+      // 过滤出备份文件（排除 manifest 文件本身）
       const backupFiles = files.filter(file =>
-        file.name.endsWith('.json') && file.name.startsWith('backup-')
+        file.name.endsWith('.json') && file.name.startsWith('backup-') && file.name !== WEBDAV_MANIFEST_FILE
       )
 
       console.log('找到备份文件数量:', backupFiles.length)
@@ -397,7 +421,7 @@ export class MobileCloudBackupService {
               description: backupData.description,
               createdAt: backupData.createdAt,
               size: actualSize,
-              cloudPath: file.path, // 使用相对路径
+              cloudPath: filePath,
               storageId: config.id
             })
             console.log('成功读取备份:', backupData.name)
@@ -419,6 +443,57 @@ export class MobileCloudBackupService {
       console.error('列出 WebDAV 备份失败:', error)
       throw error
     }
+  }
+
+  /**
+   * 读取 WebDAV manifest 文件，返回备份列表
+   */
+  private async readWebDAVManifest(config: any, baseUrl: string): Promise<CloudBackupInfo[]> {
+    const manifestUrl = `${baseUrl}/${WEBDAV_MANIFEST_FILE}`
+    try {
+      const response = await CapacitorHttp.request({
+        url: manifestUrl,
+        method: 'GET',
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
+        }
+      })
+
+      if (response.status === 404) {
+        return []
+      }
+
+      if (response.status !== 200) {
+        console.warn('读取 manifest 失败，状态码:', response.status)
+        return []
+      }
+
+      const parsed = typeof response.data === 'string'
+        ? JSON.parse(response.data)
+        : response.data
+
+      return Array.isArray(parsed?.backups) ? parsed.backups : []
+    } catch (error) {
+      console.warn('读取 WebDAV manifest 失败，视为空列表:', error)
+      return []
+    }
+  }
+
+  /**
+   * 将备份列表写回 WebDAV manifest 文件
+   */
+  private async writeWebDAVManifest(config: any, baseUrl: string, backups: CloudBackupInfo[]): Promise<void> {
+    const manifestUrl = `${baseUrl}/${WEBDAV_MANIFEST_FILE}`
+    const body = JSON.stringify({ backups, updatedAt: new Date().toISOString() }, null, 2)
+    await CapacitorHttp.request({
+      url: manifestUrl,
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
+        'Content-Type': 'application/json'
+      },
+      data: body
+    })
   }
 
   /**
@@ -768,6 +843,13 @@ export class MobileCloudBackupService {
           storageId: config.id
         }
 
+        // Android：PROPFIND 不可用，维护 manifest 文件以支持列表功能
+        if (Capacitor.getPlatform() === 'android') {
+          const existingBackups = await this.readWebDAVManifest(config, baseUrl)
+          existingBackups.push(backupInfo)
+          await this.writeWebDAVManifest(config, baseUrl, existingBackups)
+        }
+
         console.log('备份创建成功:', backupInfo)
 
         return {
@@ -1097,6 +1179,12 @@ export class MobileCloudBackupService {
       })
 
       if (response.status >= 200 && response.status < 300) {
+        // Android：从 manifest 中移除该条目
+        if (Capacitor.getPlatform() === 'android') {
+          const remaining = (await this.readWebDAVManifest(config, baseUrl)).filter(b => b.id !== backupId)
+          await this.writeWebDAVManifest(config, baseUrl, remaining)
+        }
+
         return {
           success: true,
           message: '云端备份删除成功'

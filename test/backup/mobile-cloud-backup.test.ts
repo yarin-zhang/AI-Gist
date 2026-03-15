@@ -326,7 +326,7 @@ describe('MobileCloudBackupService', () => {
     it('完整的备份-恢复流程', async () => {
       await saveConfig(service)
 
-      // 备份
+      // 备份（iOS 平台：只需 PUT，无 manifest 更新）
       mockCapacitorHttp.request.mockResolvedValueOnce({ status: 201, data: '' })
       const backupResult = await service.createCloudBackup('cfg-1', mockExportData, '移动端备份')
       expect(backupResult.success).toBe(true)
