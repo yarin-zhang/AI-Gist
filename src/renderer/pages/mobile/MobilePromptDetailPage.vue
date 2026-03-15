@@ -3,9 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button @click="handleBack">
-            <ion-icon :icon="arrowBack"></ion-icon>
-          </ion-button>
+          <ion-back-button default-href="/tabs/prompts"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ t('promptManagement.detailModal.detail') }}</ion-title>
         <ion-buttons slot="end">
@@ -84,6 +82,7 @@ import {
   IonContent,
   IonButtons,
   IonButton,
+  IonBackButton,
   IonIcon,
   IonList,
   IonItem,
@@ -95,7 +94,6 @@ import {
   actionSheetController
 } from '@ionic/vue'
 import {
-  arrowBack,
   heart,
   heartOutline,
   createOutline,
@@ -265,11 +263,6 @@ const handleDelete = async () => {
   })
 
   await alert.present()
-}
-
-// 返回
-const handleBack = () => {
-  router.back()
 }
 
 // 显示提示

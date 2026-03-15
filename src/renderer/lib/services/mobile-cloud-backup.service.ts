@@ -9,6 +9,7 @@ import { Preferences } from '@capacitor/preferences'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Capacitor } from '@capacitor/core'
 import { CapacitorHttp } from '@capacitor/core'
+import WebDav from '@renderer/capacitor-bridge/webdav-native'
 import type {
   CloudStorageConfig,
   CloudBackupInfo,
@@ -20,8 +21,6 @@ import type {
 const STORAGE_KEYS = {
   CONFIGS: 'cloud_backup_configs'
 }
-
-const WEBDAV_MANIFEST_FILE = 'backup-manifest.json'
 
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
@@ -311,134 +310,15 @@ export class MobileCloudBackupService {
 
   /**
    * 列出 WebDAV 备份
-   * iOS/桌面：使用 PROPFIND 标准协议
-   * Android：使用 manifest 文件（HttpURLConnection 不支持 PROPFIND）
+   * Android：使用自定义原生插件（OkHttp），绕过 HttpURLConnection 的方法白名单和 CORS 限制
+   * iOS/桌面：使用 CapacitorHttp（原生层，支持 PROPFIND）
    */
   private async listWebDAVBackups(config: any): Promise<CloudBackupInfo[]> {
-    const platform = Capacitor.getPlatform()
-    if (platform === 'android') {
-      // Android 不支持 PROPFIND，改用 manifest 文件
-      try {
-        const baseUrl = this.normalizeBaseUrl(config.url)
-        const manifest = await this.readWebDAVManifest(config, baseUrl)
-        return manifest.sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-      } catch (error) {
-        console.error('获取备份列表失败:', error)
-        throw error
-      }
-    }
+    const baseUrl = this.normalizeBaseUrl(config.url)
 
-    // iOS / 桌面：使用标准 PROPFIND
     try {
-      // 直接从配置的 URL 列出文件（不添加子目录）
-      const url = this.normalizeBaseUrl(config.url)
-
-      console.log('列出 WebDAV 备份，URL:', url)
-      console.log('config.url 完整值:', config.url)
-
-      // 使用 PROPFIND 列出目录内容
-      const response = await CapacitorHttp.request({
-        url,
-        method: 'PROPFIND',
-        headers: {
-          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
-          'Depth': '1',
-          'Content-Type': 'application/xml'
-        }
-      })
-
-      console.log('WebDAV PROPFIND 响应状态:', response.status)
-
-      if (response.status === 404) {
-        // 目录不存在
-        console.log('备份目录不存在')
-        return []
-      }
-
-      if (response.status !== 207) {
-        console.error('WebDAV PROPFIND 失败，状态码:', response.status)
-        return []
-      }
-
-      // 解析 WebDAV 响应，传入 config.url 用于路径标准化
-      const files = this.parseWebDAVResponse(response.data, url)
-      console.log('解析到的文件:', files)
-
-      const backups: CloudBackupInfo[] = []
-
-      // 过滤出备份文件（排除 manifest 文件本身）
-      const backupFiles = files.filter(file =>
-        file.name.endsWith('.json') && file.name.startsWith('backup-') && file.name !== WEBDAV_MANIFEST_FILE
-      )
-
-      console.log('找到备份文件数量:', backupFiles.length)
-
-      // 读取每个备份文件的元数据
-      for (const file of backupFiles) {
-        try {
-          // 构建完整的文件 URL，file.path 以 / 开头，url 已去掉末尾斜杠
-          const filePath = file.path.startsWith('/') ? file.path : `/${file.path}`
-          const fileUrl = `${url}${filePath}`
-
-          console.log('读取备份文件 URL:', fileUrl)
-          console.log('file.path:', file.path)
-
-          const fileResponse = await CapacitorHttp.request({
-            url: fileUrl,
-            method: 'GET',
-            headers: {
-              'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
-            }
-          })
-
-          if (fileResponse.status === 200) {
-            console.log('文件响应数据类型:', typeof fileResponse.data)
-            console.log('文件响应数据长度:', fileResponse.data?.length)
-
-            // CapacitorHttp 可能返回字符串或对象
-            let backupData
-            let actualSize = 0
-
-            if (typeof fileResponse.data === 'string') {
-              actualSize = new Blob([fileResponse.data]).size
-              backupData = JSON.parse(fileResponse.data)
-            } else if (typeof fileResponse.data === 'object') {
-              const jsonString = JSON.stringify(fileResponse.data)
-              actualSize = new Blob([jsonString]).size
-              backupData = fileResponse.data
-            } else {
-              console.warn('未知的响应数据类型:', typeof fileResponse.data)
-              continue
-            }
-
-            console.log('实际文件大小:', actualSize, 'bytes')
-
-            backups.push({
-              id: backupData.id,
-              name: backupData.name,
-              description: backupData.description,
-              createdAt: backupData.createdAt,
-              size: actualSize,
-              cloudPath: filePath,
-              storageId: config.id
-            })
-            console.log('成功读取备份:', backupData.name)
-          } else {
-            console.warn('读取备份文件失败，状态码:', fileResponse.status)
-          }
-        } catch (error) {
-          console.warn('解析备份文件失败:', file.name, error)
-          console.error('错误详情:', error)
-        }
-      }
-
-      console.log('最终备份列表数量:', backups.length)
-
-      return backups.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+      const backups = await this.discoverWebDAVBackupsViaPropfind(config, baseUrl)
+      return backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } catch (error) {
       console.error('列出 WebDAV 备份失败:', error)
       throw error
@@ -446,54 +326,104 @@ export class MobileCloudBackupService {
   }
 
   /**
-   * 读取 WebDAV manifest 文件，返回备份列表
+   * 通过 PROPFIND 发现 WebDAV 目录中的备份文件并读取元数据
+   * Android：使用自定义原生插件（OkHttp），支持 PROPFIND 且不受 CORS 限制
+   * iOS/桌面：使用 CapacitorHttp（原生层，同样不受 CORS 限制，且 iOS 不在 HttpURLConnection 白名单限制下）
    */
-  private async readWebDAVManifest(config: any, baseUrl: string): Promise<CloudBackupInfo[]> {
-    const manifestUrl = `${baseUrl}/${WEBDAV_MANIFEST_FILE}`
-    try {
+  private async discoverWebDAVBackupsViaPropfind(config: any, baseUrl: string): Promise<CloudBackupInfo[]> {
+    const platform = Capacitor.getPlatform()
+
+    let xmlData: string
+    let status: number
+
+    if (platform === 'android') {
+      // Android：通过 OkHttp 原生插件执行 PROPFIND
+      // CapacitorHttp 底层 HttpURLConnection 白名单不含 PROPFIND，fetch() 受 CORS 限制
+      // OkHttp 原生请求支持任意方法且绕过 CORS
+      const response = await WebDav.propfind({
+        url: baseUrl,
+        username: config.username,
+        password: config.password,
+        depth: 1
+      })
+      status = response.status
+      xmlData = response.body
+    } else {
+      // iOS / 桌面：CapacitorHttp 原生请求，支持 PROPFIND
       const response = await CapacitorHttp.request({
-        url: manifestUrl,
-        method: 'GET',
+        url: baseUrl,
+        method: 'PROPFIND',
         headers: {
-          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
+          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
+          'Depth': '1',
+          'Content-Type': 'application/xml'
         }
       })
+      status = response.status
+      xmlData = response.data
+    }
 
-      if (response.status === 404) {
-        return []
-      }
-
-      if (response.status !== 200) {
-        console.warn('读取 manifest 失败，状态码:', response.status)
-        return []
-      }
-
-      const parsed = typeof response.data === 'string'
-        ? JSON.parse(response.data)
-        : response.data
-
-      return Array.isArray(parsed?.backups) ? parsed.backups : []
-    } catch (error) {
-      console.warn('读取 WebDAV manifest 失败，视为空列表:', error)
+    if (status === 404) {
       return []
     }
-  }
 
-  /**
-   * 将备份列表写回 WebDAV manifest 文件
-   */
-  private async writeWebDAVManifest(config: any, baseUrl: string, backups: CloudBackupInfo[]): Promise<void> {
-    const manifestUrl = `${baseUrl}/${WEBDAV_MANIFEST_FILE}`
-    const body = JSON.stringify({ backups, updatedAt: new Date().toISOString() }, null, 2)
-    await CapacitorHttp.request({
-      url: manifestUrl,
-      method: 'PUT',
-      headers: {
-        'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
-        'Content-Type': 'application/json'
-      },
-      data: body
-    })
+    if (status !== 207) {
+      console.warn('WebDAV PROPFIND 失败，状态码:', status)
+      return []
+    }
+
+    const files = this.parseWebDAVResponse(xmlData, baseUrl)
+    const backupFiles = files.filter(file =>
+      file.name.endsWith('.json') && file.name.startsWith('backup-') && file.name !== 'backup-manifest.json'
+    )
+
+    const backups: CloudBackupInfo[] = []
+    for (const file of backupFiles) {
+      try {
+        const filePath = file.path.startsWith('/') ? file.path : `/${file.path}`
+        const fileUrl = `${baseUrl}${filePath}`
+
+        const fileResponse = await CapacitorHttp.request({
+          url: fileUrl,
+          method: 'GET',
+          headers: {
+            'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`)
+          }
+        })
+
+        if (fileResponse.status === 200) {
+          let backupData
+          let actualSize = 0
+
+          if (typeof fileResponse.data === 'string') {
+            actualSize = new Blob([fileResponse.data]).size
+            backupData = JSON.parse(fileResponse.data)
+          } else if (typeof fileResponse.data === 'object') {
+            const jsonString = JSON.stringify(fileResponse.data)
+            actualSize = new Blob([jsonString]).size
+            backupData = fileResponse.data
+          } else {
+            continue
+          }
+
+          backups.push({
+            id: backupData.id,
+            name: backupData.name,
+            description: backupData.description,
+            createdAt: backupData.createdAt,
+            size: actualSize,
+            cloudPath: filePath,
+            storageId: config.id
+          })
+        } else {
+          console.warn('读取备份文件失败，状态码:', fileResponse.status, file.name)
+        }
+      } catch (error) {
+        console.warn('解析备份文件失败:', file.name, error)
+      }
+    }
+
+    return backups
   }
 
   /**
@@ -843,13 +773,6 @@ export class MobileCloudBackupService {
           storageId: config.id
         }
 
-        // Android：PROPFIND 不可用，维护 manifest 文件以支持列表功能
-        if (Capacitor.getPlatform() === 'android') {
-          const existingBackups = await this.readWebDAVManifest(config, baseUrl)
-          existingBackups.push(backupInfo)
-          await this.writeWebDAVManifest(config, baseUrl, existingBackups)
-        }
-
         console.log('备份创建成功:', backupInfo)
 
         return {
@@ -1179,12 +1102,6 @@ export class MobileCloudBackupService {
       })
 
       if (response.status >= 200 && response.status < 300) {
-        // Android：从 manifest 中移除该条目
-        if (Capacitor.getPlatform() === 'android') {
-          const remaining = (await this.readWebDAVManifest(config, baseUrl)).filter(b => b.id !== backupId)
-          await this.writeWebDAVManifest(config, baseUrl, remaining)
-        }
-
         return {
           success: true,
           message: '云端备份删除成功'

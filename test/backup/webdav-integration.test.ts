@@ -50,6 +50,13 @@ vi.mock('@capacitor/filesystem', () => ({
   Encoding: { UTF8: 'utf8' },
 }))
 
+// WebDav 原生插件 mock（Android 路径用它执行 PROPFIND）
+// 在测试环境中将 propfind 代理到真实 HTTP 服务器
+const mockWebDavPropfind = vi.hoisted(() => vi.fn())
+vi.mock('@renderer/capacitor-bridge/webdav-native', () => ({
+  default: { propfind: mockWebDavPropfind, request: vi.fn() },
+}))
+
 vi.mock('@capacitor/core', () => ({
   Capacitor: { getPlatform: () => 'ios' },
   CapacitorHttp: { request: vi.fn() },
@@ -92,8 +99,61 @@ function makeBackupPayload(id = 'test-id-001') {
 // ---- 辅助：将 CapacitorHttp 请求转发到真实服务器 ----
 // MobileCloudBackupService 通过 CapacitorHttp 发请求，我们把它代理到本地服务器
 
-function setupHttpProxy() {
-  mockHttp.request.mockImplementation(async (opts: any) => {
+// ---- 将 WebDav 原生插件 propfind 代理到真实服务器（Android 路径使用原生插件）----
+function setupWebDavNativeProxy() {
+  mockWebDavPropfind.mockImplementation(async (opts: {
+    url: string
+    username?: string
+    password?: string
+    depth?: number
+  }) => {
+    const { default: http } = await import('http')
+    const { URL } = await import('url')
+
+    return new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const parsed = new URL(opts.url)
+      const auth   = opts.username
+        ? 'Basic ' + Buffer.from(`${opts.username}:${opts.password ?? ''}`).toString('base64')
+        : undefined
+
+      const headers: Record<string, string> = {
+        'Depth':        String(opts.depth ?? 1),
+        'Content-Type': 'application/xml; charset=utf-8',
+      }
+      if (auth) headers['Authorization'] = auth
+
+      const propfindBody = Buffer.from(
+        '<?xml version="1.0" encoding="utf-8"?>' +
+        '<D:propfind xmlns:D="DAV:"><D:prop>' +
+        '<D:displayname/><D:getcontentlength/><D:getlastmodified/><D:resourcetype/>' +
+        '</D:prop></D:propfind>',
+        'utf-8'
+      )
+      headers['Content-Length'] = String(propfindBody.length)
+
+      const req = http.request({
+        hostname: parsed.hostname,
+        port:     Number(parsed.port) || 80,
+        path:     parsed.pathname + parsed.search,
+        method:   'PROPFIND',
+        headers,
+      }, res => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () => resolve({
+          status: res.statusCode ?? 0,
+          body:   Buffer.concat(chunks).toString('utf-8'),
+        }))
+      })
+
+      req.on('error', reject)
+      req.write(propfindBody)
+      req.end()
+    })
+  })
+}
+
+function setupHttpProxy() {  mockHttp.request.mockImplementation(async (opts: any) => {
     const { default: http } = await import('http')
     const { URL } = await import('url')
 
@@ -174,6 +234,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
     Object.keys(mockPreferences).forEach(k => delete mockPreferences[k])
     vi.clearAllMocks()
     setupHttpProxy()
+    setupWebDavNativeProxy()
   })
 
   // ----------------------------------------------------------------
@@ -486,6 +547,62 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       const restoreResult = await service.restoreCloudBackup('cfg-real', backupId)
       expect(restoreResult.success).toBe(true)
       expect(restoreResult.data.categories).toHaveLength(1)
+    })
+
+    it('跨平台兼容：iOS 创建备份，Android 通过原生 OkHttp PROPFIND 独立发现并列出', async () => {
+      const { default: http } = await import('http')
+      const { Capacitor } = await import('@capacitor/core')
+
+      // 使用独立子目录，避免被其他测试写入的文件污染
+      const subPath = '/cross-platform-test-' + Date.now()
+      await new Promise<void>((resolve, reject) => {
+        const req = http.request(
+          { hostname: '127.0.0.1', port: PORT, path: subPath, method: 'MKCOL',
+            headers: { Authorization: 'Basic ' + Buffer.from(`${USERNAME}:${PASSWORD}`).toString('base64') } },
+          () => resolve()
+        )
+        req.on('error', reject)
+        req.end()
+      })
+
+      const subUrl = server.baseUrl + subPath
+      const setCfg = async () => {
+        await Preferences.set({
+          key: 'cloud_backup_configs',
+          value: JSON.stringify([{
+            id: 'cfg-cross',
+            name: 'Cross Platform Test',
+            type: 'webdav',
+            enabled: true,
+            url: subUrl,
+            username: USERNAME,
+            password: PASSWORD,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }]),
+        })
+      }
+
+      // iOS 创建备份
+      vi.spyOn(Capacitor, 'getPlatform').mockReturnValue('ios')
+      const iosService = MobileCloudBackupService.getInstance()
+      await setCfg()
+
+      const createResult = await iosService.createCloudBackup('cfg-cross', mockExportData, 'iOS 跨平台测试')
+      expect(createResult.success).toBe(true)
+      const backupId = createResult.backupInfo!.id
+
+      // 切换到 Android，Android 使用原生 OkHttp 插件执行 PROPFIND，不依赖 manifest
+      // 无需预先写入任何元数据文件，直接从 WebDAV 服务器发现备份
+      ;(MobileCloudBackupService as any).instance = undefined
+      vi.spyOn(Capacitor, 'getPlatform').mockReturnValue('android')
+      const androidService = MobileCloudBackupService.getInstance()
+      await setCfg()
+      setupWebDavNativeProxy() // 重新设置，因为 vi.clearAllMocks 会清除
+
+      // Android 通过原生 OkHttp PROPFIND 独立发现备份，不依赖任何其他平台预先写入的索引
+      const backups = await androidService.getCloudBackupList('cfg-cross')
+      expect(backups.some(b => b.id === backupId)).toBe(true)
     })
 
     it('多次备份后列表按时间倒序排列', async () => {

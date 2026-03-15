@@ -220,7 +220,8 @@ import {
   IonCheckbox,
   IonListHeader,
   toastController,
-  alertController
+  alertController,
+  useBackButton
 } from '@ionic/vue'
 import {
   arrowBack,
@@ -451,6 +452,11 @@ const handleCancel = async () => {
     router.back()
   }
 }
+
+// 处理 Android 物理返回键（与屏幕取消按钮逻辑一致）
+useBackButton(10, () => {
+  handleCancel()
+})
 
 // 显示提示
 const showToast = async (message: string, color: string = 'success') => {
