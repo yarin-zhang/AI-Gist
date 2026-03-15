@@ -1,0 +1,30 @@
+{
+  "fill" : {
+    "solid" : "display-p3:0.10980,0.14510,0.20392,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "AI-Gist-icon-svg.png",
+          "name" : "AI-Gist-icon-svg"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

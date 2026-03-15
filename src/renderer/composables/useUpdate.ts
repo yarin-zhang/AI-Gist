@@ -62,10 +62,9 @@ export function useUpdate() {
       }
     }
     
-    // 在非 Electron 环境中，尝试从 package.json 获取版本
+    // 在非 Electron 环境中，使用编译时注入的版本号
     try {
-      // 这里可以添加从 package.json 读取版本的逻辑
-      return '0.0.0';
+      return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
     } catch (error) {
       console.error('获取版本失败:', error);
       return '0.0.0';

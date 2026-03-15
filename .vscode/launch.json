@@ -39,6 +39,34 @@
             "env": {
                 "NODE_ENV": "test"
             }
+        },
+        {
+            "name": "移动端 - 构建并打开 iOS",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/build-mobile.js",
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "outputCapture": "std",
+            "postDebugTask": "打开 iOS 项目",
+            "env": {
+                "NODE_ENV": "production",
+                "PATH": "${env:PATH}:${workspaceFolder}/node_modules/.bin"
+            }
+        },
+        {
+            "name": "移动端 - 构建并打开 Android",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/build-mobile.js",
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "outputCapture": "std",
+            "postDebugTask": "打开 Android 项目",
+            "env": {
+                "NODE_ENV": "production",
+                "PATH": "${env:PATH}:${workspaceFolder}/node_modules/.bin"
+            }
         }
     ]
 }

@@ -329,6 +329,125 @@ export class AIConfigApiClient {
       }> => {
         return this.aiConfigService.getAIConfigStats();
       }
+    },
+
+    /**
+     * 测试AI配置连接
+     */
+    test: {
+      /**
+       * 测试AI配置的连接和可用性
+       * @param config 测试配置参数
+       * @returns Promise<测试结果> 测试结果
+       */
+      mutate: async (config: {
+        type: AIConfig['type'];
+        baseURL: string;
+        apiKey?: string
+      }): Promise<{
+        success: boolean;
+        error?: string;
+        models?: string[]
+      }> => {
+        try {
+          // 检测平台
+          const isElectron = typeof window !== 'undefined' && (window as any).electronAPI;
+
+          if (isElectron) {
+            // Electron 环境：使用 IPC
+            const testConfig: Partial<AIConfig> = {
+              type: config.type,
+              baseURL: config.baseURL,
+              apiKey: config.apiKey,
+              name: 'test',
+              configId: 'test',
+              models: [],
+              enabled: true,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+
+            const result = await window.electron.ai.testConfig(testConfig as AIConfig);
+            return {
+              success: result.success,
+              error: result.error,
+              models: result.models
+            };
+          } else {
+            // 移动端环境：直接调用 API
+            const { testAIConfig } = await import('../services/mobile-ai.service');
+            const result = await testAIConfig(config);
+            return {
+              success: result.success,
+              error: result.error,
+              models: result.models
+            };
+          }
+        } catch (error) {
+          console.error('测试连接失败:', error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+      }
+    },
+
+    /**
+     * 智能测试AI配置
+     */
+    intelligentTest: {
+      /**
+       * 使用真实提示词测试AI配置
+       * @param id AI配置ID
+       * @returns Promise<测试结果> 测试结果
+       */
+      mutate: async (id: number): Promise<{
+        success: boolean;
+        error?: string;
+        response?: string;
+        inputPrompt?: string;
+      }> => {
+        try {
+          const config = await this.aiConfigService.getAIConfigById(id);
+          if (!config) {
+            return {
+              success: false,
+              error: 'Configuration not found'
+            };
+          }
+
+          // 检测平台
+          const isElectron = typeof window !== 'undefined' && (window as any).electronAPI;
+
+          if (isElectron) {
+            // Electron 环境
+            const result = await window.electron.ai.intelligentTest(config);
+            return {
+              success: result.success,
+              error: result.error,
+              response: result.response,
+              inputPrompt: 'Test prompt'
+            };
+          } else {
+            // 移动端环境：使用移动端智能测试
+            const { intelligentTestAIConfig } = await import('../services/mobile-ai.service');
+            const result = await intelligentTestAIConfig(config);
+            return {
+              success: result.success,
+              error: result.error,
+              response: result.response,
+              inputPrompt: result.inputPrompt
+            };
+          }
+        } catch (error) {
+          console.error('智能测试失败:', error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+      }
     }
   };
 }

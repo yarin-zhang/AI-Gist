@@ -82,4 +82,5 @@ export interface CloudRestoreResult {
   message: string;
   backupInfo?: CloudBackupInfo;
   error?: string;
+  data?: any; // 恢复的备份数据（移动端使用）
 } 

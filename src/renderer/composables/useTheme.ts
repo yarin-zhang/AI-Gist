@@ -103,23 +103,27 @@ export function useTheme() {
 	 */
 	const setCssGlobalVars = () => {
 		if (typeof document !== 'undefined') {
-			const html = document.documentElement
-			const styleObject = getCssVars(themeName.value)
-			
-			// 设置主题类名
-			html.classList.remove('theme-light', 'theme-dark')
-			html.classList.add(`theme-${themeName.value}`)
-			
-			// 设置暗色模式类名
-			if (isDark.value) {
-				html.classList.add('dark')
-			} else {
-				html.classList.remove('dark')
-			}
-			
-			// 设置 CSS 变量
-			for (const [key, value] of Object.entries(styleObject)) {
-				html.style.setProperty(`--${key}`, value)
+			try {
+				const html = document.documentElement
+				const styleObject = getCssVars(themeName.value)
+
+				// 设置主题类名
+				html.classList.remove('theme-light', 'theme-dark')
+				html.classList.add(`theme-${themeName.value}`)
+
+				// 设置暗色模式类名
+				if (isDark.value) {
+					html.classList.add('dark')
+				} else {
+					html.classList.remove('dark')
+				}
+
+				// 设置 CSS 变量
+				for (const [key, value] of Object.entries(styleObject)) {
+					html.style.setProperty(`--${key}`, value)
+				}
+			} catch (error) {
+				console.error('设置 CSS 变量失败:', error)
 			}
 		}
 	}
@@ -129,30 +133,55 @@ export function useTheme() {
 	 */
 	const initTheme = async () => {
 		try {
-			// 获取系统当前主题信息
-			const themeInfo = await window.electronAPI.theme.getInfo()
-			isDarkMode.value = themeInfo.isDarkTheme
-			currentTheme.value = themeInfo.currentTheme
-			themeSource.value = themeInfo.themeSource as 'system' | 'light' | 'dark'
-			
-			// 同步 主题状态
-			themeName.value = isDarkMode.value ? ThemeNameEnum.Dark : ThemeNameEnum.Light
-			
-			console.log('主题初始化完成:', {
-				isDarkMode: isDarkMode.value,
-				currentTheme: currentTheme.value,
-				themeSource: themeSource.value,
-				themeName: themeName.value
-			})
+			// 检查是否在 Electron 环境
+			if (window.electronAPI?.theme) {
+				// 获取系统当前主题信息
+				const themeInfo = await window.electronAPI.theme.getInfo()
+				isDarkMode.value = themeInfo.isDarkTheme
+				currentTheme.value = themeInfo.currentTheme
+				themeSource.value = themeInfo.themeSource as 'system' | 'light' | 'dark'
 
-			// 设置页面根元素的主题类名
-			updateBodyTheme()
-			
-			// 设置 CSS 变量
-			setCssGlobalVars()
-			
-			// 监听主题变化
-			setupThemeListener()
+				// 同步 主题状态
+				themeName.value = isDarkMode.value ? ThemeNameEnum.Dark : ThemeNameEnum.Light
+
+				console.log('主题初始化完成:', {
+					isDarkMode: isDarkMode.value,
+					currentTheme: currentTheme.value,
+					themeSource: themeSource.value,
+					themeName: themeName.value
+				})
+
+				// 设置页面根元素的主题类名
+				updateBodyTheme()
+
+				// 设置 CSS 变量
+				setCssGlobalVars()
+
+				// 监听主题变化
+				setupThemeListener()
+			} else {
+				// Capacitor 或其他环境：使用系统默认主题
+				console.log('非 Electron 环境，使用系统默认主题')
+				isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+				themeName.value = isDarkMode.value ? ThemeNameEnum.Dark : ThemeNameEnum.Light
+				updateBodyTheme()
+				setCssGlobalVars()
+
+				// 监听系统主题变化
+				const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+				const handleChange = (e: MediaQueryListEvent) => {
+					isDarkMode.value = e.matches
+					themeName.value = e.matches ? ThemeNameEnum.Dark : ThemeNameEnum.Light
+					updateBodyTheme()
+					setCssGlobalVars()
+				}
+				mediaQuery.addEventListener('change', handleChange)
+
+				// 保存清理函数
+				removeThemeListener = () => {
+					mediaQuery.removeEventListener('change', handleChange)
+				}
+			}
 		} catch (error) {
 			console.error('初始化主题失败:', error)
 			// 降级处理：使用系统默认主题
@@ -169,20 +198,30 @@ export function useTheme() {
 	 */
 	const setThemeSource = async (source: 'system' | 'light' | 'dark') => {
 		try {
+			// 只在 Electron 环境下调用 API
+			if (!window.electronAPI?.theme) {
+				// Capacitor 环境：直接更新本地状态
+				themeName.value = source === 'dark' ? ThemeNameEnum.Dark : ThemeNameEnum.Light
+				isDarkMode.value = source === 'dark'
+				updateBodyTheme()
+				setCssGlobalVars()
+				return
+			}
+
 			const newTheme = await window.electronAPI.theme.setSource(source)
 			themeSource.value = source
 			currentTheme.value = newTheme
-			
+
 			// 立即获取更新后的主题信息
 			const themeInfo = await window.electronAPI.theme.getInfo()
 			isDarkMode.value = themeInfo.isDarkTheme
-			
+
 			// 同步 主题状态
 			themeName.value = isDarkMode.value ? ThemeNameEnum.Dark : ThemeNameEnum.Light
-			
+
 			updateBodyTheme()
 			setCssGlobalVars()
-			
+
 			console.log('主题来源已更新:', {
 				source,
 				newTheme,
@@ -225,6 +264,11 @@ export function useTheme() {
 	 * 设置系统主题监听器
 	 */
 	const setupThemeListener = () => {
+		// 只在 Electron 环境下设置监听器
+		if (!window.electronAPI?.theme) {
+			return
+		}
+
 		// 清理之前的监听器
 		if (removeThemeListener) {
 			removeThemeListener()
@@ -236,10 +280,10 @@ export function useTheme() {
 			isDarkMode.value = data.themeInfo.isDarkTheme
 			currentTheme.value = data.theme
 			themeSource.value = data.themeInfo.themeSource
-			
+
 			// 同步 主题状态
 			themeName.value = isDarkMode.value ? ThemeNameEnum.Dark : ThemeNameEnum.Light
-			
+
 			updateBodyTheme()
 			setCssGlobalVars()
 		})
@@ -249,19 +293,23 @@ export function useTheme() {
 	 * 更新页面根元素的主题类名
 	 */
 	const updateBodyTheme = () => {
-		const html = document.documentElement
-		const body = document.body
-		
-		// 移除之前的主题类
-		html.classList.remove('light', 'dark')
-		body.classList.remove('light', 'dark')
-		
-		// 添加新的主题类
-		html.classList.add(themeClass.value)
-		body.classList.add(themeClass.value)
-		
-		// 设置CSS自定义属性
-		body.style.setProperty('--theme-mode', themeClass.value)
+		try {
+			const html = document.documentElement
+			const body = document.body
+
+			// 移除之前的主题类
+			html.classList.remove('light', 'dark')
+			body.classList.remove('light', 'dark')
+
+			// 添加新的主题类
+			html.classList.add(themeClass.value)
+			body.classList.add(themeClass.value)
+
+			// 设置CSS自定义属性
+			body.style.setProperty('--theme-mode', themeClass.value)
+		} catch (error) {
+			console.error('更新主题类名失败:', error)
+		}
 	}
 
 	/**

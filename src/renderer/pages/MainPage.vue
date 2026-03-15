@@ -77,7 +77,10 @@ const handleOpenSettings = (targetSection?: string) => {
 
 const collapseRef = ref(true)
 
-window.electronAPI.sendMessage('Hello from App.vue!')
+// 只在 Electron 环境下发送消息
+if (window.electronAPI?.sendMessage) {
+    window.electronAPI.sendMessage('Hello from App.vue!')
+}
 </script>
 
 <template>

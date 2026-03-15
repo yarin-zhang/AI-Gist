@@ -270,7 +270,7 @@ export class CloudBackupManager {
           throw new Error('没有找到主窗口，无法访问数据库');
         }
         
-        // 从渲染进程获取数据
+        // 从渲染进程获取数据（使用备份专用方法，确保图片 Blob 被序列化为 base64）
         const exportResult = await mainWindow.webContents.executeJavaScript(`
           (async () => {
             try {
@@ -278,7 +278,7 @@ export class CloudBackupManager {
                 throw new Error('数据库API未初始化');
               }
               const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-              return await databaseServiceManager.exportAllData();
+              return await databaseServiceManager.exportAllDataForBackup();
             } catch (error) {
               return {
                 success: false,

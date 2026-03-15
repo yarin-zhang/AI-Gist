@@ -10,6 +10,11 @@ install-state.gz
 dist
 build
 
+# Capacitor 移动端
+ios/
+android/
+capacitor.config.json
+
 # macOS 系统文件
 .DS_Store
 
