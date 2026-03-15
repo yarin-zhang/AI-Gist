@@ -1,6 +1,7 @@
 // @ts-nocheck
 const Path = require('path');
 const vuePlugin = require('@vitejs/plugin-vue')
+const { version } = require('./package.json');
 
 const { defineConfig } = require('vite');
 
@@ -35,7 +36,8 @@ const config = defineConfig({
     },
     define: {
         // 定义环境变量，用于区分移动端和桌面端
-        '__PLATFORM__': JSON.stringify('mobile')
+        '__PLATFORM__': JSON.stringify('mobile'),
+        '__APP_VERSION__': JSON.stringify(version)
     }
 });
 

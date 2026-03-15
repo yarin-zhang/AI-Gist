@@ -1,6 +1,7 @@
 // @ts-nocheck
 const Path = require('path');
 const vuePlugin = require('@vitejs/plugin-vue')
+const { version } = require('./package.json');
 
 const { defineConfig } = require('vite');
 
@@ -19,6 +20,9 @@ const config = defineConfig({
         emptyOutDir: true,
     },
     plugins: [vuePlugin()],
+    define: {
+        '__APP_VERSION__': JSON.stringify(version)
+    },
     resolve: {
         alias: {
             '@': Path.resolve(__dirname, 'src/renderer'),

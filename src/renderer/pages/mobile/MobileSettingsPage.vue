@@ -121,7 +121,7 @@ const { setThemeSource, themeSource } = useTheme()
 
 const currentLanguage = ref(currentLocale.value)
 const currentTheme = ref(themeSource.value || 'system')
-const appVersion = ref('1.0.0')
+const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '')
 
 // 语言切换
 const handleLanguageChange = (event: any) => {
