@@ -457,17 +457,14 @@ const showActionMenu = async () => {
     }
   ]
 
-  // 只有非首选配置才能删除
-  if (!config.value.isPreferred) {
-    buttons.push({
-      text: t('common.delete'),
-      icon: trashOutline,
-      role: 'destructive',
-      handler: () => {
-        handleDelete()
-      }
-    })
-  }
+  buttons.push({
+    text: t('common.delete'),
+    icon: trashOutline,
+    role: 'destructive',
+    handler: () => {
+      handleDelete()
+    }
+  })
 
   buttons.push({
     text: t('common.cancel'),
