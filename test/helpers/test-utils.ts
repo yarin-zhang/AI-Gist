@@ -367,22 +367,24 @@ export const setupTestEnvironment = () => {
   // 设置全局 Mock
   global.indexedDB = mockIndexedDB as any
   global.IDBKeyRange = {} as any
-  
-  // Mock window 对象
-  Object.defineProperty(window, 'electron', {
-    value: mockElectron,
-    writable: true
-  })
-  
-  // Mock location
-  Object.defineProperty(window, 'location', {
-    value: {
-      href: 'http://localhost:8080',
-      origin: 'http://localhost:8080'
-    },
-    writable: true
-  })
-  
+
+  // Mock window 对象（仅在 jsdom / 浏览器环境下 window 存在时执行）
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'electron', {
+      value: mockElectron,
+      writable: true
+    })
+
+    // Mock location
+    Object.defineProperty(window, 'location', {
+      value: {
+        href: 'http://localhost:8080',
+        origin: 'http://localhost:8080'
+      },
+      writable: true
+    })
+  }
+
   // Mock crypto
   Object.defineProperty(global, 'crypto', {
     value: {
