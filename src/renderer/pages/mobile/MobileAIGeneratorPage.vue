@@ -224,14 +224,12 @@ const loadConfigs = async () => {
     const result = await databaseService.aiConfig.getEnabledAIConfigs()
     configs.value = result
 
-    // 自动选择首选配置
-    const preferred = await databaseService.aiConfig.getPreferredAIConfig()
-    if (preferred && preferred.defaultModel) {
+    // 直接从已加载的启用列表中查找首选配置，避免二次 DB 查询与列表数据不一致
+    // （单独调用 getPreferredAIConfig 可能因 enabled 字段类型差异返回不在列表中的配置）
+    const preferred = result.find(c => c.isPreferred) ?? result[0]
+    if (preferred?.defaultModel) {
       selectedModelKey.value = `${preferred.configId}:${preferred.defaultModel}`
       selectedConfigName.value = preferred.name
-    } else if (result.length > 0 && result[0].defaultModel) {
-      selectedModelKey.value = `${result[0].configId}:${result[0].defaultModel}`
-      selectedConfigName.value = result[0].name
     }
   } catch (error) {
     console.error('加载 AI 配置失败:', error)
@@ -264,8 +262,10 @@ const generatePrompt = async () => {
   generatedResult.value = ''
 
   try {
-    // 解析选中的配置和模型
-    const [configId, model] = selectedModelKey.value.split(':')
+    // 解析选中的配置和模型（使用首个 ':' 分割，保证模型名含 ':' 时也能正确解析）
+    const firstColon = selectedModelKey.value.indexOf(':')
+    const configId = selectedModelKey.value.substring(0, firstColon)
+    const model = selectedModelKey.value.substring(firstColon + 1)
     const selectedConfig = configs.value.find(c => c.configId === configId)
 
     if (!selectedConfig) {
