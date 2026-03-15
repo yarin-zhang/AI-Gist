@@ -72,11 +72,10 @@
           <ion-label>{{ t('about.projectInfo') }}</ion-label>
         </ion-list-header>
 
-        <ion-item>
-          <ion-label>
-            <h3>{{ t('about.currentVersion') }}</h3>
-            <p>{{ appVersion }}</p>
-          </ion-label>
+        <ion-item button @click="navigateToAbout">
+          <ion-icon :icon="informationCircleOutline" slot="start"></ion-icon>
+          <ion-label>{{ t('settings.menus.about.title') }}</ion-label>
+          <ion-note slot="end">{{ appVersion }}</ion-note>
         </ion-item>
       </ion-list>
     </ion-content>
@@ -99,6 +98,7 @@ import {
   IonSelect,
   IonSelectOption,
   IonIcon,
+  IonNote,
   toastController,
   alertController,
   loadingController
@@ -106,7 +106,8 @@ import {
 import {
   downloadOutline,
   cloudUploadOutline,
-  cloudOutline
+  cloudOutline,
+  informationCircleOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useTheme } from '~/composables/useTheme'
@@ -346,6 +347,11 @@ const showToast = async (message: string, color: string = 'success') => {
 // 导航到云端备份页面
 const navigateToCloudBackup = () => {
   router.push('/mobile/cloud-backup')
+}
+
+// 导航到关于页面
+const navigateToAbout = () => {
+  router.push('/mobile/about')
 }
 
 onMounted(() => {

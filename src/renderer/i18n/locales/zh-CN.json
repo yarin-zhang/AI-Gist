@@ -399,6 +399,7 @@
   },
   "promptManagement": {
     "addFirstVariable": "添加第一个变量",
+    "addImage": "添加图片",
     "addTag": "添加标签 \"{tag}\"",
     "addVariable": "手动添加",
     "additionalInfo": "补充信息",
@@ -786,6 +787,28 @@
   "settings": {
     "autoSave": "设置会自动保存",
     "resetToDefault": "恢复默认设置",
+    "menus": {
+      "about": {
+        "title": "关于",
+        "description": "查看应用版本信息和检查更新"
+      },
+      "appearance": {
+        "title": "外观设置",
+        "description": "配置应用的主题模式"
+      },
+      "language": {
+        "title": "语言设置",
+        "description": "配置应用的显示语言"
+      },
+      "cloudBackup": {
+        "title": "云端备份",
+        "description": "配置 WebDAV 和 iCloud Drive 云端备份功能"
+      },
+      "dataManagement": {
+        "title": "数据管理",
+        "description": "数据备份、恢复、导入导出功能"
+      }
+    },
     "sectionDescriptions": {
       "about": {
         "description": "查看应用版本信息和检查更新",

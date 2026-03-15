@@ -399,6 +399,7 @@
   },
   "promptManagement": {
     "addFirstVariable": "添加第一個變量",
+    "addImage": "添加圖片",
     "addTag": "新增標籤 \"{tag}\"",
     "addVariable": "手動添加",
     "additionalInfo": "補充信息",
@@ -785,6 +786,28 @@
   },
   "settings": {
     "autoSave": "設置會自動保存",
+    "menus": {
+      "about": {
+        "description": "查看應用程式版本資訊和檢查更新",
+        "title": "關於"
+      },
+      "appearance": {
+        "description": "配置應用的主題模式",
+        "title": "外觀設定"
+      },
+      "cloudBackup": {
+        "description": "設定 WebDAV 和 iCloud Drive 雲端備份功能",
+        "title": "雲端備份"
+      },
+      "dataManagement": {
+        "description": "資料備份、復原、匯入匯出功能",
+        "title": "資料管理"
+      },
+      "language": {
+        "description": "配置應用的顯示語言",
+        "title": "語言設定"
+      }
+    },
     "resetToDefault": "恢復默認設置",
     "sectionDescriptions": {
       "about": {

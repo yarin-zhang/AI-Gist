@@ -82,6 +82,40 @@
                 {{ formData.tags?.length || 0 }} {{ t('promptManagement.tags') }}
               </ion-note>
             </ion-item>
+
+            <!-- 图片 -->
+            <ion-item>
+              <ion-label>{{ t('promptManagement.images') }}</ion-label>
+              <ion-button slot="end" fill="outline" size="small" @click="triggerImagePicker">
+                {{ t('promptManagement.addImage') }}
+              </ion-button>
+            </ion-item>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/*"
+              multiple
+              class="hidden-file-input"
+              @change="handleImageFilesSelected"
+            />
+            <div v-if="imagePreviewUrls.length > 0" class="image-preview-grid">
+              <div
+                v-for="(url, index) in imagePreviewUrls"
+                :key="index"
+                class="image-preview-item"
+              >
+                <img :src="url" class="image-thumb" />
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  color="danger"
+                  class="image-remove-btn"
+                  @click="removeImage(index)"
+                >
+                  <ion-icon :icon="closeCircle" slot="icon-only"></ion-icon>
+                </ion-button>
+              </div>
+            </div>
           </div>
         </ion-list>
       </form>
@@ -196,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   IonPage,
@@ -234,6 +268,8 @@ import {
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { Prompt, Category } from '@shared/types'
+import { Camera, CameraSource, CameraResultType } from '@capacitor/camera'
+import { Capacitor } from '@capacitor/core'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -253,6 +289,67 @@ const showTagsModal = ref(false)
 const tagSearchText = ref('')
 const showMoreOptions = ref(false)
 
+// 图片相关
+const imageBlobs = ref<Blob[]>([])
+const imagePreviewUrls = ref<string[]>([])
+
+const triggerImagePicker = async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await Camera.pickImages({
+        quality: 90,
+        limit: 10
+      })
+      for (const photo of result.photos) {
+        if (!photo.webPath) continue
+        const response = await fetch(photo.webPath)
+        const blob = await response.blob()
+        if (blob.size > 5 * 1024 * 1024) {
+          showToast(t('promptManagement.imageTooLarge'), 'warning')
+          continue
+        }
+        imageBlobs.value.push(blob)
+        imagePreviewUrls.value.push(URL.createObjectURL(blob))
+      }
+    } catch (err: any) {
+      // 用户取消选择时不提示错误
+      if (!String(err).includes('cancel') && !String(err).includes('Cancel')) {
+        showToast(t('promptManagement.imageUploadFailed'), 'danger')
+      }
+    }
+  } else {
+    fileInputRef.value?.click()
+  }
+}
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const handleImageFilesSelected = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+  for (const file of Array.from(input.files)) {
+    if (!file.type.startsWith('image/')) continue
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(t('promptManagement.imageTooLarge'), 'warning')
+      continue
+    }
+    imageBlobs.value.push(file)
+    imagePreviewUrls.value.push(URL.createObjectURL(file))
+  }
+  input.value = ''
+}
+
+const removeImage = (index: number) => {
+  URL.revokeObjectURL(imagePreviewUrls.value[index])
+  imageBlobs.value.splice(index, 1)
+  imagePreviewUrls.value.splice(index, 1)
+}
+
+const loadExistingImages = (blobs: Blob[]) => {
+  imagePreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
+  imageBlobs.value = [...blobs]
+  imagePreviewUrls.value = blobs.map(blob => URL.createObjectURL(blob))
+}
+
 // 表单数据
 const formData = ref<Partial<Prompt>>({
   title: '',
@@ -264,6 +361,27 @@ const formData = ref<Partial<Prompt>>({
   isActive: true,
   useCount: 0
 })
+
+// 用于判断是否有真实改动（编辑模式下记录原始值）
+const originalSnapshot = ref<string>('')
+const originalImageCount = ref(0)
+
+const takeSnapshot = () => {
+  const { imageBlobs: _blobs, ...rest } = formData.value as any
+  originalSnapshot.value = JSON.stringify(rest)
+  originalImageCount.value = imageBlobs.value.length
+}
+
+const hasRealChanges = (): boolean => {
+  // 新建模式：有内容就算有改动
+  if (!isEdit.value) {
+    return !!(formData.value.title || formData.value.content)
+  }
+  // 编辑模式：与快照比较
+  const { imageBlobs: _blobs, ...rest } = formData.value as any
+  const currentSnapshot = JSON.stringify(rest)
+  return currentSnapshot !== originalSnapshot.value || imageBlobs.value.length !== originalImageCount.value
+}
 
 // 选中的分类名称
 const selectedCategoryName = computed(() => {
@@ -335,7 +453,13 @@ const loadData = async () => {
         isFavorite: prompt.isFavorite ?? false,
         useCount: prompt.useCount ?? 0
       }
+      // 加载已有图片
+      if (prompt.imageBlobs?.length) {
+        loadExistingImages(prompt.imageBlobs)
+      }
     }
+    // 加载完成后记录快照，用于判断是否有真实改动
+    takeSnapshot()
   } catch (error) {
     console.error('加载数据失败:', error)
     showToast(t('promptManagement.loadFailed'), 'danger')
@@ -402,16 +526,20 @@ const handleSave = async () => {
   saving.value = true
 
   try {
+    const dataToSave = {
+      ...formData.value,
+      imageBlobs: imageBlobs.value
+    }
     if (isEdit.value && promptId.value) {
       // 更新
       await api.prompts.update.mutate({
         id: promptId.value,
-        data: formData.value as Prompt
+        data: dataToSave as Prompt
       })
       showToast(t('promptManagement.updateSuccess'))
     } else {
       // 创建
-      await api.prompts.create.mutate(formData.value as any)
+      await api.prompts.create.mutate(dataToSave as any)
       showToast(t('promptManagement.createSuccess'))
     }
 
@@ -426,10 +554,7 @@ const handleSave = async () => {
 
 // 取消
 const handleCancel = async () => {
-  // 检查是否有未保存的更改
-  const hasChanges = formData.value.title || formData.value.content
-
-  if (hasChanges) {
+  if (hasRealChanges()) {
     const alert = await alertController.create({
       header: t('common.confirm'),
       message: t('promptManagement.unsavedChanges'),
@@ -472,6 +597,10 @@ const showToast = async (message: string, color: string = 'success') => {
 onMounted(() => {
   loadData()
 })
+
+onUnmounted(() => {
+  imagePreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
+})
 </script>
 
 <style scoped>
@@ -487,5 +616,40 @@ onMounted(() => {
 ion-textarea {
   --padding-top: 12px;
   --padding-bottom: 12px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.image-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px 12px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: calc(33.333% - 6px);
+}
+
+.image-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+  display: block;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 24px;
+  height: 24px;
 }
 </style>

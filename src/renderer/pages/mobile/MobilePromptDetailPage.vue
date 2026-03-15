@@ -34,6 +34,16 @@
           <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
         </div>
 
+        <!-- 提示词内容 -->
+        <div class="content-section">
+          <div class="section-header">
+            <h2>{{ t('promptManagement.detailModal.promptContent') }}</h2>
+          </div>
+          <div class="prompt-content-wrapper">
+            <div class="prompt-content">{{ prompt.content }}</div>
+          </div>
+        </div>
+
         <!-- 图片 -->
         <div v-if="imageUrls.length > 0" class="content-section">
           <div class="section-header">
@@ -45,17 +55,8 @@
               :key="index"
               :src="url"
               class="prompt-image"
+              @click="openImagePreview(url)"
             />
-          </div>
-        </div>
-
-        <!-- 提示词内容 -->
-        <div class="content-section">
-          <div class="section-header">
-            <h2>{{ t('promptManagement.detailModal.promptContent') }}</h2>
-          </div>
-          <div class="prompt-content-wrapper">
-            <div class="prompt-content">{{ prompt.content }}</div>
           </div>
         </div>
 
@@ -68,6 +69,13 @@
         </div>
       </div>
     </ion-content>
+
+    <!-- 图片全屏预览 -->
+    <ion-modal :is-open="!!previewUrl" @didDismiss="previewUrl = null" css-class="image-preview-modal">
+      <ion-content @click="previewUrl = null" class="preview-content">
+        <img v-if="previewUrl" :src="previewUrl" class="preview-image" />
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -89,9 +97,11 @@ import {
   IonLabel,
   IonChip,
   IonSpinner,
+  IonModal,
   toastController,
   alertController,
-  actionSheetController
+  actionSheetController,
+  onIonViewWillEnter
 } from '@ionic/vue'
 import {
   heart,
@@ -115,6 +125,11 @@ const prompt = ref<Prompt | null>(null)
 const categories = ref<Category[]>([])
 const loading = ref(true)
 const imageUrls = ref<string[]>([])
+const previewUrl = ref<string | null>(null)
+
+const openImagePreview = (url: string) => {
+  previewUrl.value = url
+}
 
 const updateImageUrls = () => {
   imageUrls.value.forEach(url => URL.revokeObjectURL(url))
@@ -281,6 +296,11 @@ onMounted(async () => {
   await loadPrompt()
 })
 
+// 每次页面进入（含从编辑页返回）都重新加载，保证数据实时
+onIonViewWillEnter(async () => {
+  await loadPrompt()
+})
+
 onUnmounted(() => {
   imageUrls.value.forEach(url => URL.revokeObjectURL(url))
 })
@@ -394,5 +414,20 @@ ion-chip {
   object-fit: cover;
   aspect-ratio: 1;
   background: var(--ion-color-light);
+  cursor: pointer;
+}
+
+.preview-content {
+  --background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
 }
 </style>

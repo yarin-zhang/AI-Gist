@@ -63,6 +63,10 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/ai-generator',
     component: () => import('../pages/mobile/MobileAIGeneratorPage.vue')
+  },
+  {
+    path: '/mobile/about',
+    component: () => import('../pages/mobile/MobileAboutPage.vue')
   }
 ]
 

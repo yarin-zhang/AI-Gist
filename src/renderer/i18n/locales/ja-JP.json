@@ -399,6 +399,7 @@
   },
   "promptManagement": {
     "addFirstVariable": "最初の変数を追加します",
+    "addImage": "画像を追加",
     "addTag": "タグ「{tag}」を追加",
     "addVariable": "手動追加",
     "additionalInfo": "補足情報",
@@ -785,6 +786,28 @@
   },
   "settings": {
     "autoSave": "設定は自動保存されます",
+    "menus": {
+      "about": {
+        "description": "アプリのバージョン情報を表示し、アップデートを確認する",
+        "title": "について"
+      },
+      "appearance": {
+        "description": "アプリのテーマを構成する",
+        "title": "外観設定"
+      },
+      "cloudBackup": {
+        "description": "WebDAV および iCloud Drive クラウド バックアップ機能を構成する",
+        "title": "クラウドバックアップ"
+      },
+      "dataManagement": {
+        "description": "データのバックアップ、リカバリ、インポート、エクスポート機能",
+        "title": "データ管理"
+      },
+      "language": {
+        "description": "アプリの表示言語を構成する",
+        "title": "言語設定"
+      }
+    },
     "resetToDefault": "デフォルト設定に戻す",
     "sectionDescriptions": {
       "about": {

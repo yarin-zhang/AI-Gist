@@ -399,6 +399,7 @@
   },
   "promptManagement": {
     "addFirstVariable": "Add First Variable",
+    "addImage": "Add Image",
     "addTag": "Add tag \"{tag}\"",
     "addVariable": "Add Variable",
     "additionalInfo": "Additional Information",
@@ -785,6 +786,28 @@
   },
   "settings": {
     "autoSave": "Settings will be saved automatically",
+    "menus": {
+      "about": {
+        "description": "View app version information and check for updates",
+        "title": "about"
+      },
+      "appearance": {
+        "description": "Configure your app’s theme",
+        "title": "Appearance settings"
+      },
+      "cloudBackup": {
+        "description": "Configure WebDAV and iCloud Drive cloud backup capabilities",
+        "title": "Cloud backup"
+      },
+      "dataManagement": {
+        "description": "Data backup, recovery, import and export functions",
+        "title": "Data management"
+      },
+      "language": {
+        "description": "Configure the display language of your app",
+        "title": "Language settings"
+      }
+    },
     "resetToDefault": "Restore default settings",
     "sectionDescriptions": {
       "about": {
