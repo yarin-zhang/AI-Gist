@@ -26,6 +26,7 @@ import AppInitializer from '~/components/common/AppInitializer.vue'
 import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 import ShortcutListener from '~/components/common/ShortcutListener.vue'
 import NotificationHandler from '~/components/common/NotificationHandler.vue'
+import MobileBackButtonHandler from '~/components/mobile/MobileBackButtonHandler.vue'
 
 // 检测平台
 const isDesktop = PlatformDetector.isDesktop()
@@ -102,6 +103,7 @@ onMounted(async () => {
 
     <!-- 移动端：使用 Ionic + Vue Router -->
     <ion-app v-else>
+        <MobileBackButtonHandler />
         <ion-router-outlet />
     </ion-app>
 </template>

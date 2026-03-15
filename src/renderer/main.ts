@@ -186,6 +186,12 @@ async function startApp() {
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);
       await mobileRouter.default.isReady();
+
+      // 激活 Capacitor 返回键桥接
+      // AppPlugin.java 中 hasListeners = true 后，native 才会触发 backbutton DOM 事件，
+      // 进而被 Ionic 的 startHardwareBackButton() 接管并派发 ionBackButton 事件
+      const { App: CapApp } = await import('@capacitor/app');
+      CapApp.addListener('backButton', () => { /* 由 Ionic 事件系统统一处理 */ });
     }
 
     app.mount('#app');
@@ -207,6 +213,9 @@ async function startApp() {
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);
       await mobileRouter.default.isReady();
+
+      const { App: CapApp } = await import('@capacitor/app');
+      CapApp.addListener('backButton', () => { /* 由 Ionic 事件系统统一处理 */ });
     }
 
     app.mount('#app');
