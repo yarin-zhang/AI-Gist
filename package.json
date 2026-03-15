@@ -68,6 +68,7 @@
         "@capacitor/ios": "^8.1.0",
         "@capacitor/preferences": "^8.0.1",
         "@capacitor/share": "^8.0.1",
+        "@capacitor/splash-screen": "^8.0.1",
         "@google/generative-ai": "^0.24.1",
         "@ionic/vue": "^8.0.0",
         "@ionic/vue-router": "^8.0.0",

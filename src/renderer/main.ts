@@ -80,8 +80,18 @@ function setInitialTheme() {
   console.log(`[Main] 预设主题完成: ${isDark ? 'dark' : 'light'} (来源: ${savedTheme || 'system'})`)
 }
 
-// 移除初始加载屏幕
-function removeInitialLoading() {
+// 移除初始加载屏幕（同时隐藏原生 SplashScreen）
+async function removeInitialLoading() {
+  // 移动端：隐藏 Capacitor 原生启动屏
+  if (PlatformDetector.isMobile()) {
+    try {
+      const { SplashScreen } = await import('@capacitor/splash-screen')
+      await SplashScreen.hide({ fadeOutDuration: 300 })
+    } catch (e) {
+      console.warn('[Main] SplashScreen.hide 失败:', e)
+    }
+  }
+
   const loadingElement = document.getElementById('initial-loading')
   if (loadingElement) {
     loadingElement.classList.add('loading-hidden')
