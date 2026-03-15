@@ -197,6 +197,12 @@ onUnmounted(() => {
   transition: opacity 0.15s;
 }
 
+@media (prefers-color-scheme: dark) {
+  .waterfall-card {
+    border: none;
+  }
+}
+
 .waterfall-card:active {
   opacity: 0.7;
 }

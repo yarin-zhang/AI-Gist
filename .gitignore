@@ -11,8 +11,8 @@ dist
 build
 
 # Capacitor 移动端
+# ios/ 和 android/ 应提交到 git（Capacitor 官方要求），各目录有自身的 .gitignore
 ios/
-android/
 capacitor.config.json
 
 # macOS 系统文件
