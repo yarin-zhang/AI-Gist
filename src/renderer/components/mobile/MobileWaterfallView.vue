@@ -191,10 +191,16 @@ onUnmounted(() => {
   background: var(--ion-card-background, var(--ion-item-background, #fff));
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--ion-border-color, var(--ion-color-step-150, #e0e0e0));
+  /* iOS native separator color: rgba(60,60,67,0.29) */
+  border: 1px solid rgba(60, 60, 67, 0.15);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: opacity 0.15s;
+}
+
+/* 暗色模式下不显示边框（使用 .ion-palette-dark 兼容 Android） */
+:global(.ion-palette-dark) .waterfall-card {
+  border: none;
 }
 
 .waterfall-card:active {

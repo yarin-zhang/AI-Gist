@@ -1,0 +1,108 @@
+name: Build Android APK (Mobile Branch)
+
+on:
+  push:
+    branches:
+      - mobile
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build web assets
+        run: npx vite build --config vite.config.mobile.js
+
+      - name: Configure Android SDK path
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+      - name: Fix Gradle distribution URL
+        run: |
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip|' \
+            android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Check signing configuration
+        id: signing
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Decode Keystore
+        if: steps.signing.outputs.available == 'true'
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build Signed Release APK
+        if: steps.signing.outputs.available == 'true'
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEY_STORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+      - name: Build Debug APK (No Signing Config)
+        if: steps.signing.outputs.available != 'true'
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "tag=v${VERSION}-debug" >> $GITHUB_OUTPUT
+          echo "apk_name=AI-Gist-v${VERSION}-debug.apk" >> $GITHUB_OUTPUT
+
+      - name: Collect APK
+        run: |
+          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
+          cp "$APK" "${{ steps.get_version.outputs.apk_name }}"
+
+      - name: Force update debug tag
+        run: |
+          TAG="${{ steps.get_version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin ":refs/tags/${TAG}" 2>/dev/null || true
+          git tag -f "${TAG}" -m "Debug build ${TAG}"
+          git push origin "${TAG}"
+
+      - name: Upload APK to debug release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: "AI Gist ${{ steps.get_version.outputs.tag }}"
+          draft: false
+          prerelease: true
+          generate_release_notes: false
+          files: ${{ steps.get_version.outputs.apk_name }}

@@ -24,7 +24,7 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true">
+    <ion-content ref="ionContentRef" :fullscreen="true">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
@@ -241,7 +241,9 @@ import {
   IonItemOption,
   alertController,
   toastController,
-  onIonViewWillEnter
+  onIonViewWillEnter,
+  onIonViewWillLeave,
+  onIonViewDidEnter
 } from '@ionic/vue'
 import {
   add,
@@ -259,13 +261,18 @@ import {
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { Prompt, Category } from '@shared/types'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { databaseService } from '~/lib/db'
 import MobileWaterfallView from '~/components/mobile/MobileWaterfallView.vue'
 
 const { t } = useI18n()
 const router = useRouter()
-const route = useRoute()
+
+// 滚动位置相关
+const ionContentRef = ref<any>(null)
+let savedScrollTop = 0
+let lastNavIntent: 'view' | 'mutation' | null = null
+let didReloadOnEnter = false
 
 // 状态
 const prompts = ref<Prompt[]>([])
@@ -405,16 +412,19 @@ const handleSortChange = (value: string) => {
 
 // 查看提示词
 const handleView = (prompt: Prompt) => {
+  lastNavIntent = 'view'
   router.push(`/prompt/detail/${prompt.id}`)
 }
 
 // 编辑提示词
 const handleEdit = (prompt: Prompt) => {
+  lastNavIntent = 'mutation'
   router.push(`/prompt/edit/${prompt.id}`)
 }
 
 // 创建提示词
 const handleCreate = () => {
+  lastNavIntent = 'mutation'
   router.push('/prompt/create')
 }
 
@@ -487,23 +497,32 @@ onMounted(async () => {
   await checkAIConfig()
 })
 
-// 页面进入时刷新（从编辑页返回时会触发）
+// 离开页面时保存滚动位置
+onIonViewWillLeave(async () => {
+  const scrollEl = await ionContentRef.value?.$el?.getScrollElement?.()
+  savedScrollTop = scrollEl?.scrollTop ?? 0
+})
+
+// 进入页面：只有 mutation 后才刷新列表
 onIonViewWillEnter(() => {
-  loadPrompts()
+  const isMutation = lastNavIntent === 'mutation'
+  lastNavIntent = null
+  didReloadOnEnter = isMutation
+  if (isMutation) {
+    loadPrompts()
+  }
   checkAIConfig()
 })
 
-// 监听路由变化，当从创建/编辑页返回时刷新列表
-watch(() => route.path, (newPath) => {
-  if (newPath === '/tabs/prompts') {
-    loadPrompts()
-    checkAIConfig()
+// 进入页面后恢复滚动位置（仅查看详情返回时）
+onIonViewDidEnter(async () => {
+  if (!didReloadOnEnter && savedScrollTop > 0) {
+    await ionContentRef.value?.$el?.scrollToPoint?.(0, savedScrollTop, 0)
   }
 })
 
-// keep-alive 激活时刷新
+// keep-alive 激活时仅检查 AI 配置
 onActivated(() => {
-  loadPrompts()
   checkAIConfig()
 })
 </script>
