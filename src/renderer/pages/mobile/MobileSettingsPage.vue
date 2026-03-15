@@ -175,12 +175,15 @@ const applyTheme = (theme: 'system' | 'light' | 'dark') => {
 
   console.log('[Settings] 应用主题前 html.classList:', html.classList.toString())
 
-  // 根据 Ionic 官方文档，只需要在 html 元素上添加/移除 ion-palette-dark 类
-  if (isDark) {
-    html.classList.add('ion-palette-dark')
-  } else {
-    html.classList.remove('ion-palette-dark')
-  }
+  // 1. Ionic 官方暗色调色板（控制 Ionic 组件颜色变量）
+  html.classList.toggle('ion-palette-dark', isDark)
+
+  // 2. 同步应用层主题类（global.css 中 html.dark/html.light 控制背景色等变量）
+  const body = document.body
+  html.classList.toggle('dark', isDark)
+  html.classList.toggle('light', !isDark)
+  body.classList.toggle('dark', isDark)
+  body.classList.toggle('light', !isDark)
 
   console.log('[Settings] 应用主题后 html.classList:', html.classList.toString())
   console.log('[Settings] 主题应用完成，isDark:', isDark)
