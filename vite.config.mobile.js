@@ -19,6 +19,9 @@ const config = defineConfig({
         outDir: Path.join(__dirname, 'build', 'renderer'),
         emptyOutDir: true,
     },
+    esbuild: {
+        charset: 'utf8',
+    },
     plugins: [vuePlugin()],
     resolve: {
         alias: {
