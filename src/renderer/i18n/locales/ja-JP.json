@@ -760,6 +760,9 @@
     "variableType": "タイプ",
     "version": "バージョン",
     "versionHistory": "バージョン履歴",
+    "viewMode": "ビューモード",
+    "viewModeList": "リストビュー",
+    "viewModeWaterfall": "滝の眺め",
     "warning": "警告"
   },
   "quickOptimization": {

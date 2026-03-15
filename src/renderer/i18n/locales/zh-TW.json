@@ -760,6 +760,9 @@
     "variableType": "類型",
     "version": "版本",
     "versionHistory": "版本歷史",
+    "viewMode": "視圖模式",
+    "viewModeList": "清單視圖",
+    "viewModeWaterfall": "瀑布流視圖",
     "warning": "警告"
   },
   "quickOptimization": {

@@ -60,8 +60,8 @@
         </ion-button>
       </div>
 
-      <!-- 提示词列表 -->
-      <ion-list v-else>
+      <!-- 提示词列表（列表视图） -->
+      <ion-list v-else-if="viewMode === 'list'">
         <ion-item-sliding v-for="prompt in prompts" :key="prompt.id">
           <ion-item button @click="handleView(prompt)">
             <ion-label>
@@ -100,6 +100,14 @@
         </ion-item-sliding>
       </ion-list>
 
+      <!-- 瀑布流视图 -->
+      <mobile-waterfall-view
+        v-else
+        :prompts="prompts"
+        :categories="categories"
+        @view="handleView"
+      ></mobile-waterfall-view>
+
       <!-- 加载更多 -->
       <ion-infinite-scroll
         v-if="hasNextPage"
@@ -131,6 +139,21 @@
       </ion-header>
       <ion-content>
         <ion-list>
+          <!-- 视图模式选择 -->
+          <ion-list-header>
+            <ion-label>{{ t('promptManagement.viewMode') }}</ion-label>
+          </ion-list-header>
+          <ion-item button @click="viewMode = 'list'">
+            <ion-icon :icon="listOutline" slot="start"></ion-icon>
+            <ion-label>{{ t('promptManagement.viewModeList') }}</ion-label>
+            <ion-icon v-if="viewMode === 'list'" :icon="checkmark" slot="end" color="primary"></ion-icon>
+          </ion-item>
+          <ion-item button @click="viewMode = 'waterfall'">
+            <ion-icon :icon="gridOutline" slot="start"></ion-icon>
+            <ion-label>{{ t('promptManagement.viewModeWaterfall') }}</ion-label>
+            <ion-icon v-if="viewMode === 'waterfall'" :icon="checkmark" slot="end" color="primary"></ion-icon>
+          </ion-item>
+
           <!-- 分类筛选 -->
           <ion-list-header>
             <ion-label>{{ t('promptManagement.categoryFilterTitle') }}</ion-label>
@@ -229,13 +252,16 @@ import {
   checkmark,
   createOutline,
   trashOutline,
-  sparklesOutline
+  sparklesOutline,
+  listOutline,
+  gridOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import type { Prompt, Category } from '@shared/types'
 import { useRouter, useRoute } from 'vue-router'
 import { databaseService } from '~/lib/db'
+import MobileWaterfallView from '~/components/mobile/MobileWaterfallView.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -256,6 +282,13 @@ const pageSize = 20
 const hasNextPage = ref(false)
 const totalCount = ref(0)
 const hasAIConfig = ref(false)
+const viewMode = ref<'list' | 'waterfall'>(
+  (localStorage.getItem('mobilePromptViewMode') as 'list' | 'waterfall') || 'list'
+)
+
+watch(viewMode, val => {
+  localStorage.setItem('mobilePromptViewMode', val)
+})
 
 // 排序选项
 const sortOptions = computed(() => [

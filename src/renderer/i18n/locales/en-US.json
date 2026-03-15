@@ -760,6 +760,9 @@
     "variableType": "Type",
     "version": "Version",
     "versionHistory": "Version History",
+    "viewMode": "view mode",
+    "viewModeList": "list view",
+    "viewModeWaterfall": "Waterfall view",
     "warning": "warn"
   },
   "quickOptimization": {
