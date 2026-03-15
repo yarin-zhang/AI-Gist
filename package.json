@@ -13,6 +13,7 @@
         "build:ci:win": "node scripts/build.js && yarn electron-builder --win",
         "build:ci:linux": "node scripts/build.js && yarn electron-builder --linux",
         "build:mobile": "node scripts/build-mobile.js",
+        "cap:assets": "npx @capacitor/assets generate",
         "cap:sync": "cap sync",
         "cap:ios": "cap open ios",
         "cap:android": "cap open android",

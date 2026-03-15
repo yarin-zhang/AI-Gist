@@ -39,7 +39,26 @@ yarn dev
 
 然后将窗口宽度调整到 375px 左右即可预览移动端布局。
 
-### 2. 构建移动端应用
+### 2. 更新应用图标（打包前必做）
+
+每次更换图标后，需要重新生成各平台所需的图标尺寸：
+
+```bash
+yarn cap:assets
+```
+
+图标源文件放在 `resources/` 目录下：
+
+| 文件 | 尺寸 | 说明 |
+|------|------|------|
+| `resources/icon.png` | 1024×1024 | 主图标（必须） |
+| `resources/icon-foreground.png` | 1024×1024 | Android 自适应图标前景层（可选） |
+| `resources/icon-background.png` | 1024×1024 | Android 自适应图标背景层（可选） |
+| `resources/splash.png` | 2732×2732 | 启动屏（可选） |
+
+> 注意：此命令会直接覆盖 `ios/` 和 `android/` 目录中的图标文件，运行后需要重新 `cap sync`。
+
+### 3. 构建移动端应用
 
 ```bash
 # 构建渲染层并同步到 Capacitor
