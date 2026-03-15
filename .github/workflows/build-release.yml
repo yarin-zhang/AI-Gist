@@ -41,7 +41,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # 检查tag是否已存在
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists, skipping tag creation"
@@ -230,10 +230,11 @@ jobs:
           cp "$APK" "AI-Gist-${VERSION}-android.apk"
 
       - name: Upload APK to Release
-        uses: softprops/action-gh-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          files: AI-Gist-*.apk
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          gh release upload "$VERSION" AI-Gist-*.apk \
+            --repo ${{ github.repository }} \
+            --clobber
 

@@ -59,32 +59,34 @@ jobs:
         if: steps.signing.outputs.available == 'true'
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
-      - name: Build Signed Release APK
+      - name: Build Signed Release APK and AAB
         if: steps.signing.outputs.available == 'true'
         working-directory: android
         run: |
-          ./gradlew assembleRelease \
+          ./gradlew assembleRelease bundleRelease \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
             -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEY_STORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}"
 
-      - name: Build Debug APK (No Signing Config)
+      - name: Build Debug APK and AAB (No Signing Config)
         if: steps.signing.outputs.available != 'true'
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug bundleDebug
 
       - name: Get version
         id: get_version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "tag=v${VERSION}-debug" >> $GITHUB_OUTPUT
-          echo "apk_name=AI-Gist-v${VERSION}-debug.apk" >> $GITHUB_OUTPUT
 
-      - name: Collect APK
+      - name: Collect artifacts
         run: |
+          TAG="${{ steps.get_version.outputs.tag }}"
           APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
-          cp "$APK" "${{ steps.get_version.outputs.apk_name }}"
+          AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
+          cp "$APK" "AI-Gist-${TAG}.apk"
+          cp "$AAB" "AI-Gist-${TAG}.aab"
 
       - name: Force update debug tag
         run: |
@@ -95,14 +97,16 @@ jobs:
           git tag -f "${TAG}" -m "Debug build ${TAG}"
           git push origin "${TAG}"
 
-      - name: Upload APK to debug release
+      - name: Upload to debug release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
           name: "AI Gist ${{ steps.get_version.outputs.tag }}"
-          draft: false
-          prerelease: true
+          draft: true
+          prerelease: false
           generate_release_notes: false
-          files: ${{ steps.get_version.outputs.apk_name }}
+          files: |
+            AI-Gist-${{ steps.get_version.outputs.tag }}.apk
+            AI-Gist-${{ steps.get_version.outputs.tag }}.aab
