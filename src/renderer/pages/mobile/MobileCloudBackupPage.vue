@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-back-button :text="t('common.back')" default-href="/tabs/settings"></ion-back-button>
         </ion-buttons>
-        <ion-title>{{ t('cloudBackup.title') }}</ion-title>
+        <ion-title>{{ t('dataSync.title') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 

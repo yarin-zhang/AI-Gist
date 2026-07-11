@@ -1,0 +1,92 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const readWorkspaceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const expectInOrder = (source: string, snippets: string[]) => {
+  let cursor = -1;
+  for (const snippet of snippets) {
+    const next = source.indexOf(snippet, cursor + 1);
+    expect(next, `Expected ${JSON.stringify(snippet)} after offset ${cursor}`).toBeGreaterThan(cursor);
+    cursor = next;
+  }
+};
+
+describe('settings sync and backup information architecture', () => {
+  it('makes data sync the first and default settings section', () => {
+    const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
+    expect(source).toContain("props.targetSection || 'cloud-backup'");
+    expectInOrder(source, [
+      "label: t('settings.sections.cloudBackup')",
+      "label: t('settings.sections.dataManagement')",
+    ]);
+    expect(source).toContain('<DataSyncSettings');
+    expect(source).toContain('@navigate-section="handleMenuSelect"');
+  });
+
+  it('keeps the sync page focused on status, storage, and collapsed advanced sync settings', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    expect(source).toContain("t('dataSync.storageConfiguration')");
+    expect(source).toContain('<NCollapse>');
+    expect(source).toContain("t('dataSync.advancedSettings')");
+    expect(source).not.toContain('automaticBackupService');
+    expect(source).not.toContain('getCloudBackupList');
+    expect(source).not.toContain('createCloudBackup');
+    expect(source).not.toContain('restoreCloudBackup');
+    expect(source).not.toContain('deleteCloudBackup');
+  });
+
+  it('keeps storage card and form actions in the required order', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    const cardActionStart = source.indexOf('<template #action>');
+    const cardActions = source.slice(cardActionStart, source.indexOf('</NCard>', cardActionStart));
+    expectInOrder(cardActions, [
+      '@click="editConfig(config)"',
+      '@click="testSavedConnection(config)"',
+      '@click="syncCloudData(config.id)"',
+      '@positive-click="deleteConfig(config.id)"',
+    ]);
+
+    const modalFooter = source.slice(source.indexOf('<NFlex justify="space-between" align="center">', source.indexOf('<NModal')));
+    expectInOrder(modalFooter, [
+      '@click="showConfigModal = false"',
+      '@click="testDraftConnection"',
+      '@click="saveConfig"',
+    ]);
+  });
+
+  it('routes saved and draft connection tests through the same normalized test function', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    expect(source).toContain('await testConnection(toStorageConfig())');
+    expect(source).toContain('await testConnection(config)');
+    expect(source).toContain('normalizeCloudStorageConfigForConnectionTest(config)');
+  });
+
+  it('shows local backup first and creates a lazy cloud tab for every storage configuration', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataManagementSettings.vue');
+    expectInOrder(source, [
+      '<NTabPane name="local"',
+      '<NTabPane v-for="config in storageConfigs"',
+    ]);
+    expect(source).toContain('display-directive="show:lazy"');
+    expect(source).toContain('<CloudBackupLocationPane :config="config" />');
+    expect(source).toContain("t('dataBackup.automaticBackupSettings')");
+  });
+
+  it('uses the new visible section names in every supported locale', () => {
+    const expected = {
+      'zh-CN': ['数据同步', '数据备份'],
+      'zh-TW': ['資料同步', '資料備份'],
+      'en-US': ['Data Sync', 'Data Backup'],
+      'ja-JP': ['データ同期', 'データバックアップ'],
+    } as const;
+
+    for (const [locale, [syncName, backupName]] of Object.entries(expected)) {
+      const messages = JSON.parse(readWorkspaceFile(`src/renderer/i18n/locales/${locale}.json`));
+      expect(messages.settings.sections.cloudBackup).toBe(syncName);
+      expect(messages.settings.sections.dataManagement).toBe(backupName);
+      expect(messages.dataSync.title).toBe(syncName);
+      expect(messages.dataBackup.title).toBe(backupName);
+    }
+  });
+});

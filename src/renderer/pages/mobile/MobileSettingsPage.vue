@@ -42,19 +42,19 @@
           </ion-select>
         </ion-item>
 
-        <!-- 云端备份 -->
+        <!-- 数据同步 -->
         <ion-list-header>
-          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
+          <ion-label>{{ t('dataSync.title') }}</ion-label>
         </ion-list-header>
 
         <ion-item button @click="navigateToCloudBackup">
           <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('cloudBackup.title') }}</ion-label>
+          <ion-label>{{ t('dataSync.title') }}</ion-label>
         </ion-item>
 
-        <!-- 数据管理 -->
+        <!-- 数据备份 -->
         <ion-list-header>
-          <ion-label>{{ t('dataManagement.backupManagement') }}</ion-label>
+          <ion-label>{{ t('dataBackup.title') }}</ion-label>
         </ion-list-header>
 
         <ion-item button @click="handleExport">

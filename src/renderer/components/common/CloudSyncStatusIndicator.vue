@@ -87,7 +87,7 @@ const lastSyncText = computed(() => {
 });
 
 const ariaLabel = computed(() => {
-  const action = hasErrorDetail.value ? '点击查看错误详情' : '点击打开云备份设置';
+    const action = hasErrorDetail.value ? '点击查看错误详情' : '点击打开数据同步设置';
   return `${primaryText.value}，${detailText.value}。${action}`;
 });
 

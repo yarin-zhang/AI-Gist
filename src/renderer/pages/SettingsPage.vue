@@ -73,12 +73,12 @@
                         </NCard>
 
 
-                        <!-- 数据管理设置 -->
-                        <DataManagementSettings 
-                            v-if="activeSettingKey === 'data-management'" />
-                            
-                        <!-- 云端备份设置 -->
-                        <CloudBackupSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
+                        <!-- 数据同步设置 -->
+                        <DataSyncSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
+
+                        <!-- 数据备份设置 -->
+                        <DataManagementSettings v-if="activeSettingKey === 'data-management'"
+                            @navigate-section="handleMenuSelect" />
                             
                         <!-- 外观设置 -->
                         <AppearanceSettings v-if="activeSettingKey === 'appearance'"
@@ -160,7 +160,7 @@ import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
 import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
-import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
+import DataSyncSettings from "@/components/settings/DataSyncSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
@@ -190,7 +190,7 @@ const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
 // 当前激活的设置项
-const activeSettingKey = ref(props.targetSection || 'data-management');
+const activeSettingKey = ref(props.targetSection || 'cloud-backup');
 
 
 
@@ -252,16 +252,16 @@ const settings = reactive({
 const menuOptions = computed(() => {
     const baseOptions = [
         {
-            label: t('settings.sections.dataManagement'),
-            key: "data-management",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
-            visible: true,
-        },
-        {
             label: t('settings.sections.cloudBackup'),
             key: "cloud-backup",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Cloud) }),
             visible: capabilities.cloudBackup,
+        },
+        {
+            label: t('settings.sections.dataManagement'),
+            key: "data-management",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
+            visible: true,
         },
         {
             label: t('settings.sections.appearance'),
@@ -354,11 +354,7 @@ const currentSectionInfo = computed(() => {
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
 const currentSectionIcon = computed(() => currentSectionInfo.value.icon);
-const currentSectionDescription = computed(
-    () => activeSettingKey.value === 'cloud-backup' && !capabilities.icloud
-        ? t('cloudBackup.webdavOnlySectionDescription')
-        : currentSectionInfo.value.description
-);
+const currentSectionDescription = computed(() => currentSectionInfo.value.description);
 
 // 处理菜单选择
 const handleMenuSelect = (key: string) => {

@@ -1,6 +1,8 @@
 <template>
     <NCard>
-        <NFlex vertical :size="20">
+        <NTabs v-model:value="activeBackupLocation" type="line" animated>
+            <NTabPane name="local" :tab="t('dataBackup.local')">
+                <NFlex vertical :size="20" style="padding-top: 4px;">
 
             <!-- 数据备份恢复 -->
             <div>
@@ -99,7 +101,7 @@
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination v-model:page="currentPage" :page-size="pageSize"
+                                <NPagination v-model:page="currentPage" v-model:page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
                                     :page-sizes="[6, 12, 18]" />
                             </div>
@@ -289,7 +291,65 @@
             <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
                 {{ success }}
             </NAlert>
-        </NFlex>
+                </NFlex>
+            </NTabPane>
+
+            <NTabPane v-for="config in storageConfigs" :key="config.id" :name="config.id"
+                :tab="config.name" :disabled="!config.enabled" display-directive="show:lazy">
+                <CloudBackupLocationPane :config="config" />
+            </NTabPane>
+        </NTabs>
+
+        <NAlert v-if="storageConfigs.length === 0" type="info" style="margin-top: 20px;">
+            {{ t('dataBackup.noCloudStorageDescription') }}
+            <template #action>
+                <NButton size="small" secondary @click="emit('navigate-section', 'cloud-backup')">
+                    {{ t('dataBackup.configureCloudStorage') }}
+                </NButton>
+            </template>
+        </NAlert>
+
+        <NCollapse v-else style="margin-top: 20px;">
+            <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
+                <NFlex vertical :size="16" style="padding-top: 4px;">
+                    <NText depth="3" style="font-size: 12px;">
+                        {{ t('dataBackup.automaticBackupDescription') }}
+                    </NText>
+                    <NFlex align="center" justify="space-between">
+                        <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
+                        <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
+                    </NFlex>
+                    <NFlex align="center" :size="12" wrap>
+                        <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080"
+                            :step="60" style="width: 180px;">
+                            <template #suffix>{{ t('dataBackup.minutes') }}</template>
+                        </NInputNumber>
+                        <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
+                            style="width: 160px;">
+                            <template #suffix>{{ t('dataBackup.copies') }}</template>
+                        </NInputNumber>
+                        <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
+                            {{ t('dataBackup.saveAutomaticBackupSettings') }}
+                        </NButton>
+                        <NButton secondary @click="runAutoBackupNow"
+                            :loading="autoBackupStatus.status === 'backing-up'">
+                            {{ t('dataBackup.createNow') }}
+                        </NButton>
+                    </NFlex>
+                    <NText depth="3" style="font-size: 12px;">
+                        {{ t('dataBackup.lastAutomaticBackup', {
+                            time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
+                        }) }}
+                        <template v-if="autoBackupStatus.nextBackupAt">
+                            · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
+                        </template>
+                        <template v-if="autoBackupStatus.error">
+                            · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+                        </template>
+                    </NText>
+                </NFlex>
+            </NCollapseItem>
+        </NCollapse>
     </NCard>
 </template>
 
@@ -309,6 +369,13 @@ import {
     NRadio,
     NGrid,
     NGridItem,
+    NTabs,
+    NTabPane,
+    NCollapse,
+    NCollapseItem,
+    NSwitch,
+    NInputNumber,
+    useMessage,
 } from "naive-ui";
 import {
     FileExport,
@@ -324,13 +391,33 @@ import {
     Archive,
     Folder,
 } from "@vicons/tabler";
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useDataManagement } from '@renderer/composables/useDataManagement';
 import { PlatformDetector } from '@shared/platform';
+import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
+import {
+    automaticBackupService,
+    DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
+    DEFAULT_AUTO_BACKUP_RETENTION,
+} from '@/lib/services/automatic-backup.service';
+import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
+import type { CloudStorageConfig } from '@shared/types/cloud-backup';
+import CloudBackupLocationPane from './CloudBackupLocationPane.vue';
 
 const { t } = useI18n();
+const message = useMessage();
 const capabilities = PlatformDetector.getCapabilities();
+const emit = defineEmits<{ 'navigate-section': [section: string] }>();
+
+const activeBackupLocation = ref('local');
+const storageConfigs = ref<CloudStorageConfig[]>([]);
+const autoBackupEnabled = ref(true);
+const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
+const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION);
+const autoBackupLoading = ref(false);
+const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus());
+let unsubscribeBackupStatus: (() => void) | null = null;
 
 // 使用数据管理 composable
 const {
@@ -457,16 +544,72 @@ const handleClearDatabase = async () => {
     await clearDatabase();
 };
 
+const loadStorageConfigs = async () => {
+    try {
+        storageConfigs.value = await CloudBackupAPI.getStorageConfigs();
+        if (activeBackupLocation.value !== 'local' &&
+            !storageConfigs.value.some(config => config.id === activeBackupLocation.value && config.enabled)) {
+            activeBackupLocation.value = 'local';
+        }
+    } catch (error) {
+        console.error('加载云端存储配置失败:', error);
+        message.error(t('dataBackup.loadStorageConfigsFailed'));
+    }
+};
+
+const loadAutomaticBackupSettings = async () => {
+    [autoBackupEnabled.value, autoBackupIntervalMinutes.value, autoBackupRetention.value] = await Promise.all([
+        automaticBackupService.getEnabled(),
+        automaticBackupService.getIntervalMinutes(),
+        automaticBackupService.getRetention(),
+    ]);
+};
+
+const saveAutoBackupEnabled = async (enabled: boolean) => {
+    autoBackupEnabled.value = await automaticBackupService.setEnabled(enabled);
+    message.success(enabled ? t('dataBackup.automaticBackupEnabled') : t('dataBackup.automaticBackupDisabled'));
+};
+
+const saveAutoBackupSettings = async () => {
+    autoBackupLoading.value = true;
+    try {
+        autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
+        autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value);
+        message.success(t('dataBackup.automaticBackupSettingsSaved'));
+    } catch (error) {
+        console.error('保存自动备份设置失败:', error);
+        message.error(t('dataBackup.automaticBackupSettingsSaveFailed'));
+    } finally {
+        autoBackupLoading.value = false;
+    }
+};
+
+const runAutoBackupNow = async () => {
+    await automaticBackupService.runNow('manual');
+    const status = automaticBackupService.getStatus();
+    if (status.error) message.error(status.error);
+    else message.success(t('dataBackup.automaticBackupCompleted'));
+};
+
+const formatBackupDate = (value: string) => new Date(value).toLocaleString();
+
 // 监听备份列表变化
 watch(() => backupList.value.length, (newLength, oldLength) => {
     console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
 });
+watch(pageSize, () => { currentPage.value = 1; });
 
 // 初始化
 onMounted(async () => {
+    unsubscribeBackupStatus = automaticBackupService.onStatusChange(status => {
+        autoBackupStatus.value = status;
+    });
     console.log('组件挂载，开始加载数据...');
-    // 加载备份列表
-    await getBackupList();
+    await Promise.all([
+        getBackupList(),
+        loadStorageConfigs(),
+        loadAutomaticBackupSettings(),
+    ]);
     console.log('备份列表加载完成，当前长度:', backupList.value.length);
     
     // 加载数据统计
@@ -475,6 +618,10 @@ onMounted(async () => {
         dataStats.value = stats;
     }
     console.log('数据统计加载完成');
+});
+
+onUnmounted(() => {
+    unsubscribeBackupStatus?.();
 });
 </script>
 
