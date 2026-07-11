@@ -1,7 +1,7 @@
 <template>
     <div class="network-proxy-settings">
         <NCard size="small">
-            <NFlex vertical :size="20">
+            <NFlex vertical :size="16">
                 <section class="proxy-section">
                     <NText strong>{{ t('networkProxy.proxyMode') }}</NText>
                     <NRadioGroup v-model:value="proxyConfig.mode" @update:value="handleModeChange">

@@ -2,7 +2,7 @@
     <NCard size="small">
         <NTabs v-model:value="activeBackupLocation" type="line" animated>
             <NTabPane name="local" :tab="t('dataBackup.local')">
-                <NFlex vertical :size="20" style="padding-top: 4px;">
+                <NFlex vertical :size="16" style="padding-top: 4px;">
 
             <!-- 数据备份恢复 -->
             <div>

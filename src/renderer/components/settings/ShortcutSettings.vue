@@ -20,7 +20,7 @@
             </NAlert>
 
             <NCard size="small">
-                <NFlex vertical :size="20">
+                <NFlex vertical :size="16">
                     <section class="shortcut-block">
                         <NFlex justify="space-between" align="flex-start" :size="12" wrap>
                             <div>

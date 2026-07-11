@@ -27,6 +27,11 @@ describe('settings sync and backup information architecture', () => {
   it('uses concise grouped navigation and a compact narrow-window selector', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
     expectInOrder(source, [
+      'class="settings-navigation"',
+      "{{ t('settings.title') }}",
+      '<NMenu',
+    ]);
+    expectInOrder(source, [
       "label: t('settings.groups.data')",
       "label: t('settings.groups.preferences')",
       "label: t('settings.groups.system')",
@@ -34,8 +39,12 @@ describe('settings sync and backup information architecture', () => {
     ]);
     expect(source).toContain('class="settings-compact-navigation"');
     expect(source).toContain(':options="compactMenuOptions"');
+    expect(source).toContain(':root-indent="8"');
+    expect(source).toContain(':indent="16"');
     expect(source).not.toContain("{{ t('settings.subtitle') }}");
     expect(source).not.toContain("{{ t('settings.autoSave') }}");
+    expect(source).not.toContain("t('settings.resetToDefault')");
+    expect(source).not.toContain('const resetSettings');
     expect(source).not.toContain('<NAlert :show-icon="false">');
   });
 

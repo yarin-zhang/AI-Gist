@@ -1,10 +1,16 @@
 <template>
     <NCard size="small">
-        <NFlex vertical :size="24">
+        <NFlex vertical :size="16">
             <!-- 应用信息 -->
             <NFlex vertical :size="16" align="center">
                 <div style="text-align: center;">
-                    <NAvatar size="large" :src="appIcon" style="width: 64px; height: 64px; margin-bottom: 12px;" />
+                    <NAvatar
+                        size="large"
+                        :src="appIcon"
+                        color="transparent"
+                        :bordered="false"
+                        style="width: 64px; height: 64px; margin-bottom: 12px;"
+                    />
                     <div>
                         <NText strong style="font-size: 20px; display: block; margin-bottom: 6px;">
                             {{ t('about.appName') }}

@@ -1,40 +1,19 @@
 <template>
     <div class="settings-page">
-        <header class="settings-page-header">
-            <NText strong class="settings-page-title">{{ t('settings.title') }}</NText>
-            <NFlex align="center" :size="12">
-                <NFlex v-if="saving" align="center" :size="8">
-                    <NSpin size="small" />
-                    <NText depth="3">{{ t('settings.saving') }}</NText>
-                </NFlex>
-                <NPopconfirm
-                    :negative-text="t('common.cancel')"
-                    :positive-text="t('common.confirm')"
-                    @positive-click="resetSettings"
-                >
-                    <template #trigger>
-                        <NButton quaternary size="small" :loading="loading.reset">
-                            <template #icon>
-                                <NIcon><Refresh /></NIcon>
-                            </template>
-                            {{ t('settings.resetToDefault') }}
-                        </NButton>
-                    </template>
-                    {{ t('settings.resetConfirm') }}
-                </NPopconfirm>
-            </NFlex>
-        </header>
-
         <div class="settings-layout">
             <aside class="settings-navigation" :aria-label="t('settings.settingsMenu')">
+                <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
                 <NMenu
                     v-model:value="activeSettingKey"
                     :options="menuOptions"
+                    :root-indent="8"
+                    :indent="16"
                     @update:value="handleMenuSelect"
                 />
             </aside>
 
             <div class="settings-compact-navigation">
+                <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
                 <NSelect
                     v-model:value="activeSettingKey"
                     :options="compactMenuOptions"
@@ -45,10 +24,16 @@
 
             <main class="settings-content">
                 <header class="settings-section-header">
-                    <NText strong class="settings-section-title">{{ currentSectionTitle }}</NText>
-                    <NText v-if="currentSectionDescription" depth="3" class="settings-section-description">
-                        {{ currentSectionDescription }}
-                    </NText>
+                    <div>
+                        <NText strong class="settings-section-title">{{ currentSectionTitle }}</NText>
+                        <NText v-if="currentSectionDescription" depth="3" class="settings-section-description">
+                            {{ currentSectionDescription }}
+                        </NText>
+                    </div>
+                    <NFlex v-if="saving" align="center" :size="8">
+                        <NSpin size="small" />
+                        <NText depth="3">{{ t('settings.saving') }}</NText>
+                    </NFlex>
                 </header>
 
                 <NFlex vertical :size="20">
@@ -112,16 +97,13 @@ import {
     NCard,
     NFlex,
     NIcon,
-    NButton,
     NText,
     NMenu,
-    NPopconfirm,
     NSelect,
     NSpin,
     useMessage,
 } from "naive-ui";
 import {
-    Refresh,
     Power,
     Rocket,
     Sun,
@@ -172,19 +154,7 @@ const activeSettingKey = ref(props.targetSection || 'cloud-backup');
 
 
 
-// 状态管理
 const saving = ref(false);
-const loading = reactive({
-    reset: false,
-    export: false,
-    import: false,
-    repair: false,
-    healthCheck: false,
-    backup: false,
-    clearDatabase: false,
-    restore: false,
-    refreshBackupList: false
-});
 
 // 设置数据
 const settings = reactive({
@@ -509,27 +479,6 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
     }
 };
 
-// 重置设置
-const resetSettings = async () => {
-    loading.reset = true;
-    try {
-        const defaultPrefs = await preferencesClient.reset();
-        Object.assign(settings, defaultPrefs);
-
-        // 重置主题
-        await setThemeSource(settings.themeSource);
-
-        message.success(t('settingsMessages.settingsReset'));
-        console.log(t('settingsMessages.settingsResetLog'), defaultPrefs);
-    } catch (error) {
-        console.error(t('settingsMessages.resetSettingsFailed'), error);
-        message.error(t('settingsMessages.resetSettingsFailed'));
-    }
-    loading.reset = false;
-};
-
-
-
 // 组件挂载时加载设置
 onMounted(async () => {
     initLocale(); // 初始化语言设置
@@ -555,30 +504,23 @@ watch(menuOptions, () => {
     padding: 24px;
 }
 
-.settings-page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.settings-page-title {
+.settings-navigation-title {
+    display: block;
     font-size: 28px;
     line-height: 1.2;
+    margin-bottom: 24px;
 }
 
 .settings-layout {
     display: grid;
-    grid-template-columns: 184px minmax(0, 1fr);
-    gap: 24px;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 20px;
     align-items: start;
 }
 
 .settings-navigation {
     position: sticky;
-    top: 0;
+    top: 24px;
 }
 
 .settings-compact-navigation {
@@ -591,6 +533,10 @@ watch(menuOptions, () => {
 }
 
 .settings-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 16px;
 }
 
@@ -610,20 +556,11 @@ watch(menuOptions, () => {
     margin-bottom: 0;
 }
 
+.settings-content :deep(.n-divider:not(.n-divider--vertical)) {
+    margin: 0;
+}
+
 @media (max-width: 860px) {
-    .settings-page {
-        padding: 16px;
-    }
-
-    .settings-page-header {
-        align-items: flex-start;
-        margin-bottom: 16px;
-    }
-
-    .settings-page-title {
-        font-size: 24px;
-    }
-
     .settings-layout {
         display: block;
     }
@@ -634,7 +571,11 @@ watch(menuOptions, () => {
 
     .settings-compact-navigation {
         display: block;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
+    }
+
+    .settings-compact-navigation .n-select {
+        max-width: 320px;
     }
 
     .settings-section-title {
