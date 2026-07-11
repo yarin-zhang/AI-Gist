@@ -65,6 +65,7 @@ export interface CloudSyncV2CoordinatorDeps {
   database: CloudSyncV2MetadataStore;
   storageFactory: (storageId: string) => CloudSyncV2ObjectStorageAdapter | null;
   now?: () => Date;
+  allowExperimentalShadow?: boolean;
 }
 
 export function evaluateCloudSyncV2DeviceFreshness(input: {
@@ -99,21 +100,29 @@ export class CloudSyncV2Coordinator {
   private readonly database: CloudSyncV2MetadataStore;
   private readonly storageFactory: CloudSyncV2CoordinatorDeps['storageFactory'];
   private readonly now: () => Date;
+  private readonly allowExperimentalShadow: boolean;
 
   constructor(deps: CloudSyncV2CoordinatorDeps) {
     this.database = deps.database;
     this.storageFactory = deps.storageFactory;
     this.now = deps.now || (() => new Date());
+    this.allowExperimentalShadow = deps.allowExperimentalShadow !== false;
   }
 
   async getRolloutState(storageId: string): Promise<CloudSyncV2RolloutState> {
     const stored = await this.database.getLocalSyncMetadata?.<CloudSyncV2RolloutState>(
       `${ROLLOUT_METADATA_PREFIX}${storageId}`
     );
-    return normalizeRolloutState(stored, this.now().toISOString());
+    const state = normalizeRolloutState(stored, this.now().toISOString());
+    return !this.allowExperimentalShadow && state.mode === 'shadow'
+      ? { mode: 'off', updatedAt: state.updatedAt }
+      : state;
   }
 
   async setRolloutMode(storageId: string, mode: CloudSyncV2RolloutMode): Promise<CloudSyncV2RolloutState> {
+    if (mode === 'shadow' && !this.allowExperimentalShadow) {
+      throw new Error('实验性后台完整性验证未在当前构建中启用');
+    }
     if (mode === 'read-write') {
       throw new Error('协议 v2 read-write 尚未开放；请先完成安全重建和全链读取验证');
     }
@@ -139,7 +148,7 @@ export class CloudSyncV2Coordinator {
     if (rollout.mode === 'off') return { status: 'skipped' };
     const storage = this.storageFactory(input.storageId);
     if (!storage) {
-      return this.recordFailure(input.storageId, rollout, 'transport_unavailable', 'v2 存储传输层不可用');
+      return this.recordFailure(input.storageId, rollout, 'transport_unavailable', '后台完整性验证暂不可用');
     }
 
     if (rollout.lastSourceRevision === input.revision && rollout.verifiedHead) {
@@ -159,13 +168,13 @@ export class CloudSyncV2Coordinator {
         return {
           status: 'already-current',
           headId: rollout.verifiedHead,
-          warning: 'v2 主 manifest 已提交，但备用 manifest 修复仍未完成'
+          warning: '后台完整性验证的备用索引修复仍未完成'
         };
       } catch {
         return {
           status: 'already-current',
           headId: rollout.verifiedHead,
-          warning: 'v2 主 manifest 已提交，但备用 manifest 修复仍未完成'
+          warning: '后台完整性验证的备用索引修复仍未完成'
         };
       }
     }
@@ -178,7 +187,7 @@ export class CloudSyncV2Coordinator {
             input.storageId,
             rollout,
             'unsupported_writer_protocol',
-            `v2 云端要求 writer protocol ${current.manifest.minWriterProtocol}，当前版本已拒绝写入`
+            '后台完整性验证所需的数据格式高于当前版本，已安全跳过'
           );
         }
         const baseCommitAvailable = rollout.baseCommitId
@@ -199,7 +208,7 @@ export class CloudSyncV2Coordinator {
           });
           return {
             status: 'rebase-required',
-            warning: `v2 已拒绝旧基线发布：${freshness.reason || '需要安全重建'}`
+            warning: `后台完整性验证已安全跳过：${freshness.reason || '需要重新建立同步基线'}`
           };
         }
       }
@@ -230,13 +239,13 @@ export class CloudSyncV2Coordinator {
           input.storageId,
           rollout,
           'manifest_cas_conflict',
-          'v2 manifest 被其他设备并发更新，本次影子发布已安全取消'
+          '后台完整性验证遇到并发更新，本次验证已安全取消'
         );
       }
 
       const verified = await readManifest(storage);
       if (!verified?.manifest.head || verified.manifest.head.id !== artifacts.commit.commitId) {
-        return this.recordFailure(input.storageId, rollout, 'readback_mismatch', 'v2 发布后读回校验失败');
+        return this.recordFailure(input.storageId, rollout, 'readback_mismatch', '后台完整性验证读回校验失败');
       }
 
       await this.saveRolloutState(input.storageId, {
@@ -266,7 +275,7 @@ export class CloudSyncV2Coordinator {
         status: 'published',
         headId: artifacts.commit.commitId,
         warning: publishResult.backupWarning
-          ? 'v2 主 manifest 已提交，但备用 manifest 尚未修复；下次影子同步会重试'
+          ? '后台完整性验证的备用索引尚未修复，下次同步会自动重试'
           : undefined
       };
     } catch (error) {
@@ -277,7 +286,7 @@ export class CloudSyncV2Coordinator {
         input.storageId,
         rollout,
         code,
-        `v2 影子发布失败（${code}）；v1 同步结果不受影响，可稍后重试`
+        `后台完整性验证失败（${code}）；正式同步结果不受影响`
       );
     }
   }

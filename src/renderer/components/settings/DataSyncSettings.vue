@@ -46,18 +46,10 @@
                                     <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
                                         {{ config.enabled ? t('dataSync.enabled') : t('dataSync.disabled') }}
                                     </NTag>
-                                    <NTag :type="v2RolloutModes[config.id] === 'shadow' ? 'info' : 'default'" size="small">
-                                        v2 {{ v2RolloutModes[config.id] === 'shadow' ? '影子验证' : '未启用' }}
-                                    </NTag>
                                 </NFlex>
                                 <NText depth="3" style="font-size: 12px; word-break: break-all;">
                                     {{ getConfigDescription(config) }}
                                 </NText>
-                                <NFlex align="center" justify="space-between">
-                                    <NText depth="3" style="font-size: 12px;">协议 v2 影子发布（不影响当前同步）</NText>
-                                    <NSwitch :value="v2RolloutModes[config.id] === 'shadow'"
-                                        @update:value="enabled => setV2ShadowMode(config.id, enabled)" />
-                                </NFlex>
                             </NFlex>
 
                             <template #action>
@@ -261,7 +253,6 @@ const storageConfigs = ref<CloudStorageConfig[]>([]);
 const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES);
 const autoSyncEnabled = ref(true);
-const v2RolloutModes = ref<Record<string, 'off' | 'shadow' | 'read-write'>>({});
 const showConfigModal = ref(false);
 const formRef = ref<FormInst | null>(null);
 const iCloudAvailability = ref<{ available: boolean; reason?: string } | null>(null);
@@ -517,27 +508,10 @@ const checkICloudAvailability = async () => {
 const loadStorageConfigs = async () => {
     try {
         storageConfigs.value = await CloudBackupAPI.getStorageConfigs();
-        const entries = await Promise.all(storageConfigs.value.map(async config => [
-            config.id,
-            await cloudSyncService.getCloudSyncV2RolloutState(config.id)
-                .then(state => state.mode)
-                .catch(() => 'off' as const),
-        ] as const));
-        v2RolloutModes.value = Object.fromEntries(entries);
     }
     catch (error) {
         console.error('加载存储配置失败:', error);
         message.error(t('dataSync.loadConfigsFailed'));
-    }
-};
-const setV2ShadowMode = async (storageId: string, enabled: boolean) => {
-    try {
-        const state = await cloudSyncService.setCloudSyncV2RolloutMode(storageId, enabled ? 'shadow' : 'off');
-        v2RolloutModes.value = { ...v2RolloutModes.value, [storageId]: state.mode };
-        message.success(enabled ? '已启用协议 v2 影子验证' : '已关闭协议 v2 影子验证');
-    } catch (error) {
-        console.error('更新协议 v2 影子验证状态失败:', error);
-        message.error('更新协议 v2 状态失败');
     }
 };
 const getConfigDescription = (config: CloudStorageConfig) => config.type === 'webdav'

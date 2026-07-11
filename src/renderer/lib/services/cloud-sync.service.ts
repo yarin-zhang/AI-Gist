@@ -76,6 +76,8 @@ const MAX_REMOTE_RECHECK_ATTEMPTS = 3;
 const READ_AFTER_WRITE_VERIFY_ATTEMPTS = 4;
 const READ_AFTER_WRITE_VERIFY_RETRY_MS = 120;
 const MAX_REMOTE_SNAPSHOT_SCAN = 20;
+const ENABLE_EXPERIMENTAL_CLOUD_SYNC_V2_SHADOW =
+  import.meta.env.VITE_CLOUD_SYNC_V2_SHADOW === 'true';
 const SYNC_STORE_NAMES: DataStoreName[] = [
   'categories',
   'prompts',
@@ -327,7 +329,8 @@ export class CloudSyncService {
     this.subscribeToDataChanges = deps.subscribeToDataChanges || (listener => onDataChange(SYNC_STORE_NAMES, listener));
     this.v2Coordinator = deps.v2Coordinator || new CloudSyncV2Coordinator({
       database: this.database,
-      storageFactory: storageId => this.getCloudSyncV2StorageAdapter(storageId)
+      storageFactory: storageId => this.getCloudSyncV2StorageAdapter(storageId),
+      allowExperimentalShadow: ENABLE_EXPERIMENTAL_CLOUD_SYNC_V2_SHADOW
     });
     this.restorePendingChangeState();
     this.status.conflictLogCount = this.getConflictLog().length;
@@ -379,7 +382,7 @@ export class CloudSyncService {
             result.v2MirrorStatus = 'failed';
             result.warnings = [
               ...(result.warnings || []),
-              'v2 影子发布状态记录失败；v1 同步已成功且不受影响'
+              '后台完整性验证状态记录失败；正式同步已成功且不受影响'
             ];
           }
         }

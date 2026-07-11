@@ -134,7 +134,7 @@ describe('CloudSyncService', () => {
     const v2Coordinator = {
       mirrorSuccessfulV1Sync: vi.fn().mockResolvedValue({
         status: 'failed',
-        warning: 'v2 影子发布失败（network）；v1 同步结果不受影响，可稍后重试'
+        warning: '后台完整性验证失败（network）；正式同步结果不受影响'
       }),
       getRolloutState: vi.fn(),
       setRolloutMode: vi.fn()
@@ -146,7 +146,7 @@ describe('CloudSyncService', () => {
     expect(result.success).toBe(true)
     expect(result.action).toBe('uploaded')
     expect(result.v2MirrorStatus).toBe('failed')
-    expect(result.warnings).toContain('v2 影子发布失败（network）；v1 同步结果不受影响，可稍后重试')
+    expect(result.warnings).toContain('后台完整性验证失败（network）；正式同步结果不受影响')
   })
 
   it('keeps a successful v1 result when the v2 coordinator itself throws', async () => {
@@ -160,7 +160,7 @@ describe('CloudSyncService', () => {
     const result = await service.syncNow('cfg-1', { reason: 'manual' })
 
     expect(result).toMatchObject({ success: true, action: 'uploaded', v2MirrorStatus: 'failed' })
-    expect(result.warnings).toContain('v2 影子发布状态记录失败；v1 同步已成功且不受影响')
+    expect(result.warnings).toContain('后台完整性验证状态记录失败；正式同步已成功且不受影响')
   })
 
   it('fails before upload when the local sync export is missing a required collection', async () => {

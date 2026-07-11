@@ -63,6 +63,29 @@ describe('CloudSyncV2Coordinator', () => {
     expect(exported).toBe(false);
   });
 
+  it('当前构建未启用内部实验开关时忽略历史 shadow 状态', async () => {
+    const metadata = metadataStore();
+    metadata.values.set('cloud-sync-v2-rollout:cfg', {
+      mode: 'shadow',
+      updatedAt: '2026-07-11T00:00:00.000Z'
+    });
+    let exported = false;
+    const coordinator = new CloudSyncV2Coordinator({
+      database: metadata,
+      storageFactory: () => memoryStorage(),
+      allowExperimentalShadow: false
+    });
+
+    const result = await coordinator.mirrorSuccessfulV1Sync({
+      storageId: 'cfg', revision: 'r1', deviceId: 'd1',
+      exportData: async () => { exported = true; return {}; }
+    });
+
+    expect(result.status).toBe('skipped');
+    expect(exported).toBe(false);
+    expect((await coordinator.getRolloutState('cfg')).mode).toBe('off');
+  });
+
   it('shadow 模式发布完整 v2 链并记录已验证 head，重复 revision 幂等跳过', async () => {
     const metadata = metadataStore();
     const storage = memoryStorage();
@@ -93,7 +116,7 @@ describe('CloudSyncV2Coordinator', () => {
 
     const first = await coordinator.mirrorSuccessfulV1Sync(input);
     expect(first).toMatchObject({ status: 'published' });
-    expect(first.warning).toContain('备用 manifest');
+    expect(first.warning).toContain('备用索引');
     expect((await coordinator.getRolloutState('cfg')).backupRepairRequired).toBe(true);
 
     failWrites.clear();
