@@ -361,13 +361,7 @@ class WindowManager {
     console.log(CONSTANTS.LOG_MESSAGES.QUIT_START);
     this.isQuitting = true;
     
-    // 确保窗口关闭
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.destroy();
-      this.mainWindow = null;
-    }
-    
-    // 触发应用退出
+    // 保留渲染进程直到 before-quit 完成待同步数据刷新。
     app.quit();
   }
 

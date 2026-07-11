@@ -1,6 +1,7 @@
 import type {
   CloudBackupInfo,
   CloudStorageConfig,
+  CloudBackupCreateOptions,
   WebDAVConfig
 } from '@shared/types/cloud-backup';
 import {
@@ -147,17 +148,22 @@ export class WebCloudBackupService {
     return this.request<CloudBackupInfo[]>('/api/cloud/webdav/list-backups', { config });
   }
 
-  async createCloudBackup(storageId: string, description?: string): Promise<{
+  async createCloudBackup(storageId: string, options?: string | CloudBackupCreateOptions): Promise<{
     success: boolean;
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
   }> {
     try {
+      const normalizedOptions = typeof options === 'string' ? { description: options } : options;
       const config = await this.getWebDAVConfig(storageId);
-      const exportResult = await databaseService.exportAllDataForBackup();
-      if (!exportResult.success || !exportResult.data) {
-        throw new Error(exportResult.error || exportResult.message || '导出本地数据失败');
+      let backupDataToWrite = normalizedOptions?.data;
+      if (!backupDataToWrite) {
+        const exportResult = await databaseService.exportAllDataForBackup();
+        if (!exportResult.success || !exportResult.data) {
+          throw new Error(exportResult.error || exportResult.message || '导出本地数据失败');
+        }
+        backupDataToWrite = exportResult.data;
       }
 
       const createdAt = new Date().toISOString();
@@ -167,9 +173,13 @@ export class WebCloudBackupService {
       const backupData = createBackupPayload({
         id,
         name,
-        description: description || 'Web 端云端备份',
+        description: normalizedOptions?.description || 'Web 端云端备份',
         createdAt,
-        data: exportResult.data
+        data: backupDataToWrite,
+        backupType: normalizedOptions?.backupType,
+        trigger: normalizedOptions?.trigger,
+        deviceId: normalizedOptions?.deviceId,
+        dataChecksum: normalizedOptions?.dataChecksum
       });
 
       const backupInfo = await this.request<CloudBackupInfo>('/api/cloud/webdav/write-backup', {

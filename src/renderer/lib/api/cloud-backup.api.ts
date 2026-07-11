@@ -2,7 +2,8 @@ import type {
   CloudStorageConfig, 
   WebDAVConfig, 
   ICloudConfig, 
-  CloudBackupInfo 
+  CloudBackupInfo,
+  CloudBackupCreateOptions
 } from '@shared/types/cloud-backup';
 import type {
   CloudSyncManifest,
@@ -18,6 +19,7 @@ import type {
 import { PlatformDetector } from '@shared/platform';
 import { mobileCloudBackupService } from '../services/mobile-cloud-backup.service';
 import { webCloudBackupService } from '../services/web-cloud-backup.service';
+import { DatabaseServiceManager } from '../services/database-manager.service';
 
 const getCloudBackupClient = () => {
   if (PlatformDetector.isElectron()) {
@@ -161,21 +163,40 @@ export class CloudBackupAPI {
   /**
    * 创建云端备份
    */
-  static async createCloudBackup(storageId: string, description?: string): Promise<{
+  static async createCloudBackup(
+    storageId: string,
+    options?: string | CloudBackupCreateOptions
+  ): Promise<{
     success: boolean;
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
   }> {
-    const client = getCloudBackupClient();
-    if (client) {
-      return await client.createCloudBackup(storageId, description);
+    const normalizedOptions = typeof options === 'string' ? { description: options } : options;
+    if (PlatformDetector.isWeb()) {
+      return await webCloudBackupService.createCloudBackup(storageId, normalizedOptions);
+    }
+
+    if (PlatformDetector.isMobile()) {
+      let backupData = normalizedOptions?.data;
+      if (!backupData) {
+        const exportResult = await DatabaseServiceManager.getInstance().exportAllDataForBackup();
+        if (!exportResult.success || !exportResult.data) {
+          return {
+            success: false,
+            message: '云端备份创建失败',
+            error: exportResult.error || exportResult.message || '导出本地数据失败'
+          };
+        }
+        backupData = exportResult.data;
+      }
+      return await mobileCloudBackupService.createCloudBackup(storageId, backupData, normalizedOptions);
     }
 
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.createBackup(storageId, description);
+    return await window.electronAPI.cloud.createBackup(storageId, normalizedOptions);
   }
 
   /**

@@ -14,7 +14,8 @@ import type {
 // 导入云端备份类型
 import type {
   CloudStorageConfig,
-  CloudBackupInfo
+  CloudBackupInfo,
+  CloudBackupCreateOptions
 } from './cloud-backup';
 import type {
   CloudSyncManifest,
@@ -45,6 +46,10 @@ export default interface ElectronApi {
     hideToTray: () => Promise<void>
     getSize: () => Promise<{ width: number; height: number } | null>
     getContentSize: () => Promise<{ width: number; height: number } | null>
+  }
+
+  lifecycle: {
+    onFlushRequested: (callback: (options: { reason: string; timeoutMs: number }) => Promise<any>) => () => void
   }
   
   theme: {
@@ -108,7 +113,7 @@ export default interface ElectronApi {
     deleteStorageConfig: (id: string) => Promise<{ success: boolean; error?: string }>
     testStorageConnection: (config: CloudStorageConfig) => Promise<{ success: boolean; error?: string }>
     getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>
-    createBackup: (storageId: string, description?: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
+    createBackup: (storageId: string, options?: string | CloudBackupCreateOptions) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
     restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
     deleteBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message?: string; error?: string }>
     getSyncManifest: (storageId: string) => Promise<

@@ -59,8 +59,8 @@ export function installWebRuntimeBridge(): void {
       deleteStorageConfig: (id: string) => webCloudBackupService.deleteStorageConfig(id),
       testStorageConnection: (config: any) => webCloudBackupService.testStorageConnection(config),
       getBackupList: (storageId: string) => webCloudBackupService.getCloudBackupList(storageId),
-      createBackup: (storageId: string, description?: string) =>
-        webCloudBackupService.createCloudBackup(storageId, description),
+      createBackup: (storageId: string, options?: any) =>
+        webCloudBackupService.createCloudBackup(storageId, typeof options === 'string' ? { description: options } : options),
       restoreBackup: (storageId: string, backupId: string) =>
         webCloudBackupService.restoreCloudBackup(storageId, backupId),
       deleteBackup: (storageId: string, backupId: string) =>

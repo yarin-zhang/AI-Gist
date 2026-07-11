@@ -45,9 +45,11 @@ import { onDataChange } from './data-change-events';
 const DEVICE_ID_STORAGE_KEY = 'ai_gist_cloud_sync_device_id';
 const LOCAL_STATE_STORAGE_PREFIX = 'ai_gist_cloud_sync_state';
 const LAST_AUTO_ATTEMPT_STORAGE_KEY = 'ai_gist_cloud_sync_last_auto_attempt_at';
+const PENDING_CHANGE_STORAGE_KEY = 'ai_gist_cloud_sync_pending_change';
 const CONFLICT_LOG_STORAGE_KEY = 'ai_gist_cloud_sync_conflict_log';
 const MAX_CONFLICT_LOG_ENTRIES = 50;
 export const CLOUD_SYNC_INTERVAL_SETTING_KEY = 'cloud.sync.intervalMinutes';
+export const CLOUD_SYNC_ENABLED_SETTING_KEY = 'cloud.sync.enabled';
 export const DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES = 15;
 export const MIN_CLOUD_SYNC_INTERVAL_MINUTES = 5;
 export const MAX_CLOUD_SYNC_INTERVAL_MINUTES = 1440;
@@ -80,6 +82,10 @@ export type CloudSyncRunReason =
   | 'interval'
   | 'online'
   | 'focus'
+  | 'blur'
+  | 'shutdown'
+  | 'background'
+  | 'resume'
   | 'config-change'
   | 'retry';
 export type CloudSyncLifecycleStatus = 'idle' | 'scheduled' | 'syncing' | 'success' | 'error';
@@ -139,6 +145,15 @@ export interface CloudSyncStatus {
   conflictLogCount?: number;
   lastResult?: CloudSyncResult;
   error?: string;
+  pendingChanges?: boolean;
+  lastLocalChangeAt?: string;
+}
+
+export interface CloudSyncFlushResult {
+  success: boolean;
+  skipped: boolean;
+  timedOut: boolean;
+  error?: string;
 }
 
 export interface CloudSyncErrorDiagnosisContext {
@@ -191,7 +206,8 @@ export interface CloudSyncServiceDeps {
   cloudClient?: CloudSyncCloudClient;
   configClient?: CloudSyncConfigClient;
   database?: CloudSyncDatabaseClient;
-  settings?: Pick<AppSettingsService, 'getNumberValue' | 'setNumberValue'>;
+  settings?: Pick<AppSettingsService, 'getNumberValue' | 'setNumberValue'> &
+    Partial<Pick<AppSettingsService, 'getBooleanValue' | 'setBooleanValue'>>;
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   createDeviceId?: () => string;
   subscribeToDataChanges?: (listener: (change: DataChangeEventPayload) => void) => () => void;
@@ -204,27 +220,38 @@ export class CloudSyncService {
   private readonly cloudClient?: CloudSyncCloudClient;
   private readonly configClient?: CloudSyncConfigClient;
   private readonly database: CloudSyncDatabaseClient;
-  private readonly settings: Pick<AppSettingsService, 'getNumberValue' | 'setNumberValue'>;
+  private readonly settings: Pick<AppSettingsService, 'getNumberValue' | 'setNumberValue'> &
+    Partial<Pick<AppSettingsService, 'getBooleanValue' | 'setBooleanValue'>>;
   private readonly storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   private readonly createDeviceId: () => string;
   private readonly subscribeToDataChanges: (listener: (change: DataChangeEventPayload) => void) => () => void;
   private readonly runningSyncs = new Map<string, Promise<CloudSyncResult>>();
+  private readonly syncGenerations = new Map<string, number>();
+  private readonly activeScheduledRuns = new Set<Promise<void>>();
   private readonly queuedAutoSyncs = new Map<string, CloudSyncRunReason>();
+  private syncAllAfterRetry = false;
   private readonly statusListeners = new Set<CloudSyncStatusListener>();
   private autoSyncOptions: CloudSyncAutoOptions | null = null;
+  private activeFlushPromise: Promise<CloudSyncFlushResult> | null = null;
+  private flushGeneration = 0;
   private unsubscribeDataChanges: (() => void) | null = null;
   private scheduledTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private retryStorageId: string | undefined;
+  private retryStorageIds: string[] | undefined;
+  private retryCoveredPendingVersion: number | undefined;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private browserTriggerCleanups: (() => void)[] = [];
+  private autoSyncEnabled = true;
   private applyingRemoteDataDepth = 0;
   private failureCount = 0;
   private status: CloudSyncStatus = {
     status: 'idle',
     pending: false,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    pendingChanges: false
   };
+  private pendingChangeVersion = 0;
+  private lastLocalChangeAt: string | undefined;
 
   constructor(deps: CloudSyncServiceDeps = {}) {
     this.cloudClient = deps.cloudClient;
@@ -234,6 +261,7 @@ export class CloudSyncService {
     this.storage = deps.storage || getBrowserStorage();
     this.createDeviceId = deps.createDeviceId || generateUUID;
     this.subscribeToDataChanges = deps.subscribeToDataChanges || (listener => onDataChange(SYNC_STORE_NAMES, listener));
+    this.restorePendingChangeState();
     this.status.conflictLogCount = this.getConflictLog().length;
   }
 
@@ -252,6 +280,8 @@ export class CloudSyncService {
     }
 
     const attemptAt = new Date().toISOString();
+    const generation = (this.syncGenerations.get(storageId) || 0) + 1;
+    this.syncGenerations.set(storageId, generation);
     this.saveLastAutoAttemptAt(attemptAt);
     this.updateStatus({
       status: 'syncing',
@@ -263,8 +293,12 @@ export class CloudSyncService {
       nextSyncAt: undefined
     });
 
-    const syncPromise = this.performSync(storageId, options)
+    const syncPromise = this.performSync(storageId, options, 0, generation)
       .then(result => {
+        if (this.runningSyncs.get(storageId) !== syncPromise) {
+          if (this.autoSyncOptions) this.scheduleSync('retry', { delayMs: 0 });
+          return result;
+        }
         this.updateStatus({
           status: result.success ? 'success' : 'error',
           pending: false,
@@ -283,8 +317,10 @@ export class CloudSyncService {
         return result;
       })
       .finally(() => {
-        this.runningSyncs.delete(storageId);
-        setTimeout(() => this.scheduleQueuedAutoSync(storageId), 0);
+        if (this.runningSyncs.get(storageId) === syncPromise) {
+          this.runningSyncs.delete(storageId);
+          setTimeout(() => this.scheduleQueuedAutoSync(storageId), 0);
+        }
       });
     this.runningSyncs.set(storageId, syncPromise);
     return syncPromise;
@@ -320,9 +356,11 @@ export class CloudSyncService {
   }
 
   startAutoSync(options: CloudSyncAutoOptions = {}): void {
+    const enabled = options.enabled !== false;
     this.stopAutoSync();
+    this.autoSyncEnabled = enabled;
 
-    if (options.enabled === false) {
+    if (!enabled) {
       return;
     }
 
@@ -332,25 +370,53 @@ export class CloudSyncService {
 
     if (this.autoSyncOptions.pollIntervalMs! > 0) {
       this.pollTimer = setInterval(() => {
-        void this.runScheduledSync('interval');
+        void this.startScheduledRun('interval');
       }, this.autoSyncOptions.pollIntervalMs);
     }
 
     if (this.autoSyncOptions.syncOnStart !== false) {
       this.scheduleSync('startup', {
-        delayMs: this.autoSyncOptions.startupDelayMs ?? DEFAULT_STARTUP_SYNC_DELAY_MS
+        delayMs: this.hasPendingChanges()
+          ? 0
+          : (this.autoSyncOptions.startupDelayMs ?? DEFAULT_STARTUP_SYNC_DELAY_MS)
       });
     }
   }
 
   async startAutoSyncFromSettings(options: CloudSyncAutoOptions = {}): Promise<void> {
+    const enabled = await this.getAutoSyncEnabled();
     const intervalMinutes = await this.getAutoSyncIntervalMinutes();
     const intervalMs = minutesToMs(intervalMinutes);
     this.startAutoSync({
       ...options,
+      enabled: options.enabled ?? enabled,
       pollIntervalMs: options.pollIntervalMs ?? intervalMs,
       retryMs: options.retryMs ?? intervalMs
     });
+  }
+
+  async getAutoSyncEnabled(): Promise<boolean> {
+    try {
+      return await this.settings.getBooleanValue?.(CLOUD_SYNC_ENABLED_SETTING_KEY, true) ?? true;
+    } catch {
+      return true;
+    }
+  }
+
+  async setAutoSyncEnabled(enabled: boolean): Promise<boolean> {
+    await this.settings.setBooleanValue?.(
+      CLOUD_SYNC_ENABLED_SETTING_KEY,
+      enabled,
+      '是否启用云端自动同步'
+    );
+
+    this.autoSyncEnabled = enabled;
+    if (enabled) {
+      await this.startAutoSyncFromSettings(this.autoSyncOptions || {});
+    } else {
+      this.stopAutoSync();
+    }
+    return enabled;
   }
 
   async getAutoSyncIntervalMinutes(): Promise<number> {
@@ -385,10 +451,57 @@ export class CloudSyncService {
     return normalizedMinutes;
   }
 
+  hasPendingChanges(): boolean {
+    return this.pendingChangeVersion > 0;
+  }
+
+  async flushPendingSync(options: {
+    reason?: CloudSyncRunReason;
+    timeoutMs?: number;
+  } = {}): Promise<CloudSyncFlushResult> {
+    if (!this.autoSyncEnabled || !this.hasPendingChanges()) {
+      return { success: true, skipped: true, timedOut: false };
+    }
+
+    const reason = options.reason || 'shutdown';
+    const timeoutMs = Math.max(250, options.timeoutMs ?? 5000);
+    let task = this.activeFlushPromise;
+    if (!task) {
+      const generation = ++this.flushGeneration;
+      const created = this.performPendingFlush(reason, generation);
+      task = created.finally(() => {
+        if (this.activeFlushPromise === task) this.activeFlushPromise = null;
+      });
+      this.activeFlushPromise = task;
+    }
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      const result = await Promise.race([
+        task,
+        new Promise<CloudSyncFlushResult>(resolve => {
+          timeout = setTimeout(() => resolve({
+            success: false,
+            skipped: false,
+            timedOut: true,
+            error: `同步未能在 ${timeoutMs}ms 内完成`
+          }), timeoutMs);
+        })
+      ]);
+      if (result.timedOut && this.activeFlushPromise === task) {
+        this.cancelActiveFlush();
+      }
+      return result;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
   stopAutoSync(): void {
     this.clearScheduledTimer();
     this.clearRetryTimer();
     this.queuedAutoSyncs.clear();
+    this.syncAllAfterRetry = false;
 
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
@@ -420,6 +533,9 @@ export class CloudSyncService {
 
     if (this.retryTimer && reason !== 'retry' && reason !== 'config-change') {
       if (reason !== 'online') {
+        if (reason === 'local-change' || reason === 'blur' || reason === 'background') {
+          this.syncAllAfterRetry = true;
+        }
         return;
       }
       this.clearRetryTimer();
@@ -440,7 +556,7 @@ export class CloudSyncService {
 
     this.scheduledTimer = setTimeout(() => {
       this.scheduledTimer = null;
-      void this.runScheduledSync(reason, options.storageId);
+      void this.startScheduledRun(reason, options.storageId);
     }, delayMs);
   }
 
@@ -515,13 +631,24 @@ export class CloudSyncService {
   private async performSync(
     storageId: string,
     options: CloudSyncOptions,
-    attempt = 0
+    attempt = 0,
+    generation = this.syncGenerations.get(storageId) || 0
   ): Promise<CloudSyncResult> {
     try {
+      this.assertCurrentSyncGeneration(storageId, generation);
       const deviceId = this.getOrCreateDeviceId();
       const now = new Date().toISOString();
       const localData = await this.exportLocalData();
-      const manifestResult = await this.getManifestOrRecoverCorruption(storageId, localData, deviceId, now, options);
+      this.assertCurrentSyncGeneration(storageId, generation);
+      const manifestResult = await this.getManifestOrRecoverCorruption(
+        storageId,
+        localData,
+        deviceId,
+        now,
+        options,
+        generation
+      );
+      this.assertCurrentSyncGeneration(storageId, generation);
       if (manifestResult.result) {
         return manifestResult.result;
       }
@@ -536,16 +663,19 @@ export class CloudSyncService {
 
       if (!remoteSnapshot) {
         const latestManifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+        this.assertCurrentSyncGeneration(storageId, generation);
         if (latestManifest.latestSnapshot) {
-          return await this.retryWithLatestRemote(storageId, options, attempt);
+          return await this.retryWithLatestRemote(storageId, options, attempt, generation);
         }
 
         const snapshot = createCloudSyncSnapshot(localData, deviceId);
         try {
+          this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
             this.buildManifest(latestManifest, snapshot, [], deviceId, now, options),
-            getCloudSyncManifestRevision(latestManifest)
+            getCloudSyncManifestRevision(latestManifest),
+            generation
           );
         } catch (error) {
           if (isCloudSyncRemoteChangedError(error)) {
@@ -554,11 +684,13 @@ export class CloudSyncService {
               options,
               attempt,
               snapshot,
-              false
+              false,
+              generation
             );
           }
           throw error;
         }
+        this.assertCurrentSyncGeneration(storageId, generation);
         this.saveLocalState(storageId, deviceId, snapshot, now);
 
         return {
@@ -585,10 +717,12 @@ export class CloudSyncService {
       if (mergedEqualsLocal && mergedEqualsRemote) {
         if (manifestRepairMetadata) {
           try {
+            this.assertCurrentSyncGeneration(storageId, generation);
             await this.saveManifest(
               storageId,
               this.buildManifest(manifest, remoteSnapshot, mergeResult.conflicts, deviceId, now, options),
-              getCloudSyncManifestRevision(manifest)
+              getCloudSyncManifestRevision(manifest),
+              generation
             );
           } catch (error) {
             if (isCloudSyncRemoteChangedError(error)) {
@@ -597,13 +731,15 @@ export class CloudSyncService {
                 options,
                 attempt,
                 remoteSnapshot,
-                false
+                false,
+                generation
               );
             }
             throw error;
           }
         }
 
+        this.assertCurrentSyncGeneration(storageId, generation);
         this.recordConflictLog(storageId, mergeResult.conflicts, {
           detectedAt: now,
           localRevision: localState?.lastKnownRevision,
@@ -627,11 +763,12 @@ export class CloudSyncService {
       let latestManifestForUpload: CloudSyncManifest | null = null;
       if (!mergedEqualsRemote) {
         const latestManifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+        this.assertCurrentSyncGeneration(storageId, generation);
         if (
           hasRemoteRevisionChanged(remoteSnapshot, latestManifest.latestSnapshot) &&
           hasRemoteDataChanged(remoteData, latestManifest.latestSnapshot)
         ) {
-          return await this.retryWithLatestRemote(storageId, options, attempt);
+          return await this.retryWithLatestRemote(storageId, options, attempt, generation);
         }
 
         latestManifestForUpload = latestManifest;
@@ -642,17 +779,21 @@ export class CloudSyncService {
 
       let appliedLocal = false;
       if (!mergedEqualsLocal) {
+        this.assertCurrentSyncGeneration(storageId, generation);
         await this.replaceLocalDataForSync(mergedData, localData);
+        this.assertCurrentSyncGeneration(storageId, generation);
         appliedLocal = true;
       }
 
       let uploadedRemote = false;
       if (latestManifestForUpload) {
         try {
+          this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
             this.buildManifest(latestManifestForUpload, finalSnapshot, mergeResult.conflicts, deviceId, now, options),
-            getCloudSyncManifestRevision(latestManifestForUpload)
+            getCloudSyncManifestRevision(latestManifestForUpload),
+            generation
           );
         } catch (error) {
           if (isCloudSyncRemoteChangedError(error)) {
@@ -661,7 +802,8 @@ export class CloudSyncService {
               options,
               attempt,
               finalSnapshot,
-              appliedLocal
+              appliedLocal,
+              generation
             );
           }
           throw error;
@@ -669,6 +811,7 @@ export class CloudSyncService {
         uploadedRemote = true;
       }
 
+      this.assertCurrentSyncGeneration(storageId, generation);
       this.recordConflictLog(storageId, mergeResult.conflicts, {
         detectedAt: now,
         localRevision: localState?.lastKnownRevision,
@@ -748,13 +891,14 @@ export class CloudSyncService {
   private async retryWithLatestRemote(
     storageId: string,
     options: CloudSyncOptions,
-    attempt: number
+    attempt: number,
+    generation: number
   ): Promise<CloudSyncResult> {
     if (attempt + 1 >= MAX_REMOTE_RECHECK_ATTEMPTS) {
       throw new Error('云端同步文件状态持续变化，应用会在下个同步周期自动重试');
     }
 
-    return await this.performSync(storageId, options, attempt + 1);
+    return await this.performSync(storageId, options, attempt + 1, generation);
   }
 
   private async retryAfterManifestConflict(
@@ -762,9 +906,10 @@ export class CloudSyncService {
     options: CloudSyncOptions,
     attempt: number,
     submittedSnapshot: CloudSyncSnapshot,
-    appliedLocal: boolean
+    appliedLocal: boolean,
+    generation: number
   ): Promise<CloudSyncResult> {
-    const retryResult = await this.retryWithLatestRemote(storageId, options, attempt);
+    const retryResult = await this.retryWithLatestRemote(storageId, options, attempt, generation);
     if (
       retryResult.success &&
       retryResult.remoteRevision === submittedSnapshot.revision
@@ -788,21 +933,31 @@ export class CloudSyncService {
     localData: CloudSyncDataSet,
     deviceId: string,
     now: string,
-    options: CloudSyncOptions
+    options: CloudSyncOptions,
+    generation: number
   ): Promise<{ manifest: CloudSyncManifest; result?: CloudSyncResult }> {
     try {
       const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+      this.assertCurrentSyncGeneration(storageId, generation);
       return {
         manifest: await this.repairManifestFromSnapshotFiles(storageId, manifest, deviceId, now, options, {
           required: !manifest.latestSnapshot
-        })
+        }, generation)
       };
     } catch (error) {
       if (!isRecoverableCloudSyncManifestCorruption(error)) {
         throw error;
       }
+      this.assertCurrentSyncGeneration(storageId, generation);
 
-      const recoveredManifest = await this.recoverManifestFromSnapshotFiles(storageId, deviceId, now, options);
+      const recoveredManifest = await this.recoverManifestFromSnapshotFiles(
+        storageId,
+        deviceId,
+        now,
+        options,
+        generation
+      );
+      this.assertCurrentSyncGeneration(storageId, generation);
       if (recoveredManifest) {
         return { manifest: recoveredManifest };
       }
@@ -817,7 +972,9 @@ export class CloudSyncService {
         options
       );
 
-      await this.overwriteManifest(storageId, rebuiltManifest);
+      this.assertCurrentSyncGeneration(storageId, generation);
+      await this.overwriteManifest(storageId, rebuiltManifest, generation);
+      this.assertCurrentSyncGeneration(storageId, generation);
       this.saveLocalState(storageId, deviceId, snapshot, now);
 
       return {
@@ -842,7 +999,8 @@ export class CloudSyncService {
     deviceId: string,
     now: string,
     options: CloudSyncOptions,
-    readOptions: { required: boolean }
+    readOptions: { required: boolean },
+    generation: number
   ): Promise<CloudSyncManifest> {
     const repairedMatchingSnapshotManifest = await this.repairManifestFromMatchingSnapshotFile(
       storageId,
@@ -850,8 +1008,10 @@ export class CloudSyncService {
       deviceId,
       now,
       options,
-      readOptions
+      readOptions,
+      generation
     );
+    this.assertCurrentSyncGeneration(storageId, generation);
     if (repairedMatchingSnapshotManifest) {
       return repairedMatchingSnapshotManifest;
     }
@@ -861,6 +1021,7 @@ export class CloudSyncService {
     }
 
     const newestSnapshot = await this.getNewestRemoteSnapshot(storageId, readOptions);
+    this.assertCurrentSyncGeneration(storageId, generation);
     if (!newestSnapshot) {
       return manifest;
     }
@@ -883,7 +1044,9 @@ export class CloudSyncService {
     );
 
     try {
-      await this.overwriteManifest(storageId, repairedManifest);
+      this.assertCurrentSyncGeneration(storageId, generation);
+      await this.overwriteManifest(storageId, repairedManifest, generation);
+      this.assertCurrentSyncGeneration(storageId, generation);
     } catch (error) {
       if (readOptions.required) {
         throw error;
@@ -899,7 +1062,8 @@ export class CloudSyncService {
     deviceId: string,
     now: string,
     options: CloudSyncOptions,
-    readOptions: { required: boolean }
+    readOptions: { required: boolean },
+    generation: number
   ): Promise<CloudSyncManifest | null> {
     const manifestSnapshot = manifest.latestSnapshot;
     if (!manifestSnapshot) {
@@ -907,6 +1071,7 @@ export class CloudSyncService {
     }
 
     const snapshotFile = await this.readSnapshotFileIfSupported(storageId, manifestSnapshot.revision);
+    this.assertCurrentSyncGeneration(storageId, generation);
     if (!snapshotFile || snapshotFile.revision !== manifestSnapshot.revision) {
       return null;
     }
@@ -928,7 +1093,9 @@ export class CloudSyncService {
     );
 
     try {
-      await this.overwriteManifest(storageId, repairedManifest);
+      this.assertCurrentSyncGeneration(storageId, generation);
+      await this.overwriteManifest(storageId, repairedManifest, generation);
+      this.assertCurrentSyncGeneration(storageId, generation);
     } catch (error) {
       if (readOptions.required) {
         throw error;
@@ -942,9 +1109,11 @@ export class CloudSyncService {
     storageId: string,
     deviceId: string,
     now: string,
-    options: CloudSyncOptions
+    options: CloudSyncOptions,
+    generation: number
   ): Promise<CloudSyncManifest | null> {
     const newestSnapshot = await this.getNewestRemoteSnapshot(storageId, { required: true });
+    this.assertCurrentSyncGeneration(storageId, generation);
     if (!newestSnapshot) {
       return null;
     }
@@ -957,7 +1126,9 @@ export class CloudSyncService {
       now,
       options
     );
-    await this.overwriteManifest(storageId, recoveredManifest);
+    this.assertCurrentSyncGeneration(storageId, generation);
+    await this.overwriteManifest(storageId, recoveredManifest, generation);
+    this.assertCurrentSyncGeneration(storageId, generation);
     return recoveredManifest;
   }
 
@@ -1037,29 +1208,38 @@ export class CloudSyncService {
   private async saveManifest(
     storageId: string,
     manifest: CloudSyncManifest,
-    expectedRevision: string | null
+    expectedRevision: string | null,
+    generation: number
   ): Promise<void> {
     const cloudClient = this.getCloudClient();
+    this.assertCurrentSyncGeneration(storageId, generation);
     await this.saveSnapshotFileIfSupported(storageId, manifest.latestSnapshot);
+    this.assertCurrentSyncGeneration(storageId, generation);
     const result = await cloudClient.saveCloudSyncManifest(storageId, manifest, {
       expectedRevision
     });
+    this.assertCurrentSyncGeneration(storageId, generation);
     await this.confirmManifestSaveResult(
       storageId,
       manifest,
       result,
       '保存云同步 manifest 失败',
-      { expectedRevision }
+      { expectedRevision },
+      generation
     );
   }
 
   private async overwriteManifest(
     storageId: string,
-    manifest: CloudSyncManifest
+    manifest: CloudSyncManifest,
+    generation: number
   ): Promise<void> {
+    this.assertCurrentSyncGeneration(storageId, generation);
     await this.saveSnapshotFileIfSupported(storageId, manifest.latestSnapshot);
+    this.assertCurrentSyncGeneration(storageId, generation);
     const result = await this.getCloudClient().saveCloudSyncManifest(storageId, manifest);
-    await this.confirmManifestSaveResult(storageId, manifest, result, '重建云同步 manifest 失败');
+    this.assertCurrentSyncGeneration(storageId, generation);
+    await this.confirmManifestSaveResult(storageId, manifest, result, '重建云同步 manifest 失败', undefined, generation);
   }
 
   private async confirmManifestSaveResult(
@@ -1067,14 +1247,16 @@ export class CloudSyncService {
     manifest: CloudSyncManifest,
     result: CloudSyncManifestSaveResult,
     fallbackErrorMessage: string,
-    retryOptions?: CloudSyncManifestSaveOptions
+    retryOptions: CloudSyncManifestSaveOptions | undefined,
+    generation: number
   ): Promise<void> {
+    this.assertCurrentSyncGeneration(storageId, generation);
     if (!result.success) {
       if (result.conflict || isCloudSyncRevisionConflictMessage(result.error)) {
         throw new CloudSyncRemoteChangedError(result.error || '云端同步文件已被其他设备更新');
       }
 
-      if (await this.isSavedManifestReadable(storageId, manifest)) {
+      if (await this.isSavedManifestReadable(storageId, manifest, generation)) {
         return;
       }
 
@@ -1082,11 +1264,13 @@ export class CloudSyncService {
     }
 
     try {
-      await this.verifySavedManifest(storageId, manifest);
+      await this.verifySavedManifest(storageId, manifest, generation);
     } catch (error) {
+      this.assertCurrentSyncGeneration(storageId, generation);
       const retryResult = await this.getCloudClient().saveCloudSyncManifest(storageId, manifest, retryOptions);
+      this.assertCurrentSyncGeneration(storageId, generation);
       if (!retryResult.success) {
-        if (await this.isSavedManifestReadable(storageId, manifest)) {
+        if (await this.isSavedManifestReadable(storageId, manifest, generation)) {
           return;
         }
 
@@ -1098,7 +1282,7 @@ export class CloudSyncService {
       }
 
       try {
-        await this.verifySavedManifest(storageId, manifest);
+        await this.verifySavedManifest(storageId, manifest, generation);
       } catch {
         throw error;
       }
@@ -1107,7 +1291,8 @@ export class CloudSyncService {
 
   private async isSavedManifestReadable(
     storageId: string,
-    manifest: CloudSyncManifest
+    manifest: CloudSyncManifest,
+    generation: number
   ): Promise<boolean> {
     if (!manifest.latestSnapshot) {
       return false;
@@ -1116,10 +1301,12 @@ export class CloudSyncService {
     for (let attempt = 0; attempt < READ_AFTER_WRITE_VERIFY_ATTEMPTS; attempt += 1) {
       if (attempt > 0) {
         await delay(READ_AFTER_WRITE_VERIFY_RETRY_MS * attempt);
+        this.assertCurrentSyncGeneration(storageId, generation);
       }
 
       try {
         await this.verifySavedManifestContentOnce(storageId, manifest);
+        this.assertCurrentSyncGeneration(storageId, generation);
         return true;
       } catch {
         // A failed save can still mean the primary manifest reached the server
@@ -1152,16 +1339,19 @@ export class CloudSyncService {
 
   private async verifySavedManifest(
     storageId: string,
-    manifest: CloudSyncManifest
+    manifest: CloudSyncManifest,
+    generation: number
   ): Promise<void> {
     let lastError: unknown;
     for (let attempt = 0; attempt < READ_AFTER_WRITE_VERIFY_ATTEMPTS; attempt += 1) {
       if (attempt > 0) {
         await delay(READ_AFTER_WRITE_VERIFY_RETRY_MS * attempt);
+        this.assertCurrentSyncGeneration(storageId, generation);
       }
 
       try {
         await this.verifySavedManifestOnce(storageId, manifest);
+        this.assertCurrentSyncGeneration(storageId, generation);
         return;
       } catch (error) {
         lastError = error;
@@ -1342,10 +1532,154 @@ export class CloudSyncService {
       return;
     }
 
+    this.markPendingChange(change.timestamp);
     this.scheduleSync('local-change');
   }
 
-  private async runScheduledSync(reason: CloudSyncRunReason, storageId?: string): Promise<void> {
+  private markPendingChange(timestamp = Date.now()): void {
+    this.pendingChangeVersion += 1;
+    this.lastLocalChangeAt = new Date(timestamp).toISOString();
+    this.persistPendingChangeState();
+    this.updateStatus({
+      pendingChanges: true,
+      lastLocalChangeAt: this.lastLocalChangeAt
+    });
+  }
+
+  private clearPendingChange(expectedVersion: number): void {
+    if (this.pendingChangeVersion !== expectedVersion) {
+      return;
+    }
+    this.pendingChangeVersion = 0;
+    try {
+      this.storage?.removeItem(PENDING_CHANGE_STORAGE_KEY);
+    } catch (error) {
+      console.warn('清理云同步待处理状态失败:', error);
+    }
+    this.updateStatus({ pendingChanges: false });
+  }
+
+  private restorePendingChangeState(): void {
+    try {
+      const raw = this.storage?.getItem(PENDING_CHANGE_STORAGE_KEY);
+      if (!raw) return;
+      const state = JSON.parse(raw) as { version?: number; changedAt?: string };
+      this.pendingChangeVersion = Math.max(1, Number(state.version) || 1);
+      this.lastLocalChangeAt = state.changedAt;
+      this.status.pendingChanges = true;
+      this.status.lastLocalChangeAt = state.changedAt;
+    } catch (error) {
+      console.warn('读取云同步待处理状态失败:', error);
+      this.pendingChangeVersion = 1;
+      this.status.pendingChanges = true;
+    }
+  }
+
+  private persistPendingChangeState(): void {
+    try {
+      this.storage?.setItem(PENDING_CHANGE_STORAGE_KEY, JSON.stringify({
+        version: this.pendingChangeVersion,
+        changedAt: this.lastLocalChangeAt
+      }));
+    } catch (error) {
+      console.warn('保存云同步待处理状态失败:', error);
+    }
+  }
+
+  private async performPendingFlush(
+    reason: CloudSyncRunReason,
+    generation: number
+  ): Promise<CloudSyncFlushResult> {
+    try {
+      this.clearScheduledTimer();
+      while (this.activeScheduledRuns.size > 0) {
+        await Promise.allSettled(Array.from(this.activeScheduledRuns));
+        if (generation !== this.flushGeneration) return this.createCancelledFlushResult();
+      }
+      if (this.runningSyncs.size > 0) {
+        await Promise.allSettled(Array.from(this.runningSyncs.values()));
+        if (generation !== this.flushGeneration) return this.createCancelledFlushResult();
+      }
+
+      if (!this.hasPendingChanges()) {
+        return { success: true, skipped: true, timedOut: false };
+      }
+
+      const pendingVersion = this.pendingChangeVersion;
+      const storageIds = await this.resolveStorageIds();
+      if (storageIds.length === 0) {
+        return {
+          success: false,
+          skipped: false,
+          timedOut: false,
+          error: '没有已启用的云存储配置'
+        };
+      }
+
+      const failures: string[] = [];
+      for (const storageId of storageIds) {
+        if (generation !== this.flushGeneration) return this.createCancelledFlushResult();
+        const result = await this.syncNow(storageId, {
+          ...this.autoSyncOptions,
+          reason
+        });
+        if (generation !== this.flushGeneration) return this.createCancelledFlushResult();
+        if (!result.success) {
+          failures.push(`${storageId}: ${result.error || '自动同步失败'}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        return {
+          success: false,
+          skipped: false,
+          timedOut: false,
+          error: failures.join('；')
+        };
+      }
+
+      this.clearPendingChange(pendingVersion);
+      return { success: true, skipped: false, timedOut: false };
+    } catch (error) {
+      return {
+        success: false,
+        skipped: false,
+        timedOut: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  private cancelActiveFlush(): void {
+    this.flushGeneration += 1;
+    this.activeFlushPromise = null;
+    this.activeScheduledRuns.clear();
+    for (const storageId of this.runningSyncs.keys()) {
+      this.syncGenerations.set(storageId, (this.syncGenerations.get(storageId) || 0) + 1);
+    }
+    this.runningSyncs.clear();
+  }
+
+  private assertCurrentSyncGeneration(storageId: string, generation: number): void {
+    if (this.syncGenerations.get(storageId) !== generation) {
+      throw new Error('同步任务已被更新的生命周期同步取代');
+    }
+  }
+
+  private createCancelledFlushResult(): CloudSyncFlushResult {
+    return {
+      success: false,
+      skipped: false,
+      timedOut: true,
+      error: '生命周期同步已超时并释放，待后续恢复同步'
+    };
+  }
+
+  private async runScheduledSync(
+    reason: CloudSyncRunReason,
+    storageId?: string,
+    storageIdsOverride?: string[]
+  ): Promise<void> {
     if (!this.autoSyncOptions) {
       return;
     }
@@ -1364,15 +1698,15 @@ export class CloudSyncService {
     }
 
     if (isBrowserOffline()) {
-      this.scheduleRetry(reason, '当前网络不可用，等待恢复后重试', storageId);
+      this.scheduleRetry(reason, '当前网络不可用，等待恢复后重试', storageId ? [storageId] : undefined);
       return;
     }
 
     let storageIds: string[];
     try {
-      storageIds = await this.resolveStorageIds(storageId);
+      storageIds = storageIdsOverride || await this.resolveStorageIds(storageId);
     } catch (error) {
-      this.scheduleRetry(reason, error instanceof Error ? error.message : String(error), storageId);
+      this.scheduleRetry(reason, error instanceof Error ? error.message : String(error), storageId ? [storageId] : undefined);
       return;
     }
 
@@ -1388,8 +1722,9 @@ export class CloudSyncService {
       return;
     }
 
-    let firstFailure: CloudSyncResult | null = null;
-    let firstFailureStorageId: string | undefined;
+    const pendingVersion = this.pendingChangeVersion;
+    const retryCoveredPendingVersion = reason === 'retry' ? this.retryCoveredPendingVersion : undefined;
+    const failures: { storageId: string; result: CloudSyncResult }[] = [];
     let lastResult: CloudSyncResult | undefined;
 
     for (const targetStorageId of storageIds) {
@@ -1398,19 +1733,26 @@ export class CloudSyncService {
         reason
       });
       lastResult = result;
-      if (!result.success && !firstFailure) {
-        firstFailure = result;
-        firstFailureStorageId = targetStorageId;
-      }
+      if (!result.success) failures.push({ storageId: targetStorageId, result });
     }
 
-    if (firstFailure) {
-      this.scheduleRetry(reason, firstFailure.error || '自动同步失败', firstFailureStorageId || storageId);
+    if (failures.length > 0) {
+      this.scheduleRetry(
+        reason,
+        failures.map(failure => `${failure.storageId}: ${failure.result.error || '自动同步失败'}`).join('；'),
+        failures.map(failure => failure.storageId),
+        retryCoveredPendingVersion ?? (!storageId && !storageIdsOverride && pendingVersion > 0 ? pendingVersion : undefined)
+      );
       return;
     }
 
     this.clearRetryTimer();
     this.failureCount = 0;
+    if (!storageId && !storageIdsOverride && pendingVersion > 0) {
+      this.clearPendingChange(pendingVersion);
+    } else if (retryCoveredPendingVersion !== undefined) {
+      this.clearPendingChange(retryCoveredPendingVersion);
+    }
     this.updateStatus({
       status: 'success',
       pending: false,
@@ -1422,6 +1764,28 @@ export class CloudSyncService {
       error: undefined,
       nextSyncAt: undefined
     });
+
+    if ((storageId || storageIdsOverride) && this.syncAllAfterRetry) {
+      this.syncAllAfterRetry = false;
+      this.scheduleSync('local-change', { delayMs: 0 });
+    }
+  }
+
+  private startScheduledRun(
+    reason: CloudSyncRunReason,
+    storageId?: string,
+    storageIdsOverride?: string[]
+  ): Promise<void> {
+    if (this.activeFlushPromise) {
+      return this.activeFlushPromise.then(() => undefined);
+    }
+    const run = this.runScheduledSync(reason, storageId, storageIdsOverride);
+    this.activeScheduledRuns.add(run);
+    void run.then(
+      () => this.activeScheduledRuns.delete(run),
+      () => this.activeScheduledRuns.delete(run)
+    );
+    return run;
   }
 
   private async resolveStorageIds(storageId?: string): Promise<string[]> {
@@ -1443,7 +1807,12 @@ export class CloudSyncService {
     }
   }
 
-  private scheduleRetry(reason: CloudSyncRunReason, error: string, storageId?: string): void {
+  private scheduleRetry(
+    reason: CloudSyncRunReason,
+    error: string,
+    storageIds?: string[],
+    coveredPendingVersion?: number
+  ): void {
     if (!this.autoSyncOptions) {
       return;
     }
@@ -1453,7 +1822,7 @@ export class CloudSyncService {
       this.updateStatus({
         status: 'error',
         pending: false,
-        storageId,
+        storageId: storageIds?.[0],
         reason,
         error,
         nextSyncAt: undefined
@@ -1465,11 +1834,12 @@ export class CloudSyncService {
     this.clearScheduledTimer();
     this.clearRetryTimer();
     this.failureCount += 1;
-    this.retryStorageId = storageId;
+    this.retryStorageIds = storageIds;
+    this.retryCoveredPendingVersion = coveredPendingVersion;
     this.updateStatus({
       status: 'error',
       pending: true,
-      storageId,
+      storageId: storageIds?.[0],
       reason,
       error,
       failureCount: this.failureCount,
@@ -1478,8 +1848,8 @@ export class CloudSyncService {
 
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      this.retryStorageId = undefined;
-      void this.runScheduledSync('retry', storageId);
+      this.retryStorageIds = undefined;
+      void this.startScheduledRun('retry', undefined, storageIds);
     }, retryMs);
   }
 
@@ -1487,16 +1857,28 @@ export class CloudSyncService {
     if (typeof window !== 'undefined') {
       const handleOnline = () => this.scheduleSync('online', { delayMs: 0 });
       const handleFocus = () => this.scheduleSync('focus', { delayMs: 0 });
+      const handleBlur = () => {
+        if (this.hasPendingChanges()) this.scheduleSync('blur', { delayMs: 0 });
+      };
+      const handlePageHide = () => {
+        if (this.hasPendingChanges()) void this.flushPendingSync({ reason: 'background', timeoutMs: 1500 });
+      };
       window.addEventListener('online', handleOnline);
       window.addEventListener('focus', handleFocus);
+      window.addEventListener('blur', handleBlur);
+      window.addEventListener('pagehide', handlePageHide);
       this.browserTriggerCleanups.push(() => window.removeEventListener('online', handleOnline));
       this.browserTriggerCleanups.push(() => window.removeEventListener('focus', handleFocus));
+      this.browserTriggerCleanups.push(() => window.removeEventListener('blur', handleBlur));
+      this.browserTriggerCleanups.push(() => window.removeEventListener('pagehide', handlePageHide));
     }
 
     if (typeof document !== 'undefined') {
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-          this.scheduleSync('focus', { delayMs: 0 });
+          this.scheduleSync('resume', { delayMs: 0 });
+        } else if (this.hasPendingChanges()) {
+          void this.flushPendingSync({ reason: 'background', timeoutMs: 1500 });
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1516,7 +1898,8 @@ export class CloudSyncService {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
     }
-    this.retryStorageId = undefined;
+    this.retryStorageIds = undefined;
+    this.retryCoveredPendingVersion = undefined;
   }
 
   private clearRetryTimerForStorage(storageId: string): void {
@@ -1524,7 +1907,7 @@ export class CloudSyncService {
       return;
     }
 
-    if (!this.retryStorageId || this.retryStorageId === storageId) {
+    if (!this.retryStorageIds || (this.retryStorageIds.length === 1 && this.retryStorageIds[0] === storageId)) {
       this.clearRetryTimer();
     }
   }
@@ -1534,7 +1917,11 @@ export class CloudSyncService {
       return 0;
     }
 
-    if (reason === 'local-change') {
+    if (reason === 'local-change' || reason === 'blur' || reason === 'background' || reason === 'shutdown') {
+      return 0;
+    }
+
+    if (this.hasPendingChanges() && (reason === 'resume' || reason === 'focus' || reason === 'online')) {
       return 0;
     }
 

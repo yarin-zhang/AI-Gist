@@ -100,6 +100,39 @@ describe('WebCloudBackupService', () => {
     expect(result.backupInfo?.checksum).toBe(requestBody.backupData.checksum)
   })
 
+  it('uploads the exact pre-exported automatic snapshot without exporting a second time', async () => {
+    saveWebDAVConfig()
+    const exportSpy = vi.spyOn(DatabaseServiceManager.prototype, 'exportAllDataForBackup')
+    let requestBody: any
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body))
+      return apiResponse({
+        id: requestBody.backupData.id,
+        name: requestBody.backupData.name,
+        createdAt: requestBody.backupData.createdAt,
+        cloudPath: `/AI-Gist-Backup/${requestBody.fileName}`,
+        storageId: webdavConfig.id,
+        checksum: requestBody.backupData.checksum
+      })
+    })
+
+    const service = WebCloudBackupService.getInstance()
+    const result = await service.createCloudBackup(webdavConfig.id, {
+      description: '自动恢复快照',
+      data: backupData,
+      backupType: 'automatic',
+      dataChecksum: 'same-export-checksum'
+    })
+
+    expect(result.success).toBe(true)
+    expect(exportSpy).not.toHaveBeenCalled()
+    expect(requestBody.backupData.data).toEqual(backupData)
+    expect(requestBody.backupData).toMatchObject({
+      backupType: 'automatic',
+      dataChecksum: 'same-export-checksum'
+    })
+  })
+
   it('restores WebDAV backups only after validating the shared checksum payload', async () => {
     saveWebDAVConfig()
     const payload = createBackupPayload({

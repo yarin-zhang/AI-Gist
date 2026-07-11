@@ -10,6 +10,7 @@ import { BrowserWindow } from 'electron';
 // 本地模块导入
 import { 
   CloudStorageConfig, 
+  CloudBackupCreateOptions,
   WebDAVConfig, 
   ICloudConfig, 
   CloudBackupInfo, 
@@ -287,7 +288,7 @@ export class CloudBackupManager {
     });
 
     // 创建云端备份
-    ipcMain.handle('cloud:create-backup', async (_, storageId: string, description?: string): Promise<CloudBackupResult> => {
+    ipcMain.handle('cloud:create-backup', async (_, storageId: string, options?: string | CloudBackupCreateOptions): Promise<CloudBackupResult> => {
       try {
         const config = this.getStorageConfig(storageId);
         // 直接通过数据库服务导出数据，然后创建备份
@@ -296,26 +297,30 @@ export class CloudBackupManager {
           throw new Error('没有找到主窗口，无法访问数据库');
         }
         
-        // 从渲染进程获取数据（使用备份专用方法，确保图片 Blob 被序列化为 base64）
-        const exportResult = await mainWindow.webContents.executeJavaScript(`
-          (async () => {
-            try {
-              if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
-                throw new Error('数据库API未初始化');
+        const normalizedOptions = typeof options === 'string' ? { description: options } : options;
+        let backupDataToWrite = normalizedOptions?.data;
+        if (!backupDataToWrite) {
+          // 手动备份未携带预导出数据时，再从渲染进程读取。
+          const exportResult = await mainWindow.webContents.executeJavaScript(`
+            (async () => {
+              try {
+                if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                  throw new Error('数据库API未初始化');
+                }
+                const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                return await databaseServiceManager.exportAllDataForBackup();
+              } catch (error) {
+                return {
+                  success: false,
+                  error: error.message || '未知错误'
+                };
               }
-              const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-              return await databaseServiceManager.exportAllDataForBackup();
-            } catch (error) {
-              return {
-                success: false,
-                error: error.message || '未知错误'
-              };
-            }
-          })()
-        `);
-        
-        if (!exportResult.success) {
-          throw new Error(`获取数据失败: ${exportResult.error}`);
+            })()
+          `);
+          if (!exportResult.success) {
+            throw new Error(`获取数据失败: ${exportResult.error}`);
+          }
+          backupDataToWrite = exportResult.data;
         }
         
         // 创建本地备份信息
@@ -326,9 +331,13 @@ export class CloudBackupManager {
         const localBackup = createBackupPayload({
           id: backupId,
           name: backupName,
-          description: description || '云端备份',
+          description: normalizedOptions?.description || '云端备份',
           createdAt: timestamp,
-          data: exportResult.data
+          data: backupDataToWrite,
+          backupType: normalizedOptions?.backupType,
+          trigger: normalizedOptions?.trigger,
+          deviceId: normalizedOptions?.deviceId,
+          dataChecksum: normalizedOptions?.dataChecksum
         });
         
         const provider = this.createProvider(config);

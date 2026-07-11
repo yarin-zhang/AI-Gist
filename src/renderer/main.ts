@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import i18n from './i18n'
-import { initDatabase, databaseService, cloudSyncService } from './lib/services'
+import { initDatabase, databaseService, cloudSyncService, automaticBackupService } from './lib/services'
 import type { SupportedLocale } from '@shared/types/preferences'
 import { PlatformDetector } from '@shared/platform'
 import './tailwind.css'
@@ -207,6 +207,24 @@ async function startApp() {
       platform: PlatformDetector.getPlatform(),
       deviceName: navigator.userAgent
     });
+    await automaticBackupService.startFromSettings();
+
+    if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
+      window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) =>
+        cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs })
+      );
+    }
+
+    if (PlatformDetector.isMobile()) {
+      const { App: CapApp } = await import('@capacitor/app');
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          cloudSyncService.scheduleSync('resume', { delayMs: 0 });
+        } else if (cloudSyncService.hasPendingChanges()) {
+          void cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
+        }
+      });
+    }
 
     // Vue 应用挂载完成后移除加载屏幕
     removeInitialLoading();

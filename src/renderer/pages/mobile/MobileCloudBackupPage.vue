@@ -15,6 +15,10 @@
           <ion-label>{{ t('cloudBackup.autoSync') }}</ion-label>
         </ion-list-header>
         <ion-item>
+          <ion-label>启用自动同步</ion-label>
+          <ion-toggle slot="end" :checked="autoSyncEnabled" @ionChange="saveAutoSyncEnabled"></ion-toggle>
+        </ion-item>
+        <ion-item>
           <ion-label>
             <h3>{{ t('cloudBackup.syncInterval') }}</h3>
             <p>{{ t('cloudBackup.syncIntervalDescription', { minutes: syncIntervalMinutes }) }}</p>
@@ -39,6 +43,25 @@
           >
             {{ t('cloudBackup.saveSyncInterval') }}
           </ion-button>
+        </div>
+        <ion-item>
+          <ion-label>
+            <h3>自动恢复快照</h3>
+            <p>每 6 小时创建完整备份，并仅清理旧的自动快照</p>
+          </ion-label>
+          <ion-toggle slot="end" :checked="autoBackupEnabled" @ionChange="saveAutoBackupEnabled"></ion-toggle>
+        </ion-item>
+        <ion-item>
+          <ion-label>快照间隔（分钟）</ion-label>
+          <ion-input slot="end" type="number" :value="autoBackupIntervalMinutes" @ionInput="handleAutoBackupIntervalInput"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-label>保留份数</ion-label>
+          <ion-input slot="end" type="number" :value="autoBackupRetention" @ionInput="handleAutoBackupRetentionInput"></ion-input>
+        </ion-item>
+        <div class="sync-interval-actions">
+          <ion-button size="small" fill="outline" @click="saveAutoBackupSettings">保存快照策略</ion-button>
+          <ion-button size="small" fill="outline" @click="automaticBackupService.runNow('manual')">立即创建</ion-button>
         </div>
       </ion-list>
 
@@ -304,6 +327,11 @@ import {
   getCloudSyncResultMessage,
   getCloudSyncErrorDiagnosis
 } from '~/lib/services/cloud-sync.service'
+import {
+  automaticBackupService,
+  DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
+  DEFAULT_AUTO_BACKUP_RETENTION
+} from '~/lib/services/automatic-backup.service'
 import { databaseService } from '~/lib/db'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { CloudStorageConfig, CloudBackupInfo } from '@shared/types/cloud-backup'
@@ -315,6 +343,10 @@ const platform = Capacitor.getPlatform()
 const storageConfigs = ref<CloudStorageConfig[]>([])
 const currentBackups = ref<CloudBackupInfo[]>([])
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES)
+const autoSyncEnabled = ref(true)
+const autoBackupEnabled = ref(true)
+const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
+const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const selectedConfig = ref<CloudStorageConfig | null>(null)
 const editingConfig = ref<CloudStorageConfig | null>(null)
 const iCloudAvailable = ref(false)
@@ -365,6 +397,37 @@ const handleSyncIntervalInput = (event: CustomEvent<{ value?: string | number | 
 
 const loadSyncInterval = async () => {
   syncIntervalMinutes.value = await cloudSyncService.getAutoSyncIntervalMinutes()
+}
+
+const loadAutomationSettings = async () => {
+  autoSyncEnabled.value = await cloudSyncService.getAutoSyncEnabled()
+  autoBackupEnabled.value = await automaticBackupService.getEnabled()
+  autoBackupIntervalMinutes.value = await automaticBackupService.getIntervalMinutes()
+  autoBackupRetention.value = await automaticBackupService.getRetention()
+}
+
+const saveAutoSyncEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
+  autoSyncEnabled.value = await cloudSyncService.setAutoSyncEnabled(event.detail.checked)
+}
+
+const saveAutoBackupEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
+  autoBackupEnabled.value = await automaticBackupService.setEnabled(event.detail.checked)
+}
+
+const handleAutoBackupIntervalInput = (event: CustomEvent<{ value?: string | number | null }>) => {
+  const value = Number(event.detail.value)
+  if (Number.isFinite(value)) autoBackupIntervalMinutes.value = value
+}
+
+const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | number | null }>) => {
+  const value = Number(event.detail.value)
+  if (Number.isFinite(value)) autoBackupRetention.value = value
+}
+
+const saveAutoBackupSettings = async () => {
+  autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
+  autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value)
+  await showToast('自动恢复快照策略已保存')
 }
 
 const saveSyncInterval = async () => {
@@ -934,6 +997,7 @@ const showToast = async (message: string, color: string = 'success') => {
 
 onMounted(() => {
   loadSyncInterval()
+  loadAutomationSettings()
   loadStorageConfigs()
   checkICloudAvailability()
 })

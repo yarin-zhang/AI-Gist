@@ -17,6 +17,7 @@ import { QuickOptimizationService } from './quick-optimization.service';
 import { generateUUID } from '../utils/uuid';
 import { emitDataChange } from './data-change-events';
 import { unwrapBackupData } from '@shared/backup-integrity';
+import { dataOperationLock } from './data-operation-lock';
 
 const SYNCABLE_DATA_STORES = [
   'categories',
@@ -421,7 +422,10 @@ export class DatabaseServiceManager {
         success: true,
         message: '数据导出成功',
         data: exportData,
-        recordCount: Object.values(exportData).reduce((sum, arr) => sum + arr.length, 0),
+        recordCount: Object.values(exportData).reduce<number>(
+          (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
+          0
+        ),
         size: JSON.stringify(exportData).length
       };
       
@@ -440,6 +444,10 @@ export class DatabaseServiceManager {
    * 移动端备份时使用此方法，确保 imageBlobs 能正确序列化为 JSON
    */
   async exportAllDataForBackup(): Promise<DataExportResult> {
+    return dataOperationLock.runExclusive(() => this.exportAllDataForBackupUnlocked());
+  }
+
+  private async exportAllDataForBackupUnlocked(): Promise<DataExportResult> {
     try {
       const result = await this.exportAllData();
       if (!result.success || !result.data) return result;
@@ -562,6 +570,10 @@ export class DatabaseServiceManager {
    * 与普通备份相比，同步快照额外包含删除标记，避免多端硬删除丢失。
    */
   async exportAllDataForSync(): Promise<DataExportResult> {
+    return dataOperationLock.runExclusive(() => this.exportAllDataForSyncUnlocked());
+  }
+
+  private async exportAllDataForSyncUnlocked(): Promise<DataExportResult> {
     try {
       await this.ensureStableSyncUUIDs();
     } catch (error) {
@@ -572,7 +584,7 @@ export class DatabaseServiceManager {
       };
     }
 
-    const result = await this.exportAllDataForBackup();
+    const result = await this.exportAllDataForBackupUnlocked();
     if (!result.success || !result.data) return result;
 
     let syncTombstones: any[] = [];
@@ -905,6 +917,10 @@ export class DatabaseServiceManager {
    * 恢复数据
    */
   async restoreData(backupData: any, options: { skipClean?: boolean } = {}): Promise<DataImportResult> {
+    return dataOperationLock.runExclusive(() => this.restoreDataUnlocked(backupData, options));
+  }
+
+  private async restoreDataUnlocked(backupData: any, options: { skipClean?: boolean } = {}): Promise<DataImportResult> {
     try {
       this.debugLog('渲染进程: 开始恢复数据...');
       backupData = unwrapBackupData(backupData);
@@ -1205,6 +1221,10 @@ export class DatabaseServiceManager {
    * 完全替换所有数据（先清空，再恢复）
    */
   async replaceAllData(backupData: any): Promise<DataImportResult> {
+    return dataOperationLock.runExclusive(() => this.replaceAllDataUnlocked(backupData));
+  }
+
+  private async replaceAllDataUnlocked(backupData: any): Promise<DataImportResult> {
     try {
       this.debugLog('渲染进程: 开始完全替换数据...');
       const dataToRestore = unwrapBackupData(backupData);
@@ -1214,7 +1234,7 @@ export class DatabaseServiceManager {
       await this.forceCleanAllTables();
       
       // 然后恢复数据
-      return await this.restoreData(dataToRestore, { skipClean: true });
+      return await this.restoreDataUnlocked(dataToRestore, { skipClean: true });
     } catch (error) {
       this.debugError('渲染进程: 完全替换数据失败:', error);
       return {

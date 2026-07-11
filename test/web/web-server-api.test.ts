@@ -232,7 +232,10 @@ describe('web server API handler', () => {
       promptTitle: 'Web 端备份 manifest 较新标题',
       settingValue: 'newer-backup'
     })
-    const stalePrimarySnapshot = createCloudSyncSnapshot(oldData, 'web-device-a', 'web-proxy-primary-old')
+    const stalePrimarySnapshot = {
+      ...createCloudSyncSnapshot(oldData, 'web-device-a', 'web-proxy-primary-old'),
+      createdAt: '2026-06-13T20:50:00.000Z'
+    }
     const newerBackupSnapshot = {
       ...createCloudSyncSnapshot(newerData, 'web-device-b', 'web-proxy-backup-newer'),
       createdAt: '2026-06-13T21:10:00.000Z'

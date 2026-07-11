@@ -548,7 +548,11 @@ async function listWebDAVBackups({ config }) {
         cloudPath,
         storageId: config.id,
         version: backupData.version,
-        checksum: parsedBackup.checksum
+        checksum: parsedBackup.checksum,
+        backupType: backupData.backupType,
+        trigger: backupData.trigger,
+        deviceId: backupData.deviceId,
+        dataChecksum: backupData.dataChecksum
       });
     } catch (error) {
       console.warn(`[web] 跳过无法解析的备份文件 ${cloudPath}:`, error);
@@ -576,7 +580,11 @@ async function writeWebDAVBackup({ config, fileName, backupData }) {
     cloudPath,
     storageId: config.id,
     version: backupPayload.version,
-    checksum: parsedBackup.checksum
+    checksum: parsedBackup.checksum,
+    backupType: backupPayload.backupType,
+    trigger: backupPayload.trigger,
+    deviceId: backupPayload.deviceId,
+    dataChecksum: backupPayload.dataChecksum
   };
 }
 

@@ -41,6 +41,26 @@ describe('backup-integrity', () => {
     expect(() => parseBackupPayload(payload)).toThrow('备份数据校验失败')
   })
 
+  it('保留自动恢复快照元数据且不影响旧格式校验', () => {
+    const payload = createBackupPayload({
+      id: 'automatic-1',
+      name: 'backup-automatic',
+      createdAt: '2026-07-11T00:00:00.000Z',
+      data,
+      backupType: 'automatic',
+      trigger: 'interval',
+      deviceId: 'electron',
+      dataChecksum: 'fnv1a32:test'
+    })
+
+    expect(parseBackupPayload(payload).payload).toMatchObject({
+      backupType: 'automatic',
+      trigger: 'interval',
+      deviceId: 'electron',
+      dataChecksum: 'fnv1a32:test'
+    })
+  })
+
   it('兼容旧版本裸数据导入', () => {
     expect(unwrapBackupData(data)).toEqual(data)
   })

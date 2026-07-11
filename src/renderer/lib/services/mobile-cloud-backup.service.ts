@@ -13,6 +13,7 @@ import WebDav from '@renderer/capacitor-bridge/webdav-native'
 import type {
   CloudStorageConfig,
   CloudBackupInfo,
+  CloudBackupCreateOptions,
   CloudBackupResult,
   CloudRestoreResult,
   CloudFileInfo
@@ -606,7 +607,11 @@ export class MobileCloudBackupService {
               ? getCloudBackupFilePath(file.name)
               : joinCloudPath(file.name),
             storageId: config.id,
-            checksum
+            checksum,
+            backupType: backupData.backupType,
+            trigger: backupData.trigger,
+            deviceId: backupData.deviceId,
+            dataChecksum: backupData.dataChecksum
           })
         } else {
           this.debugLog('读取备份文件失败，状态码:', fileResponse.status, file.name)
@@ -749,20 +754,19 @@ export class MobileCloudBackupService {
     const files = await this.listWebDAVFilesViaPropfind(config, getCloudSyncSnapshotsDirectoryPath())
     return files
       .filter(file => !file.isDirectory)
-      .map(file => {
+      .flatMap<CloudSyncRemoteSnapshotInfo>(file => {
         const revision = getCloudSyncSnapshotRevisionFromFileName(file.name)
         if (!revision) {
-          return null
+          return []
         }
 
-        return {
+        return [{
           revision,
           path: getCloudSyncSnapshotPath(revision),
           modifiedAt: file.modifiedAt,
           size: file.size
-        }
+        }]
       })
-      .filter((info): info is CloudSyncRemoteSnapshotInfo => !!info)
   }
 
   private async readWebDAVSyncSnapshot(
@@ -960,7 +964,11 @@ export class MobileCloudBackupService {
               size: file.size || 0,
               cloudPath: `${dirPath}/${file.name}`,
               storageId: config.id,
-              checksum: parsedBackup.checksum
+              checksum: parsedBackup.checksum,
+              backupType: backupData.backupType,
+              trigger: backupData.trigger,
+              deviceId: backupData.deviceId,
+              dataChecksum: backupData.dataChecksum
             })
           } catch (error) {
             this.debugLog('解析 iCloud 备份文件失败:', file.name, error)
@@ -1315,7 +1323,7 @@ export class MobileCloudBackupService {
   async createCloudBackup(
     storageId: string,
     data: any,
-    description?: string
+    options?: string | CloudBackupCreateOptions
   ): Promise<CloudBackupResult> {
     try {
       const configs = await this.getStorageConfigs()
@@ -1334,12 +1342,17 @@ export class MobileCloudBackupService {
       // 使用与桌面端一致的命名格式：backup-YYYY-MM-DD-xxxxxxxx
       const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`
 
+      const normalizedOptions = typeof options === 'string' ? { description: options } : options
       const backupData = createBackupPayload({
         id: backupId,
         name: backupName,
-        description: description || '移动端云端备份',
+        description: normalizedOptions?.description || '移动端云端备份',
         createdAt: timestamp,
-        data
+        data,
+        backupType: normalizedOptions?.backupType,
+        trigger: normalizedOptions?.trigger,
+        deviceId: normalizedOptions?.deviceId,
+        dataChecksum: normalizedOptions?.dataChecksum
       })
 
       const jsonString = JSON.stringify(backupData, null, 2)
@@ -1405,7 +1418,11 @@ export class MobileCloudBackupService {
           size: new Blob([jsonString]).size,
           cloudPath,
           storageId: config.id,
-          checksum: backupData.checksum
+          checksum: backupData.checksum,
+          backupType: backupData.backupType,
+          trigger: backupData.trigger,
+          deviceId: backupData.deviceId,
+          dataChecksum: backupData.dataChecksum
         }
 
         this.debugLog('备份创建成功:', backupInfo)
@@ -1502,7 +1519,11 @@ export class MobileCloudBackupService {
         size: new Blob([jsonString]).size,
         cloudPath: `${dirPath}/${fileName}`,
         storageId: config.id,
-        checksum: backupData.checksum
+        checksum: backupData.checksum,
+        backupType: backupData.backupType,
+        trigger: backupData.trigger,
+        deviceId: backupData.deviceId,
+        dataChecksum: backupData.dataChecksum
       }
 
       return {

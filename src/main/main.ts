@@ -1,4 +1,5 @@
-import { app, BrowserWindow, session, Menu } from 'electron';
+import { app, BrowserWindow, session, Menu, ipcMain, powerMonitor } from 'electron';
+import { randomUUID } from 'crypto';
 import { 
   windowManager, 
   trayManager, 
@@ -17,6 +18,58 @@ import { CloudBackupManager } from './cloud/cloud-backup-manager';
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
 let cloudBackupManager: CloudBackupManager;
+let quitFlushCompleted = false;
+let quitFlushInProgress = false;
+let resourcesCleaned = false;
+
+async function requestRendererSyncFlush(timeoutMs = 5000): Promise<void> {
+  const mainWindow = windowManager.getMainWindow();
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
+
+  const id = randomUUID();
+  await new Promise<void>(resolve => {
+    const timer = setTimeout(() => {
+      ipcMain.removeListener('cloud-sync:flush-response', onResponse);
+      resolve();
+    }, timeoutMs + 250);
+    const onResponse = (_event: Electron.IpcMainEvent, response: { id?: string }) => {
+      if (response?.id !== id) return;
+      clearTimeout(timer);
+      ipcMain.removeListener('cloud-sync:flush-response', onResponse);
+      resolve();
+    };
+    ipcMain.on('cloud-sync:flush-response', onResponse);
+    mainWindow.webContents.send('cloud-sync:flush-request', { id, reason: 'shutdown', timeoutMs });
+  });
+}
+
+function cleanupResources(): void {
+  if (resourcesCleaned) return;
+  resourcesCleaned = true;
+  ipcHandlers.cleanup();
+  trayManager.destroy();
+  themeManager.cleanup();
+}
+
+function beginGracefulQuit(timeoutMs: number, source: string): void {
+  if (quitFlushCompleted || quitFlushInProgress) return;
+  quitFlushInProgress = true;
+  console.log(`${source}，刷新待同步数据...`);
+  isQuitting = true;
+  windowManager.setQuitting(true);
+  void requestRendererSyncFlush(timeoutMs).finally(() => {
+    quitFlushCompleted = true;
+    quitFlushInProgress = false;
+    app.quit();
+  });
+}
+
+function attachSystemSessionEndHandler(window: BrowserWindow): void {
+  window.on('session-end', () => {
+    // Electron 32 的 Windows session-end 不可阻塞，只能做最后一次尽力刷新。
+    void requestRendererSyncFlush(3000);
+  });
+}
 
 // 防止多重启动 - 初始化单实例管理器
 singleInstanceManager.initialize();
@@ -60,6 +113,12 @@ app.whenReady().then(async () => {
   
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
+  attachSystemSessionEndHandler(mainWindow);
+  (powerMonitor as any).on('shutdown', (event: Electron.Event) => {
+    // Electron 32 的类型声明缺少事件参数，但 Linux/macOS 运行时支持阻止关机以便限时清理。
+    event.preventDefault();
+    beginGracefulQuit(3000, '系统即将关机');
+  });
   
   // 设置主题管理器的主窗口引用
   themeManager.setMainWindow(mainWindow);
@@ -103,6 +162,7 @@ app.whenReady().then(async () => {
     } else if (BrowserWindow.getAllWindows().length === 0) {
       // 如果没有窗口，则创建新窗口
       const newWindow = windowManager.createMainWindow();
+      attachSystemSessionEndHandler(newWindow);
       trayManager.setMainWindow(newWindow);
       themeManager.setMainWindow(newWindow);
     }
@@ -129,21 +189,12 @@ app.on('window-all-closed', function () {
 });
 
 // 应用即将退出时的处理
-app.on('before-quit', () => {
-  console.log('应用即将退出，清理资源...');
-  isQuitting = true;
-  windowManager.setQuitting(true);
-  
-  // 清理资源
-  ipcHandlers.cleanup();
-  trayManager.destroy();
-  themeManager.cleanup();
-  
-  // 强制销毁所有窗口
-  const allWindows = BrowserWindow.getAllWindows();
-  allWindows.forEach(window => {
-    if (!window.isDestroyed()) {
-      window.destroy();
-    }
-  });
+app.on('before-quit', (event) => {
+  if (quitFlushCompleted) {
+    cleanupResources();
+    return;
+  }
+
+  event.preventDefault();
+  beginGracefulQuit(5000, '应用即将退出');
 });

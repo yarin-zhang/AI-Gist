@@ -143,8 +143,12 @@
                 <NFlex vertical :size="12">
                     <NText depth="2">自动同步</NText>
                     <NText depth="3" style="font-size: 12px;">
-                        应用会按这个周期检查云端变化；本机变更也会遵守同一节流周期，避免反复连接云存储。
+                        本机数据变更后约 5 秒自动上传；下方周期用于检查其他设备的云端变化。
                     </NText>
+                    <NFlex align="center" justify="space-between">
+                        <NText>启用自动同步</NText>
+                        <NSwitch v-model:value="autoSyncEnabled" @update:value="saveAutoSyncEnabled" />
+                    </NFlex>
                     <NFlex align="center" :size="12">
                         <NInputNumber
                             v-model:value="syncIntervalMinutes"
@@ -163,6 +167,40 @@
                             保存频率
                         </NButton>
                     </NFlex>
+                    <NText v-if="syncStatus.lastLocalChangeAt" depth="3" style="font-size: 12px;">
+                        最后本地变更：{{ formatDate(syncStatus.lastLocalChangeAt) }}；
+                        {{ syncStatus.pendingChanges ? '尚有数据等待同步' : '本地变更已同步' }}
+                    </NText>
+                </NFlex>
+            </div>
+
+            <NDivider />
+
+            <div>
+                <NFlex vertical :size="12">
+                    <NText depth="2">自动恢复快照</NText>
+                    <NText depth="3" style="font-size: 12px;">
+                        定期创建独立完整备份，用于在误删或错误同步后回滚；不会清理手动备份。
+                    </NText>
+                    <NFlex align="center" justify="space-between">
+                        <NText>启用自动恢复快照</NText>
+                        <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
+                    </NFlex>
+                    <NFlex align="center" :size="12">
+                        <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080" :step="60" style="width: 180px;">
+                            <template #suffix>分钟</template>
+                        </NInputNumber>
+                        <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100" style="width: 160px;">
+                            <template #suffix>份</template>
+                        </NInputNumber>
+                        <NButton secondary @click="saveAutoBackupSettings" :loading="loading.saveAutoBackup">保存快照策略</NButton>
+                        <NButton secondary @click="runAutoBackupNow" :loading="autoBackupStatus.status === 'backing-up'">立即创建</NButton>
+                    </NFlex>
+                    <NText depth="3" style="font-size: 12px;">
+                        最近快照：{{ autoBackupStatus.lastBackupAt ? formatDate(autoBackupStatus.lastBackupAt) : '暂无' }}
+                        <template v-if="autoBackupStatus.nextBackupAt">；下次执行：{{ formatDate(autoBackupStatus.nextBackupAt) }}</template>
+                        <template v-if="autoBackupStatus.error">；失败：{{ autoBackupStatus.error }}</template>
+                    </NText>
                 </NFlex>
             </div>
 
@@ -415,7 +453,7 @@ import {
     Copy,
     AlertTriangle,
 } from "@vicons/tabler";
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { CloudBackupAPI } from "@/lib/api/cloud-backup.api";
 import { PlatformDetector } from "@shared/platform";
@@ -427,6 +465,13 @@ import {
     getCloudSyncResultMessage,
     getCloudSyncErrorDiagnosis,
 } from "@/lib/services/cloud-sync.service";
+import {
+    automaticBackupService,
+    DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
+    DEFAULT_AUTO_BACKUP_RETENTION,
+} from "@/lib/services/automatic-backup.service";
+import type { AutomaticBackupStatus } from "@/lib/services/automatic-backup.service";
+import type { CloudSyncStatus } from "@/lib/services/cloud-sync.service";
 import type { CloudStorageConfig, CloudBackupInfo } from "@shared/types/cloud-backup";
 
 const message = useMessage();
@@ -437,6 +482,12 @@ const capabilities = PlatformDetector.getCapabilities();
 const storageConfigs = ref<CloudStorageConfig[]>([]);
 const cloudBackups = ref<CloudBackupInfo[]>([]);
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES);
+const autoSyncEnabled = ref(true);
+const autoBackupEnabled = ref(true);
+const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
+const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION);
+const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus());
+const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus());
 const activeTabKey = ref<string>('');
 const showConfigModal = ref(false);
 const syncErrorDialogVisible = ref(false);
@@ -450,8 +501,11 @@ const loading = ref({
     refreshList: false,
     syncNow: false,
     saveSyncInterval: false,
+    saveAutoBackup: false,
     checkICloud: false,
 });
+let unsubscribeSyncStatus: (() => void) | null = null;
+let unsubscribeBackupStatus: (() => void) | null = null;
 
 // 分页相关状态
 const currentPage = ref(1);
@@ -617,6 +671,42 @@ const loadStorageConfigs = async () => {
 
 const loadSyncInterval = async () => {
     syncIntervalMinutes.value = await cloudSyncService.getAutoSyncIntervalMinutes();
+};
+
+const loadAutomationSettings = async () => {
+    [autoSyncEnabled.value, autoBackupEnabled.value, autoBackupIntervalMinutes.value, autoBackupRetention.value] = await Promise.all([
+        cloudSyncService.getAutoSyncEnabled(),
+        automaticBackupService.getEnabled(),
+        automaticBackupService.getIntervalMinutes(),
+        automaticBackupService.getRetention()
+    ]);
+};
+
+const saveAutoSyncEnabled = async (enabled: boolean) => {
+    autoSyncEnabled.value = await cloudSyncService.setAutoSyncEnabled(enabled);
+    message.success(enabled ? '自动同步已启用' : '自动同步已关闭');
+};
+
+const saveAutoBackupEnabled = async (enabled: boolean) => {
+    autoBackupEnabled.value = await automaticBackupService.setEnabled(enabled);
+    message.success(enabled ? '自动恢复快照已启用' : '自动恢复快照已关闭');
+};
+
+const saveAutoBackupSettings = async () => {
+    loading.value.saveAutoBackup = true;
+    try {
+        autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
+        autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value);
+        message.success('自动恢复快照策略已保存');
+    } finally {
+        loading.value.saveAutoBackup = false;
+    }
+};
+
+const runAutoBackupNow = async () => {
+    await automaticBackupService.runNow('manual');
+    if (automaticBackupService.getStatus().error) message.error(automaticBackupService.getStatus().error!);
+    else message.success('自动恢复快照检查完成');
 };
 
 const saveSyncInterval = async () => {
@@ -1015,11 +1105,19 @@ watch(activeTabKey, async (newTabKey) => {
 
 // 生命周期
 onMounted(async () => {
+    unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => { syncStatus.value = status; });
+    unsubscribeBackupStatus = automaticBackupService.onStatusChange(status => { autoBackupStatus.value = status; });
     await Promise.all([
         loadStorageConfigs(),
         loadSyncInterval(),
+        loadAutomationSettings(),
         checkICloudAvailability()
     ]);
+});
+
+onUnmounted(() => {
+    unsubscribeSyncStatus?.();
+    unsubscribeBackupStatus?.();
 });
 </script>
 

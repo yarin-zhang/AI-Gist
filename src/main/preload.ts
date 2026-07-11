@@ -61,6 +61,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getContentSize: () => ipcRenderer.invoke('get-content-size'),
   },
 
+  lifecycle: {
+    onFlushRequested: (callback: (options: { reason: string; timeoutMs: number }) => Promise<any>) => {
+      const listener = async (_event: Electron.IpcRendererEvent, request: { id: string; reason: string; timeoutMs: number }) => {
+        try {
+          const result = await callback({ reason: request.reason, timeoutMs: request.timeoutMs });
+          ipcRenderer.send('cloud-sync:flush-response', { id: request.id, result });
+        } catch (error) {
+          ipcRenderer.send('cloud-sync:flush-response', {
+            id: request.id,
+            result: { success: false, skipped: false, timedOut: false, error: error instanceof Error ? error.message : String(error) }
+          });
+        }
+      };
+      ipcRenderer.on('cloud-sync:flush-request', listener);
+      return () => ipcRenderer.removeListener('cloud-sync:flush-request', listener);
+    }
+  },
+
   // 主题管理
   theme: {
     getCurrent: () => ipcRenderer.invoke('theme:get-current'),
@@ -139,7 +157,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteStorageConfig: (id: string) => ipcRenderer.invoke('cloud:delete-storage-config', id),
     testStorageConnection: (config: any) => ipcRenderer.invoke('cloud:test-storage-connection', config),
     getBackupList: (storageId: string) => ipcRenderer.invoke('cloud:get-backup-list', storageId),
-    createBackup: (storageId: string, description?: string) => ipcRenderer.invoke('cloud:create-backup', storageId, description),
+    createBackup: (storageId: string, options?: any) => ipcRenderer.invoke('cloud:create-backup', storageId, options),
     restoreBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:restore-backup', storageId, backupId),
     deleteBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:delete-backup', storageId, backupId),
     getSyncManifest: (storageId: string) => ipcRenderer.invoke('cloud:get-sync-manifest', storageId),
