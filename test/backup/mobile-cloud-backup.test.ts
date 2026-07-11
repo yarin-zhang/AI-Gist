@@ -58,7 +58,12 @@ import { Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
 import { CapacitorHttp, Capacitor } from '@capacitor/core'
 import { createEmptyCloudSyncManifest } from '@shared/cloud-sync-manifest'
-import { getCloudSyncSnapshotFileName } from '@shared/cloud-backup-paths'
+import {
+  getCloudSyncSnapshotFileName,
+  getCloudSyncV2ArtifactPath,
+  getCloudSyncV2DirectoryPath,
+  getCloudSyncV2ManifestPath
+} from '@shared/cloud-backup-paths'
 import {
   createCloudSyncDataChecksum,
   createCloudSyncSnapshot
@@ -166,22 +171,33 @@ function installICloudMemoryFilesystem() {
     }
 
     const prefix = `${normalizedPath}/`
-    const childNames = [...files.keys()]
+    const childFiles = [...files.keys()]
       .filter(filePath => filePath.startsWith(prefix))
       .map(filePath => filePath.slice(prefix.length))
       .filter(name => name && !name.includes('/'))
+    const childDirectories = [...directories]
+      .filter(directoryPath => directoryPath.startsWith(prefix))
+      .map(directoryPath => directoryPath.slice(prefix.length))
+      .filter(name => name && !name.includes('/'))
 
     return {
-      files: childNames.map(name => ({
-        name,
-        size: files.get(`${prefix}${name}`)?.length || 0
-      }))
+      files: [
+        ...childDirectories.map(name => ({ name, type: 'directory', size: 0 })),
+        ...childFiles.map(name => ({
+          name,
+          type: 'file',
+          size: files.get(`${prefix}${name}`)?.length || 0
+        }))
+      ]
     }
   })
   ;(Filesystem.stat as any).mockImplementation(async ({ path }: { path: string }) => {
     const normalizedPath = (path || '').replace(/\/+$/, '')
     if (directories.has(normalizedPath) || files.has(normalizedPath)) {
-      return { type: files.has(normalizedPath) ? 'file' : 'directory' }
+      return {
+        type: files.has(normalizedPath) ? 'file' : 'directory',
+        size: files.get(normalizedPath)?.length || 0
+      }
     }
     throw new Error('File does not exist')
   })
@@ -198,6 +214,11 @@ function installICloudMemoryFilesystem() {
   ;(Filesystem.writeFile as any).mockImplementation(async ({ path, data }: { path: string; data: string }) => {
     addParentDirectories(path)
     files.set(path, data)
+  })
+  ;(Filesystem.deleteFile as any).mockImplementation(async ({ path }: { path: string }) => {
+    if (!files.delete(path)) {
+      throw new Error('File does not exist')
+    }
   })
 
   return files
@@ -670,6 +691,99 @@ describe('MobileCloudBackupService', () => {
       })
       expect(JSON.parse(files.get('AI-Gist-Backup/sync-manifest.json')!).latestSnapshot.revision)
         .toBe('icloud-remote-rev')
+    })
+  })
+
+  describe('sync-v2 对象存储传输', () => {
+    it('WebDAV 保真读取二进制并执行 ETag 条件写入', async () => {
+      await saveConfig(service)
+      const bytes = new Uint8Array([0, 255, 17, 128])
+      mockCapacitorHttp.request.mockResolvedValueOnce({
+        status: 200,
+        data: btoa(String.fromCharCode(...bytes)),
+        headers: { ETag: '"v1"' }
+      })
+      const path = getCloudSyncV2ArtifactPath('blobs', 'blob:sha256:test')
+
+      const object = await service.readCloudSyncV2Object('cfg-1', path)
+      expect([...object!.data]).toEqual([...bytes])
+      expect(object?.etag).toBe('"v1"')
+
+      mockCapacitorHttp.request.mockImplementation(async (request: any) =>
+        request.method === 'PUT'
+          ? { status: 412, headers: { etag: '"winner"' } }
+          : { status: 405 }
+      )
+      const result = await service.writeCloudSyncV2Object(
+        'cfg-1',
+        getCloudSyncV2ManifestPath(),
+        bytes,
+        { expectedEtag: 'v1' }
+      )
+      expect(result).toEqual({ status: 'precondition_failed', etag: '"winner"' })
+      const put = mockCapacitorHttp.request.mock.calls.map((call: any[]) => call[0])
+        .find((request: any) => request.method === 'PUT')
+      expect(put).toMatchObject({
+        dataType: 'file',
+        data: btoa(String.fromCharCode(...bytes))
+      })
+      expect(put.headers['If-Match']).toBe('"v1"')
+    })
+
+    it('拒绝路径穿越及 sync-v2 命名空间之外的访问', async () => {
+      await saveConfig(service)
+      const invalid = [
+        '/AI-Gist-Backup/sync-v2/../secret',
+        '/AI-Gist-Backup/sync-v2/%2e%2e/secret',
+        '/AI-Gist-Backup/sync-v2\\secret',
+        '/AI-Gist-Backup/sync/manifest.json'
+      ]
+      for (const path of invalid) {
+        await expect(service.readCloudSyncV2Object('cfg-1', path)).rejects.toThrow(/sync-v2/)
+        await expect(service.writeCloudSyncV2Object('cfg-1', path, new Uint8Array())).rejects.toThrow(/sync-v2/)
+        await expect(service.listCloudSyncV2Objects('cfg-1', path)).rejects.toThrow(/sync-v2/)
+        await expect(service.deleteCloudSyncV2Object('cfg-1', path)).rejects.toThrow(/sync-v2/)
+      }
+      expect(mockCapacitorHttp.request).not.toHaveBeenCalled()
+    })
+
+    it('iCloud 支持无条件二进制对象操作和列表', async () => {
+      await saveConfig(service, {
+        ...webdavConfig,
+        id: 'cfg-icloud',
+        type: 'icloud',
+        path: 'AI-Gist-Backup'
+      } as any)
+      const files = installICloudMemoryFilesystem()
+      const path = getCloudSyncV2ArtifactPath('blobs', 'blob:sha256:mobile')
+      const bytes = new Uint8Array([0, 200, 255, 10])
+
+      expect(await service.writeCloudSyncV2Object('cfg-icloud', path, bytes)).toEqual({ status: 'written' })
+      expect([...(await service.readCloudSyncV2Object('cfg-icloud', path))!.data]).toEqual([...bytes])
+      expect(await service.listCloudSyncV2Objects('cfg-icloud', getCloudSyncV2DirectoryPath()))
+        .toEqual([expect.objectContaining({ path })])
+      await service.deleteCloudSyncV2Object('cfg-icloud', path)
+      expect(files.has('AI-Gist-Backup/sync-v2/blobs/blob~3Asha256~3Amobile.bin')).toBe(false)
+    })
+
+    it('iCloud 缺少原子 CAS 时安全拒绝条件写入', async () => {
+      await saveConfig(service, {
+        ...webdavConfig,
+        id: 'cfg-icloud',
+        type: 'icloud',
+        path: 'AI-Gist-Backup'
+      } as any)
+      const files = installICloudMemoryFilesystem()
+      files.set('AI-Gist-Backup/sync-v2/manifest.json', btoa('old'))
+
+      expect(await service.writeCloudSyncV2Object(
+        'cfg-icloud',
+        getCloudSyncV2ManifestPath(),
+        new Uint8Array([110, 101, 119]),
+        { expectedEtag: '"old"' }
+      )).toEqual({ status: 'precondition_failed' })
+      expect(files.get('AI-Gist-Backup/sync-v2/manifest.json')).toBe(btoa('old'))
+      expect(Filesystem.writeFile).not.toHaveBeenCalled()
     })
   })
 

@@ -28,6 +28,12 @@ import type {
 import type {
   CloudSyncSnapshot
 } from '../cloud-sync-engine';
+import type {
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '../cloud-sync-v2-repository';
 
 /**
  * Electron API 接口定义
@@ -141,6 +147,15 @@ export default interface ElectronApi {
       storageId: string,
       snapshot: CloudSyncSnapshot
     ) => Promise<{ success: boolean; error?: string }>
+    readCloudSyncV2Object: (storageId: string, path: string) => Promise<CloudSyncV2StoredObject | null>
+    writeCloudSyncV2Object: (
+      storageId: string,
+      path: string,
+      data: Uint8Array,
+      options?: CloudSyncV2ObjectWriteOptions
+    ) => Promise<CloudSyncV2ObjectWriteResult>
+    listCloudSyncV2Objects: (storageId: string, prefix: string) => Promise<CloudSyncV2StoredObjectInfo[]>
+    deleteCloudSyncV2Object: (storageId: string, path: string) => Promise<void>
   }
 
   // 应用信息和更新

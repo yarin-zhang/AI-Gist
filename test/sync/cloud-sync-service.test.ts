@@ -130,6 +130,39 @@ describe('CloudSyncService', () => {
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain(savedManifest.latestSnapshot.revision)
   })
 
+  it('keeps a successful v1 result when an enabled v2 shadow publish fails', async () => {
+    const v2Coordinator = {
+      mirrorSuccessfulV1Sync: vi.fn().mockResolvedValue({
+        status: 'failed',
+        warning: 'v2 影子发布失败（network）；v1 同步结果不受影响，可稍后重试'
+      }),
+      getRolloutState: vi.fn(),
+      setRolloutMode: vi.fn()
+    }
+    const { service } = createService(baseData, undefined, { v2Coordinator: v2Coordinator as any })
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.action).toBe('uploaded')
+    expect(result.v2MirrorStatus).toBe('failed')
+    expect(result.warnings).toContain('v2 影子发布失败（network）；v1 同步结果不受影响，可稍后重试')
+  })
+
+  it('keeps a successful v1 result when the v2 coordinator itself throws', async () => {
+    const v2Coordinator = {
+      mirrorSuccessfulV1Sync: vi.fn().mockRejectedValue(new DOMException('quota', 'QuotaExceededError')),
+      getRolloutState: vi.fn(),
+      setRolloutMode: vi.fn()
+    }
+    const { service } = createService(baseData, undefined, { v2Coordinator: v2Coordinator as any })
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result).toMatchObject({ success: true, action: 'uploaded', v2MirrorStatus: 'failed' })
+    expect(result.warnings).toContain('v2 影子发布状态记录失败；v1 同步已成功且不受影响')
+  })
+
   it('fails before upload when the local sync export is missing a required collection', async () => {
     const incompleteLocalData = { ...baseData }
     delete (incompleteLocalData as any).promptHistories
@@ -613,7 +646,7 @@ describe('CloudSyncService', () => {
     }))
   })
 
-  it('continues sync when noncritical local sync metadata cannot be stored', async () => {
+  it('reports a warning when the complete local sync base cannot be stored anywhere', async () => {
     const storage = new MemoryStorage()
     const storageSetSpy = vi.spyOn(storage, 'setItem')
       .mockImplementation((key: string, value: string) => {
@@ -643,10 +676,7 @@ describe('CloudSyncService', () => {
         '保存云同步设备 ID 失败:',
         expect.any(Error)
       )
-      expect(warnSpy).toHaveBeenCalledWith(
-        '保存本地同步状态失败:',
-        expect.any(Error)
-      )
+      expect(result.warnings?.[0]).toContain('完整本地同步基线保存失败')
     } finally {
       warnSpy.mockRestore()
     }
@@ -680,7 +710,7 @@ describe('CloudSyncService', () => {
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain(result.remoteRevision)
   })
 
-  it('saves lightweight local sync state when base snapshot exceeds storage quota', async () => {
+  it('does not silently downgrade to a revision-only state when the base snapshot exceeds quota', async () => {
     const storage = new MemoryStorage()
     vi.spyOn(storage, 'setItem')
       .mockImplementation((key: string, value: string) => {
@@ -696,13 +726,35 @@ describe('CloudSyncService', () => {
       const result = await service.syncNow('cfg-1')
 
       expect(result.success).toBe(true)
-      const savedState = JSON.parse(storage.getItem('ai_gist_cloud_sync_state:cfg-1')!)
-      expect(savedState.lastKnownRevision).toBe(result.remoteRevision)
-      expect(savedState.baseSnapshot).toBeUndefined()
-      expect(warnSpy).not.toHaveBeenCalled()
+      expect(result.warnings?.[0]).toContain('完整本地同步基线保存失败')
+      expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toBeNull()
     } finally {
       warnSpy.mockRestore()
     }
+  })
+
+  it('stores the complete sync base in IndexedDB metadata instead of localStorage', async () => {
+    const storage = new MemoryStorage()
+    vi.spyOn(storage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key.startsWith('ai_gist_cloud_sync_state:')) throw new Error('localStorage quota')
+      MemoryStorage.prototype.setItem.call(storage, key, value)
+    })
+    const metadata = new Map<string, any>()
+    const database = {
+      exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, message: 'ok', data: baseData }),
+      replaceAllData: vi.fn().mockResolvedValue({ success: true, atomic: true, message: 'ok' }),
+      getLocalSyncMetadata: vi.fn(async (key: string) => metadata.get(key) || null),
+      setLocalSyncMetadata: vi.fn(async (key: string, value: any) => { metadata.set(key, value) }),
+      removeLocalSyncMetadata: vi.fn(async (key: string) => { metadata.delete(key) })
+    }
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), { storage, database })
+
+    const result = await service.syncNow('cfg-1')
+
+    expect(result.success).toBe(true)
+    const savedState = metadata.get('ai_gist_cloud_sync_state:cfg-1')
+    expect(savedState.baseSnapshot.revision).toBe(result.remoteRevision)
+    expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toBeNull()
   })
 
   it('fails sync when a saved manifest cannot be read back with the same revision', async () => {
@@ -822,6 +874,33 @@ describe('CloudSyncService', () => {
     expect(diagnosis.copyText).toContain(rawError)
     expect(diagnosis.copyText).toContain('存储配置 ID: cfg-1')
     expect(diagnosis.copyText).toContain('连续失败次数: 2')
+  })
+
+  it('redacts credentials, prompt content and image bytes from copyable diagnostics', () => {
+    const diagnosis = getCloudSyncErrorDiagnosis(
+      'request https://alice:super-secret@example.com failed ' +
+      'Authorization: Bearer token-value password=hunter2 ' +
+      'prompt=private-text data:image/png;base64,AAAAABBBBBCCCCCDDDD',
+      { storageId: 'cfg-1', reason: 'manual' }
+    )
+
+    expect(diagnosis.copyText).not.toContain('super-secret')
+    expect(diagnosis.copyText).not.toContain('token-value')
+    expect(diagnosis.copyText).not.toContain('hunter2')
+    expect(diagnosis.copyText).not.toContain('private-text')
+    expect(diagnosis.copyText).not.toContain('AAAAABBBBB')
+    expect(diagnosis.copyText).toContain('已隐藏')
+  })
+
+  it.each([
+    'prompt=my very secret instruction',
+    'x-api-key: sk-production-secret',
+    'password is correct horse battery staple',
+    "{'content': 'private prompt with spaces'}"
+  ])('redacts the entire ambiguous sensitive error: %s', rawError => {
+    const diagnosis = getCloudSyncErrorDiagnosis(rawError, { storageId: 'cfg-1' })
+    expect(diagnosis.copyText).not.toContain(rawError)
+    expect(diagnosis.rawError).toContain('fingerprint=')
   })
 
   it('classifies WebDAV authentication errors as user-fixable diagnostics', () => {
@@ -1262,6 +1341,199 @@ describe('CloudSyncService', () => {
     }))
     expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain('rev-base')
+  })
+
+  it('repairs business-unique collisions before publishing a merged snapshot', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      categories: [
+        baseData.categories[0],
+        {
+          id: 99,
+          uuid: 'cat-other-device',
+          name: 'Base',
+          description: 'Created independently on another device',
+          createdAt: '2026-01-02T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z'
+        }
+      ]
+    }, 'device-b', 'rev-remote')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, cloudClient, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.businessKeyMerges).toHaveLength(1)
+    expect(result.warnings?.[0]).toContain('自动归并 1 组')
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
+      categories: [expect.objectContaining({ uuid: 'cat-1', name: 'Base' })]
+    }))
+    const savedManifest = cloudClient.saveCloudSyncManifest.mock.calls.at(-1)?.[1]
+    expect(savedManifest.latestSnapshot.data.categories).toHaveLength(1)
+    expect(savedManifest.latestSnapshot.data.categories[0]).toMatchObject({
+      uuid: 'cat-1',
+      name: 'Base',
+      description: 'Created independently on another device'
+    })
+  })
+
+  it('does not rollback or repeat an identical deterministic atomic apply failure', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Remote edit', updatedAt: '2026-01-03T00:00:00.000Z' }]
+    }, 'device-b', 'rev-remote')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-01-03T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+    database.replaceAllData.mockResolvedValue({
+      success: false,
+      atomic: true,
+      message: '数据替换失败',
+      error: '写入 prompts 记录失败: quota',
+      errorCode: 'QUOTA_EXCEEDED',
+      retryable: false,
+      failures: [{
+        phase: 'write',
+        code: 'QUOTA_EXCEEDED',
+        collection: 'prompts',
+        storeName: 'prompts',
+        recordKey: 'uuid:prompt-1',
+        businessKey: 'prompt=secret instruction',
+        errorName: 'QuotaExceededError',
+        message: 'password is secret-password',
+        retryable: false
+      }]
+    })
+
+    const first = await service.syncNow('cfg-1', { reason: 'manual' })
+    const second = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(first).toMatchObject({
+      success: false,
+      errorCode: 'LOCAL_APPLY_QUOTA',
+      diagnostic: {
+        phase: 'apply-local',
+        retryClass: 'user-action',
+        failures: [expect.objectContaining({ recordKey: 'uuid:prompt-1' })]
+      }
+    })
+    expect(second.diagnostic?.fingerprint).toBe(first.diagnostic?.fingerprint)
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    const diagnosis = getCloudSyncErrorDiagnosis(first, { storageId: 'cfg-1', reason: 'manual' })
+    expect(diagnosis.title).toBe('本地存储空间不足')
+    expect(diagnosis.copyText).toContain('错误代码: LOCAL_APPLY_QUOTA')
+    expect(diagnosis.copyText).toContain('recordKey=uuid:prompt-1')
+    expect(JSON.stringify(first.diagnostic)).not.toContain('secret-password')
+    expect(JSON.stringify(first.diagnostic)).not.toContain('secret instruction')
+  })
+
+  it('restarts the merge instead of overwriting an edit made after local export', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      categories: [
+        ...baseData.categories,
+        { id: 2, uuid: 'cat-remote', name: 'Remote category', updatedAt: '2026-01-02T00:00:00.000Z' }
+      ]
+    }, 'device-b', 'rev-remote')
+    let manifest: any = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    let currentData: any = baseData
+    let listener: ((change: any) => void) | undefined
+    let releaseManifest!: () => void
+    let notifyManifestStarted!: () => void
+    const manifestStarted = new Promise<void>(resolve => { notifyManifestStarted = resolve })
+    const manifestGate = new Promise<void>(resolve => { releaseManifest = resolve })
+    let manifestReads = 0
+    const cloudClient = {
+      getCloudSyncManifest: vi.fn(async () => {
+        manifestReads += 1
+        if (manifestReads === 1) {
+          notifyManifestStarted()
+          await manifestGate
+        }
+        return manifest
+      }),
+      saveCloudSyncManifest: vi.fn(async (_storageId: string, nextManifest: any) => {
+        manifest = nextManifest
+        return { success: true }
+      })
+    }
+    const database = {
+      exportAllDataForSync: vi.fn(async () => ({ success: true, message: 'ok', data: currentData })),
+      replaceAllData: vi.fn(async () => ({ success: true, atomic: true, message: 'ok' }))
+    }
+    const storage = new MemoryStorage()
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+    const service = new CloudSyncService({
+      cloudClient,
+      database,
+      storage,
+      createDeviceId: () => 'device-a',
+      subscribeToDataChanges: nextListener => {
+        listener = nextListener
+        return () => undefined
+      }
+    })
+    service.startAutoSync({ syncOnStart: false, retryMs: 0, pollIntervalMs: 0 })
+
+    const syncing = service.syncNow('cfg-1', { reason: 'manual' })
+    await manifestStarted
+    currentData = {
+      ...baseData,
+      prompts: [{
+        ...baseData.prompts[0],
+        title: 'Local edit made during sync',
+        updatedAt: '2026-01-03T00:00:00.000Z'
+      }]
+    }
+    listener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    releaseManifest()
+
+    const result = await syncing
+
+    expect(result.success).toBe(true)
+    expect(database.exportAllDataForSync).toHaveBeenCalledTimes(2)
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
+      prompts: [expect.objectContaining({ title: 'Local edit made during sync' })],
+      categories: expect.arrayContaining([expect.objectContaining({ uuid: 'cat-remote' })])
+    }))
+    service.stopAutoSync()
   })
 
   it('ignores corrupted local base snapshots before merging', async () => {

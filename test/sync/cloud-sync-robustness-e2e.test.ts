@@ -1011,7 +1011,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       reason: 'manual'
     })
     expect(deleteUpload, JSON.stringify(deleteUpload, null, 2))
-      .toMatchObject({ success: true, action: 'uploaded' })
+      .toMatchObject({ success: true, action: 'uploaded', appliedLocal: false, uploadedRemote: true })
 
     const deleteDownload = await deviceB.syncNow(storageId, {
       deviceName: 'Phone B',
@@ -1076,7 +1076,8 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       platform: 'electron',
       reason: 'manual'
     })
-    expect(deleteUpload).toMatchObject({ success: true, action: 'uploaded' })
+    expect(deleteUpload, JSON.stringify(deleteUpload, null, 2))
+      .toMatchObject({ success: true, action: 'merged', appliedLocal: true, uploadedRemote: true })
 
     const conflictResult = await deviceB.syncNow(storageId, {
       deviceName: 'Desktop B',
@@ -2175,8 +2176,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       })
       expect(storage.getItem(`ai_gist_cloud_sync_state:${storageId}`)).toBeNull()
       expect(warnSpy).toHaveBeenCalledWith(
-        '保存本地同步状态失败:',
-        expect.any(Error)
+        expect.stringContaining('完整本地同步基线保存失败')
       )
     } finally {
       warnSpy.mockRestore()
@@ -3204,7 +3204,8 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     const retriedDownload = await deviceA.syncNow(storageId, {
       deviceName: 'Laptop A',
       platform: 'electron',
-      reason: 'manual'
+      reason: 'manual',
+      forceRetry: true
     })
     expect(retriedDownload, JSON.stringify(retriedDownload, null, 2))
       .toMatchObject({ success: true, action: 'downloaded' })

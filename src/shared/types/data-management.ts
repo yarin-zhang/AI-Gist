@@ -54,8 +54,21 @@ export interface ImportOptions {
  * 导入结果 - 扩展 BaseResponse
  */
 export interface ImportResult extends BaseResponse {
+  /** True when a failed replacement is guaranteed to have left old data intact. */
+  atomic?: boolean;
+  /** Stable identifier used to correlate UI diagnostics and internal logs. */
+  operationId?: string;
+  /** The high-level phase that failed or produced warnings. */
+  phase?: DataOperationPhase;
+  /** Whether retrying the exact same input can reasonably succeed. */
+  retryable?: boolean;
+  /** Machine-readable failure code. */
+  errorCode?: DataOperationErrorCode;
   totalImported?: number;
   totalErrors?: number;
+  totalAttempted?: number;
+  totalSucceeded?: number;
+  totalQuarantined?: number;
   details?: Record<string, number>;
   imported?: {
     categories: number;
@@ -67,9 +80,43 @@ export interface ImportResult extends BaseResponse {
     posts?: number;
   };
   errors?: string[];
+  failures?: DataOperationFailure[];
   warnings?: string[];
   skipped?: number;
   backupId?: string;
+}
+
+export type DataOperationPhase =
+  | 'validate'
+  | 'prepare'
+  | 'clear'
+  | 'write'
+  | 'commit'
+  | 'verify'
+  | 'rollback';
+
+export type DataOperationErrorCode =
+  | 'INVALID_DATA'
+  | 'RELATION_UNRESOLVED'
+  | 'UNIQUE_CONSTRAINT'
+  | 'SERIALIZATION_FAILED'
+  | 'DATABASE_UNAVAILABLE'
+  | 'TRANSACTION_ABORTED'
+  | 'QUOTA_EXCEEDED'
+  | 'VERIFY_FAILED'
+  | 'UNKNOWN_DATABASE_ERROR';
+
+export interface DataOperationFailure {
+  phase: DataOperationPhase;
+  code: DataOperationErrorCode;
+  collection?: string;
+  storeName?: string;
+  recordKey?: string;
+  businessKey?: string;
+  constraint?: string;
+  errorName?: string;
+  message: string;
+  retryable: boolean;
 }
 
 /**

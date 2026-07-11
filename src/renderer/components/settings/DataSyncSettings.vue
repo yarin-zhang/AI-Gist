@@ -46,10 +46,18 @@
                                     <NTag :type="config.enabled ? 'success' : 'warning'" size="small">
                                         {{ config.enabled ? t('dataSync.enabled') : t('dataSync.disabled') }}
                                     </NTag>
+                                    <NTag :type="v2RolloutModes[config.id] === 'shadow' ? 'info' : 'default'" size="small">
+                                        v2 {{ v2RolloutModes[config.id] === 'shadow' ? '影子验证' : '未启用' }}
+                                    </NTag>
                                 </NFlex>
                                 <NText depth="3" style="font-size: 12px; word-break: break-all;">
                                     {{ getConfigDescription(config) }}
                                 </NText>
+                                <NFlex align="center" justify="space-between">
+                                    <NText depth="3" style="font-size: 12px;">协议 v2 影子发布（不影响当前同步）</NText>
+                                    <NSwitch :value="v2RolloutModes[config.id] === 'shadow'"
+                                        @update:value="enabled => setV2ShadowMode(config.id, enabled)" />
+                                </NFlex>
                             </NFlex>
 
                             <template #action>
@@ -237,7 +245,7 @@ import {
     getCloudSyncErrorDiagnosis,
     getCloudSyncResultMessage,
 } from '@/lib/services/cloud-sync.service';
-import type { CloudSyncStatus } from '@/lib/services/cloud-sync.service';
+import type { CloudSyncResult, CloudSyncStatus } from '@/lib/services/cloud-sync.service';
 import { PlatformDetector } from '@shared/platform';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
 import {
@@ -253,6 +261,7 @@ const storageConfigs = ref<CloudStorageConfig[]>([]);
 const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES);
 const autoSyncEnabled = ref(true);
+const v2RolloutModes = ref<Record<string, 'off' | 'shadow' | 'read-write'>>({});
 const showConfigModal = ref(false);
 const formRef = ref<FormInst | null>(null);
 const iCloudAvailability = ref<{ available: boolean; reason?: string } | null>(null);
@@ -434,13 +443,15 @@ const deleteConfig = async (id: string) => {
     }
 };
 
-const syncCloudData = async (storageId: string) => {
+const syncCloudData = async (storageId: string, forceRetry = false) => {
     loading.value.syncNow = true;
     syncingStorageId.value = storageId;
     try {
-        const result = await cloudSyncService.syncNow(storageId, { platform: PlatformDetector.getPlatform(), reason: 'manual' });
+        const result = await cloudSyncService.syncNow(storageId, {
+            platform: PlatformDetector.getPlatform(), reason: 'manual', forceRetry
+        });
         if (result.success) message.success(getCloudSyncResultMessage(result.action, result.conflicts.length));
-        else message.error(showSyncErrorDetails(result.error, storageId).message);
+        else message.error(showSyncErrorDetails(result, storageId).message);
     } catch (error) {
         console.error('云同步失败:', error);
         message.error(showSyncErrorDetails(error instanceof Error ? error.message : String(error), storageId).message);
@@ -450,7 +461,7 @@ const syncCloudData = async (storageId: string) => {
     }
 };
 
-const showSyncErrorDetails = (error: string | undefined, storageId: string) => {
+const showSyncErrorDetails = (error: string | CloudSyncResult | undefined, storageId: string) => {
     const diagnosis = getCloudSyncErrorDiagnosis(error, {
         storageId, reason: 'manual', status: 'error', timestamp: new Date().toISOString(),
     });
@@ -460,12 +471,15 @@ const showSyncErrorDetails = (error: string | undefined, storageId: string) => {
     return diagnosis;
 };
 
-const showCurrentSyncError = () => showSyncErrorDetails(syncStatus.value.error, syncStatus.value.storageId || '');
+const showCurrentSyncError = () => showSyncErrorDetails(
+    syncStatus.value.lastResult || syncStatus.value.error,
+    syncStatus.value.storageId || ''
+);
 const retrySyncFromDialog = async () => {
     const storageId = syncErrorStorageId.value;
     if (!storageId) return;
     syncErrorDialogVisible.value = false;
-    await syncCloudData(storageId);
+    await syncCloudData(storageId, true);
 };
 const copySyncErrorDetails = async () => {
     if (!syncErrorDiagnosis.value) return;
@@ -499,10 +513,29 @@ const checkICloudAvailability = async () => {
     catch { iCloudAvailability.value = { available: false, reason: t('dataSync.icloudCheckFailed') }; }
 };
 const loadStorageConfigs = async () => {
-    try { storageConfigs.value = await CloudBackupAPI.getStorageConfigs(); }
+    try {
+        storageConfigs.value = await CloudBackupAPI.getStorageConfigs();
+        const entries = await Promise.all(storageConfigs.value.map(async config => [
+            config.id,
+            await cloudSyncService.getCloudSyncV2RolloutState(config.id)
+                .then(state => state.mode)
+                .catch(() => 'off' as const),
+        ] as const));
+        v2RolloutModes.value = Object.fromEntries(entries);
+    }
     catch (error) {
         console.error('加载存储配置失败:', error);
         message.error(t('dataSync.loadConfigsFailed'));
+    }
+};
+const setV2ShadowMode = async (storageId: string, enabled: boolean) => {
+    try {
+        const state = await cloudSyncService.setCloudSyncV2RolloutMode(storageId, enabled ? 'shadow' : 'off');
+        v2RolloutModes.value = { ...v2RolloutModes.value, [storageId]: state.mode };
+        message.success(enabled ? '已启用协议 v2 影子验证' : '已关闭协议 v2 影子验证');
+    } catch (error) {
+        console.error('更新协议 v2 影子验证状态失败:', error);
+        message.error('更新协议 v2 状态失败');
     }
 };
 const getConfigDescription = (config: CloudStorageConfig) => config.type === 'webdav'

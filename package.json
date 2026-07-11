@@ -55,6 +55,8 @@
         "electron-builder": "^25.1.6",
         "eslint": "^9.29.0",
         "eslint-plugin-vue": "^10.2.0",
+        "fake-indexeddb": "^6.2.5",
+        "fast-check": "^4.9.0",
         "jsdom": "^24.1.0",
         "sass": "^1.89.2",
         "tailwindcss": "^4.1.11",

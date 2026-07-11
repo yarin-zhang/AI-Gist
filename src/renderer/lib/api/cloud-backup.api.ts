@@ -16,6 +16,13 @@ import type {
 import type {
   CloudSyncSnapshot
 } from '@shared/cloud-sync-engine';
+import type {
+  CloudSyncV2ObjectStorageAdapter,
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '@shared/cloud-sync-v2-repository';
 import { PlatformDetector } from '@shared/platform';
 import { mobileCloudBackupService } from '../services/mobile-cloud-backup.service';
 import { webCloudBackupService } from '../services/web-cloud-backup.service';
@@ -330,5 +337,51 @@ export class CloudBackupAPI {
     }
 
     return await window.electronAPI.cloud.saveSyncSnapshot(storageId, snapshot);
+  }
+
+  static async readCloudSyncV2Object(
+    storageId: string,
+    path: string
+  ): Promise<CloudSyncV2StoredObject | null> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.readCloudSyncV2Object(storageId, path);
+  }
+
+  static async writeCloudSyncV2Object(
+    storageId: string,
+    path: string,
+    data: Uint8Array,
+    options?: CloudSyncV2ObjectWriteOptions
+  ): Promise<CloudSyncV2ObjectWriteResult> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.writeCloudSyncV2Object(storageId, path, data, options);
+  }
+
+  static async listCloudSyncV2Objects(
+    storageId: string,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.listCloudSyncV2Objects(storageId, prefix);
+  }
+
+  static async deleteCloudSyncV2Object(storageId: string, path: string): Promise<void> {
+    this.assertElectronCloudSyncV2Available();
+    await window.electronAPI.cloud.deleteCloudSyncV2Object(storageId, path);
+  }
+
+  static createCloudSyncV2ObjectStorageAdapter(storageId: string): CloudSyncV2ObjectStorageAdapter {
+    return {
+      read: path => this.readCloudSyncV2Object(storageId, path),
+      write: (path, data, options) => this.writeCloudSyncV2Object(storageId, path, data, options),
+      list: prefix => this.listCloudSyncV2Objects(storageId, prefix),
+      delete: path => this.deleteCloudSyncV2Object(storageId, path)
+    };
+  }
+
+  private static assertElectronCloudSyncV2Available(): void {
+    if (!PlatformDetector.isElectron() || !this.isElectronAvailable()) {
+      throw new Error('Electron cloud sync v2 API not available');
+    }
   }
 }

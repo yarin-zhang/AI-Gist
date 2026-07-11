@@ -13,7 +13,11 @@ import {
   createCloudSyncSnapshot,
   type CloudSyncDataSet
 } from '@shared/cloud-sync-engine'
-import { getCloudSyncSnapshotPath } from '@shared/cloud-backup-paths'
+import {
+  getCloudSyncSnapshotPath,
+  getCloudSyncV2DirectoryPath,
+  getCloudSyncV2ManifestPath
+} from '@shared/cloud-backup-paths'
 
 const webServerModule = await import('../../scripts/web-server.js')
 const createWebRequestHandler = (
@@ -309,6 +313,121 @@ describe('web server API handler', () => {
     ))
     expect(primaryAfterRejectedWrite.latestSnapshot.revision).toBe(stalePrimarySnapshot.revision)
     expect(backupAfterRejectedWrite.latestSnapshot.revision).toBe(newerBackupSnapshot.revision)
+  })
+
+  it('provides a namespace-restricted binary sync-v2 transport with CAS semantics', async () => {
+    webdavServer = new TestWebDAVServer({
+      port: 18770,
+      username: 'testuser',
+      password: 'testpass'
+    })
+    await webdavServer.start()
+    server = http.createServer(createWebRequestHandler({ serveStaticFiles: false }))
+    await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', () => resolve()))
+    const address = server.address() as AddressInfo
+    const apiBaseUrl = `http://127.0.0.1:${address.port}`
+    const config = {
+      id: 'web-proxy-sync-v2',
+      name: 'Web Proxy sync-v2',
+      type: 'webdav',
+      url: `${webdavServer.baseUrl}/web-proxy-sync-v2`,
+      username: 'testuser',
+      password: 'testpass',
+      createdAt: '2026-07-11T00:00:00.000Z',
+      updatedAt: '2026-07-11T00:00:00.000Z'
+    }
+    const objectPath = getCloudSyncV2ManifestPath().replace(/^\/+/, '')
+    const firstBytes = Buffer.from([0, 1, 2, 127, 128, 254, 255, 10, 13])
+
+    const firstWrite = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/write', {
+      config,
+      path: objectPath,
+      dataBase64: firstBytes.toString('base64'),
+      ifNoneMatch: '*'
+    })
+    expect(firstWrite).toMatchObject({
+      status: 200,
+      payload: { success: true, data: { status: 'written' } }
+    })
+    const firstEtag = firstWrite.payload.data.etag as string
+    expect(firstEtag).toBeTruthy()
+
+    const stat = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/stat', { config, path: objectPath })
+    expect(stat.payload.data).toMatchObject({
+      path: getCloudSyncV2ManifestPath(),
+      etag: firstEtag,
+      byteLength: firstBytes.byteLength,
+      isDirectory: false
+    })
+
+    const read = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/read', { config, path: objectPath })
+    expect(Buffer.from(read.payload.data.dataBase64, 'base64')).toEqual(firstBytes)
+    expect(read.payload.data.etag).toBe(firstEtag)
+
+    const rejectedCreate = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/write', {
+      config,
+      path: objectPath,
+      dataBase64: Buffer.from('must-not-win').toString('base64'),
+      ifNoneMatch: '*'
+    })
+    expect(rejectedCreate.payload.data).toMatchObject({
+      status: 'precondition_failed',
+      etag: firstEtag
+    })
+
+    const rejectedReplace = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/write', {
+      config,
+      path: objectPath,
+      dataBase64: Buffer.from('wrong-etag').toString('base64'),
+      ifMatch: '"wrong-etag"'
+    })
+    expect(rejectedReplace.payload.data.status).toBe('precondition_failed')
+
+    const nextBytes = Buffer.from('replacement-with-a-different-length\0\xff', 'latin1')
+    const replaced = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/write', {
+      config,
+      path: objectPath,
+      dataBase64: nextBytes.toString('base64'),
+      ifMatch: firstEtag
+    })
+    expect(replaced.payload.data.status).toBe('written')
+    expect(replaced.payload.data.etag).not.toBe(firstEtag)
+
+    const listed = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/list', {
+      config,
+      prefix: getCloudSyncV2DirectoryPath().replace(/^\/+/, '')
+    })
+    expect(listed.payload.data).toEqual([expect.objectContaining({
+      path: getCloudSyncV2ManifestPath(),
+      byteLength: nextBytes.byteLength
+    })])
+
+    for (const unsafePath of [
+      '/AI-Gist-Backup/sync-v2/manifest.json',
+      'AI-Gist-Backup/sync-v2/../sync-manifest.json',
+      'AI-Gist-Backup/sync-v2/%2e%2e/sync-manifest.json',
+      'AI-Gist-Backup/other/manifest.json',
+      'C:\\AI-Gist-Backup\\sync-v2\\manifest.json'
+    ]) {
+      const response = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/read', {
+        config,
+        path: unsafePath
+      })
+      expect(response.status).toBe(500)
+      expect(response.payload.success).toBe(false)
+    }
+
+    const deleted = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/delete', { config, path: objectPath })
+    expect(deleted.payload).toMatchObject({ success: true, data: { ok: true } })
+    const missing = await postApi(apiBaseUrl, '/api/cloud/webdav/sync-v2/read', { config, path: objectPath })
+    expect(missing.payload).toMatchObject({ success: true, data: null })
+
+    await expect(fsp.stat(path.join(
+      webdavServer.rootDir,
+      'web-proxy-sync-v2',
+      'AI-Gist-Backup',
+      'sync-manifest.json'
+    ))).rejects.toThrow()
   })
 })
 

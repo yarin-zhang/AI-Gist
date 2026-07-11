@@ -5,7 +5,10 @@
 
 import type { 
   ExportResult as DataExportResult, 
-  ImportResult as DataImportResult 
+  ImportResult as DataImportResult,
+  DataOperationErrorCode,
+  DataOperationFailure,
+  DataOperationPhase
 } from '@shared/types/data-management';
 import { BaseDatabaseService } from './base-database.service';
 import { CategoryService } from './category.service';
@@ -17,6 +20,7 @@ import { QuickOptimizationService } from './quick-optimization.service';
 import { generateUUID } from '../utils/uuid';
 import { emitDataChange } from './data-change-events';
 import { unwrapBackupData } from '@shared/backup-integrity';
+import { reconcileCloudSyncDataContract } from '@shared/cloud-sync-contract';
 import { dataOperationLock } from './data-operation-lock';
 
 const SYNCABLE_DATA_STORES = [
@@ -44,6 +48,42 @@ const RESTORABLE_DATA_FIELDS = [
 ];
 
 const DATABASE_DEBUG_STORAGE_KEY = 'ai-gist.debug.database';
+
+const RESTORE_STORE_BY_COLLECTION: Record<string, string> = {
+  categories: 'categories',
+  prompts: 'prompts',
+  promptVariables: 'promptVariables',
+  promptHistories: 'promptHistories',
+  aiConfigs: 'ai_configs',
+  quickOptimizationConfigs: 'quick_optimization_configs',
+  aiHistory: 'ai_generation_history',
+  settings: 'settings',
+  syncTombstones: 'syncTombstones'
+};
+
+interface PreparedRestoreRecord {
+  collection: string;
+  storeName: string;
+  recordKey: string;
+  businessKey?: string;
+  value: any;
+}
+
+interface PreparedRestorePlan {
+  operationId: string;
+  records: PreparedRestoreRecord[];
+  details: Record<string, number>;
+}
+
+class StructuredDataOperationError extends Error {
+  readonly failure: DataOperationFailure;
+
+  constructor(failure: DataOperationFailure) {
+    super(failure.message);
+    this.name = 'StructuredDataOperationError';
+    this.failure = failure;
+  }
+}
 
 /**
  * 统一的数据库服务管理类
@@ -359,42 +399,62 @@ export class DatabaseServiceManager {
         this.debugLog('数据库修复成功，继续导出数据...');
       }
       
-      // 安全地获取所有数据
-      const results = await Promise.allSettled([
-        this.category.getBasicCategories(),
-        this.prompt.getAllPromptsForTags(),
-        this.prompt.getAllPromptVariables(),
-        this.prompt.getAllPromptHistories(),
-        this.aiConfig.getAllAIConfigs(),
-        this.quickOptimization.getAllQuickOptimizationConfigs(),
-        this.aiGenerationHistory.getAllAIGenerationHistory(),
-        this.appSettings.getAllSettings()
-      ]);
-      
-      const tableNames = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings'];
-      const failedTables = results
-        .map((result, index) => result.status === 'rejected'
-          ? { tableName: tableNames[index], reason: result.reason }
-          : null)
-        .filter((failure): failure is { tableName: string; reason: unknown } => !!failure);
+      const consistentSnapshot = await this.tryReadConsistentExportSnapshot();
+      let categories: any[];
+      let prompts: any[];
+      let promptVariables: any[];
+      let promptHistories: any[];
+      let aiConfigs: any[];
+      let quickOptimizationConfigs: any[];
+      let aiHistory: any[];
+      let settings: any[];
 
-      if (failedTables.length > 0) {
-        failedTables.forEach(failure => {
-          this.debugWarn(`获取 ${failure.tableName} 数据失败:`, failure.reason);
-        });
-        throw new Error(`读取数据表失败: ${failedTables.map(failure => failure.tableName).join(', ')}`);
+      if (consistentSnapshot) {
+        ({
+          categories,
+          prompts,
+          promptVariables,
+          promptHistories,
+          aiConfigs,
+          quickOptimizationConfigs,
+          aiHistory,
+          settings
+        } = consistentSnapshot);
+      } else {
+        // Compatibility path for tests and legacy/incomplete databases. A
+        // healthy production database always uses the single transaction path.
+        const results = await Promise.allSettled([
+          this.category.getBasicCategories(),
+          this.prompt.getAllPromptsForTags(),
+          this.prompt.getAllPromptVariables(),
+          this.prompt.getAllPromptHistories(),
+          this.aiConfig.getAllAIConfigs(),
+          this.quickOptimization.getAllQuickOptimizationConfigs(),
+          this.aiGenerationHistory.getAllAIGenerationHistory(),
+          this.appSettings.getAllSettings()
+        ]);
+        const tableNames = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings'];
+        const failedTables = results
+          .map((result, index) => result.status === 'rejected'
+            ? { tableName: tableNames[index], reason: result.reason }
+            : null)
+          .filter((failure): failure is { tableName: string; reason: unknown } => !!failure);
+
+        if (failedTables.length > 0) {
+          throw new Error(`读取数据表失败: ${failedTables.map(failure => failure.tableName).join(', ')}`);
+        }
+
+        [
+          categories,
+          prompts,
+          promptVariables,
+          promptHistories,
+          aiConfigs,
+          quickOptimizationConfigs,
+          aiHistory,
+          settings
+        ] = results.map(result => result.status === 'fulfilled' ? (result.value || []) : []);
       }
-
-      const [
-        categories,
-        prompts,
-        promptVariables,
-        promptHistories,
-        aiConfigs,
-        quickOptimizationConfigs,
-        aiHistory,
-        settings
-      ] = results.map(result => result.status === 'fulfilled' ? (result.value || []) : []);
       
       const exportData = this.attachRelationUUIDsToExportData({
         categories: categories as any[],
@@ -917,7 +977,11 @@ export class DatabaseServiceManager {
    * 恢复数据
    */
   async restoreData(backupData: any, options: { skipClean?: boolean } = {}): Promise<DataImportResult> {
-    return dataOperationLock.runExclusive(() => this.restoreDataUnlocked(backupData, options));
+    return dataOperationLock.runExclusive(() =>
+      options.skipClean
+        ? this.restoreDataUnlocked(backupData, options)
+        : this.replaceAllDataUnlocked(backupData)
+    );
   }
 
   private async restoreDataUnlocked(backupData: any, options: { skipClean?: boolean } = {}): Promise<DataImportResult> {
@@ -1225,24 +1289,546 @@ export class DatabaseServiceManager {
   }
 
   private async replaceAllDataUnlocked(backupData: any): Promise<DataImportResult> {
+    const operationId = generateUUID();
     try {
       this.debugLog('渲染进程: 开始完全替换数据...');
       const dataToRestore = unwrapBackupData(backupData);
       this.assertRestorableDataShape(dataToRestore);
-      
-      // 先清空所有数据
-      await this.forceCleanAllTables();
-      
-      // 然后恢复数据
-      return await this.restoreDataUnlocked(dataToRestore, { skipClean: true });
+
+      const normalizedData = this.ensureUUIDsInImportData(this.cloneRestoreInput(dataToRestore));
+      const contractResult = reconcileCloudSyncDataContract(normalizedData);
+      if (!contractResult.valid) {
+        const firstIssue = contractResult.issues[0];
+        throw this.createStructuredFailure({
+          phase: 'prepare',
+          code: 'RELATION_UNRESOLVED',
+          collection: firstIssue?.collection,
+          recordKey: firstIssue?.recordIdentity,
+          businessKey: firstIssue?.referenceUuid || firstIssue?.referenceId,
+          message: firstIssue
+            ? `${firstIssue.collection} ${firstIssue.recordIdentity} 的 ${firstIssue.relation} 关系无法安全解析`
+            : '恢复数据关系无法安全解析',
+          retryable: false
+        });
+      }
+      const plan = await this.prepareAtomicRestorePlan(contractResult.data, operationId);
+      await this.commitAtomicRestorePlan(plan);
+
+      const totalSucceeded = plan.records.length;
+      return {
+        success: true,
+        atomic: true,
+        operationId,
+        phase: 'commit',
+        retryable: false,
+        message: `数据恢复成功，共恢复 ${totalSucceeded} 条记录`,
+        totalImported: totalSucceeded,
+        totalAttempted: totalSucceeded,
+        totalSucceeded,
+        totalErrors: 0,
+        totalQuarantined: 0,
+        warnings: contractResult.merges.length > 0
+          ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
+          : undefined,
+        details: plan.details,
+        imported: {
+          categories: plan.details.categories || 0,
+          prompts: plan.details.prompts || 0,
+          settings: plan.details.settings || 0,
+          history: (plan.details.aiHistory || 0) + (plan.details.promptHistories || 0),
+          aiConfigs: plan.details.aiConfigs || 0
+        }
+      };
     } catch (error) {
       this.debugError('渲染进程: 完全替换数据失败:', error);
+      const failure = this.toDataOperationFailure(error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
-        message: '数据替换失败'
+        atomic: true,
+        operationId,
+        phase: failure.phase,
+        retryable: failure.retryable,
+        errorCode: failure.code,
+        error: failure.message,
+        message: '数据替换失败',
+        totalImported: 0,
+        totalAttempted: 0,
+        totalSucceeded: 0,
+        totalErrors: 1,
+        totalQuarantined: 0,
+        failures: [failure],
+        errors: [failure.message]
       };
     }
+  }
+
+  private cloneRestoreInput<T>(value: T): T {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value);
+    }
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  private async prepareAtomicRestorePlan(data: any, operationId: string): Promise<PreparedRestorePlan> {
+    const categories = this.sortRestoreRecords(data.categories || [], 'categories');
+    const prompts = this.sortRestoreRecords(data.prompts || [], 'prompts');
+    const promptVariables = this.sortRestoreRecords(data.promptVariables || [], 'promptVariables');
+    const promptHistories = this.sortRestoreRecords(data.promptHistories || [], 'promptHistories');
+    const aiConfigs = this.sortRestoreRecords(data.aiConfigs || [], 'aiConfigs');
+    const quickOptimizationConfigs = this.sortRestoreRecords(
+      data.quickOptimizationConfigs || [],
+      'quickOptimizationConfigs'
+    );
+    const aiHistory = this.sortRestoreRecords(data.aiHistory || [], 'aiHistory');
+    const settings = this.sortRestoreRecords(data.settings || [], 'settings');
+    const syncTombstones = this.sortRestoreRecords(data.syncTombstones || [], 'syncTombstones');
+
+    this.assertUniqueRestoreValues(categories, 'categories', 'name', 'categories.name');
+    this.assertUniqueRestoreValues(categories, 'categories', 'uuid', 'categories.uuid');
+    this.assertUniqueRestoreValues(prompts, 'prompts', 'uuid', 'prompts.uuid');
+    this.assertUniqueRestoreValues(promptVariables, 'promptVariables', 'uuid', 'promptVariables.uuid');
+    this.assertUniqueRestoreValues(promptHistories, 'promptHistories', 'uuid', 'promptHistories.uuid');
+    this.assertUniqueRestoreValues(aiConfigs, 'aiConfigs', 'uuid', 'ai_configs.uuid');
+    this.assertUniqueRestoreValues(aiConfigs, 'aiConfigs', 'configId', 'ai_configs.configId');
+    this.assertUniqueRestoreValues(
+      quickOptimizationConfigs,
+      'quickOptimizationConfigs',
+      'uuid',
+      'quick_optimization_configs.uuid'
+    );
+    this.assertUniqueRestoreValues(aiHistory, 'aiHistory', 'uuid', 'ai_generation_history.uuid');
+    this.assertUniqueRestoreValues(aiHistory, 'aiHistory', 'historyId', 'ai_generation_history.historyId');
+    this.assertUniqueRestoreValues(settings, 'settings', 'key', 'settings.key');
+
+    const categoryIdByUuid = new Map<string, number>();
+    const categoryIdsBySourceId = this.createSourceIdMap(categories);
+    categories.forEach((category: any, index: number) => {
+      const newId = index + 1;
+      if (category.uuid) categoryIdByUuid.set(String(category.uuid), newId);
+    });
+
+    const promptIdByUuid = new Map<string, number>();
+    const promptIdsBySourceId = this.createSourceIdMap(prompts);
+    prompts.forEach((prompt: any, index: number) => {
+      const newId = index + 1;
+      if (prompt.uuid) promptIdByUuid.set(String(prompt.uuid), newId);
+    });
+
+    const records: PreparedRestoreRecord[] = [];
+
+    for (const [index, category] of categories.entries()) {
+      const value = { ...category, id: index + 1 };
+      if (category.parentUuid || category.parentId !== undefined) {
+        const parentId = this.resolvePreparedRelationId(
+          category.parentUuid,
+          category.parentId,
+          categoryIdByUuid,
+          categoryIdsBySourceId,
+          'categories',
+          this.getRestoreRecordKey('categories', category),
+          'parent category'
+        );
+        if (parentId !== undefined) value.parentId = parentId;
+        else delete value.parentId;
+      }
+      records.push(this.createPreparedRecord('categories', value));
+    }
+
+    const hasStandalonePromptVariables = Array.isArray(data.promptVariables);
+    for (const [index, prompt] of prompts.entries()) {
+      const value = { ...prompt, id: index + 1 };
+      delete value.category;
+      if (hasStandalonePromptVariables) delete value.variables;
+      if (prompt.categoryUuid || prompt.categoryId !== undefined) {
+        const categoryId = this.resolvePreparedRelationId(
+          prompt.categoryUuid,
+          prompt.categoryId,
+          categoryIdByUuid,
+          categoryIdsBySourceId,
+          'prompts',
+          this.getRestoreRecordKey('prompts', prompt),
+          'category',
+          true
+        );
+        if (categoryId !== undefined) value.categoryId = categoryId;
+        else delete value.categoryId;
+      }
+      records.push(this.createPreparedRecord('prompts', await this.deserializeImageBlobs(value)));
+    }
+
+    for (const [index, variable] of promptVariables.entries()) {
+      const promptId = this.resolvePreparedRelationId(
+        variable.promptUuid,
+        variable.promptId,
+        promptIdByUuid,
+        promptIdsBySourceId,
+        'promptVariables',
+        this.getRestoreRecordKey('promptVariables', variable),
+        'prompt'
+      );
+      records.push(this.createPreparedRecord('promptVariables', {
+        ...variable,
+        id: index + 1,
+        promptId
+      }));
+    }
+
+    for (const [index, history] of promptHistories.entries()) {
+      const promptId = this.resolvePreparedRelationId(
+        history.promptUuid,
+        history.promptId,
+        promptIdByUuid,
+        promptIdsBySourceId,
+        'promptHistories',
+        this.getRestoreRecordKey('promptHistories', history),
+        'prompt'
+      );
+      const value: any = { ...history, id: index + 1, promptId };
+      if (history.categoryUuid || history.categoryId !== undefined) {
+        const categoryId = this.resolvePreparedRelationId(
+          history.categoryUuid,
+          history.categoryId,
+          categoryIdByUuid,
+          categoryIdsBySourceId,
+          'promptHistories',
+          this.getRestoreRecordKey('promptHistories', history),
+          'category',
+          true
+        );
+        if (categoryId !== undefined) value.categoryId = categoryId;
+        else delete value.categoryId;
+      }
+      records.push(this.createPreparedRecord('promptHistories', await this.deserializeImageBlobs(value)));
+    }
+
+    aiConfigs.forEach((record: any, index: number) =>
+      records.push(this.createPreparedRecord('aiConfigs', { ...record, id: index + 1 }))
+    );
+    quickOptimizationConfigs.forEach((record: any, index: number) =>
+      records.push(this.createPreparedRecord('quickOptimizationConfigs', { ...record, id: index + 1 }))
+    );
+    aiHistory.forEach((record: any, index: number) =>
+      records.push(this.createPreparedRecord('aiHistory', { ...record, id: index + 1 }))
+    );
+    settings.forEach((record: any, index: number) =>
+      records.push(this.createPreparedRecord('settings', { ...record, id: index + 1 }))
+    );
+
+    for (const [index, tombstone] of syncTombstones.entries()) {
+      if (!isRestorableSyncTombstone(tombstone)) {
+        throw this.createStructuredFailure({
+          phase: 'validate',
+          code: 'INVALID_DATA',
+          collection: 'syncTombstones',
+          recordKey: `index:${index}`,
+          message: `同步删除标记格式无效: syncTombstones[${index}]`,
+          retryable: false
+        });
+      }
+      records.push(this.createPreparedRecord('syncTombstones', {
+        ...tombstone,
+        id: index + 1,
+        deletedAt: tombstone.deletedAt ? new Date(tombstone.deletedAt) : new Date()
+      }));
+    }
+
+    const details: Record<string, number> = {};
+    for (const collection of RESTORABLE_DATA_FIELDS) {
+      details[collection] = records.filter(record => record.collection === collection).length;
+    }
+
+    return { operationId, records, details };
+  }
+
+  private async commitAtomicRestorePlan(plan: PreparedRestorePlan): Promise<void> {
+    const db = await this.getDatabase();
+    if (!db) {
+      throw this.createStructuredFailure({
+        phase: 'prepare',
+        code: 'DATABASE_UNAVAILABLE',
+        message: '无法获取数据库连接',
+        retryable: true
+      });
+    }
+
+    const missingStores = SYNCABLE_DATA_STORES.filter(storeName => !db.objectStoreNames.contains(storeName));
+    if (missingStores.length > 0) {
+      throw this.createStructuredFailure({
+        phase: 'prepare',
+        code: 'DATABASE_UNAVAILABLE',
+        message: `数据库缺少恢复所需的数据表: ${missingStores.join(', ')}`,
+        retryable: false
+      });
+    }
+
+    const transactionStores = [
+      ...SYNCABLE_DATA_STORES,
+      ...(db.objectStoreNames.contains('syncMetadata') ? ['syncMetadata'] : [])
+    ];
+    let transaction: IDBTransaction;
+    try {
+      transaction = db.transaction(transactionStores, 'readwrite');
+    } catch (error) {
+      throw this.createStructuredFailure(this.createDatabaseFailure('prepare', error));
+    }
+
+    let firstFailure: DataOperationFailure | null = null;
+    const completion = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => {
+        reject(new StructuredDataOperationError(
+          firstFailure || this.createDatabaseFailure('commit', transaction.error)
+        ));
+      };
+      transaction.onabort = () => {
+        reject(new StructuredDataOperationError(
+          firstFailure || this.createDatabaseFailure('commit', transaction.error)
+        ));
+      };
+    });
+
+    const clearRequests = transactionStores.map(storeName => {
+      const request = transaction.objectStore(storeName).clear();
+      return this.waitForRestoreRequest(request, {
+        phase: 'clear',
+        code: 'TRANSACTION_ABORTED',
+        storeName,
+        message: `清空数据表 ${storeName} 失败`,
+        retryable: true
+      }, failure => { firstFailure ||= failure; });
+    });
+
+    try {
+      await Promise.all(clearRequests);
+      await Promise.all(plan.records.map(record => {
+        const request = transaction.objectStore(record.storeName).put(record.value);
+        return this.waitForRestoreRequest(request, {
+          phase: 'write',
+          code: 'UNKNOWN_DATABASE_ERROR',
+          collection: record.collection,
+          storeName: record.storeName,
+          recordKey: record.recordKey,
+          businessKey: record.businessKey,
+          message: `写入 ${record.collection} 记录失败`,
+          retryable: false
+        }, failure => { firstFailure ||= failure; });
+      }));
+      await completion;
+    } catch (error) {
+      try { transaction.abort(); } catch { /* transaction already finishing */ }
+      await completion.catch(() => undefined);
+      throw error;
+    }
+
+    for (const storeName of SYNCABLE_DATA_STORES) {
+      emitDataChange({ storeName, action: 'clear' });
+    }
+  }
+
+  private waitForRestoreRequest(
+    request: IDBRequest,
+    context: Omit<DataOperationFailure, 'errorName'>,
+    onFailure: (failure: DataOperationFailure) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve();
+      request.onerror = () => {
+        const failure = this.createDatabaseFailure(context.phase, request.error, context);
+        onFailure(failure);
+        reject(new StructuredDataOperationError(failure));
+      };
+    });
+  }
+
+  private sortRestoreRecords(records: any[], collection: string): any[] {
+    return [...records].sort((left, right) =>
+      this.getRestoreRecordKey(collection, left).localeCompare(this.getRestoreRecordKey(collection, right))
+    );
+  }
+
+  private createSourceIdMap(records: any[]): Map<string, number | null> {
+    const result = new Map<string, number | null>();
+    records.forEach((record, index) => {
+      if (record?.id === undefined || record?.id === null) return;
+      const key = String(record.id);
+      result.set(key, result.has(key) ? null : index + 1);
+    });
+    return result;
+  }
+
+  private resolvePreparedRelationId(
+    relationUuid: unknown,
+    sourceId: unknown,
+    idByUuid: Map<string, number>,
+    idBySourceId: Map<string, number | null>,
+    collection: string,
+    recordKey: string,
+    relationName: string,
+    optional = false
+  ): number | undefined {
+    if (typeof relationUuid === 'string' && relationUuid) {
+      const resolved = idByUuid.get(relationUuid);
+      if (resolved !== undefined) return resolved;
+      if (!optional) {
+        throw this.createStructuredFailure({
+          phase: 'prepare',
+          code: 'RELATION_UNRESOLVED',
+          collection,
+          recordKey,
+          businessKey: relationUuid,
+          message: `${collection} ${recordKey} 无法解析 ${relationName} UUID ${relationUuid}`,
+          retryable: false
+        });
+      }
+      return undefined;
+    }
+
+    if (sourceId !== undefined && sourceId !== null) {
+      const resolved = idBySourceId.get(String(sourceId));
+      if (typeof resolved === 'number') return resolved;
+      if (!optional) {
+        throw this.createStructuredFailure({
+          phase: 'prepare',
+          code: 'RELATION_UNRESOLVED',
+          collection,
+          recordKey,
+          businessKey: String(sourceId),
+          message: `${collection} ${recordKey} 无法唯一解析 ${relationName} ID ${String(sourceId)}`,
+          retryable: false
+        });
+      }
+    }
+
+    return undefined;
+  }
+
+  private assertUniqueRestoreValues(
+    records: any[],
+    collection: string,
+    field: string,
+    constraint: string
+  ): void {
+    const seen = new Map<string, string>();
+    for (const record of records) {
+      const value = record?.[field];
+      if (value === undefined || value === null || value === '') continue;
+      const normalized = String(value);
+      const recordKey = this.getRestoreRecordKey(collection, record);
+      const previous = seen.get(normalized);
+      if (previous) {
+        throw this.createStructuredFailure({
+          phase: 'validate',
+          code: 'UNIQUE_CONSTRAINT',
+          collection,
+          recordKey,
+          businessKey: normalized,
+          constraint,
+          message: `${collection} 存在重复唯一键 ${constraint}: ${normalized}（${previous}, ${recordKey}）`,
+          retryable: false
+        });
+      }
+      seen.set(normalized, recordKey);
+    }
+  }
+
+  private createPreparedRecord(collection: string, value: any): PreparedRestoreRecord {
+    return {
+      collection,
+      storeName: RESTORE_STORE_BY_COLLECTION[collection],
+      recordKey: this.getRestoreRecordKey(collection, value),
+      businessKey: this.getRestoreBusinessKey(collection, value),
+      value
+    };
+  }
+
+  private getRestoreRecordKey(collection: string, record: any): string {
+    const identityFields: Record<string, string[]> = {
+      categories: ['uuid', 'name', 'id'],
+      prompts: ['uuid', 'id'],
+      promptVariables: ['uuid', 'id'],
+      promptHistories: ['uuid', 'id'],
+      aiConfigs: ['configId', 'uuid', 'id'],
+      quickOptimizationConfigs: ['uuid', 'id'],
+      aiHistory: ['historyId', 'uuid', 'id'],
+      settings: ['key', 'id'],
+      syncTombstones: ['recordKey', 'recordUuid', 'id']
+    };
+    for (const field of identityFields[collection] || ['uuid', 'key', 'id']) {
+      const value = record?.[field];
+      if (value !== undefined && value !== null && value !== '') return `${field}:${String(value)}`;
+    }
+    return `indexless:${collection}`;
+  }
+
+  private getRestoreBusinessKey(collection: string, record: any): string | undefined {
+    if (collection === 'categories') return record?.name ? `name:${String(record.name)}` : undefined;
+    if (collection === 'aiConfigs') return record?.configId ? `configId:${String(record.configId)}` : undefined;
+    if (collection === 'aiHistory') return record?.historyId ? `historyId:${String(record.historyId)}` : undefined;
+    if (collection === 'settings') return record?.key ? `key:${String(record.key)}` : undefined;
+    return undefined;
+  }
+
+  private createStructuredFailure(failure: DataOperationFailure): StructuredDataOperationError {
+    return new StructuredDataOperationError(failure);
+  }
+
+  private createDatabaseFailure(
+    phase: DataOperationPhase,
+    error: unknown,
+    context: Partial<DataOperationFailure> = {}
+  ): DataOperationFailure {
+    const errorName = error instanceof DOMException
+      ? error.name
+      : error instanceof Error
+        ? error.name
+        : undefined;
+    let code: DataOperationErrorCode = context.code || 'UNKNOWN_DATABASE_ERROR';
+    let retryable = context.retryable ?? false;
+    if (errorName === 'ConstraintError') code = 'UNIQUE_CONSTRAINT';
+    if (errorName === 'QuotaExceededError') {
+      code = 'QUOTA_EXCEEDED';
+      retryable = false;
+    }
+    if (errorName === 'AbortError') {
+      code = 'TRANSACTION_ABORTED';
+      retryable = true;
+    }
+    const rawMessage = error instanceof Error ? error.message : error ? String(error) : '';
+    return {
+      phase,
+      code,
+      collection: context.collection,
+      storeName: context.storeName,
+      recordKey: context.recordKey,
+      businessKey: context.businessKey,
+      constraint: context.constraint,
+      errorName,
+      message: [context.message, rawMessage].filter(Boolean).join(': ') || '数据库操作失败',
+      retryable
+    };
+  }
+
+  private toDataOperationFailure(error: unknown): DataOperationFailure {
+    if (error instanceof StructuredDataOperationError) return error.failure;
+    if (error instanceof Error && /图片数据格式无效/.test(error.message)) {
+      return {
+        phase: 'prepare',
+        code: 'SERIALIZATION_FAILED',
+        errorName: error.name,
+        message: error.message,
+        retryable: false
+      };
+    }
+    if (error instanceof Error && /恢复数据格式无效|备份数据校验失败/.test(error.message)) {
+      return {
+        phase: 'validate',
+        code: 'INVALID_DATA',
+        errorName: error.name,
+        message: error.message,
+        retryable: false
+      };
+    }
+    return this.createDatabaseFailure('prepare', error);
   }
   
   /**
@@ -1305,6 +1891,110 @@ export class DatabaseServiceManager {
       this.debugError('获取数据库连接失败:', error);
       return null;
     }
+  }
+
+  private async tryReadConsistentExportSnapshot(): Promise<{
+    categories: any[];
+    prompts: any[];
+    promptVariables: any[];
+    promptHistories: any[];
+    aiConfigs: any[];
+    quickOptimizationConfigs: any[];
+    aiHistory: any[];
+    settings: any[];
+  } | null> {
+    const db = await this.getDatabase();
+    const stores = [
+      'categories',
+      'prompts',
+      'promptVariables',
+      'promptHistories',
+      'ai_configs',
+      'quick_optimization_configs',
+      'ai_generation_history',
+      'settings'
+    ];
+    if (!db || stores.some(storeName => !db.objectStoreNames.contains(storeName))) return null;
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(stores, 'readonly');
+      const values = new Map<string, any[]>();
+      let settled = false;
+
+      const rejectOnce = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error(String(error || '一致性导出失败')));
+      };
+
+      for (const storeName of stores) {
+        const request = transaction.objectStore(storeName).getAll();
+        request.onsuccess = () => values.set(storeName, request.result || []);
+        request.onerror = () => rejectOnce(request.error || new Error(`读取数据表失败: ${storeName}`));
+      }
+
+      transaction.onerror = () => rejectOnce(transaction.error || new Error('一致性导出事务失败'));
+      transaction.onabort = () => rejectOnce(transaction.error || new Error('一致性导出事务中止'));
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        const categories = values.get('categories') || [];
+        const promptVariables = values.get('promptVariables') || [];
+        const rawPrompts = values.get('prompts') || [];
+        const prompts = rawPrompts.map(prompt => ({
+          ...prompt,
+          category: categories.find(category => category.id === prompt.categoryId),
+          variables: promptVariables.filter(variable => variable.promptId === prompt.id)
+        }));
+        resolve({
+          categories,
+          prompts,
+          promptVariables,
+          promptHistories: values.get('promptHistories') || [],
+          aiConfigs: values.get('ai_configs') || [],
+          quickOptimizationConfigs: values.get('quick_optimization_configs') || [],
+          aiHistory: values.get('ai_generation_history') || [],
+          settings: values.get('settings') || []
+        });
+      };
+    });
+  }
+
+  async getLocalSyncMetadata<T = any>(key: string): Promise<T | null> {
+    const db = await this.getDatabase();
+    if (!db || !db.objectStoreNames.contains('syncMetadata')) return null;
+    return new Promise<T | null>((resolve, reject) => {
+      const transaction = db.transaction(['syncMetadata'], 'readonly');
+      const request = transaction.objectStore('syncMetadata').get(key);
+      request.onsuccess = () => resolve(request.result?.value as T || null);
+      request.onerror = () => reject(request.error || new Error('读取本地同步元数据失败'));
+    });
+  }
+
+  async setLocalSyncMetadata<T = any>(key: string, value: T): Promise<void> {
+    const db = await this.getDatabase();
+    if (!db || !db.objectStoreNames.contains('syncMetadata')) {
+      throw new Error('数据库缺少 syncMetadata 表');
+    }
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(['syncMetadata'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('保存本地同步元数据失败'));
+      transaction.onabort = () => reject(transaction.error || new Error('保存本地同步元数据事务中止'));
+      transaction.objectStore('syncMetadata').put({ key, value, updatedAt: new Date().toISOString() });
+    });
+  }
+
+  async removeLocalSyncMetadata(key: string): Promise<void> {
+    const db = await this.getDatabase();
+    if (!db || !db.objectStoreNames.contains('syncMetadata')) return;
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(['syncMetadata'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('删除本地同步元数据失败'));
+      transaction.onabort = () => reject(transaction.error || new Error('删除本地同步元数据事务中止'));
+      transaction.objectStore('syncMetadata').delete(key);
+    });
   }
 
   private async addRestoredRecord<T extends { id?: number } = any>(

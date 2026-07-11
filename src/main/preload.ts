@@ -168,6 +168,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('cloud:read-sync-snapshot', storageId, snapshot),
     saveSyncSnapshot: (storageId: string, snapshot: any) =>
       ipcRenderer.invoke('cloud:save-sync-snapshot', storageId, snapshot),
+    readCloudSyncV2Object: (storageId: string, path: string) =>
+      ipcRenderer.invoke('cloud:read-sync-v2-object', storageId, path),
+    writeCloudSyncV2Object: (storageId: string, path: string, data: Uint8Array, options?: any) =>
+      ipcRenderer.invoke('cloud:write-sync-v2-object', storageId, path, data, options),
+    listCloudSyncV2Objects: (storageId: string, prefix: string) =>
+      ipcRenderer.invoke('cloud:list-sync-v2-objects', storageId, prefix),
+    deleteCloudSyncV2Object: (storageId: string, path: string) =>
+      ipcRenderer.invoke('cloud:delete-sync-v2-object', storageId, path),
   },
   // 应用信息和更新
   app: {

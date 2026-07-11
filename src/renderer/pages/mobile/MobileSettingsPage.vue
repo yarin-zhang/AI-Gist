@@ -314,7 +314,7 @@ const performImport = async (file: File) => {
     const result = await databaseService.replaceAllData(importData)
 
     if (!result || !result.success) {
-      throw new Error(result?.message || '导入失败')
+      throw new Error(result?.error || result?.message || '导入失败')
     }
 
     await loading.dismiss()

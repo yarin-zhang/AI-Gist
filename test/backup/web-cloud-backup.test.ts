@@ -5,6 +5,7 @@ import {
 } from '@shared/backup-integrity'
 import { DatabaseServiceManager } from '~/lib/services/database-manager.service'
 import { WebCloudBackupService } from '~/lib/services/web-cloud-backup.service'
+import { getCloudSyncV2DirectoryPath, getCloudSyncV2ManifestPath } from '@shared/cloud-backup-paths'
 
 const webdavConfig = {
   id: 'web-cfg',
@@ -216,5 +217,71 @@ describe('WebCloudBackupService', () => {
     expect(result.success).toBe(false)
     expect(result.error).toContain('备份数据校验失败')
     expect(replaceSpy).not.toHaveBeenCalled()
+  })
+
+  it('exposes a binary-safe sync-v2 repository adapter with conditional writes', async () => {
+    saveWebDAVConfig()
+    let stored: { dataBase64: string; etag: string } | null = null
+    let version = 0
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const pathname = String(input)
+      const body = JSON.parse(String(init?.body))
+      expect(body.path || body.prefix).not.toMatch(/^\//)
+
+      if (pathname.endsWith('/sync-v2/write')) {
+        if ((body.ifNoneMatch === '*' && stored) ||
+            (body.ifMatch !== undefined && stored?.etag !== body.ifMatch)) {
+          return apiResponse({ status: 'precondition_failed', etag: stored?.etag })
+        }
+        stored = { dataBase64: body.dataBase64, etag: `"web-etag-${++version}"` }
+        return apiResponse({ status: 'written', etag: stored.etag })
+      }
+      if (pathname.endsWith('/sync-v2/read')) {
+        return apiResponse(stored ? {
+          path: getCloudSyncV2ManifestPath(),
+          dataBase64: stored.dataBase64,
+          etag: stored.etag,
+          byteLength: Buffer.from(stored.dataBase64, 'base64').byteLength
+        } : null)
+      }
+      if (pathname.endsWith('/sync-v2/list')) {
+        return apiResponse(stored ? [{
+          path: getCloudSyncV2ManifestPath(),
+          etag: stored.etag,
+          byteLength: Buffer.from(stored.dataBase64, 'base64').byteLength
+        }] : [])
+      }
+      if (pathname.endsWith('/sync-v2/delete')) {
+        stored = null
+        return apiResponse({ ok: true })
+      }
+      return apiResponse(null)
+    })
+
+    const service = WebCloudBackupService.getInstance()
+    const adapter = service.createCloudSyncV2ObjectStorageAdapter(webdavConfig.id)
+    const path = getCloudSyncV2ManifestPath()
+    const bytes = new Uint8Array([0, 1, 127, 128, 254, 255])
+    const created = await adapter.write(path, bytes, { ifAbsent: true })
+    expect(created.status).toBe('written')
+    expect(await adapter.read(path)).toEqual({ data: bytes, etag: '"web-etag-1"' })
+
+    expect(await adapter.write(path, new Uint8Array([9]), { ifAbsent: true })).toEqual({
+      status: 'precondition_failed',
+      etag: '"web-etag-1"'
+    })
+    expect(await adapter.write(path, new Uint8Array([8, 7]), { expectedEtag: '"web-etag-1"' }))
+      .toEqual({ status: 'written', etag: '"web-etag-2"' })
+    expect(await adapter.list(getCloudSyncV2DirectoryPath())).toEqual([{
+      path,
+      etag: '"web-etag-2"',
+      byteLength: 2
+    }])
+
+    await adapter.delete(path)
+    expect(await adapter.read(path)).toBeNull()
+    await expect(adapter.read('/AI-Gist-Backup/sync-v2/%2e%2e/secret'))
+      .rejects.toThrow('sync-v2 对象路径无效')
+    expect(fetchSpy).toHaveBeenCalled()
   })
 })

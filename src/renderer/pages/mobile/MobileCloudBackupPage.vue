@@ -224,7 +224,7 @@
               <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
               {{ t('cloudBackup.createCloudBackup') }}
             </ion-button>
-            <ion-button expand="block" fill="outline" @click="syncCloudData" :disabled="loading.syncNow">
+            <ion-button expand="block" fill="outline" @click="syncCloudData()" :disabled="loading.syncNow">
               <ion-icon :icon="syncOutline" slot="start"></ion-icon>
               {{ t('cloudBackup.syncNow') }}
             </ion-button>
@@ -335,6 +335,7 @@ import {
 import { databaseService } from '~/lib/db'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { CloudStorageConfig, CloudBackupInfo } from '@shared/types/cloud-backup'
+import type { CloudSyncResult } from '~/lib/services/cloud-sync.service'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -703,7 +704,7 @@ const createBackup = async () => {
 }
 
 // 立即同步
-const syncCloudData = async () => {
+const syncCloudData = async (forceRetry = false) => {
   if (!selectedConfig.value) return
 
   const loadingEl = await loadingController.create({
@@ -711,7 +712,7 @@ const syncCloudData = async () => {
   })
 
   loading.value.syncNow = true
-  let syncError: string | undefined
+  let syncError: string | CloudSyncResult | undefined
 
   try {
     await loadingEl.present()
@@ -719,13 +720,14 @@ const syncCloudData = async () => {
     const result = await cloudSyncService.syncNow(selectedConfig.value.id, {
       platform,
       deviceName: getDeviceLabel(),
-      reason: 'manual'
+      reason: 'manual',
+      forceRetry
     })
 
     if (result.success) {
       showToast(getCloudSyncResultMessage(result.action, result.conflicts.length))
     } else {
-      syncError = result.error
+      syncError = result
     }
   } catch (error) {
     console.error('云同步失败:', error)
@@ -740,7 +742,7 @@ const syncCloudData = async () => {
   }
 }
 
-const presentSyncErrorDetails = async (error?: string) => {
+const presentSyncErrorDetails = async (error?: string | CloudSyncResult) => {
   const storageId = selectedConfig.value?.id
   const diagnosis = getCloudSyncErrorDiagnosis(error, {
     storageId,
@@ -772,7 +774,7 @@ const presentSyncErrorDetails = async (error?: string) => {
       {
         text: '重新同步',
         handler: () => {
-          void syncCloudData()
+          void syncCloudData(true)
         }
       },
       {

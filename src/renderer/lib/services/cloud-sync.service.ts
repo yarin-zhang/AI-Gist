@@ -1,4 +1,5 @@
 import { PlatformDetector } from '@shared/platform';
+import { createStableChecksum } from '@shared/data-checksum';
 import type { ExportResult, ImportResult } from '@shared/types/data-management';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
 import type {
@@ -33,6 +34,12 @@ import {
 import type {
   CloudSyncRemoteSnapshotInfo
 } from '@shared/cloud-sync-snapshots';
+import {
+  reconcileCloudSyncDataContract,
+  pruneCloudSyncTombstonedPromptChildren,
+  type CloudSyncBusinessKeyMerge,
+  type CloudSyncContractIssue
+} from '@shared/cloud-sync-contract';
 import { generateUUID } from '../utils/uuid';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
 import { DatabaseServiceManager } from './database-manager.service';
@@ -41,6 +48,12 @@ import { mobileCloudBackupService } from './mobile-cloud-backup.service';
 import { webCloudBackupService } from './web-cloud-backup.service';
 import type { DataChangeEventPayload, DataStoreName } from './data-change-events';
 import { onDataChange } from './data-change-events';
+import {
+  CloudSyncV2Coordinator,
+  type CloudSyncV2RolloutMode,
+  type CloudSyncV2RolloutState
+} from './cloud-sync-v2-coordinator';
+import type { CloudSyncV2ObjectStorageAdapter } from '@shared/cloud-sync-v2-repository';
 
 const DEVICE_ID_STORAGE_KEY = 'ai_gist_cloud_sync_device_id';
 const LOCAL_STATE_STORAGE_PREFIX = 'ai_gist_cloud_sync_state';
@@ -100,12 +113,50 @@ export interface CloudSyncResult {
   conflicts: CloudSyncConflict[];
   summary: CloudSyncMergeSummary;
   error?: string;
+  errorCode?: CloudSyncErrorCode;
+  diagnostic?: CloudSyncStructuredDiagnostic;
+  warnings?: string[];
+  businessKeyMerges?: CloudSyncBusinessKeyMerge[];
+  v2MirrorStatus?: 'skipped' | 'published' | 'already-current' | 'rebase-required' | 'failed';
+}
+
+export type CloudSyncErrorCode =
+  | 'LOCAL_EXPORT_FAILED'
+  | 'DATA_CONTRACT_INVALID'
+  | 'LOCAL_APPLY_FAILED'
+  | 'LOCAL_APPLY_QUOTA'
+  | 'REMOTE_CHANGED'
+  | 'REMOTE_AUTH'
+  | 'REMOTE_NETWORK'
+  | 'REMOTE_PATH'
+  | 'REMOTE_CORRUPT'
+  | 'PROTOCOL_INCOMPATIBLE'
+  | 'SYNC_CANCELLED'
+  | 'UNKNOWN_SYNC_ERROR';
+
+export type CloudSyncRetryClass = 'transient' | 'remote-changed' | 'user-action' | 'deterministic';
+
+export interface CloudSyncStructuredDiagnostic {
+  operationId: string;
+  code: CloudSyncErrorCode;
+  phase: 'export' | 'read-remote' | 'merge' | 'apply-local' | 'write-remote' | 'verify' | 'lifecycle';
+  retryClass: CloudSyncRetryClass;
+  message: string;
+  storageId: string;
+  localRevision?: string;
+  remoteRevision?: string;
+  targetRevision?: string;
+  failures?: ImportResult['failures'];
+  contractIssues?: CloudSyncContractIssue[];
+  fingerprint: string;
 }
 
 export interface CloudSyncOptions extends CloudSyncMergeOptions {
   deviceName?: string;
   platform?: string;
   reason?: CloudSyncRunReason;
+  /** Explicitly retry an unchanged deterministic failure after the user fixed external conditions. */
+  forceRetry?: boolean;
 }
 
 export interface CloudSyncCloudClient {
@@ -126,6 +177,9 @@ export interface CloudSyncCloudClient {
 export interface CloudSyncDatabaseClient {
   exportAllDataForSync(): Promise<ExportResult>;
   replaceAllData(data: CloudSyncDataSet): Promise<ImportResult>;
+  getLocalSyncMetadata?<T = any>(key: string): Promise<T | null>;
+  setLocalSyncMetadata?<T = any>(key: string, value: T): Promise<void>;
+  removeLocalSyncMetadata?(key: string): Promise<void>;
 }
 
 export interface CloudSyncConfigClient {
@@ -211,6 +265,7 @@ export interface CloudSyncServiceDeps {
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   createDeviceId?: () => string;
   subscribeToDataChanges?: (listener: (change: DataChangeEventPayload) => void) => () => void;
+  v2Coordinator?: CloudSyncV2Coordinator;
 }
 
 type CloudSyncStatusListener = (status: CloudSyncStatus) => void;
@@ -225,10 +280,17 @@ export class CloudSyncService {
   private readonly storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   private readonly createDeviceId: () => string;
   private readonly subscribeToDataChanges: (listener: (change: DataChangeEventPayload) => void) => () => void;
+  private readonly v2Coordinator: CloudSyncV2Coordinator;
   private readonly runningSyncs = new Map<string, Promise<CloudSyncResult>>();
   private readonly syncGenerations = new Map<string, number>();
   private readonly activeScheduledRuns = new Set<Promise<void>>();
   private readonly queuedAutoSyncs = new Map<string, CloudSyncRunReason>();
+  private readonly blockedStorageFailures = new Map<string, CloudSyncResult>();
+  private readonly deterministicFailureGuards = new Map<string, {
+    localChecksum: string;
+    remoteRevision?: string;
+    result: CloudSyncResult;
+  }>();
   private syncAllAfterRetry = false;
   private readonly statusListeners = new Set<CloudSyncStatusListener>();
   private autoSyncOptions: CloudSyncAutoOptions | null = null;
@@ -261,6 +323,10 @@ export class CloudSyncService {
     this.storage = deps.storage || getBrowserStorage();
     this.createDeviceId = deps.createDeviceId || generateUUID;
     this.subscribeToDataChanges = deps.subscribeToDataChanges || (listener => onDataChange(SYNC_STORE_NAMES, listener));
+    this.v2Coordinator = deps.v2Coordinator || new CloudSyncV2Coordinator({
+      database: this.database,
+      storageFactory: storageId => this.getCloudSyncV2StorageAdapter(storageId)
+    });
     this.restorePendingChangeState();
     this.status.conflictLogCount = this.getConflictLog().length;
   }
@@ -293,8 +359,28 @@ export class CloudSyncService {
       nextSyncAt: undefined
     });
 
-    const syncPromise = this.performSync(storageId, options, 0, generation)
-      .then(result => {
+    const syncPromise = this.performSync(storageId, options, 0, generation, generateUUID())
+      .then(async result => {
+        if (result.success && result.remoteRevision) {
+          try {
+            const v2Result = await this.v2Coordinator.mirrorSuccessfulV1Sync({
+              storageId,
+              revision: result.remoteRevision,
+              deviceId: this.getOrCreateDeviceId(),
+              exportData: () => this.exportLocalData()
+            });
+            result.v2MirrorStatus = v2Result.status;
+            if (v2Result.warning) {
+              result.warnings = [...(result.warnings || []), v2Result.warning];
+            }
+          } catch {
+            result.v2MirrorStatus = 'failed';
+            result.warnings = [
+              ...(result.warnings || []),
+              'v2 影子发布状态记录失败；v1 同步已成功且不受影响'
+            ];
+          }
+        }
         if (this.runningSyncs.get(storageId) !== syncPromise) {
           if (this.autoSyncOptions) this.scheduleSync('retry', { delayMs: 0 });
           return result;
@@ -312,6 +398,8 @@ export class CloudSyncService {
         });
         if (result.success) {
           this.failureCount = 0;
+          this.blockedStorageFailures.delete(storageId);
+          this.deterministicFailureGuards.delete(storageId);
           this.clearRetryTimerForStorage(storageId);
         }
         return result;
@@ -564,6 +652,17 @@ export class CloudSyncService {
     return { ...this.status };
   }
 
+  getCloudSyncV2RolloutState(storageId: string): Promise<CloudSyncV2RolloutState> {
+    return this.v2Coordinator.getRolloutState(storageId);
+  }
+
+  setCloudSyncV2RolloutMode(
+    storageId: string,
+    mode: CloudSyncV2RolloutMode
+  ): Promise<CloudSyncV2RolloutState> {
+    return this.v2Coordinator.setRolloutMode(storageId, mode);
+  }
+
   onStatusChange(listener: CloudSyncStatusListener): () => void {
     this.statusListeners.add(listener);
     listener(this.getStatus());
@@ -632,14 +731,23 @@ export class CloudSyncService {
     storageId: string,
     options: CloudSyncOptions,
     attempt = 0,
-    generation = this.syncGenerations.get(storageId) || 0
+    generation = this.syncGenerations.get(storageId) || 0,
+    operationId = generateUUID()
   ): Promise<CloudSyncResult> {
+    let phase: CloudSyncStructuredDiagnostic['phase'] = 'export';
+    let localRevision: string | undefined;
+    let remoteRevision: string | undefined;
+    let targetRevision: string | undefined;
+    let localChecksum: string | undefined;
     try {
       this.assertCurrentSyncGeneration(storageId, generation);
       const deviceId = this.getOrCreateDeviceId();
       const now = new Date().toISOString();
       const localData = await this.exportLocalData();
+      localChecksum = createCloudSyncSemanticChecksum(localData);
+      const localChangeVersionAtExport = this.pendingChangeVersion;
       this.assertCurrentSyncGeneration(storageId, generation);
+      phase = 'read-remote';
       const manifestResult = await this.getManifestOrRecoverCorruption(
         storageId,
         localData,
@@ -654,8 +762,19 @@ export class CloudSyncService {
       }
 
       const manifest = manifestResult.manifest;
-      const localState = this.getLocalState(storageId);
+      const localState = await this.getLocalState(storageId);
       const remoteSnapshot = manifest.latestSnapshot;
+      localRevision = localState?.lastKnownRevision;
+      remoteRevision = remoteSnapshot?.revision;
+      const guardedFailure = this.deterministicFailureGuards.get(storageId);
+      if (
+        !options.forceRetry &&
+        guardedFailure &&
+        guardedFailure.localChecksum === localChecksum &&
+        guardedFailure.remoteRevision === remoteRevision
+      ) {
+        return guardedFailure.result;
+      }
       const manifestRepairMetadata = getCloudSyncManifestRepairMetadata(manifest);
       if (remoteSnapshot) {
         this.assertValidRemoteSnapshot(remoteSnapshot);
@@ -669,7 +788,9 @@ export class CloudSyncService {
         }
 
         const snapshot = createCloudSyncSnapshot(localData, deviceId);
+        targetRevision = snapshot.revision;
         try {
+          phase = 'write-remote';
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -691,7 +812,7 @@ export class CloudSyncService {
           throw error;
         }
         this.assertCurrentSyncGeneration(storageId, generation);
-        this.saveLocalState(storageId, deviceId, snapshot, now);
+        const stateWarning = await this.saveLocalState(storageId, deviceId, snapshot, now);
 
         return {
           success: true,
@@ -701,18 +822,31 @@ export class CloudSyncService {
           appliedLocal: false,
           uploadedRemote: true,
           conflicts: [],
-          summary: createEmptySummary()
+          summary: createEmptySummary(),
+          warnings: stateWarning ? [stateWarning] : undefined
         };
       }
 
       const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
       const baseData = this.getBaseData(localState);
+      phase = 'merge';
       const mergeResult = mergeCloudSyncData(localData, remoteData, baseData, {
         prefer: options.prefer || 'newer'
       });
-      const mergedData = applyCloudSyncTombstones(mergeResult.data);
+      const mergedWithDeletesApplied = pruneCloudSyncTombstonedPromptChildren(
+        applyCloudSyncTombstones(mergeResult.data),
+        baseData
+      );
+      const contractResult = reconcileCloudSyncDataContract(mergedWithDeletesApplied, baseData);
+      if (!contractResult.valid) {
+        throw new CloudSyncContractError(contractResult.issues);
+      }
+      const mergedData = contractResult.data;
       const mergedEqualsLocal = dataSetsEqual(localData, mergedData);
       const mergedEqualsRemote = dataSetsEqual(remoteData, mergedData);
+      const contractWarnings = contractResult.merges.length > 0
+        ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
+        : undefined;
 
       if (mergedEqualsLocal && mergedEqualsRemote) {
         if (manifestRepairMetadata) {
@@ -746,7 +880,7 @@ export class CloudSyncService {
           remoteRevision: remoteSnapshot.revision,
           resolvedRevision: remoteSnapshot.revision
         });
-        this.saveLocalState(storageId, deviceId, remoteSnapshot, now);
+        const stateWarning = await this.saveLocalState(storageId, deviceId, remoteSnapshot, now);
         return {
           success: true,
           action: manifestRepairMetadata ? 'uploaded' : 'noop',
@@ -755,7 +889,9 @@ export class CloudSyncService {
           appliedLocal: false,
           uploadedRemote: !!manifestRepairMetadata,
           conflicts: mergeResult.conflicts,
-          summary: mergeResult.summary
+          summary: mergeResult.summary,
+          warnings: mergeWarnings(contractWarnings, stateWarning),
+          businessKeyMerges: contractResult.merges
         };
       }
 
@@ -773,12 +909,17 @@ export class CloudSyncService {
 
         latestManifestForUpload = latestManifest;
         finalSnapshot = createCloudSyncSnapshot(mergedData, deviceId);
+        targetRevision = finalSnapshot.revision;
       } else if (manifestRepairMetadata) {
         latestManifestForUpload = manifest;
       }
 
       let appliedLocal = false;
       if (!mergedEqualsLocal) {
+        if (this.pendingChangeVersion !== localChangeVersionAtExport) {
+          return await this.retryAfterLocalChanged(storageId, options, attempt, generation, operationId);
+        }
+        phase = 'apply-local';
         this.assertCurrentSyncGeneration(storageId, generation);
         await this.replaceLocalDataForSync(mergedData, localData);
         this.assertCurrentSyncGeneration(storageId, generation);
@@ -788,6 +929,7 @@ export class CloudSyncService {
       let uploadedRemote = false;
       if (latestManifestForUpload) {
         try {
+          phase = 'write-remote';
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -818,7 +960,7 @@ export class CloudSyncService {
         remoteRevision: remoteSnapshot.revision,
         resolvedRevision: finalSnapshot.revision
       });
-      this.saveLocalState(storageId, deviceId, finalSnapshot, now);
+      const stateWarning = await this.saveLocalState(storageId, deviceId, finalSnapshot, now);
 
       return {
         success: true,
@@ -828,17 +970,37 @@ export class CloudSyncService {
         appliedLocal,
         uploadedRemote,
         conflicts: mergeResult.conflicts,
-        summary: mergeResult.summary
+        summary: mergeResult.summary,
+        warnings: mergeWarnings(contractWarnings, stateWarning),
+        businessKeyMerges: contractResult.merges
       };
     } catch (error) {
-      return {
+      const diagnostic = createCloudSyncStructuredDiagnostic(error, {
+        operationId,
+        phase,
+        storageId,
+        localRevision,
+        remoteRevision,
+        targetRevision
+      });
+      const result: CloudSyncResult = {
         success: false,
         appliedLocal: false,
         uploadedRemote: false,
         conflicts: [],
         summary: createEmptySummary(),
-        error: error instanceof Error ? error.message : String(error)
+        error: diagnostic.message,
+        errorCode: diagnostic.code,
+        diagnostic
       };
+      if (localChecksum && diagnostic.retryClass !== 'transient' && diagnostic.retryClass !== 'remote-changed') {
+        this.deterministicFailureGuards.set(storageId, {
+          localChecksum,
+          remoteRevision,
+          result
+        });
+      }
+      return result;
     }
   }
 
@@ -861,9 +1023,12 @@ export class CloudSyncService {
     try {
       const importResult = await this.database.replaceAllData(nextData);
       if (!importResult.success) {
-        throw new Error(importResult.error || importResult.message || '同步合并数据写入本地失败');
+        throw new CloudSyncLocalApplyError(importResult);
       }
     } catch (error) {
+      if (error instanceof CloudSyncLocalApplyError && error.result.atomic === true) {
+        throw error;
+      }
       const rollbackError = await this.rollbackLocalDataAfterFailedSync(rollbackData);
       if (rollbackError) {
         const originalMessage = error instanceof Error ? error.message : String(error);
@@ -899,6 +1064,19 @@ export class CloudSyncService {
     }
 
     return await this.performSync(storageId, options, attempt + 1, generation);
+  }
+
+  private async retryAfterLocalChanged(
+    storageId: string,
+    options: CloudSyncOptions,
+    attempt: number,
+    generation: number,
+    operationId: string
+  ): Promise<CloudSyncResult> {
+    if (attempt + 1 >= MAX_REMOTE_RECHECK_ATTEMPTS) {
+      throw new CloudSyncLocalChangedError('同步期间本机数据持续变化，已保留最新编辑并安排后续同步');
+    }
+    return await this.performSync(storageId, options, attempt + 1, generation, operationId);
   }
 
   private async retryAfterManifestConflict(
@@ -975,7 +1153,7 @@ export class CloudSyncService {
       this.assertCurrentSyncGeneration(storageId, generation);
       await this.overwriteManifest(storageId, rebuiltManifest, generation);
       this.assertCurrentSyncGeneration(storageId, generation);
-      this.saveLocalState(storageId, deviceId, snapshot, now);
+      const stateWarning = await this.saveLocalState(storageId, deviceId, snapshot, now);
 
       return {
         manifest: rebuiltManifest,
@@ -987,7 +1165,8 @@ export class CloudSyncService {
           appliedLocal: false,
           uploadedRemote: true,
           conflicts: [],
-          summary: createEmptySummary()
+          summary: createEmptySummary(),
+          warnings: stateWarning ? [stateWarning] : undefined
         }
       };
     }
@@ -1464,6 +1643,19 @@ export class CloudSyncService {
     }
   }
 
+  private getCloudSyncV2StorageAdapter(storageId: string): CloudSyncV2ObjectStorageAdapter | null {
+    if (PlatformDetector.isElectron()) {
+      return CloudBackupAPI.createCloudSyncV2ObjectStorageAdapter(storageId);
+    }
+    if (PlatformDetector.isWeb()) {
+      return webCloudBackupService.createCloudSyncV2ObjectStorageAdapter(storageId);
+    }
+    const mobileService = mobileCloudBackupService as any;
+    return typeof mobileService.createCloudSyncV2ObjectStorageAdapter === 'function'
+      ? mobileService.createCloudSyncV2ObjectStorageAdapter(storageId)
+      : null;
+  }
+
   private getCloudClient(): CloudSyncCloudClient {
     if (this.cloudClient) {
       return this.cloudClient;
@@ -1737,12 +1929,31 @@ export class CloudSyncService {
     }
 
     if (failures.length > 0) {
-      this.scheduleRetry(
-        reason,
-        failures.map(failure => `${failure.storageId}: ${failure.result.error || '自动同步失败'}`).join('；'),
-        failures.map(failure => failure.storageId),
-        retryCoveredPendingVersion ?? (!storageId && !storageIdsOverride && pendingVersion > 0 ? pendingVersion : undefined)
-      );
+      const retryableFailures = failures.filter(failure => canAutoRetryCloudSyncResult(failure.result));
+      const deterministicFailures = failures.filter(failure => !canAutoRetryCloudSyncResult(failure.result));
+      deterministicFailures.forEach(failure => this.blockedStorageFailures.set(failure.storageId, failure.result));
+
+      if (retryableFailures.length > 0) {
+        this.scheduleRetry(
+          reason,
+          failures.map(failure => `${failure.storageId}: ${failure.result.error || '自动同步失败'}`).join('；'),
+          retryableFailures.map(failure => failure.storageId),
+          retryCoveredPendingVersion ?? (!storageId && !storageIdsOverride && pendingVersion > 0 ? pendingVersion : undefined)
+        );
+      } else {
+        this.clearRetryTimer();
+        this.updateStatus({
+          status: 'error',
+          pending: false,
+          storageId: deterministicFailures[0]?.storageId,
+          reason,
+          lastResult: deterministicFailures[0]?.result,
+          error: deterministicFailures
+            .map(failure => `${failure.storageId}: ${failure.result.error || '自动同步失败'}`)
+            .join('；'),
+          nextSyncAt: undefined
+        });
+      }
       return;
     }
 
@@ -1753,6 +1964,20 @@ export class CloudSyncService {
     } else if (retryCoveredPendingVersion !== undefined) {
       this.clearPendingChange(retryCoveredPendingVersion);
     }
+    if (this.blockedStorageFailures.size > 0) {
+      const [blockedStorageId, blockedResult] = this.blockedStorageFailures.entries().next().value as [string, CloudSyncResult];
+      this.updateStatus({
+        status: 'error',
+        pending: false,
+        storageId: blockedStorageId,
+        reason,
+        lastResult: blockedResult,
+        error: blockedResult.error,
+        nextSyncAt: undefined
+      });
+      return;
+    }
+
     this.updateStatus({
       status: 'success',
       pending: false,
@@ -2008,10 +2233,30 @@ export class CloudSyncService {
     return deviceId;
   }
 
-  private getLocalState(storageId: string): CloudSyncLocalState | null {
+  private async getLocalState(storageId: string): Promise<CloudSyncLocalState | null> {
+    const metadataKey = this.getLocalStateStorageKey(storageId);
+    if (this.database.getLocalSyncMetadata) {
+      try {
+        const storedState = await this.database.getLocalSyncMetadata<CloudSyncLocalState>(metadataKey);
+        const normalizedState = this.normalizeLocalState(storedState, storageId);
+        if (normalizedState) return normalizedState;
+      } catch (error) {
+        console.warn('读取 IndexedDB 云同步状态失败，将尝试兼容存储:', error);
+      }
+    }
+
     try {
-      const raw = this.storage?.getItem(this.getLocalStateStorageKey(storageId));
-      return raw ? this.normalizeLocalState(JSON.parse(raw), storageId) : null;
+      const raw = this.storage?.getItem(metadataKey);
+      const normalizedState = raw ? this.normalizeLocalState(JSON.parse(raw), storageId) : null;
+      if (normalizedState && this.database.setLocalSyncMetadata) {
+        try {
+          await this.database.setLocalSyncMetadata(metadataKey, normalizedState);
+          this.storage?.removeItem(metadataKey);
+        } catch (error) {
+          console.warn('迁移云同步状态到 IndexedDB 失败:', error);
+        }
+      }
+      return normalizedState;
     } catch {
       return null;
     }
@@ -2060,12 +2305,12 @@ export class CloudSyncService {
     };
   }
 
-  private saveLocalState(
+  private async saveLocalState(
     storageId: string,
     deviceId: string,
     snapshot: CloudSyncSnapshot,
     lastSyncAt: string
-  ): void {
+  ): Promise<string | undefined> {
     const state: CloudSyncLocalState = {
       storageId,
       deviceId,
@@ -2073,6 +2318,17 @@ export class CloudSyncService {
       lastKnownRevision: snapshot.revision,
       baseSnapshot: snapshot
     };
+    const metadataKey = this.getLocalStateStorageKey(storageId);
+    if (this.database.setLocalSyncMetadata) {
+      try {
+        await this.database.setLocalSyncMetadata(metadataKey, state);
+        try { this.storage?.removeItem(metadataKey); } catch { /* compatibility cache cleanup is noncritical */ }
+        return;
+      } catch (error) {
+        console.warn('保存 IndexedDB 云同步状态失败，将尝试完整兼容存储:', error);
+      }
+    }
+
     const serializedState = JSON.stringify(state);
     const firstError = this.trySaveLocalState(storageId, serializedState);
     if (!firstError) {
@@ -2088,18 +2344,9 @@ export class CloudSyncService {
       lastError = retryError;
     }
 
-    const lightweightState: CloudSyncLocalState = {
-      storageId,
-      deviceId,
-      lastSyncAt,
-      lastKnownRevision: snapshot.revision
-    };
-    const lightweightError = this.trySaveLocalState(storageId, JSON.stringify(lightweightState));
-    if (!lightweightError) {
-      return;
-    }
-
-    console.warn('保存本地同步状态失败:', lightweightError || lastError);
+    const warning = `云端数据已提交，但完整本地同步基线保存失败: ${formatUnknownError(lastError)}`;
+    console.warn(warning);
+    return warning;
   }
 
   private trySaveLocalState(storageId: string, serializedState: string): unknown | null {
@@ -2242,6 +2489,16 @@ function minutesToMs(minutes: number): number {
   return normalizeCloudSyncIntervalMinutes(minutes) * 60 * 1000;
 }
 
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || '未知错误');
+}
+
+function mergeWarnings(existing: string[] | undefined, additional?: string): string[] | undefined {
+  const warnings = [...(existing || [])];
+  if (additional) warnings.push(additional);
+  return warnings.length > 0 ? warnings : undefined;
+}
+
 export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): string {
   if (action === 'uploaded') return '同步完成，已上传本机数据';
   if (action === 'downloaded') return '同步完成，已更新本机数据';
@@ -2250,10 +2507,15 @@ export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): 
 }
 
 export function getCloudSyncErrorDiagnosis(
-  error?: string,
+  error?: string | CloudSyncResult | CloudSyncStructuredDiagnostic,
   context: CloudSyncErrorDiagnosisContext = {}
 ): CloudSyncErrorDiagnosis {
-  const rawError = normalizeCloudSyncError(error);
+  const structuredDiagnostic = extractCloudSyncStructuredDiagnostic(error);
+  const rawError = normalizeCloudSyncError(
+    typeof error === 'string'
+      ? error
+      : structuredDiagnostic?.message || ('error' in (error || {}) ? (error as CloudSyncResult).error : undefined)
+  );
   let title = '同步遇到问题';
   let message = '同步失败，请稍后重试；如果反复出现，请复制错误详情反馈。';
   let canAutoRetry = false;
@@ -2263,7 +2525,34 @@ export function getCloudSyncErrorDiagnosis(
     '复制错误详情并反馈'
   ];
 
-  if (isCloudSyncInstabilityError(rawError)) {
+  if (structuredDiagnostic?.code === 'DATA_CONTRACT_INVALID') {
+    title = '同步数据关系需要处理';
+    message = '检测到无法安全确定的记录关系。本机数据保持不变，详情中列出了集合和记录标识。';
+    canUserFix = true;
+    suggestedActions = [
+      '查看详情中的集合、记录标识和关联类型',
+      '先导出本地安全备份，再修复对应记录',
+      '修复后重新同步'
+    ];
+  } else if (structuredDiagnostic?.code === 'LOCAL_APPLY_QUOTA') {
+    title = '本地存储空间不足';
+    message = '数据库事务因存储配额不足而中止，原有数据未被部分覆盖。';
+    canUserFix = true;
+    suggestedActions = [
+      '释放设备磁盘或应用存储空间',
+      '关闭其他占用大量空间的页面后重试',
+      '复制详情反馈存储配额信息'
+    ];
+  } else if (structuredDiagnostic?.code === 'LOCAL_APPLY_FAILED') {
+    title = '本地数据库事务未能提交';
+    message = '同步数据未写入，本机旧数据保持完整。详情中包含失败集合、记录键和数据库错误。';
+    canUserFix = structuredDiagnostic.retryClass === 'user-action';
+    suggestedActions = [
+      '查看详情中的失败阶段、集合和记录键',
+      '重启应用后再试一次',
+      '如果错误指纹未变化，请复制详情反馈'
+    ];
+  } else if (isCloudSyncInstabilityError(rawError)) {
     title = '云端同步状态暂时不一致';
     message = '应用会保留本机数据并自动重试；如果持续出现，请查看详情复制诊断信息。';
     canAutoRetry = true;
@@ -2323,7 +2612,7 @@ export function getCloudSyncErrorDiagnosis(
       canAutoRetry,
       canUserFix,
       suggestedActions
-    })
+    }, structuredDiagnostic)
   };
 }
 
@@ -2336,7 +2625,50 @@ function normalizeCloudSyncError(error?: string): string {
     return '未知错误';
   }
 
-  return error.trim();
+  return redactCloudSyncDiagnosticText(error.trim());
+}
+
+function redactCloudSyncDiagnosticText(value: string): string {
+  if (containsPotentialSensitiveDiagnosticData(value)) {
+    return `[敏感错误内容已隐藏；fingerprint=${createStableChecksum(value).slice(0, 16)}]`;
+  }
+  return value
+    .replace(/data:[^\s'"<>]+/gi, '[已隐藏图片或二进制数据]')
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/_=.-]+/gi, '$1 [已隐藏凭据]')
+    .replace(/([?&](?:api[_-]?key|token|password|secret|access[_-]?key)=)[^&#\s]+/gi, '$1[已隐藏]')
+    .replace(/("(?:api[_-]?key|token|password|secret|authorization|prompt|content|generatedPrompt|systemPrompt)"\s*:\s*")[^"]*(")/gi, '$1[已隐藏]$2')
+    .replace(/\b((?:api[_-]?key|token|password|secret|authorization|prompt|content|generatedPrompt|systemPrompt)\s*[=:]\s*)[^\s,;]+/gi, '$1[已隐藏]')
+    .replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/gi, '$1[已隐藏凭据]@')
+    .replace(/\b[A-Za-z0-9+/]{96,}={0,2}\b/g, '[已隐藏长编码数据]');
+}
+
+function containsPotentialSensitiveDiagnosticData(value: string): boolean {
+  return (
+    /data:/i.test(value) ||
+    /\b(?:Bearer|Basic)\s+/i.test(value) ||
+    /https?:\/\/[^/@\s]+:[^/@\s]+@/i.test(value) ||
+    /(?:api[_-]?key|x-api-key|access[_-]?key|password|passwd|secret|authorization|auth[_-]?token|token|prompt|content|generatedPrompt|systemPrompt)\s*(?:[=:]|\bis\b)/i.test(value) ||
+    /["'](?:api[_-]?key|x-api-key|access[_-]?key|password|passwd|secret|authorization|token|prompt|content|generatedPrompt|systemPrompt)["']\s*:/i.test(value) ||
+    /\b[A-Za-z0-9+/]{96,}={0,2}\b/.test(value)
+  );
+}
+
+function redactCloudSyncDiagnosticIdentity(value: string | undefined): string {
+  if (!value) return '未知';
+  if (/^(uuid|id|configId|historyId|key|recordKey|index):/i.test(value)) {
+    return redactCloudSyncDiagnosticText(value);
+  }
+  return `fingerprint:${createStableChecksum(value).slice(0, 16)}`;
+}
+
+function extractCloudSyncStructuredDiagnostic(
+  value?: string | CloudSyncResult | CloudSyncStructuredDiagnostic
+): CloudSyncStructuredDiagnostic | undefined {
+  if (!value || typeof value === 'string') return undefined;
+  if ('fingerprint' in value && 'retryClass' in value) {
+    return value as CloudSyncStructuredDiagnostic;
+  }
+  return (value as CloudSyncResult).diagnostic;
 }
 
 function isCloudSyncInstabilityError(error: string): boolean {
@@ -2367,7 +2699,9 @@ function isCloudSyncNetworkError(error: string): boolean {
     error.includes('socket disconnected') ||
     error.includes('Network') ||
     error.includes('network') ||
-    error.includes('fetch failed')
+    error.includes('fetch failed') ||
+    /\b(408|423|429|500|502|503|504|507)\b/.test(error) ||
+    /temporar(?:y|ily)|临时|稍后重试/i.test(error)
   );
 }
 
@@ -2388,7 +2722,8 @@ function isCloudSyncDatabaseError(error: string): boolean {
 function createCloudSyncErrorReport(
   rawError: string,
   context: CloudSyncErrorDiagnosisContext,
-  diagnosis: Omit<CloudSyncErrorDiagnosis, 'rawError' | 'copyText'>
+  diagnosis: Omit<CloudSyncErrorDiagnosis, 'rawError' | 'copyText'>,
+  structuredDiagnostic?: CloudSyncStructuredDiagnostic
 ): string {
   const lines = [
     'AI-Gist 云同步错误诊断',
@@ -2418,6 +2753,33 @@ function createCloudSyncErrorReport(
 
   if (typeof navigator !== 'undefined' && navigator.userAgent) {
     lines.push(`User-Agent: ${navigator.userAgent}`);
+  }
+
+  if (structuredDiagnostic) {
+    lines.push(
+      `操作 ID: ${structuredDiagnostic.operationId}`,
+      `错误代码: ${structuredDiagnostic.code}`,
+      `失败阶段: ${structuredDiagnostic.phase}`,
+      `重试类型: ${structuredDiagnostic.retryClass}`,
+      `错误指纹: ${structuredDiagnostic.fingerprint}`
+    );
+    if (structuredDiagnostic.localRevision) lines.push(`本地基线 revision: ${structuredDiagnostic.localRevision}`);
+    if (structuredDiagnostic.remoteRevision) lines.push(`远端 revision: ${structuredDiagnostic.remoteRevision}`);
+    if (structuredDiagnostic.targetRevision) lines.push(`目标 revision: ${structuredDiagnostic.targetRevision}`);
+
+    for (const [index, failure] of (structuredDiagnostic.failures || []).entries()) {
+      lines.push(
+        `失败记录 ${index + 1}: code=${failure.code}, phase=${failure.phase}, ` +
+        `collection=${failure.collection || '未知'}, recordKey=${redactCloudSyncDiagnosticIdentity(failure.recordKey)}, ` +
+        `constraint=${failure.constraint || '未知'}, errorName=${failure.errorName || '未知'}`
+      );
+    }
+    for (const [index, issue] of (structuredDiagnostic.contractIssues || []).entries()) {
+      lines.push(
+        `关系问题 ${index + 1}: code=${issue.code}, collection=${issue.collection}, ` +
+        `record=${redactCloudSyncDiagnosticIdentity(issue.recordIdentity)}, relation=${issue.relation}`
+      );
+    }
   }
 
   lines.push(
@@ -2482,6 +2844,123 @@ function getCloudSyncSnapshotTime(snapshot: CloudSyncSnapshot): number {
   return Number.isNaN(createdAtTime) ? 0 : createdAtTime;
 }
 
+class CloudSyncContractError extends Error {
+  readonly issues: CloudSyncContractIssue[];
+
+  constructor(issues: CloudSyncContractIssue[]) {
+    const first = issues[0];
+    super(first
+      ? `同步数据关系无效：${first.collection} ${first.recordIdentity} 的 ${first.relation} 无法安全解析`
+      : '同步数据关系无效');
+    this.name = 'CloudSyncContractError';
+    this.issues = issues;
+  }
+}
+
+class CloudSyncLocalApplyError extends Error {
+  readonly result: ImportResult;
+
+  constructor(result: ImportResult) {
+    super(result.error || result.message || '同步合并数据写入本地失败');
+    this.name = 'CloudSyncLocalApplyError';
+    this.result = result;
+  }
+}
+
+class CloudSyncLocalChangedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CloudSyncLocalChangedError';
+  }
+}
+
+function createCloudSyncStructuredDiagnostic(
+  error: unknown,
+  context: Omit<CloudSyncStructuredDiagnostic, 'code' | 'retryClass' | 'message' | 'fingerprint'>
+): CloudSyncStructuredDiagnostic {
+  const message = error instanceof Error ? error.message : String(error);
+  let code: CloudSyncErrorCode = 'UNKNOWN_SYNC_ERROR';
+  let retryClass: CloudSyncRetryClass = 'deterministic';
+  let failures: ImportResult['failures'];
+  let contractIssues: CloudSyncContractIssue[] | undefined;
+
+  if (error instanceof CloudSyncContractError) {
+    code = 'DATA_CONTRACT_INVALID';
+    contractIssues = error.issues.map(issue => ({
+      ...issue,
+      recordIdentity: redactCloudSyncDiagnosticIdentity(issue.recordIdentity)
+    }));
+  } else if (error instanceof CloudSyncLocalApplyError) {
+    code = error.result.errorCode === 'QUOTA_EXCEEDED'
+      ? 'LOCAL_APPLY_QUOTA'
+      : 'LOCAL_APPLY_FAILED';
+    retryClass = error.result.retryable ? 'transient' : 'user-action';
+    failures = error.result.failures?.map(failure => ({
+      phase: failure.phase,
+      code: failure.code,
+      collection: failure.collection,
+      storeName: failure.storeName,
+      recordKey: redactCloudSyncDiagnosticIdentity(failure.recordKey),
+      constraint: failure.constraint,
+      errorName: failure.errorName,
+      message: `${failure.code} at ${failure.phase}`,
+      retryable: failure.retryable
+    }));
+  } else if (error instanceof CloudSyncLocalChangedError) {
+    code = 'SYNC_CANCELLED';
+    retryClass = 'transient';
+  } else if (isCloudSyncRemoteChangedError(error) || isCloudSyncRevisionConflictMessage(message)) {
+    code = 'REMOTE_CHANGED';
+    retryClass = 'remote-changed';
+  } else if (isCloudSyncAuthError(message)) {
+    code = 'REMOTE_AUTH';
+    retryClass = 'user-action';
+  } else if (isCloudSyncNetworkError(message)) {
+    code = 'REMOTE_NETWORK';
+    retryClass = 'transient';
+  } else if (isCloudSyncPathError(message)) {
+    code = 'REMOTE_PATH';
+    retryClass = 'user-action';
+  } else if (/schema version|协议版本|unsupported/i.test(message)) {
+    code = 'PROTOCOL_INCOMPATIBLE';
+    retryClass = 'user-action';
+  } else if (isCloudSyncManifestCorruptionError(error)) {
+    code = 'REMOTE_CORRUPT';
+    retryClass = 'user-action';
+  } else if (/生命周期同步取代|同步任务已被更新/.test(message)) {
+    code = 'SYNC_CANCELLED';
+    retryClass = 'transient';
+  } else if (context.phase === 'export') {
+    code = 'LOCAL_EXPORT_FAILED';
+  }
+
+  const fingerprint = createStableChecksum({
+    code,
+    phase: context.phase,
+    storageId: context.storageId,
+    localRevision: context.localRevision,
+    remoteRevision: context.remoteRevision,
+    targetRevision: context.targetRevision,
+    failures: failures?.map(failure => ({
+      code: failure.code,
+      collection: failure.collection,
+      recordKey: failure.recordKey,
+      constraint: failure.constraint
+    })),
+    contractIssues
+  });
+
+  return {
+    ...context,
+    code,
+    retryClass,
+    message: redactCloudSyncDiagnosticText(message),
+    failures,
+    contractIssues,
+    fingerprint
+  };
+}
+
 class CloudSyncRemoteChangedError extends Error {
   constructor(message: string) {
     super(message);
@@ -2532,6 +3011,14 @@ function createEmptySummary(): CloudSyncMergeSummary {
 
 function dataSetsEqual(left: CloudSyncDataSet, right: CloudSyncDataSet): boolean {
   return createCloudSyncSemanticChecksum(left) === createCloudSyncSemanticChecksum(right);
+}
+
+function canAutoRetryCloudSyncResult(result: CloudSyncResult): boolean {
+  const retryClass = result.diagnostic?.retryClass;
+  if (retryClass) {
+    return retryClass === 'transient' || retryClass === 'remote-changed';
+  }
+  return isCloudSyncNetworkError(result.error || '') || isCloudSyncInstabilityError(result.error || '');
 }
 
 export const cloudSyncService = CloudSyncService.getInstance();

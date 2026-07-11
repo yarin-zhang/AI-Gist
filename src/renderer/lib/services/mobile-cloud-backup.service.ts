@@ -27,6 +27,7 @@ import {
   getCloudSyncSnapshotRevisionFromFileName,
   getCloudSyncSnapshotsDirectoryPath,
   getCloudSyncSnapshotsDirectoryRelativePath,
+  getCloudSyncV2DirectoryPath,
   getCloudBackupDirectoryPath,
   getCloudBackupFilePath,
   getCloudSyncManifestBackupPath,
@@ -57,6 +58,13 @@ import {
   createBackupPayload,
   parseBackupPayload
 } from '@shared/backup-integrity'
+import type {
+  CloudSyncV2ObjectStorageAdapter,
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '@shared/cloud-sync-v2-repository'
 
 const STORAGE_KEYS = {
   CONFIGS: 'cloud_backup_configs'
@@ -64,6 +72,13 @@ const STORAGE_KEYS = {
 
 const WEBDAV_REQUEST_TIMEOUT_MS = 30_000
 const CLOUD_BACKUP_DEBUG_STORAGE_KEY = 'ai-gist.debug.cloud-backup'
+const CLOUD_SYNC_V2_ARTIFACT_DIRECTORIES = [
+  'commits',
+  'checkpoints',
+  'deltas',
+  'blobs',
+  'quarantine'
+] as const
 
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
@@ -480,6 +495,186 @@ export class MobileCloudBackupService {
         success: false,
         error: error instanceof Error ? error.message : '保存云同步快照失败'
       }
+    }
+  }
+
+  async readCloudSyncV2Object(
+    storageId: string,
+    path: string
+  ): Promise<CloudSyncV2StoredObject | null> {
+    const config = await this.getStorageConfigOrThrow(storageId)
+    const canonicalPath = this.normalizeCloudSyncV2ObjectPath(path)
+
+    if (config.type === 'webdav') {
+      const response = await CapacitorHttp.request({
+        url: this.buildWebDAVUrlFromCloudPath(config as any, canonicalPath),
+        method: 'GET',
+        responseType: 'arraybuffer',
+        ...this.getWebDAVRequestTimeoutOptions(),
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${(config as any).username}:${(config as any).password}`)
+        }
+      })
+      if (response.status === 404) {
+        return null
+      }
+      if (response.status !== 200) {
+        throw new Error(`读取 sync-v2 对象失败（HTTP ${response.status}）`)
+      }
+      return {
+        data: await this.decodeBinaryResponse(response.data),
+        etag: this.getResponseHeader(response, 'etag')
+      }
+    }
+
+    if (config.type === 'icloud') {
+      await this.assertICloudAvailable()
+      try {
+        const result = await Filesystem.readFile({
+          path: this.getICloudSyncV2ObjectPath(config as any, canonicalPath),
+          directory: Directory.Documents
+        })
+        return { data: await this.decodeBinaryResponse(result.data) }
+      } catch (error) {
+        if (this.isNotFoundError(error)) {
+          return null
+        }
+        throw error
+      }
+    }
+
+    throw new Error('不支持的存储类型')
+  }
+
+  async writeCloudSyncV2Object(
+    storageId: string,
+    path: string,
+    data: Uint8Array,
+    options: CloudSyncV2ObjectWriteOptions = {}
+  ): Promise<CloudSyncV2ObjectWriteResult> {
+    if (!(data instanceof Uint8Array)) {
+      throw new Error('sync-v2 对象内容必须是 Uint8Array')
+    }
+    this.assertValidCloudSyncV2WriteOptions(options)
+    const config = await this.getStorageConfigOrThrow(storageId)
+    const canonicalPath = this.normalizeCloudSyncV2ObjectPath(path)
+
+    if (config.type === 'webdav') {
+      const parentPath = canonicalPath.slice(0, canonicalPath.lastIndexOf('/'))
+      await this.ensureWebDAVBackupDirectory(config as any)
+      await this.ensureWebDAVDirectoryPath(config as any, parentPath)
+      const conditionalHeaders: Record<string, string> = {}
+      if (options.ifAbsent) {
+        conditionalHeaders['If-None-Match'] = '*'
+      } else if (options.expectedEtag !== undefined) {
+        conditionalHeaders['If-Match'] = this.normalizeIfMatchHeaderValue(options.expectedEtag)
+      }
+      const response = await CapacitorHttp.request({
+        url: this.buildWebDAVUrlFromCloudPath(config as any, canonicalPath),
+        method: 'PUT',
+        data: this.encodeBase64(data),
+        dataType: 'file',
+        ...this.getWebDAVRequestTimeoutOptions(),
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${(config as any).username}:${(config as any).password}`),
+          'Content-Type': 'application/octet-stream',
+          ...conditionalHeaders
+        }
+      })
+      if (response.status === 412 ||
+          ((options.ifAbsent || options.expectedEtag !== undefined) && [400, 405, 409, 428, 501].includes(response.status))) {
+        return {
+          status: 'precondition_failed',
+          etag: this.getResponseHeader(response, 'etag')
+        }
+      }
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`写入 sync-v2 对象失败（HTTP ${response.status}）`)
+      }
+      return { status: 'written', etag: this.getResponseHeader(response, 'etag') }
+    }
+
+    if (config.type === 'icloud') {
+      await this.assertICloudAvailable()
+      // Capacitor Filesystem has no atomic create-only or compare-and-swap
+      // primitive. Refuse conditional writes instead of emulating them with a
+      // racy read-then-write sequence that could overwrite another device.
+      if (options.ifAbsent || options.expectedEtag !== undefined) {
+        return { status: 'precondition_failed' }
+      }
+      const localPath = this.getICloudSyncV2ObjectPath(config as any, canonicalPath)
+      await this.ensureICloudDirectory(localPath.slice(0, localPath.lastIndexOf('/')))
+      await Filesystem.writeFile({
+        path: localPath,
+        data: this.encodeBase64(data),
+        directory: Directory.Documents
+      })
+      return { status: 'written' }
+    }
+
+    throw new Error('不支持的存储类型')
+  }
+
+  async listCloudSyncV2Objects(
+    storageId: string,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    const config = await this.getStorageConfigOrThrow(storageId)
+    const canonicalPrefix = this.normalizeCloudSyncV2ObjectPath(prefix)
+
+    if (config.type === 'webdav') {
+      return this.listWebDAVSyncV2Objects(config as any, canonicalPrefix)
+    }
+    if (config.type === 'icloud') {
+      await this.assertICloudAvailable()
+      return this.listICloudSyncV2Objects(config as any, canonicalPrefix)
+    }
+    return []
+  }
+
+  async deleteCloudSyncV2Object(storageId: string, path: string): Promise<void> {
+    const config = await this.getStorageConfigOrThrow(storageId)
+    const canonicalPath = this.normalizeCloudSyncV2ObjectPath(path)
+
+    if (config.type === 'webdav') {
+      const response = await CapacitorHttp.request({
+        url: this.buildWebDAVUrlFromCloudPath(config as any, canonicalPath),
+        method: 'DELETE',
+        ...this.getWebDAVRequestTimeoutOptions(),
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${(config as any).username}:${(config as any).password}`)
+        }
+      })
+      if (response.status !== 404 && (response.status < 200 || response.status >= 300)) {
+        throw new Error(`删除 sync-v2 对象失败（HTTP ${response.status}）`)
+      }
+      return
+    }
+
+    if (config.type === 'icloud') {
+      await this.assertICloudAvailable()
+      try {
+        await Filesystem.deleteFile({
+          path: this.getICloudSyncV2ObjectPath(config as any, canonicalPath),
+          directory: Directory.Documents
+        })
+      } catch (error) {
+        if (!this.isNotFoundError(error)) {
+          throw error
+        }
+      }
+      return
+    }
+
+    throw new Error('不支持的存储类型')
+  }
+
+  createCloudSyncV2ObjectStorageAdapter(storageId: string): CloudSyncV2ObjectStorageAdapter {
+    return {
+      read: path => this.readCloudSyncV2Object(storageId, path),
+      write: (path, data, options) => this.writeCloudSyncV2Object(storageId, path, data, options),
+      delete: path => this.deleteCloudSyncV2Object(storageId, path),
+      list: prefix => this.listCloudSyncV2Objects(storageId, prefix)
     }
   }
 
@@ -1862,6 +2057,252 @@ export class MobileCloudBackupService {
       getCloudSyncSnapshotsDirectoryRelativePath(),
       getCloudSyncSnapshotFileName(revision)
     ).replace(/^\/+/, '')
+  }
+
+  private normalizeCloudSyncV2ObjectPath(path: string): string {
+    if (typeof path !== 'string' || !path || path.length > 2048 || path.trim() !== path ||
+        /[%\\\0\r\n?#]/.test(path) || /^[a-zA-Z]:/.test(path)) {
+      throw new Error('sync-v2 对象路径无效')
+    }
+    const relative = path.startsWith('/') ? path.slice(1) : path
+    if (!relative || relative.startsWith('/') || relative.endsWith('/')) {
+      throw new Error('sync-v2 对象路径必须是规范路径')
+    }
+    const segments = relative.split('/')
+    if (segments.some(segment => !segment || segment === '.' || segment === '..') ||
+        segments[0] !== CLOUD_BACKUP_DIR || segments[1] !== 'sync-v2') {
+      throw new Error('sync-v2 对象路径超出允许的命名空间')
+    }
+    return `/${segments.join('/')}`
+  }
+
+  private assertValidCloudSyncV2WriteOptions(options: CloudSyncV2ObjectWriteOptions): void {
+    if (options.ifAbsent && options.expectedEtag !== undefined) {
+      throw new Error('ifAbsent 与 expectedEtag 不能同时使用')
+    }
+    if (options.expectedEtag !== undefined && !String(options.expectedEtag).trim()) {
+      throw new Error('expectedEtag 不能为空')
+    }
+  }
+
+  private async listWebDAVSyncV2Objects(
+    config: any,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    const root = getCloudSyncV2DirectoryPath()
+    const relative = prefix === root ? '' : prefix.slice(`${root}/`.length)
+    const topLevel = relative.split('/')[0]
+    const directories = prefix === root
+      ? [root, ...CLOUD_SYNC_V2_ARTIFACT_DIRECTORIES.map(name => `${root}/${name}`)]
+      : CLOUD_SYNC_V2_ARTIFACT_DIRECTORIES.includes(topLevel as any)
+        ? [`${root}/${topLevel}`]
+        : [root]
+    const objects = new Map<string, CloudSyncV2StoredObjectInfo>()
+
+    for (const directory of directories) {
+      const entries = await this.listWebDAVSyncV2Directory(config, directory)
+      for (const entry of entries) {
+        if (!entry.isDirectory && entry.path.startsWith(prefix)) {
+          objects.set(entry.path, {
+            path: entry.path,
+            etag: entry.etag,
+            byteLength: entry.byteLength
+          })
+        }
+      }
+    }
+    return [...objects.values()].sort((left, right) => left.path.localeCompare(right.path))
+  }
+
+  private async listWebDAVSyncV2Directory(
+    config: any,
+    directory: string
+  ): Promise<(CloudSyncV2StoredObjectInfo & { isDirectory: boolean })[]> {
+    const url = this.buildWebDAVUrlFromCloudPath(config, directory)
+    let status: number
+    let xmlData: string
+    if (Capacitor.getPlatform() === 'android') {
+      const response = await WebDav.propfind({
+        url,
+        username: config.username,
+        password: config.password,
+        depth: 1,
+        ...this.getWebDAVRequestTimeoutOptions()
+      })
+      status = response.status
+      xmlData = response.body
+    } else {
+      const response = await CapacitorHttp.request({
+        url,
+        method: 'PROPFIND',
+        ...this.getWebDAVRequestTimeoutOptions(),
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${config.username}:${config.password}`),
+          'Depth': '1',
+          'Content-Type': 'application/xml'
+        }
+      })
+      status = response.status
+      xmlData = typeof response.data === 'string' ? response.data : ''
+    }
+    if (status === 404) {
+      return []
+    }
+    if (status !== 207) {
+      throw new Error(`列出 sync-v2 对象失败（HTTP ${status}）`)
+    }
+    return this.parseWebDAVSyncV2DirectoryResponse(xmlData, url, directory)
+  }
+
+  private parseWebDAVSyncV2DirectoryResponse(
+    xmlData: string,
+    requestUrl: string,
+    directory: string
+  ): (CloudSyncV2StoredObjectInfo & { isDirectory: boolean })[] {
+    const result: (CloudSyncV2StoredObjectInfo & { isDirectory: boolean })[] = []
+    const document = new DOMParser().parseFromString(xmlData, 'text/xml')
+    const responses = Array.from(document.getElementsByTagNameNS('*', 'response'))
+    const requestPath = new URL(requestUrl).pathname.replace(/\/+$/, '')
+
+    for (const response of responses) {
+      const href = response.getElementsByTagNameNS('*', 'href')[0]?.textContent || ''
+      let hrefPath: string
+      try {
+        hrefPath = new URL(href, requestUrl).pathname.replace(/\/+$/, '')
+      } catch {
+        continue
+      }
+      if (!hrefPath || hrefPath === requestPath) {
+        continue
+      }
+      let name: string
+      try {
+        name = decodeURIComponent(hrefPath.split('/').filter(Boolean).pop() || '')
+      } catch {
+        continue
+      }
+      if (!name || name === '.' || name === '..' || /[/\\\0\r\n]/.test(name)) {
+        continue
+      }
+      let canonicalPath: string
+      try {
+        canonicalPath = this.normalizeCloudSyncV2ObjectPath(`${directory}/${name}`)
+      } catch {
+        continue
+      }
+      const resourceType = response.getElementsByTagNameNS('*', 'resourcetype')[0]
+      const isDirectory = !!resourceType?.getElementsByTagNameNS('*', 'collection').length
+      const lengthText = response.getElementsByTagNameNS('*', 'getcontentlength')[0]?.textContent
+      const byteLength = lengthText && /^\d+$/.test(lengthText.trim())
+        ? Number(lengthText.trim())
+        : undefined
+      const etag = response.getElementsByTagNameNS('*', 'getetag')[0]?.textContent?.trim() || undefined
+      result.push({ path: canonicalPath, etag, byteLength, isDirectory })
+    }
+    return result
+  }
+
+  private getICloudSyncV2ObjectPath(config: any, canonicalPath: string): string {
+    const root = getCloudBackupDirectoryPath()
+    const relative = canonicalPath === root ? '' : canonicalPath.slice(`${root}/`.length)
+    return joinCloudPath(config.path || CLOUD_BACKUP_DIR, relative).replace(/^\/+/, '')
+  }
+
+  private async listICloudSyncV2Objects(
+    config: any,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    const root = getCloudSyncV2DirectoryPath()
+    const directories = [root, ...CLOUD_SYNC_V2_ARTIFACT_DIRECTORIES.map(name => `${root}/${name}`)]
+    const result: CloudSyncV2StoredObjectInfo[] = []
+
+    for (const directory of directories) {
+      const localDirectory = this.getICloudSyncV2ObjectPath(config, directory)
+      let files: any[]
+      try {
+        files = (await Filesystem.readdir({
+          path: localDirectory,
+          directory: Directory.Documents
+        })).files || []
+      } catch (error) {
+        if (this.isNotFoundError(error)) {
+          continue
+        }
+        throw error
+      }
+
+      for (const entry of files) {
+        const name = typeof entry === 'string' ? entry : entry?.name
+        if (typeof name !== 'string' || !name || name === '.' || name === '..' || /[/\\%\0\r\n]/.test(name)) {
+          continue
+        }
+        const localPath = `${localDirectory}/${name}`
+        let type = typeof entry === 'object' ? entry.type : undefined
+        let size = typeof entry === 'object' && Number.isFinite(entry.size) ? entry.size : undefined
+        if (type !== 'file' && type !== 'directory') {
+          try {
+            const stat = await Filesystem.stat({ path: localPath, directory: Directory.Documents })
+            type = stat.type
+            size = Number.isFinite(stat.size) ? stat.size : size
+          } catch (error) {
+            if (this.isNotFoundError(error)) {
+              continue
+            }
+            throw error
+          }
+        }
+        if (type !== 'file') {
+          continue
+        }
+        let canonicalPath: string
+        try {
+          canonicalPath = this.normalizeCloudSyncV2ObjectPath(`${directory}/${name}`)
+        } catch {
+          continue
+        }
+        if (canonicalPath.startsWith(prefix)) {
+          result.push({ path: canonicalPath, byteLength: size })
+        }
+      }
+    }
+    return result.sort((left, right) => left.path.localeCompare(right.path))
+  }
+
+  private async assertICloudAvailable(): Promise<void> {
+    const check = await this.isICloudAvailable()
+    if (!check.available) {
+      throw new Error(check.reason || 'iCloud 不可用')
+    }
+  }
+
+  private encodeBase64(data: Uint8Array): string {
+    const chunks: string[] = []
+    for (let offset = 0; offset < data.byteLength; offset += 0x8000) {
+      chunks.push(String.fromCharCode(...data.subarray(offset, offset + 0x8000)))
+    }
+    return btoa(chunks.join(''))
+  }
+
+  private async decodeBinaryResponse(input: unknown): Promise<Uint8Array> {
+    if (input instanceof Blob) {
+      return new Uint8Array(await input.arrayBuffer())
+    }
+    if (input instanceof ArrayBuffer) {
+      return new Uint8Array(input)
+    }
+    if (ArrayBuffer.isView(input)) {
+      return new Uint8Array(input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength))
+    }
+    if (typeof input !== 'string' ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input)) {
+      throw new Error('云存储返回了无效的 sync-v2 二进制内容')
+    }
+    const binary = atob(input)
+    const data = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1) {
+      data[index] = binary.charCodeAt(index)
+    }
+    return data
   }
 
   private joinUrlPath(baseUrl: string, ...parts: string[]): string {
