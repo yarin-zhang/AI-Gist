@@ -108,11 +108,20 @@ yarn install
 yarn dev
 ```
 
+如果项目位于 WSL 中，但希望直接预览 Windows 客户端，可运行：
+
+```bash
+yarn dev:win
+```
+
+渲染页面修改会由 Vite 即时热更新；Electron 主进程和 preload 修改后会自动重新编译并重启客户端。首次运行会缓存一份 Windows Electron 开发运行时，之后不需要重新打包。
+
 ### 其他常用命令
 
 ```bash
 # 开发相关
 yarn dev            # 启动应用并开启热重载
+yarn dev:win        # 从 WSL 启动 Windows 客户端并开启热重载
 yarn build          # 打包应用，输出目录为 "dist"
 
 # 跨平台构建

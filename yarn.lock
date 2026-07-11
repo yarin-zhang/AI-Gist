@@ -2726,6 +2726,7 @@ __metadata:
     "@capacitor/preferences": "npm:^8.0.1"
     "@capacitor/share": "npm:^8.0.1"
     "@capacitor/splash-screen": "npm:^8.0.1"
+    "@electron/get": "npm:^2.0.0"
     "@eslint/js": "npm:^9.29.0"
     "@google/generative-ai": "npm:^0.24.1"
     "@ionic/vue": "npm:^8.0.0"

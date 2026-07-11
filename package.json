@@ -5,6 +5,7 @@
     "main": "./main/main.js",
     "scripts": {
         "dev": "node scripts/dev-server.js",
+        "dev:win": "node scripts/dev-server.js --windows",
         "dev:web": "vite --config vite.config.web.js",
         "build": "node scripts/build.js && electron-builder",
         "build:win": "node scripts/build.js && electron-builder --win",
@@ -37,6 +38,7 @@
     },
     "devDependencies": {
         "@capacitor/assets": "^3.0.5",
+        "@electron/get": "^2.0.0",
         "@eslint/js": "^9.29.0",
         "@types/nunjucks": "^3.2.6",
         "@types/uuid": "^10.0.0",
