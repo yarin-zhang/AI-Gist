@@ -1327,9 +1327,14 @@ export class DatabaseServiceManager {
         totalSucceeded,
         totalErrors: 0,
         totalQuarantined: 0,
-        warnings: contractResult.merges.length > 0
-          ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
-          : undefined,
+        warnings: [
+          ...(contractResult.merges.length > 0
+            ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
+            : []),
+          ...(contractResult.repairs.length > 0
+            ? [`已自动修复 ${contractResult.repairs.length} 条失效的可选关联`]
+            : [])
+        ],
         details: plan.details,
         imported: {
           categories: plan.details.categories || 0,

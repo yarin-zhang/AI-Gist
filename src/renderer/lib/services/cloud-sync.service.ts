@@ -38,7 +38,8 @@ import {
   reconcileCloudSyncDataContract,
   pruneCloudSyncTombstonedPromptChildren,
   type CloudSyncBusinessKeyMerge,
-  type CloudSyncContractIssue
+  type CloudSyncContractIssue,
+  type CloudSyncRelationRepair
 } from '@shared/cloud-sync-contract';
 import { generateUUID } from '../utils/uuid';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
@@ -117,6 +118,7 @@ export interface CloudSyncResult {
   diagnostic?: CloudSyncStructuredDiagnostic;
   warnings?: string[];
   businessKeyMerges?: CloudSyncBusinessKeyMerge[];
+  relationRepairs?: CloudSyncRelationRepair[];
   v2MirrorStatus?: 'skipped' | 'published' | 'already-current' | 'rebase-required' | 'failed';
 }
 
@@ -844,9 +846,14 @@ export class CloudSyncService {
       const mergedData = contractResult.data;
       const mergedEqualsLocal = dataSetsEqual(localData, mergedData);
       const mergedEqualsRemote = dataSetsEqual(remoteData, mergedData);
-      const contractWarnings = contractResult.merges.length > 0
-        ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
-        : undefined;
+      const contractWarnings = [
+        ...(contractResult.merges.length > 0
+          ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
+          : []),
+        ...(contractResult.repairs.length > 0
+          ? [`已自动修复 ${contractResult.repairs.length} 条失效的可选关联；相关提示词已保留为未分类`]
+          : [])
+      ];
 
       if (mergedEqualsLocal && mergedEqualsRemote) {
         if (manifestRepairMetadata) {
@@ -891,7 +898,8 @@ export class CloudSyncService {
           conflicts: mergeResult.conflicts,
           summary: mergeResult.summary,
           warnings: mergeWarnings(contractWarnings, stateWarning),
-          businessKeyMerges: contractResult.merges
+          businessKeyMerges: contractResult.merges,
+          relationRepairs: contractResult.repairs
         };
       }
 
@@ -972,7 +980,8 @@ export class CloudSyncService {
         conflicts: mergeResult.conflicts,
         summary: mergeResult.summary,
         warnings: mergeWarnings(contractWarnings, stateWarning),
-        businessKeyMerges: contractResult.merges
+        businessKeyMerges: contractResult.merges,
+        relationRepairs: contractResult.repairs
       };
     } catch (error) {
       const diagnostic = createCloudSyncStructuredDiagnostic(error, {

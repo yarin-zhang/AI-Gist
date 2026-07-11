@@ -725,7 +725,10 @@ const syncCloudData = async (forceRetry = false) => {
     })
 
     if (result.success) {
-      showToast(getCloudSyncResultMessage(result.action, result.conflicts.length))
+      showToast([
+        getCloudSyncResultMessage(result.action, result.conflicts.length),
+        ...(result.warnings || [])
+      ].join('；'))
     } else {
       syncError = result
     }

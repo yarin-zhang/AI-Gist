@@ -1391,6 +1391,45 @@ describe('CloudSyncService', () => {
     })
   })
 
+  it('automatically keeps orphaned prompts as uncategorized instead of blocking sync', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const orphanedPrompts = Array.from({ length: 6 }, (_, index) => ({
+      id: index + 10,
+      uuid: `orphan-prompt-${index + 1}`,
+      title: `Orphan ${index + 1}`,
+      categoryId: 999,
+      updatedAt: '2026-07-11T00:00:00.000Z'
+    }))
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      prompts: orphanedPrompts
+    }, 'device-b', 'rev-orphaned')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-07-11T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.relationRepairs).toHaveLength(6)
+    expect(result.warnings).toContain('已自动修复 6 条失效的可选关联；相关提示词已保留为未分类')
+    const restored = database.replaceAllData.mock.calls[0][0]
+    expect(restored.prompts).toHaveLength(6)
+    expect(restored.prompts.every(
+      (prompt: any) => prompt.categoryId === undefined && prompt.categoryUuid === undefined
+    )).toBe(true)
+  })
+
   it('does not rollback or repeat an identical deterministic atomic apply failure', async () => {
     const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
     const remoteSnapshot = createCloudSyncSnapshot({

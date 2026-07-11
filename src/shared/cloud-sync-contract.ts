@@ -90,10 +90,24 @@ export interface CloudSyncBusinessKeyMerge {
   mergedRecordIdentities: string[];
 }
 
+export type CloudSyncRelationRepairCode =
+  | 'removed_unresolved_optional_relation'
+  | 'removed_ambiguous_optional_relation'
+  | 'removed_self_relation';
+
+export interface CloudSyncRelationRepair {
+  code: CloudSyncRelationRepairCode;
+  collection: CloudSyncContractCollection;
+  recordIdentity: string;
+  relation: CloudSyncContractIssue['relation'];
+  targetCollection: CloudSyncContractIssue['targetCollection'];
+}
+
 export interface CloudSyncContractResult<TData extends CloudSyncContractData = CloudSyncContractData> {
   data: TData;
   issues: CloudSyncContractIssue[];
   merges: CloudSyncBusinessKeyMerge[];
+  repairs: CloudSyncRelationRepair[];
   valid: boolean;
 }
 
@@ -243,11 +257,12 @@ export function reconcileCloudSyncDataContract<TData extends CloudSyncContractDa
     }
   }
 
-  const issues = rewriteRelations(data, resolutions);
+  const { issues, repairs } = rewriteRelations(data, resolutions);
   return {
     data,
     issues: sortIssues(issues),
     merges,
+    repairs: sortRepairs(repairs),
     valid: issues.length === 0
   };
 }
@@ -636,8 +651,9 @@ function mergeDefinedFields(target: any, source: any, excludedFields: Set<string
 function rewriteRelations(
   data: CloudSyncContractData,
   resolutions: Map<CloudSyncContractCollection, DuplicateResolution>
-): CloudSyncContractIssue[] {
+): { issues: CloudSyncContractIssue[]; repairs: CloudSyncRelationRepair[] } {
   const issues: CloudSyncContractIssue[] = [];
+  const repairs: CloudSyncRelationRepair[] = [];
 
   for (const definition of RELATIONS) {
     const records = getCollectionRecords(data, definition.collection);
@@ -651,10 +667,10 @@ function rewriteRelations(
     }
 
     for (const record of records) {
-      rewriteRelation(record, definition, targets, targetByUuid, issues);
+      rewriteRelation(record, definition, targets, targetByUuid, issues, repairs);
     }
   }
-  return issues;
+  return { issues, repairs };
 }
 
 function getCollectionRecords(
@@ -670,7 +686,8 @@ function rewriteRelation(
   definition: RelationDefinition,
   targets: DuplicateResolution,
   targetByUuid: Map<string, any>,
-  issues: CloudSyncContractIssue[]
+  issues: CloudSyncContractIssue[],
+  repairs: CloudSyncRelationRepair[]
 ): void {
   const referenceUuid = normalizeIdentityValue(record?.[definition.uuidField]);
   const referenceId = normalizeIdentityValue(record?.[definition.idField]);
@@ -685,6 +702,10 @@ function rewriteRelation(
     const canonicalUuid = targets.uuidAliases.get(referenceUuid) || referenceUuid;
     const target = targetByUuid.get(canonicalUuid);
     if (!target) {
+      if (!definition.required) {
+        removeOptionalRelation(record, definition, issueBase, repairs, 'removed_unresolved_optional_relation');
+        return;
+      }
       issues.push({
         ...issueBase,
         code: 'unresolved_relation_uuid',
@@ -695,7 +716,11 @@ function rewriteRelation(
     if (definition.collection === definition.targetCollection && target === record) {
       delete record[definition.uuidField];
       delete record[definition.idField];
-      issues.push({ ...issueBase, code: 'self_relation', referenceUuid });
+      if (definition.required) {
+        issues.push({ ...issueBase, code: 'self_relation', referenceUuid });
+      } else {
+        repairs.push({ ...issueBase, code: 'removed_self_relation' });
+      }
       return;
     }
     record[definition.uuidField] = canonicalUuid;
@@ -706,17 +731,29 @@ function rewriteRelation(
   if (referenceId) {
     const matchingTargets = targets.idTargets.get(referenceId);
     if (!matchingTargets || matchingTargets.size === 0) {
+      if (!definition.required) {
+        removeOptionalRelation(record, definition, issueBase, repairs, 'removed_unresolved_optional_relation');
+        return;
+      }
       issues.push({ ...issueBase, code: 'unresolved_relation_id', referenceId });
       return;
     }
     if (matchingTargets.size > 1) {
+      if (!definition.required) {
+        removeOptionalRelation(record, definition, issueBase, repairs, 'removed_ambiguous_optional_relation');
+        return;
+      }
       issues.push({ ...issueBase, code: 'ambiguous_relation_id', referenceId });
       return;
     }
     const target = Array.from(matchingTargets)[0];
     if (definition.collection === definition.targetCollection && target === record) {
       delete record[definition.idField];
-      issues.push({ ...issueBase, code: 'self_relation', referenceId });
+      if (definition.required) {
+        issues.push({ ...issueBase, code: 'self_relation', referenceId });
+      } else {
+        repairs.push({ ...issueBase, code: 'removed_self_relation' });
+      }
       return;
     }
     const targetUuid = normalizeIdentityValue(target?.uuid);
@@ -730,6 +767,18 @@ function rewriteRelation(
   if (definition.required) {
     issues.push({ ...issueBase, code: 'missing_required_relation' });
   }
+}
+
+function removeOptionalRelation(
+  record: any,
+  definition: RelationDefinition,
+  issueBase: Omit<CloudSyncContractIssue, 'code' | 'referenceUuid' | 'referenceId'>,
+  repairs: CloudSyncRelationRepair[],
+  code: CloudSyncRelationRepairCode
+): void {
+  delete record[definition.uuidField];
+  delete record[definition.idField];
+  repairs.push({ ...issueBase, code });
 }
 
 function rewriteNumericId(record: any, field: string, targetId: any): void {
@@ -794,6 +843,13 @@ function compareText(left: string, right: string): number {
 
 function sortIssues(issues: CloudSyncContractIssue[]): CloudSyncContractIssue[] {
   return issues.sort((left, right) => compareText(
+    `${left.collection}\u0000${left.recordIdentity}\u0000${left.relation}\u0000${left.code}`,
+    `${right.collection}\u0000${right.recordIdentity}\u0000${right.relation}\u0000${right.code}`
+  ));
+}
+
+function sortRepairs(repairs: CloudSyncRelationRepair[]): CloudSyncRelationRepair[] {
+  return [...repairs].sort((left, right) => compareText(
     `${left.collection}\u0000${left.recordIdentity}\u0000${left.relation}\u0000${left.code}`,
     `${right.collection}\u0000${right.recordIdentity}\u0000${right.relation}\u0000${right.code}`
   ));

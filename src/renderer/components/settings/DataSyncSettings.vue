@@ -450,8 +450,10 @@ const syncCloudData = async (storageId: string, forceRetry = false) => {
         const result = await cloudSyncService.syncNow(storageId, {
             platform: PlatformDetector.getPlatform(), reason: 'manual', forceRetry
         });
-        if (result.success) message.success(getCloudSyncResultMessage(result.action, result.conflicts.length));
-        else message.error(showSyncErrorDetails(result, storageId).message);
+        if (result.success) {
+            message.success(getCloudSyncResultMessage(result.action, result.conflicts.length));
+            for (const warning of result.warnings || []) message.warning(warning);
+        } else message.error(showSyncErrorDetails(result, storageId).message);
     } catch (error) {
         console.error('云同步失败:', error);
         message.error(showSyncErrorDetails(error instanceof Error ? error.message : String(error), storageId).message);

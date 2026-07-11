@@ -194,6 +194,29 @@ describe('cloud sync data contract', () => {
     });
   });
 
+  it('keeps prompts when their optional category no longer exists and moves them to uncategorized', () => {
+    const result = reconcileCloudSyncDataContract({
+      categories: [],
+      prompts: [
+        { uuid: 'prompt-by-id', title: 'A', categoryId: 999 },
+        { uuid: 'prompt-by-uuid', title: 'B', categoryUuid: 'missing-category', categoryId: 999 }
+      ],
+      promptHistories: [
+        { uuid: 'history-1', promptUuid: 'prompt-by-id', categoryId: 999 }
+      ]
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.data.prompts).toHaveLength(2);
+    expect(result.data.prompts?.[0]).not.toHaveProperty('categoryId');
+    expect(result.data.prompts?.[1]).not.toHaveProperty('categoryUuid');
+    expect(result.data.prompts?.[1]).not.toHaveProperty('categoryId');
+    expect(result.data.promptHistories?.[0]).not.toHaveProperty('categoryId');
+    expect(result.repairs).toHaveLength(3);
+    expect(result.repairs.every(repair => repair.code === 'removed_unresolved_optional_relation')).toBe(true);
+  });
+
   it('reports missing required prompt relations and removes self-parent links', () => {
     const result = reconcileCloudSyncDataContract({
       categories: [{ id: 1, uuid: 'category-1', name: 'A', parentUuid: 'category-1' }],
@@ -202,10 +225,12 @@ describe('cloud sync data contract', () => {
 
     expect(result.valid).toBe(false);
     expect(result.data.categories?.[0]).not.toHaveProperty('parentUuid');
-    expect(result.issues.map(issue => issue.code)).toEqual([
-      'self_relation',
-      'missing_required_relation'
-    ]);
+    expect(result.issues.map(issue => issue.code)).toEqual(['missing_required_relation']);
+    expect(result.repairs).toEqual([expect.objectContaining({
+      code: 'removed_self_relation',
+      collection: 'categories',
+      relation: 'parentCategory'
+    })]);
   });
 
   it('prunes prompt children only when their parent was conclusively tombstoned', () => {
@@ -257,24 +282,23 @@ describe('cloud sync data contract', () => {
     ), { numRuns: 100 });
   });
 
-  it('quarantines an invalid prompt and its dependent records as one complete group', () => {
+  it('quarantines records with missing required prompt dependencies without removing valid prompts', () => {
     const data = {
       categories: [],
-      prompts: [{ id: 10, uuid: 'prompt-1', title: 'orphan', categoryUuid: 'missing-category' }],
-      promptVariables: [{ id: 20, uuid: 'variable-1', promptId: 10, promptUuid: 'prompt-1' }],
-      promptHistories: [{ id: 30, uuid: 'history-1', promptId: 10, promptUuid: 'prompt-1' }]
+      prompts: [{ id: 10, uuid: 'prompt-1', title: 'valid uncategorized prompt' }],
+      promptVariables: [{ id: 20, uuid: 'variable-1', promptUuid: 'missing-prompt' }],
+      promptHistories: [{ id: 30, uuid: 'history-1', promptUuid: 'missing-prompt' }]
     };
     const contract = reconcileCloudSyncDataContract(data);
     const quarantine = quarantineCloudSyncContractIssues(contract.data, contract.issues);
 
     expect(contract.valid).toBe(false);
-    expect(quarantine.groups).toHaveLength(1);
-    expect(quarantine.groups[0].records.map(record => record.recordIdentity)).toEqual([
+    expect(quarantine.groups).toHaveLength(2);
+    expect(quarantine.groups.flatMap(group => group.records.map(record => record.recordIdentity)).sort()).toEqual([
       'uuid:history-1',
-      'uuid:prompt-1',
       'uuid:variable-1'
     ]);
-    expect(quarantine.data.prompts).toEqual([]);
+    expect(quarantine.data.prompts).toEqual(data.prompts);
     expect(quarantine.data.promptVariables).toEqual([]);
     expect(quarantine.data.promptHistories).toEqual([]);
   });

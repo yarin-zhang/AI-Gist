@@ -4,7 +4,8 @@ import {
   quarantineCloudSyncContractIssues,
   reconcileCloudSyncDataContract,
   type CloudSyncBusinessKeyMerge,
-  type CloudSyncContractIssue
+  type CloudSyncContractIssue,
+  type CloudSyncRelationRepair
 } from './cloud-sync-contract';
 import {
   CLOUD_SYNC_V2_PROTOCOL_VERSION,
@@ -50,6 +51,7 @@ export interface CloudSyncV2MigrationArtifacts {
   blobs: CloudSyncV2BlobArtifact[];
   contractIssues: CloudSyncContractIssue[];
   businessKeyMerges: CloudSyncBusinessKeyMerge[];
+  relationRepairs: CloudSyncRelationRepair[];
 }
 
 /**
@@ -186,7 +188,8 @@ async function finalizeMigrationArtifacts(
     quarantine,
     blobs: Array.from(blobs.values()).sort((left, right) => left.ref.id.localeCompare(right.ref.id)),
     contractIssues: contract.issues,
-    businessKeyMerges: contract.merges
+    businessKeyMerges: contract.merges,
+    relationRepairs: contract.repairs
   };
 }
 

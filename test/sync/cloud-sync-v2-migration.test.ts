@@ -63,8 +63,8 @@ describe('cloud sync v2 migration artifacts', () => {
     const artifacts = await createCloudSyncV2MigrationArtifacts({
       data: {
         ...EMPTY_DATA,
-        prompts: [{ id: 10, uuid: 'prompt-orphan', title: 'Orphan', categoryUuid: 'missing-category' }],
-        promptVariables: [{ id: 20, uuid: 'variable-orphan', promptId: 10, promptUuid: 'prompt-orphan' }]
+        prompts: [{ id: 10, uuid: 'prompt-uncategorized', title: 'Kept prompt', categoryUuid: 'missing-category' }],
+        promptVariables: [{ id: 20, uuid: 'variable-orphan', promptUuid: 'missing-prompt' }]
       },
       revision: 'revision-quarantine',
       deviceId: 'device-a'
@@ -73,10 +73,12 @@ describe('cloud sync v2 migration artifacts', () => {
     expect(artifacts.quarantine).toBeDefined();
     expect((await validateCloudSyncV2QuarantineBundle(artifacts.quarantine)).valid).toBe(true);
     expect(artifacts.quarantine?.groups[0].records.map(record => record.recordKey)).toEqual([
-      'uuid:prompt-orphan',
       'uuid:variable-orphan'
     ]);
-    expect(artifacts.checkpoint.collections.prompts).toEqual([]);
+    expect(artifacts.checkpoint.collections.prompts).toEqual([
+      expect.objectContaining({ uuid: 'prompt-uncategorized' })
+    ]);
+    expect(artifacts.relationRepairs).toHaveLength(1);
     expect(artifacts.commit.quarantine).toHaveLength(1);
   });
 });

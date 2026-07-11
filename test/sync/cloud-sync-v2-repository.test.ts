@@ -171,7 +171,10 @@ describe('cloud sync v2 repository', () => {
       new TextEncoder().encode(JSON.stringify(stale.checkpoint))
     );
     const quarantined = await createCloudSyncV2MigrationArtifacts({
-      data: { ...EMPTY_DATA, prompts: [{ id: 3, uuid: 'orphan', title: 'orphan', categoryUuid: 'missing' }] },
+      data: {
+        ...EMPTY_DATA,
+        promptVariables: [{ id: 3, uuid: 'orphan-variable', promptUuid: 'missing-prompt' }]
+      },
       revision: 'quarantined', deviceId: 'device-a', createdAt: '2026-07-11T00:00:00.000Z'
     });
     const quarantinePath = getCloudSyncV2ArtifactPath('quarantine', quarantined.quarantine!.quarantineId);
