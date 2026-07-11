@@ -1,78 +1,57 @@
 <template>
     <div class="settings-page">
-        <NFlex vertical size="large">
-            <!-- 页面标题 -->
-            <NFlex justify="space-between" align="center">
-                <div>
-                    <NText strong style="font-size: 28px">{{ t('settings.title') }}</NText>
-                    <NText depth="3" style="display: block; margin-top: 4px">
-                        {{ t('settings.subtitle') }}
-                    </NText>
-                </div>
-                <NFlex>
-                <!-- 操作状态提示 -->
-                <NFlex :size="12">
-                    <NButton ghost :loading="saving" secondary>
-                        <template #icon>
-                            <NIcon v-if="!saving" color="#18a058">
-                                <Check />
-                            </NIcon>
-                        </template>
-                        {{ t('settings.autoSave') }}
-                    </NButton>
+        <header class="settings-page-header">
+            <NText strong class="settings-page-title">{{ t('settings.title') }}</NText>
+            <NFlex align="center" :size="12">
+                <NFlex v-if="saving" align="center" :size="8">
+                    <NSpin size="small" />
+                    <NText depth="3">{{ t('settings.saving') }}</NText>
                 </NFlex>
-                    <NButton type="error" @click="resetSettings" :loading="loading.reset" secondary>
-                        <template #icon>
-                            <NIcon>
-                                <Refresh />
-                            </NIcon>
-                        </template>
-                        {{ t('settings.resetToDefault') }}
-                    </NButton>
-                </NFlex>
-
-            </NFlex>
-
-            <NFlex :size="24">
-                <!-- 左侧菜单 -->
-                <div style="width: 240px; flex-shrink: 0">
-                    <NCard>
-                        <template #header>
-                            <NFlex align="center" :size="12">
-                                <NIcon size="20" color="#409EFF">
-                                    <Settings />
-                                </NIcon>
-                                <span>{{ t('settings.settingsMenu') }}</span>
-                            </NFlex>
-                        </template>
-
-                        <NMenu v-model:value="activeSettingKey" :options="menuOptions" @update:value="handleMenuSelect"
-                            accordion show-trigger />
-                    </NCard>
-                </div>
-
-                <!-- 右侧设置内容 -->
-                <div style="flex: 1; min-width: 0">
-                    <NFlex vertical :size="24">
-                        <!-- 页面标题 -->
-                        <NCard>
-                            <template #header>
-                                <NFlex align="center" :size="12">
-                                    <NIcon size="24" color="#409EFF">
-                                        <component :is="currentSectionIcon" />
-                                    </NIcon>
-                                    <span>{{ currentSectionTitle }}</span>
-                                </NFlex>
+                <NPopconfirm
+                    :negative-text="t('common.cancel')"
+                    :positive-text="t('common.confirm')"
+                    @positive-click="resetSettings"
+                >
+                    <template #trigger>
+                        <NButton quaternary size="small" :loading="loading.reset">
+                            <template #icon>
+                                <NIcon><Refresh /></NIcon>
                             </template>
+                            {{ t('settings.resetToDefault') }}
+                        </NButton>
+                    </template>
+                    {{ t('settings.resetConfirm') }}
+                </NPopconfirm>
+            </NFlex>
+        </header>
 
-                            <NFlex vertical :size="16">
-                                <NAlert :show-icon="false">
-                                    {{ currentSectionDescription }}
-                                </NAlert>
-                            </NFlex>
-                        </NCard>
+        <div class="settings-layout">
+            <aside class="settings-navigation" :aria-label="t('settings.settingsMenu')">
+                <NMenu
+                    v-model:value="activeSettingKey"
+                    :options="menuOptions"
+                    @update:value="handleMenuSelect"
+                />
+            </aside>
 
+            <div class="settings-compact-navigation">
+                <NSelect
+                    v-model:value="activeSettingKey"
+                    :options="compactMenuOptions"
+                    :placeholder="t('settings.selectSection')"
+                    @update:value="handleMenuSelect"
+                />
+            </div>
 
+            <main class="settings-content">
+                <header class="settings-section-header">
+                    <NText strong class="settings-section-title">{{ currentSectionTitle }}</NText>
+                    <NText v-if="currentSectionDescription" depth="3" class="settings-section-description">
+                        {{ currentSectionDescription }}
+                    </NText>
+                </header>
+
+                <NFlex vertical :size="20">
                         <!-- 数据同步设置 -->
                         <DataSyncSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
 
@@ -120,10 +99,9 @@
                             <LaboratoryPanel />
                         </NCard>
 
-                    </NFlex>
-                </div>
-            </NFlex>
-        </NFlex>
+                </NFlex>
+            </main>
+        </div>
     </div>
 </template>
 
@@ -132,17 +110,17 @@ import { ref, reactive, onMounted, computed, h, watch } from "vue";
 import { useI18n } from '~/composables/useI18n'
 import {
     NCard,
-    NAlert,
     NFlex,
     NIcon,
     NButton,
     NText,
     NMenu,
+    NPopconfirm,
+    NSelect,
+    NSpin,
     useMessage,
 } from "naive-ui";
 import {
-    Settings,
-    Check,
     Refresh,
     Power,
     Rocket,
@@ -248,9 +226,9 @@ const settings = reactive({
     },
 });
 
-// 菜单选项
-const menuOptions = computed(() => {
-    const baseOptions = [
+// 设置入口。保留原有 key，避免外部跳转和状态栏入口失效。
+const settingItems = computed(() => {
+    return [
         {
             label: t('settings.sections.cloudBackup'),
             key: "cloud-backup",
@@ -267,6 +245,12 @@ const menuOptions = computed(() => {
             label: t('settings.sections.appearance'),
             key: "appearance",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
+            visible: true,
+        },
+        {
+            label: t('settings.sections.language'),
+            key: "language",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
             visible: true,
         },
         {
@@ -294,35 +278,59 @@ const menuOptions = computed(() => {
             visible: capabilities.systemProxy,
         },
         {
-            label: t('language.title'),
-            key: "language",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
-            visible: true,
-        },
-        {
             label: t('settings.sections.about'),
             key: "about",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(InfoCircle) }),
             visible: true,
         },
-    ];
-
-    // 仅在开发环境中添加实验室菜单
-    if (isDevelopment) {
-        baseOptions.push({
+        ...(isDevelopment ? [{
             label: t('settings.sections.laboratory'),
             key: "laboratory",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Flask) }),
             visible: true,
-        });
-    }
-
-    return baseOptions
-        .filter(option => option.visible)
+        }] : []),
+    ].filter(option => option.visible)
         .map(({ visible, ...option }) => option);
 });
 
-const visibleSettingKeys = computed(() => menuOptions.value.map(option => String(option.key)));
+const menuOptions = computed(() => {
+    const items = settingItems.value;
+    const pick = (...keys: string[]) => items.filter(item => keys.includes(String(item.key)));
+
+    return [
+        {
+            type: 'group' as const,
+            label: t('settings.groups.data'),
+            key: 'settings-group-data',
+            children: pick('cloud-backup', 'data-management'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.preferences'),
+            key: 'settings-group-preferences',
+            children: pick('appearance', 'language', 'shortcuts'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.system'),
+            key: 'settings-group-system',
+            children: pick('startup-behavior', 'close-behavior', 'network-proxy'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.other'),
+            key: 'settings-group-other',
+            children: pick('about', 'laboratory'),
+        },
+    ].filter(group => group.children.length > 0);
+});
+
+const compactMenuOptions = computed(() => settingItems.value.map(item => ({
+    label: item.label,
+    value: String(item.key),
+})));
+
+const visibleSettingKeys = computed(() => settingItems.value.map(option => String(option.key)));
 
 const ensureActiveSettingIsVisible = () => {
     if (!visibleSettingKeys.value.includes(activeSettingKey.value)) {
@@ -333,27 +341,23 @@ const ensureActiveSettingIsVisible = () => {
         // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
-            const section = {
-            "close-behavior": Power,
-            "startup-behavior": Rocket,
-            appearance: Sun,
-            language: Globe,
-            "data-management": Database,
-            "cloud-backup": Cloud,
-            shortcuts: Keyboard,
-            "network-proxy": Wifi,
-            about: InfoCircle,
-            laboratory: Flask
-        };
+    const item = settingItems.value.find(option => option.key === key);
+    const sectionsWithDescription = new Set([
+        'cloud-backup',
+        'data-management',
+        'shortcuts',
+        'network-proxy',
+    ]);
+
     return {
-        title: t(`settings.sectionDescriptions.${key}.title`),
-        icon: section[key as keyof typeof section] || Database,
-        description: t(`settings.sectionDescriptions.${key}.description`)
+        title: item?.label || t(`settings.sectionDescriptions.${key}.title`),
+        description: sectionsWithDescription.has(key)
+            ? t(`settings.sectionDescriptions.${key}.description`)
+            : '',
     };
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
-const currentSectionIcon = computed(() => currentSectionInfo.value.icon);
 const currentSectionDescription = computed(() => currentSectionInfo.value.description);
 
 // 处理菜单选择
@@ -549,10 +553,92 @@ watch(menuOptions, () => {
 <style scoped>
 .settings-page {
     padding: 24px;
-    overflow-y: auto;
+}
+
+.settings-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.settings-page-title {
+    font-size: 28px;
+    line-height: 1.2;
+}
+
+.settings-layout {
+    display: grid;
+    grid-template-columns: 184px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.settings-navigation {
+    position: sticky;
+    top: 0;
+}
+
+.settings-compact-navigation {
+    display: none;
+}
+
+.settings-content {
+    min-width: 0;
+    max-width: 1100px;
+}
+
+.settings-section-header {
+    margin-bottom: 16px;
+}
+
+.settings-section-title {
+    display: block;
+    font-size: 22px;
+    line-height: 1.3;
+}
+
+.settings-section-description {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
 }
 
 .n-form-item {
     margin-bottom: 0;
+}
+
+@media (max-width: 860px) {
+    .settings-page {
+        padding: 16px;
+    }
+
+    .settings-page-header {
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+
+    .settings-page-title {
+        font-size: 24px;
+    }
+
+    .settings-layout {
+        display: block;
+    }
+
+    .settings-navigation {
+        display: none;
+    }
+
+    .settings-compact-navigation {
+        display: block;
+        margin-bottom: 20px;
+    }
+
+    .settings-section-title {
+        font-size: 20px;
+    }
 }
 </style>

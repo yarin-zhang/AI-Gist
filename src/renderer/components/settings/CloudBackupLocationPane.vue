@@ -1,6 +1,6 @@
 <template>
     <NFlex vertical :size="16">
-        <NFlex justify="space-between" align="center">
+        <NFlex justify="space-between" align="center" :size="12" wrap>
             <div>
                 <NText depth="2">{{ config.name }}</NText>
                 <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">

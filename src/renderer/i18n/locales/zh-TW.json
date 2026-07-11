@@ -322,10 +322,12 @@
     "yes": "是"
   },
   "dataManagement": {
+    "aiConfigCount": "{count} 個",
     "aiConfiguration": "AI 配置",
     "backupManagement": "數據備份",
     "backupVersionList": "備份版本列表",
     "categoryManagement": "分類管理",
+    "categoryCount": "{count} 個",
     "checkDatabaseHealth": "檢查數據庫",
     "clearDatabase": "清空數據庫",
     "clearDatabaseWarning": "⚠️ 危險操作警告",
@@ -344,7 +346,7 @@
     "exportWarning": "⚠️ 匯出的資料將包含所有提示詞、分類、AI配置（含API金鑰）等敏感資訊。\n請妥善保管匯出文件，避免洩漏。",
     "formatNote": "格式說明",
     "formatNoteText": "AI 配置數據包含複雜的對象結構因此表頭不統一，僅支持導出為 JSON 格式。",
-    "fullBackupDescription": "導出完整備份壓縮包，或從壓縮包導入完整備份。\n導出的數據將包含 AI 配置信息中的 API 密鑰等敏感信息。\n請妥善保管導出文件，避免洩露。",
+    "fullBackupDescription": "匯出或匯入可完整還原的資料包；其中可能包含 API 金鑰，請妥善保管。",
     "fullBackupManagement": "完整備份管理",
     "importFullBackup": "導入完整備份",
     "importWarning": "⚠️ 導入備份將會完全覆蓋現有的所有資料（包括提示詞、分類、AI配置等），此操作不可撤銷！\n建議先建立目前資料的備份。",
@@ -352,6 +354,7 @@
     "noBackups": "暫無備份版本，請先創建備份",
     "openBackupDirectory": "打開備份目錄",
     "promptLibrary": "描述詞庫",
+    "promptCount": "{count} 條",
     "refreshBackupList": "刷新備份列表",
     "repairDatabase": "修復數據庫",
     "restore": "恢復",
@@ -500,6 +503,7 @@
     "directModeDesc": "不配置額外代理，使用系統默認網絡連接",
     "httpProxy": "HTTP 代理",
     "httpsProxy": "HTTPS 代理",
+    "invalidAddress": "請輸入正確的代理位址，例如 127.0.0.1:7890",
     "lastRefresh": "最後刷新",
     "manualConfig": "手動配置",
     "manualMode": "手動配置",
@@ -516,6 +520,8 @@
     "systemProxyInfo": "系統代理信息",
     "testConnection": "測試連接",
     "testConnectionDesc": "測試當前代理配置是否正常工作",
+    "testing": "測試中...",
+    "testingDescription": "正在測試網絡連接...",
     "title": "網絡代理設置"
   },
   "prompt": {
@@ -916,6 +922,12 @@
   },
   "settings": {
     "autoSave": "設置會自動保存",
+    "groups": {
+      "data": "資料",
+      "other": "其他",
+      "preferences": "偏好",
+      "system": "系統"
+    },
     "menus": {
       "about": {
         "description": "查看應用程式版本資訊和檢查更新",
@@ -938,7 +950,10 @@
         "title": "語言設定"
       }
     },
-    "resetToDefault": "恢復默認設置",
+    "resetConfirm": "確定將應用偏好恢復為預設值嗎？",
+    "resetToDefault": "恢復預設設定",
+    "saving": "儲存中",
+    "selectSection": "選擇設定項目",
     "sectionDescriptions": {
       "about": {
         "description": "查看應用版本信息和檢查更新",
@@ -953,11 +968,11 @@
         "title": "關閉行為設置"
       },
       "cloud-backup": {
-        "description": "設定雲端儲存並保持各裝置資料自動同步",
+        "description": "設定雲端儲存並保持裝置間資料同步",
         "title": "資料同步"
       },
       "data-management": {
-        "description": "查看本機和各雲端位置的歷史備份版本",
+        "description": "建立、還原和管理本機及雲端備份",
         "title": "資料備份"
       },
       "laboratory": {
@@ -969,11 +984,11 @@
         "title": "語言設置"
       },
       "network-proxy": {
-        "description": "配置網絡代理設置，解決網絡連接問題",
+        "description": "選擇連線方式並測試代理連線",
         "title": "網絡代理設置"
       },
       "shortcuts": {
-        "description": "配置全局快捷鍵和提示詞快捷鍵",
+        "description": "設定全域快捷鍵和快速複製",
         "title": "快捷鍵設置"
       },
       "startup-behavior": {
@@ -983,18 +998,19 @@
     },
     "sections": {
       "about": "關於",
-      "appearance": "外觀設置",
-      "close": "關閉行為設置",
+      "appearance": "外觀",
+      "close": "關閉行為",
       "cloudBackup": "資料同步",
       "dataManagement": "資料備份",
+      "language": "語言",
       "laboratory": "實驗室",
-      "networkProxy": "網絡代理設置",
-      "shortcuts": "快捷鍵設置",
-      "startup": "啟動行為設置"
+      "networkProxy": "網絡代理",
+      "shortcuts": "快捷鍵",
+      "startup": "啟動"
     },
-    "settingsMenu": "設置菜單",
+    "settingsMenu": "設定導覽",
     "subtitle": "個性化配置您的應用偏好",
-    "title": "應用設置"
+    "title": "設定"
   },
   "settingsMessages": {
     "autoBackupBeforeRestore": "恢復前自動備份 - {timestamp}",

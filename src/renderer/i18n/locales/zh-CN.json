@@ -322,10 +322,12 @@
     "yes": "是"
   },
   "dataManagement": {
+    "aiConfigCount": "{count} 个",
     "aiConfiguration": "AI 配置",
     "backupManagement": "数据备份",
     "backupVersionList": "备份版本列表",
     "categoryManagement": "分类管理",
+    "categoryCount": "{count} 个",
     "checkDatabaseHealth": "检查数据库",
     "clearDatabase": "清空数据库",
     "clearDatabaseWarning": "⚠️ 危险操作警告",
@@ -344,7 +346,7 @@
     "exportWarning": "⚠️ 导出的数据将包含所有提示词、分类、AI配置（含API密钥）等敏感信息。请妥善保管导出文件，避免泄露。",
     "formatNote": "格式说明",
     "formatNoteText": "AI 配置数据包含复杂的对象结构因此表头不统一，仅支持导出为 JSON 格式。",
-    "fullBackupDescription": "导出完整备份压缩包，或从压缩包导入完整备份。导出的数据将包含 AI 配置信息中的 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。",
+    "fullBackupDescription": "导出或导入可完整恢复的数据包；其中可能包含 API 密钥，请妥善保管。",
     "fullBackupManagement": "完整备份管理",
     "importFullBackup": "导入完整备份",
     "importWarning": "⚠️ 导入备份将会完全覆盖现有的所有数据（包括提示词、分类、AI配置等），此操作不可撤销！建议先创建当前数据的备份。",
@@ -352,6 +354,7 @@
     "noBackups": "暂无备份版本，请先创建备份",
     "openBackupDirectory": "打开备份目录",
     "promptLibrary": "描述词库",
+    "promptCount": "{count} 条",
     "refreshBackupList": "刷新备份列表",
     "repairDatabase": "修复数据库",
     "restore": "恢复",
@@ -500,6 +503,7 @@
     "directModeDesc": "不配置额外代理，使用系统默认网络连接",
     "httpProxy": "HTTP 代理",
     "httpsProxy": "HTTPS 代理",
+    "invalidAddress": "请输入正确的代理地址，如 127.0.0.1:7890",
     "lastRefresh": "最后刷新",
     "manualConfig": "手动配置",
     "manualMode": "手动配置",
@@ -516,6 +520,8 @@
     "systemProxyInfo": "系统代理信息",
     "testConnection": "测试连接",
     "testConnectionDesc": "测试当前代理配置是否正常工作",
+    "testing": "测试中...",
+    "testingDescription": "正在测试网络连接...",
     "title": "网络代理设置"
   },
   "prompt": {
@@ -916,7 +922,16 @@
   },
   "settings": {
     "autoSave": "设置会自动保存",
+    "groups": {
+      "data": "数据",
+      "other": "其他",
+      "preferences": "偏好",
+      "system": "系统"
+    },
+    "resetConfirm": "确定将应用偏好恢复为默认值吗？",
     "resetToDefault": "恢复默认设置",
+    "saving": "保存中",
+    "selectSection": "选择设置项",
     "menus": {
       "about": {
         "title": "关于",
@@ -953,11 +968,11 @@
         "title": "关闭行为设置"
       },
       "cloud-backup": {
-        "description": "配置云端存储并保持各设备数据自动同步",
+        "description": "配置云端存储并保持设备间数据同步",
         "title": "数据同步"
       },
       "data-management": {
-        "description": "查看本地和各云端位置的历史备份版本",
+        "description": "创建、恢复和管理本地及云端备份",
         "title": "数据备份"
       },
       "laboratory": {
@@ -969,11 +984,11 @@
         "title": "语言设置"
       },
       "network-proxy": {
-        "description": "配置网络代理设置，解决网络连接问题",
+        "description": "选择联网方式并测试代理连接",
         "title": "网络代理设置"
       },
       "shortcuts": {
-        "description": "配置全局快捷键和提示词快捷键",
+        "description": "设置全局快捷键和快捷复制",
         "title": "快捷键设置"
       },
       "startup-behavior": {
@@ -983,18 +998,19 @@
     },
     "sections": {
       "about": "关于",
-      "appearance": "外观设置",
-      "close": "关闭行为设置",
+      "appearance": "外观",
+      "close": "关闭行为",
       "cloudBackup": "数据同步",
       "dataManagement": "数据备份",
+      "language": "语言",
       "laboratory": "实验室",
-      "networkProxy": "网络代理设置",
-      "shortcuts": "快捷键设置",
-      "startup": "启动行为设置"
+      "networkProxy": "网络代理",
+      "shortcuts": "快捷键",
+      "startup": "启动"
     },
-    "settingsMenu": "设置菜单",
+    "settingsMenu": "设置导航",
     "subtitle": "个性化配置您的应用偏好",
-    "title": "应用设置"
+    "title": "设置"
   },
   "settingsMessages": {
     "autoBackupBeforeRestore": "恢复前自动备份 - {timestamp}",

@@ -322,10 +322,12 @@
     "yes": "はい"
   },
   "dataManagement": {
+    "aiConfigCount": "{count} 件",
     "aiConfiguration": "AI設定",
     "backupManagement": "データバックアップ",
     "backupVersionList": "バックアップバージョンリスト",
     "categoryManagement": "分類管理",
+    "categoryCount": "{count} 件",
     "checkDatabaseHealth": "データベースを確認",
     "clearDatabase": "データベースをクリア",
     "clearDatabaseWarning": "⚠️危険な操作警告",
@@ -344,7 +346,7 @@
     "exportWarning": "⚠️ エクスポートされたデータには、すべてのプロンプト、カテゴリ、AI設定（APIキーを含む）などの機密情報が含まれます。エクスポートファイルを安全に保管し、漏洩を避けてください。",
     "formatNote": "形式説明",
     "formatNoteText": "AI設定データには複雑なオブジェクト構造が含まれるため、テーブルヘッダーが統一されず、JSON形式でのエクスポートのみサポート。",
-    "fullBackupDescription": "完全バックアップ圧縮パッケージをエクスポート、または圧縮パッケージから完全バックアップをインポート。エクスポートデータにはAPIキーなどの機密情報が含まれます。エクスポートファイルを適切に保管し、漏洩を避けてください。",
+    "fullBackupDescription": "完全に復元できるデータをエクスポートまたはインポートします。API キーを含む場合があるため、安全に保管してください。",
     "fullBackupManagement": "完全バックアップ管理",
     "importFullBackup": "完全バックアップをインポート",
     "importWarning": "⚠️ バックアップをインポートすると、既存のすべてのデータ（プロンプト、カテゴリ、AI設定など）が完全に上書きされます。この操作は元に戻せません！現在のデータのバックアップを先に作成することをお勧めします。",
@@ -352,6 +354,7 @@
     "noBackups": "バックアップバージョンがありません。先にバックアップを作成してください",
     "openBackupDirectory": "バックアップディレクトリを開く",
     "promptLibrary": "プロンプトライブラリ",
+    "promptCount": "{count} 件",
     "refreshBackupList": "バックアップリストを更新",
     "repairDatabase": "データベースを修復",
     "restore": "復元",
@@ -500,6 +503,7 @@
     "directModeDesc": "追加のプロキシは構成されていません。システムデフォルトネットワーク接続を使用します",
     "httpProxy": "HTTPプロキシ",
     "httpsProxy": "HTTPSプロキシ",
+    "invalidAddress": "127.0.0.1:7890 のような正しいプロキシアドレスを入力してください",
     "lastRefresh": "最後の更新",
     "manualConfig": "手動設定",
     "manualMode": "手動設定",
@@ -516,6 +520,8 @@
     "systemProxyInfo": "システムプロキシ情報",
     "testConnection": "接続テスト",
     "testConnectionDesc": "現在のプロキシ設定が正常に動作するかテスト",
+    "testing": "テスト中...",
+    "testingDescription": "ネットワーク接続をテストしています...",
     "title": "ネットワークプロキシ設定"
   },
   "prompt": {
@@ -916,6 +922,12 @@
   },
   "settings": {
     "autoSave": "設定は自動保存されます",
+    "groups": {
+      "data": "データ",
+      "other": "その他",
+      "preferences": "環境設定",
+      "system": "システム"
+    },
     "menus": {
       "about": {
         "description": "アプリのバージョン情報を表示し、アップデートを確認する",
@@ -938,7 +950,10 @@
         "title": "言語設定"
       }
     },
-    "resetToDefault": "デフォルト設定に戻す",
+    "resetConfirm": "アプリの環境設定をデフォルトに戻しますか？",
+    "resetToDefault": "デフォルトに戻す",
+    "saving": "保存中",
+    "selectSection": "設定項目を選択",
     "sectionDescriptions": {
       "about": {
         "description": "アプリケーションのバージョン情報を表示し、更新を確認",
@@ -953,11 +968,11 @@
         "title": "終了時の動作設定"
       },
       "cloud-backup": {
-        "description": "クラウドストレージを設定し、デバイス間でデータを自動同期します",
+        "description": "クラウドストレージを設定し、デバイス間でデータを同期します",
         "title": "データ同期"
       },
       "data-management": {
-        "description": "ローカルおよび各クラウド保存先の過去のバックアップを表示します",
+        "description": "ローカルとクラウドのバックアップを作成、復元、管理します",
         "title": "データバックアップ"
       },
       "laboratory": {
@@ -969,11 +984,11 @@
         "title": "言語設定"
       },
       "network-proxy": {
-        "description": "ネットワークプロキシ設定を構成し、接続問題を解決",
+        "description": "接続方法を選択し、プロキシ接続をテストします",
         "title": "ネットワークプロキシ設定"
       },
       "shortcuts": {
-        "description": "グローバルショートカットキーとプロンプトワードショートカットキーを構成します",
+        "description": "グローバルショートカットとクイックコピーを設定します",
         "title": "ショートカットキー設定"
       },
       "startup-behavior": {
@@ -983,18 +998,19 @@
     },
     "sections": {
       "about": "アプリについて",
-      "appearance": "外観設定",
-      "close": "終了時の動作設定",
+      "appearance": "外観",
+      "close": "終了時の動作",
       "cloudBackup": "データ同期",
       "dataManagement": "データバックアップ",
+      "language": "言語",
       "laboratory": "研究室",
-      "networkProxy": "ネットワークプロキシ設定",
-      "shortcuts": "ショートカットキー設定",
-      "startup": "起動時の動作設定"
+      "networkProxy": "ネットワークプロキシ",
+      "shortcuts": "ショートカット",
+      "startup": "起動"
     },
-    "settingsMenu": "設定メニュー",
+    "settingsMenu": "設定ナビゲーション",
     "subtitle": "アプリケーションの設定をカスタマイズ",
-    "title": "アプリケーション設定"
+    "title": "設定"
   },
   "settingsMessages": {
     "autoBackupBeforeRestore": "復元前の自動バックアップ - {timestamp}",

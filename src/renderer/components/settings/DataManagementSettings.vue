@@ -1,5 +1,5 @@
 <template>
-    <NCard>
+    <NCard size="small">
         <NTabs v-model:value="activeBackupLocation" type="line" animated>
             <NTabPane name="local" :tab="t('dataBackup.local')">
                 <NFlex vertical :size="20" style="padding-top: 4px;">
@@ -8,8 +8,8 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.backupManagement') }}</NText>
-                        <NFlex :size="12">
+                        <NText strong>{{ t('dataManagement.backupManagement') }}</NText>
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleCreateBackup" :loading="loading.backup">
                                 <template #icon>
                                     <NIcon>
@@ -40,7 +40,7 @@
                     <!-- 备份版本列表 -->
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
-                            <NText depth="2">{{ t('dataManagement.backupVersionList') }}</NText>
+                            <NText strong>{{ t('dataManagement.backupVersionList') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                 <NGridItem v-for="backup in paginatedBackups" :key="backup.id"
                                     span="6 600:5 900:4 1200:3 1500:2 1800:1">
@@ -61,7 +61,8 @@
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
                                                 <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
-                                                    negative-text="取消" positive-text="确定恢复" placement="top"
+                                                    :negative-text="t('common.cancel')"
+                                                    :positive-text="t('dataBackup.confirmRestore')" placement="top"
                                                     :show-icon="false">
                                                     <template #trigger>
                                                         <NButton type="primary" size="small"
@@ -80,7 +81,8 @@
                                                     </div>
                                                 </NPopconfirm>
                                                 <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
-                                                    negative-text="取消" positive-text="确定">
+                                                    :negative-text="t('common.cancel')"
+                                                    :positive-text="t('common.confirm')">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
                                                             <template #icon>
@@ -122,12 +124,12 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.fullBackupManagement') }}</NText>
+                        <NText strong>{{ t('dataManagement.fullBackupManagement') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.fullBackupDescription') }}
                         </NText>
 
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleExportFullBackup" :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
@@ -155,7 +157,7 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.selectiveDataExport') }}</NText>
+                        <NText strong>{{ t('dataManagement.selectiveDataExport') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.exportDescription') }}
                         </NText>
@@ -170,21 +172,21 @@
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.prompts }} 条</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.promptCount', { count: dataStats.prompts }) }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.categories }} 个</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.categoryCount', { count: dataStats.categories }) }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.aiConfigs }} 个</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.aiConfigCount', { count: dataStats.aiConfigs }) }}</NTag>
                                             <NTag size="small" type="warning">{{
                                                 t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
@@ -193,7 +195,7 @@
                             </NFlex>
                         </NCard>
 
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" type="primary"
                                 @click="handleExportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
                                 :loading="loading.export">
@@ -234,11 +236,11 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.databaseMaintenance') }}</NText>
+                        <NText strong>{{ t('dataManagement.databaseMaintenance') }}</NText>
                         <NText depth="3" style="font-size: 12px">
                             {{ t('dataManagement.maintenanceDescription') }}
                         </NText>
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleCheckDatabaseHealth">
                                 <template #icon>
                                     <NIcon>
@@ -315,7 +317,7 @@
                     <NText depth="3" style="font-size: 12px;">
                         {{ t('dataBackup.automaticBackupDescription') }}
                     </NText>
-                    <NFlex align="center" justify="space-between">
+                    <NFlex align="center" justify="space-between" :size="12" wrap>
                         <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
                         <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
                     </NFlex>

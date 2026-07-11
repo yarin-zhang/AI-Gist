@@ -322,10 +322,12 @@
     "yes": "Yes"
   },
   "dataManagement": {
+    "aiConfigCount": "{count}",
     "aiConfiguration": "AI Configuration",
     "backupManagement": "Data Backup",
     "backupVersionList": "Backup Version List",
     "categoryManagement": "Category Management",
+    "categoryCount": "{count}",
     "checkDatabaseHealth": "Check the database",
     "clearDatabase": "Clear Database",
     "clearDatabaseWarning": "⚠️ Dangerous Operation Warning",
@@ -344,7 +346,7 @@
     "exportWarning": "⚠️ The exported data will contain all prompts, categories, AI configurations (including API keys) and other sensitive information. Please keep the exported file safe to avoid leakage.",
     "formatNote": "Format Note",
     "formatNoteText": "AI configuration data contains complex object structures so headers are not uniform, only supports export as JSON format.",
-    "fullBackupDescription": "Export complete backup package, or import complete backup from package. Exported data will contain sensitive information such as API keys in AI configuration. Please keep export files safe to avoid leakage.",
+    "fullBackupDescription": "Export or import a fully restorable package. It may contain API keys, so keep it secure.",
     "fullBackupManagement": "Full Backup Management",
     "importFullBackup": "Import Full Backup",
     "importWarning": "⚠️ Importing backup will completely overwrite all existing data (including prompts, categories, AI configurations, etc.), this operation cannot be undone! It is recommended to create a backup of current data first.",
@@ -352,6 +354,7 @@
     "noBackups": "No backup versions yet, please create a backup first",
     "openBackupDirectory": "Open Backup Directory",
     "promptLibrary": "Prompt Library",
+    "promptCount": "{count}",
     "refreshBackupList": "Refresh Backup List",
     "repairDatabase": "Repair Database",
     "restore": "Restore",
@@ -500,6 +503,7 @@
     "directModeDesc": "No additional proxy is configured, use the system default network connection",
     "httpProxy": "HTTP Proxy",
     "httpsProxy": "HTTPS Proxy",
+    "invalidAddress": "Enter a valid proxy address, such as 127.0.0.1:7890",
     "lastRefresh": "Last refresh",
     "manualConfig": "Manual Configuration",
     "manualMode": "Manual Configuration",
@@ -516,6 +520,8 @@
     "systemProxyInfo": "System Proxy Information",
     "testConnection": "Test Connection",
     "testConnectionDesc": "Test if the current proxy configuration works properly",
+    "testing": "Testing...",
+    "testingDescription": "Testing the network connection...",
     "title": "Network Proxy Settings"
   },
   "prompt": {
@@ -916,6 +922,12 @@
   },
   "settings": {
     "autoSave": "Settings will be saved automatically",
+    "groups": {
+      "data": "Data",
+      "other": "Other",
+      "preferences": "Preferences",
+      "system": "System"
+    },
     "menus": {
       "about": {
         "description": "View app version information and check for updates",
@@ -938,7 +950,10 @@
         "title": "Language settings"
       }
     },
-    "resetToDefault": "Restore default settings",
+    "resetConfirm": "Restore application preferences to their defaults?",
+    "resetToDefault": "Restore Defaults",
+    "saving": "Saving",
+    "selectSection": "Choose a settings section",
     "sectionDescriptions": {
       "about": {
         "description": "View application version information and check for updates",
@@ -957,7 +972,7 @@
         "title": "Data Sync"
       },
       "data-management": {
-        "description": "View historical backups stored locally and in each cloud location",
+        "description": "Create, restore, and manage local and cloud backups",
         "title": "Data Backup"
       },
       "laboratory": {
@@ -969,11 +984,11 @@
         "title": "Language settings"
       },
       "network-proxy": {
-        "description": "Configure network proxy settings to resolve connection issues",
+        "description": "Choose how the app connects and test the proxy",
         "title": "Network Proxy Settings"
       },
       "shortcuts": {
-        "description": "Configure global shortcuts and prompt shortcuts",
+        "description": "Configure global shortcuts and quick copy actions",
         "title": "Shortcut Settings"
       },
       "startup-behavior": {
@@ -987,12 +1002,13 @@
       "close": "Close Behavior",
       "cloudBackup": "Data Sync",
       "dataManagement": "Data Backup",
+      "language": "Language",
       "laboratory": "Laboratory",
       "networkProxy": "Network Proxy",
       "shortcuts": "Shortcuts",
       "startup": "Startup"
     },
-    "settingsMenu": "Settings menu",
+    "settingsMenu": "Settings navigation",
     "subtitle": "Manage application configuration and preferences",
     "title": "Settings"
   },

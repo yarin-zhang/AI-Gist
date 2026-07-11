@@ -24,6 +24,31 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('@navigate-section="handleMenuSelect"');
   });
 
+  it('uses concise grouped navigation and a compact narrow-window selector', () => {
+    const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
+    expectInOrder(source, [
+      "label: t('settings.groups.data')",
+      "label: t('settings.groups.preferences')",
+      "label: t('settings.groups.system')",
+      "label: t('settings.groups.other')",
+    ]);
+    expect(source).toContain('class="settings-compact-navigation"');
+    expect(source).toContain(':options="compactMenuOptions"');
+    expect(source).not.toContain("{{ t('settings.subtitle') }}");
+    expect(source).not.toContain("{{ t('settings.autoSave') }}");
+    expect(source).not.toContain('<NAlert :show-icon="false">');
+  });
+
+  it('removes duplicate summaries from simple preference panels', () => {
+    const language = readWorkspaceFile('src/renderer/components/settings/LanguageSettings.vue');
+    const closeBehavior = readWorkspaceFile('src/renderer/components/settings/CloseBehaviorSettings.vue');
+    const startup = readWorkspaceFile('src/renderer/components/settings/StartupBehaviorSettings.vue');
+
+    expect(language).not.toContain("t('language.description')");
+    expect(closeBehavior).not.toContain("t('closeBehavior.currentSetting')");
+    expect(startup).toContain('<NSwitch');
+  });
+
   it('keeps the sync page focused on status, storage, and collapsed advanced sync settings', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
     expect(source).toContain("t('dataSync.storageConfiguration')");
@@ -87,6 +112,11 @@ describe('settings sync and backup information architecture', () => {
       expect(messages.settings.sections.dataManagement).toBe(backupName);
       expect(messages.dataSync.title).toBe(syncName);
       expect(messages.dataBackup.title).toBe(backupName);
+      expect(messages.settings.groups.data).toBeTruthy();
+      expect(messages.settings.groups.preferences).toBeTruthy();
+      expect(messages.settings.groups.system).toBeTruthy();
+      expect(messages.settings.groups.other).toBeTruthy();
+      expect(messages.settings.sections.language).toBeTruthy();
     }
   });
 });

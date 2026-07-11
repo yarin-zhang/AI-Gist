@@ -1,59 +1,37 @@
 <template>
     <div class="network-proxy-settings">
-        <NFlex vertical :size="24">
-            <!-- 代理模式选择 -->
-            <NCard>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('networkProxy.proxyMode') }}</NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('networkProxy.description') }}
-                        </NText>
-                    </NFlex>
-
+        <NCard size="small">
+            <NFlex vertical :size="20">
+                <section class="proxy-section">
+                    <NText strong>{{ t('networkProxy.proxyMode') }}</NText>
                     <NRadioGroup v-model:value="proxyConfig.mode" @update:value="handleModeChange">
                         <NFlex vertical :size="12">
                             <NRadio value="direct">
-                                <NFlex align="center" :size="8">
-                                    <div>
-                                        <div>{{ t('networkProxy.directMode') }}</div>
-                                        <NText depth="3" style="font-size: 12px">
-                                            {{ t('networkProxy.directModeDesc') }}
-                                        </NText>
-                                    </div>
-                                </NFlex>
+                                <div>
+                                    <div>{{ t('networkProxy.directMode') }}</div>
+                                    <NText depth="3" class="setting-description">{{ t('networkProxy.directModeDesc') }}</NText>
+                                </div>
                             </NRadio>
                             <NRadio value="system">
-                                <NFlex align="center" :size="8">
-                                    <div>
-                                        <div>{{ t('networkProxy.systemMode') }}</div>
-                                        <NText depth="3" style="font-size: 12px">
-                                            {{ t('networkProxy.systemModeDesc') }}
-                                        </NText>
-                                    </div>
-                                </NFlex>
+                                <div>
+                                    <div>{{ t('networkProxy.systemMode') }}</div>
+                                    <NText depth="3" class="setting-description">{{ t('networkProxy.systemModeDesc') }}</NText>
+                                </div>
                             </NRadio>
                             <NRadio value="manual">
-                                <NFlex align="center" :size="8">
-                                    <div>
-                                        <div>{{ t('networkProxy.manualMode') }}</div>
-                                        <NText depth="3" style="font-size: 12px">
-                                            {{ t('networkProxy.manualModeDesc') }}
-                                        </NText>
-                                    </div>
-                                </NFlex>
+                                <div>
+                                    <div>{{ t('networkProxy.manualMode') }}</div>
+                                    <NText depth="3" class="setting-description">{{ t('networkProxy.manualModeDesc') }}</NText>
+                                </div>
                             </NRadio>
                         </NFlex>
                     </NRadioGroup>
-                </NFlex>
-            </NCard>
+                </section>
 
-            <!-- 手动配置 -->
-            <NCard v-if="proxyConfig.mode === 'manual'">
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('networkProxy.manualConfig') }}</NText>
-                    </NFlex>
+                <template v-if="proxyConfig.mode === 'manual'">
+                    <NDivider />
+                    <section class="proxy-section">
+                    <NText strong>{{ t('networkProxy.manualConfig') }}</NText>
 
                     <NForm ref="formRef" :model="proxyConfig.manualConfig" :rules="formRules">
                         <NFormItem :label="t('networkProxy.httpProxy')" path="httpProxy">
@@ -72,69 +50,61 @@
                             <NInput 
                                 v-model:value="proxyConfig.manualConfig.noProxy" 
                                 :placeholder="'localhost,127.0.0.1'" />
-                            <NText depth="3" style="font-size: 12px; margin-top: 4px;">
+                            <NText depth="3" class="setting-description">
                                 {{ t('networkProxy.noProxyDesc') }}
                             </NText>
                         </NFormItem>
                     </NForm>
-                </NFlex>
-            </NCard>
+                    </section>
+                </template>
 
-            <!-- 系统代理信息 -->
-            <NCard v-if="proxyConfig.mode === 'system'">
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NFlex align="center" justify="space-between">
-                            <NText depth="2">{{ t('networkProxy.systemProxyInfo') }}</NText>
+                <template v-if="proxyConfig.mode === 'system'">
+                    <NDivider />
+                    <section class="proxy-section">
+                        <NFlex align="center" justify="space-between" :size="12">
+                            <NText strong>{{ t('networkProxy.systemProxyInfo') }}</NText>
                             <NButton 
                                 size="small" 
                                 @click="refreshSystemProxyInfo" 
                                 :loading="loading.refresh"
-                                type="primary" 
-                                ghost>
+                                quaternary>
                                 <template #icon>
-                                    <NIcon>
-                                        <Refresh />
-                                    </NIcon>
+                                    <NIcon><Refresh /></NIcon>
                                 </template>
-                                刷新
+                                {{ t('common.refresh') }}
                             </NButton>
                         </NFlex>
-                    </NFlex>
 
                     <NFlex vertical :size="8">
                         <NFlex align="center" :size="8">
-                            <NText>{{ t('networkProxy.currentProxy') }}:</NText>
-                            <NText v-if="systemProxyInfo.hasProxy" type="success">
-                                {{ t('networkProxy.proxyDetected') }}
-                            </NText>
-                            <NText v-else type="warning">
-                                {{ t('networkProxy.noProxyDetected') }}
-                            </NText>
+                            <NText>{{ t('networkProxy.currentProxy') }}</NText>
+                            <NTag :type="systemProxyInfo.hasProxy ? 'success' : 'warning'" size="small">
+                                {{ systemProxyInfo.hasProxy
+                                    ? t('networkProxy.proxyDetected')
+                                    : t('networkProxy.noProxyDetected') }}
+                            </NTag>
                         </NFlex>
                         
                         <NFlex v-if="systemProxyInfo.proxyAddress" align="center" :size="8">
-                            <NText>{{ t('networkProxy.proxyAddress') }}:</NText>
+                            <NText>{{ t('networkProxy.proxyAddress') }}</NText>
                             <NText depth="3">{{ systemProxyInfo.proxyAddress }}</NText>
                         </NFlex>
                         
                         <NFlex v-if="systemProxyInfo.lastRefreshTime" align="center" :size="8">
-                            <NText>{{ t('networkProxy.lastRefresh') }}:</NText>
+                            <NText>{{ t('networkProxy.lastRefresh') }}</NText>
                             <NText depth="3">{{ systemProxyInfo.lastRefreshTime }}</NText>
                         </NFlex>
                     </NFlex>
-                </NFlex>
-            </NCard>
+                    </section>
+                </template>
 
-            <!-- 连接测试 -->
-            <NCard>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('networkProxy.testConnection') }}</NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('networkProxy.testConnectionDesc') }}
-                        </NText>
-                    </NFlex>
+                <NDivider />
+
+                <section class="proxy-section">
+                    <div>
+                        <NText strong>{{ t('networkProxy.testConnection') }}</NText>
+                        <NText depth="3" class="setting-description">{{ t('networkProxy.testConnectionDesc') }}</NText>
+                    </div>
 
                     <NFlex :size="12">
                         <NButton 
@@ -147,23 +117,19 @@
                                     <Wifi />
                                 </NIcon>
                             </template>
-                            {{ isTesting ? '测试中...' : t('networkProxy.testConnection') }}
+                            {{ isTesting ? t('networkProxy.testing') : t('networkProxy.testConnection') }}
                         </NButton>
                     </NFlex>
 
-                    <!-- 测试进度 -->
                     <NAlert v-if="isTesting" type="info" show-icon>
                         <template #icon>
                             <NIcon>
                                 <Wifi />
                             </NIcon>
                         </template>
-                        <NFlex vertical :size="8">
-                            <NText>正在测试网络连接...</NText>
-                        </NFlex>
+                        {{ t('networkProxy.testingDescription') }}
                     </NAlert>
 
-                    <!-- 测试结果 -->
                     <NAlert v-if="testResult && !isTesting" :type="testResult.overall.success ? 'success' : 'error'" show-icon>
                         <template #icon>
                             <NIcon v-if="testResult.overall.success">
@@ -173,19 +139,14 @@
                                 <AlertCircle />
                             </NIcon>
                         </template>
-                        <NFlex vertical :size="8">
-                            <NText>
-                                {{ testResult.overall.success ? t('networkProxy.connectionSuccess') : t('networkProxy.connectionFailed') }}
-                            </NText>
-                        </NFlex>
+                        {{ testResult.overall.success ? t('networkProxy.connectionSuccess') : t('networkProxy.connectionFailed') }}
                     </NAlert>
 
-                    <!-- 详细测试结果 -->
                     <NFlex v-if="testResults.length > 0" vertical :size="12">
-                        <NText depth="2" style="font-size: 14px;">{{ t('networkProxy.connectionTest') }}</NText>
+                        <NText strong style="font-size: 14px;">{{ t('networkProxy.connectionTest') }}</NText>
                         <NFlex vertical :size="8">
                             <NFlex v-for="result in testResults" :key="result.name" 
-                                align="center" justify="space-between" style="padding: 8px; border-radius: 4px; background: var(--n-color);">
+                                align="center" justify="space-between" :size="12" class="test-result-row">
                                 <NFlex align="center" :size="8">
                                     <NIcon v-if="result.success" color="#18a058" size="16">
                                         <Check />
@@ -206,15 +167,15 @@
                                         {{ result.error }}
                                     </NText>
                                     <NText v-if="isTesting && !result.success && !result.error" depth="3" style="font-size: 12px; color: #f0a020;">
-                                        测试中...
+                                        {{ t('networkProxy.testing') }}
                                     </NText>
                                 </NFlex>
                             </NFlex>
                         </NFlex>
                     </NFlex>
-                </NFlex>
-            </NCard>
-        </NFlex>
+                </section>
+            </NFlex>
+        </NCard>
     </div>
 </template>
 
@@ -233,6 +194,8 @@ import {
     NButton,
     NIcon,
     NAlert,
+    NDivider,
+    NTag,
     FormRules
 } from 'naive-ui';
 import {
@@ -318,14 +281,14 @@ const formRules: FormRules = {
     httpProxy: [
         {
             pattern: /^(\d{1,3}\.){3}\d{1,3}:\d+$/,
-            message: '请输入正确的代理地址格式，如：127.0.0.1:7890',
+            message: () => t('networkProxy.invalidAddress'),
             trigger: 'blur'
         }
     ],
     httpsProxy: [
         {
             pattern: /^(\d{1,3}\.){3}\d{1,3}:\d+$/,
-            message: '请输入正确的代理地址格式，如：127.0.0.1:7890',
+            message: () => t('networkProxy.invalidAddress'),
             trigger: 'blur'
         }
     ]
@@ -500,5 +463,31 @@ onUnmounted(() => {
 <style scoped>
 .network-proxy-settings {
     width: 100%;
+}
+
+.proxy-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.setting-description {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.test-result-row {
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--surface-secondary);
+    word-break: break-word;
+}
+
+@media (max-width: 640px) {
+    .test-result-row {
+        align-items: flex-start !important;
+        flex-direction: column;
+    }
 }
 </style>

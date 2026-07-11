@@ -1,5 +1,5 @@
 <template>
-    <NCard>
+    <NCard size="small">
         <NFlex vertical :size="20">
             <NAlert :type="statusAlertType" :title="statusTitle" show-icon>
                 <NFlex vertical :size="4">
@@ -19,9 +19,9 @@
             </NAlert>
 
             <NFlex vertical :size="16">
-                <NFlex justify="space-between" align="center">
+                <NFlex justify="space-between" align="center" :size="12" wrap>
                     <div>
-                        <NText depth="2">{{ t('dataSync.storageConfiguration') }}</NText>
+                        <NText strong>{{ t('dataSync.storageConfiguration') }}</NText>
                         <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
                             {{ storageDescriptionText }}
                         </NText>
@@ -53,8 +53,8 @@
                             </NFlex>
 
                             <template #action>
-                                <NFlex justify="space-between" align="center" style="width: 100%;">
-                                    <NFlex :size="8">
+                                <NFlex justify="space-between" align="center" style="width: 100%;" wrap>
+                                    <NFlex :size="8" wrap>
                                         <NButton size="small" @click="editConfig(config)">
                                             <template #icon><NIcon><Edit /></NIcon></template>
                                             {{ t('dataSync.editConfig') }}
@@ -99,7 +99,7 @@
             <NCollapse>
                 <NCollapseItem :title="t('dataSync.advancedSettings')" name="advanced-sync-settings">
                     <NFlex vertical :size="16" style="padding-top: 4px;">
-                        <NFlex align="center" justify="space-between">
+                        <NFlex align="center" justify="space-between" :size="12" wrap>
                             <div>
                                 <NText>{{ t('dataSync.enableAutoSync') }}</NText>
                                 <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
@@ -108,14 +108,14 @@
                             </div>
                             <NSwitch v-model:value="autoSyncEnabled" @update:value="saveAutoSyncEnabled" />
                         </NFlex>
-                        <NFlex align="center" justify="space-between">
+                        <NFlex align="center" justify="space-between" :size="12" wrap>
                             <div>
                                 <NText>{{ t('dataSync.syncInterval') }}</NText>
                                 <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
                                     {{ t('dataSync.syncIntervalDescription') }}
                                 </NText>
                             </div>
-                            <NFlex align="center" :size="12">
+                            <NFlex align="center" :size="12" wrap>
                                 <NInputNumber v-model:value="syncIntervalMinutes"
                                     :min="MIN_CLOUD_SYNC_INTERVAL_MINUTES"
                                     :max="MAX_CLOUD_SYNC_INTERVAL_MINUTES" :step="5" style="width: 160px;">

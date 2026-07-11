@@ -1,14 +1,14 @@
 <template>
     <div class="shortcut-settings">
-        <NFlex vertical>
-            <!-- 权限提示 -->
-            <NCard v-if="permissionStatus && !permissionStatus.hasPermission" size="small" type="warning">
-                <NFlex vertical size="small">
-                    <NText strong style="color: #f0a020;">⚠️ {{ t('shortcuts.permissionRequired') }}</NText>
-                    <NText depth="3" style="font-size: 12px;">
-                        {{ permissionStatus.message }}
-                    </NText>
-                    <NFlex size="small">
+        <NFlex vertical :size="16">
+            <NAlert
+                v-if="permissionStatus && !permissionStatus.hasPermission"
+                type="warning"
+                :title="t('shortcuts.permissionRequired')"
+            >
+                {{ permissionStatus.message }}
+                <template #action>
+                    <NFlex :size="8">
                         <NButton size="small" @click="openSystemPreferences">
                             {{ t('shortcuts.openSystemPreferences') }}
                         </NButton>
@@ -16,69 +16,74 @@
                             {{ t('shortcuts.retryCheck') }}
                         </NButton>
                     </NFlex>
-                </NFlex>
-            </NCard>
+                </template>
+            </NAlert>
 
             <NCard size="small">
-                <NFlex vertical>
-                    <!-- 显示界面快捷键 -->
-                    <NFlex vertical size="small">
-                        <NFlex align="center" size="small">
-                            <NText strong>{{ t('shortcuts.showInterface') }}</NText>
-                            <NText v-if="permissionStatus?.hasPermission && showInterfaceShortcut" depth="3" style="font-size: 12px; color: #18a058;">
-                                ✓ {{ t('shortcuts.registered') }}
-                            </NText>
-                            <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
-                                ✗ {{ t('shortcuts.notRegistered') }}
-                            </NText>
+                <NFlex vertical :size="20">
+                    <section class="shortcut-block">
+                        <NFlex justify="space-between" align="flex-start" :size="12" wrap>
+                            <div>
+                                <NText strong>{{ t('shortcuts.showInterface') }}</NText>
+                                <NText depth="3" class="setting-description">
+                                    {{ t('shortcuts.showInterfaceDesc') }}
+                                </NText>
+                            </div>
+                            <NTag
+                                size="small"
+                                :type="permissionStatus?.hasPermission && showInterfaceShortcut ? 'success' : 'error'"
+                            >
+                                {{ permissionStatus?.hasPermission && showInterfaceShortcut
+                                    ? t('shortcuts.registered')
+                                    : t('shortcuts.notRegistered') }}
+                            </NTag>
                         </NFlex>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('shortcuts.showInterfaceDesc') }}
-                        </NText>
-                        <NFlex align="center" size="small">
+                        <NFlex align="center" :size="8" class="shortcut-control-row">
                             <NInput v-model:value="showInterfaceShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
                                 @click="startCaptureShortcut('showInterface')"
-                                :class="{ 'capturing': capturingType === 'showInterface' }" style="width: 50%;"/>
-                            <NButton size="small" type="warning" ghost @click="clearShortcut('showInterface')">
+                                :class="{ 'capturing': capturingType === 'showInterface' }" />
+                            <NButton size="small" secondary @click="clearShortcut('showInterface')">
                                 {{ t('shortcuts.clear') }}
                             </NButton>
                         </NFlex>
-                    </NFlex>
+                    </section>
 
-                    <!-- 复制提示词快捷键 -->
-                    <NFlex vertical size="small">
-                        <NFlex align="center" size="small">
-                            <NText strong>{{ t('shortcuts.copyPrompt') }}</NText>
-                            <NText v-if="permissionStatus?.hasPermission && copyPromptShortcut" depth="3" style="font-size: 12px; color: #18a058;">
-                                ✓ {{ t('shortcuts.registered') }}
-                            </NText>
-                            <NText v-else depth="3" style="font-size: 12px; color: #d03050;">
-                                ✗ {{ t('shortcuts.notRegistered') }}
-                            </NText>
+                    <NDivider />
+
+                    <section class="shortcut-block">
+                        <NFlex justify="space-between" align="flex-start" :size="12" wrap>
+                            <div>
+                                <NText strong>{{ t('shortcuts.copyPrompt') }}</NText>
+                                <NText depth="3" class="setting-description">
+                                    {{ t('shortcuts.copyPromptDesc') }}
+                                </NText>
+                            </div>
+                            <NTag
+                                size="small"
+                                :type="permissionStatus?.hasPermission && copyPromptShortcut ? 'success' : 'error'"
+                            >
+                                {{ permissionStatus?.hasPermission && copyPromptShortcut
+                                    ? t('shortcuts.registered')
+                                    : t('shortcuts.notRegistered') }}
+                            </NTag>
                         </NFlex>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('shortcuts.copyPromptDesc') }}
-                        </NText>
-                        <NFlex align="center" size="small">
+                        <NFlex align="center" :size="8" class="shortcut-control-row">
                             <NInput v-model:value="copyPromptShortcut" :placeholder="t('shortcuts.clickToInput')" readonly
                                 @click="startCaptureShortcut('copyPrompt')"
-                                :class="{ 'capturing': capturingType === 'copyPrompt' }" style="width: 50%;"/>
-                            <NButton size="small" type="warning" ghost @click="clearShortcut('copyPrompt')">
+                                :class="{ 'capturing': capturingType === 'copyPrompt' }" />
+                            <NButton size="small" secondary @click="clearShortcut('copyPrompt')">
                                 {{ t('shortcuts.clear') }}
                             </NButton>
                         </NFlex>
-                        
-                        <!-- 选择复制的提示词 -->
-                        <NFlex vertical size="small">
-                            <NFlex align="center" size="small">
+
+                        <div class="dependent-setting">
+                            <NFlex align="center" justify="space-between" :size="8" wrap>
                                 <NText strong>{{ t('shortcuts.selectPrompt') }}</NText>
                                 <NButton 
-                                    size="tiny" 
-                                    type="primary" 
-                                    ghost
+                                    size="small"
+                                    quaternary
                                     @click="loadPromptOptions" 
-                                    :loading="loadingPrompts"
-                                    style="margin-left: 8px;">
+                                    :loading="loadingPrompts">
                                     <template #icon>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
@@ -90,7 +95,7 @@
                                     {{ t('shortcuts.refreshPrompts') }}
                                 </NButton>
                             </NFlex>
-                            <NText depth="3" style="font-size: 12px;">
+                            <NText depth="3" class="setting-description">
                                 {{ t('shortcuts.selectPromptDesc') }}
                             </NText>
                             <NSelect 
@@ -102,27 +107,25 @@
                                 remote
                                 :loading="loadingPrompts"
                                 clearable />
-                            
-                            <!-- 空状态提示 -->
-                            <div v-if="!loadingPrompts && promptOptions.length === 0" style="margin-top: 8px; padding: 12px; background: var(--n-color); border-radius: 4px; text-align: center;">
-                                <NText depth="3" style="font-size: 12px;">
-                                    {{ t('shortcuts.noPromptsMessage') }}
-                                </NText>
-                            </div>
-                            
-                            <!-- 显示选中的提示词预览 -->
-                            <div v-if="selectedPromptPreview" style="margin-top: 8px; padding: 8px; background: var(--n-color); border-radius: 4px;">
+
+                            <NEmpty
+                                v-if="!loadingPrompts && promptOptions.length === 0"
+                                size="small"
+                                :description="t('shortcuts.noPromptsAvailable')"
+                            />
+
+                            <div v-if="selectedPromptPreview" class="prompt-preview">
                                 <NText strong style="font-size: 12px;">{{ t('shortcuts.selectedPromptPreview') }}</NText>
-                                <NText depth="3" style="font-size: 11px; display: block; margin-top: 4px; white-space: pre-wrap; max-height: 60px; overflow: hidden;">
+                                <NText depth="3" class="prompt-preview-content">
                                     {{ selectedPromptPreview }}
                                 </NText>
                             </div>
-                        </NFlex>
-                    </NFlex>
+                        </div>
+                    </section>
 
-                    <!-- 操作按钮 -->
-                    <NFlex size="small">
-                        <NButton @click="resetShortcuts">
+                    <NDivider />
+                    <NFlex justify="flex-end">
+                        <NButton secondary @click="resetShortcuts">
                             {{ t('shortcuts.resetToDefault') }}
                         </NButton>
                     </NFlex>
@@ -132,7 +135,7 @@
 
         <!-- 快捷键捕获提示 -->
         <NModal v-model:show="showCaptureModal" :mask-closable="false" :closable="false">
-            <NCard style="width: 400px;" :title="t('shortcuts.inputShortcut')">
+            <NCard style="width: min(400px, calc(100vw - 32px));" :title="t('shortcuts.inputShortcut')">
                 <NFlex vertical size="medium" align="center">
                     <NText>{{ t('shortcuts.pressShortcut') }}</NText>
                     <NText strong style="font-size: 18px; color: var(--primary-color);">
@@ -155,7 +158,20 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { NModal, NCard, NText, NButton, NFlex, NInput, NSelect, useMessage } from 'naive-ui';
+import {
+  NAlert,
+  NButton,
+  NCard,
+  NDivider,
+  NEmpty,
+  NFlex,
+  NInput,
+  NModal,
+  NSelect,
+  NTag,
+  NText,
+  useMessage
+} from 'naive-ui';
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const { t } = useI18n();
@@ -690,5 +706,56 @@ onUnmounted(async () => {
 </script>
 
 <style scoped>
+.shortcut-block,
+.dependent-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
+.setting-description {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.shortcut-control-row {
+  max-width: 520px;
+}
+
+.shortcut-control-row .n-input {
+  flex: 1;
+}
+
+.dependent-setting {
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border-subtle);
+}
+
+.prompt-preview {
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--surface-secondary);
+}
+
+.prompt-preview-content {
+  display: block;
+  margin-top: 4px;
+  max-height: 72px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .shortcut-control-row {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .dependent-setting {
+    padding-left: 12px;
+  }
+}
 </style>

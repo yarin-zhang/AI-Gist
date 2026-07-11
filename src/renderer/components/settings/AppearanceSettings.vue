@@ -1,9 +1,9 @@
 <template>
-    <NCard>
-        <NFlex vertical :size="16">
-            <NFormItem :label="t('appearance.theme')">
-                <NRadioGroup v-model:value="props.modelValue.themeSource" @update:value="handleUpdate">
-                    <NFlex vertical :size="8">
+    <NCard size="small">
+        <NFlex vertical :size="12">
+            <NText strong>{{ t('appearance.theme') }}</NText>
+            <NRadioGroup v-model:value="props.modelValue.themeSource" @update:value="handleUpdate">
+                    <NFlex vertical :size="12">
                         <NRadio value="system">
                             <NFlex align="center" :size="8">
                                 <div>
@@ -35,14 +35,13 @@
                             </NFlex>
                         </NRadio>
                     </NFlex>
-                </NRadioGroup>
-            </NFormItem>
+            </NRadioGroup>
         </NFlex>
     </NCard>
 </template>
 
 <script setup lang="ts">
-import { NCard, NFlex, NFormItem, NRadioGroup, NRadio, NText } from "naive-ui";
+import { NCard, NFlex, NRadioGroup, NRadio, NText } from "naive-ui";
 import { useI18n } from 'vue-i18n'
 
 interface AppearanceSettings {

@@ -1,19 +1,16 @@
 <template>
-    <NCard>
+    <NCard size="small">
         <NFlex vertical :size="24">
             <!-- 应用信息 -->
             <NFlex vertical :size="16" align="center">
                 <div style="text-align: center;">
-                    <NAvatar size="large" :src="appIcon" style="width: 80px; height: 80px; margin-bottom: 16px;" />
+                    <NAvatar size="large" :src="appIcon" style="width: 64px; height: 64px; margin-bottom: 12px;" />
                     <div>
-                        <NText strong style="font-size: 24px; display: block; margin-bottom: 8px;">
+                        <NText strong style="font-size: 20px; display: block; margin-bottom: 6px;">
                             {{ t('about.appName') }}
                         </NText>
-                        <NText depth="3" style="font-size: 14px; display: block; margin-bottom: 4px;">
+                        <NText depth="3" style="font-size: 14px; display: block;">
                             {{ t('about.appDescription') }}
-                        </NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('about.appFeatures') }}
                         </NText>
                     </div>
                 </div>
@@ -23,7 +20,15 @@
 
             <!-- 版本信息 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.versionInfo') }}</NText>
+                <NFlex justify="space-between" align="center" :size="12" wrap>
+                    <NText strong style="font-size: 16px;">{{ t('about.versionInfo') }}</NText>
+                    <NButton @click="handleCheckForUpdates" :loading="checking" secondary type="primary">
+                        <template #icon>
+                            <NIcon><Refresh /></NIcon>
+                        </template>
+                        {{ t('about.checkForUpdates') }}
+                    </NButton>
+                </NFlex>
                 <NFlex vertical :size="8">
                     <NFlex justify="space-between">
                         <NText depth="2">{{ t('about.currentVersion') }}</NText>
@@ -45,21 +50,6 @@
                         <NText depth="2">{{ t('about.publishedAt') }}</NText>
                         <NText>{{ publishedAt }}</NText>
                     </NFlex>
-                </NFlex>
-            </NFlex>
-
-            <!-- 更新检查 -->
-            <NFlex vertical :size="12">
-                <NFlex justify="space-between" align="center">
-                    <NText strong style="font-size: 16px;">{{ t('about.updateCheck') }}</NText>
-                    <NButton @click="handleCheckForUpdates" :loading="checking" secondary type="primary">
-                        <template #icon>
-                            <NIcon>
-                                <Refresh />
-                            </NIcon>
-                        </template>
-                        {{ t('about.checkForUpdates') }}
-                    </NButton>
                 </NFlex>
 
                 <!-- 更新信息 -->
@@ -98,7 +88,7 @@
 
             <!-- 项目信息 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.projectInfo') }}</NText>
+                <NText strong style="font-size: 16px;">{{ t('about.projectInfo') }}</NText>
                 <NFlex vertical :size="8">
                     <NFlex justify="space-between">
                         <NText depth="2">{{ t('about.developer') }}</NText>
@@ -119,7 +109,7 @@
 
             <!-- 反馈与支持 -->
             <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px; margin-bottom: 8px;">{{ t('about.feedbackSupport') }}</NText>
+                <NText strong style="font-size: 16px;">{{ t('about.feedbackSupport') }}</NText>
                 <NFlex :size="12" wrap>
                     <NButton @click="openIssues" secondary>
                         <template #icon>
