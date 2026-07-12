@@ -203,6 +203,7 @@
                 :category-counts="categoryCountMap" :active-category-id="selectedCategory"
                 :total-count="statistics.totalCount" :loading="initialLoading" :global-results="folderGlobalResults"
                 :moving-prompt-id="movingPromptId" :supports-global-shortcuts="supportsGlobalShortcuts"
+                :resolve-image-url="getImageUrlFromBlob"
                 @navigate="handleFolderNavigate" @open="$emit('view', $event)"
                 @prompt-action="handleFolderPromptAction" @move="handleMovePrompt"
                 @manage-categories="$emit('manage-categories')" />
@@ -386,6 +387,7 @@ import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
 import { getRuntimeVariables, renderPromptContent } from '@/lib/utils/prompt-runtime'
 import { recordPromptUsage } from '@/lib/utils/prompt-usage'
+import { onDataChange } from '@/lib/services/data-change-events'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
 import type { PromptShortcutBinding, ShortcutState } from '@shared/types/preferences'
 import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue'
@@ -442,8 +444,11 @@ const showFavoritesOnly = ref(false)
 const selectedTag = ref<string>('') // 添加专门的标签搜索状态
 const movingPromptId = ref<number | null>(null)
 const folderInitialized = ref(false)
-const pendingFolderCategoryId = ref<number | null | undefined>(undefined)
+const folderPromptCache = ref<PromptWithRelations[]>([])
 let folderLoadRequestId = 0
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let realtimeRefreshPending = false
+let realtimeRefreshPromise: Promise<void> | null = null
 
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
@@ -975,36 +980,35 @@ const redesignedTableColumns = computed(() => {
 })
 
 // 加载文件夹视图数据。根目录默认只展示未分类提示词；存在内容筛选时跨分类展示结果。
-const loadFolderData = async (
-    showLoading = !folderInitialized.value,
-    targetCategoryId = selectedCategory.value,
-    commitLocation = false,
-) => {
+const applyFolderLocation = (categoryId = selectedCategory.value) => {
+    const globalResults = categoryId === null && Boolean(
+        searchText.value.trim() || selectedTag.value || showFavoritesOnly.value
+    )
+    prompts.value = globalResults
+        ? [...folderPromptCache.value]
+        : categoryId !== null
+            ? folderPromptCache.value.filter(prompt => prompt.categoryId === categoryId)
+            : folderPromptCache.value.filter(prompt => !prompt.categoryId)
+    totalCount.value = prompts.value.length
+}
+
+const loadFolderData = async (showLoading = !folderInitialized.value) => {
     const requestId = ++folderLoadRequestId
     try {
         if (showLoading) initialLoading.value = true
-        const globalResults = targetCategoryId === null && Boolean(
-            searchText.value.trim() || selectedTag.value || showFavoritesOnly.value
-        )
         const filters = {
             search: searchText.value || undefined,
             tags: selectedTag.value || undefined,
             isFavorite: showFavoritesOnly.value || undefined,
             sortBy: sortType.value,
-            ...(targetCategoryId !== null
-                ? { categoryId: targetCategoryId }
-                : globalResults
-                    ? {}
-                    : { categoryId: null }),
         }
         const [result, latestStatistics] = await Promise.all([
             api.prompts.getAll.query(filters),
             api.prompts.getStatistics.query(),
         ])
         if (requestId !== folderLoadRequestId) return
-        if (commitLocation) selectedCategory.value = targetCategoryId
-        prompts.value = result.data || []
-        totalCount.value = result.total || 0
+        folderPromptCache.value = result.data || []
+        applyFolderLocation()
         statistics.value = latestStatistics
         folderInitialized.value = true
     } catch (error) {
@@ -1017,12 +1021,12 @@ const loadFolderData = async (
 }
 
 // 加载数据
-const loadPrompts = async (reset = true) => {
+const loadPrompts = async (reset = true, showLoading = reset) => {
     try {
         if (reset) {
-            initialLoading.value = true
+            if (showLoading) initialLoading.value = true
             currentPage.value = 1
-            prompts.value = []
+            if (showLoading) prompts.value = []
         } else {
             loadingMore.value = true
         }        // 加载统计信息（仅在首次加载时）
@@ -1144,9 +1148,9 @@ const handleLoadMore = () => {
 }
 
 // 专门为表格视图加载数据的函数
-const loadPromptsForTable = async () => {
+const loadPromptsForTable = async (showLoading = true) => {
     try {
-        loadingMore.value = true
+        if (showLoading) loadingMore.value = true
 
         // 根据过滤条件加载显示的提示词（分页）
         const filters = {
@@ -1182,15 +1186,15 @@ const loadPromptsForTable = async () => {
         message.error(t('promptManagement.loadPromptsFailed'))
         console.error(error)
     } finally {
-        loadingMore.value = false
+        if (showLoading) loadingMore.value = false
     }
 }
 
-const loadCategories = async () => {
+const loadCategories = async (includeStatistics = true) => {
     try {
         categories.value = await api.categories.getAll.query()
         // 每次加载分类时都同时更新统计信息，确保计数准确
-        await loadStatistics()
+        if (includeStatistics) await loadStatistics()
     } catch (error) {
         message.error(t('promptManagement.loadCategoriesFailed'))
         console.error(error)
@@ -1250,16 +1254,11 @@ const handleCategoryQuickFilter = (categoryId: number | null) => {
     }
 }
 
-const handleFolderNavigate = async (categoryId: number | null) => {
-    if (pendingFolderCategoryId.value === categoryId) return
-    if (pendingFolderCategoryId.value === undefined && selectedCategory.value === categoryId) return
-    pendingFolderCategoryId.value = categoryId
+const handleFolderNavigate = (categoryId: number | null) => {
+    if (selectedCategory.value === categoryId) return
+    selectedCategory.value = categoryId
     currentPage.value = 1
-    try {
-        await loadFolderData(false, categoryId, true)
-    } finally {
-        if (pendingFolderCategoryId.value === categoryId) pendingFolderCategoryId.value = undefined
-    }
+    applyFolderLocation(categoryId)
 }
 
 const handleMovePrompt = async (prompt: PromptWithRelations, targetCategoryId: number | null) => {
@@ -1317,14 +1316,13 @@ const toggleAdvancedFilter = () => {
 
 // 清除所有筛选条件
 const clearAllFilters = () => {
-    const previousCategory = selectedCategory.value
     searchText.value = ''
     selectedTag.value = ''
     showFavoritesOnly.value = false
     if (viewMode.value === 'tree') {
         currentPage.value = 1
-        if (previousCategory === null) loadFolderData(false, null)
-        else loadFolderData(false, null, true)
+        selectedCategory.value = null
+        loadFolderData(false)
         return
     }
     selectedCategory.value = null
@@ -1550,21 +1548,55 @@ const loadStatistics = async () => {
     }
 }
 
+const reloadRealtimeData = async (showLoading = false) => {
+    await loadCategories(false)
+    if (viewMode.value === 'table') {
+        await Promise.all([loadPromptsForTable(showLoading), loadStatistics()])
+    } else if (viewMode.value === 'tree') {
+        await loadFolderData(showLoading)
+    } else {
+        await loadPrompts(true, showLoading)
+    }
+}
+
+const runRealtimeRefresh = (showLoading = false): Promise<void> => {
+    realtimeRefreshPending = true
+    if (realtimeRefreshPromise) return realtimeRefreshPromise
+
+    realtimeRefreshPromise = (async () => {
+        try {
+            do {
+                realtimeRefreshPending = false
+                await reloadRealtimeData(showLoading)
+                showLoading = false
+            } while (realtimeRefreshPending)
+        } finally {
+            realtimeRefreshPromise = null
+        }
+    })()
+    return realtimeRefreshPromise
+}
+
+const scheduleRealtimeRefresh = () => {
+    realtimeRefreshPending = true
+    if (realtimeRefreshTimer) return
+
+    realtimeRefreshTimer = setTimeout(() => {
+        realtimeRefreshTimer = null
+        void runRealtimeRefresh()
+    }, 80)
+}
+
+const unsubscribeDataChanges = onDataChange(
+    ['prompts', 'categories', 'promptVariables'],
+    scheduleRealtimeRefresh,
+)
+
 // 组件挂载时加载数据
 onMounted(async () => {
     if (supportsGlobalShortcuts && window.electronAPI?.shortcuts) shortcutState.value = await window.electronAPI.shortcuts.getState()
     await waitForDatabase()
-    // 先加载统计信息和分类，确保 totalCount 有正确值
-    await loadStatistics()
-    await loadCategories()
-    // 然后根据初始视图模式选择正确的加载方法
-    if (viewMode.value === 'table') {
-        await loadPromptsForTable()
-    } else if (viewMode.value === 'tree') {
-        await loadFolderData(true)
-    } else {
-        await loadPrompts(true) // 初始加载
-    }
+    await runRealtimeRefresh(true)
 })
 
 // 图片处理函数
@@ -1650,6 +1682,8 @@ const hasValidImage = (prompt: PromptWithRelations) => {
 
 // 组件卸载时清理URL缓存
 onBeforeUnmount(() => {
+    unsubscribeDataChanges()
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
     // 清理所有创建的Blob URL
     imageUrlCache.forEach(url => {
         URL.revokeObjectURL(url);

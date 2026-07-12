@@ -165,7 +165,7 @@ class WindowManager {
 
     if (process.env.NODE_ENV === 'development') {
       // 开发环境：加载开发服务器页面
-      const rendererPort = process.argv[2];
+      const rendererPort = process.argv.find(argument => /^\d+$/.test(argument)) || process.argv[2];
       this.mainWindow.loadURL(`http://localhost:${rendererPort}`);
     } else {
       // 生产环境：加载打包后的静态文件

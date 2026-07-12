@@ -194,6 +194,14 @@ async function startElectron() {
         args.push(`--remote-debugging-port=${remoteDebuggingPort}`);
     }
 
+    const isolatedUserDataDirectory = process.env.AI_GIST_USER_DATA_DIR;
+    if (isolatedUserDataDirectory) {
+        const userDataDirectory = isWindowsPreview && isolatedUserDataDirectory.startsWith('/')
+            ? runCommand('wslpath', ['-w', isolatedUserDataDirectory])
+            : isolatedUserDataDirectory;
+        args.unshift(`--user-data-dir=${userDataDirectory}`);
+    }
+
     electronProcess = ChildProcess.spawn(executable, args, spawnOptions);
     electronProcessLocker = false;
 

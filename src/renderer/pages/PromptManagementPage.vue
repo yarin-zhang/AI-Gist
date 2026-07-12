@@ -98,6 +98,7 @@ import QuickOptimizationConfigModal from '@/components/ai/QuickOptimizationConfi
 import PromptList from '@/components/prompt-management/PromptList.vue'
 import { api } from '@/lib/api'
 import { useDatabase } from '@/composables/useDatabase'
+import { onDataChange } from '@/lib/services/data-change-events'
 
 const emit = defineEmits<{
     'navigate-to-ai-config': []
@@ -126,6 +127,9 @@ const modalWorkspaceRef = ref<any>()
 const creationModalRef = ref<any>()
 const promptListRef = ref<any>()
 const promptDrafts = ref<Record<number, Record<string, any>>>({})
+let workspaceRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let workspaceRefreshPending = false
+let workspaceRefreshPromise: Promise<void> | null = null
 type PromptDisplayMode = 'workspace' | 'grid' | 'table' | 'tree'
 const storedDisplayMode = localStorage.getItem('prompt_display_mode') as PromptDisplayMode | null
 const displayMode = ref<PromptDisplayMode>(storedDisplayMode || 'workspace')
@@ -158,10 +162,10 @@ const loadCategories = async () => {
     categories.value = result || []
 }
 
-const loadWorkspaceData = async () => {
-    loading.value = true
+const loadWorkspaceData = async (showLoading = true) => {
+    if (showLoading) loading.value = true
     await Promise.all([loadPrompts(), loadCategories()])
-    loading.value = false
+    if (showLoading) loading.value = false
 }
 
 const restoreSelection = () => {
@@ -173,6 +177,58 @@ const restoreSelection = () => {
         workspaceMode.value = 'use'
     }
 }
+
+const reconcileSelection = () => {
+    const current = selectedPrompt.value
+    if (current) {
+        const refreshed = prompts.value.find(item => item.id === current.id)
+            || prompts.value.find(item => item.uuid === current.uuid)
+        if (refreshed) {
+            if (workspaceMode.value !== 'edit' || !hasUnsavedChanges()) {
+                selectedPrompt.value = refreshed
+            }
+            return
+        }
+        if (workspaceMode.value === 'edit' && hasUnsavedChanges()) return
+        selectedPrompt.value = null
+        workspaceMode.value = 'use'
+    }
+    restoreSelection()
+}
+
+const runWorkspaceRefresh = (showLoading = false): Promise<void> => {
+    workspaceRefreshPending = true
+    if (workspaceRefreshPromise) return workspaceRefreshPromise
+
+    workspaceRefreshPromise = (async () => {
+        try {
+            do {
+                workspaceRefreshPending = false
+                await loadWorkspaceData(showLoading)
+                reconcileSelection()
+                showLoading = false
+            } while (workspaceRefreshPending)
+        } finally {
+            workspaceRefreshPromise = null
+        }
+    })()
+    return workspaceRefreshPromise
+}
+
+const scheduleWorkspaceRefresh = () => {
+    workspaceRefreshPending = true
+    if (workspaceRefreshTimer) return
+
+    workspaceRefreshTimer = setTimeout(() => {
+        workspaceRefreshTimer = null
+        void runWorkspaceRefresh(false)
+    }, 80)
+}
+
+const unsubscribeDataChanges = onDataChange(
+    ['prompts', 'categories', 'promptVariables'],
+    scheduleWorkspaceRefresh,
+)
 
 const confirmDiscardChanges = () => new Promise<boolean>((resolve) => {
     if (!hasUnsavedChanges()) {
@@ -399,11 +455,14 @@ defineExpose({
 onMounted(async () => {
     window.addEventListener('beforeunload', handleBeforeUnload)
     await waitForDatabase()
-    await loadWorkspaceData()
-    restoreSelection()
+    await runWorkspaceRefresh(true)
 })
 
-onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+    unsubscribeDataChanges()
+    if (workspaceRefreshTimer) clearTimeout(workspaceRefreshTimer)
+})
 
 watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', String(size)))
 </script>
@@ -454,5 +513,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
     .prompt-command-bar { grid-template-columns: auto 1fr auto; gap: 12px; }
     .page-subtitle, .view-switcher-item span, .page-actions .action-label { display: none; }
     .view-switcher-item { width: 32px; justify-content: center; padding: 0; }
+    .page-actions :deep(.n-button) { width: 32px; padding: 0; }
+    .page-actions :deep(.n-button__icon) { margin: 0; }
 }
 </style>

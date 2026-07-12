@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { AlertTriangle, Clock, Cloud, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
+import { AlertTriangle, CircleCheck, Clock, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
@@ -23,8 +23,9 @@ const emit = defineEmits<{
 const visualState = computed(() => {
   if (status.value.status === 'syncing') return 'syncing';
   if (status.value.status === 'error') return 'error';
-  if (status.value.status === 'scheduled') return 'scheduled';
+  if (status.value.status === 'scheduled' && status.value.pendingChanges) return 'scheduled';
   if (status.value.lastResult?.success || status.value.lastSyncAt) return 'success';
+  if (status.value.status === 'scheduled') return 'scheduled';
   return 'idle';
 });
 
@@ -32,15 +33,15 @@ const statusIcon = computed(() => {
   if (visualState.value === 'syncing') return Refresh;
   if (visualState.value === 'scheduled') return Clock;
   if (visualState.value === 'error') return AlertTriangle;
-  if (visualState.value === 'success') return Cloud;
+  if (visualState.value === 'success') return CircleCheck;
   return CloudOff;
 });
 
 const primaryText = computed(() => {
   if (status.value.status === 'syncing') return '正在同步';
   if (status.value.status === 'error') return '同步遇到问题';
-  if (status.value.status === 'scheduled') return '等待下次同步';
-  if (status.value.lastResult?.success) return '云同步正常';
+  if (visualState.value === 'scheduled') return '等待下次同步';
+  if (visualState.value === 'success') return '云同步正常';
   return '云同步待机';
 });
 
@@ -49,11 +50,15 @@ const detailText = computed(() => {
     return getFriendlyCloudSyncError(status.value.error);
   }
 
-  if (status.value.lastResult?.success) {
+  if (visualState.value === 'success' && status.value.lastResult?.success) {
     return getCloudSyncResultMessage(status.value.lastResult.action);
   }
 
-  if (status.value.status === 'scheduled') {
+  if (visualState.value === 'success') {
+    return '本机与云端数据已同步';
+  }
+
+  if (visualState.value === 'scheduled') {
     return '应用会在同步周期到达后检查云端变化';
   }
 

@@ -12,6 +12,7 @@ import os from 'os'
 
 export interface WebDAVServerOptions {
   port?: number
+  host?: string
   username?: string
   password?: string
   rootDir?: string
@@ -54,10 +55,12 @@ export class TestWebDAVServer {
   readonly rootDir: string
   private username: string
   private password: string
+  private host: string
   readonly port: number
 
   constructor(opts: WebDAVServerOptions = {}) {
     this.port     = opts.port     ?? 18765
+    this.host     = opts.host     ?? '127.0.0.1'
     this.username = opts.username ?? 'testuser'
     this.password = opts.password ?? 'testpass'
     this.rootDir  = opts.rootDir  ?? fs.mkdtempSync(path.join(os.tmpdir(), 'ai-gist-webdav-'))
@@ -69,7 +72,7 @@ export class TestWebDAVServer {
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.server.once('error', reject)
-      this.server.listen(this.port, '127.0.0.1', () => resolve())
+      this.server.listen(this.port, this.host, () => resolve())
     })
   }
 

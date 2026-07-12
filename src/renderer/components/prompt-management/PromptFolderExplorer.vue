@@ -81,7 +81,11 @@
                         @dragleave="handleDragLeave($event, `category-${category.id}`)"
                         @drop="handleDrop($event, category.id || null)">
                         <div class="folder-icon" :style="{ color: category.color || 'var(--content-secondary)' }">
-                            <NIcon size="58"><Folder /></NIcon>
+                            <svg class="asset-glyph folder-glyph" viewBox="0 0 72 72" aria-hidden="true"
+                                focusable="false">
+                                <path d="M11 24v-1.5a6 6 0 0 1 6-6h11.7a6 6 0 0 1 4.35 1.87l4.7 4.95a4 4 0 0 0 2.9 1.25H55a6 6 0 0 1 6 6V52a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6V24z"
+                                    fill="currentColor" fill-opacity=".08" stroke="currentColor" />
+                            </svg>
                         </div>
                         <NText strong class="folder-item-name">{{ category.name }}</NText>
                         <NText depth="3" class="folder-item-meta">
@@ -100,10 +104,24 @@
                         @keydown.space.prevent="selectItem(`prompt-${prompt.id}`)"
                         @dragstart="handleDragStart($event, prompt)" @dragend="handleDragEnd">
                         <div class="prompt-file-icon" aria-hidden="true">
-                            <span class="prompt-file-fold" />
-                            <span class="prompt-file-lines">
-                                <span v-for="line in getSkeletonLines(prompt.content)" :key="line.key"
-                                    class="prompt-file-line" :style="{ width: `${line.width}%` }" />
+                            <svg class="asset-glyph prompt-file-glyph" viewBox="0 0 72 72" focusable="false">
+                                <path d="M21 9.5h20.5L54 22v34a6.5 6.5 0 0 1-6.5 6.5h-26A6.5 6.5 0 0 1 15 56V16a6.5 6.5 0 0 1 6-6.5z"
+                                    fill="currentColor" fill-opacity=".055" stroke="currentColor" />
+                                <path d="M41.5 9.5v8.7a4.3 4.3 0 0 0 4.3 4.3H54" fill="none"
+                                    stroke="currentColor" />
+                                <line v-for="line in getSkeletonLines(prompt.content)" :key="line.key" x1="24"
+                                    :x2="24 + line.width * 0.27" :y1="line.y" :y2="line.y"
+                                    stroke="currentColor" />
+                            </svg>
+                            <span v-if="getPromptImages(prompt).length" class="prompt-file-attachments">
+                                <img v-for="(image, imageIndex) in getPromptImages(prompt).slice(0, 3)"
+                                    :key="`${prompt.id}-attachment-${imageIndex}`" class="prompt-file-attachment"
+                                    :src="resolveImageUrl(image)" alt="" draggable="false"
+                                    :style="getAttachmentStyle(imageIndex, Math.min(getPromptImages(prompt).length, 3))"
+                                    @error="handleAttachmentImageError" />
+                                <span v-if="getPromptImages(prompt).length > 1" class="prompt-file-attachment-count">
+                                    {{ getPromptImages(prompt).length }}
+                                </span>
                             </span>
                         </div>
                         <NText strong class="folder-item-name prompt-file-name">{{ prompt.title }}</NText>
@@ -136,7 +154,6 @@ import {
     DotsVertical,
     Edit,
     Eye,
-    Folder,
     FolderOff,
     Folders,
     Keyboard,
@@ -157,6 +174,7 @@ interface Props {
     globalResults?: boolean
     movingPromptId?: number | null
     supportsGlobalShortcuts?: boolean
+    resolveImageUrl: (blob: Blob) => string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -228,11 +246,27 @@ const openPrompt = (prompt: PromptWithRelations) => {
 const getSkeletonLines = (content: string) => {
     const length = content?.trim().length || 0
     const count = length < 80 ? 2 : length < 240 ? 3 : length < 600 ? 4 : 5
-    const widths = [88, 72, 94, 64, 80]
+    const widths = [28, 82, 68, 88, 58]
     return widths.slice(0, count).map((width, index) => ({
         key: `${index}-${length}`,
         width: index === count - 1 ? Math.max(38, Math.min(88, 38 + (length % 51))) : width,
+        y: 31.5 + index * 8.4,
     }))
+}
+
+const getPromptImages = (prompt: PromptWithRelations) => Array.isArray(prompt.imageBlobs)
+    ? prompt.imageBlobs.filter((image): image is Blob => image instanceof Blob && image.size > 0)
+    : []
+
+const getAttachmentStyle = (index: number, visibleCount: number) => ({
+    left: `${index * 5}px`,
+    bottom: `${index * 3}px`,
+    zIndex: visibleCount - index,
+})
+
+const handleAttachmentImageError = (event: Event) => {
+    const target = event.currentTarget
+    if (target instanceof HTMLImageElement) target.style.display = 'none'
 }
 
 const getPromptOptions = (prompt: PromptWithRelations) => [
@@ -438,26 +472,29 @@ const handleDragEnd = () => {
 .folder-item.dragging .folder-item-actions { display: none; }
 
 .folder-icon { width: 76px; height: 82px; display: grid; place-items: center; }
+.asset-glyph { display: block; overflow: visible; stroke-width: 3.1; stroke-linecap: round; stroke-linejoin: round; shape-rendering: geometricPrecision; }
+.folder-glyph { width: 68px; height: 68px; color: inherit; }
 .folder-item-category > * { pointer-events: none; }
 .folder-item-name { width: 100%; min-width: 0; display: -webkit-box; overflow: hidden; text-align: center; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; font-size: 14px; line-height: 1.3; word-break: break-word; }
 .folder-item-meta { width: 100%; margin-top: 3px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 .prompt-file-icon {
     position: relative;
-    width: 58px;
-    height: 74px;
-    flex: 0 0 74px;
-    margin: 4px 0 4px;
-    overflow: hidden;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    background: var(--surface-primary);
+    width: 68px;
+    height: 78px;
+    flex: 0 0 78px;
+    display: grid;
+    place-items: center;
+    margin: 1px 0 3px;
+    color: var(--content-secondary);
 }
 
-.prompt-file-fold { position: absolute; top: -1px; right: -1px; width: 15px; height: 15px; overflow: hidden; background: var(--surface-secondary); clip-path: polygon(0 0, 100% 100%, 0 100%); }
-.prompt-file-fold::after { content: ''; position: absolute; top: 0; left: 0; width: 22px; height: 1px; background: var(--border-strong); transform: rotate(45deg); transform-origin: 0 0; }
-.prompt-file-lines { position: absolute; inset: 22px 10px 9px; display: flex; flex-direction: column; gap: 5px; }
-.prompt-file-line { height: 4px; flex: 0 0 4px; border-radius: var(--radius-control); background: var(--content-tertiary); opacity: .42; }
+.prompt-file-glyph { width: 66px; height: 72px; }
+.prompt-file-glyph line { opacity: .68; }
+.prompt-file-attachments { position: absolute; left: -4px; bottom: 2px; width: 42px; height: 34px; pointer-events: none; }
+.prompt-file-attachment { position: absolute; width: 27px; height: 27px; box-sizing: border-box; border: 2px solid var(--surface-primary); border-radius: var(--radius-control); object-fit: cover; background: var(--surface-secondary); }
+.prompt-file-attachment-count { position: absolute; right: 0; bottom: -2px; z-index: 5; min-width: 18px; height: 18px; display: grid; place-items: center; box-sizing: border-box; padding: 0 4px; border: 2px solid var(--surface-primary); border-radius: 999px; color: var(--content-primary); background: var(--surface-tertiary); font-size: 12px; font-weight: var(--font-weight-semibold); line-height: 1; font-variant-numeric: tabular-nums; }
+.folder-item:hover .prompt-file-icon, .folder-item.selected .prompt-file-icon { color: var(--content-primary); }
 .prompt-file-name { margin-top: 2px; }
 
 .folder-item-actions { position: absolute; top: 5px; right: 5px; opacity: 0; pointer-events: none; background: var(--surface-primary); }
