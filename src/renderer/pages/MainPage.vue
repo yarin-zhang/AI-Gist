@@ -105,9 +105,9 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 </script>
 
 <template>
-    <div style="height: 100vh; ">
-        <NLayout>
-            <NLayout has-sider style="height: 100%; ">
+    <div class="main-page-shell">
+        <div class="main-layout">
+            <NLayout has-sider class="main-layout-body">
                 <NLayoutSider bordered collapse-mode="width" :collapsed-width="56"
                     :collapsed="collapseRef" :width="240" :native-scrollbar="false">
                     <div class="main-sider-content">
@@ -133,7 +133,7 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                 </NLayoutSider>
 
                 <NLayout>
-                    <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 24px);">
+                    <NLayoutContent content-style="overflow-y: auto; height: 100%;">
                         <PromptManagementPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
@@ -141,14 +141,37 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                     </NLayoutContent>
                 </NLayout>
             </NLayout>
-            <NLayoutFooter bordered style="height: 24px; padding: 0;">
+            <NLayoutFooter bordered class="main-layout-footer">
                 <StatusBar @open-settings="handleOpenSettings" />
             </NLayoutFooter>
-        </NLayout>
+        </div>
     </div>
 </template>
 
 <style scoped>
+.main-page-shell,
+.main-layout {
+    width: 100%;
+    height: 100vh;
+    min-height: 0;
+}
+
+.main-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-layout-body {
+    flex: 1;
+    min-height: 0;
+}
+
+.main-layout-footer {
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+}
+
 .main-sider-content {
     height: 100%;
     min-height: 0;
@@ -172,6 +195,8 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 
 .main-sider-toggle {
     min-height: 48px;
+    flex: 0 0 48px;
+    margin-top: auto;
     display: flex;
     align-items: center;
     justify-content: center;

@@ -1,7 +1,7 @@
 <template>
     <div class="prompt-list">
         <!-- 搜索和过滤器 -->
-        <section class="prompt-filter-bar">
+        <section class="prompt-filter-bar ui-toolbar">
             <NFlex vertical :size="getCardSpacing()">
                 <NFlex wrap align="center" class="prompt-toolbar-row">
                     <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" class="prompt-search-input"
@@ -169,16 +169,18 @@
                     </div>
                 </div>
             </NFlex>
-        </section> <!-- 提示词列表 -->
-        <div v-if="initialLoading" style="text-align: center; padding: 40px;">
-            <NSpin size="large" />
-        </div>
-        <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) ||
-            (viewMode === 'tree' && treeData.length === 0) ||
-            (viewMode === 'table' && prompts.length === 0)" style="text-align: center; padding: 40px;">
-            <NEmpty :description="t('promptManagement.noPrompts')" />
-        </div>
-        <div v-else>
+        </section>
+
+        <div class="prompt-list-body">
+            <div v-if="initialLoading" class="prompt-list-state">
+                <NSpin size="large" />
+            </div>
+            <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) ||
+                (viewMode === 'tree' && treeData.length === 0) ||
+                (viewMode === 'table' && prompts.length === 0)" class="prompt-list-state">
+                <NEmpty :description="t('promptManagement.noPrompts')" />
+            </div>
+            <div v-else class="prompt-list-results">
             <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
             <div v-if="viewMode === 'table' && selectedRows.length > 0" class="batch-action-bar">
                 <NCard size="small">
@@ -209,7 +211,7 @@
             <div v-if="viewMode === 'tree'" class="data-view-surface folder-view-table">
                 <NDataTable :columns="redesignedTreeTableColumns" :data="treeData" :loading="initialLoading"
                     :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
-                    v-model:checked-row-keys="selectedRowKeys" :max-height="'calc(100vh - 250px)'" :scroll-x="900"
+                    v-model:checked-row-keys="selectedRowKeys" flex-height style="height: 100%" :scroll-x="900"
                     :row-props="getTreeRowProps"
                     :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" default-expand-all />
             </div>
@@ -218,12 +220,12 @@
             <div v-else-if="viewMode === 'table'" class="data-view-surface table-view-table">
                 <NDataTable :columns="redesignedTableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" :max-height="'calc(100vh - 250px)'" :scroll-x="980"
+                    :pagination="tablePagination" flex-height style="height: 100%" :scroll-x="980"
                     :row-props="getTableRowProps" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
-            <div v-else> <!-- 无限滚动容器 -->
+            <div v-else class="grid-scroll-region"> <!-- 无限滚动容器 -->
                 <NInfiniteScroll :distance="100" @load="handleLoadMore" :style="{ minHeight: '400px' }">
                     <div class="prompt-grid">
                         <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" size="small"
@@ -328,6 +330,7 @@
                         </div>
                     </template>
                 </NInfiniteScroll>
+            </div>
             </div>
         </div>
     </div>
@@ -602,7 +605,11 @@ const renderTagsCell = (prompt: PromptWithRelations) => {
     if (!tags.length) return '-'
     return h(NFlex, { size: 5, wrap: false, class: 'table-tags' }, {
         default: () => [
-            ...tags.slice(0, 2).map(tag => h(NTag, { size: 'small', bordered: false }, { default: () => tag })),
+            ...tags.slice(0, 2).map(tag => h(NTag, {
+                size: 'small',
+                bordered: false,
+                color: getTagColor(tag)
+            }, { default: () => tag })),
             ...(tags.length > 2
                 ? [h(NText, { depth: 3, class: 'table-tag-overflow' }, { default: () => `+${tags.length - 2}` })]
                 : [])
@@ -1232,6 +1239,7 @@ const redesignedTreeTableColumns = computed(() => {
         {
             title: titleFor('name', t('promptManagement.title')),
             key: 'name',
+            tree: true,
             width: 460,
             render: (row: TreeNode) => {
                 if (row.type === 'prompt') return renderPromptIdentity(row.data as PromptWithRelations)
@@ -1942,17 +1950,15 @@ defineExpose({
 .prompt-list {
     display: flex;
     flex-direction: column;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .prompt-filter-bar {
-    position: sticky;
-    top: 0;
-    z-index: 4;
+    flex: 0 0 auto;
     padding: var(--compact-padding);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-panel);
-    background: var(--surface-tertiary);
+    background: var(--surface-secondary);
 }
 
 .prompt-filter-bar :deep(.n-button),
@@ -1969,9 +1975,33 @@ defineExpose({
 .prompt-search-input { flex: 1 1 320px; min-width: 240px; }
 .prompt-sort-select { width: 164px; }
 .active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--border-default); color: var(--content-secondary); font-size: 12px; }
-.advanced-filter-panel { margin-top: 4px; padding: 10px 2px 2px; border-top: 1px solid var(--border-default); }
+.advanced-filter-panel { max-height: min(30vh, 260px); margin-top: 4px; padding: 10px 6px 2px 2px; overflow-y: auto; border-top: 1px solid var(--border-default); }
 .batch-action-bar { margin-top: 12px; }
 .batch-action-bar :deep(.n-card) { box-shadow: none; }
+
+.prompt-list-body,
+.prompt-list-results {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.prompt-list-state {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    padding: 40px;
+    text-align: center;
+}
+
+.grid-scroll-region {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
 
 .prompt-grid {
     display: grid;
@@ -2037,13 +2067,19 @@ defineExpose({
 .category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 
-.data-view-surface { margin-top: 12px; overflow: hidden; border-radius: var(--radius-panel); }
+.data-view-surface { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; overflow: hidden; border-radius: var(--radius-panel); }
+.data-view-surface :deep(.n-data-table) { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.data-view-surface :deep(.n-data-table-wrapper),
+.data-view-surface :deep(.n-data-table-base-table),
+.data-view-surface :deep(.n-data-table-base-table-body) { min-height: 0; }
+.data-view-surface :deep(.n-data-table-wrapper),
+.data-view-surface :deep(.n-data-table-base-table) { flex: 1 1 0; }
 .data-view-surface :deep(.n-data-table-th) { height: 40px; background: var(--surface-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
 .data-view-surface :deep(.n-data-table-td) { height: 58px; font-size: var(--font-size-base); }
 .data-view-surface :deep(.prompt-data-row) { cursor: pointer; }
 .data-view-surface :deep(.prompt-data-row:hover .n-data-table-td) { background: var(--interactive-hover); }
 .folder-view-table :deep(.folder-category-row .n-data-table-td) { height: 54px; background: var(--surface-secondary); }
-.data-view-surface :deep(.table-prompt-cell) { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.data-view-surface :deep(.table-prompt-cell) { width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 11px; vertical-align: middle; }
 .data-view-surface :deep(.table-prompt-thumbnail), .data-view-surface :deep(.table-prompt-placeholder) { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--radius-image); }
 .data-view-surface :deep(.table-prompt-placeholder) { display: grid; place-items: center; border: 1px solid var(--border-default); color: var(--content-secondary); background: var(--surface-secondary); }
 .data-view-surface :deep(.table-prompt-copy) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -2055,7 +2091,7 @@ defineExpose({
 .data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }
 .data-view-surface :deep(.table-tags .n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
 .data-view-surface :deep(.table-tag-overflow) { font-size: 12px; }
-.data-view-surface :deep(.folder-category-cell) { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.data-view-surface :deep(.folder-category-cell) { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 10px; vertical-align: middle; }
 .data-view-surface :deep(.folder-category-icon) { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
 .data-view-surface :deep(.folder-category-copy) { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .data-view-surface :deep(.folder-category-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }

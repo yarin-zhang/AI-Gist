@@ -444,7 +444,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
 .workspace-shell-split { flex: 1; min-width: 0; min-height: 0; }
 .workspace-resize-line { width: 1px; height: 100%; margin: 0 4px; background: var(--border-default); transition: width .12s ease, margin .12s ease, background-color .12s ease; }
 .workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { width: 3px; margin: 0 3px; background: var(--content-secondary); }
-.legacy-view-surface { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--page-padding); }
+.legacy-view-surface { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; padding: var(--page-padding); }
 
 @media (max-width: 1120px) {
     .prompt-command-bar { grid-template-columns: auto 1fr auto; gap: 12px; }

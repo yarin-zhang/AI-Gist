@@ -18,23 +18,26 @@
                     <NForm label-placement="top" class="variable-form">
                         <NFormItem v-for="variable in variables" :key="variable.name"
                             :label="variable.name" :required="variable.required"
-                            :validation-status="missingVariables.includes(variable.name) ? 'error' : undefined"
-                            :feedback="missingVariables.includes(variable.name) ? t('promptWorkspace.requiredValue') : undefined">
+                            :validation-status="showVariableError(variable.name) ? 'error' : undefined"
+                            :feedback="showVariableError(variable.name) ? t('promptWorkspace.requiredValue') : undefined">
                             <NSelect v-if="variable.type === 'select'" :value="draft[variable.name]"
                                 :options="getVariableOptions(variable)" clearable
                                 :placeholder="variable.placeholder || t('promptWorkspace.enterValue', { name: variable.name })"
-                                @update:value="updateValue(variable.name, $event)" />
+                                @update:value="updateValue(variable.name, $event)"
+                                @blur="markVariableTouched(variable.name)" />
                             <NInputNumber v-else-if="isNumberVariable(variable.type)"
                                 :value="draft[variable.name]" clearable style="width: 100%"
                                 :placeholder="variable.placeholder || t('promptWorkspace.enterValue', { name: variable.name })"
-                                @update:value="updateValue(variable.name, $event)" />
+                                @update:value="updateValue(variable.name, $event)"
+                                @blur="markVariableTouched(variable.name)" />
                             <NSwitch v-else-if="isBooleanVariable(variable.type)"
                                 :value="Boolean(draft[variable.name])"
                                 @update:value="updateValue(variable.name, $event)" />
                             <NInput v-else :value="stringValue(draft[variable.name])" type="textarea"
                                 :autosize="{ minRows: variable.type === 'textarea' ? 3 : 1, maxRows: 7 }"
                                 :placeholder="variable.placeholder || t('promptWorkspace.enterValue', { name: variable.name })"
-                                @update:value="updateValue(variable.name, $event)" />
+                                @update:value="updateValue(variable.name, $event)"
+                                @blur="markVariableTouched(variable.name)" />
                         </NFormItem>
                     </NForm>
                 </NScrollbar>
@@ -185,12 +188,17 @@ const runResult = ref('')
 const runError = ref('')
 const shouldStop = ref(false)
 const imageUrls = ref<string[]>([])
+const touchedVariables = ref<Set<string>>(new Set())
 
 const variables = computed<PromptVariable[]>(() => {
     return deriveWorkspaceVariables(props.prompt)
 })
 
 const missingVariables = computed(() => getMissingRequiredVariables(variables.value, props.draft))
+
+const showVariableError = (name: string) => (
+    touchedVariables.value.has(name) && missingVariables.value.includes(name)
+)
 
 const canUse = computed(() => Boolean(filledContent.value.trim()) && missingVariables.value.length === 0 && !renderError.value)
 
@@ -222,12 +230,18 @@ watch(() => props.prompt.id, () => {
     showAIRun.value = false
     runResult.value = ''
     runError.value = ''
+    touchedVariables.value = new Set()
     initializeDraft()
     loadHistory()
     updateImageUrls()
 }, { immediate: true })
 
 const updateValue = (name: string, value: any) => emit('update:draft', { ...props.draft, [name]: value })
+
+const markVariableTouched = (name: string) => {
+    if (touchedVariables.value.has(name)) return
+    touchedVariables.value = new Set([...touchedVariables.value, name])
+}
 
 const clearValues = () => {
     const next: Record<string, any> = {}

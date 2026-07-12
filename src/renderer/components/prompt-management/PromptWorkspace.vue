@@ -4,11 +4,6 @@
             <header class="workspace-header">
                 <div class="workspace-primary-row">
                     <div class="workspace-identity">
-                        <div class="workspace-breadcrumb">
-                            <span>{{ prompt?.category?.name || t('promptManagement.noCategory') }}</span>
-                            <span class="breadcrumb-separator">/</span>
-                            <span>{{ prompt?.isJinjaTemplate ? 'Jinja' : t('promptManagement.regularMode') }}</span>
-                        </div>
                         <div class="workspace-title-row">
                             <NText strong class="workspace-title">
                                 {{ prompt?.title || t('promptWorkspace.newPrompt') }}
@@ -55,7 +50,6 @@
                             @click="$emit('request-mode', 'edit')">
                             <NIcon size="16"><Edit /></NIcon>
                             <span>{{ t('promptManagement.edit') }}</span>
-                            <span v-if="mode === 'edit'" class="edit-status-dot" />
                         </button>
                     </div>
                     <div v-if="prompt" class="workspace-meta">
@@ -143,10 +137,8 @@ defineExpose({
 <style scoped>
 .prompt-workspace { flex: 1; min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; background: var(--surface-body); }
 .workspace-header { flex: 0 0 auto; border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
-.workspace-primary-row { min-height: 66px; padding: 10px var(--page-padding) 8px; display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
+.workspace-primary-row { min-height: 60px; padding: 9px var(--page-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
 .workspace-identity { min-width: 0; }
-.workspace-breadcrumb { display: flex; gap: 6px; margin-bottom: 2px; color: var(--content-secondary); font-size: 12px; }
-.breadcrumb-separator { opacity: .5; }
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .workspace-title { max-width: min(620px, 52vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
 .workspace-description { display: block; max-width: 660px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -160,7 +152,6 @@ defineExpose({
 .workspace-mode-tab.active { color: var(--accent-primary); font-weight: 500; }
 .workspace-mode-tab.active::after { background: var(--accent-primary); }
 .workspace-mode-tab:disabled { cursor: not-allowed; opacity: .45; }
-.edit-status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-warning); }
 .workspace-meta { height: 100%; display: flex; align-items: center; gap: 8px; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .meta-divider { width: 1px; height: 11px; background: var(--border-default); }
 .workspace-body { flex: 1; min-height: 0; overflow: hidden; }

@@ -106,6 +106,7 @@
                                                     tag
                                                     :max-tag-count="50"
                                                     :loading="loadingTags"
+                                                    :render-tag="renderPromptTag"
                                                 />
                                             </NFormItem>
                                         </NFlex>
@@ -411,8 +412,9 @@
                                                         t('promptManagement.tags') }}</NText>
                                                 <NFlex size="small" wrap>
                                                     <NTag
-                                                        v-for="tag in (typeof previewHistory.tags === 'string' ? previewHistory.tags.split(',').map(t => t.trim()).filter(t => t) : previewHistory.tags)"
-                                                        :key="tag" size="small">
+                                                        v-for="tag in getTagsArray(previewHistory.tags)"
+                                                        :key="tag" size="small" :bordered="false"
+                                                        :color="getTagColor(tag)">
                                                         {{ tag }}
                                                     </NTag>
                                                 </NFlex>
@@ -470,9 +472,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, reactive, h } from "vue";
 import { useI18n } from 'vue-i18n'
-import type { UploadFileInfo } from 'naive-ui'
+import type { SelectProps, UploadFileInfo } from 'naive-ui'
 import {
     NForm,
     NFormItem,
@@ -504,6 +506,7 @@ import {
 import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
+import { useTagColors } from "@/composables/useTagColors";
 import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
 import RegularPromptEditor from "@/components/prompt-management/RegularPromptEditor.vue";
@@ -542,6 +545,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const { t } = useI18n()
+const { getTagColor, getTagsArray } = useTagColors()
 const message = useMessage();
 const formRef = ref();
 const contentScrollbarRef = ref(); // 内容区域滚动条引用
@@ -603,6 +607,21 @@ const initialFormState = ref<any>(null);
 // 标签相关
 const tagOptions = ref<{ label: string; value: string }[]>([]);
 const loadingTags = ref(false);
+const renderPromptTag: NonNullable<SelectProps['renderTag']> = ({ option, handleClose }) => h(
+    NTag,
+    {
+        size: 'small',
+        bordered: false,
+        closable: !option.disabled,
+        color: getTagColor(String(option.value ?? option.label ?? '')),
+        onMousedown: (event: MouseEvent) => event.stopPropagation(),
+        onClose: (event: MouseEvent) => {
+            event.stopPropagation()
+            handleClose()
+        },
+    },
+    { default: () => String(option.value ?? option.label ?? '') }
+)
 
 // 表单数据
 const formData = ref<{
