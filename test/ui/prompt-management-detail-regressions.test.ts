@@ -37,13 +37,45 @@ describe('prompt management detail regressions', () => {
     expect(page).toContain('overflow: hidden')
   })
 
-  it('anchors the main sidebar toggle below the flexible menu region', () => {
+  it('anchors the main sidebar toggle to the bottom of the sidebar region', () => {
     const mainPage = readRendererFile('pages/MainPage.vue')
 
     expect(mainPage).toContain('<div class="main-layout">')
     expect(mainPage).toContain('class="main-layout-body"')
-    expect(mainPage).toMatch(/\.main-sider-menu\s*\{[^}]*flex:\s*1/s)
-    expect(mainPage).toMatch(/\.main-sider-toggle\s*\{[^}]*margin-top:\s*auto/s)
+    expect(mainPage).toContain('content-style="height: 100%;"')
+    expect(mainPage).toMatch(/\.main-sider-content\s*\{[^}]*display:\s*grid/s)
+    expect(mainPage).toMatch(/\.main-sider-content\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) 48px/s)
+    expect(mainPage).toMatch(/\.main-sider-brand\s*\{[^}]*grid-row:\s*1/s)
+    expect(mainPage).toMatch(/\.main-sider-menu\s*\{[^}]*grid-row:\s*2/s)
+    expect(mainPage).toMatch(/\.main-sider-menu\s*\{[^}]*overflow-y:\s*auto/s)
+    expect(mainPage).toMatch(/\.main-sider-toggle\s*\{[^}]*grid-row:\s*3/s)
+    expect(mainPage).toMatch(/\.main-sider-toggle\s*\{[^}]*box-sizing:\s*border-box/s)
+    expect(mainPage).not.toMatch(/\.main-sider-toggle\s*\{[^}]*position:\s*absolute/s)
+  })
+
+  it('keeps the workspace split drag gutter visually flush with both panes', () => {
+    const page = readRendererFile('pages/PromptManagementPage.vue')
+
+    expect(page).toContain(':resize-trigger-size="1"')
+    expect(page).toMatch(/n-split__resize-trigger-wrapper\)[^}]*background:\s*transparent/s)
+    expect(page).toMatch(/n-split__resize-trigger-wrapper\)::before[^}]*inset:\s*0 -4px/s)
+    expect(page).toMatch(/\.workspace-resize-line\s*\{[^}]*width:\s*1px/s)
+  })
+
+  it('allows the category pane to collapse to a single visible category row', () => {
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+
+    expect(sidebar).toContain('MIN_CATEGORY_PANE_HEIGHT = 82')
+    expect(sidebar).toContain(':max="librarySplitMax"')
+    expect(sidebar).toContain('new ResizeObserver(updateLibrarySplitBounds)')
+    expect(sidebar).not.toContain(':max="0.82"')
+  })
+
+  it('allows the active category filter to be clicked again to clear it', () => {
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+
+    expect(sidebar).toMatch(/key\.startsWith\('category:'\)\s*&&\s*activeFilter\.value\s*===\s*key/)
+    expect(sidebar).toMatch(/activeFilter\.value\s*=\s*'all'[\s\S]*?return/)
   })
 
   it('uses shared prompt-tag colors in list and edit surfaces', () => {

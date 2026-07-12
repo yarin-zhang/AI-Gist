@@ -1,13 +1,6 @@
 <template>
     <aside class="prompt-library">
         <div class="library-header">
-            <div class="library-title-row">
-                <div class="library-title-copy">
-                    <NText strong class="library-title">{{ t('promptWorkspace.library') }}</NText>
-                    <span class="library-count">{{ prompts.length }}</span>
-                </div>
-            </div>
-
             <NInput v-model:value="searchText" clearable size="small"
                 :placeholder="t('promptManagement.searchPrompt')">
                 <template #prefix><NIcon size="16"><Search /></NIcon></template>
@@ -24,8 +17,9 @@
                 </button>
         </div>
 
-        <NSplit v-model:size="librarySplitSize" direction="vertical" :min="0.45" :max="0.82"
-            :resize-trigger-size="9" class="library-split">
+        <NSplit ref="librarySplitRef" v-model:size="librarySplitSize" direction="vertical"
+            :min="MIN_PROMPT_PANE_RATIO" :max="librarySplitMax"
+            :resize-trigger-size="LIBRARY_RESIZE_TRIGGER_SIZE" class="library-split">
                 <template #1>
                     <section class="prompt-section">
                         <div class="result-heading">
@@ -154,6 +148,25 @@ const selectedIds = ref<number[]>([])
 const thumbnailUrlCache = new Map<Blob, string>()
 const storedSplitSize = Number(localStorage.getItem('prompt_library_split_size'))
 const librarySplitSize = ref(Number.isFinite(storedSplitSize) && storedSplitSize > 0 ? storedSplitSize : 0.7)
+const librarySplitRef = ref<{ $el?: HTMLElement } | null>(null)
+const librarySplitMax = ref('9999px')
+const MIN_PROMPT_PANE_RATIO = 0.45
+const MIN_CATEGORY_PANE_HEIGHT = 82
+const LIBRARY_RESIZE_TRIGGER_SIZE = 9
+let librarySplitResizeObserver: ResizeObserver | undefined
+
+const updateLibrarySplitBounds = () => {
+    const splitElement = librarySplitRef.value?.$el
+    if (!(splitElement instanceof HTMLElement)) return
+
+    const usableHeight = Math.max(0, splitElement.clientHeight - LIBRARY_RESIZE_TRIGGER_SIZE)
+    const maxPromptPaneHeight = Math.max(0, usableHeight - MIN_CATEGORY_PANE_HEIGHT)
+    librarySplitMax.value = `${maxPromptPaneHeight}px`
+
+    if (usableHeight === 0) return
+    const maxRatio = Math.max(MIN_PROMPT_PANE_RATIO, maxPromptPaneHeight / usableHeight)
+    if (librarySplitSize.value > maxRatio) librarySplitSize.value = maxRatio
+}
 
 const categoryCounts = computed(() => {
     const counts = new Map<number | undefined, number>()
@@ -252,6 +265,10 @@ const confirmBatchDelete = () => {
 }
 
 const selectNavigation = (key: string) => {
+    if (key.startsWith('category:') && activeFilter.value === key) {
+        activeFilter.value = 'all'
+        return
+    }
     activeFilter.value = key
 }
 
@@ -269,9 +286,19 @@ const handleSearchShortcut = (event: KeyboardEvent) => {
 
 watch(librarySplitSize, size => localStorage.setItem('prompt_library_split_size', String(size)))
 
-onMounted(() => window.addEventListener('keydown', handleSearchShortcut))
+onMounted(() => {
+    window.addEventListener('keydown', handleSearchShortcut)
+    requestAnimationFrame(() => {
+        const splitElement = librarySplitRef.value?.$el
+        if (!(splitElement instanceof HTMLElement)) return
+        updateLibrarySplitBounds()
+        librarySplitResizeObserver = new ResizeObserver(updateLibrarySplitBounds)
+        librarySplitResizeObserver.observe(splitElement)
+    })
+})
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleSearchShortcut)
+    librarySplitResizeObserver?.disconnect()
     thumbnailUrlCache.forEach(url => URL.revokeObjectURL(url))
     thumbnailUrlCache.clear()
 })
@@ -289,11 +316,7 @@ onBeforeUnmount(() => {
     border-right: 0;
 }
 
-.library-header { padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-.library-title-row { height: 26px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.library-title-copy { display: flex; align-items: center; min-width: 0; gap: 7px; }
-.library-title { font-size: 14px; letter-spacing: -.01em; }
-.library-count { min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0 7px; border: 1px solid var(--border-default); border-radius: 999px; color: var(--content-secondary); background: var(--surface-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.library-header { padding: 12px 12px 10px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .library-navigation { padding: 8px 8px 4px; }
 .library-split { flex: 1; min-height: 0; }
 .prompt-section, .category-section { height: 100%; min-height: 0; display: flex; flex-direction: column; }

@@ -29,7 +29,7 @@
         <div class="prompt-page-content">
             <template v-if="displayMode === 'workspace'">
                 <NSplit v-model:size="libraryPaneSize" direction="horizontal" min="220px" max="420px"
-                    :resize-trigger-size="9" class="workspace-shell-split">
+                    :resize-trigger-size="1" class="workspace-shell-split">
                     <template #1>
                         <PromptLibrarySidebar :prompts="prompts" :categories="categories"
                             :selected-id="selectedPrompt?.id" :loading="loading" @select="handleSelectPrompt"
@@ -442,8 +442,10 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
 .view-switcher-item.active { color: var(--content-primary); background: var(--surface-primary); font-weight: var(--font-weight-medium); }
 .prompt-page-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .workspace-shell-split { flex: 1; min-width: 0; min-height: 0; }
-.workspace-resize-line { width: 1px; height: 100%; margin: 0 4px; background: var(--border-default); transition: width .12s ease, margin .12s ease, background-color .12s ease; }
-.workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { width: 3px; margin: 0 3px; background: var(--content-secondary); }
+.workspace-shell-split :deep(.n-split__resize-trigger-wrapper) { position: relative; z-index: 2; overflow: visible; background: transparent; }
+.workspace-shell-split :deep(.n-split__resize-trigger-wrapper)::before { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
+.workspace-resize-line { width: 1px; height: 100%; background: var(--border-default); transition: background-color .12s ease; }
+.workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { background: var(--border-strong); }
 .legacy-view-surface { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; padding: var(--page-padding); }
 
 @media (max-width: 1120px) {

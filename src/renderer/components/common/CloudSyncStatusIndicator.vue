@@ -279,8 +279,13 @@ onUnmounted(() => {
   display: grid;
   width: 24px;
   height: 22px;
+  box-sizing: border-box;
+  flex: 0 0 24px;
   place-items: center;
+  padding: 0;
   color: var(--content-secondary);
+  line-height: 1;
+  appearance: none;
   background: var(--surface-primary);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -316,6 +321,7 @@ onUnmounted(() => {
 }
 
 .cloud-sync-icon {
+  display: block;
   width: 15px;
   height: 15px;
 }

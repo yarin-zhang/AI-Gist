@@ -72,10 +72,12 @@ const handleNavigateToAIConfig = async () => {
     }
 }
 
-const handleOpenSettings = (targetSection?: string) => {
+const handleOpenSettings = async (targetSection?: string) => {
+    // 先清空旧目标，确保在设置页内切换后重复点击同一入口仍会触发定位。
+    settingsTargetSection.value = undefined;
     currentView.value = 'settings'
-    // 设置目标设置区域
     if (targetSection) {
+        await nextTick();
         settingsTargetSection.value = targetSection;
     }
 };
@@ -109,7 +111,8 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
         <div class="main-layout">
             <NLayout has-sider class="main-layout-body">
                 <NLayoutSider bordered collapse-mode="width" :collapsed-width="56"
-                    :collapsed="collapseRef" :width="240" :native-scrollbar="false">
+                    :collapsed="collapseRef" :width="240" :native-scrollbar="false"
+                    content-style="height: 100%;">
                     <div class="main-sider-content">
                         <NFlex vertical align="center" justify="center" class="main-sider-brand" v-if="!collapseRef">
                             <NText strong>{{ t('mainPage.title') }}</NText>
@@ -175,12 +178,13 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 .main-sider-content {
     height: 100%;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) 48px;
     background: var(--surface-sidebar);
 }
 
 .main-sider-brand {
+    grid-row: 1;
     min-height: 58px;
     padding: 0 16px;
     border-bottom: 1px solid var(--border-default);
@@ -188,18 +192,20 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 }
 
 .main-sider-menu {
-    flex: 1;
+    grid-row: 2;
     min-height: 0;
     padding-top: var(--spacing-sm);
+    overflow-y: auto;
 }
 
 .main-sider-toggle {
-    min-height: 48px;
-    flex: 0 0 48px;
-    margin-top: auto;
+    grid-row: 3;
+    height: 48px;
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: var(--surface-sidebar);
     border-top: 1px solid var(--border-default);
 }
 </style>
