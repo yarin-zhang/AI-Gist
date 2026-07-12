@@ -1,5 +1,5 @@
 html.ai-gist-mobile {
-  --mobile-tabbar-height: 64px;
+  --mobile-tabbar-height: 56px;
   --mobile-page-gutter: 16px;
   --mobile-touch-target: 44px;
   --mobile-surface-border: var(--border-default);
@@ -62,7 +62,7 @@ html.ai-gist-mobile ion-tab-button {
 
 html.ai-gist-mobile ion-fab[vertical="bottom"][horizontal="end"] {
   right: var(--mobile-page-gutter);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height) + 12px);
 }
 
 html.ai-gist-mobile ion-fab-button {
