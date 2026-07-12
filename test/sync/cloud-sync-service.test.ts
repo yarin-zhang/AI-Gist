@@ -916,6 +916,35 @@ describe('CloudSyncService', () => {
     expect(diagnosis.copyText).toContain('401 Unauthorized')
   })
 
+  it('classifies Android WebDAV Failed to connect errors as transient network failures', async () => {
+    const { service, cloudClient } = createService(baseData)
+    cloudClient.getCloudSyncManifest.mockRejectedValue(new Error(
+      '读取云同步 manifest 失败，且备份副本不可用: ' +
+      'GET 请求失败: Failed to connect to /198.18.0.1:18765；' +
+      '备份副本错误: GET 请求失败: Failed to connect to /198.18.0.1:18765'
+    ))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual', platform: 'android' })
+    const diagnosis = getCloudSyncErrorDiagnosis(result, {
+      storageId: 'cfg-1',
+      reason: 'manual',
+      platform: 'android'
+    })
+
+    expect(result).toMatchObject({
+      success: false,
+      errorCode: 'REMOTE_NETWORK',
+      diagnostic: {
+        phase: 'read-remote',
+        retryClass: 'transient'
+      }
+    })
+    expect(diagnosis.title).toBe('无法连接到云存储')
+    expect(diagnosis.canAutoRetry).toBe(true)
+    expect(diagnosis.copyText).toContain('错误代码: REMOTE_NETWORK')
+    expect(diagnosis.copyText).toContain('重试类型: transient')
+  })
+
   it('fails sync when a saved manifest reads back the same revision with different data', async () => {
     const emptyManifest = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
     const { service, cloudClient, storage } = createService(baseData, emptyManifest)

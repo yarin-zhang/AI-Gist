@@ -3042,6 +3042,7 @@ function isCloudSyncNetworkError(error: string): boolean {
     error.includes('Network') ||
     error.includes('network') ||
     error.includes('fetch failed') ||
+    /failed to connect|connection (?:refused|reset)|connectexception|sockettimeoutexception|unknownhostexception/i.test(error) ||
     /\b(408|423|429|500|502|503|504|507)\b/.test(error) ||
     /temporar(?:y|ily)|临时|稍后重试/i.test(error)
   );
@@ -3325,7 +3326,7 @@ function isRecoverableCloudSyncManifestCorruption(error: unknown): boolean {
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  if (/401|403|Unauthorized|Forbidden|ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|TLS connection|socket disconnected|Network|network/i.test(message)) {
+  if (isCloudSyncAuthError(message) || isCloudSyncNetworkError(message)) {
     return false;
   }
 
