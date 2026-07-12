@@ -4,8 +4,6 @@
 
 # AI Gist
 
-> Desktop UI contributions must follow [AI_UI_DESIGN_PROMPT.md](docs/AI_UI_DESIGN_PROMPT.md).
-
 ![100% 本地数据](https://img.shields.io/badge/数据存储-100%25本地-success?style=flat&logo=database&logoColor=white) ![AI 支持](https://img.shields.io/badge/AI-支持多模型-blue?style=flat&logo=openai&logoColor=white) ![桌面端](https://img.shields.io/badge/桌面端-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white) ![移动端](https://img.shields.io/badge/移动端-Android%20%7C%20iOS-00A98F?style=flat&logo=capacitor&logoColor=white)
 
 ✨ AI Gist 是一款隐私优先的 AI 提示词管理工具，致力于让个人收藏的 AI 提示词能够发挥最大价值。现已覆盖 Windows / macOS / Linux 桌面端，并提供 Android APK 与 iOS App Store 版本，支持变量替换、Jinja 模板、AI 生成与调优、历史版本记录、云端备份等核心功能。
