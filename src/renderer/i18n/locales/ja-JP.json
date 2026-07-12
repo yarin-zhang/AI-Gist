@@ -1032,7 +1032,7 @@
     "discardChanges": "変更を破棄",
     "continueEditing": "編集を続ける",
     "fillVariables": "変数を入力",
-    "fillVariablesHint": "{count} 個の変数を入力すると、最終プロンプトがリアルタイムで生成されます",
+    "fillVariablesHint": "{count} 個の変数を入力すると、同じキャンバスで結果がリアルタイムに更新されます",
     "requiredValue": "必須変数を入力してください",
     "enterValue": "{name} を入力",
     "finalPrompt": "最終プロンプト",
@@ -1068,6 +1068,27 @@
     "folderView": "フォルダー",
     "collapseSidebar": "ライブラリを折りたたむ",
     "expandSidebar": "ライブラリを展開する"
+  },
+  "promptEditor": {
+    "viewMode": "編集ビュー", "visual": "変数ブロック", "source": "ソース",
+    "variableCount": "{count} 個の変数", "insertVariable": "変数を挿入", "insertAtCursor": "現在のカーソル位置に挿入",
+    "unclosedVariable": "閉じられていない変数構文が {count} 件あります", "variableTokenLabel": "変数 {name}、{count} 回使用",
+    "createVariable": "変数「{name}」を作成", "variables": "変数", "addVariable": "新しい変数",
+    "inUse": "本文内", "unused": "未使用", "notInserted": "未挿入", "noVariables": "本文に変数がありません",
+    "addFirstVariable": "最初の変数を作成", "unusedVariableHint": "この変数は本文で使用されていません",
+    "occurrenceCount": "本文で {count} 回使用", "deleteVariable": "変数を削除",
+    "confirmDeleteUnused": "この未使用の変数設定を削除しますか？", "confirmDeleteVariable": "この変数と本文内の {count} 箇所を削除しますか？", "confirmDeleteJinja": "この Jinja 変数設定を削除しますか？テンプレートソースは変更されません。",
+    "selectNeedsOption": "選択変数には少なくとも1つの選択肢が必要です", "inputPlaceholder": "入力ヒント",
+    "inputPlaceholderHint": "変数が空のときに表示するヒント", "description": "説明", "descriptionHint": "入力内容を理解するための説明",
+    "selectVariableHint": "変数を選択してプロパティを編集", "typeText": "1行テキスト", "typeTextarea": "長文",
+    "typeSelect": "選択", "typeNumber": "数値", "typeBoolean": "切り替え", "typeList": "リスト", "typeDict": "辞書",
+    "variableNameRequired": "変数名を入力してください", "variableNameInvalid": "名前に括弧や改行は使用できません",
+    "variableNameDuplicate": "変数名は重複できません", "defaultVariableName": "変数{index}",
+    "aiOptimize": "AI 最適化", "configureOptimization": "クイック最適化設定を管理"
+  },
+  "promptFill": {
+    "viewMode": "使用ビュー", "fill": "入力", "result": "最終結果",
+    "progress": "{filled}/{total} 入力済み", "liveResult": "リアルタイム結果"
   },
   "quickOptimization": {
     "addConfig": "設定を追加",

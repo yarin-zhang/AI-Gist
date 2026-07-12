@@ -1032,7 +1032,7 @@
     "discardChanges": "放弃更改",
     "continueEditing": "继续编辑",
     "fillVariables": "填写变量",
-    "fillVariablesHint": "填写 {count} 个变量，右侧会实时生成最终提示词",
+    "fillVariablesHint": "填写 {count} 个变量，结果会在同一画布中实时更新",
     "requiredValue": "请填写必填变量",
     "enterValue": "请输入 {name}",
     "finalPrompt": "最终提示词",
@@ -1068,6 +1068,27 @@
     "folderView": "文件夹",
     "collapseSidebar": "收起提示词库",
     "expandSidebar": "展开提示词库"
+  },
+  "promptEditor": {
+    "viewMode": "编辑视图", "visual": "变量块", "source": "源码",
+    "variableCount": "{count} 个变量", "insertVariable": "插入变量", "insertAtCursor": "插入到当前光标位置",
+    "unclosedVariable": "检测到 {count} 处未闭合的变量语法", "variableTokenLabel": "变量 {name}，共出现 {count} 次",
+    "createVariable": "创建变量“{name}”", "variables": "变量", "addVariable": "新建变量",
+    "inUse": "正文中", "unused": "未使用", "notInserted": "未插入", "noVariables": "正文中还没有变量",
+    "addFirstVariable": "创建第一个变量", "unusedVariableHint": "该变量尚未出现在正文中",
+    "occurrenceCount": "正文中出现 {count} 次", "deleteVariable": "删除变量",
+    "confirmDeleteUnused": "删除这个未使用的变量配置？", "confirmDeleteVariable": "删除该变量及正文中的 {count} 个位置？", "confirmDeleteJinja": "删除这个 Jinja 变量配置？模板源码不会被修改。",
+    "selectNeedsOption": "选择变量至少需要一个选项", "inputPlaceholder": "填写提示",
+    "inputPlaceholderHint": "变量为空时显示的提示", "description": "说明", "descriptionHint": "帮助使用者理解应该填写什么",
+    "selectVariableHint": "选择一个变量以编辑属性", "typeText": "单行文本", "typeTextarea": "长文本",
+    "typeSelect": "选择", "typeNumber": "数字", "typeBoolean": "开关", "typeList": "列表", "typeDict": "字典",
+    "variableNameRequired": "请输入变量名称", "variableNameInvalid": "名称不能包含花括号或换行",
+    "variableNameDuplicate": "变量名称不能重复", "defaultVariableName": "变量{index}",
+    "aiOptimize": "AI 优化", "configureOptimization": "管理快速优化配置"
+  },
+  "promptFill": {
+    "viewMode": "使用视图", "fill": "填写", "result": "最终结果",
+    "progress": "已填写 {filled}/{total}", "liveResult": "实时结果"
   },
   "quickOptimization": {
     "addConfig": "添加配置",

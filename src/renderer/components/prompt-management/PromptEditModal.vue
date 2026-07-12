@@ -47,7 +47,8 @@
                     <!-- 补充信息 Tab -->
                     <NTabPane name="info" :tab="t('promptManagement.info')">
                         <NSplit direction="horizontal" :style="{ height: `${contentHeight - 50}px` }"
-                            :default-size="0.6" :min="0.3" :max="0.8" :disabled="modalWidth <= 800">
+                            :default-size="0.6" :min="0.3" :max="0.8" :resize-trigger-size="20"
+                            :disabled="modalWidth <= 800" class="edit-info-split">
                             <!-- 左侧：基本信息 -->
                             <template #1>
                                 <NCard :title="t('promptManagement.basicInfo')" size="small" class="edit-info-panel"
@@ -85,6 +86,10 @@
                                         </NFlex>
                                     </NScrollbar>
                                 </NCard>
+                            </template>
+
+                            <template #resize-trigger>
+                                <div class="edit-info-resize-handle" aria-hidden="true" />
                             </template>
 
                             <!-- 右侧：分类与标签 -->
@@ -517,7 +522,7 @@ import type { PromptHistory } from "@/lib/db";
 import { jinjaService } from "@/lib/utils/jinja.service";
 
 // 统一变量类型定义
-type VariableType = 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'select';
+type VariableType = 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'textarea' | 'select' | 'number' | 'boolean';
 
 interface Variable {
     name: string;
@@ -526,6 +531,7 @@ interface Variable {
     defaultValue?: string;
     required: boolean;
     placeholder?: string;
+    description?: string;
 }
 
 interface Props {
@@ -678,6 +684,7 @@ const createComparableFormState = (includeVariables = true) => ({
             defaultValue: variable.defaultValue || "",
             required: variable.required !== false,
             placeholder: variable.placeholder || "",
+            description: variable.description || "",
         }))
         : undefined,
     isJinjaEnabled: isJinjaEnabled.value,
@@ -1584,6 +1591,7 @@ watch(
                         defaultValue: v.defaultValue || "",
                         required: v.required !== false,
                         placeholder: v.placeholder || "",
+                        description: v.description || "",
                     })) || [],
                 isJinjaTemplate: newPrompt.isJinjaTemplate || false,
                 imageBlobs: imageBlobs,
@@ -2024,6 +2032,7 @@ const handleSave = async () => {
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
+                    description: v.description || undefined,
                 }));
         } else {
             // 常规模式：使用表单中的变量
@@ -2041,6 +2050,7 @@ const handleSave = async () => {
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
+                    description: v.description || undefined,
                 }));
         }
 
@@ -2255,6 +2265,7 @@ const updateVariables = (newVariables: any[], source: "auto" | "user" = "user") 
                 newVar.required !== currentVar.required ||
                 newVar.defaultValue !== currentVar.defaultValue ||
                 newVar.placeholder !== currentVar.placeholder ||
+                newVar.description !== currentVar.description ||
                 JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options);
         });
 
@@ -2270,6 +2281,7 @@ const updateVariables = (newVariables: any[], source: "auto" | "user" = "user") 
         defaultValue: v.defaultValue,
         required: v.required,
         placeholder: v.placeholder,
+        description: v.description,
     })) as Variable[];
 
     // Editors may derive variables asynchronously after a prompt is opened. This is
@@ -2300,6 +2312,8 @@ defineExpose({
 .edit-workspace-tabs { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
 .edit-workspace-tabs :deep(> .n-tabs-nav) { flex: 0 0 auto; }
 .edit-workspace-tabs :deep(.n-tabs-pane-wrapper) { width: 100%; }
+.edit-info-split :deep(.n-split__resize-trigger-wrapper) { position: relative; background: transparent; }
+.edit-info-resize-handle { width: 100%; height: 100%; background: transparent; }
 
 .prompt-edit-embedded :deep(.modal-content) {
     padding-top: 8px !important;

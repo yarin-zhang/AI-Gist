@@ -128,39 +128,13 @@
           <NButton circle quaternary @click="backToSearch"><template #icon><NIcon><X /></NIcon></template></NButton>
         </NFlex>
       </template>
-      <NScrollbar class="variable-scrollbar">
-        <NForm label-placement="top">
-          <NFormItem
-            v-for="variable in activeVariables"
-            :key="variable.name"
-            :label="variable.name"
-            :required="variable.required"
-          >
-            <NSwitch v-if="variable.type === 'boolean' || variable.type === 'bool'" v-model:value="variableValues[variable.name]" />
-            <NInputNumber
-              v-else-if="['number', 'int', 'float'].includes(variable.type)"
-              v-model:value="variableValues[variable.name]"
-              style="width: 100%"
-            />
-            <NSelect
-              v-else-if="variable.type === 'select'"
-              v-model:value="variableValues[variable.name]"
-              :options="(variable.options || []).map(option => ({ label: option, value: option }))"
-            />
-            <NInput
-              v-else
-              v-model:value="variableValues[variable.name]"
-              :type="variable.type === 'textarea' ? 'textarea' : 'text'"
-              :placeholder="variable.placeholder || variable.description"
-            />
-          </NFormItem>
-        </NForm>
-      </NScrollbar>
+      <PromptFillCanvas v-if="activePrompt" ref="fillCanvasRef" :prompt="activePrompt"
+        :values="variableValues" compact @update:values="variableValues = $event" />
       <NAlert v-if="executionError" type="error" :show-icon="false">{{ executionError }}</NAlert>
       <template #footer>
         <NFlex justify="flex-end">
           <NButton @click="backToSearch">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :loading="executing" :disabled="missingRequired" @click="executeActivePrompt">
+          <NButton type="primary" :loading="executing" @click="executeActivePrompt">
             {{ desiredAction === 'paste' ? t('shortcuts.copyAndPaste') : t('shortcuts.copyPrompt') }}
           </NButton>
         </NFlex>
@@ -193,8 +167,8 @@
 <script setup lang="ts">
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import {
-  NAlert, NButton, NCard, NDivider, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput, NInputNumber,
-  NList, NListItem, NModal, NScrollbar, NSelect, NSwitch, NTag, NText, NThing, type InputInst, type ScrollbarInst,
+  NAlert, NButton, NCard, NDivider, NEmpty, NFlex, NIcon, NInput,
+  NList, NListItem, NModal, NScrollbar, NTag, NText, NThing, type InputInst, type ScrollbarInst,
 } from 'naive-ui';
 import { FilePlus, FileText, Search, Settings, X } from '@vicons/tabler';
 import { useI18n } from 'vue-i18n';
@@ -210,6 +184,7 @@ import ShortcutBindingModal from './ShortcutBindingModal.vue';
 import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
 import { useTagColors } from '@/composables/useTagColors';
 import { recordPromptUsage } from '@/lib/utils/prompt-usage';
+import PromptFillCanvas from '@/components/prompt-management/PromptFillCanvas.vue';
 
 type PromptResult = { kind: 'prompt'; key: string; label: string; description: string; prompt: PromptWithRelations };
 type CommandResult = {
@@ -228,8 +203,8 @@ const query = ref('');
 const selectedIndex = ref(0);
 const mode = ref<'search' | 'variables'>('search');
 const activePrompt = ref<PromptWithRelations | null>(null);
-const activeVariables = computed(() => activePrompt.value ? getRuntimeVariables(activePrompt.value) : []);
 const variableValues = ref<Record<string, any>>({});
+const fillCanvasRef = ref<InstanceType<typeof PromptFillCanvas>>();
 const desiredAction = ref<ShortcutAction>('copy');
 const executing = ref(false);
 const executionError = ref('');
@@ -464,7 +439,11 @@ async function preparePrompt(prompt: PromptWithRelations, action: ShortcutAction
 }
 
 async function executeActivePrompt(): Promise<void> {
-  if (!activePrompt.value || missingRequired.value) return;
+  if (!activePrompt.value) return;
+  if (missingRequired.value) {
+    await fillCanvasRef.value?.validateAndFocus();
+    return;
+  }
   executing.value = true;
   executionError.value = '';
   try {
@@ -806,7 +785,13 @@ onBeforeUnmount(() => {
 .variable-card :deep(.n-card-content) {
   flex-direction: column;
   gap: var(--spacing-md);
-  padding: 0 var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  min-height: 0;
+}
+
+.variable-card :deep(.prompt-fill-canvas) {
+  flex: 1;
+  min-height: 0;
 }
 
 .variable-title {

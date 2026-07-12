@@ -1032,7 +1032,7 @@
     "discardChanges": "放棄變更",
     "continueEditing": "繼續編輯",
     "fillVariables": "填寫變數",
-    "fillVariablesHint": "填寫 {count} 個變數，右側會即時產生最終提示詞",
+    "fillVariablesHint": "填寫 {count} 個變數，結果會在同一畫布中即時更新",
     "requiredValue": "請填寫必填變數",
     "enterValue": "請輸入 {name}",
     "finalPrompt": "最終提示詞",
@@ -1068,6 +1068,27 @@
     "folderView": "資料夾",
     "collapseSidebar": "收合提示詞庫",
     "expandSidebar": "展開提示詞庫"
+  },
+  "promptEditor": {
+    "viewMode": "編輯檢視", "visual": "變數區塊", "source": "原始碼",
+    "variableCount": "{count} 個變數", "insertVariable": "插入變數", "insertAtCursor": "插入到目前游標位置",
+    "unclosedVariable": "偵測到 {count} 處未閉合的變數語法", "variableTokenLabel": "變數 {name}，共出現 {count} 次",
+    "createVariable": "建立變數「{name}」", "variables": "變數", "addVariable": "新增變數",
+    "inUse": "正文中", "unused": "未使用", "notInserted": "未插入", "noVariables": "正文中還沒有變數",
+    "addFirstVariable": "建立第一個變數", "unusedVariableHint": "此變數尚未出現在正文中",
+    "occurrenceCount": "正文中出現 {count} 次", "deleteVariable": "刪除變數",
+    "confirmDeleteUnused": "刪除此未使用的變數設定？", "confirmDeleteVariable": "刪除此變數及正文中的 {count} 個位置？", "confirmDeleteJinja": "刪除此 Jinja 變數設定？範本原始碼不會被修改。",
+    "selectNeedsOption": "選擇變數至少需要一個選項", "inputPlaceholder": "填寫提示",
+    "inputPlaceholderHint": "變數為空時顯示的提示", "description": "說明", "descriptionHint": "協助使用者理解應該填寫什麼",
+    "selectVariableHint": "選擇一個變數以編輯屬性", "typeText": "單行文字", "typeTextarea": "長文字",
+    "typeSelect": "選擇", "typeNumber": "數字", "typeBoolean": "開關", "typeList": "清單", "typeDict": "字典",
+    "variableNameRequired": "請輸入變數名稱", "variableNameInvalid": "名稱不能包含大括號或換行",
+    "variableNameDuplicate": "變數名稱不能重複", "defaultVariableName": "變數{index}",
+    "aiOptimize": "AI 優化", "configureOptimization": "管理快速優化設定"
+  },
+  "promptFill": {
+    "viewMode": "使用檢視", "fill": "填寫", "result": "最終結果",
+    "progress": "已填寫 {filled}/{total}", "liveResult": "即時結果"
   },
   "quickOptimization": {
     "addConfig": "添加配置",

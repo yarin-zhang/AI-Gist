@@ -76,7 +76,7 @@
             @updated="handleCategoriesUpdated" />
 
         <QuickOptimizationConfigModal :show="showQuickOptimizationModal"
-            @update:show="showQuickOptimizationModal = $event"
+            @update:show="handleQuickOptimizationModalShowUpdate"
             @configs-updated="handleQuickOptimizationConfigsUpdated" />
 
     </div>
@@ -424,6 +424,11 @@ const handleCategoriesUpdated = async () => {
 
 const handleQuickOptimizationConfigsUpdated = () => {
     activeWorkspaceRef()?.refreshQuickOptimizationConfigs?.()
+}
+
+const handleQuickOptimizationModalShowUpdate = (show: boolean) => {
+    showQuickOptimizationModal.value = show
+    if (!show) handleQuickOptimizationConfigsUpdated()
 }
 
 const handleListRefresh = async () => {

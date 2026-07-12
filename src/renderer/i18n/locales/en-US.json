@@ -1032,7 +1032,7 @@
     "discardChanges": "Discard changes",
     "continueEditing": "Continue editing",
     "fillVariables": "Fill variables",
-    "fillVariablesHint": "Fill {count} variables to build the final prompt in real time",
+    "fillVariablesHint": "Fill {count} variables and see the result update in the same canvas",
     "requiredValue": "This variable is required",
     "enterValue": "Enter {name}",
     "finalPrompt": "Final prompt",
@@ -1068,6 +1068,27 @@
     "folderView": "Folders",
     "collapseSidebar": "Collapse prompt library",
     "expandSidebar": "Expand prompt library"
+  },
+  "promptEditor": {
+    "viewMode": "Editor view", "visual": "Variable blocks", "source": "Source",
+    "variableCount": "{count} variables", "insertVariable": "Insert variable", "insertAtCursor": "Insert at the current cursor",
+    "unclosedVariable": "Found {count} unclosed variable placeholders", "variableTokenLabel": "Variable {name}, used {count} times",
+    "createVariable": "Create variable “{name}”", "variables": "Variables", "addVariable": "New variable",
+    "inUse": "In prompt", "unused": "Unused", "notInserted": "Not inserted", "noVariables": "This prompt has no variables yet",
+    "addFirstVariable": "Create first variable", "unusedVariableHint": "This variable is not currently used in the prompt",
+    "occurrenceCount": "Used {count} times in the prompt", "deleteVariable": "Delete variable",
+    "confirmDeleteUnused": "Delete this unused variable configuration?", "confirmDeleteVariable": "Delete this variable and its {count} prompt positions?", "confirmDeleteJinja": "Delete this Jinja variable configuration? The template source will not be changed.",
+    "selectNeedsOption": "A select variable needs at least one option", "inputPlaceholder": "Input placeholder",
+    "inputPlaceholderHint": "Hint shown when the variable is empty", "description": "Description", "descriptionHint": "Help people understand what to enter",
+    "selectVariableHint": "Select a variable to edit its properties", "typeText": "Single-line text", "typeTextarea": "Long text",
+    "typeSelect": "Select", "typeNumber": "Number", "typeBoolean": "Toggle", "typeList": "List", "typeDict": "Dictionary",
+    "variableNameRequired": "Enter a variable name", "variableNameInvalid": "Names cannot contain braces or line breaks",
+    "variableNameDuplicate": "Variable names must be unique", "defaultVariableName": "Variable {index}",
+    "aiOptimize": "AI optimize", "configureOptimization": "Manage quick optimization settings"
+  },
+  "promptFill": {
+    "viewMode": "Use view", "fill": "Fill", "result": "Final result",
+    "progress": "{filled}/{total} filled", "liveResult": "Live result"
   },
   "quickOptimization": {
     "addConfig": "Add Configuration",

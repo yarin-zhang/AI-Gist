@@ -14,11 +14,13 @@ describe('prompt management detail regressions', () => {
 
   it('does not show required-variable errors before a field has been touched', () => {
     const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
+    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
 
-    expect(useWorkspace).toContain('touchedVariables')
-    expect(useWorkspace).toContain('showVariableError(variable.name)')
-    expect(useWorkspace).toContain('@blur="markVariableTouched(variable.name)"')
-    expect(useWorkspace).not.toContain(':validation-status="missingVariables.includes(variable.name)')
+    expect(useWorkspace).toContain('<PromptFillCanvas')
+    expect(fillCanvas).toContain('const touched = ref(new Set<string>())')
+    expect(fillCanvas).toContain(':error="showError(segment.name)"')
+    expect(fillCanvas).toContain('@blur="markTouched(segment.name)"')
+    expect(fillCanvas).not.toContain(':error="missing.value.includes')
   })
 
   it('uses normal-flow filters and flex-height data tables', () => {
@@ -109,11 +111,11 @@ describe('prompt management detail regressions', () => {
     expect(editModal).toContain(':pane-style="workspacePaneStyle"')
     expect(editModal).toContain(':pane-wrapper-style="workspacePaneWrapperStyle"')
     expect(editModal).toMatch(/\.edit-workspace-tabs\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%[^}]*min-height:\s*0/s)
-    expect(regularEditor).toMatch(/\.prompt-editor-split\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
-    expect(regularEditor).toMatch(/\.editor-shell-panel :deep\(> \.n-card__content\)\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s)
-    expect(regularEditor).toContain('class="prompt-content-input"')
-    expect(regularEditor).toContain(':show-feedback="false"')
-    expect(regularEditor).toMatch(/\.prompt-content-field\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
+    expect(regularEditor).toContain('<StructuredPromptEditor')
+    expect(regularEditor).toContain('<VariableInspector')
+    expect(regularEditor).toMatch(/\.regular-editor-workspace\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
+    expect(regularEditor).toMatch(/\.editor-primary-column\s*\{[^}]*min-height:\s*0[^}]*display:\s*flex/s)
+    expect(regularEditor).toContain('new ResizeObserver')
     expect(regularEditor).not.toContain('contentHeight - 130')
   })
 
