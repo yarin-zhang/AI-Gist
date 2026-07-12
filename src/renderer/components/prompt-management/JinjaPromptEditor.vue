@@ -1,9 +1,10 @@
 <template>
     <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
-        :disabled="modalWidth <= 800">
+        :disabled="modalWidth <= 800" class="prompt-editor-split">
         <!-- 左侧：模板编辑区 -->
         <template #1>
-            <NCard :title="t('promptManagement.jinjaTemplate')" size="small" :style="{ height: '100%' }">
+            <NCard :title="t('promptManagement.jinjaTemplate')" size="small" :style="{ height: '100%' }"
+                class="editor-shell-panel editor-content-panel">
                 <template #header-extra>
                     <NTooltip placement="top">
                         <template #trigger>
@@ -137,7 +138,7 @@
 
         <!-- 右侧：Jinja变量配置区 -->
         <template #2>
-            <NCard size="small" :style="{ height: '100%' }">
+            <NCard size="small" :style="{ height: '100%' }" class="editor-shell-panel editor-variables-panel">
                 <template #header>
                     <NFlex justify="space-between" align="center">
                         <NText strong>{{ t('promptManagement.jinjaVariablesTitle') }}</NText>
@@ -179,7 +180,7 @@
 
                         <!-- 变量列表 -->
                         <div v-if="jinjaVariables.length > 0">
-                            <NCard v-for="(variable, index) in jinjaVariables" :key="index" size="small"
+                            <NCard v-for="(variable, index) in jinjaVariables" :key="index" size="small" class="variable-config-card"
                                 style="margin-bottom: 8px;">
                                 <template #header>
                                     <NFlex justify="space-between" align="center">
@@ -440,7 +441,7 @@ interface Props {
 
 interface Emits {
     (e: "update:content", value: string): void;
-    (e: "update:variables", variables: JinjaVariable[]): void;
+    (e: "update:variables", variables: JinjaVariable[], source?: "auto" | "user"): void;
     (e: "optimize-prompt", configId: number): void;
     (e: "stop-optimization"): void;
     (e: "open-quick-optimization-config"): void;
@@ -477,9 +478,11 @@ const templateValidation = ref<{ isValid: boolean; error?: string }>({ isValid: 
 
 // Jinja变量列表
 const jinjaVariables = ref<JinjaVariable[]>([]);
+const initializingJinjaVariables = ref(false);
 
 // 初始化变量列表
 const initializeJinjaVariables = () => {
+    initializingJinjaVariables.value = true;
     if (props.variables && props.variables.length > 0) {
         // 如果有传入的变量，使用传入的变量
         jinjaVariables.value = [...props.variables];
@@ -488,6 +491,9 @@ const initializeJinjaVariables = () => {
         const extractedVariables = extractVariablesFromContent();
         jinjaVariables.value = extractedVariables;
     }
+    nextTick(() => {
+        initializingJinjaVariables.value = false;
+    });
 };
 
 // 从模板内容中提取变量
@@ -738,9 +744,10 @@ watch(
     () => jinjaVariables.value,
     (newVariables) => {
         updatePreviewVariableValues();
+        const source = initializingJinjaVariables.value ? 'auto' : 'user';
         // 通知父组件变量已更新 - 使用 nextTick 避免递归更新
         nextTick(() => {
-            emit('update:variables', [...newVariables]);
+            emit('update:variables', [...newVariables], source);
         });
     },
     { deep: true }
@@ -755,4 +762,13 @@ defineExpose({
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.prompt-editor-split { background: var(--app-bg-color); }
+.editor-shell-panel { border: 0 !important; border-radius: 0 !important; background: var(--app-surface-color); }
+.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--app-border-color); }
+.editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: 14px; font-weight: 600; }
+.editor-shell-panel :deep(> .n-card__content) { padding: 14px 16px; }
+.variable-config-card { border-radius: 8px; box-shadow: none; }
+.variable-config-card :deep(.n-card-header__main) { font-size: 14px; }
+.prompt-editor-split :deep(.n-split-pane__split-bar) { background: var(--app-border-color); }
+</style>

@@ -473,7 +473,7 @@ ion-chip {
 
 .prompt-image {
   width: calc(50% - 4px);
-  border-radius: 8px;
+  border-radius: var(--app-image-radius);
   object-fit: cover;
   aspect-ratio: 1;
   background: var(--ion-color-light);
@@ -491,6 +491,6 @@ ion-chip {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--app-image-radius);
 }
 </style>

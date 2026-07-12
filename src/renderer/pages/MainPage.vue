@@ -10,13 +10,17 @@ import {
     MenuOption,
     NIcon,
     NFlex,
-    NText
+    NText,
+    NButton,
+    NTooltip
 } from 'naive-ui'
 import {
     Home as HomeIcon,
     Star as PromptIcon,
     Settings as SettingsIcon,
-    Diamonds as AIIcon
+    Diamonds as AIIcon,
+    ChevronLeft,
+    ChevronRight
 } from '@vicons/tabler'
 
 import SettingsPage from './SettingsPage.vue'
@@ -104,16 +108,27 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
     <div style="height: 100vh; ">
         <NLayout>
             <NLayout has-sider style="height: 100%; ">
-                <NLayoutSider bordered collapse-mode="width" :collapsed-width="64"
-                    @update:collapsed="collapseRef = $event" :default-collapsed="collapseRef" :width="260"
-                    show-trigger="bar">
-                    <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
-                        <NText strong style="font-size: 16px; ">
-                            {{ t('mainPage.title') }}
-                        </NText>
-                    </NFlex>
-                    <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
-                        :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
+                <NLayoutSider bordered collapse-mode="width" :collapsed-width="56"
+                    :collapsed="collapseRef" :width="240" :native-scrollbar="false">
+                    <div class="main-sider-content">
+                        <NFlex vertical align="center" justify="center" class="main-sider-brand" v-if="!collapseRef">
+                            <NText strong>{{ t('mainPage.title') }}</NText>
+                        </NFlex>
+                        <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
+                            :collapsed-width="56" :collapsed-icon-size="20" class="main-sider-menu" />
+                        <div class="main-sider-toggle">
+                            <NTooltip placement="right">
+                                <template #trigger>
+                                    <NButton quaternary circle size="small" @click="collapseRef = !collapseRef">
+                                        <template #icon>
+                                            <NIcon size="16"><ChevronRight v-if="collapseRef" /><ChevronLeft v-else /></NIcon>
+                                        </template>
+                                    </NButton>
+                                </template>
+                                {{ collapseRef ? t('promptWorkspace.expandSidebar') : t('promptWorkspace.collapseSidebar') }}
+                            </NTooltip>
+                        </div>
+                    </div>
                 </NLayoutSider>
 
                 <NLayout>
@@ -131,3 +146,33 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
         </NLayout>
     </div>
 </template>
+
+<style scoped>
+.main-sider-content {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-sider-brand {
+    min-height: 58px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--app-border-color);
+    font-size: var(--n-font-size, 14px);
+}
+
+.main-sider-menu {
+    flex: 1;
+    min-height: 0;
+    margin-top: 8px;
+}
+
+.main-sider-toggle {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid var(--app-border-color);
+}
+</style>

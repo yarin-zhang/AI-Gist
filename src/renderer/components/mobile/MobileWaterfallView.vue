@@ -210,6 +210,8 @@ onUnmounted(() => {
 .card-image-wrapper {
   width: 100%;
   line-height: 0;
+  border-radius: var(--app-image-radius);
+  overflow: hidden;
 }
 
 .card-image {
@@ -217,6 +219,7 @@ onUnmounted(() => {
   height: auto;
   display: block;
   object-fit: cover;
+  border-radius: var(--app-image-radius);
 }
 
 .card-content {

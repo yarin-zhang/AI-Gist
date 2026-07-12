@@ -1,10 +1,10 @@
 <template>
     <div class="prompt-list">
         <!-- 搜索和过滤器 -->
-        <NCard>
+        <section class="prompt-filter-bar">
             <NFlex vertical :size="getCardSpacing()">
-                <NFlex>
-                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" style="flex: 1"
+                <NFlex wrap align="center" class="prompt-toolbar-row">
+                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" class="prompt-search-input"
                         @input="handleSearch" clearable>
                         <template #prefix>
                             <NIcon>
@@ -13,8 +13,8 @@
                         </template>
                     </NInput>
                     <NSelect v-model:value="sortType" :options="sortOptions" :placeholder="t('promptManagement.sortBy')"
-                        style="width: 160px; margin-right: 8px" />
-                    <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
+                        class="prompt-sort-select" />
+                    <NButton secondary :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
                             <NIcon>
                                 <Tag />
@@ -22,7 +22,7 @@
                         </template>
                         {{ t('promptManagement.advancedFilter') }}
                     </NButton>
-                    <NButton :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
+                    <NButton secondary :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
                         <template #icon>
                             <NIcon>
                                 <Heart />
@@ -30,7 +30,7 @@
                         </template>
                         {{ t('promptManagement.favorites') }}
                     </NButton>
-                    <NButton @click="$emit('manage-categories')">
+                    <NButton secondary @click="$emit('manage-categories')">
                         <template #icon>
                             <NIcon>
                                 <Folder />
@@ -38,7 +38,7 @@
                         </template>
                         {{ t('promptManagement.categories') }}
                     </NButton>
-                    <NButtonGroup>
+                    <NButtonGroup v-if="!hideViewSwitcher">
                         <NButton :type="viewMode === 'grid' ? 'primary' : 'default'" @click="setViewMode('grid')">
                             <template #icon>
                                 <NIcon>
@@ -64,7 +64,7 @@
                 </NFlex>
                 <!-- 搜索提示信息 -->
                 <div v-if="searchText.trim() || selectedTag || selectedCategory || showFavoritesOnly"
-                    style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
+                    class="active-filter-summary">
                     <NFlex justify="space-between" align="center">
                         <NFlex align="center">
                             <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
@@ -92,7 +92,7 @@
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
-                <div v-if="showAdvancedFilter">
+                <div v-if="showAdvancedFilter" class="advanced-filter-panel">
                     <!-- 分类快捷筛选 -->
                     <div v-if="categories.length > 0" :style="{ padding: categoriesExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
@@ -169,7 +169,7 @@
                     </div>
                 </div>
             </NFlex>
-        </NCard> <!-- 提示词列表 -->
+        </section> <!-- 提示词列表 -->
         <div v-if="initialLoading" style="text-align: center; padding: 40px;">
             <NSpin size="large" />
         </div>
@@ -180,8 +180,8 @@
         </div>
         <div v-else>
             <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
-            <div v-if="viewMode === 'table' && selectedRows.length > 0" style="margin-bottom: 16px;">
-                <NCard>
+            <div v-if="viewMode === 'table' && selectedRows.length > 0" class="batch-action-bar">
+                <NCard size="small">
                     <NFlex justify="space-between" align="center">
                         <NText>{{ t('promptManagement.selectedPrompts', { count: selectedRows.length }) }}</NText>
                         <NFlex size="small">
@@ -206,28 +206,35 @@
             </div>
 
             <!-- 树形表格视图 -->
-            <div v-if="viewMode === 'tree'" style="margin-top: 16px;">
-                <NDataTable :columns="treeTableColumns" :data="treeData" :loading="initialLoading"
+            <div v-if="viewMode === 'tree'" class="data-view-surface folder-view-table">
+                <NDataTable :columns="redesignedTreeTableColumns" :data="treeData" :loading="initialLoading"
                     :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
-                    v-model:checked-row-keys="selectedRowKeys" :max-height="600" :scroll-x="1280"
+                    v-model:checked-row-keys="selectedRowKeys" :max-height="'calc(100vh - 250px)'" :scroll-x="900"
+                    :row-props="getTreeRowProps"
                     :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" default-expand-all />
             </div>
 
             <!-- 表格视图 -->
-            <div v-else-if="viewMode === 'table'" style="margin-top: 16px;">
-                <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
+            <div v-else-if="viewMode === 'table'" class="data-view-surface table-view-table">
+                <NDataTable :columns="redesignedTableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" :max-height="600" :scroll-x="1280" remote />
+                    :pagination="tablePagination" :max-height="'calc(100vh - 250px)'" :scroll-x="980"
+                    :row-props="getTableRowProps" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
             <div v-else> <!-- 无限滚动容器 -->
                 <NInfiniteScroll :distance="100" @load="handleLoadMore" :style="{ minHeight: '400px' }">
                     <div class="prompt-grid">
-                        <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
+                        <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" size="small"
                             @click="$emit('view', prompt)">
                             <template #header>
-                                <NText strong>{{ prompt.title }}</NText>
+                                <div class="prompt-card-title-block">
+                                    <NText strong class="prompt-card-title">{{ prompt.title }}</NText>
+                                    <NText depth="3" class="prompt-card-kind">
+                                        {{ prompt.isJinjaTemplate ? 'Jinja' : t('promptManagement.regularMode') }}
+                                    </NText>
+                                </div>
                             </template>
 
                             <template #header-extra>
@@ -262,54 +269,26 @@
                                 </NFlex>
                             </template>
 
-                            <!-- 描述和图片并排显示 -->
-                            <NFlex align="start" size="medium" style="min-height: 80px;">
+                            <NFlex align="center" size="medium" class="prompt-card-main">
                                 <!-- 左侧：描述或内容预览 -->
                                 <div style="flex: 1; min-width: 0;">
                                     <NText depth="3" v-if="prompt.description" class="description-text">
                                         {{ prompt.description }}
                                     </NText>
-                                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
+                                    <NText depth="3" v-if="!prompt.description"
                                         class="content-preview-text">
                                         {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                                     </NText>
                                 </div>
                                 
                                 <!-- 右侧：图片预览 -->
-                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;" @click.stop>
-                                    <NCarousel
-                                        autoplay
-                                        :show-dots="false"
-                                        :touchable="true"
-                                        mousewheel
-                                        v-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1"
-                                        direction="vertical"
-                                        dot-placement="bottom"
-                                        style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden;"
-                                        @click.stop
-                                    >
-                                        <NImage
-                                            v-for="(blob, index) in prompt.imageBlobs"
-                                            :key="index"
-                                            :src="getImageUrlFromBlob(blob)"
-                                            width="60"
-                                            height="60"
-                                            object-fit="cover"
-                                            style="border-radius: 6px;"
-                                            :preview-disabled="false"
-                                            :lazy="true"
-                                            @error="handleImageError"
-                                            fallback-src=""
-                                            @click.stop
-                                        />
-                                    </NCarousel>
+                                <div v-if="hasValidImage(prompt)" class="prompt-card-thumbnail" @click.stop>
                                     <NImage
-                                        v-else-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1"
                                         :src="getImageUrl(prompt.imageBlobs)"
-                                        width="60"
-                                        height="60"
+                                        width="72"
+                                        height="72"
                                         object-fit="cover"
-                                        style="border-radius: 6px;"
+                                        style="border-radius: var(--app-image-radius);"
                                         :preview-disabled="false"
                                         :lazy="true"
                                         @error="handleImageError"
@@ -320,45 +299,20 @@
                             </NFlex>
 
                             <template #footer>
-                                <NFlex justify="space-between" align="center">
-                                    <!-- 标签区域 -->
-                                    <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
+                                <div class="prompt-card-footer">
+                                    <div class="prompt-card-taxonomy">
                                         <NTag v-if="supportsGlobalShortcuts && shortcutBindingFor(prompt.uuid)" size="small" type="success" :bordered="false">
                                             <template #icon><NIcon><Keyboard /></NIcon></template>
                                             {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
                                         </NTag>
-                                        <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small"
-                                            type="info">
-                                            {{ t('promptManagement.variableCount', { count: prompt.variables.length })
-                                            }}
-                                        </NTag>
-                                        <NTag v-if="prompt.category" size="small"
-                                            :color="getCategoryTagColor(prompt.category)">
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Box />
-                                                </NIcon>
-                                            </template>
+                                        <span v-if="prompt.category" class="prompt-card-category">
+                                            <span class="category-color-dot" :style="{ background: prompt.category.color || 'var(--app-text-color-secondary)' }" />
                                             {{ prompt.category.name }}
-                                        </NTag>
-                                        <template v-if="prompt.tags">
-                                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small"
-                                                :bordered="false" :color="getTagColor(tag)"
-                                                :class="{ 'highlighted-tag': isTagMatched(tag) }">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Tag />
-                                                    </NIcon>
-                                                </template>
-                                                {{ tag }}
-                                            </NTag>
-                                        </template>
-                                    </NFlex>
-                                    <!-- 使用次数区域 -->
-                                    <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
-                                        {{ t('promptManagement.useCount', { count: prompt.useCount }) }}
-                                    </NText>
-                                </NFlex>
+                                        </span>
+                                        <span v-else class="prompt-card-category">{{ t('promptManagement.noCategory') }}</span>
+                                    </div>
+                                    <NText depth="3" class="prompt-card-date">{{ formatDate(prompt.updatedAt) }}</NText>
+                                </div>
                             </template>
                         </NCard>
                     </div>
@@ -424,7 +378,8 @@ import {
     Folder,
     List,
     GridDots,
-    Keyboard
+    Keyboard,
+    FileText
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
@@ -441,7 +396,18 @@ interface Emits {
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
     (e: 'manage-categories'): void
+    (e: 'view-mode-change', mode: 'grid' | 'table' | 'tree'): void
 }
+
+interface Props {
+    forcedViewMode?: 'grid' | 'table' | 'tree'
+    hideViewSwitcher?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    forcedViewMode: 'grid',
+    hideViewSwitcher: false,
+})
 
 // 树形数据结构类型
 interface TreeNode {
@@ -506,7 +472,7 @@ const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
 const tagsExpanded = ref(true) // 高级筛选开启时默认展开
 
 // 视图模式状态
-const viewMode = ref<'grid' | 'table' | 'tree'>('grid') // 'grid' | 'table' | 'tree'
+const viewMode = ref<'grid' | 'table' | 'tree'>(props.forcedViewMode) // 'grid' | 'table' | 'tree'
 
 // 表格多选相关状态
 const selectedRowKeys = ref<(string | number)[]>([])
@@ -585,6 +551,109 @@ const popularTags = computed(() => {
     return statistics.value.popularTags || []
 })
 
+const formatDate = (date: Date | string) => new Date(date).toLocaleDateString()
+
+const renderPromptThumbnail = (prompt: PromptWithRelations) => {
+    if (!hasValidImage(prompt)) {
+        return h('span', { class: 'table-prompt-placeholder' }, [
+            h(NIcon, { size: 17 }, { default: () => h(FileText) })
+        ])
+    }
+    return h(NImage, {
+        src: getImageUrl(prompt.imageBlobs),
+        width: 40,
+        height: 40,
+        objectFit: 'cover',
+        previewDisabled: true,
+        lazy: true,
+        onError: handleImageError,
+        fallbackSrc: '',
+        class: 'table-prompt-thumbnail'
+    })
+}
+
+const renderPromptIdentity = (prompt: PromptWithRelations) => h(
+    'div',
+    { class: 'table-prompt-cell' },
+    [
+        renderPromptThumbnail(prompt),
+        h('div', { class: 'table-prompt-copy' }, [
+            h(NText, { strong: true, class: 'table-prompt-title' }, { default: () => prompt.title }),
+            h(NText, { depth: 3, class: 'table-prompt-description' }, {
+                default: () => prompt.description || prompt.content?.slice(0, 90) || '-'
+            })
+        ])
+    ]
+)
+
+const renderCategoryCell = (prompt: PromptWithRelations) => {
+    if (!prompt.category) return h(NText, { depth: 3 }, { default: () => t('promptManagement.noCategory') })
+    return h('span', { class: 'table-category-cell' }, [
+        h('span', {
+            class: 'category-color-dot',
+            style: { background: prompt.category.color || 'var(--app-text-color-secondary)' }
+        }),
+        prompt.category.name
+    ])
+}
+
+const renderTagsCell = (prompt: PromptWithRelations) => {
+    const tags = getTagsArray(prompt.tags || '')
+    if (!tags.length) return '-'
+    return h(NFlex, { size: 5, wrap: false, class: 'table-tags' }, {
+        default: () => [
+            ...tags.slice(0, 2).map(tag => h(NTag, { size: 'small', bordered: false }, { default: () => tag })),
+            ...(tags.length > 2
+                ? [h(NText, { depth: 3, class: 'table-tag-overflow' }, { default: () => `+${tags.length - 2}` })]
+                : [])
+        ]
+    })
+}
+
+const renderRowActions = (prompt: PromptWithRelations) => h(NFlex, { size: 3, justify: 'end', wrap: false }, {
+    default: () => [
+        h(NButton, {
+            size: 'small', quaternary: true, circle: true,
+            onClick: (event: Event) => { event.stopPropagation(); handleCopyPrompt(prompt) }
+        }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Copy) }) }),
+        h(NButton, {
+            size: 'small', quaternary: true, circle: true,
+            type: prompt.isFavorite ? 'error' : 'default',
+            onClick: (event: Event) => { event.stopPropagation(); toggleFavorite(prompt.id!) }
+        }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Heart) }) }),
+        h(NDropdown, {
+            options: getPromptActions(prompt),
+            onSelect: (key: string) => handlePromptAction(key, prompt)
+        }, {
+            default: () => h(NButton, {
+                size: 'small', quaternary: true, circle: true,
+                onClick: (event: Event) => event.stopPropagation()
+            }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(DotsVertical) }) })
+        })
+    ]
+})
+
+const isInteractiveRowTarget = (event: MouseEvent) => {
+    const target = event.target
+    return target instanceof HTMLElement && Boolean(target.closest('button, a, input, .n-checkbox, .n-dropdown, .n-image'))
+}
+
+const getTableRowProps = (row: PromptWithRelations) => ({
+    class: 'prompt-data-row',
+    onClick: (event: MouseEvent) => {
+        if (!isInteractiveRowTarget(event)) emit('view', row)
+    }
+})
+
+const getTreeRowProps = (row: TreeNode) => ({
+    class: row.type === 'category' ? 'folder-category-row' : 'prompt-data-row folder-prompt-row',
+    onClick: (event: MouseEvent) => {
+        if (row.type === 'prompt' && !isInteractiveRowTarget(event)) {
+            emit('view', row.data as PromptWithRelations)
+        }
+    }
+})
+
 // 树形表格列定义
 const treeTableColumns = computed(() => [
     {
@@ -648,7 +717,7 @@ const treeTableColumns = computed(() => [
                             mousewheel: true,
                             direction: 'vertical',
                             dotPlacement: 'bottom',
-                            style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                            style: 'width: 50px; height: 50px; border-radius: var(--app-image-radius); overflow: hidden;'
                         },
                         {
                             default: () => prompt.imageBlobs!.map((blob: Blob, index: number) =>
@@ -659,7 +728,7 @@ const treeTableColumns = computed(() => [
                                         width: 50,
                                         height: 50,
                                         objectFit: 'cover',
-                                        style: 'border-radius: 4px;',
+                                        style: 'border-radius: var(--app-image-radius);',
                                         previewDisabled: false,
                                         lazy: true,
                                         onError: handleImageError,
@@ -677,7 +746,7 @@ const treeTableColumns = computed(() => [
                             width: 50,
                             height: 50,
                             objectFit: 'cover',
-                            style: 'border-radius: 4px;',
+                            style: 'border-radius: var(--app-image-radius);',
                             previewDisabled: false,
                             lazy: true,
                             onError: handleImageError,
@@ -925,7 +994,7 @@ const tableColumns = computed(() => [
                         mousewheel: true,
                         direction: 'vertical',
                         dotPlacement: 'bottom',
-                        style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                        style: 'width: 50px; height: 50px; border-radius: var(--app-image-radius); overflow: hidden;'
                     },
                     {
                         default: () => row.imageBlobs!.map((blob: Blob, index: number) =>
@@ -936,7 +1005,7 @@ const tableColumns = computed(() => [
                                     width: 50,
                                     height: 50,
                                     objectFit: 'cover',
-                                    style: 'border-radius: 4px;',
+                                    style: 'border-radius: var(--app-image-radius);',
                                     previewDisabled: false,
                                     lazy: true,
                                     onError: handleImageError,
@@ -954,7 +1023,7 @@ const tableColumns = computed(() => [
                         width: 50,
                         height: 50,
                         objectFit: 'cover',
-                        style: 'border-radius: 4px;',
+                        style: 'border-radius: var(--app-image-radius);',
                         previewDisabled: false,
                         lazy: true,
                         onError: handleImageError,
@@ -1154,6 +1223,96 @@ const tableColumns = computed(() => [
     }
 ])
 
+const redesignedTreeTableColumns = computed(() => {
+    const source = treeTableColumns.value
+    const titleFor = (key: string, fallback: string) => source.find(column => column.key === key)?.title || fallback
+    return [
+        { type: 'selection' as const, width: 42 },
+        {
+            title: titleFor('name', t('promptManagement.title')),
+            key: 'name',
+            width: 460,
+            render: (row: TreeNode) => {
+                if (row.type === 'prompt') return renderPromptIdentity(row.data as PromptWithRelations)
+                const category = row.data as CategoryWithRelations
+                return h('div', { class: 'folder-category-cell' }, [
+                    h('span', { class: 'folder-category-icon', style: { color: category.color } }, [
+                        h(NIcon, { size: 18 }, { default: () => h(Folder) })
+                    ]),
+                    h('div', { class: 'folder-category-copy' }, [
+                        h(NText, { strong: true }, { default: () => category.name }),
+                        h(NText, { depth: 3, class: 'folder-category-description' }, {
+                            default: () => category.description || t('promptManagement.categoryPromptCount', {
+                                count: category.prompts?.length || row.children?.length || 0
+                            })
+                        })
+                    ])
+                ])
+            }
+        },
+        {
+            title: titleFor('tags', t('promptManagement.tags')),
+            key: 'tags',
+            width: 210,
+            render: (row: TreeNode) => row.type === 'prompt'
+                ? renderTagsCell(row.data as PromptWithRelations)
+                : '-'
+        },
+        {
+            title: titleFor('updatedAt', t('promptManagement.update')),
+            key: 'updatedAt',
+            width: 120,
+            render: (row: TreeNode) => formatDate(row.data.updatedAt)
+        },
+        {
+            title: '',
+            key: 'actions',
+            width: 126,
+            render: (row: TreeNode) => row.type === 'prompt'
+                ? renderRowActions(row.data as PromptWithRelations)
+                : null
+        }
+    ]
+})
+
+const redesignedTableColumns = computed(() => {
+    const source = tableColumns.value
+    const titleFor = (key: string, fallback: string) => source.find(column => column.key === key)?.title || fallback
+    return [
+        { type: 'selection' as const, width: 42 },
+        {
+            title: titleFor('title', t('promptManagement.title')),
+            key: 'title',
+            width: 420,
+            render: renderPromptIdentity
+        },
+        {
+            title: titleFor('category', t('promptManagement.category')),
+            key: 'category',
+            width: 160,
+            render: renderCategoryCell
+        },
+        {
+            title: titleFor('tags', t('promptManagement.tags')),
+            key: 'tags',
+            width: 190,
+            render: renderTagsCell
+        },
+        {
+            title: titleFor('updatedAt', t('promptManagement.update')),
+            key: 'updatedAt',
+            width: 120,
+            render: (row: PromptWithRelations) => formatDate(row.updatedAt)
+        },
+        {
+            title: '',
+            key: 'actions',
+            width: 126,
+            render: renderRowActions
+        }
+    ]
+})
+
 // 加载树形数据
 const loadTreeData = async () => {
     try {
@@ -1228,6 +1387,7 @@ const loadPrompts = async (reset = true) => {
 // 切换视图模式
 const setViewMode = (mode: 'grid' | 'table' | 'tree') => {
     viewMode.value = mode
+    emit('view-mode-change', mode)
     // 切换到表格视图时清除选择并重新加载数据
     if (mode === 'table') {
         clearSelection()
@@ -1242,6 +1402,10 @@ const setViewMode = (mode: 'grid' | 'table' | 'tree') => {
         loadPrompts(true)
     }
 }
+
+watch(() => props.forcedViewMode, (mode) => {
+    if (mode !== viewMode.value) setViewMode(mode)
+})
 
 // 清除选择
 const clearSelection = () => {
@@ -1768,7 +1932,8 @@ defineExpose({
         }
     },
     loadCategories,
-    loadStatistics
+    loadStatistics,
+    setViewMode,
 })
 </script>
 
@@ -1776,24 +1941,115 @@ defineExpose({
 .prompt-list {
     display: flex;
     flex-direction: column;
+    min-height: 100%;
 }
+
+.prompt-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    padding: 10px 12px;
+    border: 1px solid var(--app-border-color);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--app-surface-color) 96%, transparent);
+    backdrop-filter: blur(10px);
+}
+
+.prompt-filter-bar :deep(.n-button),
+.prompt-filter-bar :deep(.n-input),
+.prompt-filter-bar :deep(.n-base-selection) {
+    font-size: 14px;
+}
+
+.prompt-filter-bar :deep(.n-button__icon) {
+    font-size: 16px;
+}
+
+.prompt-toolbar-row { gap: 8px !important; }
+.prompt-search-input { flex: 1 1 320px; min-width: 240px; }
+.prompt-sort-select { width: 164px; }
+.active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--app-border-color); color: var(--app-text-color-secondary); font-size: 12px; }
+.advanced-filter-panel { margin-top: 4px; padding: 10px 2px 2px; border-top: 1px solid var(--app-border-color); }
+.batch-action-bar { margin-top: 12px; }
+.batch-action-bar :deep(.n-card) { box-shadow: none; }
 
 .prompt-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 16px;
-    margin-top: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
 }
 
 .prompt-card {
-    transition: all 0.3s ease;
+    min-height: 176px;
+    border-radius: 8px;
+    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
     cursor: pointer;
+    box-shadow: none;
 }
 
 .prompt-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: color-mix(in srgb, var(--app-text-color-secondary) 42%, var(--app-border-color));
+    background: color-mix(in srgb, var(--app-surface-color) 96%, var(--app-bg-color));
+    box-shadow: 0 5px 16px rgba(15, 23, 42, .06);
 }
+
+.prompt-card :deep(.n-card-header) {
+    padding: 13px 13px 9px;
+}
+
+.prompt-card :deep(.n-card-header__main) {
+    font-size: 14px;
+    min-width: 0;
+}
+
+.prompt-card :deep(.n-card__content) {
+    padding: 10px 13px 12px;
+    font-size: 14px;
+}
+
+.prompt-card :deep(.n-card__footer) {
+    padding: 9px 13px 11px;
+    border-top: 1px solid color-mix(in srgb, var(--app-border-color) 72%, transparent);
+}
+
+.prompt-card :deep(.n-button__icon) {
+    font-size: 15px;
+}
+
+.prompt-card-title-block { min-width: 0; }
+.prompt-card-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.prompt-card-kind { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; }
+.prompt-card-main { min-height: 76px; }
+.prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--app-image-radius); }
+.prompt-card-footer { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.prompt-card-category, .table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--app-text-color-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+.prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.data-view-surface { margin-top: 12px; overflow: hidden; border: 1px solid var(--app-border-color); border-radius: 8px; background: var(--app-surface-color); }
+.data-view-surface :deep(.n-data-table-th) { height: 40px; background: color-mix(in srgb, var(--app-surface-color) 96%, var(--app-bg-color)); font-size: 12px; font-weight: 500; }
+.data-view-surface :deep(.n-data-table-td) { height: 58px; font-size: 14px; }
+.data-view-surface :deep(.prompt-data-row) { cursor: pointer; }
+.data-view-surface :deep(.prompt-data-row:hover .n-data-table-td) { background: var(--app-hover-color); }
+.folder-view-table :deep(.folder-category-row .n-data-table-td) { height: 54px; background: color-mix(in srgb, var(--app-surface-color) 94%, var(--app-bg-color)); }
+.data-view-surface :deep(.table-prompt-cell) { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.data-view-surface :deep(.table-prompt-thumbnail), .data-view-surface :deep(.table-prompt-placeholder) { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--app-image-radius); }
+.data-view-surface :deep(.table-prompt-placeholder) { display: grid; place-items: center; border: 1px solid var(--app-border-color); color: var(--app-text-color-secondary); background: var(--app-bg-color); }
+.data-view-surface :deep(.table-prompt-copy) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.data-view-surface :deep(.table-prompt-title) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.data-view-surface :deep(.table-prompt-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--app-text-color-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.data-view-surface :deep(.category-color-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+.data-view-surface :deep(.table-tags) { overflow: hidden; }
+.data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }
+.data-view-surface :deep(.table-tags .n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.data-view-surface :deep(.table-tag-overflow) { font-size: 12px; }
+.data-view-surface :deep(.folder-category-cell) { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.data-view-surface :deep(.folder-category-icon) { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border: 1px solid var(--app-border-color); border-radius: 7px; background: var(--app-bg-color); }
+.data-view-surface :deep(.folder-category-copy) { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.data-view-surface :deep(.folder-category-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 /* 高亮匹配的标签 */
 .highlighted-tag {
@@ -1811,10 +2067,15 @@ defineExpose({
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.4;
+    line-height: 1.5;
     max-height: calc(1.4em * 3);
     /* 限制最大高度为3行 */
     word-break: break-word;
+}
+
+@media (max-width: 900px) {
+    .prompt-sort-select { width: 140px; }
+    .prompt-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 }
 
 /* 轮播图样式 - 已移除，现在使用NImage组件 */

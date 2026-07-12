@@ -1,5 +1,9 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleCancel">
+    <CommonModal ref="modalRef" :show="show" :embedded="embedded"
+        :class="{ 'prompt-edit-embedded': embedded }"
+        :min-header-height="embedded ? 0 : 60" :header-default-height="embedded ? 0 : 80"
+        :footer-default-height="embedded ? 58 : 80" :content-padding="embedded ? 12 : 16"
+        @update:show="$emit('update:show', $event)" @close="handleCancel">
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical>
@@ -14,7 +18,8 @@
         <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
             <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top">
-                <NTabs v-model:value="activeTab" type="segment" :style="{ height: `${contentHeight}px` }">
+                <NTabs v-model:value="activeTab" :type="embedded ? 'line' : 'segment'"
+                    :style="{ height: `${contentHeight}px` }" class="edit-workspace-tabs">
                     <!-- 编辑 Tab -->
                     <NTabPane name="edit" :tab="t('promptManagement.edit')">
                         <!-- 常规模式编辑器 -->
@@ -43,7 +48,7 @@
                             :default-size="0.6" :min="0.3" :max="0.8" :disabled="modalWidth <= 800">
                             <!-- 左侧：基本信息 -->
                             <template #1>
-                                <NCard :title="t('promptManagement.basicInfo')" size="small"
+                                <NCard :title="t('promptManagement.basicInfo')" size="small" class="edit-info-panel"
                                     :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
@@ -82,7 +87,7 @@
 
                             <!-- 右侧：分类与标签 -->
                             <template #2>
-                                <NCard :title="t('promptManagement.categoryAndTags')" size="small"
+                                <NCard :title="t('promptManagement.categoryAndTags')" size="small" class="edit-info-panel"
                                     :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
@@ -112,7 +117,7 @@
 
                     <!-- 历史记录 Tab - 仅在编辑模式下显示 -->
                     <NTabPane v-if="isEdit" name="history" :tab="t('promptManagement.history')">
-                        <NCard :title="t('promptManagement.versionHistory')" size="small">
+                        <NCard :title="t('promptManagement.versionHistory')" size="small" class="edit-history-panel">
                             <NScrollbar :style="{ height: `${contentHeight - 150}px` }">
                                 <!-- 加载状态 -->
                                 <div v-if="loadingHistory"
@@ -194,7 +199,7 @@
                     <NFlex align="center" size="small">
                         <!-- 模式切换按钮 - 仅在编辑Tab时显示 -->
                         <NFlex v-if="activeTab === 'edit'" size="small">
-                            <NButton :type="!isJinjaEnabled ? 'primary' : 'default'" @click="switchToRegularMode"
+                            <NButton size="small" :type="!isJinjaEnabled ? 'primary' : 'default'" @click="switchToRegularMode"
                                 :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
@@ -203,7 +208,7 @@
                                 </template>
                                 {{ t('promptManagement.regularMode') }}
                             </NButton>
-                            <NButton :type="isJinjaEnabled ? 'primary' : 'default'" @click="switchToJinjaMode"
+                            <NButton size="small" :type="isJinjaEnabled ? 'primary' : 'default'" @click="switchToJinjaMode"
                                 :disabled="isStreaming || optimizing !== null">
                                 <template #icon>
                                     <NIcon>
@@ -223,8 +228,8 @@
                 <div>
                     <!-- 右侧区域 -->
                     <NFlex size="small">
-                        <NButton @click="handleCancel">{{ t('common.cancel') }}</NButton>
-                        <NButton type="primary" @click="handleSave" :loading="saving"
+                        <NButton size="small" @click="handleCancel">{{ t('common.cancel') }}</NButton>
+                        <NButton size="small" type="primary" @click="handleSave" :loading="saving"
                             :disabled="!formData.content.trim()">
                             {{ isEdit ? t('promptManagement.update') : t('promptManagement.create') }}
                         </NButton>
@@ -522,15 +527,18 @@ interface Props {
     show: boolean;
     prompt?: any;
     categories: any[];
+    embedded?: boolean;
 }
 
 interface Emits {
     (e: "update:show", value: boolean): void;
-    (e: "saved"): void;
+    (e: "saved", prompt?: any): void;
     (e: "open-quick-optimization-config"): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    embedded: false,
+});
 const emit = defineEmits<Emits>();
 
 const { t } = useI18n()
@@ -588,6 +596,9 @@ const DEBOUNCE_DELAY = 500; // 500ms 防抖延迟
 
 // 图片上传相关
 const imageFileList = ref<UploadFileInfo[]>([]);
+const initialFormSnapshot = ref("");
+const initialNonVariableSnapshot = ref("");
+const initialFormState = ref<any>(null);
 
 // 标签相关
 const tagOptions = ref<{ label: string; value: string }[]>([]);
@@ -613,6 +624,71 @@ const formData = ref<{
     isJinjaTemplate: false,
     imageBlobs: [],
 });
+
+const createComparableFormState = (includeVariables = true) => ({
+    title: formData.value.title,
+    description: formData.value.description,
+    content: formData.value.content,
+    categoryId: formData.value.categoryId ?? null,
+    tags: [...formData.value.tags].sort(),
+    variables: includeVariables
+        ? formData.value.variables.map(variable => ({
+            name: variable.name || "",
+            type: variable.type || "text",
+            options: Array.isArray(variable.options) ? variable.options.map(option => option || "") : [],
+            defaultValue: variable.defaultValue || "",
+            required: variable.required !== false,
+            placeholder: variable.placeholder || "",
+        }))
+        : undefined,
+    isJinjaEnabled: isJinjaEnabled.value,
+    images: (formData.value.imageBlobs || []).map(blob => ({
+        size: blob.size,
+        type: blob.type,
+    })),
+});
+
+const createFormSnapshot = () => JSON.stringify(createComparableFormState(true));
+const createNonVariableSnapshot = () => JSON.stringify(createComparableFormState(false));
+
+const hasUnsavedChanges = computed(() => {
+    if (isInitializing.value || !initialFormSnapshot.value) return false;
+    return createFormSnapshot() !== initialFormSnapshot.value;
+});
+
+const markFormClean = () => {
+    initialFormSnapshot.value = createFormSnapshot();
+    initialNonVariableSnapshot.value = createNonVariableSnapshot();
+    initialFormState.value = {
+        ...formData.value,
+        __isJinjaEnabled: isJinjaEnabled.value,
+        tags: [...formData.value.tags],
+        variables: formData.value.variables.map(variable => ({
+            ...variable,
+            options: variable.options ? [...variable.options] : undefined,
+        })),
+        imageBlobs: [...(formData.value.imageBlobs || [])],
+    };
+};
+
+const discardChanges = () => {
+    if (!initialFormState.value) return;
+    isInitializing.value = true;
+    formData.value = {
+        ...initialFormState.value,
+        tags: [...initialFormState.value.tags],
+        variables: initialFormState.value.variables.map((variable: Variable) => ({
+            ...variable,
+            options: variable.options ? [...variable.options] : undefined,
+        })),
+        imageBlobs: [...(initialFormState.value.imageBlobs || [])],
+    };
+    isJinjaEnabled.value = Boolean(initialFormState.value.__isJinjaEnabled);
+    nextTick(() => {
+        isInitializing.value = false;
+        markFormClean();
+    });
+};
 
 // 计算属性
 const isEdit = computed(() => !!props.prompt?.id);
@@ -779,6 +855,7 @@ const resetForm = () => {
         formRef.value?.restoreValidation();
         // 重置初始化标志
         isInitializing.value = false;
+        markFormClean();
     });
 };
 
@@ -1555,6 +1632,7 @@ watch(
         // 重置初始化标志
         nextTick(() => {
             isInitializing.value = false;
+            markFormClean();
         });
     },
     { immediate: true }
@@ -1964,6 +2042,8 @@ const handleSave = async () => {
             fromFileList: imageFileList.value.length > 0
         });
 
+        let savedPrompt: any;
+
         if (isEdit.value) {
             // 编辑模式：先创建历史记录，再更新
             const currentPromptData = {
@@ -1979,9 +2059,13 @@ const handleSave = async () => {
             };
 
             await createHistoryRecord(currentPromptData);
-            await api.prompts.update.mutate({
+            savedPrompt = await api.prompts.update.mutate({
                 id: props.prompt.id,
-                data,
+                data: {
+                    ...data,
+                    isFavorite: props.prompt.isFavorite || false,
+                    useCount: props.prompt.useCount || 0,
+                },
             });
             message.success(t('promptManagement.updateSuccess'));
             await loadHistory();
@@ -1991,12 +2075,13 @@ const handleSave = async () => {
                 ...data,
                 uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             };
-            await api.prompts.create.mutate(createData);
+            savedPrompt = await api.prompts.create.mutate(createData);
             message.success(t('promptManagement.createSuccess'));
         }
 
+        markFormClean();
         // 立即发送 saved 事件，通知父组件刷新数据
-        emit("saved");
+        emit("saved", savedPrompt);
 
         // 短暂延迟后关闭弹窗，确保数据已经刷新
         setTimeout(() => {
@@ -2016,8 +2101,17 @@ const handleSave = async () => {
     }
 };
 
+const handleEditorShortcut = (event: KeyboardEvent) => {
+    if (!props.embedded || !props.show || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+    event.preventDefault();
+    if (!saving.value && formData.value.content.trim()) handleSave();
+};
+
+onMounted(() => window.addEventListener('keydown', handleEditorShortcut));
+
 // 组件卸载时的清理
 onBeforeUnmount(() => {
+    window.removeEventListener('keydown', handleEditorShortcut);
     // 清理防抖定时器
     if (debounceTimer.value) {
         clearTimeout(debounceTimer.value);
@@ -2108,7 +2202,7 @@ const updateContent = (newContent: string) => {
 };
 
 // 变量更新方法
-const updateVariables = (newVariables: any[]) => {
+const updateVariables = (newVariables: any[], source: "auto" | "user" = "user") => {
     // 防止在初始化过程中触发
     if (isInitializing.value) return;
 
@@ -2138,11 +2232,21 @@ const updateVariables = (newVariables: any[]) => {
         required: v.required,
         placeholder: v.placeholder,
     })) as Variable[];
+
+    // Editors may derive variables asynchronously after a prompt is opened. This is
+    // initialization, not a user edit, so rebase only when every non-variable field
+    // still matches the clean state.
+    if (source === "auto" && createNonVariableSnapshot() === initialNonVariableSnapshot.value) {
+        nextTick(markFormClean);
+    }
 };
 
 // 暴露方法给父组件
 defineExpose({
-    refreshQuickOptimizationConfigs
+    refreshQuickOptimizationConfigs,
+    hasUnsavedChanges,
+    markFormClean,
+    discardChanges,
 });
 
 
@@ -2152,4 +2256,54 @@ defineExpose({
 
 </script>
 
-<style scoped></style>
+<style scoped>
+.prompt-edit-embedded :deep(.modal-content) {
+    padding-top: 8px !important;
+}
+
+.prompt-edit-embedded :deep(.edit-workspace-tabs > .n-tabs-nav) {
+    margin: 0 4px 8px;
+}
+
+.prompt-edit-embedded :deep(.edit-workspace-tabs .n-tabs-tab) {
+    min-width: 74px;
+    justify-content: center;
+    padding: 7px 10px;
+    font-size: 14px;
+}
+
+.prompt-edit-embedded :deep(.n-card) {
+    border-radius: 7px;
+}
+
+.prompt-edit-embedded :deep(.n-card-header) {
+    padding: 10px 14px;
+}
+
+.prompt-edit-embedded :deep(.n-card-header__main) {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.prompt-edit-embedded :deep(.n-card__content) {
+    padding: 12px 14px;
+}
+
+.prompt-edit-embedded :deep(.modal-footer) {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+}
+
+.prompt-edit-embedded :deep(.edit-info-panel),
+.prompt-edit-embedded :deep(.edit-history-panel) {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.prompt-edit-embedded :deep(.edit-info-panel > .n-card-header),
+.prompt-edit-embedded :deep(.edit-history-panel > .n-card-header) {
+    min-height: 52px;
+    border-bottom: 1px solid var(--app-border-color);
+}
+</style>

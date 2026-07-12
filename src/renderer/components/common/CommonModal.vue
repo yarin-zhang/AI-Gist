@@ -1,16 +1,18 @@
 <template>
-    <NModal :show="show" style="background-color: var(--app-bg-color);">
-        <div :style="{
-            width: `${modalWidth}px`,
-            height: `${modalHeight}px`,
+    <component :is="embedded ? 'div' : NModal" :show="embedded ? undefined : show"
+        v-show="!embedded || show" :class="{ 'common-modal-embedded-root': embedded }"
+        style="background-color: var(--app-bg-color);">
+        <div ref="containerRef" :class="{ 'common-modal-embedded': embedded }" :style="{
+            width: embedded ? '100%' : `${modalWidth}px`,
+            height: embedded ? '100%' : `${modalHeight}px`,
             position: 'relative',
             backgroundColor: 'var(--app-bg-color)',
             color: 'var(--app-text-color)',
-            borderRadius: '8px',
+            borderRadius: embedded ? '0' : '8px',
             overflow: 'hidden'
         }">
             <!-- 固定在右上角的关闭按钮 -->
-            <NButton @click="handleClose" size="small" circle :style="{
+            <NButton v-if="!embedded" @click="handleClose" size="small" circle :style="{
                 position: 'absolute',
                 top: '26px',
                 right: '26px',
@@ -152,11 +154,11 @@
                 </template>
             </NSplit>
         </div>
-    </NModal>
+    </component>
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, useSlots, watch } from "vue";
 import {
     NModal,
     NButton,
@@ -169,6 +171,7 @@ import { useWindowSize } from "@/composables/useWindowSize";
 
 interface Props {
     show: boolean;
+    embedded?: boolean;
     minHeaderHeight?: number;
     contentPadding?: number;
     headerResizable?: boolean;
@@ -183,6 +186,7 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+    embedded: false,
     minHeaderHeight: 60, // 最小头部高度
     contentPadding: 16, // 内容边距
     headerResizable: false, // 头部是否可调整大小
@@ -193,6 +197,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 const slots = useSlots();
+const containerRef = ref<HTMLElement | null>(null);
+const embeddedHeight = ref(0);
+let resizeObserver: ResizeObserver | null = null;
 
 // 获取窗口尺寸
 const { modalWidth, modalMaxHeight } = useWindowSize();
@@ -207,7 +214,9 @@ const hasFooter = computed(() => {
 
 // 计算内容区域的实际可用高度
 const contentHeight = computed(() => {
-    let availableHeight = modalHeight.value;
+    let availableHeight = props.embedded && embeddedHeight.value > 0
+        ? embeddedHeight.value
+        : modalHeight.value;
 
     // 减去 Header 的高度
     availableHeight -= props.headerDefaultHeight;
@@ -233,6 +242,29 @@ const handleClose = () => {
     emit("update:show", false);
     emit("close");
 };
+
+const observeEmbeddedContainer = async () => {
+    if (!props.embedded) return;
+    await nextTick();
+    resizeObserver?.disconnect();
+    if (!containerRef.value) return;
+
+    const updateHeight = () => {
+        embeddedHeight.value = containerRef.value?.getBoundingClientRect().height || 0;
+    };
+
+    updateHeight();
+    resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(containerRef.value);
+};
+
+onMounted(observeEmbeddedContainer);
+watch(() => props.embedded, observeEmbeddedContainer);
+watch(() => props.show, (show) => {
+    if (show) observeEmbeddedContainer();
+});
+
+onUnmounted(() => resizeObserver?.disconnect());
 </script>
 
 <style scoped>
@@ -254,6 +286,17 @@ const handleClose = () => {
     color: var(--app-text-color);
     overflow: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.common-modal-embedded-root,
+.common-modal-embedded {
+    min-width: 0;
+    min-height: 0;
+}
+
+.common-modal-embedded-root {
+    width: 100%;
+    height: 100%;
 }
 
 /* 确保 NSplit 的分割线样式适配主题 */

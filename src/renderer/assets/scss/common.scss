@@ -1,3 +1,18 @@
+:root {
+	/* One radius for user-provided prompt images across every view and preview. */
+	--app-image-radius: 8px;
+}
+
+/* Naive UI images render their <img> with an inherited radius. */
+.n-image,
+.n-image-preview {
+	border-radius: var(--app-image-radius);
+}
+
+.n-image {
+	overflow: hidden;
+}
+
 .status-badge {
 	color: var(--content-primary);
 	font-size: var(--font-size-xs);
@@ -180,4 +195,33 @@ ion-toast.mobile-toast-success {
 	--border-width: 1px;
 	--button-color: var(--ion-color-primary);
 	--color: #111827;
+}
+
+/* Naive UI Split: keep a generous drag hit-area without rendering a heavy bar. */
+.n-split--horizontal > .n-split__resize-trigger-wrapper > .n-split__resize-trigger {
+	width: 1px !important;
+	height: 100% !important;
+	margin: 0 auto;
+	background-color: var(--app-border-color) !important;
+	transition: width 0.12s ease, background-color 0.12s ease;
+}
+
+.n-split--horizontal > .n-split__resize-trigger-wrapper:hover > .n-split__resize-trigger,
+.n-split--horizontal > .n-split__resize-trigger-wrapper > .n-split__resize-trigger--hover {
+	width: 3px !important;
+	background-color: var(--app-text-color-secondary) !important;
+}
+
+.n-split--vertical > .n-split__resize-trigger-wrapper > .n-split__resize-trigger {
+	width: 100% !important;
+	height: 1px !important;
+	margin: auto 0;
+	background-color: var(--app-border-color) !important;
+	transition: height 0.12s ease, background-color 0.12s ease;
+}
+
+.n-split--vertical > .n-split__resize-trigger-wrapper:hover > .n-split__resize-trigger,
+.n-split--vertical > .n-split__resize-trigger-wrapper > .n-split__resize-trigger--hover {
+	height: 3px !important;
+	background-color: var(--app-text-color-secondary) !important;
 }

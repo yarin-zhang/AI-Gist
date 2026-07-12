@@ -1,9 +1,10 @@
 <template>
     <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
-        :disabled="modalWidth <= 800">
+        :disabled="modalWidth <= 800" class="prompt-editor-split">
         <!-- 左侧：内容编辑区 -->
         <template #1>
-            <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }">
+            <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }"
+                class="editor-shell-panel editor-content-panel">
                 <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
                     <NFlex vertical size="medium" style="padding-right: 12px;">
                         <NFormItem path="content" style="flex: 1;" :show-label="false">
@@ -101,7 +102,7 @@
 
         <!-- 右侧：变量配置区 -->
         <template #2>
-            <NCard size="small" :style="{ height: '100%' }">
+            <NCard size="small" :style="{ height: '100%' }" class="editor-shell-panel editor-variables-panel">
                 <template #header>
                     <NFlex justify="space-between" align="center">
                         <NText strong>{{ t('promptManagement.detectedVariables') }}</NText>
@@ -117,7 +118,7 @@
                 </template>
                 <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                     <NFlex vertical size="medium" style="padding-right: 12px;" v-if="variables.length > 0">
-                        <NCard v-for="(variable, index) in variables" :key="index" size="small">
+                        <NCard v-for="(variable, index) in variables" :key="index" size="small" class="variable-config-card">
                             <template #header>
                                 <NFlex justify="space-between" align="center">
                                     <NText>{{ variable.name || t('promptManagement.variable') + (index + 1) }}</NText>
@@ -224,7 +225,7 @@ interface Props {
 
 interface Emits {
     (e: "update:content", value: string): void;
-    (e: "update:variables", value: Variable[]): void;
+    (e: "update:variables", value: Variable[], source?: "auto" | "user"): void;
     (e: "optimize-prompt", configId: number): void;
     (e: "stop-optimization"): void;
     (e: "open-quick-optimization-config"): void;
@@ -296,7 +297,7 @@ const extractVariables = (content: string) => {
         }
     );
 
-    emit("update:variables", newVariables);
+    emit("update:variables", newVariables, "auto");
 };
 
 // 防抖的变量提取方法
@@ -478,4 +479,13 @@ defineExpose({
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.prompt-editor-split { background: var(--app-bg-color); }
+.editor-shell-panel { border: 0 !important; border-radius: 0 !important; background: var(--app-surface-color); }
+.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--app-border-color); }
+.editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: 14px; font-weight: 600; }
+.editor-shell-panel :deep(> .n-card__content) { padding: 14px 16px; }
+.variable-config-card { border-radius: 8px; box-shadow: none; }
+.variable-config-card :deep(.n-card-header__main) { font-size: 14px; }
+.prompt-editor-split :deep(.n-split-pane__split-bar) { background: var(--app-border-color); }
+</style>
