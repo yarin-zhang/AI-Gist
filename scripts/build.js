@@ -65,6 +65,28 @@ function copyAssets() {
     }
 }
 
+/**
+ * 复制主进程在运行时会直接 require 的渲染器共享资源。
+ *
+ * TypeScript 会在主进程产物中保留对 design-tokens.json 的 require，
+ * 而 Vite 只会将 JSON 内联到渲染器 bundle，不会保留原文件。
+ * 因此需要显式复制到 build/renderer，以便 electron-builder 将其收入 asar。
+ */
+function copyRendererRuntimeResources() {
+    const rendererSourcePath = Path.join(__dirname, '..', 'src', 'renderer');
+    const rendererBuildPath = Path.join(__dirname, '..', 'build', 'renderer');
+    const runtimeResourceFiles = ['design-tokens.json'];
+
+    FileSystem.mkdirSync(rendererBuildPath, { recursive: true });
+
+    runtimeResourceFiles.forEach(file => {
+        const srcPath = Path.join(rendererSourcePath, file);
+        const destPath = Path.join(rendererBuildPath, file);
+        FileSystem.copyFileSync(srcPath, destPath);
+        console.log(Chalk.greenBright(`渲染器运行时资源已复制: ${file}`));
+    });
+}
+
 // 清理构建目录
 FileSystem.rmSync(Path.join(__dirname, '..', 'build'), {
     recursive: true,
@@ -84,6 +106,9 @@ Promise.all([
         
         // 复制图标资源文件
         copyAssets();
+
+        // 复制主进程依赖的渲染器运行时资源
+        copyRendererRuntimeResources();
         
         console.log(Chalk.greenBright('构建成功完成！'));
         console.log(Chalk.greenBright('可以使用 electron-builder 进行打包。'));
