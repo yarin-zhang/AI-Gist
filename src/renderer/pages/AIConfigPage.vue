@@ -1,1558 +1,1249 @@
 <template>
     <div class="ai-config-page">
-        <NFlex vertical size="large">
-            <!-- 页面标题 -->
-            <NFlex justify="space-between" align="center" class="ai-config-header">
+        <header class="ai-command-bar">
+            <div class="page-identity">
+                <span class="page-identity-icon"><NIcon size="18"><Robot /></NIcon></span>
                 <div>
-                    <NText strong class="ai-config-title">{{ t('aiConfig.title') }}</NText>
-                    <NText depth="3" class="ai-config-subtitle">
-                        {{ t('aiConfig.subtitle') }}
-                    </NText>
+                    <NText strong class="page-title">{{ t('aiConfig.title') }}</NText>
+                    <NText depth="3" class="page-subtitle">{{ t('aiConfig.subtitle') }}</NText>
                 </div>
-                <NFlex>
-                    <NButton @click="showQuickOptimizationModal = true" style="margin-right: 8px;">
-                        <template #icon>
-                            <NIcon>
-                                <Settings />
-                            </NIcon>
-                        </template>
-                        {{ t('aiConfig.optimizePrompt') }}
-                    </NButton>
-                    <NButton type="primary" @click="showAddModal = true">
-                        <template #icon>
-                            <NIcon>
-                                <Plus />
-                            </NIcon>
-                        </template>
-                        {{ t('aiConfig.addConfig') }}
-                    </NButton>
-                </NFlex>
-            </NFlex>
+            </div>
 
-            <!-- 全局首选项状态显示 -->
-            <NAlert v-if="preferredConfig" type="info" :show-icon="false" style="margin-top: 16px">
-                <NFlex align="center" justify="space-between">
-                    <NFlex align="center" style="gap: 8px">
-                        <NIcon size="18">
-                            <Settings />
-                        </NIcon>
-                        <NText>
-                            {{ t('aiConfig.currentPreferredConfig') }}
-                            <NText strong>{{ preferredConfig.name }}</NText>
-                            <NTag size="small" :type="getConfigTagType(preferredConfig.type)" style="margin-left: 8px">
-                                {{ getConfigTypeLabel(preferredConfig.type) }}
-                            </NTag>
-                        </NText>
-                    </NFlex>
-                    <NButton size="small" @click="clearPreferred">
-                        {{ t('aiConfig.cancelPreferred') }}
-                    </NButton>
-                </NFlex>
-            </NAlert>
-            <NAlert v-else-if="configs.filter(c => c.enabled).length > 1" type="warning" :show-icon="false"
-                style="margin-top: 16px">
-                <NFlex align="center" style="gap: 8px">
-                    <NIcon size="18">
-                        <Settings />
-                    </NIcon>
-                    <NText>
-                        {{ t('aiConfig.multipleConfigsWarning') }}
-                    </NText>
-                </NFlex>
-            </NAlert>
-            <!-- 配置卡片列表 -->
-            <div class="config-list">
-                <div v-if="configs.length === 0" style="text-align: center; padding: 40px">
-                    <NEmpty :description="t('aiConfig.noConfigs')">
-                        <template #extra>
-                            <NButton type="primary" @click="showAddModal = true">
-                                <template #icon>
-                                    <NIcon>
-                                        <Plus />
-                                    </NIcon>
-                                </template>
-                                {{ t('aiConfig.addConfig') }}
-                            </NButton>
-                        </template>
-                    </NEmpty>
-                </div>
-                <n-card v-for="config in configs" :key="config.id" class="config-card">
-                    <template #header>
-                        <div class="config-header">
-                            <div class="config-info">
-                                <NIcon size="24">
-                                    <Server v-if="['openai', 'azure', 'deepseek', 'mistral', 'siliconflow', 'tencent', 'aliyun', 'zhipu'].includes(config.type)" />
-                                    <Robot v-else />
-                                </NIcon>
-                                <h3>{{ config.name }}</h3>
-                                <n-tag :type="getConfigTagType(config.type)">
-                                    {{ getConfigTypeLabel(config.type) }}
-                                </n-tag>
-                                <n-tag :type="config.enabled ? 'success' : 'warning'">
-                                    {{ config.enabled ? t('aiConfig.enabled') : t('aiConfig.disabled') }}
-                                </n-tag>
-                                <n-tag v-if="config.isPreferred" type="primary">
-                                    <template #icon>
-                                        <NIcon size="12">
-                                            <Settings />
-                                        </NIcon>
-                                    </template>
-                                    {{ t('aiConfig.globalPreferred') }}
-                                </n-tag>
-                            </div>
-                            <div class="config-switch">
-                                <n-space>
-                                    <n-button size="small" @click="setPreferred(config)"
-                                        :type="config.isPreferred ? 'primary' : 'default'" :disabled="!config.enabled">
-                                        <template #icon>
-                                            <NIcon>
-                                                <Settings />
-                                            </NIcon>
-                                        </template>
-                                        {{ config.isPreferred ? t('aiConfig.alreadyPreferred') : t('aiConfig.setAsPreferred') }}
-                                    </n-button>
-                                    <n-switch v-model:value="config.enabled"
-                                        @update:value="(value) => toggleConfig(config.id!, value)" />
-                                </n-space>
-                            </div>
-                        </div>
+            <div v-if="configs.length" class="preference-summary">
+                <NIcon size="16"><Star /></NIcon>
+                <span v-if="explicitPreferredConfig">
+                    {{ t('aiConfig.workspace.explicitPreferred', { name: explicitPreferredConfig.name }) }}
+                </span>
+                <span v-else-if="fallbackConfig">
+                    {{ t('aiConfig.workspace.fallbackPreferred', { name: fallbackConfig.name }) }}
+                </span>
+                <span v-else>{{ t('aiConfig.workspace.noEnabledConfig') }}</span>
+            </div>
+
+            <div class="page-actions">
+                <NButton size="small" @click="showQuickOptimizationModal = true">
+                    <template #icon><NIcon size="16"><Settings /></NIcon></template>
+                    <span class="action-label">{{ t('aiConfig.optimizePrompt') }}</span>
+                </NButton>
+                <NButton type="primary" size="small" @click="openCreateConfig">
+                    <template #icon><NIcon size="16"><Plus /></NIcon></template>
+                    <span class="action-label">{{ t('aiConfig.addConfig') }}</span>
+                </NButton>
+            </div>
+        </header>
+
+        <div class="ai-page-content">
+            <div v-if="loading" class="page-state ui-surface">
+                <NSpin size="small" />
+                <NText depth="3">{{ t('aiConfig.workspace.loading') }}</NText>
+            </div>
+
+            <NResult v-else-if="loadError" status="error" :title="t('aiConfig.loadFailed')"
+                :description="loadError" class="page-state ui-surface">
+                <template #footer>
+                    <NButton @click="loadConfigs"><template #icon><NIcon><Refresh /></NIcon></template>{{ t('common.retry') }}</NButton>
+                </template>
+            </NResult>
+
+            <div v-else-if="configs.length === 0" class="page-state ui-surface">
+                <NEmpty :description="t('aiConfig.noConfigs')">
+                    <template #extra>
+                        <NButton type="primary" @click="openCreateConfig">
+                            <template #icon><NIcon><Plus /></NIcon></template>
+                            {{ t('aiConfig.addConfig') }}
+                        </NButton>
                     </template>
+                </NEmpty>
+            </div>
 
-                    <div class="config-details">
-                        <n-flex justify="space-between" >
-                            <n-flex vertical>
-                                <p><strong>{{ t('aiConfig.baseURL') }}:</strong> {{ config.baseURL }}</p>
-                                <p v-if="config.defaultModel">
-                                    <strong>{{ t('aiConfig.defaultModel') }}:</strong> {{ config.defaultModel }}
-                                </p>
-                                <p v-if="config.customModel">
-                                    <strong>{{ t('aiConfig.customModel') }}:</strong> {{ config.customModel }}
-                                </p>
-                            </n-flex>
-                            <n-flex vertical>
-                                <p><strong>{{ t('aiConfig.createdAt') }}:</strong> {{ formatDate(config.createdAt) }}</p>
-                                <!-- <p>
-                                    <strong>{{ t('aiConfig.systemPrompt') }}:</strong>
-                                    <NTag size="small" :type="config.systemPrompt ? 'success' : 'default'">
-                                        {{ config.systemPrompt ? t('aiConfig.systemPromptCustomized') : t('aiConfig.systemPromptDefault') }}
-                                    </NTag>
-                                </p> -->
-                                <!-- <p>
-                                    <strong>{{ t('aiConfig.preferredStatus') }}:</strong>
-                                    <NTag size="small" :type="config.isPreferred ? 'primary' : 'default'">
-                                        {{ config.isPreferred ? t('aiConfig.globalPreferredStatus') : t('aiConfig.normalConfig') }}
-                                    </NTag>
-                                </p> -->
-                            </n-flex>
-                        </n-flex>
-                    </div>
+            <NSplit v-else v-model:size="libraryPaneSize" direction="horizontal" min="240px" max="400px"
+                :resize-trigger-size="1" class="config-workspace-split">
+                <template #1>
+                    <aside class="config-library">
+                        <div class="library-search">
+                            <NInput v-model:value="searchText" clearable size="small"
+                                :placeholder="t('aiConfig.workspace.searchPlaceholder')">
+                                <template #prefix><NIcon size="16"><Search /></NIcon></template>
+                            </NInput>
+                        </div>
 
-                    <template #action>
-                        <NFlex justify="space-between" align="center">
-                            <!-- 左侧：常用操作 -->
-                            <NFlex align="center" size="small">
-                                <n-button size="small" secondary @click="editConfig(config)">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Settings />
-                                        </NIcon>
+                        <div class="library-filters" role="navigation" :aria-label="t('aiConfig.workspace.filterLabel')">
+                            <button v-for="filter in filterOptions" :key="filter.key" type="button"
+                                class="filter-item" :class="{ active: activeFilter === filter.key }"
+                                @click="activeFilter = filter.key">
+                                <NIcon size="16"><component :is="filter.icon" /></NIcon>
+                                <span>{{ filter.label }}</span>
+                                <span class="filter-count">{{ filter.count }}</span>
+                            </button>
+                        </div>
+
+                        <div class="library-heading">
+                            <NText depth="3">{{ t('aiConfig.workspace.configCount', { count: filteredConfigs.length }) }}</NText>
+                        </div>
+
+                        <NScrollbar class="config-results">
+                            <NEmpty v-if="filteredConfigs.length === 0" size="small"
+                                :description="t('aiConfig.workspace.noMatchingConfigs')" class="library-empty" />
+                            <button v-for="config in filteredConfigs" v-else :key="config.id" type="button"
+                                class="config-list-item" :class="{ active: selectedConfig?.id === config.id }"
+                                @click="selectConfig(config)">
+                                <span class="provider-icon"><NIcon size="18"><component :is="getConfigIcon(config)" /></NIcon></span>
+                                <span class="config-list-copy">
+                                    <span class="config-list-title-row">
+                                        <span class="config-list-title">{{ config.name }}</span>
+                                        <NIcon v-if="config.isPreferred && config.enabled" size="15" color="var(--accent-warning)"><Star /></NIcon>
+                                    </span>
+                                    <span class="config-list-meta">
+                                        <span>{{ getConfigDisplayLabel(config) }}</span>
+                                        <span>·</span>
+                                        <span>{{ config.defaultModel || config.customModel || t('aiConfig.workspace.noDefaultModel') }}</span>
+                                    </span>
+                                </span>
+                                <span class="status-dot" :class="config.enabled ? 'enabled' : 'disabled'"
+                                    :title="config.enabled ? t('aiConfig.enabled') : t('aiConfig.disabled')" />
+                            </button>
+                        </NScrollbar>
+                    </aside>
+                </template>
+
+                <template #resize-trigger><div class="workspace-resize-line" /></template>
+
+                <template #2>
+                    <main v-if="selectedConfig" class="config-workspace">
+                        <header class="workspace-header">
+                            <div class="workspace-identity">
+                                <span class="workspace-provider-icon"><NIcon size="22"><component :is="getConfigIcon(selectedConfig)" /></NIcon></span>
+                                <div class="workspace-title-copy">
+                                    <div class="workspace-title-row">
+                                        <NText strong class="workspace-title">{{ selectedConfig.name }}</NText>
+                                        <NTag size="small">{{ getConfigDisplayLabel(selectedConfig) }}</NTag>
+                                        <NTag size="small" :type="selectedConfig.enabled ? 'success' : 'default'">
+                                            {{ selectedConfig.enabled ? t('aiConfig.enabled') : t('aiConfig.disabled') }}
+                                        </NTag>
+                                    </div>
+                                    <NText depth="3" class="workspace-subtitle">
+                                        {{ selectedConfig.defaultModel || selectedConfig.customModel || t('aiConfig.workspace.noDefaultModel') }}
+                                    </NText>
+                                </div>
+                            </div>
+
+                            <div class="workspace-actions">
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NSwitch :value="selectedConfig.enabled" :loading="togglingConfigId === selectedConfig.id"
+                                            @update:value="value => toggleConfig(selectedConfig!, value)" />
                                     </template>
-                                    {{ t('aiConfig.edit') }}
-                                </n-button>
-                                <n-button size="small" @click="editSystemPrompt(config)">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Edit />
-                                        </NIcon>
-                                    </template>
+                                    {{ selectedConfig.enabled ? t('aiConfig.workspace.disableConfig') : t('aiConfig.workspace.enableConfig') }}
+                                </NTooltip>
+                                <NButton size="small" :disabled="!selectedConfig.enabled" @click="setPreferred(selectedConfig)">
+                                    <template #icon><NIcon size="16"><Star /></NIcon></template>
+                                    {{ selectedConfig.isPreferred ? t('aiConfig.cancelPreferred') : t('aiConfig.setAsPreferred') }}
+                                </NButton>
+                                <NButton size="small" @click="editSystemPrompt(selectedConfig)">
+                                    <template #icon><NIcon size="16"><Edit /></NIcon></template>
                                     {{ t('aiConfig.systemPrompt') }}
-                                </n-button>
-                            </NFlex>
-
-                            <!-- 右侧：不常用操作 -->
-                            <NFlex align="center" size="small">
-                                <n-button size="small" @click="testConfig(config)"
-                                    :loading="testingConfigs.has(config.id!)">
-                                    <template #icon>
-                                        <NIcon>
-                                            <AccessPoint />
-                                        </NIcon>
-                                    </template>
-                                    {{ t('aiConfig.connectionTest') }}
-                                </n-button>
-                                <n-button size="small" @click="intelligentTest(config)"
-                                    :loading="intelligentTestingConfigs.has(config.id!)">
-                                    <template #icon>
-                                        <NIcon>
-                                            <Robot />
-                                        </NIcon>
-                                    </template>
-                                    {{ t('aiConfig.requestTest') }}
-                                </n-button>
-                                <n-button size="small" type="error" @click="deleteConfig(config.id!)">
-                                    <template #icon>
-                                        <NIcon>
-                                            <DatabaseOff />
-                                        </NIcon>
+                                </NButton>
+                                <NButton type="primary" size="small" @click="openEditConfig(selectedConfig)">
+                                    <template #icon><NIcon size="16"><Settings /></NIcon></template>
+                                    {{ t('aiConfig.edit') }}
+                                </NButton>
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NButton quaternary circle size="small" type="error" :aria-label="t('aiConfig.delete')"
+                                            @click="deleteConfig(selectedConfig)">
+                                            <template #icon><NIcon size="16"><Trash /></NIcon></template>
+                                        </NButton>
                                     </template>
                                     {{ t('aiConfig.delete') }}
-                                </n-button>
-                            </NFlex>
-                        </NFlex>
-                    </template>
-                </n-card>
-            </div>
-        </NFlex>
-        <!-- 添加/编辑配置弹窗 -->
-        <CommonModal ref="modalRef" :show="showAddModal" @update:show="showAddModal = $event" @close="closeModal">
-            <!-- 顶部固定区域 -->
-            <template #header>
-                <NFlex align="center" justify="space-between">
-                    <NFlex align="center" style="gap: 12px">
-                        <NIcon size="20">
-                            <Settings />
-                        </NIcon>
-                        <div>
-                            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
-                                {{ editingConfig ? t('aiConfig.editConfig') : t('aiConfig.addConfig') }}
-                            </NText>
-                            <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
-                                {{
-                                    editingConfig
-                                        ? t('aiConfig.editConfigDesc')
-                                        : t('aiConfig.addConfigDesc')
-                                }}
-                            </NText>
-                        </div>
-                    </NFlex>
-                </NFlex>
-            </template> <template #content="{ contentHeight }">
-                <!-- 中间可操作区域 -->
-                <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3"
-                    :max="0.8" :disabled="modalWidth <= 800">
-                    <!-- 左侧：基本配置 -->
-                    <template #1>
-                        <NCard :title="t('aiConfig.basicConfig')" size="small" :style="{ height: '100%' }">
-                            <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
-                                <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top"
-                                    require-mark-placement="right-hanging" style="padding-right: 12px;">
-                                    <NFlex vertical size="small">
-                                        <n-form-item :label="t('aiConfig.serviceType')" path="type">
-                                            <n-select v-model:value="formData.type" :options="typeOptions"
-                                                @update:value="onTypeChange" />
-                                        </n-form-item>
+                                </NTooltip>
+                            </div>
+                        </header>
 
-                                        <n-form-item :label="t('aiConfig.configName')" path="name">
-                                            <n-input v-model:value="formData.name" :placeholder="t('aiConfig.configNamePlaceholder')" />
-                                        </n-form-item>                                         <n-form-item :label="getBaseURLInfo.label" path="baseURL"
-                                            v-if="needsBaseURL || formData.type === 'anthropic' || formData.type === 'google'">
-                                            <n-input v-model:value="formData.baseURL"
-                                                :placeholder="getBaseURLInfo.placeholder" />
-                                        </n-form-item>
+                        <NScrollbar class="workspace-scroll">
+                            <div class="workspace-sections">
+                                <NAlert v-if="selectedConfig.isPreferred && selectedConfig.enabled" type="success" :show-icon="false">
+                                    {{ t('aiConfig.workspace.preferredDescription') }}
+                                </NAlert>
+                                <NAlert v-else-if="selectedConfig.id === fallbackConfig?.id" type="warning" :show-icon="false">
+                                    {{ t('aiConfig.workspace.fallbackDescription') }}
+                                </NAlert>
 
-                                        <n-form-item :label="getApiKeyLabel" path="apiKey" v-if="needsApiKey">
-                                            <n-input v-model:value="formData.apiKey" type="password"
-                                                show-password-on="click"
-                                                :placeholder="`${t('aiConfig.enter')} ${getApiKeyLabel.replace('：', '')}`" />
-                                        </n-form-item>
-
-                                        <!-- 连接测试区域 -->
-                                        <n-form-item :label="t('aiConfig.connectionTest')">
-                                            <NFlex vertical size="medium" style="width: 100%;"> <n-button
-                                                    @click="testFormConnection" :loading="testingFormConnection"
-                                                    :disabled="!canTestConnection" type="info" block>
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Server />
-                                                        </NIcon>
-                                                    </template>
-                                                    {{ t('aiConfig.testConnectionAndGetModels') }}
-                                                </n-button>
-
-                                                <!-- 测试结果显示 -->
-                                                <n-alert v-if="formTestResult"
-                                                    :type="formTestResult.success ? 'success' : 'error'"
-                                                    :title="formTestResult.success ? t('aiConfig.testSuccess') : t('aiConfig.testFailed')">
-                                                    {{
-                                                        formTestResult.success
-                                                            ? getModelListDisplayMessage(formTestResult)
-                                                            : formTestResult.error
-                                                    }}
-                                                </n-alert>
-                                            </NFlex>
-                                        </n-form-item>
-
-                                        <!-- 服务商特点说明 -->
-                                        <div v-if="getServiceInfo.description" style="margin-bottom: 16px;">
-                                            <NAlert type="success" :show-icon="false" size="small">
-                                                <NFlex align="start" size="small">
-                                                    <NFlex vertical size="small">
-                                                        <NText strong >
-                                                            {{ getServiceInfo.name }} {{ t('aiConfig.serviceIntroduction') }}
-                                                        </NText>
-                                                        <NText depth="3" style="font-size: 12px;">
-                                                            {{ getServiceInfo.description }}
-                                                        </NText>
-                                                    </NFlex>
-                                                </NFlex>
-                                                <!-- 只有在有URL时才显示按钮区域 -->
-                                                <div v-if="getApiKeyInfo.apiKeyUrl || getApiKeyInfo.docUrl">
-                                                    <NFlex align="center" justify="space-between">
-                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.apiKeyUrl">
-                                                            <NButton size="small" type="info" text @click="openApiKeyUrl">
-                                                                <template #icon>
-                                                                    <NIcon size="12">
-                                                                        <ExternalLink />
-                                                                    </NIcon>
-                                                                </template>
-                                                                {{ t('aiConfig.getApiKey') }}
-                                                            </NButton>
-                                                        </NFlex>
-                                                        <NFlex align="center" size="small" v-if="getApiKeyInfo.docUrl">
-                                                            <NButton size="small" type="info" text @click="openDocumentationUrl">
-                                                                <template #icon>
-                                                                    <NIcon size="12">
-                                                                        <Book />
-                                                                    </NIcon>
-                                                                </template>
-                                                                {{ t('aiConfig.viewDocumentation') }}
-                                                            </NButton>
-                                                        </NFlex>
-                                                    </NFlex>
-                                                </div>
-                                            </NAlert>
+                                <section class="detail-panel ui-surface">
+                                    <div class="section-heading">
+                                        <div>
+                                            <NText strong class="section-title">{{ t('aiConfig.workspace.connectionSection') }}</NText>
+                                            <NText depth="3" class="section-description">{{ t('aiConfig.workspace.connectionSectionDesc') }}</NText>
                                         </div>
-
-                                    </NFlex>
-                                </n-form>
-                            </NScrollbar>
-                        </NCard>
-                    </template>
-
-                    <!-- 右侧：模型配置 -->
-                    <template #2>
-                        <NCard :title="t('aiConfig.modelConfig')" size="small" :style="{ height: '100%' }">
-                            <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
-                                <NFlex vertical size="large" style="padding-right: 12px;">
-                                    <n-form-item :label="t('aiConfig.modelList')" path="models">
-                                        <n-dynamic-tags v-model:value="formData.models" />
-                                        <template #feedback>
-                                            <NText depth="3" style="font-size: 12px;">
-                                                {{ t('aiConfig.clickTestConnectionTip') }}
-                                            </NText>
-                                        </template>
-                                    </n-form-item>
-
-                                    <n-form-item :label="t('aiConfig.defaultModel')" path="defaultModel">
-                                        <n-select v-model:value="formData.defaultModel" :options="modelOptions"
-                                            :placeholder="t('aiConfig.selectDefaultModel')" filterable tag clearable />
-                                    </n-form-item>
-
-                                    <n-form-item :label="t('aiConfig.customModel')" path="customModel">
-                                        <n-input v-model:value="formData.customModel" :placeholder="t('aiConfig.customModelPlaceholder')" />
-                                        <template #feedback>
-                                            <NText depth="3" style="font-size: 12px;">
-                                                {{ t('aiConfig.customModelTip') }}
-                                            </NText>
-                                        </template>
-                                    </n-form-item>
-
-                                    <!-- 模型信息显示 -->
-                                    <div v-if="formData.models.length > 0">
-                                        <NText strong style="margin-bottom: 8px; display: block;">{{ t('aiConfig.availableModels') }}</NText>
-                                        <NFlex wrap style="gap: 8px;">
-                                            <NTag v-for="model in formData.models" :key="model" size="small"
-                                                :type="model === formData.defaultModel ? 'primary' : 'default'">
-                                                {{ model }}
-                                                <template v-if="model === formData.defaultModel" #icon>
-                                                    <NIcon size="12">
-                                                        <Settings />
-                                                    </NIcon>
-                                                </template>
-                                            </NTag>
-                                        </NFlex>
-
-                                        <!-- 模型测试区域 -->
-                                        <n-form-item :label="t('aiConfig.modelTest')" style="margin-top: 16px;">
-                                            <NFlex vertical size="medium" style="width: 100%;">
-                                                <n-select 
-                                                    v-model:value="selectedTestModel" 
-                                                    :options="modelTestOptions"
-                                                    :placeholder="t('aiConfig.selectModelToTest')"
-                                                    :disabled="formData.models.length === 0"
-                                                />
-                                                <n-button
-                                                    @click="testSelectedModel" 
-                                                    :loading="testingSelectedModel"
-                                                    :disabled="!selectedTestModel || !canTestConnection"
-                                                    type="info" 
-                                                    block
-                                                >
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Robot />
-                                                        </NIcon>
-                                                    </template>
-                                                    {{ t('aiConfig.testSelectedModel') }}
-                                                </n-button>
-
-                                                <!-- 模型测试结果显示 -->
-                                                <n-alert v-if="modelTestResult"
-                                                    :type="modelTestResult.success ? 'success' : 'error'"
-                                                    :title="modelTestResult.success ? t('aiConfig.modelTestSuccess') : t('aiConfig.modelTestFailed')">
-                                                    {{ modelTestResult.error }}
-                                                    <div v-if="modelTestResult.response" style="margin-top: 8px; padding: 8px; background: var(--surface-tertiary); border: 1px solid var(--border-default); border-radius: var(--radius-control); font-family: monospace;">
-                                                        {{ modelTestResult.response }}
-                                                    </div>
-                                                </n-alert>
-                                            </NFlex>
-                                        </n-form-item>
+                                        <NButton size="small" :loading="testingConfigs.has(selectedConfig.id!)"
+                                            :disabled="!selectedConfig.enabled" @click="testConfig(selectedConfig)">
+                                            <template #icon><NIcon size="16"><AccessPoint /></NIcon></template>
+                                            {{ t('aiConfig.connectionTest') }}
+                                        </NButton>
                                     </div>
-                                </NFlex>
-                            </NScrollbar>
-                        </NCard>
-                    </template>
-                </NSplit>
-            </template>
-            <!-- 底部固定区域 -->
-            <template #footer>
-                <NFlex justify="end">
-                    <n-button @click="closeModal">{{ t('aiConfig.cancel') }}</n-button>
-                    <n-button type="primary" @click="saveConfig" :loading="saving">
-                        {{ editingConfig ? t('aiConfig.updateConfig') : t('aiConfig.addConfigButton') }}
-                    </n-button>
-                </NFlex>
-            </template>
-        </CommonModal>
+                                    <div class="detail-grid">
+                                        <div class="detail-field detail-field-wide">
+                                            <span class="field-label">{{ t('aiConfig.baseURL') }}</span>
+                                            <span class="field-value code-value">{{ selectedConfig.baseURL || t('aiConfig.workspace.officialEndpoint') }}</span>
+                                        </div>
+                                        <div class="detail-field">
+                                            <span class="field-label">{{ t('aiConfig.workspace.credential') }}</span>
+                                            <span class="field-value">{{ selectedConfig.apiKey ? maskSecret(selectedConfig.apiKey) : t('aiConfig.workspace.notRequired') }}</span>
+                                        </div>
+                                    </div>
+                                    <NAlert v-if="connectionResults[selectedConfig.id!]" class="inline-result"
+                                        :type="connectionResults[selectedConfig.id!].success ? 'success' : 'error'"
+                                        :title="connectionResults[selectedConfig.id!].success ? t('aiConfig.connectionTestSuccess') : t('aiConfig.testFailedTitle')">
+                                        {{ connectionResults[selectedConfig.id!].success ? t('aiConfig.workspace.connectionVerified') : connectionResults[selectedConfig.id!].error }}
+                                    </NAlert>
+                                </section>
 
-        <!-- 智能测试结果弹窗 -->
-        <n-modal v-model:show="showIntelligentTestResult" preset="dialog" style="width: 600px">
+                                <section class="detail-panel ui-surface">
+                                    <div class="section-heading">
+                                        <div>
+                                            <NText strong class="section-title">{{ t('aiConfig.workspace.modelsSection') }}</NText>
+                                            <NText depth="3" class="section-description">{{ t('aiConfig.workspace.modelsSectionDesc') }}</NText>
+                                        </div>
+                                    </div>
+                                    <div class="detail-grid">
+                                        <div class="detail-field">
+                                            <span class="field-label">{{ t('aiConfig.defaultModel') }}</span>
+                                            <span class="field-value">{{ selectedConfig.defaultModel || t('aiConfig.workspace.notConfigured') }}</span>
+                                        </div>
+                                        <div class="detail-field">
+                                            <span class="field-label">{{ t('aiConfig.availableModels') }}</span>
+                                            <span class="field-value">{{ t('aiConfig.workspace.modelCount', { count: selectedConfig.models?.length || 0 }) }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="selectedConfig.models?.length" class="model-tags">
+                                        <NTag v-for="model in selectedConfig.models" :key="model" size="small"
+                                            :type="model === selectedConfig.defaultModel ? 'primary' : 'default'">{{ model }}</NTag>
+                                    </div>
+                                    <div class="request-test-bar ui-surface-muted">
+                                        <NSelect v-model:value="requestTestModels[selectedConfig.id!]" size="small" filterable tag
+                                            :options="getModelOptions(selectedConfig)" :placeholder="t('aiConfig.selectModelToTest')" />
+                                        <NButton size="small" :loading="intelligentTestingConfigs.has(selectedConfig.id!)"
+                                            :disabled="!selectedConfig.enabled || !requestTestModels[selectedConfig.id!]"
+                                            @click="intelligentTest(selectedConfig)">
+                                            <template #icon><NIcon size="16"><Robot /></NIcon></template>
+                                            {{ t('aiConfig.requestTest') }}
+                                        </NButton>
+                                    </div>
+                                    <NAlert v-if="requestResults[selectedConfig.id!]" class="inline-result"
+                                        :type="requestResults[selectedConfig.id!].success ? 'success' : 'error'"
+                                        :title="requestResults[selectedConfig.id!].success ? t('aiConfig.modelTestSuccess') : t('aiConfig.modelTestFailed')">
+                                        <div v-if="requestResults[selectedConfig.id!].inputPrompt" class="result-block">
+                                            <span class="field-label">{{ t('aiConfig.inputPrompt') }}</span>
+                                            <pre>{{ requestResults[selectedConfig.id!].inputPrompt }}</pre>
+                                        </div>
+                                        <div v-if="requestResults[selectedConfig.id!].response" class="result-block">
+                                            <span class="field-label">{{ t('aiConfig.aiResponse') }}</span>
+                                            <pre>{{ requestResults[selectedConfig.id!].response }}</pre>
+                                        </div>
+                                        <span v-if="requestResults[selectedConfig.id!].error">{{ requestResults[selectedConfig.id!].error }}</span>
+                                    </NAlert>
+                                </section>
+
+                                <section class="detail-panel ui-surface">
+                                    <div class="section-heading">
+                                        <div>
+                                            <NText strong class="section-title">{{ t('aiConfig.workspace.behaviorSection') }}</NText>
+                                            <NText depth="3" class="section-description">{{ t('aiConfig.workspace.behaviorSectionDesc') }}</NText>
+                                        </div>
+                                        <NButton size="small" @click="editSystemPrompt(selectedConfig)">{{ t('aiConfig.workspace.editPrompt') }}</NButton>
+                                    </div>
+                                    <div class="prompt-preview">{{ selectedConfig.systemPrompt || t('aiConfig.workspace.defaultPromptInUse') }}</div>
+                                </section>
+
+                                <section class="detail-panel ui-surface">
+                                    <div class="section-heading compact-heading">
+                                        <NText strong class="section-title">{{ t('aiConfig.workspace.metadataSection') }}</NText>
+                                    </div>
+                                    <div class="detail-grid metadata-grid">
+                                        <div class="detail-field"><span class="field-label">{{ t('aiConfig.createdAt') }}</span><span class="field-value">{{ formatDate(selectedConfig.createdAt) }}</span></div>
+                                        <div class="detail-field"><span class="field-label">{{ t('aiConfig.workspace.updatedAt') }}</span><span class="field-value">{{ formatDate(selectedConfig.updatedAt) }}</span></div>
+                                        <div class="detail-field detail-field-wide"><span class="field-label">Config ID</span><span class="field-value code-value">{{ selectedConfig.configId }}</span></div>
+                                    </div>
+                                </section>
+                            </div>
+                        </NScrollbar>
+                    </main>
+
+                    <div v-else class="workspace-empty">
+                        <NEmpty :description="t('aiConfig.workspace.selectConfig')" />
+                    </div>
+                </template>
+            </NSplit>
+        </div>
+
+        <CommonModal :show="showEditorModal" @update:show="handleEditorShowUpdate">
             <template #header>
-                <NFlex align="center" style="gap: 8px">
-                    <NIcon size="20">
-                        <Robot />
-                    </NIcon>
-                    <NText strong>{{ t('aiConfig.intelligentTestResult') }}</NText>
-                </NFlex>
-            </template>
-
-            <div v-if="intelligentTestResult">
-                <n-alert v-if="intelligentTestResult.success" type="success" :title="t('aiConfig.testSuccessTitle')">
-                    <div style="margin-top: 12px">
-                        <div style="margin-bottom: 16px">
-                            <strong>{{ t('aiConfig.inputPrompt') }}</strong>
-                            <div style="
-                  background: var(--surface-tertiary);
-                  padding: 12px;
-                  border-radius: 6px;
-                  margin-top: 8px;
-                  white-space: pre-wrap;
-                  font-family: monospace;
-                ">
-                                {{ intelligentTestResult.inputPrompt }}
-                            </div>
-                        </div>
-                        <div>
-                            <strong>{{ t('aiConfig.aiResponse') }}</strong>
-                            <div style="
-                  background: var(--surface-tertiary);
-                  padding: 12px;
-                  border-radius: 6px;
-                  margin-top: 8px;
-                  white-space: pre-wrap;
-                ">
-                                {{ intelligentTestResult.response }}
-                            </div>
-                        </div>
-                    </div>
-                </n-alert>
-                <n-alert v-else type="error" :title="t('aiConfig.testFailedTitle')">
-                    <div v-if="intelligentTestResult.inputPrompt" style="margin-bottom: 12px">
-                        <strong>{{ t('aiConfig.attemptedPrompt') }}</strong>
-                        <div style="
-                background: var(--surface-tertiary);
-                padding: 12px;
-                border-radius: 6px;
-                margin-top: 8px;
-                white-space: pre-wrap;
-                font-family: monospace;
-              ">
-                            {{ intelligentTestResult.inputPrompt }}
-                        </div>
-                    </div>
+                <div class="modal-title-row">
+                    <span class="modal-title-icon"><NIcon size="20"><Settings /></NIcon></span>
                     <div>
-                        <strong>{{ t('aiConfig.errorInfo') }}</strong> {{ intelligentTestResult.error }}
+                        <NText strong class="modal-title">{{ editingConfig ? t('aiConfig.editConfig') : t('aiConfig.addConfig') }}</NText>
+                        <NText depth="3" class="modal-subtitle">{{ editingConfig ? t('aiConfig.editConfigDesc') : t('aiConfig.addConfigDesc') }}</NText>
                     </div>
-                </n-alert>
-            </div>
-
-            <template #action>
-                <n-button @click="showIntelligentTestResult = false">{{ t('aiConfig.close') }}</n-button>
-            </template>
-        </n-modal>
-
-        <!-- 系统提示词编辑弹窗 -->
-        <CommonModal ref="systemPromptModalRef" :show="showSystemPromptModal"
-            @update:show="showSystemPromptModal = $event" @close="closeSystemPromptModal">
-            <!-- 顶部固定区域 -->
-            <template #header>
-                <NFlex align="center" justify="space-between">
-                    <NFlex align="center" style="gap: 12px">
-                        <NIcon size="20">
-                            <Edit />
-                        </NIcon>
-                        <div>
-                            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
-                                {{ t('aiConfig.editGenerationPrompt') }}
-                            </NText>
-                            <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
-                                {{ t('aiConfig.customSystemPromptDesc') }}
-                            </NText>
-                        </div>
-                    </NFlex>
-                </NFlex>
+                </div>
             </template>
 
-            <!-- 中间可操作区域 -->
             <template #content="{ contentHeight }">
-                <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
-                    <NAlert type="info" :show-icon="false">
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('aiConfig.systemPromptTip') }}
-                        </NText>
-                    </NAlert>
+                <div class="editor-shell" :style="{ height: `${contentHeight}px` }">
+                    <div class="editor-navigation" :class="{ 'create-navigation': !editingConfig }">
+                        <button v-for="section in editorSections" :key="section.key" type="button"
+                            class="editor-nav-item" :class="{ active: activeEditorSection === section.key, complete: isEditorSectionComplete(section.key) }"
+                            :disabled="!editingConfig && !canNavigateToCreateSection(section.key)"
+                            @click="navigateEditorSection(section.key)">
+                            <span class="step-index">{{ section.index }}</span>
+                            <span><strong>{{ section.label }}</strong><small>{{ section.description }}</small></span>
+                        </button>
+                    </div>
 
-                    <NInput v-model:value="systemPromptContent" type="textarea" :placeholder="t('aiConfig.systemPromptPlaceholder')" :rows="15"
-                        :style="{
-                            height: `${contentHeight - 120}px`,
-                            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace'
-                        }" :autosize="false" show-count />
-                </NFlex>
+                    <NScrollbar class="editor-content">
+                        <div class="editor-content-inner">
+                            <section v-if="activeEditorSection === 'provider'" class="editor-section">
+                                <div class="editor-section-heading">
+                                    <NText strong>{{ t('aiConfig.workspace.chooseProvider') }}</NText>
+                                    <NText depth="3">{{ t('aiConfig.workspace.chooseProviderDesc') }}</NText>
+                                </div>
+                                <div v-for="group in providerGroups" :key="group.key" class="provider-group">
+                                    <div class="provider-group-title"><NIcon size="16"><component :is="group.icon" /></NIcon>{{ group.label }}</div>
+                                    <div class="provider-grid">
+                                        <button v-for="provider in group.providers" :key="provider.id" type="button"
+                                            class="provider-card" :class="{ active: selectedProviderChoiceId === provider.id }"
+                                            @click="selectProviderChoice(provider)">
+                                            <span class="provider-card-icon"><NIcon size="20"><component :is="provider.icon" /></NIcon></span>
+                                            <span class="provider-card-copy"><strong>{{ provider.label }}</strong><small>{{ provider.description }}</small></span>
+                                            <NIcon v-if="selectedProviderChoiceId === provider.id" size="18" color="var(--content-secondary)"><Check /></NIcon>
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section v-else-if="activeEditorSection === 'connection'" class="editor-section">
+                                <div class="editor-section-heading">
+                                    <NText strong>{{ t('aiConfig.workspace.configureConnection') }}</NText>
+                                    <NText depth="3">{{ t('aiConfig.workspace.configureConnectionDesc') }}</NText>
+                                </div>
+                                <NForm ref="formRef" :model="formData" :rules="formRules" label-placement="top">
+                                    <div class="form-panel ui-surface">
+                                        <div class="form-grid">
+                                            <NFormItem :label="t('aiConfig.serviceType')" path="type">
+                                                <NSelect v-model:value="formData.type" :options="flatProviderOptions" @update:value="onTypeChange" />
+                                            </NFormItem>
+                                            <NFormItem :label="t('aiConfig.configName')" path="name">
+                                                <NInput v-model:value="formData.name" :placeholder="t('aiConfig.configNamePlaceholder')" />
+                                            </NFormItem>
+                                            <NFormItem v-if="needsBaseURL || supportsCustomEndpoint" :label="getBaseURLInfo.label" path="baseURL" class="form-span-2">
+                                                <NInput v-model:value="formData.baseURL" :placeholder="getBaseURLInfo.placeholder" />
+                                            </NFormItem>
+                                            <NFormItem v-if="needsApiKey" :label="getApiKeyLabel" path="apiKey" class="form-span-2">
+                                                <NInput v-model:value="formData.apiKey" type="password" show-password-on="click"
+                                                    :placeholder="t('aiConfig.workspace.apiKeyPlaceholder')" />
+                                            </NFormItem>
+                                        </div>
+                                    </div>
+
+                                    <div class="provider-help ui-surface-muted">
+                                        <div><NText strong>{{ selectedProviderChoice?.label || getConfigTypeLabel(formData.type) }}</NText><NText depth="3">{{ selectedProviderChoice?.description || getProviderDescription(formData.type) }}</NText></div>
+                                        <NFlex size="small">
+                                            <NButton v-if="getApiKeyInfo.apiKeyUrl" text size="small" @click="openApiKeyUrl"><template #icon><NIcon><ExternalLink /></NIcon></template>{{ t('aiConfig.getApiKey') }}</NButton>
+                                            <NButton v-if="getApiKeyInfo.docUrl" text size="small" @click="openDocumentationUrl"><template #icon><NIcon><Book /></NIcon></template>{{ t('aiConfig.viewDocumentation') }}</NButton>
+                                        </NFlex>
+                                    </div>
+
+                                    <div class="connection-test-panel ui-surface">
+                                        <div class="section-heading">
+                                            <div><NText strong>{{ t('aiConfig.connectionTest') }}</NText><NText depth="3" class="section-description">{{ t('aiConfig.workspace.connectionTestDesc') }}</NText></div>
+                                            <NButton type="primary" size="small" :loading="testingFormConnection" :disabled="!canTestConnection" @click="testFormConnection">
+                                                <template #icon><NIcon><AccessPoint /></NIcon></template>{{ t('aiConfig.connectionTest') }}
+                                            </NButton>
+                                        </div>
+                                        <NAlert v-if="formTestResult" :type="formTestResult.success ? 'success' : 'error'"
+                                            :title="formTestResult.success ? t('aiConfig.testSuccess') : t('aiConfig.testFailed')">
+                                            {{ formTestResult.success ? t('aiConfig.workspace.connectionVerified') : formTestResult.error }}
+                                        </NAlert>
+                                    </div>
+                                </NForm>
+                            </section>
+
+                            <section v-else class="editor-section">
+                                <div class="editor-section-heading">
+                                    <NText strong>{{ t('aiConfig.workspace.configureModels') }}</NText>
+                                    <NText depth="3">{{ t('aiConfig.workspace.configureModelsDesc') }}</NText>
+                                </div>
+                                <div class="form-panel ui-surface">
+                                    <div class="section-heading model-list-heading">
+                                        <div>
+                                            <NText strong>{{ t('aiConfig.modelList') }}</NText>
+                                            <NText depth="3" class="section-description">{{ t('aiConfig.workspace.modelFetchDesc') }}</NText>
+                                        </div>
+                                        <NButton size="small" :loading="fetchingModels" :disabled="!canTestConnection" @click="fetchModelList(true)">
+                                            <template #icon><NIcon><CloudDownload /></NIcon></template>{{ t('aiConfig.workspace.fetchModels') }}
+                                        </NButton>
+                                    </div>
+                                    <NAlert v-if="modelFetchState !== 'idle'" class="model-fetch-result"
+                                        :type="modelFetchState === 'success' ? 'success' : modelFetchState === 'error' ? 'error' : 'warning'"
+                                        :title="modelFetchState === 'success' ? t('aiConfig.workspace.modelsFetched') : t('aiConfig.workspace.modelsNotFetched')">
+                                        {{ modelFetchMessage }}
+                                    </NAlert>
+                                    <NForm :model="formData" label-placement="top">
+                                        <NFormItem :label="t('aiConfig.workspace.availableModelNames')">
+                                            <NDynamicTags v-model:value="formData.models" />
+                                            <template #feedback>{{ t('aiConfig.workspace.manualModelTip') }}</template>
+                                        </NFormItem>
+                                        <div class="form-grid">
+                                            <NFormItem :label="t('aiConfig.defaultModel')">
+                                                <NSelect v-model:value="formData.defaultModel" :options="modelOptions" filterable tag clearable
+                                                    :placeholder="t('aiConfig.selectDefaultModel')" />
+                                            </NFormItem>
+                                            <NFormItem :label="t('aiConfig.customModel')">
+                                                <NInput v-model:value="formData.customModel" :placeholder="t('aiConfig.customModelPlaceholder')" />
+                                            </NFormItem>
+                                        </div>
+                                    </NForm>
+                                </div>
+                                <div class="connection-test-panel ui-surface">
+                                    <div class="section-heading">
+                                        <div><NText strong>{{ t('aiConfig.modelTest') }}</NText><NText depth="3" class="section-description">{{ t('aiConfig.workspace.modelTestDesc') }}</NText></div>
+                                    </div>
+                                    <div class="request-test-bar ui-surface-muted">
+                                        <NSelect v-model:value="selectedTestModel" :options="modelOptions" filterable tag
+                                            :placeholder="t('aiConfig.selectModelToTest')" />
+                                        <NButton size="small" :loading="testingSelectedModel" :disabled="!selectedTestModel || !canTestConnection" @click="testSelectedModel">
+                                            <template #icon><NIcon><Robot /></NIcon></template>{{ t('aiConfig.testSelectedModel') }}
+                                        </NButton>
+                                    </div>
+                                    <NAlert v-if="modelTestResult" :type="modelTestResult.success ? 'success' : 'error'"
+                                        :title="modelTestResult.success ? t('aiConfig.modelTestSuccess') : t('aiConfig.modelTestFailed')">
+                                        <span v-if="modelTestResult.response">{{ modelTestResult.response }}</span>
+                                        <span v-else>{{ modelTestResult.error }}</span>
+                                    </NAlert>
+                                </div>
+                            </section>
+                        </div>
+                    </NScrollbar>
+                </div>
             </template>
 
-            <!-- 底部固定区域 -->
             <template #footer>
-                <NFlex justify="space-between">
-                    <NButton @click="resetSystemPromptToDefault" secondary type="warning">
-                        {{ t('aiConfig.resetToDefault') }}
-                    </NButton>
+                <NFlex justify="space-between" align="center">
+                    <NText depth="3" class="dirty-indicator">{{ editorDirty ? t('aiConfig.workspace.unsavedChanges') : '' }}</NText>
                     <NFlex>
-                        <NButton @click="closeSystemPromptModal">{{ t('aiConfig.cancel') }}</NButton>
-                        <NButton type="primary" @click="saveSystemPrompt">
-                            {{ t('aiConfig.save') }}
+                        <NButton @click="requestCloseEditor">{{ t('common.cancel') }}</NButton>
+                        <NButton v-if="!editingConfig && activeEditorSection !== 'provider'" @click="previousCreateStep">
+                            <template #icon><NIcon><ChevronLeft /></NIcon></template>{{ t('common.previous') }}
+                        </NButton>
+                        <NButton v-if="!editingConfig && activeEditorSection !== 'models'" type="primary" @click="nextCreateStep">
+                            {{ t('common.next') }}<template #icon><NIcon><ChevronRight /></NIcon></template>
+                        </NButton>
+                        <NButton v-else type="primary" :loading="saving" @click="saveConfig">
+                            {{ editingConfig ? t('aiConfig.updateConfig') : t('aiConfig.addConfigButton') }}
                         </NButton>
                     </NFlex>
                 </NFlex>
             </template>
         </CommonModal>
 
-        <!-- 快速优化提示词配置管理模态窗 -->
-        <QuickOptimizationConfigModal 
-            :show="showQuickOptimizationModal" 
+        <CommonModal :show="showSystemPromptModal" @update:show="handleSystemPromptShowUpdate">
+            <template #header>
+                <div class="modal-title-row">
+                    <span class="modal-title-icon"><NIcon size="20"><Edit /></NIcon></span>
+                    <div><NText strong class="modal-title">{{ t('aiConfig.editGenerationPrompt') }}</NText><NText depth="3" class="modal-subtitle">{{ editingSystemPromptConfig?.name }} · {{ t('aiConfig.customSystemPromptDesc') }}</NText></div>
+                </div>
+            </template>
+            <template #content="{ contentHeight }">
+                <div class="prompt-editor-shell" :style="{ height: `${contentHeight}px` }">
+                    <NAlert type="info" :show-icon="false">{{ t('aiConfig.systemPromptTip') }}</NAlert>
+                    <NInput v-model:value="systemPromptContent" type="textarea" :placeholder="t('aiConfig.systemPromptPlaceholder')"
+                        class="system-prompt-input" :autosize="false" show-count />
+                </div>
+            </template>
+            <template #footer>
+                <NFlex justify="space-between">
+                    <NButton secondary @click="resetSystemPromptToDefault">{{ t('aiConfig.resetToDefault') }}</NButton>
+                    <NFlex><NButton @click="requestCloseSystemPrompt">{{ t('common.cancel') }}</NButton><NButton type="primary" :loading="savingSystemPrompt" @click="saveSystemPrompt">{{ t('common.save') }}</NButton></NFlex>
+                </NFlex>
+            </template>
+        </CommonModal>
+
+        <QuickOptimizationConfigModal :show="showQuickOptimizationModal"
             @update:show="showQuickOptimizationModal = $event"
-            @configs-updated="handleQuickOptimizationConfigsUpdated"
-        />
+            @configs-updated="handleQuickOptimizationConfigsUpdated" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from "vue";
-import { useI18n } from 'vue-i18n';
+import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
-    NButton,
-    NCard,
-    NForm,
-    NFormItem,
-    NInput,
-    NSelect,
-    NTag,
-    NModal,
-    NSwitch,
-    NDynamicTags,
-    NIcon,
-    NSpace,
-    NDropdown,
-    NScrollbar,
-    NFlex,
-    NText,
-    NAlert,
-    NEmpty,
-    NSplit,
-    useMessage,
-} from "naive-ui";
-import { Plus, Robot, DatabaseOff, Server, Settings, Edit, AccessPoint, ExternalLink, Book, InfoCircle } from "@vicons/tabler";
-import type { AIConfig } from "~/lib/db";
-import { databaseService } from "~/lib/db";
-import { useDatabase } from "~/composables/useDatabase";
-import { useWindowSize } from "~/composables/useWindowSize";
-import CommonModal from "~/components/common/CommonModal.vue";
-import QuickOptimizationConfigModal from "~/components/ai/QuickOptimizationConfigModal.vue";
-import { getDefaultBaseURL, getProviderMetadata } from "@shared/ai-provider-metadata";
-import { openExternalUrl } from "~/lib/platform/shell";
+    NAlert, NButton, NDynamicTags, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput,
+    NResult, NScrollbar, NSelect, NSpin, NSplit, NSwitch, NTag, NText, NTooltip,
+    useDialog, useMessage,
+} from 'naive-ui'
+import {
+    AccessPoint, Api, Atom, Book, BrandGoogle, BrandOpenSource, BrandWindows, Check,
+    ChevronLeft, ChevronRight, Circles, Cloud, CloudDownload, DeviceDesktop, Edit, ExternalLink,
+    LetterA, LetterD, LetterM, LetterT, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
+    Search, Server, Settings, Star, Trash,
+} from '@vicons/tabler'
+import type { AIConfig, AIConfigTestResult, AIProviderType } from '@shared/types/ai'
+import { getDefaultBaseURL, getProviderMetadata } from '@shared/ai-provider-metadata'
+import { databaseService } from '@/lib/db'
+import { useDatabase } from '@/composables/useDatabase'
+import { openExternalUrl } from '@/lib/platform/shell'
+import CommonModal from '@/components/common/CommonModal.vue'
+import QuickOptimizationConfigModal from '@/components/ai/QuickOptimizationConfigModal.vue'
 
-const { t } = useI18n();
-const message = useMessage();
-const { isDatabaseReady, safeDbOperation, waitForDatabase } = useDatabase();
+type ConfigFilter = 'all' | 'enabled' | 'disabled' | 'local' | 'online'
+type EditorSection = 'provider' | 'connection' | 'models'
+type RequestTestResult = AIConfigTestResult & { inputPrompt?: string }
+type ModelFetchState = 'idle' | 'success' | 'empty' | 'error'
 
-// 获取窗口尺寸用于响应式布局
-const { modalWidth } = useWindowSize();
+interface ProviderChoice {
+    id: string
+    type: AIProviderType
+    label: string
+    description: string
+    icon: Component
+    defaultName: string
+    baseURL?: string
+    placeholder?: string
+    apiKeyUrl?: string
+    docUrl?: string
+    custom?: boolean
+}
 
-// 数据状态
-const configs = ref<AIConfig[]>([]);
-const preferredConfig = ref<AIConfig | null>(null);
-const showAddModal = ref(false);
-const editingConfig = ref<AIConfig | null>(null);
-const saving = ref(false);
-const testingConfigs = ref(new Set<number>());
-const intelligentTestingConfigs = ref(new Set<number>());
-const testingFormConnection = ref(false);
-const formTestResult = ref<{
-    success: boolean;
-    models?: string[];
-    error?: string;
-    modelSource?: 'remote' | 'default' | 'unavailable';
-    modelListMessage?: string;
-} | null>(null);
+const { t } = useI18n()
+const message = useMessage()
+const dialog = useDialog()
+const { waitForDatabase } = useDatabase()
 
-// 模型测试相关状态
-const selectedTestModel = ref<string>('');
-const testingSelectedModel = ref(false);
-const modelTestResult = ref<{
-    success: boolean;
-    error?: string;
-    model?: string;
-    response?: string;
-} | null>(null);
-const showIntelligentTestResult = ref(false);
-const intelligentTestResult = ref<{
-    success: boolean;
-    response?: string;
-    error?: string;
-    inputPrompt?: string;
-} | null>(null);
-const autoShowAddModal = ref(false);
+const configs = ref<AIConfig[]>([])
+const loading = ref(true)
+const loadError = ref('')
+const selectedConfigId = ref<number | null>(null)
+const searchText = ref('')
+const activeFilter = ref<ConfigFilter>('all')
+const storedLibraryPaneSize = localStorage.getItem('ai_config_library_pane_size')
+const libraryPaneSize = ref(storedLibraryPaneSize && /^\d+(\.\d+)?px$/.test(storedLibraryPaneSize) ? storedLibraryPaneSize : '280px')
 
-// 系统提示词编辑相关状态
-const showSystemPromptModal = ref(false);
-const editingSystemPromptConfig = ref<AIConfig | null>(null);
-const systemPromptContent = ref("");
+const showEditorModal = ref(false)
+const editingConfig = ref<AIConfig | null>(null)
+const activeEditorSection = ref<EditorSection>('provider')
+const editorSnapshot = ref('')
+const saving = ref(false)
+const formRef = ref<any>()
+const testingFormConnection = ref(false)
+const formTestResult = ref<AIConfigTestResult | null>(null)
+const lastTestFingerprint = ref('')
+const fetchingModels = ref(false)
+const modelFetchAttempted = ref(false)
+const modelFetchState = ref<ModelFetchState>('idle')
+const modelFetchMessage = ref('')
+const selectedTestModel = ref('')
+const testingSelectedModel = ref(false)
+const modelTestResult = ref<AIConfigTestResult | null>(null)
 
-// 快速优化配置相关状态
-const showQuickOptimizationModal = ref(false);
+const testingConfigs = ref(new Set<number>())
+const intelligentTestingConfigs = ref(new Set<number>())
+const togglingConfigId = ref<number | null>(null)
+const connectionResults = reactive<Record<number, AIConfigTestResult>>({})
+const requestResults = reactive<Record<number, RequestTestResult>>({})
+const requestTestModels = reactive<Record<number, string>>({})
 
-// 表单数据
+const showSystemPromptModal = ref(false)
+const editingSystemPromptConfig = ref<AIConfig | null>(null)
+const systemPromptContent = ref('')
+const systemPromptSnapshot = ref('')
+const savingSystemPrompt = ref(false)
+const showQuickOptimizationModal = ref(false)
+
 const formData = reactive({
-            type: "openai" as "openai" | "ollama" | "anthropic" | "google" | "azure" | "lmstudio" | "deepseek" | "mistral" | "siliconflow" | "tencent" | "aliyun" | "zhipu" | "openrouter",
-    name: "",
-    baseURL: "",
-    apiKey: "",
+    type: 'openai' as AIProviderType,
+    name: '',
+    baseURL: '',
+    apiKey: '',
     models: [] as string[],
-    defaultModel: "",
-    customModel: "",
-    systemPrompt: "",
-});
+    defaultModel: '',
+    customModel: '',
+    systemPrompt: '',
+})
 
-// 表单校验规则
-const formRules = computed(() => ({
-    type: [{ required: true, message: t('aiConfig.pleaseSelectType'), trigger: "change" }],
-    name: [{ required: true, message: t('aiConfig.pleaseEnterConfigName'), trigger: "blur" }],
-    baseURL: [
-        {
-            required: needsBaseURL.value,
-            message: t('aiConfig.pleaseEnterBaseURL'),
-            trigger: "blur"
-        }
-    ],
-    apiKey: [
-        {
-            required: needsApiKey.value,
-            message: getApiKeyLabel.value.replace('：', ''),
-            trigger: "blur"
-        }
-    ],
-}));
+const localProviderTypes: AIProviderType[] = ['ollama', 'lmstudio']
+const onlineProviderTypes: AIProviderType[] = ['openai', 'anthropic', 'google', 'azure', 'mistral', 'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow']
+const allProviderTypes = [...localProviderTypes, ...onlineProviderTypes]
 
-// 计算属性：是否需要Base URL
-const needsBaseURL = computed(() => {
-    return !['anthropic', 'google'].includes(formData.type);
-});
+const providerIcons: Record<AIProviderType, Component> = {
+    openai: Atom,
+    ollama: BrandOpenSource,
+    anthropic: LetterA,
+    google: BrandGoogle,
+    azure: BrandWindows,
+    lmstudio: DeviceDesktop,
+    deepseek: LetterD,
+    mistral: LetterM,
+    siliconflow: Circles,
+    tencent: LetterT,
+    aliyun: Cloud,
+    zhipu: LetterZ,
+    openrouter: Route,
+}
 
-// 计算属性：是否需要API Key
-const needsApiKey = computed(() => {
-    return !['ollama', 'lmstudio'].includes(formData.type);
-});
+const officialProviderChoices = computed<ProviderChoice[]>(() => allProviderTypes.map(type => ({
+    id: `official:${type}`,
+    type,
+    label: getConfigTypeLabel(type),
+    description: getProviderDescription(type),
+    icon: providerIcons[type],
+    defaultName: getConfigTypeLabel(type),
+    baseURL: getDefaultBaseURL(type),
+})))
 
-// 计算属性：API Key标签
-const getApiKeyLabel = computed(() => {
-    switch (formData.type) {
-        case 'anthropic':
-            return 'Anthropic API Key：';
-        case 'google':
-            return 'Google Gemini AI API Key：';
-        case 'azure':
-            return 'Azure OpenAI API Key：';
-        case 'deepseek':
-            return 'DeepSeek API Key：';
-        case 'siliconflow':
-            return '硅基流动 API Key：';
-        case 'tencent':
-            return '腾讯云 API Key：';
-        case 'aliyun':
-            return '阿里云 API Key：';
-        case 'mistral':
-            return 'Mistral API Key：';
-        case 'zhipu':
-            return '智谱AI API Key：';
-        case 'openrouter':
-            return 'OpenRouter API Key：';
-        case 'openai':
-        default:
-            return 'API Key：';
-    }
-});
-
-// 计算属性：Base URL标签和placeholder
-const getBaseURLInfo = computed(() => {
-    switch (formData.type) {
-        case 'ollama':
-            return {
-                label: t('aiConfig.ollamaServiceAddress'),
-                placeholder: t('aiConfig.ollamaExample')
-            };
-        case 'lmstudio':
-            return {
-                label: t('aiConfig.lmstudioServiceAddress'),
-                placeholder: t('aiConfig.lmstudioExample')
-            };
-        case 'azure':
-            return {
-                label: t('aiConfig.azureOpenAIEndpoint'),
-                placeholder: 'https://your-resource.openai.azure.com/openai/v1'
-            };
-        case 'deepseek':
-            return {
-                label: t('aiConfig.deepseekAPIAddress'),
-                placeholder: t('aiConfig.deepseekExample')
-            };
-        case 'siliconflow':
-            return {
-                label: t('aiConfig.siliconflowAPIAddress'),
-                placeholder: t('aiConfig.siliconflowExample')
-            };
-        case 'tencent':
-            return {
-                label: t('aiConfig.tencentAPIAddress'),
-                placeholder: getDefaultBaseURL('tencent')
-            };
-        case 'aliyun':
-            return {
-                label: t('aiConfig.aliyunAPIAddress'),
-                placeholder: getDefaultBaseURL('aliyun')
-            };
-        case 'mistral':
-            return {
-                label: t('aiConfig.mistralAPIAddress'),
-                placeholder: t('aiConfig.mistralExample')
-            };
-        case 'zhipu':
-            return {
-                label: t('aiConfig.zhipuAPIAddress'),
-                placeholder: t('aiConfig.zhipuExample')
-            };
-        case 'anthropic':
-            return {
-                label: t('aiConfig.customEndpoint'),
-                placeholder: t('aiConfig.useOfficialEndpoint')
-            };
-        case 'google':
-            return {
-                label: t('aiConfig.customEndpoint'),
-                placeholder: t('aiConfig.useOfficialEndpoint')
-            };
-        case 'openrouter':
-            return {
-                label: t('aiConfig.baseURL') + '：',
-                placeholder: getDefaultBaseURL('openrouter')
-            };
-
-        case 'openai':
-        default:
-            return {
-                label: t('aiConfig.baseURL') + '：',
-                placeholder: getDefaultBaseURL('openai')
-            };
-    }
-});
-
-// 计算属性：API Key 信息
-const getApiKeyInfo = computed(() => {
-    const metadata = getProviderMetadata(formData.type);
-    return {
-        name: metadata.displayName,
-        apiKeyUrl: metadata.apiKeyUrl,
-        docUrl: metadata.docUrl
-    };
-});
-
-// 计算属性：服务商信息
-const getServiceInfo = computed(() => {
-    switch (formData.type) {
-        case 'openai':
-            return {
-                name: 'OpenAI',
-                description: t('aiConfig.serviceDescriptions.openai')
-            };
-        case 'anthropic':
-            return {
-                name: 'Anthropic Claude',
-                description: t('aiConfig.serviceDescriptions.anthropic')
-            };
-        case 'google':
-            return {
-                name: 'Google Gemini AI',
-                description: t('aiConfig.serviceDescriptions.google')
-            };
-        case 'azure':
-            return {
-                name: 'Azure OpenAI',
-                description: t('aiConfig.serviceDescriptions.azure')
-            };
-        case 'deepseek':
-            return {
-                name: 'DeepSeek',
-                description: t('aiConfig.serviceDescriptions.deepseek')
-            };
-        case 'siliconflow':
-            return {
-                name: '硅基流动',
-                description: t('aiConfig.serviceDescriptions.siliconflow')
-            };
-        case 'tencent':
-            return {
-                name: '腾讯云',
-                description: t('aiConfig.serviceDescriptions.tencent')
-            };
-        case 'aliyun':
-            return {
-                name: '阿里云',
-                description: t('aiConfig.serviceDescriptions.aliyun')
-            };
-        case 'mistral':
-            return {
-                name: 'Mistral AI',
-                description: t('aiConfig.serviceDescriptions.mistral')
-            };
-        case 'zhipu':
-            return {
-                name: '智谱AI',
-                description: t('aiConfig.serviceDescriptions.zhipu')
-            };
-        case 'openrouter':
-            return {
-                name: 'OpenRouter',
-                description: t('aiConfig.serviceDescriptions.openrouter')
-            };
-        case 'ollama':
-            return {
-                name: 'Ollama',
-                description: t('aiConfig.serviceDescriptions.ollama')
-            };
-        case 'lmstudio':
-            return {
-                name: 'LM Studio',
-                description: t('aiConfig.serviceDescriptions.lmstudio')
-            };
-        default:
-            return {
-                name: '',
-                description: ''
-            };
-    }
-});
-
-// 类型选项
-const typeOptions = [
+const compatibilityProviderChoices = computed<ProviderChoice[]>(() => [
     {
-        type: 'group',
-        label: t('aiConfig.localServices'),
-        key: 'local',
-        children: [
-            { label: "Ollama", value: "ollama" },
-            { label: "LM Studio", value: "lmstudio" },
-        ]
+        id: 'custom:openai', type: 'openai', label: t('aiConfig.workspace.customOpenAI'),
+        description: t('aiConfig.workspace.customOpenAIDesc'), icon: Api,
+        defaultName: t('aiConfig.workspace.customOpenAI'), baseURL: '',
+        placeholder: 'https://your-provider.example/v1', custom: true,
     },
     {
-        type: 'group',
-        label: t('aiConfig.onlineServices'),
-        key: 'online',
-        children: [
-            { label: "OpenAI", value: "openai" },
-            { label: "Anthropic Claude", value: "anthropic" },
-            { label: "Google Gemini AI", value: "google" },
-            { label: "Azure OpenAI", value: "azure" },
-            { label: "Mistral AI", value: "mistral" },
-            { label: "OpenRouter", value: "openrouter" },
-            { label: "DeepSeek", value: "deepseek" },
-            { label: "腾讯云", value: "tencent" },
-            { label: "阿里云", value: "aliyun" },
-            { label: "智谱 AI", value: "zhipu" },
-            { label: "硅基流动", value: "siliconflow" },
-        ]
+        id: 'custom:claude', type: 'anthropic', label: t('aiConfig.workspace.customClaude'),
+        description: t('aiConfig.workspace.customClaudeDesc'), icon: LetterA,
+        defaultName: t('aiConfig.workspace.customClaude'), baseURL: '',
+        placeholder: 'https://your-provider.example', custom: true,
+    },
+])
+
+const onlinePresetChoices = computed<ProviderChoice[]>(() => [
+    {
+        id: 'preset:groq', type: 'openai', label: 'Groq',
+        description: t('aiConfig.workspace.groqPresetDesc'), icon: Api,
+        defaultName: 'Groq', baseURL: 'https://api.groq.com/openai/v1', custom: true,
+        apiKeyUrl: 'https://console.groq.com/keys', docUrl: 'https://console.groq.com/docs/quickstart',
+    },
+    {
+        id: 'preset:moonshot', type: 'openai', label: 'Moonshot AI',
+        description: t('aiConfig.workspace.moonshotPresetDesc'), icon: LetterM,
+        defaultName: 'Moonshot AI', baseURL: 'https://api.moonshot.cn/v1', custom: true,
+        apiKeyUrl: 'https://platform.moonshot.cn/console/api-keys', docUrl: 'https://platform.moonshot.cn/docs/intro',
+    },
+    {
+        id: 'preset:together', type: 'openai', label: 'Together AI',
+        description: t('aiConfig.workspace.togetherPresetDesc'), icon: Circles,
+        defaultName: 'Together AI', baseURL: 'https://api.together.xyz/v1', custom: true,
+        apiKeyUrl: 'https://api.together.ai/settings/api-keys', docUrl: 'https://docs.together.ai/docs/quickstart',
+    },
+    {
+        id: 'preset:vllm', type: 'openai', label: 'vLLM',
+        description: t('aiConfig.workspace.vllmPresetDesc'), icon: Server,
+        defaultName: 'vLLM', baseURL: 'http://localhost:8000/v1', custom: true,
+        docUrl: 'https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html',
+    },
+])
+
+const providerGroups = computed(() => [
+    { key: 'local', label: t('aiConfig.localServices'), icon: DeviceDesktop, providers: officialProviderChoices.value.filter(provider => localProviderTypes.includes(provider.type)) },
+    { key: 'online', label: t('aiConfig.onlineServices'), icon: Cloud, providers: [...officialProviderChoices.value.filter(provider => onlineProviderTypes.includes(provider.type)), ...onlinePresetChoices.value] },
+    { key: 'custom', label: t('aiConfig.workspace.customServices'), icon: Api, providers: compatibilityProviderChoices.value },
+])
+const flatProviderOptions = computed(() => allProviderTypes.map(value => ({ value, label: getConfigTypeLabel(value) })))
+const selectedProviderChoiceId = ref('official:openai')
+const lastAutoConfigName = ref('OpenAI')
+const allProviderChoices = computed(() => [...officialProviderChoices.value, ...onlinePresetChoices.value, ...compatibilityProviderChoices.value])
+const selectedProviderChoice = computed(() => allProviderChoices.value.find(choice => choice.id === selectedProviderChoiceId.value) || null)
+
+const selectedConfig = computed(() => configs.value.find(config => config.id === selectedConfigId.value) || null)
+const explicitPreferredConfig = computed(() => configs.value.find(config => config.isPreferred && config.enabled) || null)
+const fallbackConfig = computed(() => explicitPreferredConfig.value || configs.value.find(config => config.enabled) || null)
+const enabledCount = computed(() => configs.value.filter(config => config.enabled).length)
+
+const filterOptions = computed(() => [
+    { key: 'all' as const, label: t('aiConfig.workspace.allConfigs'), icon: ListDetails, count: configs.value.length },
+    { key: 'enabled' as const, label: t('aiConfig.enabled'), icon: Check, count: enabledCount.value },
+    { key: 'disabled' as const, label: t('aiConfig.disabled'), icon: Settings, count: configs.value.length - enabledCount.value },
+    { key: 'local' as const, label: t('aiConfig.localServices'), icon: DeviceDesktop, count: configs.value.filter(config => isLocalProvider(config.type)).length },
+    { key: 'online' as const, label: t('aiConfig.onlineServices'), icon: Server, count: configs.value.filter(config => !isLocalProvider(config.type)).length },
+])
+
+const filteredConfigs = computed(() => {
+    let result = configs.value.filter(config => {
+        if (activeFilter.value === 'enabled') return config.enabled
+        if (activeFilter.value === 'disabled') return !config.enabled
+        if (activeFilter.value === 'local') return isLocalProvider(config.type)
+        if (activeFilter.value === 'online') return !isLocalProvider(config.type)
+        return true
+    })
+    const query = searchText.value.trim().toLocaleLowerCase()
+    if (query) {
+        result = result.filter(config => `${config.name} ${getConfigTypeLabel(config.type)} ${config.baseURL} ${(config.models || []).join(' ')}`.toLocaleLowerCase().includes(query))
     }
-];
+    return result
+})
 
-// 表单引用
-const formRef = ref();
-const modalRef = ref<InstanceType<typeof CommonModal> | null>(null);
+const isCustomProviderChoice = computed(() => Boolean(selectedProviderChoice.value?.custom))
+const needsBaseURL = computed(() => isCustomProviderChoice.value || !['anthropic', 'google'].includes(formData.type))
+const supportsCustomEndpoint = computed(() => ['anthropic', 'google'].includes(formData.type))
+const needsApiKey = computed(() => !isLocalProvider(formData.type))
+const canTestConnection = computed(() => (!needsApiKey.value || Boolean(formData.apiKey.trim())) && (!needsBaseURL.value || Boolean(formData.baseURL.trim())))
+const connectionFingerprint = computed(() => JSON.stringify({ type: formData.type, baseURL: formData.baseURL.trim(), apiKey: formData.apiKey }))
+const getApiKeyLabel = computed(() => `${getConfigTypeLabel(formData.type)} API Key`)
+const getApiKeyInfo = computed(() => selectedProviderChoice.value?.custom
+    ? { apiKeyUrl: selectedProviderChoice.value.apiKeyUrl || '', docUrl: selectedProviderChoice.value.docUrl || '' }
+    : getProviderMetadata(formData.type))
+const getBaseURLInfo = computed(() => ({
+    label: isCustomProviderChoice.value ? t('aiConfig.workspace.customServiceEndpoint') : ['anthropic', 'google'].includes(formData.type) ? t('aiConfig.customEndpoint') : t('aiConfig.baseURL'),
+    placeholder: selectedProviderChoice.value?.placeholder || getDefaultBaseURL(formData.type) || t('aiConfig.useOfficialEndpoint'),
+}))
+const modelOptions = computed(() => formData.models.map(model => ({ label: model, value: model })))
 
-// 计算属性：模型选项
-const modelOptions = computed(() => {
-    return formData.models.map((model) => ({
-        label: model,
-        value: model,
-    }));
-});
+const editorSections = computed(() => [
+    { key: 'provider' as const, index: 1, label: t('aiConfig.workspace.providerStep'), description: t('aiConfig.workspace.providerStepDesc') },
+    { key: 'connection' as const, index: 2, label: t('aiConfig.workspace.connectionStep'), description: t('aiConfig.workspace.connectionStepDesc') },
+    { key: 'models' as const, index: 3, label: t('aiConfig.workspace.modelsStep'), description: t('aiConfig.workspace.modelsStepDesc') },
+])
 
-// 计算属性：模型测试选项
-const modelTestOptions = computed(() => {
-    return formData.models.map((model) => ({
-        label: model,
-        value: model,
-    }));
-});
+const serializeForm = () => JSON.stringify({
+    type: formData.type, name: formData.name, baseURL: formData.baseURL, apiKey: formData.apiKey,
+    models: formData.models, defaultModel: formData.defaultModel, customModel: formData.customModel,
+    systemPrompt: formData.systemPrompt,
+})
+const editorDirty = computed(() => showEditorModal.value && serializeForm() !== editorSnapshot.value)
+const systemPromptDirty = computed(() => showSystemPromptModal.value && systemPromptContent.value !== systemPromptSnapshot.value)
 
-// 计算属性：是否可以测试连接
-const canTestConnection = computed(() => {
-    // 如果需要API Key但没有提供，则不能测试
-    if (needsApiKey.value && !formData.apiKey.trim()) {
-        return false;
-    }
+const formRules = computed(() => ({
+    type: [{ required: true, message: t('aiConfig.pleaseSelectType'), trigger: 'change' }],
+    name: [{ required: true, message: t('aiConfig.pleaseEnterConfigName'), trigger: 'blur' }],
+    baseURL: [{ required: needsBaseURL.value, message: t('aiConfig.pleaseEnterBaseURL'), trigger: 'blur' }],
+    apiKey: [{ required: needsApiKey.value, message: t('aiConfig.pleaseEnterAPIKey'), trigger: 'blur' }],
+}))
 
-    // 如果需要Base URL但没有提供，则不能测试
-    if (needsBaseURL.value && !formData.baseURL.trim()) {
-        return false;
-    }
+const isLocalProvider = (type: AIProviderType) => localProviderTypes.includes(type)
+const getConfigTypeLabel = (type: AIProviderType) => getProviderMetadata(type).displayName
+const getProviderDescription = (type: AIProviderType) => t(`aiConfig.serviceDescriptions.${type}`)
+const normalizeURL = (value?: string) => (value || '').trim().replace(/\/+$/, '')
+const isCustomConfig = (config: AIConfig) => (
+    config.type === 'openai' && normalizeURL(config.baseURL) !== normalizeURL(getDefaultBaseURL('openai'))
+) || (
+    config.type === 'anthropic' && Boolean(normalizeURL(config.baseURL))
+)
+const findPresetChoice = (config: AIConfig) => onlinePresetChoices.value.find(choice => (
+    choice.type === config.type
+    && Boolean(choice.baseURL)
+    && normalizeURL(choice.baseURL) === normalizeURL(config.baseURL)
+))
+const getConfigDisplayLabel = (config: AIConfig) => findPresetChoice(config)?.label || (isCustomConfig(config)
+    ? config.type === 'anthropic' ? t('aiConfig.workspace.claudeCompatible') : t('aiConfig.workspace.openAICompatible')
+    : getConfigTypeLabel(config.type))
+const getProviderIcon = (type: AIProviderType) => providerIcons[type]
+const getConfigIcon = (config: AIConfig) => findPresetChoice(config)?.icon || (isCustomConfig(config) ? Api : getProviderIcon(config.type))
+const maskSecret = (value: string) => value.length <= 8 ? '••••••••' : `${value.slice(0, 3)}••••••${value.slice(-3)}`
+const formatDate = (date: Date | string) => new Date(date).toLocaleString()
+const getModelOptions = (config: AIConfig) => [...new Set([...(config.models || []), config.defaultModel, config.customModel].filter(Boolean) as string[])].map(model => ({ label: model, value: model }))
 
-    return true;
-});
+const serializeConfig = (config: AIConfig) => ({
+    id: config.id, configId: config.configId, name: config.name, type: config.type, baseURL: config.baseURL,
+    apiKey: config.apiKey, secretKey: config.secretKey, models: [...(config.models || [])],
+    defaultModel: config.defaultModel, customModel: config.customModel, enabled: config.enabled,
+    systemPrompt: config.systemPrompt, createdAt: new Date(config.createdAt), updatedAt: new Date(config.updatedAt),
+})
 
-const getModelListDisplayMessage = (result: {
-    success: boolean;
-    models?: string[];
-    error?: string;
-    modelSource?: 'remote' | 'default' | 'unavailable';
-    modelListMessage?: string;
-}) => {
-    if (!result.success) {
-        return result.error || '';
-    }
-
-    const modelCount = result.models?.length || 0;
-    if (result.modelSource === 'remote' && modelCount > 0) {
-        return t('aiConfig.foundModels', { count: modelCount });
-    }
-    if (result.modelSource === 'default' && modelCount > 0) {
-        return t('aiConfig.usingDefaultModels', { count: modelCount });
-    }
-    if (result.modelSource === 'unavailable') {
-        return result.modelListMessage || t('aiConfig.connectionSuccessNoModels');
-    }
-
-    return result.modelListMessage || (
-        modelCount > 0
-            ? t('aiConfig.foundModels', { count: modelCount })
-            : t('aiConfig.connectionSuccessNoModels')
-    );
-};
-
-// 加载配置列表
 const loadConfigs = async () => {
-    const result = await safeDbOperation(
-        () => databaseService.aiConfig.getAllAIConfigs(),
-        []
-    );
-    if (result) {
-        configs.value = result;
-
-        // 同时加载首选配置
-        const preferred = await safeDbOperation(
-            () => databaseService.aiConfig.getPreferredAIConfig(),
-            null
-        );
-        preferredConfig.value = preferred || null;
-    }
-};
-
-// 添加配置
-const saveConfig = async () => {
+    loading.value = true
+    loadError.value = ''
     try {
-        await formRef.value?.validate();
-        saving.value = true;
-
-        if (editingConfig.value) {
-            // 更新配置
-            const updateData = {
-                type: formData.type,
-                name: formData.name,
-                baseURL: formData.baseURL,
-                apiKey: formData.apiKey || undefined,
-                models: [...formData.models], // 创建新数组确保可序列化
-                defaultModel: formData.defaultModel || undefined,
-                customModel: formData.customModel || undefined,
-                systemPrompt: formData.systemPrompt || undefined,
-                // 保持原有的首选项状态，除非配置被禁用
-                isPreferred: editingConfig.value.isPreferred,
-            };
-            await databaseService.aiConfig.updateAIConfig(editingConfig.value.id!, updateData);
-            message.success(t('aiConfig.configUpdateSuccess'));
-        } else {
-            // 添加新配置
-            const configData = {
-                configId: `config_${Date.now()}_${Math.random()
-                    .toString(36)
-                    .substr(2, 9)}`,
-                type: formData.type,
-                name: formData.name,
-                baseURL: formData.baseURL,
-                apiKey: formData.apiKey || undefined,
-                models: [...formData.models], // 创建新数组确保可序列化
-                defaultModel: formData.defaultModel || undefined,
-                customModel: formData.customModel || undefined,
-                systemPrompt: formData.systemPrompt || undefined,
-                enabled: true,
-            };
-            await databaseService.aiConfig.createAIConfig(configData);
-            message.success(t('aiConfig.configAddSuccess'));
-        }
-
-        closeModal();
-        loadConfigs();
+        const result = await databaseService.aiConfig.getAllAIConfigs()
+        configs.value = result
+        const storedId = Number(localStorage.getItem('ai_config_workspace_last_id'))
+        const selected = result.find(config => config.id === selectedConfigId.value)
+            || result.find(config => config.id === storedId)
+            || result.find(config => config.isPreferred && config.enabled)
+            || result.find(config => config.enabled)
+            || result[0]
+        selectedConfigId.value = selected?.id || null
+        result.forEach(config => {
+            if (config.id && !requestTestModels[config.id]) requestTestModels[config.id] = config.defaultModel || config.customModel || config.models?.[0] || ''
+        })
     } catch (error) {
-        message.error(t('aiConfig.saveFailed') + (error as Error).message);
+        console.error(error)
+        loadError.value = (error as Error).message
     } finally {
-        saving.value = false;
+        loading.value = false
     }
-};
+}
 
-// 编辑配置
-const editConfig = (config: AIConfig) => {
-    editingConfig.value = config;
-    formData.name = config.name;
-    formData.type = config.type;
-    formData.baseURL = config.baseURL;
-    formData.apiKey = config.apiKey || "";
-    formData.models = Array.isArray(config.models) ? config.models : [];
-    formData.defaultModel = config.defaultModel || "";
-    formData.customModel = config.customModel || "";
-    formData.systemPrompt = config.systemPrompt || "";
-    
-    // 清空测试状态
-    formTestResult.value = null;
-    modelTestResult.value = null;
-    selectedTestModel.value = '';
-    testingSelectedModel.value = false;
-    testingFormConnection.value = false;
-    
-    showAddModal.value = true;
-};
+const selectConfig = (config: AIConfig) => {
+    selectedConfigId.value = config.id || null
+    if (config.id) localStorage.setItem('ai_config_workspace_last_id', String(config.id))
+}
 
-// 删除配置
-const deleteConfig = async (id: number) => {
+const resolveProviderChoiceId = (config?: AIConfig) => {
+    if (!config) return 'official:openai'
+    const preset = findPresetChoice(config)
+    if (preset) return preset.id
+    if (isCustomConfig(config)) return config.type === 'anthropic' ? 'custom:claude' : 'custom:openai'
+    return `official:${config.type}`
+}
+
+const resetEditorForm = (config?: AIConfig) => {
+    formData.type = config?.type || 'openai'
+    formData.name = config?.name || getConfigTypeLabel(formData.type)
+    formData.baseURL = config?.baseURL ?? getDefaultBaseURL(formData.type)
+    formData.apiKey = config?.apiKey || ''
+    formData.models = [...(config?.models || [])]
+    formData.defaultModel = config?.defaultModel || ''
+    formData.customModel = config?.customModel || ''
+    formData.systemPrompt = config?.systemPrompt || ''
+    selectedProviderChoiceId.value = resolveProviderChoiceId(config)
+    lastAutoConfigName.value = config ? '' : getConfigTypeLabel(formData.type)
+    formTestResult.value = null
+    lastTestFingerprint.value = ''
+    fetchingModels.value = false
+    modelFetchAttempted.value = false
+    modelFetchState.value = 'idle'
+    modelFetchMessage.value = ''
+    modelTestResult.value = null
+    selectedTestModel.value = config?.defaultModel || config?.customModel || config?.models?.[0] || ''
+    editorSnapshot.value = serializeForm()
+}
+
+const openCreateConfig = () => {
+    editingConfig.value = null
+    activeEditorSection.value = 'provider'
+    resetEditorForm()
+    showEditorModal.value = true
+}
+
+const openEditConfig = (config: AIConfig) => {
+    editingConfig.value = config
+    activeEditorSection.value = 'connection'
+    resetEditorForm(config)
+    showEditorModal.value = true
+}
+
+const confirmDiscard = (content: string) => new Promise<boolean>(resolve => {
+    let settled = false
+    const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value) } }
+    dialog.warning({
+        title: t('aiConfig.workspace.unsavedChanges'), content,
+        positiveText: t('aiConfig.workspace.discardChanges'), negativeText: t('aiConfig.workspace.continueEditing'),
+        maskClosable: false, onPositiveClick: () => finish(true), onNegativeClick: () => finish(false), onClose: () => finish(false),
+    })
+})
+
+const requestCloseEditor = async () => {
+    if (editorDirty.value && !(await confirmDiscard(t('aiConfig.workspace.unsavedEditorMessage')))) return
+    showEditorModal.value = false
+    editingConfig.value = null
+}
+const handleEditorShowUpdate = (value: boolean) => { if (!value) requestCloseEditor() }
+
+const selectProviderChoice = (choice: ProviderChoice) => {
+    const shouldReplaceName = !formData.name.trim() || formData.name === lastAutoConfigName.value
+    selectedProviderChoiceId.value = choice.id
+    formData.type = choice.type
+    if (shouldReplaceName) formData.name = choice.defaultName
+    lastAutoConfigName.value = choice.defaultName
+    formData.baseURL = choice.baseURL ?? getDefaultBaseURL(choice.type)
+    formData.apiKey = ''
+    formData.models = []
+    formData.defaultModel = ''
+    formData.customModel = ''
+    formTestResult.value = null
+    lastTestFingerprint.value = ''
+    modelFetchAttempted.value = false
+    modelFetchState.value = 'idle'
+    modelFetchMessage.value = ''
+    modelTestResult.value = null
+    selectedTestModel.value = ''
+}
+
+const onTypeChange = (type: AIProviderType) => {
+    const choice = officialProviderChoices.value.find(provider => provider.type === type)
+    if (choice) selectProviderChoice(choice)
+}
+
+const canNavigateToCreateSection = (section: EditorSection) => {
+    return Boolean(section)
+}
+const isEditorSectionComplete = (section: EditorSection) => {
+    if (section === 'provider') return Boolean(formData.type)
+    if (section === 'connection') return Boolean(formTestResult.value?.success)
+    return Boolean(formData.defaultModel || formData.customModel)
+}
+const validateConnectionFields = () => {
+    if (!formData.name.trim()) { message.warning(t('aiConfig.pleaseEnterConfigName')); return false }
+    if (needsBaseURL.value && !formData.baseURL.trim()) { message.warning(t('aiConfig.pleaseEnterBaseURL')); return false }
+    if (needsApiKey.value && !formData.apiKey.trim()) { message.warning(t('aiConfig.pleaseEnterAPIKey')); return false }
+    return true
+}
+
+const confirmContinueAfterConnectionTest = () => new Promise<boolean>(resolve => {
+    if (formTestResult.value?.success) { resolve(true); return }
+    let settled = false
+    const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value) } }
+    dialog.warning({
+        title: formTestResult.value ? t('aiConfig.workspace.continueAfterFailedTestTitle') : t('aiConfig.workspace.continueWithoutTestTitle'),
+        content: formTestResult.value
+            ? t('aiConfig.workspace.continueAfterFailedTestMessage', { error: formTestResult.value.error || t('common.unknownError') })
+            : t('aiConfig.workspace.continueWithoutTestMessage'),
+        positiveText: t('aiConfig.workspace.continueToModels'),
+        negativeText: t('aiConfig.workspace.stayAndTest'),
+        maskClosable: false,
+        onPositiveClick: () => finish(true), onNegativeClick: () => finish(false), onClose: () => finish(false),
+    })
+})
+
+const buildTemporaryConfig = (): AIConfig => ({
+    configId: editingConfig.value?.configId || 'temp_test',
+    name: formData.name || 'Test', type: formData.type, baseURL: formData.baseURL,
+    apiKey: formData.apiKey, models: [...formData.models], defaultModel: formData.defaultModel || undefined,
+    customModel: formData.customModel || undefined, enabled: true,
+    createdAt: editingConfig.value?.createdAt || new Date(), updatedAt: new Date(),
+})
+
+const confirmReplaceModels = () => new Promise<boolean>(resolve => {
+    let settled = false
+    const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value) } }
+    dialog.warning({
+        title: t('aiConfig.workspace.replaceModelsTitle'), content: t('aiConfig.workspace.replaceModelsMessage'),
+        positiveText: t('aiConfig.workspace.fetchAndReplace'), negativeText: t('common.cancel'),
+        onPositiveClick: () => finish(true), onNegativeClick: () => finish(false), onClose: () => finish(false),
+    })
+})
+
+const fetchModelList = async (manual = false) => {
+    if (!validateConnectionFields()) return false
+    if (manual && formData.models.length && !(await confirmReplaceModels())) return false
+    fetchingModels.value = true
+    modelFetchAttempted.value = true
+    modelFetchState.value = 'idle'
+    modelFetchMessage.value = ''
     try {
-        await databaseService.aiConfig.deleteAIConfig(id);
-        message.success(t('aiConfig.configDeleteSuccess'));
-        loadConfigs();
-    } catch (error) {
-        message.error(t('aiConfig.deleteFailed') + (error as Error).message);
-    }
-};
-
-// 切换配置状态
-const toggleConfig = async (id: number, enabled: boolean) => {
-    try {
-        await databaseService.aiConfig.updateAIConfig(id, { enabled });
-
-        // 如果禁用的是首选配置，需要清除首选项状态
-        if (!enabled) {
-            const config = configs.value.find(c => c.id === id);
-            if (config?.isPreferred) {
-                await databaseService.aiConfig.updateAIConfig(id, { isPreferred: false });
-            }
+        const models = [...new Set(await window.electronAPI.ai.getModels(serializeConfig(buildTemporaryConfig())))]
+        if (!models.length) {
+            modelFetchState.value = 'empty'
+            modelFetchMessage.value = t('aiConfig.workspace.noModelsReturned')
+            return false
         }
-
-        message.success(enabled ? t('aiConfig.configEnabled') : t('aiConfig.configDisabled'));
-        loadConfigs(); // 重新加载以更新UI状态
+        formData.models = models
+        if (!formData.defaultModel) formData.defaultModel = models[0]
+        if (!selectedTestModel.value) selectedTestModel.value = formData.defaultModel || models[0]
+        modelFetchState.value = 'success'
+        modelFetchMessage.value = t('aiConfig.workspace.modelFetchSuccess', { count: models.length })
+        return true
     } catch (error) {
-        message.error(t('aiConfig.updateFailed') + (error as Error).message);
-    }
-};
+        modelFetchState.value = 'error'
+        modelFetchMessage.value = (error as Error).message
+        return false
+    } finally { fetchingModels.value = false }
+}
 
-// 设置首选配置
-const setPreferred = async (config: AIConfig) => {
-    if (!config.id) return;
+const enterModelsStep = async () => {
+    if (!validateConnectionFields()) { activeEditorSection.value = 'connection'; return }
+    if (!(await confirmContinueAfterConnectionTest())) return
+    activeEditorSection.value = 'models'
+    if (!modelFetchAttempted.value && (!editingConfig.value || formData.models.length === 0)) await fetchModelList(false)
+}
 
-    try {
-        if (config.isPreferred) {
-            // 如果已经是首选，则取消首选
-            await databaseService.aiConfig.clearPreferredAIConfig();
-            message.success(t('aiConfig.preferredCleared'));
-        } else {
-            // 设置为首选
-            await databaseService.aiConfig.setPreferredAIConfig(config.id);
-            message.success(t('aiConfig.setAsPreferredSuccess', { name: config.name }));
-        }
+const navigateEditorSection = async (section: EditorSection) => {
+    if (section === activeEditorSection.value) return
+    if (section === 'models') { await enterModelsStep(); return }
+    activeEditorSection.value = section
+}
+const previousCreateStep = () => { activeEditorSection.value = activeEditorSection.value === 'models' ? 'connection' : 'provider' }
+const nextCreateStep = async () => {
+    if (activeEditorSection.value === 'provider') { activeEditorSection.value = 'connection'; return }
+    try { await formRef.value?.validate() } catch { return }
+    await enterModelsStep()
+}
 
-        loadConfigs(); // 重新加载以更新UI状态
-    } catch (error) {
-        message.error(t('aiConfig.setFailed') + (error as Error).message);
-    }
-};
-
-// 清除首选配置
-const clearPreferred = async () => {
-    try {
-        await databaseService.aiConfig.clearPreferredAIConfig();
-        message.success(t('aiConfig.globalPreferredCleared'));
-        loadConfigs(); // 重新加载以更新UI状态
-    } catch (error) {
-        message.error(t('aiConfig.clearFailed') + (error as Error).message);
-    }
-};
-
-// 测试配置
-const testConfig = async (config: AIConfig) => {
-    if (!config.id) return;
-
-    testingConfigs.value.add(config.id);
-    try {
-        // 序列化配置对象以确保可以通过 IPC 传递
-        const serializedConfig = serializeConfig(config);
-
-        const result = await window.electronAPI.ai.testConfig(serializedConfig);
-        if (result.success) {
-            message.success(t('aiConfig.connectionTestSuccess'));
-            if (result.models && result.models.length > 0) {
-                if (result.modelSource === 'default') {
-                    message.warning(getModelListDisplayMessage(result));
-                } else {
-                    message.info(getModelListDisplayMessage(result));
-                }
-            } else if (result.modelSource === 'unavailable') {
-                message.warning(getModelListDisplayMessage(result));
-            }
-        } else {
-            message.error(t('aiConfig.connectionTestFailed') + result.error);
-        }
-    } catch (error) {
-        message.error(t('aiConfig.testFailed') + (error as Error).message);
-    } finally {
-        testingConfigs.value.delete(config.id);
-    }
-};
-
-// 表单内测试连接并获取模型
 const testFormConnection = async () => {
-    testingFormConnection.value = true;
-    formTestResult.value = null;
-
+    try { await formRef.value?.validate() } catch { return }
+    testingFormConnection.value = true
+    formTestResult.value = null
     try {
-        // 构建临时配置对象进行测试
-        const tempConfig = {
-            configId: "temp_test",
-            name: formData.name || "Test",
-            type: formData.type,
-            baseURL: formData.baseURL,
-            apiKey: formData.apiKey,
-            models: [],
-            enabled: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        // 使用 serializeConfig 确保对象可以被序列化
-        const serializedConfig = serializeConfig(tempConfig);
-
-        const result = await window.electronAPI.ai.testConfig(serializedConfig);
-        formTestResult.value = result;
-
-        if (result.success) {
-            message.success(t('aiConfig.connectionTestSuccess'));
-
-            // 自动填充模型列表
-            if (result.models && result.models.length > 0) {
-                formData.models = [...result.models];
-
-                // 如果还没有设置默认模型，自动设置第一个
-                if (!formData.defaultModel && result.models.length > 0) {
-                    formData.defaultModel = result.models[0];
-                }
-
-                if (result.modelSource === 'default') {
-                    message.warning(getModelListDisplayMessage(result));
-                } else {
-                    message.info(t('aiConfig.modelsAutoFilled', { count: result.models.length }));
-                }
-            } else {
-                message.warning(getModelListDisplayMessage(result));
-            }
-        } else {
-            message.error(t('aiConfig.connectionTestFailed') + result.error);
-        }
+        const result = await window.electronAPI.ai.testConfig(serializeConfig(buildTemporaryConfig()))
+        formTestResult.value = result.success
+            ? { success: true, message: t('aiConfig.workspace.connectionVerified') }
+            : { success: false, error: result.error || t('common.unknownError') }
+        lastTestFingerprint.value = connectionFingerprint.value
     } catch (error) {
-        message.error(t('aiConfig.testFailed') + (error as Error).message);
-        formTestResult.value = { success: false, error: (error as Error).message };
-    } finally {
-        testingFormConnection.value = false;
-    }
-};
+        formTestResult.value = { success: false, error: (error as Error).message }
+    } finally { testingFormConnection.value = false }
+}
 
-// 测试选中的模型
 const testSelectedModel = async () => {
-    if (!selectedTestModel.value) return;
-    
-    testingSelectedModel.value = true;
-    modelTestResult.value = null;
-
+    if (!selectedTestModel.value) return
+    testingSelectedModel.value = true
+    modelTestResult.value = null
     try {
-        // 构建临时配置对象进行测试
-        const tempConfig = {
-            configId: "temp_test",
-            name: formData.name || "Test",
-            type: formData.type,
-            baseURL: formData.baseURL,
-            apiKey: formData.apiKey,
-            models: [...formData.models], // 创建新数组确保可序列化
-            enabled: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
+        modelTestResult.value = await window.electronAPI.ai.testModel(serializeConfig({
+            configId: 'temp_test', name: formData.name || 'Test', type: formData.type, baseURL: formData.baseURL,
+            apiKey: formData.apiKey, models: [...formData.models], defaultModel: selectedTestModel.value,
+            enabled: true, createdAt: new Date(), updatedAt: new Date(),
+        }), selectedTestModel.value)
+    } catch (error) { modelTestResult.value = { success: false, error: (error as Error).message } }
+    finally { testingSelectedModel.value = false }
+}
 
-        // 使用 serializeConfig 确保对象可以被序列化
-        const serializedConfig = serializeConfig(tempConfig);
-
-        const result = await window.electronAPI.ai.testModel(serializedConfig, selectedTestModel.value);
-        modelTestResult.value = result;
-
-        if (result.success) {
-            message.success(t('aiConfig.modelTestSuccess'));
-        } else {
-            message.error(t('aiConfig.modelTestFailed') + result.error);
+const saveConfig = async () => {
+    if (!editingConfig.value && activeEditorSection.value !== 'models') return
+    if (!formData.name.trim()) { message.warning(t('aiConfig.pleaseEnterConfigName')); return }
+    if (needsBaseURL.value && !formData.baseURL.trim()) { message.warning(t('aiConfig.pleaseEnterBaseURL')); return }
+    if (needsApiKey.value && !formData.apiKey.trim()) { message.warning(t('aiConfig.pleaseEnterAPIKey')); return }
+    if (!formData.defaultModel && !formData.customModel) { message.warning(t('aiConfig.pleaseSelectDefaultModel')); return }
+    saving.value = true
+    try {
+        const savedModels = [...new Set([
+            ...formData.models,
+            ...(formData.defaultModel ? [formData.defaultModel] : []),
+        ])]
+        const data = {
+            type: formData.type, name: formData.name.trim(), baseURL: formData.baseURL.trim(),
+            apiKey: formData.apiKey || undefined, models: savedModels,
+            defaultModel: formData.defaultModel || undefined, customModel: formData.customModel || undefined,
+            systemPrompt: formData.systemPrompt || undefined,
         }
-    } catch (error) {
-        message.error(t('aiConfig.testFailed') + (error as Error).message);
-        modelTestResult.value = { 
-            success: false, 
-            model: selectedTestModel.value,
-            error: (error as Error).message 
-        };
-    } finally {
-        testingSelectedModel.value = false;
-    }
-};
+        let saved: AIConfig
+        if (editingConfig.value?.id) {
+            saved = await databaseService.aiConfig.updateAIConfig(editingConfig.value.id, { ...data, isPreferred: editingConfig.value.isPreferred })
+            message.success(t('aiConfig.configUpdateSuccess'))
+        } else {
+            saved = await databaseService.aiConfig.createAIConfig({
+                ...data, configId: `config_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, enabled: true,
+            })
+            message.success(t('aiConfig.configAddSuccess'))
+        }
+        showEditorModal.value = false
+        editingConfig.value = null
+        await loadConfigs()
+        if (saved.id) selectConfig(configs.value.find(config => config.id === saved.id) || saved)
+    } catch (error) { message.error(t('aiConfig.saveFailed') + (error as Error).message) }
+    finally { saving.value = false }
+}
 
-// 智能测试 - 发送真实提示词
+const testConfig = async (config: AIConfig) => {
+    if (!config.id) return
+    testingConfigs.value.add(config.id)
+    try {
+        const result = await window.electronAPI.ai.testConfig(serializeConfig(config))
+        connectionResults[config.id] = result.success
+            ? { success: true, message: t('aiConfig.workspace.connectionVerified') }
+            : { success: false, error: result.error || t('common.unknownError') }
+    }
+    catch (error) { connectionResults[config.id] = { success: false, error: (error as Error).message } }
+    finally { testingConfigs.value.delete(config.id) }
+}
+
 const intelligentTest = async (config: AIConfig) => {
-    if (!config.id) return;
-
-    intelligentTestingConfigs.value.add(config.id);
+    if (!config.id) return
+    intelligentTestingConfigs.value.add(config.id)
     try {
-        // 序列化配置对象以确保可以通过 IPC 传递
-        const serializedConfig = serializeConfig(config);
+        requestResults[config.id] = await window.electronAPI.ai.intelligentTest(serializeConfig({ ...config, defaultModel: requestTestModels[config.id] || config.defaultModel }))
+    } catch (error) { requestResults[config.id] = { success: false, error: (error as Error).message } }
+    finally { intelligentTestingConfigs.value.delete(config.id) }
+}
 
-        const result = await window.electronAPI.ai.intelligentTest(
-            serializedConfig
-        );
-        intelligentTestResult.value = result;
-        showIntelligentTestResult.value = true;
-
-        if (result.success) {
-            message.success(t('aiConfig.intelligentTestComplete'));
-        } else {
-            message.error(t('aiConfig.intelligentTestFailed') + result.error);
-        }
-    } catch (error) {
-        message.error(t('aiConfig.intelligentTestFailed') + (error as Error).message);
-        intelligentTestResult.value = {
-            success: false,
-            error: (error as Error).message,
-        };
-        showIntelligentTestResult.value = true;
-    } finally {
-        intelligentTestingConfigs.value.delete(config.id);
+const toggleConfig = async (config: AIConfig, enabled: boolean) => {
+    if (!config.id) return
+    if (!enabled && config.isPreferred) {
+        const confirmed = await new Promise<boolean>(resolve => dialog.warning({
+            title: t('aiConfig.workspace.disablePreferredTitle'), content: t('aiConfig.workspace.disablePreferredMessage'),
+            positiveText: t('aiConfig.workspace.disableAnyway'), negativeText: t('common.cancel'),
+            onPositiveClick: () => resolve(true), onNegativeClick: () => resolve(false), onClose: () => resolve(false),
+        }))
+        if (!confirmed) return
     }
-};
+    togglingConfigId.value = config.id
+    try {
+        await databaseService.aiConfig.updateAIConfig(config.id, { enabled, ...(enabled ? {} : { isPreferred: false }) })
+        await loadConfigs()
+    } catch (error) { message.error(t('aiConfig.updateFailed') + (error as Error).message) }
+    finally { togglingConfigId.value = null }
+}
 
-// 编辑系统提示词
+const setPreferred = async (config: AIConfig) => {
+    if (!config.id || !config.enabled) return
+    try {
+        if (config.isPreferred) await databaseService.aiConfig.clearPreferredAIConfig()
+        else await databaseService.aiConfig.setPreferredAIConfig(config.id)
+        await loadConfigs()
+    } catch (error) { message.error(t('aiConfig.setFailed') + (error as Error).message) }
+}
+
+const deleteConfig = (config: AIConfig) => {
+    if (!config.id) return
+    dialog.error({
+        title: t('common.confirm'), content: t('aiConfig.deleteConfirm', { name: config.name }),
+        positiveText: t('common.delete'), negativeText: t('common.cancel'),
+        onPositiveClick: async () => {
+            try {
+                await databaseService.aiConfig.deleteAIConfig(config.id!)
+                delete connectionResults[config.id!]
+                delete requestResults[config.id!]
+                selectedConfigId.value = null
+                await loadConfigs()
+                message.success(t('aiConfig.configDeleteSuccess'))
+            } catch (error) { message.error(t('aiConfig.deleteFailed') + (error as Error).message) }
+        },
+    })
+}
+
+const getDefaultSystemPrompt = () => t('aiConfig.workspace.defaultSystemPrompt')
 const editSystemPrompt = (config: AIConfig) => {
-    editingSystemPromptConfig.value = config;
-    systemPromptContent.value = config.systemPrompt || getDefaultSystemPrompt();
-    showSystemPromptModal.value = true;
-};
-
-// 保存系统提示词
+    editingSystemPromptConfig.value = config
+    systemPromptContent.value = config.systemPrompt || getDefaultSystemPrompt()
+    systemPromptSnapshot.value = systemPromptContent.value
+    showSystemPromptModal.value = true
+}
+const resetSystemPromptToDefault = () => { systemPromptContent.value = getDefaultSystemPrompt() }
+const requestCloseSystemPrompt = async () => {
+    if (systemPromptDirty.value && !(await confirmDiscard(t('aiConfig.workspace.unsavedPromptMessage')))) return
+    showSystemPromptModal.value = false
+    editingSystemPromptConfig.value = null
+}
+const handleSystemPromptShowUpdate = (value: boolean) => { if (!value) requestCloseSystemPrompt() }
 const saveSystemPrompt = async () => {
-    if (!editingSystemPromptConfig.value?.id) return;
-
+    if (!editingSystemPromptConfig.value?.id) return
+    savingSystemPrompt.value = true
     try {
-        await databaseService.aiConfig.updateAIConfig(editingSystemPromptConfig.value.id, {
-            systemPrompt: systemPromptContent.value.trim() || undefined,
-        });
-        message.success(t('aiConfig.systemPromptUpdateSuccess'));
-        closeSystemPromptModal();
-        loadConfigs();
-    } catch (error) {
-        message.error("更新失败: " + (error as Error).message);
+        await databaseService.aiConfig.updateAIConfig(editingSystemPromptConfig.value.id, { systemPrompt: systemPromptContent.value.trim() || undefined })
+        showSystemPromptModal.value = false
+        editingSystemPromptConfig.value = null
+        await loadConfigs()
+        message.success(t('aiConfig.systemPromptUpdateSuccess'))
+    } catch (error) { message.error(t('aiConfig.saveFailed') + (error as Error).message) }
+    finally { savingSystemPrompt.value = false }
+}
+
+const openApiKeyUrl = () => getApiKeyInfo.value.apiKeyUrl && openExternalUrl(getApiKeyInfo.value.apiKeyUrl)
+const openDocumentationUrl = () => getApiKeyInfo.value.docUrl && openExternalUrl(getApiKeyInfo.value.docUrl)
+const handleQuickOptimizationConfigsUpdated = () => message.success(t('aiConfig.quickOptimizationUpdated'))
+const openAddConfigModal = () => openCreateConfig()
+
+watch(libraryPaneSize, size => localStorage.setItem('ai_config_library_pane_size', size))
+watch(selectedConfig, config => {
+    if (config?.id && !requestTestModels[config.id]) requestTestModels[config.id] = config.defaultModel || config.customModel || config.models?.[0] || ''
+})
+watch(connectionFingerprint, fingerprint => {
+    if (lastTestFingerprint.value && fingerprint !== lastTestFingerprint.value) {
+        formTestResult.value = null
+        lastTestFingerprint.value = ''
     }
-};
+})
 
-// 关闭系统提示词编辑弹窗
-const closeSystemPromptModal = () => {
-    showSystemPromptModal.value = false;
-    editingSystemPromptConfig.value = null;
-    systemPromptContent.value = "";
-};
-
-// 获取默认系统提示词
-const getDefaultSystemPrompt = () => {
-    return `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
-
-要求：
-1. 提示词应该清晰、具体、可操作
-2. 包含必要的上下文和约束条件
-3. 使用适当的格式和结构
-4. 考虑不同的使用场景
-5. 提供具体的输出格式要求
-
-请直接返回优化后的提示词内容，不需要额外的解释。`;
-};
-
-// 重置系统提示词为默认值
-const resetSystemPromptToDefault = () => {
-    systemPromptContent.value = getDefaultSystemPrompt();
-};
-
-// 关闭弹窗
-const closeModal = () => {
-    showAddModal.value = false;
-    editingConfig.value = null;
-    formTestResult.value = null;
-    modelTestResult.value = null;
-    selectedTestModel.value = '';
-    testingSelectedModel.value = false;
-    testingFormConnection.value = false;
-    resetForm();
-};
-
-// 重置表单
-const resetForm = () => {
-    formData.type = "openai";
-    formData.name = getProviderMetadata('openai').displayName;
-    formData.baseURL = getDefaultBaseURL('openai');
-    formData.apiKey = "";
-    formData.models = [];
-    formData.defaultModel = "";
-    formData.customModel = "";
-    formData.systemPrompt = "";
-    formTestResult.value = null;
-    modelTestResult.value = null;
-    selectedTestModel.value = '';
-    testingSelectedModel.value = false;
-    testingFormConnection.value = false;
-};
-
-// 类型变化处理
-const onTypeChange = (type: typeof formData.type) => {
-    formData.baseURL = getDefaultBaseURL(type);
-    formData.apiKey = "";
-
-    // 自动填充配置名称（仅在新建模式下，且名称为空或为之前的自动名称时）
-    if (!editingConfig.value) {
-        const currentName = formData.name.trim();
-        const autoGeneratedNames = [
-            "", "OpenAI", "Ollama", "LM Studio", "Anthropic Claude", "Google Gemini AI",
-            "Azure OpenAI", "Mistral AI", "OpenRouter", "DeepSeek", "腾讯云", "阿里云", "智谱AI", "硅基流动"
-        ];
-
-        if (autoGeneratedNames.includes(currentName)) {
-            formData.name = getProviderMetadata(type).displayName;
-        }
-    }
-
-    // 清空之前的测试结果和模型列表
-    formTestResult.value = null;
-    modelTestResult.value = null;
-    selectedTestModel.value = '';
-    testingSelectedModel.value = false;
-    testingFormConnection.value = false;
-    formData.models = [];
-    formData.defaultModel = "";
-};
-
-// 获取配置类型标签
-const getConfigTypeLabel = (type: string) => {
-    const typeLabels: Record<string, string> = {
-        'openai': 'OpenAI',
-        'ollama': 'Ollama',
-        'lmstudio': 'LM Studio',
-        'anthropic': 'Anthropic Claude',
-        'google': 'Google Gemini AI',
-        'azure': 'Azure OpenAI',
-        'openrouter': 'OpenRouter',
-        'mistral': 'Mistral AI',
-        'deepseek': 'DeepSeek',
-        'tencent': '腾讯云',
-        'aliyun': '阿里云',
-        'zhipu': '智谱AI',
-        'siliconflow': '硅基流动',
-    };
-    return typeLabels[type] || type;
-};
-
-// 获取配置标签颜色类型
-const getConfigTagType = (type: string): 'success' | 'error' | 'default' | 'warning' | 'primary' | 'info' => {
-    const tagTypes: Record<string, 'success' | 'error' | 'default' | 'warning' | 'primary' | 'info'> = {
-        'openai': 'success',
-        'ollama': 'info',
-        'anthropic': 'warning',
-        'google': 'primary',
-        'azure': 'success',
-        'lmstudio': 'info',
-        'deepseek': 'error',
-        'siliconflow': 'primary',
-        'tencent': 'success',
-        'aliyun': 'warning',
-        'mistral': 'warning',
-        'zhipu': 'primary'
-    };
-    return tagTypes[type] || 'default';
-};
-
-// 格式化日期
-const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleString("zh-CN");
-};
-
-// 序列化配置对象以确保可以通过 IPC 传递
-const serializeConfig = (config: AIConfig) => {
-    return {
-        id: config.id,
-        configId: config.configId,
-        name: config.name,
-        type: config.type,
-        baseURL: config.baseURL,
-        apiKey: config.apiKey,
-        secretKey: config.secretKey,
-        models: [...(config.models || [])], // 创建新数组
-        defaultModel: config.defaultModel,
-        customModel: config.customModel,
-        enabled: config.enabled,
-        systemPrompt: config.systemPrompt,
-        createdAt: new Date(config.createdAt),
-        updatedAt: new Date(config.updatedAt),
-    };
-};
-
-// 组件挂载时加载数据
-onMounted(async () => {
-    // 等待数据库就绪后再加载数据
-    await waitForDatabase();
-    loadConfigs();
-});
-
-// 监听自动显示添加配置弹窗
-watch(autoShowAddModal, (show) => {
-    if (show) {
-        showAddModal.value = true;
-        autoShowAddModal.value = false; // 重置状态
-    }
-});
-
-// 处理快速优化配置更新
-const handleQuickOptimizationConfigsUpdated = () => {
-    message.success("快速优化配置已更新");
-};
-
-// 打开API Key获取页面
-const openApiKeyUrl = () => {
-    const info = getApiKeyInfo.value;
-    if (info.apiKeyUrl) {
-        openExternalUrl(info.apiKeyUrl);
-    }
-};
-
-// 打开文档页面
-const openDocumentationUrl = () => {
-    const info = getApiKeyInfo.value;
-    if (info.docUrl) {
-        openExternalUrl(info.docUrl);
-    }
-};
-
-// 导出方法供父组件调用
-const openAddConfigModal = () => {
-    autoShowAddModal.value = true;
-};
-
-defineExpose({
-    openAddConfigModal,
-});
+onMounted(async () => { await waitForDatabase(); await loadConfigs() })
+defineExpose({ openAddConfigModal })
 </script>
 
 <style scoped>
-.ai-config-page {
-    height: 100%;
-    box-sizing: border-box;
-    padding: var(--page-padding);
-    overflow-y: auto;
-    background: var(--surface-body);
+.ai-config-page { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
+.ai-command-bar { min-height: 76px; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, auto) minmax(260px, 1fr); align-items: center; gap: 16px; padding: 0 var(--page-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.page-identity, .modal-title-row, .workspace-identity { display: flex; align-items: center; min-width: 0; gap: 12px; }
+.page-identity-icon, .modal-title-icon, .workspace-provider-icon, .provider-icon { display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
+.page-identity-icon { width: 34px; height: 34px; }
+.page-title { display: block; font-size: var(--font-size-2xl); line-height: 1.25; }
+.page-subtitle, .modal-subtitle, .workspace-subtitle, .section-description, .editor-section-heading > .n-text, .provider-help .n-text { display: block; margin-top: 3px; font-size: var(--font-size-sm); }
+.preference-summary { justify-self: center; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px 10px; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-actions, .workspace-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.ai-page-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.page-state { flex: 1; margin: var(--page-padding); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.config-workspace-split { flex: 1; min-width: 0; min-height: 0; }
+.config-workspace-split :deep(.n-split__resize-trigger-wrapper) { position: relative; z-index: 2; overflow: visible; background: transparent; }
+.config-workspace-split :deep(.n-split__resize-trigger-wrapper)::before { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
+.workspace-resize-line { width: 1px; height: 100%; background: var(--border-default); transition: background-color .12s ease; }
+.config-workspace-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { background: var(--border-strong); }
+.config-library { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--surface-primary); }
+.library-search { padding: 12px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.library-filters { padding: 8px; }
+.filter-item, .config-list-item, .editor-nav-item, .provider-card { appearance: none; color: var(--content-primary); font: inherit; cursor: pointer; }
+.filter-item { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 9px; padding: 5px 9px; border: 0; border-radius: var(--radius-control); background: transparent; text-align: left; }
+.filter-item:hover, .config-list-item:hover, .editor-nav-item:hover, .provider-card:hover { background: var(--interactive-hover); }
+.filter-item.active, .config-list-item.active, .editor-nav-item.active, .provider-card.active { background: var(--surface-tertiary); }
+.filter-item.active { font-weight: var(--font-weight-medium); }
+.filter-count { margin-left: auto; color: var(--content-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.library-heading { padding: 7px 14px 5px; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-xs); }
+.config-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
+.config-list-item { width: 100%; min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 8px 9px; margin-bottom: 2px; border: 0; border-radius: var(--radius-panel); background: transparent; text-align: left; }
+.provider-icon { width: 34px; height: 34px; }
+.config-list-copy { flex: 1; min-width: 0; }
+.config-list-title-row { display: flex; align-items: center; gap: 6px; }
+.config-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-medium); }
+.config-list-meta { display: flex; gap: 5px; margin-top: 4px; color: var(--content-secondary); font-size: var(--font-size-xs); overflow: hidden; white-space: nowrap; }
+.config-list-meta span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.status-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--content-muted); }
+.status-dot.enabled { background: var(--accent-success); }
+.library-empty { padding: 32px 8px; }
+.config-workspace { height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
+.workspace-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.workspace-provider-icon { width: 40px; height: 40px; }
+.workspace-title-copy { min-width: 0; }
+.workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.workspace-title { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xl); }
+.workspace-scroll { flex: 1; min-height: 0; }
+.workspace-sections { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--section-gap); padding: var(--page-padding); }
+.detail-panel { padding: var(--content-padding); }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.compact-heading { margin-bottom: 10px; }
+.section-title { display: block; font-size: var(--font-size-lg); }
+.detail-grid, .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
+.detail-field { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.detail-field-wide, .form-span-2 { grid-column: 1 / -1; }
+.field-label { color: var(--content-secondary); font-size: var(--font-size-xs); }
+.field-value { min-width: 0; overflow-wrap: anywhere; }
+.code-value, .result-block pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; user-select: text; }
+.model-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.request-test-bar { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin-top: 14px; padding: var(--compact-padding); }
+.inline-result { margin-top: 14px; }
+.result-block + .result-block { margin-top: 12px; }
+.result-block pre { max-height: 220px; margin: 5px 0 0; padding: 10px; overflow: auto; white-space: pre-wrap; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-xs); }
+.prompt-preview { max-height: 150px; overflow: hidden; white-space: pre-wrap; color: var(--content-secondary); font-size: var(--font-size-sm); line-height: var(--line-height-relaxed); }
+.workspace-empty { height: 100%; display: grid; place-items: center; background: var(--surface-body); }
+.modal-title-icon { width: 36px; height: 36px; }
+.modal-title { display: block; font-size: var(--font-size-xl); }
+.editor-shell { min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: var(--section-gap); }
+.editor-navigation { display: flex; flex-direction: column; gap: 4px; padding-right: var(--section-gap); border-right: 1px solid var(--border-default); }
+.editor-nav-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 0; border-radius: var(--radius-panel); background: transparent; text-align: left; }
+.editor-nav-item:disabled { cursor: not-allowed; opacity: .5; }
+.editor-nav-item small { display: block; margin-top: 3px; color: var(--content-secondary); font-size: var(--font-size-xs); font-weight: normal; }
+.step-index { width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: 50%; color: var(--content-secondary); font-size: var(--font-size-xs); }
+.editor-nav-item.active .step-index { color: white; border-color: var(--accent-primary); background: var(--accent-primary); }
+.editor-nav-item.complete:not(.active) .step-index { color: var(--accent-success); border-color: var(--accent-success); }
+.editor-content { min-width: 0; min-height: 0; }
+.editor-content-inner { max-width: 900px; margin: 0 auto; padding-right: 8px; }
+.editor-section { display: flex; flex-direction: column; gap: var(--section-gap); }
+.editor-section-heading .n-text:first-child { display: block; font-size: var(--font-size-lg); }
+.provider-group { display: flex; flex-direction: column; gap: 8px; }
+.provider-group-title { display: flex; align-items: center; gap: 7px; color: var(--content-secondary); font-size: var(--font-size-sm); }
+.provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.provider-card { min-height: 74px; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); text-align: left; transition: border-color .15s ease, background-color .15s ease; }
+.provider-card:hover { border-color: var(--border-strong); }
+.provider-card-copy { flex: 1; min-width: 0; }
+.provider-card-copy strong, .provider-card-copy small { display: block; }
+.provider-card-copy small { margin-top: 3px; color: var(--content-secondary); font-size: var(--font-size-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-card-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--content-secondary); border-radius: var(--radius-control); background: var(--surface-secondary); }
+.form-panel, .connection-test-panel { padding: var(--content-padding); }
+.model-list-heading { margin-bottom: 12px; }
+.model-fetch-result { margin-bottom: 14px; }
+.provider-help { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: var(--compact-padding); }
+.provider-help > div:first-child { min-width: 0; }
+.prompt-editor-shell { min-height: 0; display: flex; flex-direction: column; gap: var(--section-gap); }
+.system-prompt-input { flex: 1; min-height: 0; }
+.system-prompt-input :deep(.n-input-wrapper), .system-prompt-input :deep(.n-input__textarea-el) { height: 100%; }
+.system-prompt-input :deep(.n-input__textarea-el) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.dirty-indicator { min-height: 20px; font-size: var(--font-size-xs); }
+
+@media (max-width: 1240px) {
+    .ai-command-bar { grid-template-columns: minmax(240px, 1fr) auto; }
+    .preference-summary { display: none; }
+    .workspace-actions .n-button:not(.n-button--circle) { padding-left: 9px; padding-right: 9px; }
+    .workspace-title { max-width: 240px; }
 }
-
-.ai-config-header { min-height: 60px; }
-.ai-config-title { display: block; font-size: var(--font-size-2xl); line-height: 1.3; }
-.ai-config-subtitle { display: block; margin-top: var(--spacing-xs); font-size: var(--font-size-base); }
-
-.config-list {
-    display: grid;
-    gap: var(--section-gap);
-}
-
-.config-card {
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-panel);
-    background: var(--surface-secondary);
-    box-shadow: none;
-    transition: background-color .16s ease, border-color .16s ease;
-}
-
-.config-card:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-tertiary);
-}
-
-.config-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.config-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.config-info h3 {
-    margin: 0;
-    font-size: var(--font-size-lg);
-}
-
-.config-switch {
-    display: flex;
-    align-items: center;
-}
-
-.config-details p {
-    margin: 4px 0;
-    color: var(--content-secondary);
+@media (max-width: 1080px) {
+    .action-label { display: none; }
+    .workspace-header { align-items: flex-start; }
+    .workspace-actions { flex-wrap: wrap; }
+    .editor-shell { grid-template-columns: 190px minmax(0, 1fr); }
+    .provider-grid { grid-template-columns: 1fr; }
 }
 </style>
