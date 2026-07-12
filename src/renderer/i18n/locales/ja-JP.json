@@ -1115,7 +1115,8 @@
     "defaultAction": "既定のアクション", "defaultActionDesc": "Enter の既定動作", "promptBindings": "プロンプト直接キー",
     "noPromptBindings": "ショートカットはまだありません", "disabled": "無効", "conflict": "競合", "unsupported": "未対応",
     "invalidTarget": "プロンプトがありません", "missingPrompt": "プロンプトが見つかりません",
-    "assignFromPromptHint": "プロンプト一覧または詳細から設定できます。", "notSet": "未設定"
+    "assignFromPromptHint": "プロンプト一覧または詳細から設定できます。", "notSet": "未設定",
+    "command": "コマンド", "resultCount": "{count} 件"
   },
   "startup": {
     "autoStart": "自動起動",

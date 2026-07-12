@@ -11,6 +11,7 @@ const shortcutsAPI = {
   markInvalidTarget: (id: string) => ipcRenderer.invoke('shortcuts:mark-invalid-target', id),
   launcherReady: () => ipcRenderer.send('shortcuts:launcher-ready'),
   showLauncher: () => ipcRenderer.invoke('shortcuts:show-launcher'),
+  openLauncher: () => ipcRenderer.invoke('shortcuts:open-launcher'),
   hideLauncher: () => ipcRenderer.invoke('shortcuts:hide-launcher'),
   executeText: (request: any) => ipcRenderer.invoke('shortcuts:execute-text', request),
   navigateMain: (target: string, promptUUID?: string) => ipcRenderer.invoke('shortcuts:navigate-main', target, promptUUID),

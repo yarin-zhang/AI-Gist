@@ -1120,7 +1120,8 @@
     "behavior": "呼叫行為", "defaultAction": "啟動器預設動作", "defaultActionDesc": "Enter 的預設動作",
     "promptBindings": "提示詞直達鍵", "noPromptBindings": "尚未分配提示詞快捷鍵",
     "disabled": "已停用", "conflict": "快捷鍵衝突", "unsupported": "不支援", "invalidTarget": "提示詞已失效",
-    "missingPrompt": "找不到提示詞", "assignFromPromptHint": "可從提示詞列表或詳細頁直接設定。", "notSet": "未設定"
+    "missingPrompt": "找不到提示詞", "assignFromPromptHint": "可從提示詞列表或詳細頁直接設定。", "notSet": "未設定",
+    "command": "指令", "resultCount": "{count} 個結果"
   },
   "startup": {
     "autoStart": "開機自動啟動",

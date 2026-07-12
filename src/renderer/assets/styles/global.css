@@ -68,11 +68,15 @@ body.ai-gist-launcher,
 body.ai-gist-launcher.light,
 body.ai-gist-launcher.dark,
 body.ai-gist-launcher #app {
-  background: transparent !important;
+  background: var(--app-bg-color, #ffffff) !important;
 }
 
 body.ai-gist-launcher #initial-loading {
   display: none;
+}
+
+body.ai-gist-launcher {
+  transition: none !important;
 }
 
 /* 为窗口拖拽区域设置背景色 */

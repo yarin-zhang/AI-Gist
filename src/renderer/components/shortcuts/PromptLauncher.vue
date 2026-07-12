@@ -1,91 +1,124 @@
 <template>
-  <div class="launcher-shell" @keydown="handleKeydown">
-    <div v-if="mode === 'search'" class="launcher-panel">
-      <NInput
-        ref="searchInput"
-        v-model:value="query"
-        size="large"
-        clearable
-        :placeholder="t('shortcuts.launcherPlaceholder')"
-        @update:value="selectedIndex = 0"
-      >
-        <template #prefix><NIcon><Search /></NIcon></template>
-      </NInput>
-
-      <div class="result-list">
-        <button
-          v-for="(item, index) in results"
-          :key="item.key"
-          class="result-row"
-          :class="{ selected: index === selectedIndex }"
-          @mouseenter="selectedIndex = index"
-          @click="executeItem(item, state?.preferences.defaultAction || 'copy')"
+  <div class="launcher-shell">
+    <NCard v-if="mode === 'search'" class="launcher-card" size="small" :bordered="false">
+      <template #header>
+        <NInput
+          ref="searchInput"
+          v-model:value="query"
+          size="large"
+          clearable
+          autofocus
+          :placeholder="t('shortcuts.launcherPlaceholder')"
+          :input-props="searchInputProps"
+          @update:value="handleQueryChanged"
         >
-          <NIcon size="20"><component :is="item.kind === 'prompt' ? FileText : item.icon" /></NIcon>
-          <div class="result-copy">
-            <NText strong>{{ item.label }}</NText>
-            <NText depth="3" class="result-description">{{ item.description }}</NText>
+          <template #prefix><NIcon><Search /></NIcon></template>
+          <template #suffix><NText depth="3" class="escape-hint">Esc</NText></template>
+        </NInput>
+      </template>
+
+      <NScrollbar ref="resultScrollbar" class="result-scrollbar">
+        <NList id="prompt-launcher-results" v-if="results.length" hoverable clickable :show-divider="false">
+          <NListItem
+            v-for="(item, index) in results"
+            :id="resultDomId(item)"
+            :key="item.key"
+            :ref="element => setResultElement(element, index)"
+            class="launcher-result"
+            :class="{ 'launcher-result--selected': index === selectedIndex }"
+            role="option"
+            :aria-selected="index === selectedIndex"
+            @mouseenter="selectResult(index)"
+            @click="executeItem(item, state?.preferences.defaultAction || 'copy')"
+          >
+            <NThing>
+              <template #avatar>
+                <NIcon size="18" class="result-icon" :class="{ 'result-icon--selected': index === selectedIndex }">
+                  <component :is="item.kind === 'prompt' ? FileText : item.icon" />
+                </NIcon>
+              </template>
+              <template #header>
+                <NText :strong="index === selectedIndex">{{ item.label }}</NText>
+              </template>
+              <template #description>
+                <NText depth="3" class="result-description">{{ item.description }}</NText>
+              </template>
+              <template #header-extra>
+                <NText v-if="item.kind === 'prompt' && bindingFor(item.prompt.uuid)" depth="3" class="result-meta">
+                  {{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}
+                </NText>
+                <NText v-else-if="item.kind === 'prompt' && runtimeVariables(item.prompt).length" depth="3" class="result-meta">
+                  {{ t('shortcuts.variablesCount', { count: runtimeVariables(item.prompt).length }) }}
+                </NText>
+              </template>
+            </NThing>
+          </NListItem>
+        </NList>
+        <NEmpty v-else :description="t('shortcuts.noLauncherResults')" size="small" />
+      </NScrollbar>
+
+      <template #footer>
+        <NFlex justify="space-between" align="center" :wrap="false">
+          <NText depth="3" class="result-count">{{ t('shortcuts.resultCount', { count: results.length }) }}</NText>
+          <NFlex :size="8" :wrap="false" align="center" class="keyboard-hints">
+            <span><span class="key-cap">↑↓</span> {{ t('shortcuts.navigate') }}</span>
+            <NDivider vertical />
+            <span><span class="key-cap">Enter</span> {{ defaultActionLabel }}</span>
+            <NDivider vertical />
+            <span><span class="key-cap">{{ modifierLabel }} K</span> {{ t('shortcuts.actions') }}</span>
+          </NFlex>
+        </NFlex>
+      </template>
+    </NCard>
+
+    <NCard v-else class="launcher-card variable-card" size="small" :bordered="true">
+      <template #header>
+        <NFlex align="center" justify="space-between">
+          <div>
+            <NText strong class="variable-title">{{ activePrompt?.title }}</NText>
+            <NText depth="3" class="variable-description">{{ t('shortcuts.fillVariablesDesc') }}</NText>
           </div>
-          <NTag v-if="item.kind === 'prompt' && bindingFor(item.prompt.uuid)" size="small" :bordered="false">
-            {{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}
-          </NTag>
-          <NTag v-else-if="item.kind === 'prompt' && runtimeVariables(item.prompt).length" size="small" type="info" :bordered="false">
-            {{ t('shortcuts.variablesCount', { count: runtimeVariables(item.prompt).length }) }}
-          </NTag>
-        </button>
-        <NEmpty v-if="results.length === 0" :description="t('shortcuts.noLauncherResults')" size="small" />
-      </div>
-
-      <div class="launcher-footer">
-        <span><kbd>↑</kbd><kbd>↓</kbd> {{ t('shortcuts.navigate') }}</span>
-        <span><kbd>Enter</kbd> {{ state?.preferences.defaultAction === 'paste' ? t('shortcuts.actionPaste') : t('shortcuts.actionCopy') }}</span>
-        <span><kbd>{{ modifierLabel }}</kbd><kbd>Enter</kbd> {{ t('shortcuts.actionPaste') }}</span>
-        <span><kbd>{{ modifierLabel }}</kbd><kbd>K</kbd> {{ t('shortcuts.actions') }}</span>
-      </div>
-    </div>
-
-    <div v-else class="launcher-panel variable-panel">
-      <NFlex align="center" justify="space-between">
-        <div>
-          <NText strong class="variable-title">{{ activePrompt?.title }}</NText>
-          <NText depth="3" class="result-description">{{ t('shortcuts.fillVariablesDesc') }}</NText>
-        </div>
-        <NButton text @click="backToSearch"><NIcon><X /></NIcon></NButton>
-      </NFlex>
-      <div class="variable-form">
-        <NFormItem
-          v-for="variable in activeVariables"
-          :key="variable.name"
-          :label="variable.name"
-          :required="variable.required"
-        >
-          <NSwitch v-if="variable.type === 'boolean' || variable.type === 'bool'" v-model:value="variableValues[variable.name]" />
-          <NInputNumber
-            v-else-if="['number', 'int', 'float'].includes(variable.type)"
-            v-model:value="variableValues[variable.name]"
-            style="width: 100%"
-          />
-          <NSelect
-            v-else-if="variable.type === 'select'"
-            v-model:value="variableValues[variable.name]"
-            :options="(variable.options || []).map(option => ({ label: option, value: option }))"
-          />
-          <NInput
-            v-else
-            v-model:value="variableValues[variable.name]"
-            :type="variable.type === 'textarea' ? 'textarea' : 'text'"
-            :placeholder="variable.placeholder || variable.description"
-          />
-        </NFormItem>
-      </div>
+          <NButton circle quaternary @click="backToSearch"><template #icon><NIcon><X /></NIcon></template></NButton>
+        </NFlex>
+      </template>
+      <NScrollbar class="variable-scrollbar">
+        <NForm label-placement="top">
+          <NFormItem
+            v-for="variable in activeVariables"
+            :key="variable.name"
+            :label="variable.name"
+            :required="variable.required"
+          >
+            <NSwitch v-if="variable.type === 'boolean' || variable.type === 'bool'" v-model:value="variableValues[variable.name]" />
+            <NInputNumber
+              v-else-if="['number', 'int', 'float'].includes(variable.type)"
+              v-model:value="variableValues[variable.name]"
+              style="width: 100%"
+            />
+            <NSelect
+              v-else-if="variable.type === 'select'"
+              v-model:value="variableValues[variable.name]"
+              :options="(variable.options || []).map(option => ({ label: option, value: option }))"
+            />
+            <NInput
+              v-else
+              v-model:value="variableValues[variable.name]"
+              :type="variable.type === 'textarea' ? 'textarea' : 'text'"
+              :placeholder="variable.placeholder || variable.description"
+            />
+          </NFormItem>
+        </NForm>
+      </NScrollbar>
       <NAlert v-if="executionError" type="error" :show-icon="false">{{ executionError }}</NAlert>
-      <NFlex justify="flex-end">
-        <NButton @click="backToSearch">{{ t('common.cancel') }}</NButton>
-        <NButton type="primary" :loading="executing" :disabled="missingRequired" @click="executeActivePrompt">
-          {{ desiredAction === 'paste' ? t('shortcuts.copyAndPaste') : t('shortcuts.copyPrompt') }}
-        </NButton>
-      </NFlex>
-    </div>
+      <template #footer>
+        <NFlex justify="flex-end">
+          <NButton @click="backToSearch">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" :loading="executing" :disabled="missingRequired" @click="executeActivePrompt">
+            {{ desiredAction === 'paste' ? t('shortcuts.copyAndPaste') : t('shortcuts.copyPrompt') }}
+          </NButton>
+        </NFlex>
+      </template>
+    </NCard>
 
     <ShortcutBindingModal
       v-if="bindingPrompt"
@@ -111,12 +144,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import {
-  NAlert, NButton, NEmpty, NFlex, NFormItem, NIcon, NInput, NInputNumber,
-  NSelect, NSwitch, NTag, NText, NModal, NCard, type InputInst,
+  NAlert, NButton, NCard, NDivider, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput, NInputNumber,
+  NList, NListItem, NModal, NScrollbar, NSelect, NSwitch, NText, NThing, type InputInst, type ScrollbarInst,
 } from 'naive-ui';
-import { FilePlus, FileText, Keyboard, Search, Settings, X } from '@vicons/tabler';
+import { FilePlus, FileText, Search, Settings, X } from '@vicons/tabler';
 import { useI18n } from 'vue-i18n';
 import type { PromptShortcutBinding, PromptWithRelations, ShortcutAction, ShortcutInvocation, ShortcutState } from '@shared/types';
 import { apiClientManager } from '@/lib/api';
@@ -127,6 +160,7 @@ import {
   renderPromptContent,
 } from '@/lib/utils/prompt-runtime';
 import ShortcutBindingModal from './ShortcutBindingModal.vue';
+import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
 
 type PromptResult = { kind: 'prompt'; key: string; label: string; description: string; prompt: PromptWithRelations };
 type CommandResult = {
@@ -137,6 +171,7 @@ type LauncherResult = PromptResult | CommandResult;
 
 const { t } = useI18n();
 const searchInput = ref<InputInst | null>(null);
+const resultScrollbar = ref<ScrollbarInst | null>(null);
 const prompts = ref<PromptWithRelations[]>([]);
 const state = ref<ShortcutState | null>(null);
 const query = ref('');
@@ -152,6 +187,20 @@ const showBindingModal = ref(false);
 const showActionModal = ref(false);
 const bindingPrompt = ref<PromptWithRelations | null>(null);
 const modifierLabel = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl';
+const resultElements = new Map<number, HTMLElement>();
+const defaultActionLabel = computed(() => state.value?.preferences.defaultAction === 'paste'
+  ? t('shortcuts.actionPaste')
+  : t('shortcuts.actionCopy'));
+const activeDescendant = computed(() => {
+  const item = results.value[selectedIndex.value];
+  return item ? resultDomId(item) : undefined;
+});
+const searchInputProps = computed(() => ({
+  role: 'combobox',
+  'aria-autocomplete': 'list',
+  'aria-controls': 'prompt-launcher-results',
+  'aria-activedescendant': activeDescendant.value,
+}));
 
 const commands = computed<CommandResult[]>(() => [
   { kind: 'command', key: 'command:home', label: t('shortcuts.commandOpenApp'), description: t('shortcuts.commandOpenAppDesc'), icon: markRaw(FileText), target: 'home' },
@@ -218,6 +267,42 @@ function displayAccelerator(accelerator: string): string {
   return accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '');
 }
 
+function resultDomId(item: LauncherResult): string {
+  return `launcher-result-${item.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+function setResultElement(element: Element | ComponentPublicInstance | null, index: number): void {
+  if (!element) {
+    resultElements.delete(index);
+    return;
+  }
+  const node = '$el' in element ? element.$el : element;
+  if (node instanceof HTMLElement) resultElements.set(index, node);
+}
+
+function scrollSelectedIntoView(): void {
+  const selected = resultElements.get(selectedIndex.value);
+  const viewport = selected?.closest<HTMLElement>('.n-scrollbar-container');
+  if (!selected || !viewport) return;
+
+  const selectedRect = selected.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
+  let offset = 0;
+  if (selectedRect.top < viewportRect.top) offset = selectedRect.top - viewportRect.top;
+  else if (selectedRect.bottom > viewportRect.bottom) offset = selectedRect.bottom - viewportRect.bottom;
+  if (offset !== 0) resultScrollbar.value?.scrollBy({ top: offset, behavior: 'auto' });
+}
+
+function selectResult(index: number): void {
+  selectedIndex.value = clampLauncherSelection(index, results.value.length);
+  void nextTick(scrollSelectedIntoView);
+}
+
+function handleQueryChanged(): void {
+  selectedIndex.value = 0;
+  void nextTick(scrollSelectedIntoView);
+}
+
 async function loadData(): Promise<void> {
   const [allPrompts, shortcutState] = await Promise.all([
     apiClientManager.prompt.prompts.getAllForTags.query(),
@@ -271,12 +356,16 @@ async function findPrompt(promptUUID: string): Promise<PromptWithRelations | nul
 async function handleInvocation(invocation: ShortcutInvocation): Promise<void> {
   executionError.value = '';
   if (invocation.kind === 'launcher') {
+    await window.electronAPI.shortcuts.hideLauncher();
     mode.value = 'search';
     query.value = '';
     selectedIndex.value = 0;
     await loadData();
     await nextTick();
+    await window.electronAPI.shortcuts.showLauncher();
+    await nextTick();
     searchInput.value?.focus();
+    searchInput.value?.select();
     return;
   }
   if (!invocation.promptUUID) return;
@@ -297,6 +386,7 @@ async function preparePrompt(prompt: PromptWithRelations, action: ShortcutAction
   variableValues.value = createDefaultVariableValues(prompt);
   if (getRuntimeVariables(prompt).length > 0) {
     mode.value = 'variables';
+    await nextTick();
     await window.electronAPI.shortcuts.showLauncher();
     return;
   }
@@ -366,10 +456,11 @@ async function openPromptDetail(): Promise<void> {
 async function handleBindingSaved(): Promise<void> {
   showBindingModal.value = false;
   await loadData();
+  await nextTick();
   await window.electronAPI.shortcuts.showLauncher();
 }
 
-function handleKeydown(event: KeyboardEvent): void {
+function handleWindowKeydown(event: KeyboardEvent): void {
   if (showBindingModal.value) return;
   if (showActionModal.value) {
     if (event.key === 'Escape') {
@@ -380,6 +471,7 @@ function handleKeydown(event: KeyboardEvent): void {
   }
   if (event.key === 'Escape') {
     event.preventDefault();
+    event.stopPropagation();
     if (mode.value === 'variables') backToSearch();
     else void window.electronAPI.shortcuts.hideLauncher();
     return;
@@ -387,45 +479,181 @@ function handleKeydown(event: KeyboardEvent): void {
   if (mode.value !== 'search') {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
+      event.stopPropagation();
       void executeActivePrompt();
     }
     return;
   }
+  if (event.isComposing || event.keyCode === 229) return;
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
+    event.stopPropagation();
     const direction = event.key === 'ArrowDown' ? 1 : -1;
-    selectedIndex.value = (selectedIndex.value + direction + results.value.length) % Math.max(results.value.length, 1);
+    selectedIndex.value = moveLauncherSelection(selectedIndex.value, results.value.length, direction);
+    void nextTick(scrollSelectedIntoView);
   } else if (event.key === 'Enter') {
     event.preventDefault();
+    event.stopPropagation();
     const item = results.value[selectedIndex.value];
     if (item) void executeItem(item, event.ctrlKey || event.metaKey ? 'paste' : (state.value?.preferences.defaultAction || 'copy'));
   } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault();
+    event.stopPropagation();
     openActions();
   }
 }
 
 let removeInvocationListener: (() => void) | undefined;
 onMounted(async () => {
+  window.addEventListener('keydown', handleWindowKeydown, true);
   removeInvocationListener = window.electronAPI.shortcuts.onLauncherInvocation(invocation => void handleInvocation(invocation));
   await loadData();
   window.electronAPI.shortcuts.launcherReady();
 });
-onBeforeUnmount(() => removeInvocationListener?.());
+watch(() => results.value.length, length => {
+  selectedIndex.value = clampLauncherSelection(selectedIndex.value, length);
+  void nextTick(scrollSelectedIntoView);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleWindowKeydown, true);
+  removeInvocationListener?.();
+});
 </script>
 
 <style scoped>
-.launcher-shell { width: 100vw; height: 100vh; padding: 12px; box-sizing: border-box; background: transparent; }
-.launcher-panel { height: 100%; box-sizing: border-box; padding: 16px; border-radius: 14px; background: var(--n-color); box-shadow: 0 18px 60px rgba(0, 0, 0, .28); border: 1px solid var(--n-border-color); display: flex; flex-direction: column; gap: 12px; }
-.result-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.result-row { width: 100%; border: 0; background: transparent; color: inherit; border-radius: 8px; padding: 9px 10px; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer; }
-.result-row.selected { background: var(--n-color-hover); }
-.result-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.result-description { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.launcher-footer { border-top: 1px solid var(--n-border-color); padding-top: 10px; display: flex; gap: 16px; color: var(--n-text-color-3); font-size: 12px; }
-kbd { padding: 1px 5px; border: 1px solid var(--n-border-color); border-radius: 4px; background: var(--n-color-embedded); margin-right: 2px; }
-.variable-panel { gap: 16px; }
-.variable-title { font-size: 16px; }
-.variable-form { flex: 1; overflow-y: auto; padding-right: 4px; }
-.action-card { width: min(360px, calc(100vw - 32px)); }
+.launcher-shell {
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  background: var(--surface-primary);
+}
+
+.launcher-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.launcher-card :deep(.n-card-content) {
+  display: flex;
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.launcher-card :deep(.n-card-header) {
+  flex: 0 0 auto;
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+}
+
+.launcher-card :deep(.n-card__footer) {
+  flex: 0 0 auto;
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.result-scrollbar,
+.variable-scrollbar {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.result-scrollbar :deep(.n-scrollbar-container),
+.variable-scrollbar :deep(.n-scrollbar-container) {
+  max-height: 100%;
+}
+
+.launcher-card :deep(.n-list) {
+  background: transparent;
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+.launcher-result {
+  border-radius: var(--radius-sm);
+  transition: background-color 100ms ease;
+}
+
+.launcher-result :deep(.n-list-item__main) {
+  padding: 10px 12px;
+}
+
+.launcher-result--selected {
+  background: var(--surface-tertiary);
+}
+
+.launcher-result :deep(.n-thing-header__title) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.launcher-result :deep(.n-thing-main) {
+  min-width: 0;
+}
+
+.result-description {
+  display: block;
+  max-width: 470px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-icon {
+  color: var(--content-tertiary);
+  transition: color 100ms ease;
+}
+
+.result-icon--selected {
+  color: var(--accent-primary);
+}
+
+.result-meta,
+.escape-hint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--font-size-xs);
+}
+
+.result-count,
+.key-cap {
+  font-size: var(--font-size-xs);
+}
+
+.key-cap {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: var(--font-weight-medium);
+  color: var(--content-secondary);
+}
+
+.keyboard-hints {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.variable-card :deep(.n-card-content) {
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-lg);
+}
+
+.variable-title {
+  font-size: var(--font-size-lg);
+}
+
+.variable-description {
+  display: block;
+  margin-top: var(--spacing-xs);
+}
+
+.action-card {
+  width: min(360px, calc(100vw - 32px));
+}
 </style>

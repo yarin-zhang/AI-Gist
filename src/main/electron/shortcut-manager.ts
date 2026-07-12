@@ -7,6 +7,7 @@ import {
   clipboard,
   globalShortcut,
   Notification,
+  nativeTheme,
   screen,
   systemPreferences,
 } from 'electron';
@@ -264,15 +265,18 @@ export class ShortcutManager {
     if (this.launcherLoadPromise) return this.launcherLoadPromise;
     this.launcherLoadPromise = (async () => {
       const launcher = new BrowserWindow({
-        width: 720,
-        height: 520,
+        width: 700,
+        height: 460,
         show: false,
         frame: false,
         resizable: false,
         movable: true,
         alwaysOnTop: true,
         skipTaskbar: true,
-        backgroundColor: '#00000000',
+        transparent: false,
+        hasShadow: true,
+        roundedCorners: true,
+        backgroundColor: nativeTheme.shouldUseDarkColors ? '#101014' : '#ffffff',
         webPreferences: {
           preload: join(__dirname, '..', 'preload.js'),
           nodeIntegration: false,
@@ -308,20 +312,22 @@ export class ShortcutManager {
     this.launcherReady = true;
     const pending = this.pendingInvocations.splice(0);
     for (const invocation of pending) {
-      if (invocation.kind === 'launcher') this.showLauncherWindow();
       this.launcherWindow.webContents.send('shortcut:launcher-invocation', invocation);
     }
   }
 
   async openLauncher(invocation: ShortcutInvocation): Promise<void> {
     if (!this.launcherWindow?.isVisible()) {
-      this.pasteTarget = this.mainWindow?.isFocused() || this.launcherWindow?.isFocused()
+      const pasteCapability = await this.getPasteCapability(false);
+      this.pasteTarget = this.mainWindow?.isFocused()
+        || this.launcherWindow?.isFocused()
+        || !pasteCapability.supported
+        || !pasteCapability.permissionGranted
         ? null
         : await this.capturePasteTarget();
     }
     const launcher = await this.ensureLauncherWindow();
     if (this.launcherReady) {
-      if (invocation.kind === 'launcher') this.showLauncherWindow();
       launcher.webContents.send('shortcut:launcher-invocation', invocation);
     }
     else this.pendingInvocations.push(invocation);
@@ -334,12 +340,18 @@ export class ShortcutManager {
     const x = Math.round(display.workArea.x + (display.workArea.width - bounds.width) / 2);
     const y = Math.round(display.workArea.y + Math.min(140, (display.workArea.height - bounds.height) / 3));
     this.launcherWindow.setPosition(x, y, false);
+    this.launcherWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#101014' : '#ffffff');
+    this.launcherWindow.webContents.invalidate();
     this.launcherWindow.show();
     this.launcherWindow.focus();
   }
 
   hideLauncherWindow(): void {
     this.launcherWindow?.hide();
+  }
+
+  async previewLauncher(): Promise<void> {
+    await this.openLauncher({ kind: 'launcher' });
   }
 
   private showMainWindow(): void {

@@ -1139,7 +1139,9 @@
     "invalidTarget": "提示词已失效",
     "missingPrompt": "找不到提示词",
     "assignFromPromptHint": "可在提示词列表或详情页直接设置直达键。",
-    "notSet": "未设置"
+    "notSet": "未设置",
+    "command": "命令",
+    "resultCount": "{count} 个结果"
   },
   "startup": {
     "autoStart": "开机自动启动",

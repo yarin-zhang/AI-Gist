@@ -189,6 +189,11 @@ async function startElectron() {
         };
     }
 
+    const remoteDebuggingPort = process.env.AI_GIST_REMOTE_DEBUGGING_PORT;
+    if (remoteDebuggingPort && /^\d+$/.test(remoteDebuggingPort)) {
+        args.push(`--remote-debugging-port=${remoteDebuggingPort}`);
+    }
+
     electronProcess = ChildProcess.spawn(executable, args, spawnOptions);
     electronProcessLocker = false;
 

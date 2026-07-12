@@ -279,6 +279,7 @@ class IpcHandlers {
     ipcMain.handle('shortcuts:resolve-legacy-binding', (_, id: string, promptUUID: string) => manager.resolveLegacyBinding(id, promptUUID));
     ipcMain.handle('shortcuts:mark-invalid-target', (_, id: string) => manager.markBindingInvalid(id));
     ipcMain.handle('shortcuts:show-launcher', () => manager.showLauncherWindow());
+    ipcMain.handle('shortcuts:open-launcher', () => manager.previewLauncher());
     ipcMain.handle('shortcuts:hide-launcher', () => manager.hideLauncherWindow());
     ipcMain.handle('shortcuts:execute-text', (_, request: ShortcutExecutionRequest) => manager.executeText(request));
     ipcMain.handle('shortcuts:navigate-main', (_, target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => manager.navigateMain(target, promptUUID));
@@ -519,6 +520,7 @@ class IpcHandlers {
     ipcMain.removeHandler('shortcuts:resolve-legacy-binding');
     ipcMain.removeHandler('shortcuts:mark-invalid-target');
     ipcMain.removeHandler('shortcuts:show-launcher');
+    ipcMain.removeHandler('shortcuts:open-launcher');
     ipcMain.removeHandler('shortcuts:hide-launcher');
     ipcMain.removeHandler('shortcuts:execute-text');
     ipcMain.removeHandler('shortcuts:navigate-main');

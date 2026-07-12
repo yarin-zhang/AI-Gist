@@ -1139,7 +1139,9 @@
     "invalidTarget": "Missing prompt",
     "missingPrompt": "Prompt not found",
     "assignFromPromptHint": "Assign direct shortcuts from a prompt list or detail view.",
-    "notSet": "Not set"
+    "notSet": "Not set",
+    "command": "Command",
+    "resultCount": "{count} results"
   },
   "startup": {
     "autoStart": "Auto launch on system startup",

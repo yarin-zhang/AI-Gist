@@ -246,6 +246,7 @@ export interface ShortcutsAPI {
   markInvalidTarget: (id: string) => Promise<void>;
   launcherReady: () => void;
   showLauncher: () => Promise<void>;
+  openLauncher: () => Promise<void>;
   hideLauncher: () => Promise<void>;
   executeText: (request: ShortcutExecutionRequest) => Promise<{ success: boolean; pasted: boolean; warning?: string }>;
   navigateMain: (target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => Promise<void>;
