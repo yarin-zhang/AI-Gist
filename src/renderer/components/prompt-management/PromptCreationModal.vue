@@ -1,6 +1,6 @@
 <template>
     <NModal :show="show" :mask-closable="false" :close-on-esc="false" display-directive="show">
-        <section class="prompt-creation-modal" role="dialog" aria-modal="true">
+        <div class="prompt-creation-modal" role="dialog" aria-modal="true">
             <header class="creation-header">
                 <div>
                     <NText strong class="creation-title">{{ t('promptManagement.createPrompt') }}</NText>
@@ -45,7 +45,7 @@
                     </NScrollbar>
                 </main>
             </div>
-        </section>
+        </div>
     </NModal>
 </template>
 

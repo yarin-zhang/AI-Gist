@@ -81,9 +81,29 @@ describe('desktop design-system contract', () => {
 
     expect(mainPage).not.toMatch(/n-menu-item-content(?:--selected)?[^}]*background/s);
     expect(settingsPage).not.toMatch(/n-menu-item-content(?:--selected)?[^}]*background/s);
-    expect(globalStyles).not.toMatch(/body\s*\{[^}]*user-select:\s*none/s);
+    expect(globalStyles).toMatch(/body\s*\{[^}]*-webkit-user-select:\s*none[^}]*user-select:\s*none/s);
+    expect(globalStyles).toContain('[contenteditable="true"]');
     expect(globalStyles).toContain('.n-input__input-el');
-    expect(globalStyles).toContain('-webkit-app-region: no-drag');
+    expect(globalStyles).toContain('.n-input__textarea-el');
     expect(globalStyles).toContain('user-select: text');
+    expect(globalStyles).not.toContain('-webkit-app-region: no-drag');
+  });
+
+  it('uses a focus-trap-compatible root for every raw Naive UI modal', () => {
+    const rawModal = /<(NModal|n-modal)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1>/g;
+    const allowedRoot = /^\s*<(?:div|NCard|n-card)\b/;
+    const offenders: string[] = [];
+
+    for (const path of desktopFiles.filter(file => file.endsWith('.vue'))) {
+      const source = readFileSync(path, 'utf8');
+      for (const match of source.matchAll(rawModal)) {
+        const [, , attributes, content] = match;
+        if (/\bpreset\s*=/.test(attributes)) continue;
+        const contentWithoutComments = content.replace(/^\s*<!--[\s\S]*?-->/, '');
+        if (!allowedRoot.test(contentWithoutComments)) offenders.push(relative(root, path));
+      }
+    }
+
+    expect([...new Set(offenders)]).toEqual([]);
   });
 });

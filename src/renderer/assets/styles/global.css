@@ -20,27 +20,23 @@ body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--font-size-base, 14px);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
   transition: background-color 0.3s ease, color 0.3s ease;
   /* 默认背景色，会被主题类覆盖 */
   background-color: #ffffff;
 }
 
-/* Keep native editing semantics inside Electron and Web shells. */
+/* Keep native editing and selection semantics inside editable controls. */
 input,
 textarea,
 select,
 [contenteditable="true"],
-.n-input,
-.n-base-selection {
-  -webkit-app-region: no-drag;
-}
-
-input,
-textarea,
-[contenteditable="true"],
 .n-input__input-el,
 .n-input__textarea-el {
   -webkit-user-select: text;
+  -moz-user-select: text;
   user-select: text;
 }
 

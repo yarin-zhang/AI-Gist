@@ -45,7 +45,7 @@ The desktop design language is **tinted surfaces with restrained boundary border
 - Selected rows, cards, tabs, and navigation items use a neutral tinted surface and, where useful, stronger text weight. They do not gain a selection border.
 - Do not add horizontal padding or item margins to a collapsible `NMenu`: its `collapsed-width`, icon size, and internal 8px inset already determine the icon geometry. Apply only vertical spacing outside that calculation.
 - Naive UI Menu paints hover and selection through `.n-menu-item-content::before`; configure these states with Menu theme overrides and do not add a second background to `.n-menu-item-content`.
-- Never disable text selection globally. Native inputs, textareas, selects, and editable regions must retain focus, caret, selection, and Electron `no-drag` behavior.
+- The desktop shell keeps ordinary interface copy unselectable with body-level `user-select: none` to prevent accidental selection. Native inputs, textareas, selects, contenteditable regions, and Naive UI's native input elements must explicitly retain `user-select: text`, focus, caret, and selection behavior.
 - Do not use large blue blocks, gradients, glowing borders, scale animations, or “AI-style” selection treatments.
 - Preserve the user’s current view when opening global create/edit/detail workflows.
 
@@ -59,6 +59,7 @@ The desktop design language is **tinted surfaces with restrained boundary border
 ### Modals and overlays
 
 - Reuse `CommonModal` or the established full-workspace modal shells.
+- When using a raw `NModal` without a preset, its first rendered child must be a `div` or Naive UI `NCard`. Do not use semantic elements such as `section`, `main`, `article`, or `aside` as the modal content root: Naive UI 2.41's focus trap locates custom modal content by its rendered `DIV` root, and another tag can make editable controls immediately lose focus.
 - Modal surfaces use `--surface-primary`, `--border-default`, `--radius-modal`, and `--shadow-overlay`.
 - Modal headers and footers use `--surface-secondary` with a separator border.
 - Protect unsaved edits before closing or changing workflow.

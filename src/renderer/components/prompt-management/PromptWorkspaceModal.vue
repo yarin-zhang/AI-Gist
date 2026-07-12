@@ -1,6 +1,6 @@
 <template>
     <NModal :show="show" :mask-closable="false" :close-on-esc="false" display-directive="show">
-        <section class="prompt-workspace-modal" role="dialog" aria-modal="true">
+        <div class="prompt-workspace-modal" role="dialog" aria-modal="true">
             <PromptWorkspace ref="workspaceRef" :prompt="prompt" :categories="categories" :mode="mode"
                 :draft="draft" closable @close="$emit('request-close')"
                 @request-mode="$emit('request-mode', $event)" @update:draft="$emit('update:draft', $event)"
@@ -8,7 +8,7 @@
                 @toggle-favorite="$emit('toggle-favorite')" @delete="$emit('delete')"
                 @create="$emit('create')" @cancel-edit="$emit('cancel-edit')"
                 @open-quick-optimization-config="$emit('open-quick-optimization-config')" />
-        </section>
+        </div>
     </NModal>
 </template>
 
