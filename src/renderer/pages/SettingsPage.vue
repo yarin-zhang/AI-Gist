@@ -2,7 +2,7 @@
     <div class="settings-page">
         <header class="settings-command-bar">
             <div class="page-identity">
-                <span class="page-identity-icon"><NIcon size="18"><SettingsIcon /></NIcon></span>
+                <span class="page-identity-icon"><NIcon size="18"><SettingsNavigationIcon /></NIcon></span>
                 <div>
                     <NText strong class="page-title">{{ t('settings.title') }}</NText>
                     <NText depth="3" class="page-subtitle">{{ t('settings.subtitle') }}</NText>
@@ -121,7 +121,6 @@ import {
 import {
     Power,
     Rocket,
-    Settings as SettingsIcon,
     Flask,
     Database,
     InfoCircle,
@@ -129,6 +128,7 @@ import {
     Keyboard,
     Wifi,
 } from "@vicons/tabler";
+import { SettingsNavigationIcon } from '@/theme/navigation-icons'
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
@@ -237,7 +237,7 @@ const settingItems = computed(() => {
         {
             label: t('settings.sections.general'),
             key: "general",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(SettingsIcon) }),
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(SettingsNavigationIcon) }),
             visible: true,
         },
         {
@@ -671,7 +671,7 @@ watch(menuOptions, () => {
     margin-bottom: 0;
 }
 
-.settings-content :deep(.n-divider:not(.n-divider--vertical)) {
+.settings-content-inner :deep(.n-divider:not(.n-divider--vertical)) {
     margin: 0;
 }
 

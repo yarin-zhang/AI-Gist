@@ -62,8 +62,16 @@
                                         <span class="prompt-list-title">{{ prompt.title || t('promptManagement.untitledPrompt') }}</span>
                                         <NIcon v-if="prompt.isFavorite" size="16" color="var(--accent-warning)"><Star /></NIcon>
                                     </div>
-                                    <div v-if="prompt.category" class="prompt-list-meta">
-                                        <span>{{ prompt.category.name }}</span>
+                                    <div v-if="prompt.category || getPromptTags(prompt).length" class="prompt-list-meta">
+                                        <span v-if="prompt.category" class="prompt-list-category">{{ prompt.category.name }}</span>
+                                        <NTag v-for="tag in getPromptTags(prompt).slice(0, 2)" :key="tag"
+                                            size="small" :bordered="false" :color="getTagColor(tag)"
+                                            class="prompt-list-tag">
+                                            {{ tag }}
+                                        </NTag>
+                                        <span v-if="getPromptTags(prompt).length > 2" class="prompt-list-tag-overflow">
+                                            +{{ getPromptTags(prompt).length - 2 }}
+                                        </span>
                                     </div>
                                 </div>
                                 <img v-if="getPromptThumbnail(prompt)" :src="getPromptThumbnail(prompt)"
@@ -115,11 +123,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NText, NTooltip } from 'naive-ui'
+import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
 import {
-    ArrowsSort, Check, Clock, Heart, ListDetails, Search, Settings, Star
+    ArrowsSort, Check, Clock, ListDetails, Search, Settings, Star
 } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
+import { useTagColors } from '@/composables/useTagColors'
 
 interface Props {
     prompts: PromptWithRelations[]
@@ -140,6 +149,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { getTagColor, getTagsArray } = useTagColors()
 const searchText = ref('')
 const activeFilter = ref('all')
 const sortBy = ref<'updated' | 'usage' | 'title'>('updated')
@@ -177,8 +187,15 @@ const categoryCounts = computed(() => {
 const navigationItems = computed(() => [
     { key: 'all', label: t('promptWorkspace.allPrompts'), icon: ListDetails, count: props.prompts.length },
     { key: 'recent', label: t('promptWorkspace.recent'), icon: Clock, count: Math.min(props.prompts.length, 12) },
-    { key: 'favorites', label: t('promptManagement.favorites'), icon: Heart, count: props.prompts.filter(p => p.isFavorite).length },
+    {
+        key: 'favorites',
+        label: t('promptManagement.favorites'),
+        icon: Star,
+        count: props.prompts.filter(p => p.isFavorite).length,
+    },
 ])
+
+const getPromptTags = (prompt: PromptWithRelations) => getTagsArray(prompt.tags)
 
 const filteredPrompts = computed(() => {
     let result = [...props.prompts]
@@ -333,14 +350,18 @@ onBeforeUnmount(() => {
 .category-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
-.prompt-list-item { position: relative; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 9px 8px 10px; margin-bottom: 2px; border-radius: var(--radius-panel); }
+.prompt-list-item { position: relative; min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 7px 9px 7px 10px; margin-bottom: 2px; border-radius: var(--radius-panel); }
 .prompt-list-item.active { color: var(--content-primary); background: var(--surface-tertiary); }
 .selection-check { width: 18px; height: 18px; margin: 1px 9px 0 0; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-control); }
 .selection-check.checked { color: white; border-color: var(--accent-primary); background: var(--accent-primary); }
 .prompt-list-main { flex: 1; min-width: 0; }
 .prompt-list-title-row { display: flex; align-items: center; gap: 6px; }
 .prompt-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); font-weight: var(--font-weight-medium); }
-.prompt-list-meta { display: flex; gap: 7px; margin-top: 4px; color: var(--content-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.prompt-list-meta { display: flex; align-items: center; gap: 5px; min-width: 0; margin-top: 4px; color: var(--content-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.prompt-list-category { flex: 0 1 auto; max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
+.prompt-list-tag { flex: 0 1 auto; min-width: 0; max-width: 84px; }
+.prompt-list-tag :deep(.n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.prompt-list-tag-overflow { flex: 0 0 auto; color: var(--content-tertiary); font-variant-numeric: tabular-nums; }
 .prompt-thumbnail { width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--radius-image); object-fit: cover; background: var(--surface-secondary); }
 .library-state { padding: 32px 8px; text-align: center; }
 .selection-toolbar { margin: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }

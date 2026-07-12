@@ -53,6 +53,33 @@ describe('prompt management detail regressions', () => {
     expect(mainPage).not.toMatch(/\.main-sider-toggle\s*\{[^}]*position:\s*absolute/s)
   })
 
+  it('shares navigation icons between the sidebar and page headers', () => {
+    const icons = readRendererFile('theme/navigation-icons.ts')
+    const mainPage = readRendererFile('pages/MainPage.vue')
+    const promptPage = readRendererFile('pages/PromptManagementPage.vue')
+    const aiConfigPage = readRendererFile('pages/AIConfigPage.vue')
+    const settingsPage = readRendererFile('pages/SettingsPage.vue')
+
+    expect(icons).toContain('Star as PromptNavigationIcon')
+    expect(icons).toContain('Diamonds as AIConfigNavigationIcon')
+    expect(icons).toContain('Settings as SettingsNavigationIcon')
+    expect(mainPage).toContain('h(PromptNavigationIcon)')
+    expect(mainPage).toContain('h(AIConfigNavigationIcon)')
+    expect(mainPage).toContain('h(SettingsNavigationIcon)')
+    expect(promptPage).toContain('<PromptNavigationIcon />')
+    expect(aiConfigPage).toContain('<AIConfigNavigationIcon />')
+    expect(settingsPage).toContain('<SettingsNavigationIcon />')
+  })
+
+  it('shows the About logo beside the expanded sidebar brand name', () => {
+    const mainPage = readRendererFile('pages/MainPage.vue')
+
+    expect(mainPage).toContain("new URL('../assets/images/logo.png', import.meta.url).href")
+    expect(mainPage).toContain('<img :src="appIcon" class="main-sider-brand-logo" alt="" />')
+    expect(mainPage).toMatch(/\.main-sider-brand-logo\s*\{[^}]*width:\s*30px/s)
+    expect(mainPage).toMatch(/\.main-sider-brand-logo\s*\{[^}]*border-radius:\s*var\(--radius-image\)/s)
+  })
+
   it('keeps the workspace split drag gutter visually flush with both panes', () => {
     const page = readRendererFile('pages/PromptManagementPage.vue')
 
@@ -80,12 +107,48 @@ describe('prompt management detail regressions', () => {
 
   it('uses shared prompt-tag colors in list and edit surfaces', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
     const editor = readRendererFile('components/prompt-management/PromptEditModal.vue')
     const launcher = readRendererFile('components/shortcuts/PromptLauncher.vue')
 
     expect(list).toContain('color: getTagColor(tag)')
+    expect(sidebar).toContain(':color="getTagColor(tag)"')
+    expect(sidebar).toContain('getPromptTags(prompt).slice(0, 2)')
+    expect(sidebar).toContain('prompt-list-tag-overflow')
     expect(editor).toContain(':render-tag="renderPromptTag"')
     expect(editor).toContain(':color="getTagColor(tag)"')
     expect(launcher).toContain(':color="getTagColor(tag)"')
+  })
+
+  it('uses neutral stars by default and warning color only for favorited prompts', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+    const workspace = readRendererFile('components/prompt-management/PromptWorkspace.vue')
+
+    expect(list).not.toContain('Heart')
+    expect(sidebar).not.toContain('Heart')
+    expect(list).toContain('<Star />')
+    expect(list).toContain("prompt.isFavorite ? 'var(--accent-warning)' : undefined")
+    expect(list).toContain("row.isFavorite ? 'var(--accent-warning)' : undefined")
+    expect(sidebar).not.toContain('iconColor')
+    expect(workspace).toContain(":color=\"prompt.isFavorite ? 'var(--accent-warning)' : undefined\"")
+    expect(list).not.toContain("isFavorite ? 'error' : 'default'")
+  })
+
+  it('uses colored category and tag chips in cards without empty taxonomy copy', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+
+    expect(list).not.toContain('prompt-card-kind')
+    expect(list).not.toContain("prompt.isJinjaTemplate ? 'Jinja'")
+    expect(list).toContain(':color="getCategoryTagColor(prompt.category)"')
+    expect(list).toContain('getTagsArray(prompt.tags).slice(0, 2)')
+    expect(list).not.toContain('<span v-else class="prompt-card-category">')
+  })
+
+  it('keeps settings dividers compact inside the scrollable detail area', () => {
+    const settingsPage = readRendererFile('pages/SettingsPage.vue')
+
+    expect(settingsPage).toMatch(/\.settings-content-inner :deep\(\.n-divider:not\(\.n-divider--vertical\)\)\s*\{[^}]*margin:\s*0/s)
+    expect(settingsPage).not.toContain('.settings-content :deep(.n-divider')
   })
 })

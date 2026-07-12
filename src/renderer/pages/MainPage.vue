@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, nextTick, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, h, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
     NLayout,
@@ -15,13 +15,14 @@ import {
     NTooltip
 } from 'naive-ui'
 import {
-    Home as HomeIcon,
-    Star as PromptIcon,
-    Settings as SettingsIcon,
-    Diamonds as AIIcon,
     ChevronLeft,
     ChevronRight
 } from '@vicons/tabler'
+import {
+    AIConfigNavigationIcon,
+    PromptNavigationIcon,
+    SettingsNavigationIcon,
+} from '@/theme/navigation-icons'
 
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
@@ -31,6 +32,7 @@ import StatusBar from '~/components/common/StatusBar.vue'
 const { t } = useI18n()
 const currentView = ref('prompts')
 const settingsTargetSection = ref<string>()
+const appIcon = new URL('../assets/images/logo.png', import.meta.url).href
 
 // 组件引用
 const aiConfigPageRef = ref()
@@ -41,17 +43,17 @@ const menuOptions: MenuOption[] = [
     {
         label: t('mainPage.menu.prompts'),
         key: 'prompts',
-        icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
+        icon: () => h(NIcon, null, { default: () => h(PromptNavigationIcon) })
     },
     {
         label: t('mainPage.menu.aiConfig'),
         key: 'ai-config',
-        icon: () => h(NIcon, null, { default: () => h(AIIcon) })
+        icon: () => h(NIcon, null, { default: () => h(AIConfigNavigationIcon) })
     },
     {
         label: t('mainPage.menu.settings'),
         key: 'settings',
-        icon: () => h(NIcon, null, { default: () => h(SettingsIcon) })
+        icon: () => h(NIcon, null, { default: () => h(SettingsNavigationIcon) })
     }
 ]
 
@@ -114,7 +116,8 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                     :collapsed="collapseRef" :width="240" :native-scrollbar="false"
                     content-style="height: 100%;">
                     <div class="main-sider-content">
-                        <NFlex vertical align="center" justify="center" class="main-sider-brand" v-if="!collapseRef">
+                        <NFlex v-if="!collapseRef" align="center" :size="10" class="main-sider-brand">
+                            <img :src="appIcon" class="main-sider-brand-logo" alt="" />
                             <NText strong>{{ t('mainPage.title') }}</NText>
                         </NFlex>
                         <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
@@ -187,8 +190,18 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
     grid-row: 1;
     min-height: 58px;
     padding: 0 16px;
+    overflow: hidden;
     border-bottom: 1px solid var(--border-default);
     font-size: var(--n-font-size, 14px);
+}
+
+.main-sider-brand-logo {
+    display: block;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    object-fit: contain;
+    border-radius: var(--radius-image);
 }
 
 .main-sider-menu {

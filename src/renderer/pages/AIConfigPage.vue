@@ -2,7 +2,7 @@
     <div class="ai-config-page">
         <header class="ai-command-bar">
             <div class="page-identity">
-                <span class="page-identity-icon"><NIcon size="18"><Robot /></NIcon></span>
+                <span class="page-identity-icon"><NIcon size="18"><AIConfigNavigationIcon /></NIcon></span>
                 <div>
                     <NText strong class="page-title">{{ t('aiConfig.title') }}</NText>
                     <NText depth="3" class="page-subtitle">{{ t('aiConfig.subtitle') }}</NText>
@@ -489,6 +489,7 @@ import {
     LetterA, LetterD, LetterM, LetterT, LetterX, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
     Search, Server, Settings, Star, Trash,
 } from '@vicons/tabler'
+import { AIConfigNavigationIcon } from '@/theme/navigation-icons'
 import type { AIConfig, AIConfigTestResult, AIProviderType } from '@shared/types/ai'
 import { getDefaultBaseURL, getProviderMetadata } from '@shared/ai-provider-metadata'
 import { databaseService } from '@/lib/db'

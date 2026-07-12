@@ -25,7 +25,7 @@
                     <NButton secondary :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
                         <template #icon>
                             <NIcon>
-                                <Heart />
+                                <Star />
                             </NIcon>
                         </template>
                         {{ t('promptManagement.favorites') }}
@@ -233,9 +233,6 @@
                             <template #header>
                                 <div class="prompt-card-title-block">
                                     <NText strong class="prompt-card-title">{{ prompt.title }}</NText>
-                                    <NText depth="3" class="prompt-card-kind">
-                                        {{ prompt.isJinjaTemplate ? 'Jinja' : t('promptManagement.regularMode') }}
-                                    </NText>
                                 </div>
                             </template>
 
@@ -250,10 +247,10 @@
                                         </template>
                                     </NButton>
                                     <NButton size="small" text @click.stop="toggleFavorite(prompt.id!)"
-                                        :type="prompt.isFavorite ? 'error' : 'default'">
+                                        :type="prompt.isFavorite ? 'warning' : 'default'">
                                         <template #icon>
-                                            <NIcon>
-                                                <Heart />
+                                            <NIcon :color="prompt.isFavorite ? 'var(--accent-warning)' : undefined">
+                                                <Star />
                                             </NIcon>
                                         </template>
                                     </NButton>
@@ -307,11 +304,19 @@
                                             <template #icon><NIcon><Keyboard /></NIcon></template>
                                             {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
                                         </NTag>
-                                        <span v-if="prompt.category" class="prompt-card-category">
-                                            <span class="category-color-dot" :style="{ background: prompt.category.color || 'var(--content-secondary)' }" />
+                                        <NTag v-if="prompt.category" size="small" :bordered="false"
+                                            :color="getCategoryTagColor(prompt.category)" class="prompt-card-taxonomy-tag">
                                             {{ prompt.category.name }}
-                                        </span>
-                                        <span v-else class="prompt-card-category">{{ t('promptManagement.noCategory') }}</span>
+                                        </NTag>
+                                        <NTag v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag"
+                                            size="small" :bordered="false" :color="getTagColor(tag)"
+                                            class="prompt-card-taxonomy-tag">
+                                            {{ tag }}
+                                        </NTag>
+                                        <NText v-if="getTagsArray(prompt.tags).length > 2" depth="3"
+                                            class="prompt-card-tag-overflow">
+                                            +{{ getTagsArray(prompt.tags).length - 2 }}
+                                        </NText>
                                     </div>
                                     <NText depth="3" class="prompt-card-date">{{ formatDate(prompt.updatedAt) }}</NText>
                                 </div>
@@ -369,7 +374,7 @@ import {
 } from 'naive-ui'
 import {
     Search,
-    Heart,
+    Star,
     DotsVertical,
     Edit,
     Trash,
@@ -625,9 +630,14 @@ const renderRowActions = (prompt: PromptWithRelations) => h(NFlex, { size: 3, ju
         }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Copy) }) }),
         h(NButton, {
             size: 'small', quaternary: true, circle: true,
-            type: prompt.isFavorite ? 'error' : 'default',
+            type: prompt.isFavorite ? 'warning' : 'default',
             onClick: (event: Event) => { event.stopPropagation(); toggleFavorite(prompt.id!) }
-        }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Heart) }) }),
+        }, {
+            icon: () => h(NIcon, {
+                size: 16,
+                color: prompt.isFavorite ? 'var(--accent-warning)' : undefined,
+            }, { default: () => h(Star) })
+        }),
         h(NDropdown, {
             options: getPromptActions(prompt),
             iconSize: 16,
@@ -885,14 +895,16 @@ const treeTableColumns = computed(() => [
                     {
                         size: 'small',
                         text: true,
-                        type: prompt.isFavorite ? 'error' : 'default',
+                        type: prompt.isFavorite ? 'warning' : 'default',
                         onClick: (e: Event) => {
                             e.stopPropagation()
                             toggleFavorite(prompt.id!)
                         }
                     },
                     {
-                        icon: () => h(NIcon, null, { default: () => h(Heart) })
+                        icon: () => h(NIcon, {
+                            color: prompt.isFavorite ? 'var(--accent-warning)' : undefined,
+                        }, { default: () => h(Star) })
                     }
                 )
             }
@@ -1155,14 +1167,16 @@ const tableColumns = computed(() => [
                 {
                     size: 'small',
                     text: true,
-                    type: row.isFavorite ? 'error' : 'default',
+                    type: row.isFavorite ? 'warning' : 'default',
                     onClick: (e: Event) => {
                         e.stopPropagation()
                         toggleFavorite(row.id!)
                     }
                 },
                 {
-                    icon: () => h(NIcon, null, { default: () => h(Heart) })
+                    icon: () => h(NIcon, {
+                        color: row.isFavorite ? 'var(--accent-warning)' : undefined,
+                    }, { default: () => h(Star) })
                 }
             )
         }
@@ -2058,12 +2072,14 @@ defineExpose({
 
 .prompt-card-title-block { width: 100%; min-width: 0; overflow: hidden; }
 .prompt-card-title { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); }
-.prompt-card-kind { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); font-weight: var(--font-weight-normal); }
 .prompt-card-main { min-height: 76px; }
 .prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--radius-image); }
 .prompt-card-footer { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 7px; }
-.prompt-card-category, .table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.prompt-card-taxonomy-tag { flex: 0 1 auto; min-width: 0; max-width: 92px; }
+.prompt-card-taxonomy-tag :deep(.n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.prompt-card-tag-overflow { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 

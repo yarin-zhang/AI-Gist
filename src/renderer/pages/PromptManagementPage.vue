@@ -2,7 +2,7 @@
     <div class="prompt-management-page">
         <header class="prompt-command-bar">
             <div class="page-identity">
-                <span class="page-identity-icon"><NIcon size="18"><Stars /></NIcon></span>
+                <span class="page-identity-icon"><NIcon size="18"><PromptNavigationIcon /></NIcon></span>
                 <div>
                     <NText strong class="page-title">{{ t('promptManagement.title') }}</NText>
                     <NText depth="3" class="page-subtitle">{{ t('promptManagement.subtitle') }}</NText>
@@ -86,7 +86,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
-import { Folder, GridDots, LayoutSidebarRight, List, Plus, Stars } from '@vicons/tabler'
+import { Folder, GridDots, LayoutSidebarRight, List, Plus } from '@vicons/tabler'
+import { PromptNavigationIcon } from '@/theme/navigation-icons'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import PromptLibrarySidebar from '@/components/prompt-management/PromptLibrarySidebar.vue'
 import PromptWorkspace, { type PromptWorkspaceMode } from '@/components/prompt-management/PromptWorkspace.vue'

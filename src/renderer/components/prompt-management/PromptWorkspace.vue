@@ -20,7 +20,11 @@
                         <NButton v-if="prompt?.id" circle quaternary size="small"
                             :type="prompt.isFavorite ? 'warning' : 'default'"
                             :aria-label="t('promptManagement.favorites')" @click="$emit('toggle-favorite')">
-                            <template #icon><NIcon size="16"><Star /></NIcon></template>
+                            <template #icon>
+                                <NIcon size="16" :color="prompt.isFavorite ? 'var(--accent-warning)' : undefined">
+                                    <Star />
+                                </NIcon>
+                            </template>
                         </NButton>
                         <NTooltip v-if="prompt?.id">
                             <template #trigger>
