@@ -1,5 +1,5 @@
 <template>
-    <CommonModal :show="show" @update:show="handleModalShowUpdate">
+    <CommonModal :show="show" :body-padding="0" @update:show="handleModalShowUpdate">
         <template #header>
             <div class="modal-title-row">
                 <span class="modal-title-icon"><NIcon size="20"><Settings /></NIcon></span>
@@ -356,15 +356,16 @@ watch(() => props.show, show => { if (show) loadConfigs() })
 .modal-title-icon { width: 36px; height: 36px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
 .modal-title { display: block; font-size: var(--font-size-xl); line-height: var(--line-height-normal); overflow-wrap: anywhere; }
 .modal-subtitle, .editor-subtitle, .library-summary .n-text:last-child, .section-heading .n-text:last-child { display: block; margin-top: 3px; font-size: var(--font-size-sm); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
-.optimization-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); margin: calc(var(--content-padding) * -1); }
-.optimization-library { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border-default); background: var(--surface-primary); }
+.optimization-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: hidden; background: var(--surface-primary); }
+.optimization-library { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border-default); background: var(--surface-primary); }
 .library-summary { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: var(--compact-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .library-summary > div { min-width: 0; }
-.optimization-list { flex: 1; min-height: 0; padding: 7px; }
-.optimization-item { width: 100%; min-height: 60px; display: flex; align-items: flex-start; gap: 4px; padding: 4px 8px 4px 4px; margin-bottom: 2px; color: var(--content-primary); border-radius: var(--radius-panel); background: transparent; }
+.optimization-list { flex: 1; min-height: 0; padding: 7px; background: var(--surface-primary); }
+.optimization-item { width: 100%; min-height: 60px; box-sizing: border-box; display: flex; align-items: flex-start; gap: 4px; padding: 4px 8px 4px 4px; margin-bottom: 2px; color: var(--content-primary); border-radius: var(--radius-panel); background: transparent; }
 .optimization-item:hover { background: var(--interactive-hover); }
 .optimization-item.active { background: var(--surface-tertiary); }
-.optimization-select { appearance: none; flex: 1; min-width: 0; min-height: 52px; display: flex; align-items: flex-start; gap: 9px; padding: 4px; color: inherit; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.optimization-select { appearance: none; flex: 1; min-width: 0; min-height: 52px; box-sizing: border-box; display: flex; align-items: flex-start; gap: 9px; padding: 4px; color: inherit; border: 0; border-radius: var(--radius-control); outline: none; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.optimization-select:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
 .drag-order { width: 24px; height: 24px; margin-top: 1px; display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .optimization-copy { flex: 1; min-width: 0; }
 .optimization-copy strong, .optimization-copy small { display: block; white-space: normal; overflow-wrap: anywhere; }

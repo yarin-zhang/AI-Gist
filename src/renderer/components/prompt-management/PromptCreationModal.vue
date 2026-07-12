@@ -137,7 +137,8 @@ defineExpose({
 .creation-method strong, .creation-method small { display: block; }
 .creation-method strong { font-size: var(--font-size-base); font-weight: var(--font-weight-medium); }
 .creation-method small { margin-top: 2px; color: var(--content-secondary); font-size: var(--font-size-xs); }
-.creation-content { min-width: 0; min-height: 0; overflow: hidden; background: var(--surface-body); }
+.creation-content { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-body); }
+.creation-content :deep(.prompt-edit-embedded) { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; }
 .ai-creation-pane { height: 100%; }
 .ai-creation-pane :deep(.n-scrollbar-content) { padding: var(--content-padding); }
 .ai-creation-pane :deep(.generator-card), .ai-creation-pane :deep(.history-card) { border-radius: var(--radius-panel); box-shadow: none; }

@@ -158,12 +158,9 @@ import {
     createWorkspaceDraft, deriveWorkspaceVariables, getMissingRequiredVariables,
     isBooleanVariable, isNumberVariable, renderWorkspacePrompt
 } from '@/lib/utils/prompt-workspace'
-
-interface UseRecord {
-    date: string
-    content: string
-    variables: Record<string, any>
-}
+import {
+    readPromptUsageHistory, recordPromptUsage, type PromptUsageRecord
+} from '@/lib/utils/prompt-usage'
 
 const props = defineProps<{
     prompt: PromptWithRelations
@@ -179,7 +176,7 @@ const { t } = useI18n()
 const message = useMessage()
 const showHistory = ref(false)
 const showAIRun = ref(false)
-const useHistory = ref<UseRecord[]>([])
+const useHistory = ref<PromptUsageRecord[]>([])
 const renderError = ref('')
 const selectedModelKey = ref('')
 const modelSelectorRef = ref<any>()
@@ -213,12 +210,7 @@ const initializeDraft = () => {
 }
 
 const loadHistory = () => {
-    try {
-        useHistory.value = JSON.parse(localStorage.getItem(`prompt_history_${props.prompt.id}`) || '[]')
-            .map((record: any) => ({ ...record, date: record.date || new Date().toISOString() }))
-    } catch {
-        useHistory.value = []
-    }
+    useHistory.value = props.prompt.id ? readPromptUsageHistory(props.prompt.id) : []
 }
 
 const updateImageUrls = () => {
@@ -253,7 +245,7 @@ const clearValues = () => {
     emit('update:draft', next)
 }
 
-const restoreHistory = (record: UseRecord) => {
+const restoreHistory = (record: PromptUsageRecord) => {
     emit('update:draft', { ...record.variables })
     showHistory.value = false
     message.success(t('promptWorkspace.valuesRestored'))
@@ -268,14 +260,13 @@ const copyPrompt = async () => {
     if (!canUse.value || !props.prompt.id) return
     try {
         await navigator.clipboard.writeText(filledContent.value)
-        const updatedPrompt = await api.prompts.incrementUseCount.mutate(props.prompt.id)
-        const record: UseRecord = {
-            date: new Date().toISOString(),
+        const updatedPrompt = await recordPromptUsage({
+            promptId: props.prompt.id,
             content: filledContent.value,
             variables: { ...props.draft },
-        }
-        useHistory.value = [record, ...useHistory.value].slice(0, 50)
-        localStorage.setItem(`prompt_history_${props.prompt.id}`, JSON.stringify(useHistory.value))
+            incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+        })
+        useHistory.value = readPromptUsageHistory(props.prompt.id)
         message.success(t('promptWorkspace.copiedAndRecorded'))
         emit('updated', updatedPrompt as PromptWithRelations)
     } catch (error) {

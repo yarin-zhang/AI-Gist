@@ -73,7 +73,7 @@
                         <!-- Content -->
                         <template #2>
                             <div class="modal-content" :style="{
-                                padding: `${contentPadding}px`,
+                                padding: `${resolvedBodyPadding}px`,
                                 height: '100%',
                                 overflow: 'hidden',
                                 backgroundColor: 'var(--surface-primary)',
@@ -141,7 +141,7 @@
                 <!-- Content -->
                 <template #2>
                     <div class="modal-content" :style="{
-                        padding: `${contentPadding}px`,
+                        padding: `${resolvedBodyPadding}px`,
                         height: '100%',
                         overflow: 'hidden',
                         backgroundColor: 'var(--surface-primary)',
@@ -175,6 +175,7 @@ interface Props {
     embedded?: boolean;
     minHeaderHeight?: number;
     contentPadding?: number;
+    bodyPadding?: number;
     headerResizable?: boolean;
     headerDefaultHeight?: number; // 头部默认高度（像素）
     footerDefaultHeight?: number; // 底部默认高度（像素）
@@ -207,6 +208,7 @@ const { modalWidth, modalMaxHeight } = useWindowSize();
 
 // 模态框高度就是窗口高度
 const modalHeight = modalMaxHeight;
+const resolvedBodyPadding = computed(() => props.bodyPadding ?? props.contentPadding);
 
 // 是否有底部内容
 const hasFooter = computed(() => {
@@ -228,7 +230,7 @@ const contentHeight = computed(() => {
     }
 
     // 减去内容区域的内边距 (上下各一份)
-    availableHeight -= props.contentPadding * 2;
+    availableHeight -= resolvedBodyPadding.value * 2;
 
     return Math.max(0, availableHeight);
 });

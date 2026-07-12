@@ -17,14 +17,16 @@
         </template>
         <!-- 中间可操作区域 -->
         <template #content="{ contentHeight }">
-            <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top">
+            <NForm ref="formRef" :model="formData" :rules="rules" label-placement="top"
+                class="edit-workspace-form">
                 <NTabs v-model:value="activeTab" :type="embedded ? 'line' : 'segment'"
-                    :style="{ height: `${contentHeight}px` }" class="edit-workspace-tabs">
+                    :pane-style="workspacePaneStyle" :pane-wrapper-style="workspacePaneWrapperStyle"
+                    class="edit-workspace-tabs">
                     <!-- 编辑 Tab -->
                     <NTabPane name="edit" :tab="t('promptManagement.edit')">
                         <!-- 常规模式编辑器 -->
                         <RegularPromptEditor v-if="!isJinjaEnabled" :content="formData.content"
-                            :variables="formData.variables" :content-height="contentHeight"
+                            :variables="formData.variables"
                             :quick-optimization-configs="quickOptimizationConfigs" :optimizing="optimizing"
                             :is-streaming="isStreaming" :stream-stats="streamStats" @update:content="updateContent"
                             @update:variables="updateVariables" @optimize-prompt="optimizePrompt"
@@ -551,6 +553,24 @@ const formRef = ref();
 const contentScrollbarRef = ref(); // 内容区域滚动条引用
 const saving = ref(false);
 const activeTab = ref("edit");
+const workspacePaneStyle = {
+    flex: '1 1 0',
+    width: '100%',
+    height: '100%',
+    minHeight: '0',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+} as const;
+const workspacePaneWrapperStyle = {
+    flex: '1 1 0',
+    width: '100%',
+    height: '100%',
+    minHeight: '0',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+} as const;
 const historyList = ref<PromptHistory[]>([]);
 const loadingHistory = ref(false);
 const showPreviewModal = ref(false);
@@ -2276,6 +2296,11 @@ defineExpose({
 </script>
 
 <style scoped>
+.edit-workspace-form { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.edit-workspace-tabs { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+.edit-workspace-tabs :deep(> .n-tabs-nav) { flex: 0 0 auto; }
+.edit-workspace-tabs :deep(.n-tabs-pane-wrapper) { width: 100%; }
+
 .prompt-edit-embedded :deep(.modal-content) {
     padding-top: 8px !important;
 }

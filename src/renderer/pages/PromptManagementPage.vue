@@ -54,8 +54,7 @@
             <div v-else class="legacy-view-surface">
                 <PromptList ref="promptListRef" :forced-view-mode="displayMode" hide-view-switcher
                     @view="handleClassicViewPrompt" @edit="handleClassicEditPrompt"
-                    @refresh="handleListRefresh" @manage-categories="showCategoryManagement = true"
-                    @view-mode-change="handleLegacyViewModeChange" />
+                    @refresh="handleListRefresh" @view-mode-change="handleLegacyViewModeChange" />
             </div>
         </div>
 

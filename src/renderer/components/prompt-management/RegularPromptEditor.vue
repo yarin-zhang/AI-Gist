@@ -1,22 +1,22 @@
 <template>
-    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
+    <NSplit direction="horizontal" :default-size="0.6" :min="0.3" :max="0.8"
         :disabled="modalWidth <= 800" class="prompt-editor-split">
         <!-- 左侧：内容编辑区 -->
         <template #1>
             <NCard :title="t('promptManagement.content')" size="small" :style="{ height: '100%' }"
                 class="editor-shell-panel editor-content-panel">
-                <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
-                    <NFlex vertical size="medium" style="padding-right: 12px;">
-                        <NFormItem path="content" style="flex: 1;" :show-label="false">
-                            <NInput :value="content" @update:value="(value) => $emit('update:content', value)"
-                                type="textarea" show-count :placeholder="t('promptManagement.contentPlaceholder')"
-                                :style="{
-                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                    backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
-                                    border: isStreaming ? '1px solid var(--success-color)' : undefined
-                                }" :autosize="{ minRows: 9 }" :readonly="isStreaming" />
-                        </NFormItem>
-                    </NFlex>
+                <div ref="contentScrollbarRef" class="editor-content-layout">
+                    <NFormItem path="content" :show-label="false" :show-feedback="false"
+                        class="prompt-content-field">
+                        <NInput :value="content" @update:value="(value) => $emit('update:content', value)"
+                            type="textarea" show-count :placeholder="t('promptManagement.contentPlaceholder')"
+                            class="prompt-content-input"
+                            :style="{
+                                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                                backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
+                                border: isStreaming ? '1px solid var(--success-color)' : undefined
+                            }" :readonly="isStreaming" />
+                    </NFormItem>
                     <NAlert type="info" :show-icon="false" style="margin: 0;">
                         <NFlex justify="space-between" align="center">
                             <div>
@@ -96,7 +96,7 @@
                             </NFlex>
                         </NCard>
                     </div>
-                </NScrollbar>
+                </div>
             </NCard>
         </template>
 
@@ -116,8 +116,8 @@
                         </NButton>
                     </NFlex>
                 </template>
-                <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
-                    <NFlex vertical size="medium" style="padding-right: 12px;" v-if="variables.length > 0">
+                <NScrollbar class="editor-panel-scroll">
+                    <NFlex v-if="variables.length > 0" vertical size="medium" class="variables-stack">
                         <NCard v-for="(variable, index) in variables" :key="index" size="small" class="variable-config-card">
                             <template #header>
                                 <NFlex justify="space-between" align="center">
@@ -166,13 +166,15 @@
                             </NFlex>
                         </NCard>
                     </NFlex>
-                    <NEmpty v-else :description="t('promptManagement.variableTip')" size="small">
-                        <template #icon>
-                            <NIcon>
-                                <Plus />
-                            </NIcon>
-                        </template>
-                    </NEmpty>
+                    <div v-else class="variables-empty">
+                        <NEmpty :description="t('promptManagement.variableTip')" size="small">
+                            <template #icon>
+                                <NIcon>
+                                    <Plus />
+                                </NIcon>
+                            </template>
+                        </NEmpty>
+                    </div>
                 </NScrollbar>
             </NCard>
         </template>
@@ -216,7 +218,6 @@ interface Variable {
 interface Props {
     content: string;
     variables: Variable[];
-    contentHeight: number;
     quickOptimizationConfigs: any[];
     optimizing: string | null;
     isStreaming: boolean;
@@ -480,11 +481,23 @@ defineExpose({
 </script>
 
 <style scoped>
-.prompt-editor-split { background: var(--surface-body); }
-.editor-shell-panel { border: 1px solid var(--border-default) !important; border-radius: var(--radius-panel) !important; background: var(--surface-primary); }
-.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.prompt-editor-split { width: 100%; height: 100%; min-height: 0; background: var(--surface-body); }
+.prompt-editor-split :deep(.n-split-pane) { min-height: 0; overflow: hidden; }
+.editor-shell-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default) !important; border-radius: var(--radius-panel) !important; background: var(--surface-primary); }
+.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); }
-.editor-shell-panel :deep(> .n-card__content) { padding: 14px 16px; }
+.editor-shell-panel :deep(> .n-card__content) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 14px 16px; }
+.editor-content-layout { flex: 1 1 0; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.editor-panel-scroll { flex: 1 1 0; height: 0; min-height: 0; }
+.editor-panel-scroll :deep(.n-scrollbar-content) { min-height: 100%; display: flex; flex-direction: column; }
+.prompt-content-field { flex: 1 1 0; height: 0; min-height: 220px; margin-bottom: var(--section-gap); }
+.prompt-content-field :deep(.n-form-item-blank) { height: 100%; min-height: 0; }
+.prompt-content-input { height: 100%; min-height: 0; }
+.prompt-content-input :deep(.n-input-wrapper),
+.prompt-content-input :deep(.n-input__textarea),
+.prompt-content-input :deep(.n-input__textarea-el) { height: 100%; min-height: 0; }
+.variables-stack { min-height: 100%; padding-right: 12px; }
+.variables-empty { flex: 1 1 0; min-height: 100%; display: grid; place-items: center; padding-right: 12px; }
 .variable-config-card { border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); box-shadow: none; }
 .variable-config-card :deep(.n-card-header__main) { font-size: var(--font-size-base); }
 .prompt-editor-split :deep(.n-split-pane__split-bar) { background: var(--border-default); }

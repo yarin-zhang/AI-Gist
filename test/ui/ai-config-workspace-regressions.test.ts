@@ -80,14 +80,21 @@ describe('AI configuration workspace regressions', () => {
 
   it('uses a single quick-optimization modal with an inline editor', () => {
     const modal = readRendererFile('components/ai/QuickOptimizationConfigModal.vue')
+    const commonModal = readRendererFile('components/common/CommonModal.vue')
 
     expect(modal.match(/<CommonModal\b/g)?.length).toBe(1)
+    expect(modal).toContain(':body-padding="0"')
     expect(modal).toContain('class="optimization-library"')
     expect(modal).toContain('class="optimization-editor"')
     expect(modal).toContain('moveSelected(-1)')
     expect(modal).toContain('moveSelected(1)')
     expect(modal).toContain('enabledCount >= 5')
     expect(modal).toContain('confirmDiscard')
+    expect(modal).not.toContain('margin: calc(var(--content-padding) * -1)')
+    expect(modal).toMatch(/\.optimization-workspace\s*\{[^}]*overflow:\s*hidden[^}]*background:\s*var\(--surface-primary\)/s)
+    expect(modal).toMatch(/\.optimization-select:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent-primary\)/s)
+    expect(commonModal).toContain('bodyPadding?: number')
+    expect(commonModal).toContain('resolvedBodyPadding')
   })
 
   it('keeps quick-optimization names, descriptions, and templates fully readable', () => {

@@ -37,6 +37,49 @@ describe('prompt management detail regressions', () => {
     expect(page).toContain('overflow: hidden')
   })
 
+  it('lets the card grid consume the full desktop workspace width', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+
+    expect(list).toMatch(/\.prompt-list\s*\{[^}]*flex:\s*1 1 0[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*min-width:\s*0/s)
+    expect(list).toMatch(/\.grid-scroll-region\s*\{[^}]*width:\s*100%/s)
+    expect(list).toMatch(/\.prompt-grid\s*\{[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*grid-template-columns:\s*repeat\(auto-fill, minmax\(286px, 1fr\)\)/s)
+  })
+
+  it('keeps category management out of the legacy view toolbar', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+
+    expect(list).not.toContain("$emit('manage-categories')")
+    expect(list).not.toContain("(e: 'manage-categories')")
+  })
+
+  it('records usage for copy actions in every legacy prompt view', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+
+    expect(list).toContain("import { recordPromptUsage } from '@/lib/utils/prompt-usage'")
+    expect(list.match(/recordPromptUsage\(\{/g)?.length).toBe(2)
+    expect(list).toContain('prompt.useCount = updated.useCount')
+    expect(list).toContain('incrementUseCount: id => api.prompts.incrementUseCount.mutate(id)')
+  })
+
+  it('keeps the creation editor content and variable panes at full available height', () => {
+    const creation = readRendererFile('components/prompt-management/PromptCreationModal.vue')
+    const editModal = readRendererFile('components/prompt-management/PromptEditModal.vue')
+    const regularEditor = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
+
+    expect(creation).toMatch(/\.creation-content\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/s)
+    expect(creation).toMatch(/\.creation-content :deep\(\.prompt-edit-embedded\)\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
+    expect(editModal).toContain('class="edit-workspace-form"')
+    expect(editModal).toContain(':pane-style="workspacePaneStyle"')
+    expect(editModal).toContain(':pane-wrapper-style="workspacePaneWrapperStyle"')
+    expect(editModal).toMatch(/\.edit-workspace-tabs\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%[^}]*min-height:\s*0/s)
+    expect(regularEditor).toMatch(/\.prompt-editor-split\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
+    expect(regularEditor).toMatch(/\.editor-shell-panel :deep\(> \.n-card__content\)\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0/s)
+    expect(regularEditor).toContain('class="prompt-content-input"')
+    expect(regularEditor).toContain(':show-feedback="false"')
+    expect(regularEditor).toMatch(/\.prompt-content-field\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
+    expect(regularEditor).not.toContain('contentHeight - 130')
+  })
+
   it('anchors the main sidebar toggle to the bottom of the sidebar region', () => {
     const mainPage = readRendererFile('pages/MainPage.vue')
 

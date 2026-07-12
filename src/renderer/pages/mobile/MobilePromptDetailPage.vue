@@ -126,6 +126,7 @@ import {
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { recordPromptUsage } from '~/lib/utils/prompt-usage'
 import type { Prompt, Category } from '@shared/types'
 
 const { t } = useI18n()
@@ -242,7 +243,11 @@ const copyContent = async () => {
   try {
     await navigator.clipboard.writeText(prompt.value.content)
     try {
-      const updated = await api.prompts.incrementUseCount.mutate(prompt.value.id!)
+      const updated = await recordPromptUsage({
+        promptId: prompt.value.id!,
+        content: prompt.value.content,
+        incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+      })
       prompt.value.useCount = updated.useCount
     } catch (usageError) {
       console.warn('更新提示词使用次数失败:', usageError)

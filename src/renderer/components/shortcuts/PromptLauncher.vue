@@ -209,6 +209,7 @@ import {
 import ShortcutBindingModal from './ShortcutBindingModal.vue';
 import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
 import { useTagColors } from '@/composables/useTagColors';
+import { recordPromptUsage } from '@/lib/utils/prompt-usage';
 
 type PromptResult = { kind: 'prompt'; key: string; label: string; description: string; prompt: PromptWithRelations };
 type CommandResult = {
@@ -474,11 +475,14 @@ async function executeActivePrompt(): Promise<void> {
       content,
       action: desiredAction.value,
     });
-    if (activePrompt.value.id) await apiClientManager.prompt.prompts.incrementUseCount.mutate(activePrompt.value.id);
-    const historyKey = `prompt_history_${activePrompt.value.id}`;
-    const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    history.unshift({ date: new Date().toISOString(), content, variables: { ...variableValues.value } });
-    localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 50)));
+    if (activePrompt.value.id) {
+      await recordPromptUsage({
+        promptId: activePrompt.value.id,
+        content,
+        variables: { ...variableValues.value },
+        incrementUseCount: id => apiClientManager.prompt.prompts.incrementUseCount.mutate(id),
+      });
+    }
     state.value = await window.electronAPI.shortcuts.getState();
     mode.value = 'search';
   } catch (caught) {

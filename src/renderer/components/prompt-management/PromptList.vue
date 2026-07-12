@@ -30,14 +30,6 @@
                         </template>
                         {{ t('promptManagement.favorites') }}
                     </NButton>
-                    <NButton secondary @click="$emit('manage-categories')">
-                        <template #icon>
-                            <NIcon>
-                                <Folder />
-                            </NIcon>
-                        </template>
-                        {{ t('promptManagement.categories') }}
-                    </NButton>
                     <NButtonGroup v-if="!hideViewSwitcher">
                         <NButton :type="viewMode === 'grid' ? 'primary' : 'default'" @click="setViewMode('grid')">
                             <template #icon>
@@ -393,7 +385,8 @@ import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
 import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
-import { jinjaService } from '@/lib/utils/jinja.service'
+import { getRuntimeVariables, renderPromptContent } from '@/lib/utils/prompt-runtime'
+import { recordPromptUsage } from '@/lib/utils/prompt-usage'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
 import type { PromptShortcutBinding, ShortcutState } from '@shared/types/preferences'
 import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue'
@@ -403,7 +396,6 @@ interface Emits {
     (e: 'edit', prompt: any): void
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
-    (e: 'manage-categories'): void
     (e: 'view-mode-change', mode: 'grid' | 'table' | 'tree'): void
 }
 
@@ -1738,47 +1730,29 @@ const handleShortcutBindingSaved = async () => {
 
 const handleCopyPrompt = async (prompt: PromptWithRelations) => {
     try {
-        let contentToCopy = prompt.content;
-
-        // 检查是否为 Jinja 模板
-        if (prompt.isJinjaTemplate) {
-            try {
-                // 生成默认变量值
-                const defaultVariables: Record<string, any> = {};
-                if (prompt.variables && prompt.variables.length > 0) {
-                    // 使用存储的变量配置
-                    prompt.variables.forEach((variable: any) => {
-                        defaultVariables[variable.name] = variable.defaultValue || `[${variable.name}]`;
-                    });
-                } else {
-                    // 从模板内容中提取变量
-                    const templateVariables = jinjaService.extractVariables(prompt.content);
-                    templateVariables.forEach(variableName => {
-                        defaultVariables[variableName] = `[${variableName}]`;
-                    });
-                }
-                
-                // 使用 Jinja 服务渲染模板
-                contentToCopy = jinjaService.render(prompt.content, defaultVariables);
-            } catch (error) {
-                console.error('Jinja 模板渲染失败:', error);
-                // 渲染失败时返回原始内容
-                contentToCopy = prompt.content;
-            }
-        } else {
-            // 变量模式：检查是否有变量配置
-            if (prompt.variables && prompt.variables.length > 0) {
-                // 变量替换逻辑
-                Object.entries(prompt.variables).forEach(([key, variable]: [string, any]) => {
-                    const regex = new RegExp(`\\{\\{${variable.name}\\}\\}`, "g");
-                    // 使用默认值替换变量，如果没有默认值则使用变量名
-                    const replacement = variable.defaultValue || `[${variable.name}]`;
-                    contentToCopy = contentToCopy.replace(regex, replacement);
-                });
-            }
+        const variables = Object.fromEntries(getRuntimeVariables(prompt).map(variable => [
+            variable.name,
+            variable.defaultValue === undefined || variable.defaultValue === ''
+                ? `[${variable.name}]`
+                : variable.defaultValue,
+        ]))
+        let contentToCopy = prompt.content
+        try {
+            contentToCopy = renderPromptContent(prompt, variables)
+        } catch (error) {
+            console.error('提示词默认变量渲染失败:', error)
         }
 
         await navigator.clipboard.writeText(contentToCopy)
+        if (prompt.id) {
+            const updated = await recordPromptUsage({
+                promptId: prompt.id,
+                content: contentToCopy,
+                variables,
+                incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+            })
+            prompt.useCount = updated.useCount
+        }
         message.success(t('promptManagement.copyPromptSuccess'))
     } catch (error) {
         message.error(t('promptManagement.copyFailed'))
@@ -1789,6 +1763,14 @@ const handleCopyPrompt = async (prompt: PromptWithRelations) => {
 const handleCopyOriginalPrompt = async (prompt: PromptWithRelations) => {
     try {
         await navigator.clipboard.writeText(prompt.content)
+        if (prompt.id) {
+            const updated = await recordPromptUsage({
+                promptId: prompt.id,
+                content: prompt.content,
+                incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+            })
+            prompt.useCount = updated.useCount
+        }
         message.success(t('promptManagement.copyOriginalContentSuccess'))
     } catch (error) {
         message.error(t('promptManagement.copyFailed'))
@@ -1962,9 +1944,13 @@ defineExpose({
 
 <style scoped>
 .prompt-list {
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: none;
     height: 100%;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
@@ -2013,12 +1999,16 @@ defineExpose({
 
 .grid-scroll-region {
     flex: 1;
+    width: 100%;
     min-height: 0;
     overflow-y: auto;
 }
 
 .prompt-grid {
     display: grid;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
     grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
     gap: 12px;
     margin-top: 12px;
