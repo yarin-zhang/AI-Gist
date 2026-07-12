@@ -13,6 +13,20 @@ describe('AI configuration workspace regressions', () => {
     expect(page).toContain('v-model:size="libraryPaneSize"')
     expect(page).toContain("localStorage.setItem('ai_config_library_pane_size'")
     expect(page).toContain("localStorage.setItem('ai_config_workspace_last_id'")
+    expect(page).toMatch(/\.ai-config-page\s*\{[^}]*height:\s*calc\(100vh - 24px\)[^}]*overflow:\s*hidden/s)
+    expect(page).toMatch(/\.workspace-scroll\s*\{[^}]*height:\s*0[^}]*overflow:\s*hidden/s)
+  })
+
+  it('matches prompt management typography and centers preferred status in list rows', () => {
+    const page = readRendererFile('pages/AIConfigPage.vue')
+
+    expect(page).toMatch(/\.ai-command-bar\s*\{[^}]*flex:\s*0 0 60px/s)
+    expect(page).toMatch(/\.page-title\s*\{[^}]*font-size:\s*var\(--font-size-lg\)/s)
+    expect(page).toMatch(/\.page-subtitle\s*\{[^}]*font-size:\s*var\(--font-size-xs\)/s)
+    expect(page).toContain('class="preferred-marker"')
+    expect(page).toMatch(/\.preferred-marker\s*\{[^}]*align-self:\s*center/s)
+    expect(page).toContain("id: 'preset:groq'")
+    expect(page).toMatch(/id:\s*'preset:groq'[\s\S]*?icon:\s*LetterX/)
   })
 
   it('distinguishes an explicit preferred configuration from fallback behavior', () => {
@@ -74,6 +88,16 @@ describe('AI configuration workspace regressions', () => {
     expect(modal).toContain('moveSelected(1)')
     expect(modal).toContain('enabledCount >= 5')
     expect(modal).toContain('confirmDiscard')
+  })
+
+  it('keeps quick-optimization names, descriptions, and templates fully readable', () => {
+    const modal = readRendererFile('components/ai/QuickOptimizationConfigModal.vue')
+
+    expect(modal).toContain(':autosize="{ minRows: 2, maxRows: 8 }"')
+    expect(modal).toContain(':autosize="{ minRows: 12, maxRows: 28 }"')
+    expect(modal).toMatch(/\.optimization-copy strong, \.optimization-copy small\s*\{[^}]*white-space:\s*normal/s)
+    expect(modal).toMatch(/\.optimization-copy strong, \.optimization-copy small\s*\{[^}]*overflow-wrap:\s*anywhere/s)
+    expect(modal).not.toMatch(/\.optimization-copy strong, \.optimization-copy small\s*\{[^}]*text-overflow:\s*ellipsis/s)
   })
 
   it('ships the new workspace copy in every supported locale', () => {

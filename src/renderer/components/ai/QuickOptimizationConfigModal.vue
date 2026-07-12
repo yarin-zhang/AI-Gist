@@ -113,7 +113,7 @@
                                         </div>
                                     </NFormItem>
                                     <NFormItem :label="t('quickOptimization.description')" path="description" class="form-span-2">
-                                        <NInput v-model:value="draft.description" type="textarea" :rows="2"
+                                        <NInput v-model:value="draft.description" type="textarea" :autosize="{ minRows: 2, maxRows: 8 }"
                                             :placeholder="t('quickOptimization.descriptionPlaceholder')" />
                                     </NFormItem>
                                 </div>
@@ -128,7 +128,7 @@
                                     <NTag size="small">{{ t('quickOptimization.workspace.contentVariable') }}</NTag>
                                 </div>
                                 <NFormItem path="prompt" :show-label="false">
-                                    <NInput v-model:value="draft.prompt" type="textarea" :rows="12" show-count
+                                    <NInput v-model:value="draft.prompt" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" show-count
                                         class="template-input" :placeholder="t('quickOptimization.promptTemplatePlaceholder')" />
                                 </NFormItem>
                             </section>
@@ -351,28 +351,32 @@ watch(() => props.show, show => { if (show) loadConfigs() })
 </script>
 
 <style scoped>
-.modal-title-row { display: flex; align-items: center; gap: 12px; }
+.modal-title-row { display: flex; align-items: flex-start; gap: 12px; }
+.modal-title-row > div { min-width: 0; }
 .modal-title-icon { width: 36px; height: 36px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
-.modal-title { display: block; font-size: var(--font-size-xl); }
-.modal-subtitle, .editor-subtitle, .library-summary .n-text:last-child, .section-heading .n-text:last-child { display: block; margin-top: 3px; font-size: var(--font-size-sm); }
-.optimization-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr); margin: calc(var(--content-padding) * -1); }
+.modal-title { display: block; font-size: var(--font-size-xl); line-height: var(--line-height-normal); overflow-wrap: anywhere; }
+.modal-subtitle, .editor-subtitle, .library-summary .n-text:last-child, .section-heading .n-text:last-child { display: block; margin-top: 3px; font-size: var(--font-size-sm); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
+.optimization-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); margin: calc(var(--content-padding) * -1); }
 .optimization-library { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border-default); background: var(--surface-primary); }
-.library-summary { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: var(--compact-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.library-summary { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: var(--compact-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.library-summary > div { min-width: 0; }
 .optimization-list { flex: 1; min-height: 0; padding: 7px; }
-.optimization-item { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 4px; padding: 4px 8px 4px 4px; margin-bottom: 2px; color: var(--content-primary); border-radius: var(--radius-panel); background: transparent; }
+.optimization-item { width: 100%; min-height: 60px; display: flex; align-items: flex-start; gap: 4px; padding: 4px 8px 4px 4px; margin-bottom: 2px; color: var(--content-primary); border-radius: var(--radius-panel); background: transparent; }
 .optimization-item:hover { background: var(--interactive-hover); }
 .optimization-item.active { background: var(--surface-tertiary); }
-.optimization-select { appearance: none; flex: 1; min-width: 0; min-height: 52px; display: flex; align-items: center; gap: 9px; padding: 4px; color: inherit; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.drag-order { width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.optimization-select { appearance: none; flex: 1; min-width: 0; min-height: 52px; display: flex; align-items: flex-start; gap: 9px; padding: 4px; color: inherit; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.drag-order { width: 24px; height: 24px; margin-top: 1px; display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .optimization-copy { flex: 1; min-width: 0; }
-.optimization-copy strong, .optimization-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.optimization-copy small { margin-top: 4px; color: var(--content-secondary); font-size: var(--font-size-xs); font-weight: normal; }
-.item-controls { flex: 0 0 auto; }
-.library-help { padding: 9px 12px; border-top: 1px solid var(--border-default); background: var(--surface-secondary); font-size: var(--font-size-xs); }
+.optimization-copy strong, .optimization-copy small { display: block; white-space: normal; overflow-wrap: anywhere; }
+.optimization-copy strong { line-height: var(--line-height-normal); }
+.optimization-copy small { margin-top: 4px; color: var(--content-secondary); font-size: var(--font-size-xs); font-weight: normal; line-height: var(--line-height-normal); }
+.item-controls { flex: 0 0 auto; margin-top: 8px; }
+.library-help { padding: 9px 12px; border-top: 1px solid var(--border-default); background: var(--surface-secondary); font-size: var(--font-size-xs); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
 .library-state { flex: 1; display: grid; place-items: center; padding: 20px; }
 .optimization-editor { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
-.editor-header { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
-.editor-title { display: block; font-size: var(--font-size-lg); }
+.editor-header { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.editor-header > div:first-child { min-width: 0; }
+.editor-title { display: block; font-size: var(--font-size-lg); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
 .editor-scroll { flex: 1; min-height: 0; }
 .optimization-form { max-width: 860px; display: flex; flex-direction: column; gap: var(--section-gap); margin: 0 auto; padding: var(--page-padding); }
 .form-section { padding: var(--content-padding); }
@@ -380,12 +384,14 @@ watch(() => props.show, show => { if (show) loadConfigs() })
 .form-span-2 { grid-column: 1 / -1; }
 .switch-field { min-height: 34px; display: flex; align-items: center; gap: 9px; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.section-heading > div { min-width: 0; }
+.section-heading .n-tag { flex: 0 0 auto; }
 .template-input :deep(.n-input__textarea-el) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .editor-empty { display: grid; place-items: center; background: var(--surface-body); }
 .dirty-indicator { min-height: 20px; font-size: var(--font-size-xs); }
 
 @media (max-width: 980px) {
-    .optimization-workspace { grid-template-columns: 240px minmax(0, 1fr); }
+    .optimization-workspace { grid-template-columns: 270px minmax(0, 1fr); }
     .form-grid { grid-template-columns: 1fr; }
     .form-span-2 { grid-column: auto; }
 }

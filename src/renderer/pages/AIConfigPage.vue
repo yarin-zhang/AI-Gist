@@ -91,13 +91,16 @@
                                 <span class="config-list-copy">
                                     <span class="config-list-title-row">
                                         <span class="config-list-title">{{ config.name }}</span>
-                                        <NIcon v-if="config.isPreferred && config.enabled" size="15" color="var(--accent-warning)"><Star /></NIcon>
                                     </span>
                                     <span class="config-list-meta">
                                         <span>{{ getConfigDisplayLabel(config) }}</span>
                                         <span>·</span>
                                         <span>{{ config.defaultModel || config.customModel || t('aiConfig.workspace.noDefaultModel') }}</span>
                                     </span>
+                                </span>
+                                <span v-if="config.isPreferred && config.enabled" class="preferred-marker"
+                                    :title="t('aiConfig.globalPreferred')">
+                                    <NIcon size="15" color="var(--accent-warning)"><Star /></NIcon>
                                 </span>
                                 <span class="status-dot" :class="config.enabled ? 'enabled' : 'disabled'"
                                     :title="config.enabled ? t('aiConfig.enabled') : t('aiConfig.disabled')" />
@@ -483,7 +486,7 @@ import {
 import {
     AccessPoint, Api, Atom, Book, BrandGoogle, BrandOpenSource, BrandWindows, Check,
     ChevronLeft, ChevronRight, Circles, Cloud, CloudDownload, DeviceDesktop, Edit, ExternalLink,
-    LetterA, LetterD, LetterM, LetterT, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
+    LetterA, LetterD, LetterM, LetterT, LetterX, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
     Search, Server, Settings, Star, Trash,
 } from '@vicons/tabler'
 import type { AIConfig, AIConfigTestResult, AIProviderType } from '@shared/types/ai'
@@ -617,7 +620,7 @@ const compatibilityProviderChoices = computed<ProviderChoice[]>(() => [
 const onlinePresetChoices = computed<ProviderChoice[]>(() => [
     {
         id: 'preset:groq', type: 'openai', label: 'Groq',
-        description: t('aiConfig.workspace.groqPresetDesc'), icon: Api,
+        description: t('aiConfig.workspace.groqPresetDesc'), icon: LetterX,
         defaultName: 'Groq', baseURL: 'https://api.groq.com/openai/v1', custom: true,
         apiKeyUrl: 'https://console.groq.com/keys', docUrl: 'https://console.groq.com/docs/quickstart',
     },
@@ -1137,23 +1140,26 @@ defineExpose({ openAddConfigModal })
 </script>
 
 <style scoped>
-.ai-config-page { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
-.ai-command-bar { min-height: 76px; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, auto) minmax(260px, 1fr); align-items: center; gap: 16px; padding: 0 var(--page-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.ai-config-page { width: 100%; height: calc(100vh - 24px); min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-body); }
+.ai-command-bar { flex: 0 0 60px; min-height: 60px; display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(300px, 1fr); align-items: center; gap: var(--section-gap); padding: 0 var(--page-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
 .page-identity, .modal-title-row, .workspace-identity { display: flex; align-items: center; min-width: 0; gap: 12px; }
 .page-identity-icon, .modal-title-icon, .workspace-provider-icon, .provider-icon { display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
-.page-identity-icon { width: 34px; height: 34px; }
-.page-title { display: block; font-size: var(--font-size-2xl); line-height: 1.25; }
-.page-subtitle, .modal-subtitle, .workspace-subtitle, .section-description, .editor-section-heading > .n-text, .provider-help .n-text { display: block; margin-top: 3px; font-size: var(--font-size-sm); }
+.page-identity { gap: 10px; }
+.page-identity-icon { width: 32px; height: 32px; flex: 0 0 32px; color: var(--accent-primary); border: 0; border-radius: var(--radius-panel); }
+.page-title { display: block; font-size: var(--font-size-lg); line-height: 1.25; }
+.page-subtitle { display: block; max-width: 320px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); }
+.modal-subtitle, .workspace-subtitle, .section-description, .editor-section-heading > .n-text, .provider-help .n-text { display: block; margin-top: 3px; font-size: var(--font-size-sm); }
 .preference-summary { justify-self: center; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px 10px; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-actions, .workspace-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
-.ai-page-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.ai-page-content { flex: 1; height: 0; min-height: 0; display: flex; overflow: hidden; }
 .page-state { flex: 1; margin: var(--page-padding); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
-.config-workspace-split { flex: 1; min-width: 0; min-height: 0; }
+.config-workspace-split { flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.config-workspace-split :deep(.n-split-pane) { min-width: 0; min-height: 0; overflow: hidden; }
 .config-workspace-split :deep(.n-split__resize-trigger-wrapper) { position: relative; z-index: 2; overflow: visible; background: transparent; }
 .config-workspace-split :deep(.n-split__resize-trigger-wrapper)::before { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
 .workspace-resize-line { width: 1px; height: 100%; background: var(--border-default); transition: background-color .12s ease; }
 .config-workspace-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { background: var(--border-strong); }
-.config-library { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--surface-primary); }
+.config-library { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-primary); }
 .library-search { padding: 12px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .library-filters { padding: 8px; }
 .filter-item, .config-list-item, .editor-nav-item, .provider-card { appearance: none; color: var(--content-primary); font: inherit; cursor: pointer; }
@@ -1171,16 +1177,17 @@ defineExpose({ openAddConfigModal })
 .config-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-medium); }
 .config-list-meta { display: flex; gap: 5px; margin-top: 4px; color: var(--content-secondary); font-size: var(--font-size-xs); overflow: hidden; white-space: nowrap; }
 .config-list-meta span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.preferred-marker { align-self: center; width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; }
 .status-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--content-muted); }
 .status-dot.enabled { background: var(--accent-success); }
 .library-empty { padding: 32px 8px; }
-.config-workspace { height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
-.workspace-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.config-workspace { width: 100%; height: 100%; max-height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-body); }
+.workspace-header { flex: 0 0 auto; min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
 .workspace-provider-icon { width: 40px; height: 40px; }
 .workspace-title-copy { min-width: 0; }
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .workspace-title { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xl); }
-.workspace-scroll { flex: 1; min-height: 0; }
+.workspace-scroll { flex: 1; height: 0; min-height: 0; overflow: hidden; }
 .workspace-sections { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--section-gap); padding: var(--page-padding); }
 .detail-panel { padding: var(--content-padding); }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
