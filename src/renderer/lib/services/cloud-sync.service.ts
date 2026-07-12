@@ -374,6 +374,9 @@ export class CloudSyncService {
       this.queueAutoSyncAfterRunning(storageId, options.reason || 'manual');
       return running;
     }
+    const manualPendingVersion = (options.reason || 'manual') === 'manual' && this.pendingChangeVersion > 0
+      ? this.pendingChangeVersion
+      : undefined;
 
     const attemptAt = new Date().toISOString();
     const generation = (this.syncGenerations.get(storageId) || 0) + 1;
@@ -409,6 +412,23 @@ export class CloudSyncService {
               ...(result.warnings || []),
               '后台完整性验证状态记录失败；正式同步已成功且不受影响'
             ];
+          }
+        }
+        if (
+          result.success &&
+          manualPendingVersion !== undefined &&
+          this.pendingChangeVersion === manualPendingVersion &&
+          this.autoSyncOptions
+        ) {
+          try {
+            const enabledStorageIds = await this.resolveStorageIds();
+            if (enabledStorageIds.length === 1 && enabledStorageIds[0] === storageId) {
+              this.clearPendingChange(manualPendingVersion);
+              this.clearScheduledTimer();
+              this.queuedAutoSyncs.delete(storageId);
+            }
+          } catch (error) {
+            console.warn('手动同步成功后检查待处理自动同步失败:', error);
           }
         }
         if (this.runningSyncs.get(storageId) !== syncPromise) {

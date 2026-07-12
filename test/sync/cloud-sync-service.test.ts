@@ -1986,6 +1986,118 @@ describe('CloudSyncService', () => {
     service.stopAutoSync()
   })
 
+  it('coalesces a pending automatic sync into a successful manual sync for the only enabled storage', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    let cloudManifest: any = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    let releaseSave!: () => void
+    let notifySaveStarted!: () => void
+    const saveStarted = new Promise<void>(resolve => {
+      notifySaveStarted = resolve
+    })
+    const releaseSavePromise = new Promise<void>(resolve => {
+      releaseSave = resolve
+    })
+    const { service, cloudClient } = createService(baseData, cloudManifest, {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    cloudClient.getCloudSyncManifest.mockImplementation(async () => cloudManifest)
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (_storageId: string, manifest: any) => {
+      cloudManifest = manifest
+      notifySaveStarted()
+      await releaseSavePromise
+      return { success: true }
+    })
+
+    service.startAutoSync({
+      syncOnStart: false,
+      debounceMs: 25,
+      pollIntervalMs: 0,
+      retryMs: 0
+    })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    const manualSync = service.syncNow('cfg-1', { reason: 'manual' })
+    await saveStarted
+    await vi.advanceTimersByTimeAsync(25)
+    releaseSave()
+    const result = await manualSync
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(result.success).toBe(true)
+    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(service.getStatus()).toMatchObject({ status: 'success', pending: false })
+
+    service.stopAutoSync()
+  })
+
+  it('keeps the pending automatic sync when a manual sync covers only one of multiple enabled storages', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const secondConfig = {
+      ...enabledWebDAVConfig,
+      id: 'cfg-2',
+      name: 'Second WebDAV'
+    }
+    const manifests: Record<string, any> = {
+      'cfg-1': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+      'cfg-2': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    }
+    const { service, cloudClient } = createService(baseData, manifests['cfg-1'], {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => manifests[storageId])
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      manifests[storageId] = manifest
+      return { success: true }
+    })
+
+    service.startAutoSync({
+      syncOnStart: false,
+      debounceMs: 25,
+      pollIntervalMs: 0,
+      retryMs: 0
+    })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    const manualResult = await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(manualResult.success).toBe(true)
+    expect(service.hasPendingChanges()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(25)
+
+    expect(cloudClient.saveCloudSyncManifest.mock.calls.map(call => call[0])).toEqual(['cfg-1', 'cfg-2'])
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(service.getStatus()).toMatchObject({ status: 'success', pending: false })
+
+    service.stopAutoSync()
+  })
+
   it('queues an automatic local-change sync when local data changes during a running sync', async () => {
     vi.useFakeTimers()
     const initialData = {
