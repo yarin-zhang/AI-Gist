@@ -18,6 +18,7 @@ describe('shared tag color utilities', () => {
 
   it('normalizes string and array tag values', () => {
     expect(getTagsArray(' design, AI ,, prompt ')).toEqual(['design', 'AI', 'prompt']);
+    expect(getTagsArray('周报')).toEqual(['周报']);
     expect(getTagsArray([' design ', '', 'AI'])).toEqual(['design', 'AI']);
   });
 

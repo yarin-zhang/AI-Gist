@@ -83,11 +83,11 @@
                 <ion-chip v-if="prompt.categoryId" size="small" outline>
                   <ion-label>{{ getCategoryName(prompt.categoryId) }}</ion-label>
                 </ion-chip>
-                <ion-chip v-for="tag in (prompt.tags || []).slice(0, 2)" :key="tag" size="small">
+                <ion-chip v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag" size="small">
                   <ion-label>{{ tag }}</ion-label>
                 </ion-chip>
-                <ion-chip v-if="(prompt.tags || []).length > 2" size="small">
-                  <ion-label>+{{ (prompt.tags || []).length - 2 }}</ion-label>
+                <ion-chip v-if="getTagsArray(prompt.tags).length > 2" size="small">
+                  <ion-label>+{{ getTagsArray(prompt.tags).length - 2 }}</ion-label>
                 </ion-chip>
               </div>
             </ion-label>
@@ -275,6 +275,7 @@ import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { getTagsArray } from '~/lib/utils/tag-colors'
 import type { Prompt, Category } from '@shared/types'
 import { useRouter } from 'vue-router'
 import { databaseService } from '~/lib/db'

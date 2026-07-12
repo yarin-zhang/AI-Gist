@@ -5,6 +5,13 @@ import { resolve } from 'node:path'
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 describe('mobile sync and restore UI wiring', () => {
+  it('normalizes prompt tags before rendering list chips', () => {
+    const source = read('src/renderer/pages/mobile/MobilePromptPage.vue')
+    expect(source).toContain('getTagsArray(prompt.tags).slice(0, 2)')
+    expect(source).toContain('getTagsArray(prompt.tags).length - 2')
+    expect(source).not.toContain('(prompt.tags || []).slice(0, 2)')
+  })
+
   it('refreshes visible prompt data from database change events after a remote apply', () => {
     const source = read('src/renderer/pages/mobile/MobilePromptPage.vue')
     expect(source).toContain("onDataChange(['prompts', 'categories', 'ai_configs'], scheduleRealtimeRefresh)")
