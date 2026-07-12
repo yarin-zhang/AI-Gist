@@ -15,7 +15,7 @@ const expectInOrder = (source: string, snippets: string[]) => {
 describe('settings sync and backup information architecture', () => {
   it('makes data sync the first and default settings section', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
-    expect(source).toContain("props.targetSection || 'cloud-backup'");
+    expect(source).toContain("normalizeSettingKey(props.targetSection) || 'cloud-backup'");
     expectInOrder(source, [
       "label: t('settings.sections.cloudBackup')",
       "label: t('settings.sections.dataManagement')",
@@ -46,6 +46,44 @@ describe('settings sync and backup information architecture', () => {
     expect(source).not.toContain("t('settings.resetToDefault')");
     expect(source).not.toContain('const resetSettings');
     expect(source).not.toContain('<NAlert :show-icon="false">');
+  });
+
+  it('combines appearance and language under general settings and keeps native features in the system group', () => {
+    const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
+
+    expect(source).toContain('<template v-if="activeSettingKey === \'general\'">');
+    expectInOrder(source, [
+      '<AppearanceSettings',
+      '<LanguageSettings />',
+    ]);
+    expectInOrder(source, [
+      "label: t('settings.sections.general')",
+      "label: t('settings.sections.startup')",
+      "label: t('settings.sections.close')",
+      "label: t('settings.sections.shortcuts')",
+      "label: t('settings.sections.networkProxy')",
+    ]);
+    expect(source).toContain("children: pick('general')");
+    expect(source).toContain("children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy')");
+    expect(source).toContain('visible: capabilities.startup');
+    expect(source).toContain('visible: capabilities.tray');
+    expect(source).toContain('visible: capabilities.globalShortcuts');
+    expect(source).toContain('visible: capabilities.systemProxy');
+  });
+
+  it('gives the settings navigation and content independent scroll areas', () => {
+    const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
+    const style = source.slice(source.indexOf('<style scoped>'));
+
+    expect(style).toMatch(/\.settings-page\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/s);
+    expect(style).toMatch(/\.settings-layout\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s);
+    expect(source).toContain('<NScrollbar class="settings-navigation-scrollbar" trigger="hover">');
+    expect(style).toMatch(/\.settings-navigation\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(style).toMatch(/\.settings-navigation-scrollbar\s*\{[^}]*height:\s*100%;/s);
+    expect(style).toMatch(/\.settings-content\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(style).not.toContain('position: sticky');
+    expect(source).not.toContain('handleNavigationScroll');
+    expect(source).not.toContain('isNavigationScrolling');
   });
 
   it('removes duplicate summaries from simple preference panels', () => {
@@ -109,23 +147,23 @@ describe('settings sync and backup information architecture', () => {
 
   it('uses the new visible section names in every supported locale', () => {
     const expected = {
-      'zh-CN': ['数据同步', '数据备份'],
-      'zh-TW': ['資料同步', '資料備份'],
-      'en-US': ['Data Sync', 'Data Backup'],
-      'ja-JP': ['データ同期', 'データバックアップ'],
+      'zh-CN': ['数据同步', '数据备份', '通用设置'],
+      'zh-TW': ['資料同步', '資料備份', '一般設定'],
+      'en-US': ['Data Sync', 'Data Backup', 'General Settings'],
+      'ja-JP': ['データ同期', 'データバックアップ', '一般設定'],
     } as const;
 
-    for (const [locale, [syncName, backupName]] of Object.entries(expected)) {
+    for (const [locale, [syncName, backupName, generalName]] of Object.entries(expected)) {
       const messages = JSON.parse(readWorkspaceFile(`src/renderer/i18n/locales/${locale}.json`));
       expect(messages.settings.sections.cloudBackup).toBe(syncName);
       expect(messages.settings.sections.dataManagement).toBe(backupName);
+      expect(messages.settings.sections.general).toBe(generalName);
       expect(messages.dataSync.title).toBe(syncName);
       expect(messages.dataBackup.title).toBe(backupName);
       expect(messages.settings.groups.data).toBeTruthy();
       expect(messages.settings.groups.preferences).toBeTruthy();
       expect(messages.settings.groups.system).toBeTruthy();
       expect(messages.settings.groups.other).toBeTruthy();
-      expect(messages.settings.sections.language).toBeTruthy();
     }
   });
 });

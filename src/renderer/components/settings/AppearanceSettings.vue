@@ -6,32 +6,17 @@
                     <NFlex vertical :size="12">
                         <NRadio value="system">
                             <NFlex align="center" :size="8">
-                                <div>
-                                    <div>{{ t('appearance.auto') }}</div>
-                                    <NText depth="3" style="font-size: 12px">
-                                        {{ t('appearance.autoSwitchTip') }}
-                                    </NText>
-                                </div>
+                                <div>{{ t('appearance.auto') }}</div>
                             </NFlex>
                         </NRadio>
                         <NRadio value="light">
                             <NFlex align="center" :size="8">
-                                <div>
-                                    <div>{{ t('appearance.light') }}</div>
-                                    <NText depth="3" style="font-size: 12px">
-                                        {{ t('appearance.alwaysLight') }}
-                                    </NText>
-                                </div>
+                                <div>{{ t('appearance.light') }}</div>
                             </NFlex>
                         </NRadio>
                         <NRadio value="dark">
                             <NFlex align="center" :size="8">
-                                <div>
-                                    <div>{{ t('appearance.dark') }}</div>
-                                    <NText depth="3" style="font-size: 12px">
-                                        {{ t('appearance.alwaysDark') }}
-                                    </NText>
-                                </div>
+                                <div>{{ t('appearance.dark') }}</div>
                             </NFlex>
                         </NRadio>
                     </NFlex>

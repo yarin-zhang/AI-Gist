@@ -208,10 +208,7 @@
     "title": "AIプロンプトジェネレーター"
   },
   "appearance": {
-    "alwaysDark": "常にダークテーマを使用",
-    "alwaysLight": "常にライトテーマを使用",
     "auto": "システムに従う",
-    "autoSwitchTip": "テーマを自動的に切り替えます",
     "dark": "ダークテーマ",
     "light": "ライトテーマ",
     "theme": "テーマモード"
@@ -1002,6 +999,7 @@
       "close": "終了時の動作",
       "cloudBackup": "データ同期",
       "dataManagement": "データバックアップ",
+      "general": "一般設定",
       "language": "言語",
       "laboratory": "研究室",
       "networkProxy": "ネットワークプロキシ",

@@ -2,14 +2,16 @@
     <div class="settings-page">
         <div class="settings-layout">
             <aside class="settings-navigation" :aria-label="t('settings.settingsMenu')">
-                <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
-                <NMenu
-                    v-model:value="activeSettingKey"
-                    :options="menuOptions"
-                    :root-indent="8"
-                    :indent="16"
-                    @update:value="handleMenuSelect"
-                />
+                <NScrollbar class="settings-navigation-scrollbar" trigger="hover">
+                    <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
+                    <NMenu
+                        v-model:value="activeSettingKey"
+                        :options="menuOptions"
+                        :root-indent="8"
+                        :indent="16"
+                        @update:value="handleMenuSelect"
+                    />
+                </NScrollbar>
             </aside>
 
             <div class="settings-compact-navigation">
@@ -44,23 +46,23 @@
                         <DataManagementSettings v-if="activeSettingKey === 'data-management'"
                             @navigate-section="handleMenuSelect" />
                             
-                        <!-- 外观设置 -->
-                        <AppearanceSettings v-if="activeSettingKey === 'appearance'"
-                            :model-value="{ themeSource: settings.themeSource }"
-                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
-
-                        <!-- 语言设置 -->
-                        <LanguageSettings v-if="activeSettingKey === 'language'" />
-
-                        <!-- 关闭行为设置 -->
-                        <CloseBehaviorSettings v-if="capabilities.tray && activeSettingKey === 'close-behavior'"
-                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
-                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
+                        <!-- 通用设置 -->
+                        <template v-if="activeSettingKey === 'general'">
+                            <AppearanceSettings
+                                :model-value="{ themeSource: settings.themeSource }"
+                                @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
+                            <LanguageSettings />
+                        </template>
 
                         <!-- 启动行为设置 -->
                         <StartupBehaviorSettings v-if="capabilities.startup && activeSettingKey === 'startup-behavior'"
                             :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
                             @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }" />
+
+                        <!-- 关闭行为设置 -->
+                        <CloseBehaviorSettings v-if="capabilities.tray && activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
 
                         <!-- 快捷键设置 -->
                         <ShortcutSettings v-if="capabilities.globalShortcuts && activeSettingKey === 'shortcuts'"
@@ -101,17 +103,17 @@ import {
     NMenu,
     NSelect,
     NSpin,
+    NScrollbar,
     useMessage,
 } from "naive-ui";
 import {
     Power,
     Rocket,
-    Sun,
+    Settings as SettingsIcon,
     Flask,
     Database,
     InfoCircle,
     Cloud,
-    Globe,
     Keyboard,
     Wifi,
 } from "@vicons/tabler";
@@ -149,8 +151,16 @@ const capabilities = PlatformDetector.getCapabilities()
 const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
-// 当前激活的设置项
-const activeSettingKey = ref(props.targetSection || 'cloud-backup');
+const normalizeSettingKey = (key?: string) => {
+    if (key === 'appearance' || key === 'language') {
+        return 'general';
+    }
+
+    return key;
+};
+
+// 当前激活的设置项。兼容外部入口仍传入旧的外观、语言 key。
+const activeSettingKey = ref(normalizeSettingKey(props.targetSection) || 'cloud-backup');
 
 
 
@@ -196,7 +206,7 @@ const settings = reactive({
     },
 });
 
-// 设置入口。保留原有 key，避免外部跳转和状态栏入口失效。
+// 设置入口。系统组功能必须通过平台能力控制可见性。
 const settingItems = computed(() => {
     return [
         {
@@ -212,22 +222,10 @@ const settingItems = computed(() => {
             visible: true,
         },
         {
-            label: t('settings.sections.appearance'),
-            key: "appearance",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
+            label: t('settings.sections.general'),
+            key: "general",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(SettingsIcon) }),
             visible: true,
-        },
-        {
-            label: t('settings.sections.language'),
-            key: "language",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
-            visible: true,
-        },
-        {
-            label: t('settings.sections.shortcuts'),
-            key: "shortcuts",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
-            visible: capabilities.globalShortcuts,
         },
         {
             label: t('settings.sections.startup'),
@@ -240,6 +238,12 @@ const settingItems = computed(() => {
             key: "close-behavior",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Power) }),
             visible: capabilities.tray,
+        },
+        {
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
+            visible: capabilities.globalShortcuts,
         },
         {
             label: t('settings.sections.networkProxy'),
@@ -278,13 +282,13 @@ const menuOptions = computed(() => {
             type: 'group' as const,
             label: t('settings.groups.preferences'),
             key: 'settings-group-preferences',
-            children: pick('appearance', 'language', 'shortcuts'),
+            children: pick('general'),
         },
         {
             type: 'group' as const,
             label: t('settings.groups.system'),
             key: 'settings-group-system',
-            children: pick('startup-behavior', 'close-behavior', 'network-proxy'),
+            children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy'),
         },
         {
             type: 'group' as const,
@@ -488,8 +492,9 @@ onMounted(async () => {
 
 // 监听 props 变化，自动跳转到对应设置页面
 watch(() => props.targetSection, (newTargetSection) => {
-    if (newTargetSection && newTargetSection !== activeSettingKey.value) {
-        activeSettingKey.value = newTargetSection;
+    const normalizedTargetSection = normalizeSettingKey(newTargetSection);
+    if (normalizedTargetSection && normalizedTargetSection !== activeSettingKey.value) {
+        activeSettingKey.value = normalizedTargetSection;
         ensureActiveSettingIsVisible();
     }
 }, { immediate: true });
@@ -501,7 +506,11 @@ watch(menuOptions, () => {
 
 <style scoped>
 .settings-page {
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
     padding: 24px;
+    overflow: hidden;
 }
 
 .settings-navigation-title {
@@ -515,12 +524,22 @@ watch(menuOptions, () => {
     display: grid;
     grid-template-columns: 168px minmax(0, 1fr);
     gap: 20px;
-    align-items: start;
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
 }
 
 .settings-navigation {
-    position: sticky;
-    top: 24px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.settings-navigation-scrollbar {
+    height: 100%;
+}
+
+.settings-navigation-scrollbar :deep(.n-scrollbar-container) {
+    overscroll-behavior: contain;
 }
 
 .settings-compact-navigation {
@@ -529,7 +548,10 @@ watch(menuOptions, () => {
 
 .settings-content {
     min-width: 0;
+    min-height: 0;
     max-width: 1100px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .settings-section-header {
@@ -562,7 +584,8 @@ watch(menuOptions, () => {
 
 @media (max-width: 860px) {
     .settings-layout {
-        display: block;
+        display: flex;
+        flex-direction: column;
     }
 
     .settings-navigation {
@@ -571,7 +594,12 @@ watch(menuOptions, () => {
 
     .settings-compact-navigation {
         display: block;
+        flex: 0 0 auto;
         margin-bottom: 24px;
+    }
+
+    .settings-content {
+        flex: 1 1 auto;
     }
 
     .settings-compact-navigation .n-select {

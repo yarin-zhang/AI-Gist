@@ -208,10 +208,7 @@
     "title": "AI 提示詞生成器"
   },
   "appearance": {
-    "alwaysDark": "始終使用深色",
-    "alwaysLight": "始終使用淺色",
     "auto": "跟隨系統",
-    "autoSwitchTip": "自動切換主題",
     "dark": "深色主題",
     "light": "淺色主題",
     "theme": "主題模式"
@@ -1002,6 +999,7 @@
       "close": "關閉行為",
       "cloudBackup": "資料同步",
       "dataManagement": "資料備份",
+      "general": "一般設定",
       "language": "語言",
       "laboratory": "實驗室",
       "networkProxy": "網絡代理",

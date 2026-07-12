@@ -208,10 +208,7 @@
     "title": "AI Prompt Generator"
   },
   "appearance": {
-    "alwaysDark": "Always use dark",
-    "alwaysLight": "Always use light",
     "auto": "Follow System",
-    "autoSwitchTip": "Auto switch theme",
     "dark": "Dark Theme",
     "light": "Light Theme",
     "theme": "Theme Mode"
@@ -1002,6 +999,7 @@
       "close": "Close Behavior",
       "cloudBackup": "Data Sync",
       "dataManagement": "Data Backup",
+      "general": "General Settings",
       "language": "Language",
       "laboratory": "Laboratory",
       "networkProxy": "Network Proxy",
