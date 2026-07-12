@@ -5,7 +5,7 @@
         <NInput
           ref="searchInput"
           v-model:value="query"
-          size="large"
+          size="medium"
           clearable
           autofocus
           :placeholder="t('shortcuts.launcherPlaceholder')"
@@ -33,7 +33,7 @@
           >
             <NThing>
               <template #avatar>
-                <NIcon size="18" class="result-icon" :class="{ 'result-icon--selected': index === selectedIndex }">
+                <NIcon size="16" class="result-icon" :class="{ 'result-icon--selected': index === selectedIndex }">
                   <component :is="item.kind === 'prompt' ? FileText : item.icon" />
                 </NIcon>
               </template>
@@ -549,12 +549,16 @@ onBeforeUnmount(() => {
 
 .launcher-card :deep(.n-card-header) {
   flex: 0 0 auto;
-  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+  padding: var(--compact-padding) var(--compact-padding) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
 }
 
 .launcher-card :deep(.n-card__footer) {
   flex: 0 0 auto;
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-xs) var(--compact-padding);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-secondary);
 }
 
 .result-scrollbar,
@@ -573,31 +577,51 @@ onBeforeUnmount(() => {
 
 .launcher-card :deep(.n-list) {
   background: transparent;
-  padding: var(--spacing-xs) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
 }
 
-.launcher-result {
+.launcher-card :deep(.n-list .launcher-result) {
+  padding: 0;
   border-radius: var(--radius-sm);
   transition: background-color 100ms ease;
 }
 
-.launcher-result :deep(.n-list-item__main) {
-  padding: 10px 12px;
+.launcher-card :deep(.launcher-result .n-list-item__main) {
+  min-width: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
 }
 
 .launcher-result--selected {
   background: var(--surface-tertiary);
 }
 
-.launcher-result :deep(.n-thing-header__title) {
+.launcher-card :deep(.launcher-result .n-thing .n-thing-header__title) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-tight);
 }
 
-.launcher-result :deep(.n-thing-main) {
+.launcher-card :deep(.launcher-result .n-thing-main) {
   min-width: 0;
+}
+
+.launcher-card :deep(.launcher-result .n-thing-avatar) {
+  margin-top: 1px;
+  margin-right: var(--spacing-sm);
+}
+
+.launcher-card :deep(.launcher-result .n-thing-header) {
+  min-width: 0;
+  margin-bottom: var(--spacing-xs);
+  gap: var(--spacing-sm);
+}
+
+.launcher-card :deep(.launcher-result .n-thing-main__description) {
+  min-width: 0;
+  line-height: var(--line-height-tight);
 }
 
 .result-description {
@@ -606,6 +630,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--font-size-xs);
 }
 
 .result-icon {
@@ -621,6 +646,7 @@ onBeforeUnmount(() => {
 .escape-hint {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
 }
 
 .result-count,
