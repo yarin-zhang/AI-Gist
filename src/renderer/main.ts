@@ -8,8 +8,11 @@ import './tailwind.css'
 import './assets/scss/index.scss'
 import { setupMobileDebug } from './utils/mobile-debug'
 import { installWebRuntimeBridge } from './lib/platform/web-runtime-bridge'
+import { getCssVars } from './theme'
 
 installWebRuntimeBridge()
+document.documentElement.classList.toggle('desktop-shell', PlatformDetector.isDesktopShell())
+document.documentElement.classList.toggle('mobile-shell', PlatformDetector.isMobileShell())
 const isLauncherSurface = new URLSearchParams(window.location.search).get('surface') === 'launcher'
 if (isLauncherSurface) {
   document.documentElement.classList.add('ai-gist-launcher')
@@ -76,6 +79,13 @@ function setInitialTheme() {
   body.classList.toggle('light', !isDark)
 }
 
+function applyInitialDesignTokens() {
+  const themeName = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  for (const [key, value] of Object.entries(getCssVars(themeName))) {
+    document.documentElement.style.setProperty(`--${key}`, value)
+  }
+}
+
 // 移除初始加载屏幕（同时隐藏原生 SplashScreen）
 async function removeInitialLoading() {
   // 移动端：隐藏 Capacitor 原生启动屏
@@ -104,6 +114,7 @@ async function startApp() {
   try {
     // 立即设置初始主题和语言
     setInitialTheme()
+    applyInitialDesignTokens()
     initLocale()
     
     await initDatabase();

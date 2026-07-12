@@ -115,6 +115,7 @@ import { Share } from '@capacitor/share'
 import { databaseService } from '~/lib/db'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { createBackupPayload } from '@shared/backup-integrity'
+import { getCssVars } from '~/theme'
 
 const router = useRouter()
 const { t, currentLocale, switchLocale } = useI18n()
@@ -173,6 +174,10 @@ const applyTheme = (theme: 'system' | 'light' | 'dark') => {
   html.classList.toggle('light', !isDark)
   body.classList.toggle('dark', isDark)
   body.classList.toggle('light', !isDark)
+
+  for (const [key, value] of Object.entries(getCssVars(isDark ? 'dark' : 'light'))) {
+    html.style.setProperty(`--${key}`, value)
+  }
 }
 
 // 导出数据

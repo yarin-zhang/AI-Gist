@@ -288,7 +288,7 @@
                                         width="72"
                                         height="72"
                                         object-fit="cover"
-                                        style="border-radius: var(--app-image-radius);"
+                                        style="border-radius: var(--radius-image);"
                                         :preview-disabled="false"
                                         :lazy="true"
                                         @error="handleImageError"
@@ -306,7 +306,7 @@
                                             {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
                                         </NTag>
                                         <span v-if="prompt.category" class="prompt-card-category">
-                                            <span class="category-color-dot" :style="{ background: prompt.category.color || 'var(--app-text-color-secondary)' }" />
+                                            <span class="category-color-dot" :style="{ background: prompt.category.color || 'var(--content-secondary)' }" />
                                             {{ prompt.category.name }}
                                         </span>
                                         <span v-else class="prompt-card-category">{{ t('promptManagement.noCategory') }}</span>
@@ -591,7 +591,7 @@ const renderCategoryCell = (prompt: PromptWithRelations) => {
     return h('span', { class: 'table-category-cell' }, [
         h('span', {
             class: 'category-color-dot',
-            style: { background: prompt.category.color || 'var(--app-text-color-secondary)' }
+            style: { background: prompt.category.color || 'var(--content-secondary)' }
         }),
         prompt.category.name
     ])
@@ -718,7 +718,7 @@ const treeTableColumns = computed(() => [
                             mousewheel: true,
                             direction: 'vertical',
                             dotPlacement: 'bottom',
-                            style: 'width: 50px; height: 50px; border-radius: var(--app-image-radius); overflow: hidden;'
+                            style: 'width: 50px; height: 50px; border-radius: var(--radius-image); overflow: hidden;'
                         },
                         {
                             default: () => prompt.imageBlobs!.map((blob: Blob, index: number) =>
@@ -729,7 +729,7 @@ const treeTableColumns = computed(() => [
                                         width: 50,
                                         height: 50,
                                         objectFit: 'cover',
-                                        style: 'border-radius: var(--app-image-radius);',
+                                        style: 'border-radius: var(--radius-image);',
                                         previewDisabled: false,
                                         lazy: true,
                                         onError: handleImageError,
@@ -747,7 +747,7 @@ const treeTableColumns = computed(() => [
                             width: 50,
                             height: 50,
                             objectFit: 'cover',
-                            style: 'border-radius: var(--app-image-radius);',
+                            style: 'border-radius: var(--radius-image);',
                             previewDisabled: false,
                             lazy: true,
                             onError: handleImageError,
@@ -995,7 +995,7 @@ const tableColumns = computed(() => [
                         mousewheel: true,
                         direction: 'vertical',
                         dotPlacement: 'bottom',
-                        style: 'width: 50px; height: 50px; border-radius: var(--app-image-radius); overflow: hidden;'
+                        style: 'width: 50px; height: 50px; border-radius: var(--radius-image); overflow: hidden;'
                     },
                     {
                         default: () => row.imageBlobs!.map((blob: Blob, index: number) =>
@@ -1006,7 +1006,7 @@ const tableColumns = computed(() => [
                                     width: 50,
                                     height: 50,
                                     objectFit: 'cover',
-                                    style: 'border-radius: var(--app-image-radius);',
+                                    style: 'border-radius: var(--radius-image);',
                                     previewDisabled: false,
                                     lazy: true,
                                     onError: handleImageError,
@@ -1024,7 +1024,7 @@ const tableColumns = computed(() => [
                         width: 50,
                         height: 50,
                         objectFit: 'cover',
-                        style: 'border-radius: var(--app-image-radius);',
+                        style: 'border-radius: var(--radius-image);',
                         previewDisabled: false,
                         lazy: true,
                         onError: handleImageError,
@@ -1949,11 +1949,10 @@ defineExpose({
     position: sticky;
     top: 0;
     z-index: 4;
-    padding: 10px 12px;
-    border: 1px solid var(--app-border-color);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--app-surface-color) 96%, transparent);
-    backdrop-filter: blur(10px);
+    padding: var(--compact-padding);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-tertiary);
 }
 
 .prompt-filter-bar :deep(.n-button),
@@ -1969,8 +1968,8 @@ defineExpose({
 .prompt-toolbar-row { gap: 8px !important; }
 .prompt-search-input { flex: 1 1 320px; min-width: 240px; }
 .prompt-sort-select { width: 164px; }
-.active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--app-border-color); color: var(--app-text-color-secondary); font-size: 12px; }
-.advanced-filter-panel { margin-top: 4px; padding: 10px 2px 2px; border-top: 1px solid var(--app-border-color); }
+.active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--border-default); color: var(--content-secondary); font-size: 12px; }
+.advanced-filter-panel { margin-top: 4px; padding: 10px 2px 2px; border-top: 1px solid var(--border-default); }
 .batch-action-bar { margin-top: 12px; }
 .batch-action-bar :deep(.n-card) { box-shadow: none; }
 
@@ -1983,80 +1982,88 @@ defineExpose({
 
 .prompt-card {
     min-height: 176px;
-    border-radius: 8px;
-    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+    border-radius: var(--radius-panel);
+    min-width: 0;
+    transition: border-color .16s ease, background-color .16s ease;
     cursor: pointer;
     box-shadow: none;
 }
 
 .prompt-card:hover {
-    border-color: color-mix(in srgb, var(--app-text-color-secondary) 42%, var(--app-border-color));
-    background: color-mix(in srgb, var(--app-surface-color) 96%, var(--app-bg-color));
-    box-shadow: 0 5px 16px rgba(15, 23, 42, .06);
+    border-color: var(--border-strong);
+    background: var(--surface-secondary);
+    box-shadow: none;
 }
 
 .prompt-card :deep(.n-card-header) {
     padding: 13px 13px 9px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    border-bottom: 0;
 }
 
 .prompt-card :deep(.n-card-header__main) {
-    font-size: 14px;
+    flex: 1 1 auto;
+    overflow: hidden;
+    font-size: var(--font-size-base);
+    min-width: 0;
+}
+
+.prompt-card :deep(.n-card-header__extra) {
+    flex: 0 0 auto;
     min-width: 0;
 }
 
 .prompt-card :deep(.n-card__content) {
     padding: 10px 13px 12px;
-    font-size: 14px;
+    font-size: var(--font-size-base);
 }
 
 .prompt-card :deep(.n-card__footer) {
     padding: 9px 13px 11px;
-    border-top: 1px solid color-mix(in srgb, var(--app-border-color) 72%, transparent);
+    border-top: 0;
 }
 
-.prompt-card :deep(.n-button__icon) {
-    font-size: 15px;
-}
+.prompt-card :deep(.n-button__icon) { font-size: var(--font-size-lg); }
 
-.prompt-card-title-block { min-width: 0; }
-.prompt-card-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.prompt-card-kind { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; }
+.prompt-card-title-block { width: 100%; min-width: 0; overflow: hidden; }
+.prompt-card-title { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); }
+.prompt-card-kind { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); font-weight: var(--font-weight-normal); }
 .prompt-card-main { min-height: 76px; }
-.prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--app-image-radius); }
+.prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--radius-image); }
 .prompt-card-footer { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 7px; }
-.prompt-card-category, .table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--app-text-color-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-card-category, .table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 
-.data-view-surface { margin-top: 12px; overflow: hidden; border: 1px solid var(--app-border-color); border-radius: 8px; background: var(--app-surface-color); }
-.data-view-surface :deep(.n-data-table-th) { height: 40px; background: color-mix(in srgb, var(--app-surface-color) 96%, var(--app-bg-color)); font-size: 12px; font-weight: 500; }
-.data-view-surface :deep(.n-data-table-td) { height: 58px; font-size: 14px; }
+.data-view-surface { margin-top: 12px; overflow: hidden; border-radius: var(--radius-panel); }
+.data-view-surface :deep(.n-data-table-th) { height: 40px; background: var(--surface-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.data-view-surface :deep(.n-data-table-td) { height: 58px; font-size: var(--font-size-base); }
 .data-view-surface :deep(.prompt-data-row) { cursor: pointer; }
-.data-view-surface :deep(.prompt-data-row:hover .n-data-table-td) { background: var(--app-hover-color); }
-.folder-view-table :deep(.folder-category-row .n-data-table-td) { height: 54px; background: color-mix(in srgb, var(--app-surface-color) 94%, var(--app-bg-color)); }
+.data-view-surface :deep(.prompt-data-row:hover .n-data-table-td) { background: var(--interactive-hover); }
+.folder-view-table :deep(.folder-category-row .n-data-table-td) { height: 54px; background: var(--surface-secondary); }
 .data-view-surface :deep(.table-prompt-cell) { min-width: 0; display: flex; align-items: center; gap: 11px; }
-.data-view-surface :deep(.table-prompt-thumbnail), .data-view-surface :deep(.table-prompt-placeholder) { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--app-image-radius); }
-.data-view-surface :deep(.table-prompt-placeholder) { display: grid; place-items: center; border: 1px solid var(--app-border-color); color: var(--app-text-color-secondary); background: var(--app-bg-color); }
+.data-view-surface :deep(.table-prompt-thumbnail), .data-view-surface :deep(.table-prompt-placeholder) { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--radius-image); }
+.data-view-surface :deep(.table-prompt-placeholder) { display: grid; place-items: center; border: 1px solid var(--border-default); color: var(--content-secondary); background: var(--surface-secondary); }
 .data-view-surface :deep(.table-prompt-copy) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .data-view-surface :deep(.table-prompt-title) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .data-view-surface :deep(.table-prompt-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--app-text-color-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .data-view-surface :deep(.category-color-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .data-view-surface :deep(.table-tags) { overflow: hidden; }
 .data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }
 .data-view-surface :deep(.table-tags .n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
 .data-view-surface :deep(.table-tag-overflow) { font-size: 12px; }
 .data-view-surface :deep(.folder-category-cell) { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.data-view-surface :deep(.folder-category-icon) { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border: 1px solid var(--app-border-color); border-radius: 7px; background: var(--app-bg-color); }
+.data-view-surface :deep(.folder-category-icon) { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
 .data-view-surface :deep(.folder-category-copy) { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .data-view-surface :deep(.folder-category-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 
 /* 高亮匹配的标签 */
 .highlighted-tag {
-    border: 1px solid var(--n-color-primary) !important;
-    transform: scale(1.02);
-    transition: all 0.3s ease;
+    background: var(--interactive-active) !important;
+    font-weight: var(--font-weight-medium);
 }
 
 /* 描述文本和内容预览的多行截断样式 */
@@ -2068,9 +2075,7 @@ defineExpose({
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.5;
-    max-height: calc(1.4em * 3);
-    /* 限制最大高度为3行 */
+    line-height: var(--line-height-normal);
     word-break: break-word;
 }
 

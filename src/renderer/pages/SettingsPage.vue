@@ -38,7 +38,7 @@
                     </NFlex>
                 </header>
 
-                <NFlex vertical :size="20">
+                <NFlex vertical :size="16">
                         <!-- 数据同步设置 -->
                         <DataSyncSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
 
@@ -505,21 +505,22 @@ watch(menuOptions, () => {
     height: 100%;
     min-height: 0;
     box-sizing: border-box;
-    padding: 24px;
+    padding: var(--page-padding);
     overflow: hidden;
+    background: var(--surface-body);
 }
 
 .settings-navigation-title {
     display: block;
-    font-size: 28px;
-    line-height: 1.2;
-    margin-bottom: 24px;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-tight);
+    margin-bottom: var(--spacing-xl);
 }
 
 .settings-layout {
     display: grid;
-    grid-template-columns: 168px minmax(0, 1fr);
-    gap: 20px;
+    grid-template-columns: 208px minmax(0, 1fr);
+    gap: var(--section-gap);
     height: 100%;
     min-height: 0;
     align-items: stretch;
@@ -528,6 +529,10 @@ watch(menuOptions, () => {
 .settings-navigation {
     min-height: 0;
     overflow: hidden;
+    padding: var(--content-padding) var(--spacing-sm);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
 }
 
 .settings-navigation-scrollbar {
@@ -538,6 +543,27 @@ watch(menuOptions, () => {
     overscroll-behavior: contain;
 }
 
+.settings-navigation :deep(.n-menu) {
+    width: 100%;
+}
+
+.settings-navigation :deep(.n-menu-item-content) {
+    border-radius: var(--radius-control);
+}
+
+.settings-navigation :deep(.n-menu-item-content:hover) {
+    background: var(--surface-secondary);
+}
+
+.settings-navigation :deep(.n-menu-item-content--selected) {
+    background: var(--surface-tertiary);
+    font-weight: var(--font-weight-medium);
+}
+
+.settings-navigation :deep(.n-menu-item-content__icon) {
+    flex: 0 0 auto;
+}
+
 .settings-compact-navigation {
     display: none;
 }
@@ -545,29 +571,31 @@ watch(menuOptions, () => {
 .settings-content {
     min-width: 0;
     min-height: 0;
-    max-width: 1100px;
+    max-width: 1120px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    padding: 0 var(--spacing-xs) var(--page-padding) 0;
+    background: transparent;
 }
 
 .settings-section-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: var(--section-gap);
+    margin-bottom: var(--section-gap);
 }
 
 .settings-section-title {
     display: block;
-    font-size: 22px;
+    font-size: var(--font-size-xl);
     line-height: 1.3;
 }
 
 .settings-section-description {
     display: block;
     margin-top: 4px;
-    font-size: 14px;
+    font-size: var(--font-size-base);
 }
 
 .n-form-item {
@@ -591,7 +619,7 @@ watch(menuOptions, () => {
     .settings-compact-navigation {
         display: block;
         flex: 0 0 auto;
-        margin-bottom: 24px;
+        margin-bottom: var(--section-gap);
     }
 
     .settings-content {
@@ -603,7 +631,7 @@ watch(menuOptions, () => {
     }
 
     .settings-section-title {
-        font-size: 20px;
+        font-size: var(--font-size-xl);
     }
 }
 </style>

@@ -10,7 +10,7 @@
 
             <NInput v-model:value="searchText" clearable size="small"
                 :placeholder="t('promptManagement.searchPrompt')">
-                <template #prefix><NIcon size="15"><Search /></NIcon></template>
+                <template #prefix><NIcon size="16"><Search /></NIcon></template>
             </NInput>
         </div>
 
@@ -36,7 +36,7 @@
                                 </NButton>
                                 <NDropdown :options="sortOptions" :icon-size="16" @select="handleSortAction">
                                     <NButton quaternary circle size="tiny" :aria-label="t('promptWorkspace.sortBy')">
-                                        <template #icon><NIcon size="15"><ArrowsSort /></NIcon></template>
+                                        <template #icon><NIcon size="16"><ArrowsSort /></NIcon></template>
                                     </NButton>
                                 </NDropdown>
                                 <NTooltip>
@@ -44,7 +44,7 @@
                                         <NButton quaternary circle size="tiny" :type="selectionMode ? 'primary' : 'default'"
                                             :aria-label="t('promptWorkspace.selectMultiple')"
                                             @click="selectionMode ? exitSelectionMode() : selectionMode = true">
-                                            <template #icon><NIcon size="15"><Check /></NIcon></template>
+                                            <template #icon><NIcon size="16"><Check /></NIcon></template>
                                         </NButton>
                                     </template>
                                     {{ t('promptWorkspace.selectMultiple') }}
@@ -66,7 +66,7 @@
                                 <div class="prompt-list-main">
                                     <div class="prompt-list-title-row">
                                         <span class="prompt-list-title">{{ prompt.title || t('promptManagement.untitledPrompt') }}</span>
-                                        <NIcon v-if="prompt.isFavorite" size="15" color="#d97706"><Star /></NIcon>
+                                        <NIcon v-if="prompt.isFavorite" size="16" color="var(--accent-warning)"><Star /></NIcon>
                                     </div>
                                     <div v-if="prompt.category" class="prompt-list-meta">
                                         <span>{{ prompt.category.name }}</span>
@@ -107,7 +107,7 @@
                             <button v-for="category in categories" :key="category.id" type="button"
                                 class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
                                 @click="selectNavigation(`category:${category.id}`)">
-                                <span class="category-dot" :style="{ backgroundColor: category.color || '#94a3b8' }" />
+                                <span class="category-dot" :style="{ backgroundColor: category.color || 'var(--content-tertiary)' }" />
                                 <span class="category-name">{{ category.name }}</span>
                                 <span class="nav-count">{{ categoryCounts.get(category.id) || 0 }}</span>
                             </button>
@@ -285,43 +285,43 @@ onBeforeUnmount(() => {
     min-width: 0;
     height: 100%;
     min-height: 0;
-    background: var(--app-surface-color);
+    background: var(--surface-primary);
     border-right: 0;
 }
 
-.library-header { padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--app-border-color); }
+.library-header { padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .library-title-row { height: 26px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .library-title-copy { display: flex; align-items: center; min-width: 0; gap: 7px; }
 .library-title { font-size: 14px; letter-spacing: -.01em; }
-.library-count { min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0 7px; border-radius: 10px; color: var(--app-text-color-secondary); background: var(--app-hover-color); font-size: 12px; font-variant-numeric: tabular-nums; }
+.library-count { min-width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0 7px; border: 1px solid var(--border-default); border-radius: 999px; color: var(--content-secondary); background: var(--surface-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .library-navigation { padding: 8px 8px 4px; }
 .library-split { flex: 1; min-height: 0; }
 .prompt-section, .category-section { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .category-list { flex: 1; min-height: 0; padding: 0 8px 8px; }
 .library-nav-item, .category-item, .prompt-list-item {
-    appearance: none; width: 100%; border: 0; color: var(--app-text-color); background: transparent;
-    cursor: pointer; text-align: left; border-radius: 8px;
+    appearance: none; width: 100%; border: 0; color: var(--content-primary); background: transparent;
+    cursor: pointer; text-align: left; border-radius: var(--radius-panel);
 }
-.library-nav-item, .category-item { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 6px 9px; font-size: 14px; }
-.library-nav-item:hover, .category-item:hover, .prompt-list-item:hover { background: var(--app-hover-color); }
-.library-nav-item.active, .category-item.active { background: var(--app-hover-color); color: var(--app-text-color); font-weight: 500; }
-.nav-count { margin-left: auto; color: var(--app-text-color-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.library-nav-item, .category-item { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 6px 9px; font-size: var(--font-size-base); }
+.library-nav-item:hover, .category-item:hover, .prompt-list-item:hover { background: var(--interactive-hover); }
+.library-nav-item.active, .category-item.active { background: var(--surface-tertiary); color: var(--content-primary); font-weight: var(--font-weight-medium); }
+.nav-count { margin-left: auto; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .category-heading, .result-heading { min-height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 5px; font-size: 12px; letter-spacing: .02em; }
 .category-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
-.prompt-list-item { position: relative; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 9px 8px 10px; margin-bottom: 2px; border: 1px solid transparent; border-radius: 7px; }
-.prompt-list-item.active { border-color: var(--app-border-color); color: var(--app-text-color); background: var(--app-hover-color); }
-.selection-check { width: 18px; height: 18px; margin: 1px 9px 0 0; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--app-border-color); border-radius: 5px; }
-.selection-check.checked { color: white; border-color: var(--primary-color, #3b82f6); background: var(--primary-color, #3b82f6); }
+.prompt-list-item { position: relative; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 9px 8px 10px; margin-bottom: 2px; border-radius: var(--radius-panel); }
+.prompt-list-item.active { color: var(--content-primary); background: var(--surface-tertiary); }
+.selection-check { width: 18px; height: 18px; margin: 1px 9px 0 0; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-control); }
+.selection-check.checked { color: white; border-color: var(--accent-primary); background: var(--accent-primary); }
 .prompt-list-main { flex: 1; min-width: 0; }
 .prompt-list-title-row { display: flex; align-items: center; gap: 6px; }
-.prompt-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
-.prompt-list-meta { display: flex; gap: 7px; margin-top: 4px; color: var(--app-text-color-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; }
-.prompt-thumbnail { width: 38px; height: 38px; flex: 0 0 38px; border: 1px solid var(--app-border-color); border-radius: var(--app-image-radius); object-fit: cover; background: var(--app-bg-color); }
+.prompt-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); font-weight: var(--font-weight-medium); }
+.prompt-list-meta { display: flex; gap: 7px; margin-top: 4px; color: var(--content-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.prompt-thumbnail { width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--radius-image); object-fit: cover; background: var(--surface-secondary); }
 .library-state { padding: 32px 8px; text-align: center; }
-.selection-toolbar { margin: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--app-border-color); border-radius: 8px; background: var(--app-surface-color); box-shadow: 0 6px 18px rgba(15, 23, 42, .10); }
-.library-resize-line { width: 100%; height: 1px; margin: 4px 0; background: var(--app-border-color); transition: height .12s ease, margin .12s ease, background-color .12s ease; }
+.selection-toolbar { margin: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
+.library-resize-line { width: 100%; height: 1px; margin: 4px 0; background: var(--border-default); transition: height .12s ease, margin .12s ease, background-color .12s ease; }
 .library-split :deep(.n-split__resize-trigger-wrapper:hover) .library-resize-line,
-.library-split :deep(.n-split__resize-trigger--hover) { height: 3px; margin: 3px 0; background: var(--app-text-color-secondary); }
+.library-split :deep(.n-split__resize-trigger--hover) { height: 3px; margin: 3px 0; background: var(--content-secondary); }
 </style>

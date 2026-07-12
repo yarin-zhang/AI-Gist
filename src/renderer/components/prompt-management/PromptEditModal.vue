@@ -2,12 +2,12 @@
     <CommonModal ref="modalRef" :show="show" :embedded="embedded"
         :class="{ 'prompt-edit-embedded': embedded }"
         :min-header-height="embedded ? 0 : 60" :header-default-height="embedded ? 0 : 80"
-        :footer-default-height="embedded ? 58 : 80" :content-padding="embedded ? 12 : 16"
+        :footer-default-height="embedded ? 58 : 80" :content-padding="16"
         @update:show="$emit('update:show', $event)" @close="handleCancel">
         <!-- 顶部固定区域 -->
         <template #header>
             <NFlex vertical>
-                <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
                     {{ isEdit ? t('promptManagement.edit') : t('promptManagement.create') }}
                 </NText>
                 <NText depth="3">
@@ -74,7 +74,7 @@
                                                     :disabled="saving" 
                                                     :multiple="true">
                                                     <NUploadDragger>
-                                                        <NText style="font-size: 10px; ">
+                                                        <NText style="font-size: var(--font-size-xs);">
                                                             {{ t('promptManagement.uploadImage') }}
                                                         </NText>
                                                     </NUploadDragger>
@@ -2273,7 +2273,7 @@ defineExpose({
 }
 
 .prompt-edit-embedded :deep(.n-card) {
-    border-radius: 7px;
+    border-radius: var(--radius-panel);
 }
 
 .prompt-edit-embedded :deep(.n-card-header) {
@@ -2296,14 +2296,15 @@ defineExpose({
 
 .prompt-edit-embedded :deep(.edit-info-panel),
 .prompt-edit-embedded :deep(.edit-history-panel) {
-    border: 0;
-    border-radius: 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
     box-shadow: none;
 }
 
 .prompt-edit-embedded :deep(.edit-info-panel > .n-card-header),
 .prompt-edit-embedded :deep(.edit-history-panel > .n-card-header) {
     min-height: 52px;
-    border-bottom: 1px solid var(--app-border-color);
+    border-bottom: 1px solid var(--border-default);
 }
 </style>

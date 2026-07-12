@@ -39,7 +39,7 @@
                         <span v-if="closable" class="workspace-control-divider" />
                         <NButton v-if="closable" circle quaternary size="small"
                             :aria-label="t('common.close')" @click="$emit('close')">
-                            <template #icon><NIcon size="17"><X /></NIcon></template>
+                            <template #icon><NIcon size="16"><X /></NIcon></template>
                         </NButton>
                     </div>
                 </div>
@@ -48,12 +48,12 @@
                     <div class="workspace-mode-tabs">
                         <button type="button" class="workspace-mode-tab" :class="{ active: mode === 'use' }"
                             :disabled="!prompt?.id" @click="$emit('request-mode', 'use')">
-                            <NIcon size="15"><PlayerPlay /></NIcon>
+                            <NIcon size="16"><PlayerPlay /></NIcon>
                             <span>{{ t('promptWorkspace.use') }}</span>
                         </button>
                         <button type="button" class="workspace-mode-tab" :class="{ active: mode === 'edit' }"
                             @click="$emit('request-mode', 'edit')">
-                            <NIcon size="15"><Edit /></NIcon>
+                            <NIcon size="16"><Edit /></NIcon>
                             <span>{{ t('promptManagement.edit') }}</span>
                             <span v-if="mode === 'edit'" class="edit-status-dot" />
                         </button>
@@ -141,32 +141,32 @@ defineExpose({
 </script>
 
 <style scoped>
-.prompt-workspace { flex: 1; min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; background: var(--app-bg-color); }
-.workspace-header { flex: 0 0 auto; border-bottom: 1px solid var(--app-border-color); background: var(--app-surface-color); }
-.workspace-primary-row { min-height: 66px; padding: 10px 18px 8px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.prompt-workspace { flex: 1; min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; background: var(--surface-body); }
+.workspace-header { flex: 0 0 auto; border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.workspace-primary-row { min-height: 66px; padding: 10px var(--page-padding) 8px; display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
 .workspace-identity { min-width: 0; }
-.workspace-breadcrumb { display: flex; gap: 6px; margin-bottom: 2px; color: var(--app-text-color-secondary); font-size: 12px; }
+.workspace-breadcrumb { display: flex; gap: 6px; margin-bottom: 2px; color: var(--content-secondary); font-size: 12px; }
 .breadcrumb-separator { opacity: .5; }
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .workspace-title { max-width: min(620px, 52vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
 .workspace-description { display: block; max-width: 660px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .workspace-controls { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
-.workspace-control-divider { width: 1px; height: 18px; margin: 0 5px; background: var(--app-border-color); }
-.workspace-mode-bar { height: 38px; padding: 0 18px; display: flex; align-items: flex-end; justify-content: space-between; border-top: 1px solid color-mix(in srgb, var(--app-border-color) 65%, transparent); }
-.workspace-mode-tabs { height: 100%; display: flex; align-items: stretch; gap: 18px; }
-.workspace-mode-tab { position: relative; min-width: 72px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 4px; border: 0; color: var(--app-text-color-secondary); background: transparent; cursor: pointer; font: inherit; font-size: 14px; }
+.workspace-control-divider { width: 1px; height: 18px; margin: 0 5px; background: var(--border-default); }
+.workspace-mode-bar { height: 38px; padding: 0 var(--page-padding); display: flex; align-items: flex-end; justify-content: space-between; border-top: 1px solid var(--border-subtle); background: var(--surface-secondary); }
+.workspace-mode-tabs { height: 100%; display: flex; align-items: stretch; gap: var(--section-gap); }
+.workspace-mode-tab { position: relative; min-width: 72px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 4px; border: 0; color: var(--content-secondary); background: transparent; cursor: pointer; font: inherit; font-size: 14px; }
 .workspace-mode-tab::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: transparent; }
-.workspace-mode-tab:hover:not(:disabled) { color: var(--app-text-color); }
-.workspace-mode-tab.active { color: var(--primary-color, #3b82f6); font-weight: 500; }
-.workspace-mode-tab.active::after { background: var(--primary-color, #3b82f6); }
+.workspace-mode-tab:hover:not(:disabled) { color: var(--content-primary); }
+.workspace-mode-tab.active { color: var(--accent-primary); font-weight: 500; }
+.workspace-mode-tab.active::after { background: var(--accent-primary); }
 .workspace-mode-tab:disabled { cursor: not-allowed; opacity: .45; }
-.edit-status-dot { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; }
-.workspace-meta { height: 100%; display: flex; align-items: center; gap: 8px; color: var(--app-text-color-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
-.meta-divider { width: 1px; height: 11px; background: var(--app-border-color); }
+.edit-status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-warning); }
+.workspace-meta { height: 100%; display: flex; align-items: center; gap: 8px; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.meta-divider { width: 1px; height: 11px; background: var(--border-default); }
 .workspace-body { flex: 1; min-height: 0; overflow: hidden; }
-.unsaved-dot { width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; }
+.unsaved-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warning); }
 .workspace-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px; text-align: center; }
-.empty-illustration { display: grid; place-items: center; width: 64px; height: 64px; border: 1px solid color-mix(in srgb, var(--primary-color, #3b82f6) 20%, var(--app-border-color)); border-radius: 16px; color: var(--primary-color, #3b82f6); background: color-mix(in srgb, var(--primary-color, #3b82f6) 7%, transparent); }
+.empty-illustration { display: grid; place-items: center; width: 64px; height: 64px; border: 1px solid var(--border-default); border-radius: var(--radius-modal); color: var(--accent-primary); background: var(--surface-secondary); }
 .empty-title { font-size: 18px; }
 .empty-description { max-width: 420px; margin-bottom: 8px; }
 @media (max-width: 1080px) {

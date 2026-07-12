@@ -17,15 +17,15 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 
   /* 浅色主题 */
-  background: #ffffff;
-  color: #333333;
+  background: var(--surface-body, #f5f6f8);
+  color: var(--content-primary, #1f2328);
 }
 
 /* Logo */
 #initial-loading .loading-logo {
   width: 80px;
   height: 80px;
-  border-radius: 18px;
+  border-radius: var(--radius-image, 8px);
   margin-bottom: 14px;
   object-fit: contain;
 }
@@ -43,8 +43,8 @@
 #initial-loading .spinner {
   width: 28px;
   height: 28px;
-  border: 2.5px solid rgba(0, 0, 0, 0.1);
-  border-top: 2.5px solid #409eff;
+  border: 2.5px solid var(--border-default, rgba(0, 0, 0, 0.1));
+  border-top: 2.5px solid var(--accent-primary, #3b82f6);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
@@ -52,14 +52,14 @@
 /* 桌面端暗色模式（Naive UI 使用 html.dark / body.dark） */
 html.dark #initial-loading,
 body.dark #initial-loading {
-  background: #101014;
-  color: #e5e5e5;
+  background: var(--surface-body, #101014);
+  color: var(--content-primary, #e5e5e5);
 }
 
 html.dark #initial-loading .spinner,
 body.dark #initial-loading .spinner {
   border-color: rgba(255, 255, 255, 0.1);
-  border-top-color: #409eff;
+  border-top-color: var(--accent-primary, #60a5fa);
 }
 
 /* 移动端暗色模式（Ionic 使用 html.ion-palette-dark） */
@@ -70,7 +70,7 @@ html.ion-palette-dark #initial-loading {
 
 html.ion-palette-dark #initial-loading .spinner {
   border-color: rgba(255, 255, 255, 0.1);
-  border-top-color: #409eff;
+  border-top-color: var(--accent-primary, #60a5fa);
 }
 
 /* 系统暗色模式后备（主题未初始化前防止闪白） */
@@ -82,7 +82,7 @@ html.ion-palette-dark #initial-loading .spinner {
 
   #initial-loading .spinner {
     border-color: rgba(255, 255, 255, 0.1);
-    border-top-color: #409eff;
+    border-top-color: var(--accent-primary, #60a5fa);
   }
 }
 

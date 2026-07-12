@@ -3,7 +3,7 @@
         <!-- 没有AI 配置时显示的空状态 -->
         <n-empty v-if="configs.length === 0 && !loading" :description="t('aiGenerator.noConfigAvailable')" size="large" style="margin: 40px 0;">
             <template #icon>
-                <n-icon size="48" :color="'var(--text-color-3)'">
+                <n-icon size="48" :color="'var(--content-tertiary)'">
                     <Robot />
                 </n-icon>
             </template>
@@ -39,7 +39,7 @@
                                         <n-input v-model:value="generatedResult" type="textarea" :rows="4"
                                             :placeholder="t('aiGenerator.resultPlaceholder')" :readonly="autoSaveEnabled" show-count :style="{
                                                 height: '100%',
-                                                backgroundColor: 'var(--code-color)',
+                                                backgroundColor: 'var(--surface-tertiary)',
                                                 opacity: generatedResult ? 1 : 0.7
                                             }" />
                                     </div>
@@ -145,7 +145,7 @@
                     <n-list>
                         <n-list-item v-for="item in paginatedHistory" :key="item.id">
                             <template #prefix>
-                                <n-icon :color="item.status === 'success' ? '#18a058' : '#d03050'">
+                                <n-icon :color="item.status === 'success' ? 'var(--accent-success)' : 'var(--accent-error)'">
                                     <Check v-if="item.status === 'success'" />
                                     <AlertCircle v-else />
                                 </n-icon>
@@ -156,7 +156,7 @@
                                 <template #description>
                                     <n-space align="center">
                                         <n-space align="center" :size="4">
-                                            <n-icon v-if="isConfigPreferred(item.configId)" size="14" color="#f0c674">
+                                            <n-icon v-if="isConfigPreferred(item.configId)" size="14" color="var(--accent-warning)">
                                                 <Star />
                                             </n-icon>
                                             <span>{{ getConfigNameOnly(item.configId) }}</span>
@@ -1024,7 +1024,7 @@ const loadCategories = async () => {
 
 .history-content {
     font-size: 12px;
-    color: var(--text-color-3);
+    color: var(--content-tertiary);
     line-height: 1.4;
     word-break: break-word;
 }
@@ -1038,7 +1038,7 @@ const loadCategories = async () => {
 .generation-status-bar {
     background-color: var(--primary-color-suppl);
     border: 1px solid var(--primary-color);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     padding: 8px 12px;
     font-size: 13px;
 }
@@ -1059,7 +1059,7 @@ const loadCategories = async () => {
 .generation-status-bar {
     background: var(--info-color-suppl);
     border: 1px solid var(--info-color);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     padding: 8px 12px;
     margin-bottom: 16px;
     font-size: 14px;

@@ -115,7 +115,8 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                             <NText strong>{{ t('mainPage.title') }}</NText>
                         </NFlex>
                         <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
-                            :collapsed-width="56" :collapsed-icon-size="20" class="main-sider-menu" />
+                            :collapsed="collapseRef" :collapsed-width="56" :collapsed-icon-size="20"
+                            class="main-sider-menu" />
                         <div class="main-sider-toggle">
                             <NTooltip placement="right">
                                 <template #trigger>
@@ -153,19 +154,37 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--surface-sidebar);
 }
 
 .main-sider-brand {
     min-height: 58px;
     padding: 0 16px;
-    border-bottom: 1px solid var(--app-border-color);
+    border-bottom: 1px solid var(--border-default);
     font-size: var(--n-font-size, 14px);
 }
 
 .main-sider-menu {
     flex: 1;
     min-height: 0;
-    margin-top: 8px;
+    padding: var(--spacing-sm);
+}
+
+.main-sider-menu :deep(.n-menu-item-content) {
+    border-radius: var(--radius-control);
+}
+
+.main-sider-menu :deep(.n-menu-item-content:hover) {
+    background: var(--surface-secondary);
+}
+
+.main-sider-menu :deep(.n-menu-item-content--selected) {
+    background: var(--surface-tertiary);
+    font-weight: var(--font-weight-medium);
+}
+
+.main-sider-menu :deep(.n-menu-item-content__icon) {
+    flex: 0 0 auto;
 }
 
 .main-sider-toggle {
@@ -173,6 +192,6 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
     display: flex;
     align-items: center;
     justify-content: center;
-    border-top: 1px solid var(--app-border-color);
+    border-top: 1px solid var(--border-default);
 }
 </style>

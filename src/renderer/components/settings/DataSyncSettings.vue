@@ -532,7 +532,7 @@ onUnmounted(() => unsubscribeSyncStatus?.());
 .sync-error-action-list {
     margin: 0;
     padding-left: 20px;
-    color: var(--text-color-2);
+    color: var(--content-secondary);
     font-size: 13px;
     line-height: 1.6;
 }

@@ -2,7 +2,7 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: '20px', fontWeight: 600 }">{{ t('promptManagement.categoryManageTitle') }}
+            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">{{ t('promptManagement.categoryManageTitle') }}
             </NText>
             <NText depth="3">{{ t('promptManagement.categoryManageDesc') }}</NText>
         </template><!-- 中间可操作区域 --> <template #content="{ contentHeight }">
@@ -23,7 +23,7 @@
                                     <NFlex justify="space-between" align="center">
                                         <NFlex align="center" size="medium">
                                             <div class="color-indicator"
-                                                :style="{ backgroundColor: category.color || '#18A05880' }">
+                                                :style="{ backgroundColor: category.color || 'var(--accent-success)' }">
                                             </div>
                                             <div v-if="editingCategory?.id === category.id" style="min-width: 200px;">
                                                 <NFlex vertical size="small">
@@ -184,7 +184,7 @@ const { modalWidth } = useWindowSize()
 // 响应式数据
 const newCategory = ref({
     name: '',
-    color: '#18A05833'
+    color: '#18a058'
 })
 
 const editingCategory = ref<{
@@ -253,7 +253,7 @@ const handleCreate = async () => {
 
         newCategory.value = {
             name: '',
-            color: '#18A05833'
+            color: '#18a058'
         }
 
         message.success(t('promptManagement.categoryCreatedSuccess'))
@@ -272,7 +272,7 @@ const handleEdit = (category: any) => {
     editingCategory.value = {
         id: category.id,
         name: category.name,
-        color: category.color || '#18A05833'
+        color: category.color || '#18a058'
     }
 }
 

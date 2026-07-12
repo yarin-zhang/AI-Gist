@@ -1,12 +1,61 @@
-:root {
-	/* One radius for user-provided prompt images across every view and preview. */
-	--app-image-radius: 8px;
-}
-
 /* Naive UI images render their <img> with an inherited radius. */
 .n-image,
 .n-image-preview {
-	border-radius: var(--app-image-radius);
+	border-radius: var(--radius-image, 8px);
+}
+
+/* Canonical desktop surfaces. Structural containers are never transparent. */
+.desktop-shell .ui-surface {
+	background: var(--surface-primary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+	box-shadow: none;
+}
+
+.desktop-shell .ui-surface-muted {
+	background: var(--surface-secondary);
+	border-radius: var(--radius-panel);
+}
+
+.desktop-shell .ui-interactive-surface {
+	transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.desktop-shell .ui-interactive-surface:hover {
+	background: var(--surface-secondary);
+}
+
+.desktop-shell .ui-toolbar {
+	background: var(--surface-secondary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+}
+
+.desktop-shell .n-button .n-button__icon {
+	font-size: var(--font-size-lg);
+}
+
+.desktop-shell .n-dropdown-option .n-base-icon {
+	font-size: var(--font-size-lg);
+}
+
+/* Desktop typography roles: controls and navigation use the body size. */
+.desktop-shell .n-button,
+.desktop-shell .n-input,
+.desktop-shell .n-base-selection,
+.desktop-shell .n-menu,
+.desktop-shell .n-tabs,
+.desktop-shell .n-data-table,
+.desktop-shell .n-form-item-label,
+.desktop-shell .n-dropdown-option-body__label {
+	font-size: var(--font-size-base);
+}
+
+.desktop-shell .n-form-item-feedback,
+.desktop-shell .n-form-item-label__asterisk,
+.desktop-shell .n-base-selection-tags,
+.desktop-shell .n-tag {
+	font-size: var(--font-size-xs);
 }
 
 .n-image {
@@ -182,8 +231,8 @@
 }
 
 ion-toast.mobile-toast {
-	--border-radius: 8px;
-	--box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+	--border-radius: var(--radius-panel, 8px);
+	--box-shadow: var(--shadow-popover, 0 8px 28px rgba(15, 23, 42, 0.18));
 	--max-width: 480px;
 	--width: calc(100% - 32px);
 }
@@ -202,26 +251,26 @@ ion-toast.mobile-toast-success {
 	width: 1px !important;
 	height: 100% !important;
 	margin: 0 auto;
-	background-color: var(--app-border-color) !important;
+	background-color: var(--border-default) !important;
 	transition: width 0.12s ease, background-color 0.12s ease;
 }
 
 .n-split--horizontal > .n-split__resize-trigger-wrapper:hover > .n-split__resize-trigger,
 .n-split--horizontal > .n-split__resize-trigger-wrapper > .n-split__resize-trigger--hover {
 	width: 3px !important;
-	background-color: var(--app-text-color-secondary) !important;
+	background-color: var(--content-secondary) !important;
 }
 
 .n-split--vertical > .n-split__resize-trigger-wrapper > .n-split__resize-trigger {
 	width: 100% !important;
 	height: 1px !important;
 	margin: auto 0;
-	background-color: var(--app-border-color) !important;
+	background-color: var(--border-default) !important;
 	transition: height 0.12s ease, background-color 0.12s ease;
 }
 
 .n-split--vertical > .n-split__resize-trigger-wrapper:hover > .n-split__resize-trigger,
 .n-split--vertical > .n-split__resize-trigger-wrapper > .n-split__resize-trigger--hover {
 	height: 3px !important;
-	background-color: var(--app-text-color-secondary) !important;
+	background-color: var(--content-secondary) !important;
 }

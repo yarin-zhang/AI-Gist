@@ -148,10 +148,10 @@
                             <NFlex v-for="result in testResults" :key="result.name" 
                                 align="center" justify="space-between" :size="12" class="test-result-row">
                                 <NFlex align="center" :size="8">
-                                    <NIcon v-if="result.success" color="#18a058" size="16">
+                                    <NIcon v-if="result.success" color="var(--accent-success)" size="16">
                                         <Check />
                                     </NIcon>
-                                    <NIcon v-else color="#d03050" size="16">
+                                    <NIcon v-else color="var(--accent-error)" size="16">
                                         <AlertCircle />
                                     </NIcon>
                                     <NFlex vertical :size="4">
@@ -163,10 +163,10 @@
                                     <NText v-if="result.success && result.responseTime" depth="3" style="font-size: 12px;">
                                         {{ result.responseTime }}ms
                                     </NText>
-                                    <NText v-if="!result.success && result.error" depth="3" style="font-size: 12px; color: #d03050;">
+                                    <NText v-if="!result.success && result.error" depth="3" style="font-size: 12px; color: var(--accent-error);">
                                         {{ result.error }}
                                     </NText>
-                                    <NText v-if="isTesting && !result.success && !result.error" depth="3" style="font-size: 12px; color: #f0a020;">
+                                    <NText v-if="isTesting && !result.success && !result.error" depth="3" style="font-size: 12px; color: var(--accent-warning);">
                                         {{ t('networkProxy.testing') }}
                                     </NText>
                                 </NFlex>
@@ -479,7 +479,7 @@ onUnmounted(() => {
 
 .test-result-row {
     padding: 10px 12px;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--surface-secondary);
     word-break: break-word;
 }

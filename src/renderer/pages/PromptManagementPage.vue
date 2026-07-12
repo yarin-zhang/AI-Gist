@@ -415,7 +415,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    background: var(--app-bg-color);
+    background: var(--surface-body);
 }
 
 .prompt-command-bar {
@@ -424,27 +424,27 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
     display: grid;
     grid-template-columns: minmax(220px, 1fr) auto minmax(300px, 1fr);
     align-items: center;
-    gap: 20px;
-    padding: 0 18px;
-    border-bottom: 1px solid var(--app-border-color);
-    background: var(--app-surface-color);
+    gap: var(--section-gap);
+    padding: 0 var(--page-padding);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-primary);
 }
 
 .page-identity, .page-actions { display: flex; align-items: center; }
 .page-identity { gap: 10px; min-width: 0; }
-.page-identity-icon { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 8px; color: var(--primary-color, #3b82f6); background: color-mix(in srgb, var(--primary-color, #3b82f6) 10%, transparent); }
-.page-title { display: block; font-size: 16px; line-height: 1.25; }
-.page-subtitle { display: block; max-width: 320px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.page-identity-icon { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: var(--radius-panel); color: var(--accent-primary); background: var(--surface-secondary); }
+.page-title { display: block; font-size: var(--font-size-lg); line-height: 1.25; }
+.page-subtitle { display: block; max-width: 320px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); }
 .page-actions { justify-content: flex-end; gap: 8px; }
-.view-switcher { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--app-border-color); border-radius: 9px; background: color-mix(in srgb, var(--app-bg-color) 82%, transparent); }
-.view-switcher-item { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: 6px; color: var(--app-text-color-secondary); background: transparent; cursor: pointer; font: inherit; font-size: 14px; }
-.view-switcher-item:hover { color: var(--app-text-color); background: var(--app-hover-color); }
-.view-switcher-item.active { color: var(--app-text-color); background: var(--app-surface-color); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+.view-switcher { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
+.view-switcher-item { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: var(--radius-control); color: var(--content-secondary); background: transparent; cursor: pointer; font: inherit; font-size: var(--font-size-base); }
+.view-switcher-item:hover { color: var(--content-primary); background: var(--interactive-hover); }
+.view-switcher-item.active { color: var(--content-primary); background: var(--surface-primary); font-weight: var(--font-weight-medium); }
 .prompt-page-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .workspace-shell-split { flex: 1; min-width: 0; min-height: 0; }
-.workspace-resize-line { width: 1px; height: 100%; margin: 0 4px; background: var(--app-border-color); transition: width .12s ease, margin .12s ease, background-color .12s ease; }
-.workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { width: 3px; margin: 0 3px; background: var(--app-text-color-secondary); }
-.legacy-view-surface { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px; }
+.workspace-resize-line { width: 1px; height: 100%; margin: 0 4px; background: var(--border-default); transition: width .12s ease, margin .12s ease, background-color .12s ease; }
+.workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { width: 3px; margin: 0 3px; background: var(--content-secondary); }
+.legacy-view-surface { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--page-padding); }
 
 @media (max-width: 1120px) {
     .prompt-command-bar { grid-template-columns: auto 1fr auto; gap: 12px; }

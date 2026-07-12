@@ -302,7 +302,7 @@
             </NTabPane>
         </NTabs>
 
-        <NAlert v-if="storageConfigs.length === 0" type="info" style="margin-top: 20px;">
+        <NAlert v-if="storageConfigs.length === 0" type="info" style="margin-top: var(--section-gap);">
             {{ t('dataBackup.noCloudStorageDescription') }}
             <template #action>
                 <NButton size="small" secondary @click="emit('navigate-section', 'cloud-backup')">
@@ -311,7 +311,7 @@
             </template>
         </NAlert>
 
-        <NCollapse v-else style="margin-top: 20px;">
+        <NCollapse v-else style="margin-top: var(--section-gap);">
             <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
                 <NFlex vertical :size="16" style="padding-top: 4px;">
                     <NText depth="3" style="font-size: 12px;">
@@ -633,6 +633,6 @@ onUnmounted(() => {
     justify-content: center;
     margin-top: 16px;
     padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-default);
 }
 </style>

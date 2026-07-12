@@ -1,21 +1,22 @@
 <template>
     <component :is="embedded ? 'div' : NModal" :show="embedded ? undefined : show"
         v-show="!embedded || show" :class="{ 'common-modal-embedded-root': embedded }"
-        style="background-color: var(--app-bg-color);">
+        style="background-color: var(--surface-primary);">
         <div ref="containerRef" :class="{ 'common-modal-embedded': embedded }" :style="{
             width: embedded ? '100%' : `${modalWidth}px`,
             height: embedded ? '100%' : `${modalHeight}px`,
             position: 'relative',
-            backgroundColor: 'var(--app-bg-color)',
-            color: 'var(--app-text-color)',
-            borderRadius: embedded ? '0' : '8px',
+            backgroundColor: 'var(--surface-primary)',
+            color: 'var(--content-primary)',
+            borderRadius: embedded ? '0' : 'var(--radius-modal)',
             overflow: 'hidden'
         }">
             <!-- 固定在右上角的关闭按钮 -->
             <NButton v-if="!embedded" @click="handleClose" size="small" circle :style="{
                 position: 'absolute',
-                top: '26px',
-                right: '26px',
+                top: `${headerDefaultHeight / 2}px`,
+                right: `${contentPadding}px`,
+                transform: 'translateY(-50%)',
                 zIndex: 1000,
                 display: 'flex',
                 alignItems: 'center',
@@ -40,8 +41,8 @@
                             <div class="modal-header" :style="{
                                 padding: `0 ${contentPadding}px`,
                                 height: '100%',
-                                borderBottom: '1px solid var(--app-border-color)',
-                                backgroundColor: 'var(--app-surface-color)',
+                                borderBottom: '1px solid var(--border-default)',
+                                backgroundColor: 'var(--surface-secondary)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center',
@@ -51,7 +52,7 @@
                                 <div v-if="slots['header-extra']" :style="{
                                     position: 'absolute',
                                     top: '50%',
-                                    right: '70px', // 为关闭按钮预留更多空间
+                                    right: `${contentPadding + 40}px`,
                                     transform: 'translateY(-50%)',
                                     zIndex: 100,
                                     whiteSpace: 'nowrap' // 防止按钮换行
@@ -61,7 +62,7 @@
 
                                 <!-- 主要的 Header 内容 -->
                                 <div :style="{
-                                    paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
+                                    paddingRight: slots['header-extra'] ? '220px' : '44px',
                                     overflow: 'hidden',
                                     width: '100%'
                                 }">
@@ -75,7 +76,7 @@
                                 padding: `${contentPadding}px`,
                                 height: '100%',
                                 overflow: 'hidden',
-                                backgroundColor: 'var(--app-bg-color)',
+                                backgroundColor: 'var(--surface-primary)',
                                 display: 'flex',
                                 flexDirection: 'column'
                             }">
@@ -90,8 +91,8 @@
                     <NFlex class="modal-footer" vertical justify="center" :style="{
                         padding: `0 ${contentPadding}px`,
                         height: '100%',
-                        borderTop: '1px solid var(--app-border-color)',
-                        backgroundColor: 'var(--app-surface-color)'
+                        borderTop: '1px solid var(--border-default)',
+                        backgroundColor: 'var(--surface-secondary)'
                     }">
                         <slot name="footer" />
                     </NFlex>
@@ -108,8 +109,8 @@
                     <div class="modal-header" :style="{
                         padding: `0 ${contentPadding}px`,
                         height: '100%',
-                        borderBottom: '1px solid var(--app-border-color)',
-                        backgroundColor: 'var(--app-surface-color)',
+                        borderBottom: '1px solid var(--border-default)',
+                        backgroundColor: 'var(--surface-secondary)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
@@ -119,7 +120,7 @@
                         <div v-if="slots['header-extra']" :style="{
                             position: 'absolute',
                             top: '50%',
-                            right: '70px', // 为关闭按钮预留更多空间
+                                right: `${contentPadding + 40}px`,
                             transform: 'translateY(-50%)',
                             zIndex: 100,
                             whiteSpace: 'nowrap' // 防止按钮换行
@@ -129,7 +130,7 @@
 
                         <!-- 主要的 Header 内容 -->
                         <div :style="{
-                            paddingRight: slots['header-extra'] ? '240px' : '60px', // 进一步增加右边距
+                            paddingRight: slots['header-extra'] ? '220px' : '44px',
                             overflow: 'hidden',
                             width: '100%'
                         }">
@@ -143,7 +144,7 @@
                         padding: `${contentPadding}px`,
                         height: '100%',
                         overflow: 'hidden',
-                        backgroundColor: 'var(--app-bg-color)',
+                        backgroundColor: 'var(--surface-primary)',
                         display: 'flex',
                         flexDirection: 'column'
                     }">
@@ -269,21 +270,21 @@ onUnmounted(() => resizeObserver?.disconnect());
 
 <style scoped>
 .modal-header {
-    background-color: var(--app-surface-color);
-    color: var(--app-text-color);
+    background-color: var(--surface-secondary);
+    color: var(--content-primary);
     overflow: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .modal-content {
-    background-color: var(--app-bg-color);
-    color: var(--app-text-color);
+    background-color: var(--surface-primary);
+    color: var(--content-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .modal-footer {
-    background-color: var(--app-surface-color);
-    color: var(--app-text-color);
+    background-color: var(--surface-secondary);
+    color: var(--content-primary);
     overflow: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -305,12 +306,12 @@ onUnmounted(() => resizeObserver?.disconnect());
 }
 
 :deep(.n-split-pane__split-bar) {
-    background-color: var(--app-border-color);
+    background-color: var(--border-default);
     transition: background-color 0.3s ease;
 }
 
 :deep(.n-split-pane__split-bar:hover) {
-    background-color: var(--primary-color, #007bff);
+    background-color: var(--accent-primary);
 }
 
 /* 明确设置模态框的背景，避免透明问题 */
@@ -319,7 +320,7 @@ onUnmounted(() => resizeObserver?.disconnect());
 }
 
 :deep(.n-modal) {
-    background-color: var(--app-bg-color);
-    border: 1px solid var(--app-border-color);
+    background-color: var(--surface-primary);
+    border: 1px solid var(--border-default);
 }
 </style>

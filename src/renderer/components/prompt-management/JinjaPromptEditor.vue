@@ -71,7 +71,7 @@
                                 </NFlex>
                                 <!-- 流式传输状态显示 -->
                                 <div v-if="isStreaming" style="margin-top: 4px;">
-                                    <NText type="success" style="font-size: 11px;">
+                                    <NText type="success" style="font-size: var(--font-size-xs);">
                                         {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{
                                         t('promptManagement.characters') }})
                                     </NText>
@@ -281,7 +281,7 @@
                         </template>
                         <NFlex vertical size="small">
                             <NFlex v-for="example in examples" :key="example.code" align="center" size="small"
-                                style="padding: 8px; border-radius: 4px; background: var(--color-fill-2);">
+                                style="padding: 8px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary);">
                                 <NInput :value="example.code" readonly size="small" :style="{
                                     fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                                     fontSize: '12px',
@@ -763,12 +763,12 @@ defineExpose({
 </script>
 
 <style scoped>
-.prompt-editor-split { background: var(--app-bg-color); }
-.editor-shell-panel { border: 0 !important; border-radius: 0 !important; background: var(--app-surface-color); }
-.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--app-border-color); }
-.editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: 14px; font-weight: 600; }
+.prompt-editor-split { background: var(--surface-body); }
+.editor-shell-panel { border: 1px solid var(--border-default) !important; border-radius: var(--radius-panel) !important; background: var(--surface-primary); }
+.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); }
 .editor-shell-panel :deep(> .n-card__content) { padding: 14px 16px; }
-.variable-config-card { border-radius: 8px; box-shadow: none; }
-.variable-config-card :deep(.n-card-header__main) { font-size: 14px; }
-.prompt-editor-split :deep(.n-split-pane__split-bar) { background: var(--app-border-color); }
+.variable-config-card { border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); box-shadow: none; }
+.variable-config-card :deep(.n-card-header__main) { font-size: var(--font-size-base); }
+.prompt-editor-split :deep(.n-split-pane__split-bar) { background: var(--border-default); }
 </style>

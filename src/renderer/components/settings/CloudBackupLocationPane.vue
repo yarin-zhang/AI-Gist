@@ -169,6 +169,6 @@ onMounted(refreshCloudBackupList);
     justify-content: center;
     margin-top: 16px;
     padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-default);
 }
 </style>

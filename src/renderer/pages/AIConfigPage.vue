@@ -2,10 +2,10 @@
     <div class="ai-config-page">
         <NFlex vertical size="large">
             <!-- 页面标题 -->
-            <NFlex justify="space-between" align="center">
+            <NFlex justify="space-between" align="center" class="ai-config-header">
                 <div>
-                    <NText strong style="font-size: 28px">{{ t('aiConfig.title') }}</NText>
-                    <NText depth="3" style="display: block; margin-top: 4px">
+                    <NText strong class="ai-config-title">{{ t('aiConfig.title') }}</NText>
+                    <NText depth="3" class="ai-config-subtitle">
                         {{ t('aiConfig.subtitle') }}
                     </NText>
                 </div>
@@ -151,7 +151,7 @@
                         <NFlex justify="space-between" align="center">
                             <!-- 左侧：常用操作 -->
                             <NFlex align="center" size="small">
-                                <n-button size="small" @click="editConfig(config)" type="info">
+                                <n-button size="small" secondary @click="editConfig(config)">
                                     <template #icon>
                                         <NIcon>
                                             <Settings />
@@ -172,7 +172,7 @@
                             <!-- 右侧：不常用操作 -->
                             <NFlex align="center" size="small">
                                 <n-button size="small" @click="testConfig(config)"
-                                    :loading="testingConfigs.has(config.id!)" type="info">
+                                    :loading="testingConfigs.has(config.id!)">
                                     <template #icon>
                                         <NIcon>
                                             <AccessPoint />
@@ -209,11 +209,11 @@
             <template #header>
                 <NFlex align="center" justify="space-between">
                     <NFlex align="center" style="gap: 12px">
-                        <NIcon size="24">
+                        <NIcon size="20">
                             <Settings />
                         </NIcon>
                         <div>
-                            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
                                 {{ editingConfig ? t('aiConfig.editConfig') : t('aiConfig.addConfig') }}
                             </NText>
                             <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
@@ -401,7 +401,7 @@
                                                     :type="modelTestResult.success ? 'success' : 'error'"
                                                     :title="modelTestResult.success ? t('aiConfig.modelTestSuccess') : t('aiConfig.modelTestFailed')">
                                                     {{ modelTestResult.error }}
-                                                    <div v-if="modelTestResult.response" style="margin-top: 8px; padding: 8px; background: var(--code-color); border-radius: 4px; font-family: monospace;">
+                                                    <div v-if="modelTestResult.response" style="margin-top: 8px; padding: 8px; background: var(--surface-tertiary); border: 1px solid var(--border-default); border-radius: var(--radius-control); font-family: monospace;">
                                                         {{ modelTestResult.response }}
                                                     </div>
                                                 </n-alert>
@@ -429,7 +429,7 @@
         <n-modal v-model:show="showIntelligentTestResult" preset="dialog" style="width: 600px">
             <template #header>
                 <NFlex align="center" style="gap: 8px">
-                    <NIcon size="24">
+                    <NIcon size="20">
                         <Robot />
                     </NIcon>
                     <NText strong>{{ t('aiConfig.intelligentTestResult') }}</NText>
@@ -442,7 +442,7 @@
                         <div style="margin-bottom: 16px">
                             <strong>{{ t('aiConfig.inputPrompt') }}</strong>
                             <div style="
-                  background: var(--code-color);
+                  background: var(--surface-tertiary);
                   padding: 12px;
                   border-radius: 6px;
                   margin-top: 8px;
@@ -455,7 +455,7 @@
                         <div>
                             <strong>{{ t('aiConfig.aiResponse') }}</strong>
                             <div style="
-                  background: var(--code-color);
+                  background: var(--surface-tertiary);
                   padding: 12px;
                   border-radius: 6px;
                   margin-top: 8px;
@@ -470,7 +470,7 @@
                     <div v-if="intelligentTestResult.inputPrompt" style="margin-bottom: 12px">
                         <strong>{{ t('aiConfig.attemptedPrompt') }}</strong>
                         <div style="
-                background: var(--code-color);
+                background: var(--surface-tertiary);
                 padding: 12px;
                 border-radius: 6px;
                 margin-top: 8px;
@@ -498,11 +498,11 @@
             <template #header>
                 <NFlex align="center" justify="space-between">
                     <NFlex align="center" style="gap: 12px">
-                        <NIcon size="24">
+                        <NIcon size="20">
                             <Edit />
                         </NIcon>
                         <div>
-                            <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
                                 {{ t('aiConfig.editGenerationPrompt') }}
                             </NText>
                             <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
@@ -1500,22 +1500,33 @@ defineExpose({
 
 <style scoped>
 .ai-config-page {
-    padding: 24px;
+    height: 100%;
+    box-sizing: border-box;
+    padding: var(--page-padding);
     overflow-y: auto;
+    background: var(--surface-body);
 }
+
+.ai-config-header { min-height: 60px; }
+.ai-config-title { display: block; font-size: var(--font-size-2xl); line-height: 1.3; }
+.ai-config-subtitle { display: block; margin-top: var(--spacing-xs); font-size: var(--font-size-base); }
 
 .config-list {
     display: grid;
-    gap: 16px;
+    gap: var(--section-gap);
 }
 
 .config-card {
-    border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-secondary);
+    box-shadow: none;
+    transition: background-color .16s ease, border-color .16s ease;
 }
 
 .config-card:hover {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--border-strong);
+    background: var(--surface-tertiary);
 }
 
 .config-header {
@@ -1532,7 +1543,7 @@ defineExpose({
 
 .config-info h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
 }
 
 .config-switch {
@@ -1540,12 +1551,8 @@ defineExpose({
     align-items: center;
 }
 
-.config-details {
-    border-top: 1px solid var(--border-color-1);
-}
-
 .config-details p {
     margin: 4px 0;
-    color: var(--text-color-2);
+    color: var(--content-secondary);
 }
 </style>

@@ -57,10 +57,10 @@ defineExpose({
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid var(--app-border-color);
-    border-radius: 10px;
-    background: var(--app-bg-color);
-    box-shadow: 0 24px 72px rgba(15, 23, 42, .24);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-modal);
+    background: var(--surface-primary);
+    box-shadow: var(--shadow-overlay);
 }
 
 @media (max-width: 760px) {

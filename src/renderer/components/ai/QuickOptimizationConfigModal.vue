@@ -8,7 +8,7 @@
                         <Settings />
                     </NIcon>
                     <div>
-                        <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                        <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
                             {{ t('quickOptimization.title') }}
                         </NText>
                         <NText depth="3" style="font-size: 13px; display: block; margin-top: 2px">
@@ -110,7 +110,7 @@
                                             type="textarea" 
                                             readonly 
                                             :rows="3"
-                                            :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace', fontSize: '11px' }"
+                                            :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace', fontSize: 'var(--font-size-xs)' }"
                                         />
 
                                     </div>
@@ -494,4 +494,4 @@ const checkDatabaseHealth = async () => {
 };
 </script>
 
-<style scoped></style> 
+<style scoped></style>

@@ -29,7 +29,7 @@ const handleOpenSettings = (targetSection?: string) => {
 <style scoped>
 .status-bar {
   height: 100%;
-  background-color: var(--n-color);
+  background-color: var(--surface-primary);
   font-size: 12px;
   overflow: visible;
 }

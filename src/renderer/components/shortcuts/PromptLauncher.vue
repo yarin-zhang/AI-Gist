@@ -1,6 +1,6 @@
 <template>
   <div class="launcher-shell">
-    <NCard v-if="mode === 'search'" class="launcher-card" size="small" :bordered="false">
+    <NCard v-if="mode === 'search'" class="launcher-card" size="small" :bordered="true">
       <template #header>
         <NInput
           ref="searchInput"
@@ -525,7 +525,8 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   box-sizing: border-box;
-  background: var(--surface-primary);
+  padding: 8px;
+  background: var(--surface-body);
 }
 
 .launcher-card {
@@ -534,7 +535,7 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-radius: 0;
+  border-radius: var(--radius-panel);
 }
 
 .launcher-card :deep(.n-card-content) {

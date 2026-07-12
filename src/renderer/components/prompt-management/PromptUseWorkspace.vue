@@ -50,7 +50,7 @@
                         <NText depth="3" class="pane-description">{{ t('promptWorkspace.livePreview') }}</NText>
                     </div>
                     <NButton size="tiny" quaternary @click="showHistory = true">
-                        <template #icon><NIcon size="15"><History /></NIcon></template>
+                        <template #icon><NIcon size="16"><History /></NIcon></template>
                         {{ t('promptWorkspace.useHistory') }}
                     </NButton>
                 </div>
@@ -73,7 +73,7 @@
                                 <NText strong>{{ t('promptWorkspace.runWithAI') }}</NText>
                                 <NText depth="3" class="pane-description">{{ t('promptWorkspace.runWithAIHint') }}</NText>
                             </div>
-                            <NButton quaternary circle size="tiny" @click="showAIRun = false"><NIcon size="15"><X /></NIcon></NButton>
+                            <NButton quaternary circle size="tiny" @click="showAIRun = false"><NIcon size="16"><X /></NIcon></NButton>
                         </div>
                         <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
                             :placeholder="t('promptManagement.detailModal.selectAIModel')" :disabled="running" />
@@ -364,12 +364,12 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.use-workspace { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--app-bg-color); }
+.use-workspace { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
 .use-content { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 360px) minmax(440px, 1fr); }
 .use-content.without-variables { grid-template-columns: 1fr; }
-.use-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--app-surface-color); }
-.variable-pane { border-right: 1px solid var(--app-border-color); background: color-mix(in srgb, var(--app-surface-color) 94%, var(--app-bg-color)); }
-.pane-heading { min-height: 52px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--app-border-color); }
+.use-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-primary); }
+.variable-pane { border-right: 1px solid var(--border-default); background: var(--surface-secondary); }
+.pane-heading { min-height: 52px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .pane-heading :deep(.n-text--strong) { font-size: 14px; }
 .pane-description { display: block; margin-top: 2px; font-size: 12px; }
 .pane-scroll { flex: 1; min-height: 0; }
@@ -377,24 +377,24 @@ onBeforeUnmount(() => {
 .variable-form :deep(.n-form-item) { margin-bottom: 12px; }
 .variable-form :deep(.n-form-item-label) { min-height: 22px; padding-bottom: 4px; font-size: 13px; font-weight: 500; }
 .variable-form :deep(.n-input), .variable-form :deep(.n-base-selection) { --n-height: 32px !important; }
-.preview-scroll { background: var(--app-bg-color); }
-.prompt-preview { min-height: 260px; margin: 0; padding: 20px 22px 28px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.72 Monaco, Menlo, Consolas, monospace; color: var(--app-text-color); tab-size: 2; cursor: text; user-select: text; -webkit-user-select: text; }
-.prompt-preview::selection { color: inherit; background: color-mix(in srgb, var(--primary-color, #3b82f6) 24%, transparent); }
+.preview-scroll { background: var(--surface-primary); }
+.prompt-preview { min-height: 260px; margin: 0; padding: var(--page-padding) var(--page-padding) var(--spacing-2xl); white-space: pre-wrap; overflow-wrap: anywhere; font: var(--font-size-base)/1.72 Monaco, Menlo, Consolas, monospace; color: var(--content-primary); tab-size: 2; cursor: text; user-select: text; -webkit-user-select: text; }
+.prompt-preview::selection { color: inherit; background: color-mix(in srgb, var(--accent-primary) 24%, transparent); }
 .preview-alert { padding: 12px 16px 0; }
 .prompt-images { display: flex; gap: 10px; flex-wrap: wrap; padding: 0 22px 22px; }
-.use-action-bar { min-height: 58px; flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--app-border-color); background: var(--app-surface-color); }
-.ai-run-panel { margin: 0; padding: 14px 18px 18px; border-top: 1px solid var(--app-border-color); background: var(--app-surface-color); }
+.use-action-bar { min-height: 58px; flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--border-default); background: var(--surface-secondary); }
+.ai-run-panel { margin: 0; padding: 14px 18px 18px; border-top: 1px solid var(--border-default); background: var(--surface-secondary); }
 .ai-run-header, .ai-result-heading, .history-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ai-run-actions { margin-top: 10px; }
 .ai-result { margin-top: 14px; }
 .ai-result pre { margin-bottom: 0; white-space: pre-wrap; font: 14px/1.65 Monaco, Menlo, Consolas, monospace; }
 .history-list { display: flex; flex-direction: column; gap: 12px; }
-.history-item { padding: 12px; border: 1px solid var(--app-border-color); border-radius: 8px; }
+.history-item { padding: 12px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .history-values { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.history-item p { margin: 10px 0 0; color: var(--app-text-color-secondary); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.history-item p { margin: 10px 0 0; color: var(--content-secondary); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 1000px) {
     .use-content { grid-template-columns: 1fr; overflow-y: auto; }
     .use-pane { min-height: 420px; }
-    .variable-pane { border-right: 0; border-bottom: 1px solid var(--app-border-color); }
+    .variable-pane { border-right: 0; border-bottom: 1px solid var(--border-default); }
 }
 </style>
