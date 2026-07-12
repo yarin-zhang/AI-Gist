@@ -2,6 +2,15 @@ import { createStableChecksum } from './data-checksum';
 
 export const BACKUP_PAYLOAD_SCHEMA_VERSION = 1;
 
+export type BackupType = 'manual' | 'automatic';
+
+export interface BackupMetadata {
+  backupType?: BackupType;
+  trigger?: string;
+  deviceId?: string;
+  dataChecksum?: string;
+}
+
 export interface BackupPayload<TData = any> {
   schemaVersion: typeof BACKUP_PAYLOAD_SCHEMA_VERSION;
   id: string;
@@ -12,6 +21,10 @@ export interface BackupPayload<TData = any> {
   data: TData;
   checksum: string;
   checksumAlgorithm: 'fnv1a32';
+  backupType?: BackupType;
+  trigger?: string;
+  deviceId?: string;
+  dataChecksum?: string;
 }
 
 export interface ParsedBackupPayload<TData = any> {
@@ -41,7 +54,7 @@ export function createBackupPayload<TData>(
     description?: string;
     createdAt: string;
     data: TData;
-  }
+  } & BackupMetadata
 ): BackupPayload<TData> {
   return {
     schemaVersion: BACKUP_PAYLOAD_SCHEMA_VERSION,
@@ -51,7 +64,11 @@ export function createBackupPayload<TData>(
     createdAt: input.createdAt,
     data: input.data,
     checksum: createBackupDataChecksum(input.data),
-    checksumAlgorithm: 'fnv1a32'
+    checksumAlgorithm: 'fnv1a32',
+    backupType: input.backupType,
+    trigger: input.trigger,
+    deviceId: input.deviceId,
+    dataChecksum: input.dataChecksum
   };
 }
 

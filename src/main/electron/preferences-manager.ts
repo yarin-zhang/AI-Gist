@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import path from 'path';
 
 // 本地模块导入
-import { UserPreferences } from '@shared/types';
+import { ShortcutPreferences, UserPreferences } from '@shared/types';
 import { themeManager } from './theme-manager';
 
 /**
@@ -78,21 +78,21 @@ class PreferencesManager {
       autoBackup: true,
       backupInterval: 24,
     },
-    // 新增：快捷键配置
     shortcuts: {
-      showInterface: {
-        key: 'Ctrl+Shift+G',
-        description: '切换界面',
-        enabled: true,
-        type: 'show-interface'
+      version: 2,
+      defaultAction: 'copy',
+      commands: {
+        launcher: {
+          accelerator: 'CommandOrControl+Shift+G',
+          enabled: true,
+        },
+        showMainWindow: {
+          accelerator: '',
+          enabled: false,
+        },
       },
-      copyPrompt: {
-        key: 'Ctrl+Shift+Alt+C',
-        description: '复制提示词',
-        enabled: true,
-        type: 'copy-prompt'
-      },
-      promptTriggers: []
+      promptBindings: [],
+      recentPromptUUIDs: [],
     },
     // 网络代理配置
     networkProxy: {
@@ -162,6 +162,7 @@ class PreferencesManager {
    * 将加载的配置与默认值合并
    */
   private mergeWithDefaults(loadedPrefs: any): UserPreferences {
+    const shortcuts = this.normalizeShortcuts(loadedPrefs.shortcuts);
     return {
       // 旧属性
       closeBehaviorMode: loadedPrefs.closeBehaviorMode ?? this.defaultPreferences.closeBehaviorMode,
@@ -189,22 +190,82 @@ class PreferencesManager {
         autoBackup: loadedPrefs.dataSync?.autoBackup ?? this.defaultPreferences.dataSync!.autoBackup,
         backupInterval: loadedPrefs.dataSync?.backupInterval ?? this.defaultPreferences.dataSync!.backupInterval,
       },
-      shortcuts: {
-        showInterface: {
-          key: loadedPrefs.shortcuts?.showInterface?.key ?? this.defaultPreferences.shortcuts!.showInterface.key,
-          description: loadedPrefs.shortcuts?.showInterface?.description ?? this.defaultPreferences.shortcuts!.showInterface.description,
-          enabled: loadedPrefs.shortcuts?.showInterface?.enabled ?? this.defaultPreferences.shortcuts!.showInterface.enabled,
-          type: loadedPrefs.shortcuts?.showInterface?.type ?? this.defaultPreferences.shortcuts!.showInterface.type,
-        },
-        copyPrompt: {
-          key: loadedPrefs.shortcuts?.copyPrompt?.key ?? this.defaultPreferences.shortcuts!.copyPrompt.key,
-          description: loadedPrefs.shortcuts?.copyPrompt?.description ?? this.defaultPreferences.shortcuts!.copyPrompt.description,
-          enabled: loadedPrefs.shortcuts?.copyPrompt?.enabled ?? this.defaultPreferences.shortcuts!.copyPrompt.enabled,
-          type: loadedPrefs.shortcuts?.copyPrompt?.type ?? this.defaultPreferences.shortcuts!.copyPrompt.type,
-        },
-        promptTriggers: loadedPrefs.shortcuts?.promptTriggers ?? this.defaultPreferences.shortcuts!.promptTriggers,
+      shortcuts,
+      networkProxy: {
+        mode: loadedPrefs.networkProxy?.mode ?? this.defaultPreferences.networkProxy!.mode,
+        manualConfig: loadedPrefs.networkProxy?.manualConfig,
       },
     };
+  }
+
+  private normalizeShortcuts(input: any): ShortcutPreferences {
+    const defaults = this.defaultPreferences.shortcuts!;
+    if (input?.version === 2 && input.commands) {
+      return {
+        version: 2,
+        defaultAction: input.defaultAction === 'paste' ? 'paste' : 'copy',
+        commands: {
+          launcher: {
+            accelerator: input.commands.launcher?.accelerator || defaults.commands.launcher.accelerator,
+            enabled: input.commands.launcher?.enabled ?? defaults.commands.launcher.enabled,
+          },
+          showMainWindow: {
+            accelerator: input.commands.showMainWindow?.accelerator || '',
+            enabled: input.commands.showMainWindow?.enabled ?? false,
+          },
+        },
+        promptBindings: Array.isArray(input.promptBindings) ? input.promptBindings : [],
+        recentPromptUUIDs: Array.isArray(input.recentPromptUUIDs) ? input.recentPromptUUIDs.slice(0, 20) : [],
+      };
+    }
+
+    const promptBindings = [] as ShortcutPreferences['promptBindings'];
+    const copyPrompt = input?.copyPrompt;
+    if (copyPrompt?.enabled && copyPrompt?.key && (copyPrompt.selectedPromptUUID || copyPrompt.selectedPromptId)) {
+      promptBindings.push({
+        id: `legacy-copy-${copyPrompt.selectedPromptUUID || copyPrompt.selectedPromptId}`,
+        promptUUID: copyPrompt.selectedPromptUUID || `legacy-id:${copyPrompt.selectedPromptId}`,
+        accelerator: this.normalizeLegacyAccelerator(copyPrompt.key),
+        action: 'copy',
+        enabled: true,
+      });
+    }
+
+    if (Array.isArray(input?.promptTriggers)) {
+      input.promptTriggers.forEach((trigger: any, index: number) => {
+        if (!trigger?.enabled || !trigger?.key || (!trigger.promptUUID && !trigger.promptId)) return;
+        promptBindings.push({
+          id: `legacy-trigger-${trigger.promptUUID || trigger.promptId}-${index}`,
+          promptUUID: trigger.promptUUID || `legacy-id:${trigger.promptId}`,
+          accelerator: this.normalizeLegacyAccelerator(trigger.key),
+          action: 'copy',
+          enabled: true,
+        });
+      });
+    }
+
+    return {
+      version: 2,
+      defaultAction: 'copy',
+      commands: {
+        launcher: {
+          accelerator: this.normalizeLegacyAccelerator(input?.showInterface?.key) || defaults.commands.launcher.accelerator,
+          enabled: input?.showInterface?.enabled ?? true,
+        },
+        showMainWindow: {
+          accelerator: '',
+          enabled: false,
+        },
+      },
+      promptBindings,
+      recentPromptUUIDs: [],
+    };
+  }
+
+  private normalizeLegacyAccelerator(accelerator?: string): string {
+    if (!accelerator) return '';
+    if (/^Ctrl\+Shift\+G$/i.test(accelerator)) return 'CommandOrControl+Shift+G';
+    return accelerator.replace(/^Cmd\+/i, 'Command+');
   }
 
   // ==================== 配置保存 ====================

@@ -1,8 +1,8 @@
 <template>
-    <NCard>
+    <NCard size="small">
         <NFlex vertical :size="16">
-            <NFormItem :label="t('closeBehavior.closeBehaviorMode')">
-                <NRadioGroup v-model:value="props.modelValue.closeBehaviorMode" @update:value="handleUpdate">
+            <NText strong>{{ t('closeBehavior.closeBehaviorMode') }}</NText>
+            <NRadioGroup v-model:value="props.modelValue.closeBehaviorMode" @update:value="handleUpdate">
                     <NFlex vertical :size="12">
                         <NRadio value="ask">
                             <NFlex align="center" :size="8">
@@ -25,11 +25,11 @@
                             </NFlex>
                         </NRadio>
                     </NFlex>
-                </NRadioGroup>
-            </NFormItem>
+            </NRadioGroup>
 
-            <NFormItem v-if="props.modelValue.closeBehaviorMode === 'fixed'" :label="t('closeBehavior.closeAction')"
-                style="margin-left: 24px">
+            <template v-if="props.modelValue.closeBehaviorMode === 'fixed'">
+                <NDivider />
+                <NText strong>{{ t('closeBehavior.closeAction') }}</NText>
                 <NRadioGroup v-model:value="props.modelValue.closeAction" @update:value="handleUpdate">
                     <NFlex vertical :size="8">
                         <NRadio value="quit">
@@ -54,26 +54,13 @@
                         </NRadio>
                     </NFlex>
                 </NRadioGroup>
-            </NFormItem>
-
-            <NAlert v-if="props.modelValue.closeBehaviorMode === 'ask'" type="info" show-icon>
-                <template #header>{{ t('closeBehavior.currentSetting') }}</template>
-                {{ t('closeBehavior.askOnClose') }}
-            </NAlert>
-
-            <NAlert v-if="props.modelValue.closeBehaviorMode === 'fixed'" type="success" show-icon>
-                <template #header>{{ t('closeBehavior.currentSetting') }}</template>
-                {{ t('closeBehavior.directAction', {
-                    action: props.modelValue.closeAction === "quit" ?
-                        t('closeBehavior.quit') :
-                        t('closeBehavior.minimize') }) }}
-            </NAlert>
+            </template>
         </NFlex>
     </NCard>
 </template>
 
 <script setup lang="ts">
-import { NCard, NFlex, NFormItem, NRadioGroup, NRadio, NText, NAlert } from "naive-ui";
+import { NCard, NFlex, NRadioGroup, NRadio, NText, NDivider } from "naive-ui";
 import { useI18n } from 'vue-i18n'
 
 interface CloseBehaviorSettings {

@@ -100,18 +100,118 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
     },
     Card: {
       color: surface.primary,
+      colorModal: surface.primary,
+      colorPopover: surface.primary,
       colorEmbedded: surface.secondary,
+      colorEmbeddedModal: surface.secondary,
+      colorEmbeddedPopover: surface.secondary,
+      actionColor: surface.secondary,
+      borderColor: border.default,
+      borderRadius: tokens.component.panelRadius,
+      boxShadow: "none",
       titleFontSizeSmall: tokens.typography.fontSizes.lg,
       titleFontSizeMedium: tokens.typography.fontSizes.lg,
       titleFontSizeLarge: tokens.typography.fontSizes.lg,
       titleFontSizeHuge: tokens.typography.fontSizes.lg,
       titleFontWeight: tokens.typography.fontWeights.semibold
     },
+    Layout: {
+      color: surface.body,
+      headerColor: surface.primary,
+      footerColor: surface.primary,
+      siderColor: surface.sidebar,
+      headerBorderColor: border.default,
+      footerBorderColor: border.default,
+      siderBorderColor: border.default
+    },
+    Button: {
+      fontSizeTiny: tokens.typography.fontSizes.xs,
+      fontSizeSmall: tokens.typography.fontSizes.base,
+      fontSizeMedium: tokens.typography.fontSizes.base,
+      fontSizeLarge: tokens.typography.fontSizes.base
+    },
+    Input: {
+      fontSizeTiny: tokens.typography.fontSizes.xs,
+      fontSizeSmall: tokens.typography.fontSizes.base,
+      fontSizeMedium: tokens.typography.fontSizes.base,
+      fontSizeLarge: tokens.typography.fontSizes.base,
+      lineHeight: tokens.typography.lineHeights.normal,
+      lineHeightTextarea: tokens.typography.lineHeights.normal
+    },
+    Select: {
+      fontSizeTiny: tokens.typography.fontSizes.xs,
+      fontSizeSmall: tokens.typography.fontSizes.base,
+      fontSizeMedium: tokens.typography.fontSizes.base,
+      fontSizeLarge: tokens.typography.fontSizes.base
+    },
+    Form: {
+      labelFontSizeLeftSmall: tokens.typography.fontSizes.base,
+      labelFontSizeLeftMedium: tokens.typography.fontSizes.base,
+      labelFontSizeLeftLarge: tokens.typography.fontSizes.base,
+      labelFontSizeTopSmall: tokens.typography.fontSizes.base,
+      labelFontSizeTopMedium: tokens.typography.fontSizes.base,
+      labelFontSizeTopLarge: tokens.typography.fontSizes.base
+    },
+    Menu: {
+      borderRadius: tokens.component.controlRadius,
+      groupTextColor: content.secondary,
+      itemColorHover: interactive.hover,
+      itemColorActive: interactive.active,
+      itemColorActiveHover: interactive.active,
+      itemColorActiveCollapsed: interactive.active,
+      itemTextColor: content.secondary,
+      itemTextColorHover: content.primary,
+      itemTextColorActive: content.primary,
+      itemTextColorActiveHover: content.primary,
+      itemIconColor: content.secondary,
+      itemIconColorHover: content.primary,
+      itemIconColorActive: content.primary,
+      itemIconColorActiveHover: content.primary
+    },
+    Modal: {
+      color: surface.primary,
+      textColor: content.primary,
+      boxShadow: tokens.elevation.overlay,
+      colorModal: surface.primary
+    },
+    Drawer: {
+      color: surface.primary,
+      borderRadius: tokens.component.modalRadius,
+      boxShadow: tokens.elevation.overlay,
+      headerBorderBottom: `1px solid ${border.default}`,
+      footerBorderTop: `1px solid ${border.default}`
+    },
+    Dropdown: {
+      color: surface.primary,
+      dividerColor: border.default,
+      borderRadius: tokens.component.panelRadius,
+      optionColorHover: interactive.hover,
+      optionColorActive: interactive.active,
+      optionIconSizeSmall: tokens.component.menuIconSize,
+      optionIconSizeMedium: tokens.component.menuIconSize,
+      optionIconSizeLarge: tokens.component.menuIconSize,
+      optionIconSizeHuge: tokens.component.menuIconSize
+    },
+    DataTable: {
+      borderColor: border.default,
+      borderRadius: tokens.component.panelRadius,
+      thColor: surface.secondary,
+      thColorHover: surface.secondary,
+      tdColor: surface.primary,
+      tdColorHover: interactive.hover,
+      thTextColor: content.secondary,
+      tdTextColor: content.primary,
+      thFontWeight: tokens.typography.fontWeights.medium,
+      fontSizeSmall: tokens.typography.fontSizes.base,
+      fontSizeMedium: tokens.typography.fontSizes.base,
+      fontSizeLarge: tokens.typography.fontSizes.base
+    },
     LoadingBar: {
       colorLoading: accent.primary
     },
     Tag: {
-      colorBordered: "rgba(0, 0, 0, 0.08)"
+      colorBordered: interactive.hover,
+      border: `1px solid ${border.default}`
     }
   }
 }
@@ -119,7 +219,7 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
 // 获取 CSS 变量
 export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> {
   const palette = tokens.palette[themeName]
-  const { surface, content, accent, border, interactive } = palette
+  const { surface, content, accent, border, interactive, overlay } = palette
   
   return {
     // 表面颜色
@@ -151,6 +251,10 @@ export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> 
     "interactive-hover": interactive.hover,
     "interactive-active": interactive.active,
     "interactive-focus": interactive.focus,
+
+    // 浮层遮罩
+    "overlay-backdrop": overlay.backdrop,
+    "overlay-preview": overlay.preview,
     
     // 间距
     "spacing-xs": tokens.spacing.xs,
@@ -166,6 +270,20 @@ export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> 
     "radius-md": tokens.radius.md,
     "radius-lg": tokens.radius.lg,
     "radius-xl": tokens.radius.xl,
+    "radius-control": tokens.component.controlRadius,
+    "radius-panel": tokens.component.panelRadius,
+    "radius-modal": tokens.component.modalRadius,
+    "radius-image": tokens.component.imageRadius,
+
+    // 页面布局
+    "page-padding": tokens.component.pagePadding,
+    "content-padding": tokens.component.contentPadding,
+    "compact-padding": tokens.component.compactPadding,
+    "section-gap": tokens.component.sectionGap,
+
+    // 浮层阴影（常驻面板不使用阴影）
+    "shadow-popover": tokens.elevation.popover,
+    "shadow-overlay": tokens.elevation.overlay,
     
     // 字体
     "font-size-xs": tokens.typography.fontSizes.xs,
@@ -188,4 +306,4 @@ export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> 
     "line-height-normal": tokens.typography.lineHeights.normal,
     "line-height-relaxed": tokens.typography.lineHeights.relaxed
   }
-} 
+}

@@ -592,9 +592,9 @@ onMounted(() => {
 }
 
 .form-content {
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
-  border: 1px solid var(--ion-color-light-shade);
+  border: 1px solid var(--border-default);
   overflow: hidden;
 }
 
@@ -650,11 +650,11 @@ ion-item {
 }
 
 .test-result.success {
-  background-color: var(--ion-color-success-tint);
+  background-color: color-mix(in srgb, var(--accent-success) 8%, var(--surface-primary));
 }
 
 .test-result.error {
-  background-color: var(--ion-color-danger-tint);
+  background-color: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
 }
 
 .test-result-content {

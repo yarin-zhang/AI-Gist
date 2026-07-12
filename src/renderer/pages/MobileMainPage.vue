@@ -41,8 +41,8 @@ const { t } = useI18n()
 
 <style scoped>
 ion-tab-bar {
-  --background: var(--ion-background-color, #ffffff);
-  border-top: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.1));
+  --background: var(--surface-primary);
+  border-top: 1px solid var(--border-default);
 }
 
 ion-tab-button {
@@ -50,9 +50,4 @@ ion-tab-button {
   --color-selected: var(--ion-color-primary);
 }
 
-/* 暗色主题适配：通过 ion-palette-dark 类控制（与主题切换逻辑一致） */
-:global(.ion-palette-dark) ion-tab-bar {
-  --background: var(--ion-background-color, #000000);
-  border-top-color: rgba(255, 255, 255, 0.1);
-}
 </style>

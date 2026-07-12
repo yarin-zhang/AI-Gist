@@ -5,6 +5,17 @@
 // 使用 Uint8Array 替代 Buffer 类型
 type Buffer = Uint8Array;
 
+export type CloudBackupType = 'manual' | 'automatic';
+
+export interface CloudBackupCreateOptions {
+  description?: string;
+  data?: any;
+  backupType?: CloudBackupType;
+  trigger?: string;
+  deviceId?: string;
+  dataChecksum?: string;
+}
+
 export interface CloudStorageConfig {
   id: string;
   name: string;
@@ -38,6 +49,10 @@ export interface CloudBackupInfo {
   storageId: string; // 关联的存储配置ID
   checksum?: string;
   version?: string;
+  backupType?: CloudBackupType;
+  trigger?: string;
+  deviceId?: string;
+  dataChecksum?: string;
 }
 
 export interface CloudStorageProvider {

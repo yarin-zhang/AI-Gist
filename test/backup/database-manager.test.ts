@@ -221,6 +221,16 @@ describe('DatabaseServiceManager', () => {
       return restored
     })
 
+    vi.spyOn(manager as any, 'commitAtomicRestorePlan').mockImplementation(async (plan: any) => {
+      for (const record of plan.records) {
+        if (record.storeName === failRestoredStoreName) {
+          throw new Error(failRestoredStoreError)
+        }
+        restoredRecords[record.storeName] = restoredRecords[record.storeName] || []
+        restoredRecords[record.storeName].push(record.value)
+      }
+    })
+
     // clearMocks 会清除 mockReturnValue，需要在每个 beforeEach 重新设置
     mockCategoryService.checkObjectStoreExists.mockResolvedValue(true)
     mockCategoryService.repairDatabase.mockResolvedValue({ success: true })
@@ -579,13 +589,13 @@ describe('DatabaseServiceManager', () => {
       vi.useRealTimers()
     })
 
-    it('先清空再恢复数据', async () => {
-      // mock forceCleanAllTables
+    it('通过原子提交计划替换数据，不再提前逐表清空', async () => {
       const cleanSpy = vi.spyOn(manager, 'forceCleanAllTables').mockResolvedValue()
 
       const result = await manager.replaceAllData(makeExportData())
 
-      expect(cleanSpy).toHaveBeenCalledTimes(1)
+      expect(cleanSpy).not.toHaveBeenCalled()
+      expect((manager as any).commitAtomicRestorePlan).toHaveBeenCalledTimes(1)
       expect(result.success).toBe(true)
     })
 
@@ -596,29 +606,29 @@ describe('DatabaseServiceManager', () => {
 
       expect(result.success).toBe(true)
       expect(restoredRecords.categories[0]).toMatchObject({
-        id: 10,
+        id: 1,
         uuid: mockCategory.uuid
       })
       expect(restoredRecords.prompts[0]).toMatchObject({
-        id: 20,
+        id: 1,
         uuid: mockPrompt.uuid,
-        categoryId: 10
+        categoryId: 1
       })
       expect(restoredRecords.promptVariables[0]).toMatchObject({
         uuid: mockPromptVariable.uuid,
-        promptId: 20
+        promptId: 1
       })
       expect(restoredRecords.promptHistories[0]).toMatchObject({
         uuid: mockPromptHistory.uuid,
-        promptId: 20
+        promptId: 1
       })
       expect(restoredRecords.ai_generation_history[0]).toMatchObject({
-        id: 60,
+        id: 1,
         uuid: mockAIHistory.uuid,
         historyId: mockAIHistory.historyId
       })
       expect(restoredRecords.settings[0]).toMatchObject({
-        id: 70,
+        id: 1,
         key: mockSetting.key,
         category: mockSetting.category,
         isSystem: true,
@@ -655,18 +665,18 @@ describe('DatabaseServiceManager', () => {
       expect(result.success).toBe(true)
       expect(restoredRecords.prompts[0]).toMatchObject({
         uuid: mockPrompt.uuid,
-        categoryId: 10
+        categoryId: 1
       })
       expect(restoredRecords.promptVariables[0]).toMatchObject({
         uuid: mockPromptVariable.uuid,
-        promptId: 20,
+        promptId: 1,
         promptUuid: mockPrompt.uuid
       })
       expect(restoredRecords.promptHistories[0]).toMatchObject({
         uuid: mockPromptHistory.uuid,
-        promptId: 20,
+        promptId: 1,
         promptUuid: mockPrompt.uuid,
-        categoryId: 10,
+        categoryId: 1,
         categoryUuid: mockCategory.uuid
       })
     })
@@ -716,17 +726,17 @@ describe('DatabaseServiceManager', () => {
         syncTombstones: [mockSyncTombstone]
       })
 
-      expect(cleanSpy).toHaveBeenCalledTimes(1)
+      expect(cleanSpy).not.toHaveBeenCalled()
       expect(result.success).toBe(true)
       expect(result.details?.syncTombstones).toBe(1)
-      expect(restoredTombstones).toHaveLength(1)
-      expect(restoredTombstones[0]).toMatchObject({
+      expect(restoredRecords.syncTombstones).toHaveLength(1)
+      expect(restoredRecords.syncTombstones[0]).toMatchObject({
         collectionName: 'prompts',
         recordKey: 'uuid:prompt-1',
         recordUuid: 'prompt-1'
       })
-      expect(restoredTombstones[0].id).toBeUndefined()
-      expect(restoredTombstones[0].deletedAt).toBeInstanceOf(Date)
+      expect(restoredRecords.syncTombstones[0].id).toBe(1)
+      expect(restoredRecords.syncTombstones[0].deletedAt).toBeInstanceOf(Date)
     })
 
     it('同步删除标记格式无效时恢复失败，避免静默丢失删除历史', async () => {
@@ -743,8 +753,9 @@ describe('DatabaseServiceManager', () => {
     })
 
     it('数据库缺少删除标记表时恢复失败，避免误标同步成功', async () => {
-      vi.spyOn(manager, 'forceCleanAllTables').mockResolvedValue()
-      mockCategoryService.db = createMockDbWithoutSyncTombstones()
+      ;(manager as any).commitAtomicRestorePlan.mockRejectedValueOnce(
+        new Error('数据库缺少 syncTombstones 表')
+      )
 
       const result = await manager.replaceAllData({
         ...makeExportData(),
@@ -764,7 +775,8 @@ describe('DatabaseServiceManager', () => {
 
       expect(result.success).toBe(false)
       expect(result.totalErrors).toBe(1)
-      expect(result.error).toContain('恢复过程中有 1 条记录失败')
+      expect(result.error).toContain('settings write failed')
+      expect(result.failures?.[0]).toMatchObject({ phase: 'prepare' })
     })
 
     it('结构化恢复失败不会默认写入 console.warn/error', async () => {

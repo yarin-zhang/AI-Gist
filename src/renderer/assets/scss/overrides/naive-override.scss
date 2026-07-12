@@ -1,57 +1,79 @@
 // 模态框样式
 .n-modal-mask {
 	backdrop-filter: blur(8px);
-	background-color: rgba(0, 0, 0, 0.4);
+	background-color: var(--overlay-backdrop);
 }
 
 .n-modal,
 .n-card.n-modal[role] {
 	background-color: var(--surface-primary);
 	backdrop-filter: blur(20px);
-	border: 1px solid var(--border-subtle);
-	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-modal);
+	box-shadow: var(--shadow-overlay);
 }
 
 // 卡片样式
 .n-card {
+	background: var(--surface-primary);
+	border-color: var(--border-default);
+	border-radius: var(--radius-panel);
+	box-shadow: none;
+
 	.n-card-header {
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		gap: var(--spacing-md);
 		justify-content: space-between;
-		padding: var(--spacing-lg) var(--spacing-xl);
-		border-bottom: 1px solid var(--border-subtle);
+		padding: 14px var(--content-padding);
+		border-bottom: 1px solid var(--border-default);
+		background: var(--surface-secondary);
 
 		.n-card-header__main {
-			min-width: auto !important;
+			min-width: 0 !important;
+			overflow: hidden;
 			font-weight: var(--font-weight-semibold);
 			color: var(--content-primary);
 		}
+
+		.n-card-header__extra {
+			min-width: 0;
+			flex: 0 0 auto;
+		}
+	}
+
+	.n-card__action {
+		background: var(--surface-secondary);
 	}
 
 	> .n-card-content,
 	> .n-card__content {
-		padding: var(--spacing-xl);
+		padding: var(--content-padding);
 		max-height: 100%;
 	}
 
 	> .n-card-header + .n-card-content,
 	> .n-card-header + .n-card__content {
-		padding-top: var(--spacing-xl);
+		padding-top: var(--content-padding);
 	}
+}
+
+/* A card nested inside another structural card is grouped content. */
+.desktop-shell .n-card .n-card {
+	background: var(--surface-secondary);
 }
 
 // 图片预览
 .n-image-preview-container {
 	.n-image-preview-overlay {
 		backdrop-filter: blur(8px);
-		background-color: rgba(0, 0, 0, 0.8);
+		background-color: var(--overlay-preview);
 	}
 	
 	.n-image-preview-toolbar {
 		box-sizing: content-box;
 		background-color: var(--surface-primary);
 		border-radius: var(--radius-lg);
-		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+		box-shadow: var(--shadow-popover);
 
 		* {
 			box-sizing: content-box;
@@ -95,10 +117,15 @@
 
 // 下拉菜单
 .n-dropdown-menu {
+	background: var(--surface-primary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+	box-shadow: var(--shadow-popover);
+
 	&.n-dropdown-menu--scrollable {
 		max-height: 60vh;
-		border-radius: var(--radius-lg);
-		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+		border-radius: var(--radius-panel);
+		box-shadow: var(--shadow-popover);
 	}
 }
 
@@ -111,12 +138,16 @@
 // 弹出层最大宽度
 .v-binder-follower-content {
 	max-width: calc(100vw - (var(--spacing-xl) * 2));
-	border-radius: var(--radius-lg);
-	box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+	border-radius: var(--radius-panel);
+	box-shadow: var(--shadow-popover);
 }
 
 // 数据表格
 .n-data-table {
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+	overflow: hidden;
+
 	.n-data-table-resize-button {
 		--n-merged-border-color: var(--border-default);
 	}
@@ -125,6 +156,20 @@
 		background-color: var(--surface-secondary);
 		font-weight: var(--font-weight-semibold);
 	}
+}
+
+.desktop-shell .n-drawer {
+	background: var(--surface-primary);
+	border-left: 1px solid var(--border-default);
+	box-shadow: var(--shadow-overlay);
+}
+
+.desktop-shell .n-popover,
+.desktop-shell .n-base-select-menu {
+	background: var(--surface-primary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+	box-shadow: var(--shadow-popover);
 }
 
 // 步骤组件
@@ -198,7 +243,7 @@
 			background: color-mix(in srgb, currentColor 5%, var(--surface-primary) 95%);
 			border: 1px solid currentColor;
 			border-top: 0;
-			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			box-shadow: none;
 		}
 	}
 

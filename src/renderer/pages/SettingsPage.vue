@@ -1,107 +1,84 @@
 <template>
     <div class="settings-page">
-        <NFlex vertical size="large">
-            <!-- 页面标题 -->
-            <NFlex justify="space-between" align="center">
+        <header class="settings-command-bar">
+            <div class="page-identity">
+                <span class="page-identity-icon"><NIcon size="18"><SettingsNavigationIcon /></NIcon></span>
                 <div>
-                    <NText strong style="font-size: 28px">{{ t('settings.title') }}</NText>
-                    <NText depth="3" style="display: block; margin-top: 4px">
-                        {{ t('settings.subtitle') }}
-                    </NText>
+                    <NText strong class="page-title">{{ t('settings.title') }}</NText>
+                    <NText depth="3" class="page-subtitle">{{ t('settings.subtitle') }}</NText>
                 </div>
-                <NFlex>
-                <!-- 操作状态提示 -->
-                <NFlex :size="12">
-                    <NButton ghost :loading="saving" secondary>
-                        <template #icon>
-                            <NIcon v-if="!saving" color="#18a058">
-                                <Check />
-                            </NIcon>
-                        </template>
-                        {{ t('settings.autoSave') }}
-                    </NButton>
-                </NFlex>
-                    <NButton type="error" @click="resetSettings" :loading="loading.reset" secondary>
-                        <template #icon>
-                            <NIcon>
-                                <Refresh />
-                            </NIcon>
-                        </template>
-                        {{ t('settings.resetToDefault') }}
-                    </NButton>
-                </NFlex>
+            </div>
 
+            <NFlex v-if="saving" align="center" :size="8" class="settings-save-status">
+                <NSpin size="small" />
+                <NText depth="3">{{ t('settings.saving') }}</NText>
             </NFlex>
+        </header>
 
-            <NFlex :size="24">
-                <!-- 左侧菜单 -->
-                <div style="width: 240px; flex-shrink: 0">
-                    <NCard>
-                        <template #header>
-                            <NFlex align="center" :size="12">
-                                <NIcon size="20" color="#409EFF">
-                                    <Settings />
-                                </NIcon>
-                                <span>{{ t('settings.settingsMenu') }}</span>
-                            </NFlex>
+        <div class="settings-workspace">
+            <aside class="settings-navigation" :aria-label="t('settings.settingsMenu')">
+                <NScrollbar class="settings-navigation-scrollbar" trigger="hover">
+                    <div class="settings-navigation-inner">
+                        <NMenu
+                            v-model:value="activeSettingKey"
+                            :options="menuOptions"
+                            :root-indent="8"
+                            :indent="16"
+                            @update:value="handleMenuSelect"
+                        />
+                    </div>
+                </NScrollbar>
+            </aside>
+
+            <div class="settings-compact-navigation">
+                <NSelect
+                    v-model:value="activeSettingKey"
+                    :options="compactMenuOptions"
+                    :placeholder="t('settings.selectSection')"
+                    @update:value="handleMenuSelect"
+                />
+            </div>
+
+            <main class="settings-detail">
+                <header class="settings-section-header">
+                    <div>
+                        <NText strong class="settings-section-title">{{ currentSectionTitle }}</NText>
+                        <NText v-if="currentSectionDescription" depth="3" class="settings-section-description">
+                            {{ currentSectionDescription }}
+                        </NText>
+                    </div>
+                </header>
+
+                <NScrollbar class="settings-content-scrollbar" trigger="hover">
+                    <div class="settings-content-inner">
+                        <NFlex vertical :size="16">
+                        <!-- 数据同步设置 -->
+                        <DataSyncSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
+
+                        <!-- 数据备份设置 -->
+                        <DataManagementSettings v-if="activeSettingKey === 'data-management'"
+                            @navigate-section="handleMenuSelect" />
+                            
+                        <!-- 通用设置 -->
+                        <template v-if="activeSettingKey === 'general'">
+                            <AppearanceSettings
+                                :model-value="{ themeSource: settings.themeSource }"
+                                @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
+                            <LanguageSettings />
                         </template>
-
-                        <NMenu v-model:value="activeSettingKey" :options="menuOptions" @update:value="handleMenuSelect"
-                            accordion show-trigger />
-                    </NCard>
-                </div>
-
-                <!-- 右侧设置内容 -->
-                <div style="flex: 1; min-width: 0">
-                    <NFlex vertical :size="24">
-                        <!-- 页面标题 -->
-                        <NCard>
-                            <template #header>
-                                <NFlex align="center" :size="12">
-                                    <NIcon size="24" color="#409EFF">
-                                        <component :is="currentSectionIcon" />
-                                    </NIcon>
-                                    <span>{{ currentSectionTitle }}</span>
-                                </NFlex>
-                            </template>
-
-                            <NFlex vertical :size="16">
-                                <NAlert :show-icon="false">
-                                    {{ currentSectionDescription }}
-                                </NAlert>
-                            </NFlex>
-                        </NCard>
-
-
-                        <!-- 数据管理设置 -->
-                        <DataManagementSettings 
-                            v-if="activeSettingKey === 'data-management'" />
-                            
-                        <!-- 云端备份设置 -->
-                        <CloudBackupSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
-                            
-                        <!-- 外观设置 -->
-                        <AppearanceSettings v-if="activeSettingKey === 'appearance'"
-                            :model-value="{ themeSource: settings.themeSource }"
-                            @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
-
-                        <!-- 语言设置 -->
-                        <LanguageSettings v-if="activeSettingKey === 'language'" />
-
-                        <!-- 关闭行为设置 -->
-                        <CloseBehaviorSettings v-if="capabilities.tray && activeSettingKey === 'close-behavior'"
-                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
-                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
 
                         <!-- 启动行为设置 -->
                         <StartupBehaviorSettings v-if="capabilities.startup && activeSettingKey === 'startup-behavior'"
                             :model-value="{ startMinimized: settings.startMinimized, autoLaunch: settings.autoLaunch }"
                             @update:model-value="(val) => { settings.startMinimized = val.startMinimized; settings.autoLaunch = val.autoLaunch; updateSetting(); }" />
 
+                        <!-- 关闭行为设置 -->
+                        <CloseBehaviorSettings v-if="capabilities.tray && activeSettingKey === 'close-behavior'"
+                            :model-value="{ closeBehaviorMode: settings.closeBehaviorMode, closeAction: settings.closeAction }"
+                            @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
+
                         <!-- 快捷键设置 -->
-                        <ShortcutSettings v-if="capabilities.globalShortcuts && activeSettingKey === 'shortcuts'"
-                            :model-value="settings.shortcuts"
-                            @update:model-value="(val: any) => { settings.shortcuts = val; updateSetting(); }" />
+                        <ShortcutSettings v-if="capabilities.globalShortcuts && activeSettingKey === 'shortcuts'" />
 
                         <!-- 网络代理设置 -->
                         <NetworkProxySettings v-if="capabilities.systemProxy && activeSettingKey === 'network-proxy'"
@@ -119,11 +96,11 @@
                         <NCard v-if="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
-
-                    </NFlex>
-                </div>
-            </NFlex>
-        </NFlex>
+                        </NFlex>
+                    </div>
+                </NScrollbar>
+            </main>
+        </div>
     </div>
 </template>
 
@@ -132,35 +109,32 @@ import { ref, reactive, onMounted, computed, h, watch } from "vue";
 import { useI18n } from '~/composables/useI18n'
 import {
     NCard,
-    NAlert,
     NFlex,
     NIcon,
-    NButton,
     NText,
     NMenu,
+    NSelect,
+    NSpin,
+    NScrollbar,
     useMessage,
 } from "naive-ui";
 import {
-    Settings,
-    Check,
-    Refresh,
     Power,
     Rocket,
-    Sun,
     Flask,
     Database,
     InfoCircle,
     Cloud,
-    Globe,
     Keyboard,
     Wifi,
 } from "@vicons/tabler";
+import { SettingsNavigationIcon } from '@/theme/navigation-icons'
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import CloseBehaviorSettings from "@/components/settings/CloseBehaviorSettings.vue";
 import StartupBehaviorSettings from "@/components/settings/StartupBehaviorSettings.vue";
 import DataManagementSettings from "@/components/settings/DataManagementSettings.vue";
-import CloudBackupSettings from "@/components/settings/CloudBackupSettings.vue";
+import DataSyncSettings from "@/components/settings/DataSyncSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
@@ -189,24 +163,20 @@ const capabilities = PlatformDetector.getCapabilities()
 const isDevelopment = import.meta.env.DEV;
 const currentMode = import.meta.env.MODE;
 
-// 当前激活的设置项
-const activeSettingKey = ref(props.targetSection || 'data-management');
+const normalizeSettingKey = (key?: string) => {
+    if (key === 'appearance' || key === 'language') {
+        return 'general';
+    }
+
+    return key;
+};
+
+// 当前激活的设置项。兼容外部入口仍传入旧的外观、语言 key。
+const activeSettingKey = ref(normalizeSettingKey(props.targetSection) || 'cloud-backup');
 
 
 
-// 状态管理
 const saving = ref(false);
-const loading = reactive({
-    reset: false,
-    export: false,
-    import: false,
-    repair: false,
-    healthCheck: false,
-    backup: false,
-    clearDatabase: false,
-    restore: false,
-    refreshBackupList: false
-});
 
 // 设置数据
 const settings = reactive({
@@ -223,19 +193,20 @@ const settings = reactive({
     },
     // 快捷键设置
     shortcuts: {
-        showInterface: {
-            key: 'Ctrl+Shift+G',
-            description: '显示界面',
-            enabled: true,
-            type: 'show-interface' as const
+        version: 2 as const,
+        defaultAction: 'copy' as const,
+        commands: {
+            launcher: {
+                accelerator: 'CommandOrControl+Shift+G',
+                enabled: true,
+            },
+            showMainWindow: {
+                accelerator: '',
+                enabled: false,
+            },
         },
-        copyPrompt: {
-            key: 'Ctrl+Shift+Alt+C',
-            description: '复制提示词',
-            enabled: true,
-            type: 'copy-prompt' as const
-        },
-        promptTriggers: []
+        promptBindings: [],
+        recentPromptUUIDs: [],
     },
     // 网络代理设置
     networkProxy: {
@@ -248,15 +219,9 @@ const settings = reactive({
     },
 });
 
-// 菜单选项
-const menuOptions = computed(() => {
-    const baseOptions = [
-        {
-            label: t('settings.sections.dataManagement'),
-            key: "data-management",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
-            visible: true,
-        },
+// 设置入口。系统组功能必须通过平台能力控制可见性。
+const settingItems = computed(() => {
+    return [
         {
             label: t('settings.sections.cloudBackup'),
             key: "cloud-backup",
@@ -264,16 +229,16 @@ const menuOptions = computed(() => {
             visible: capabilities.cloudBackup,
         },
         {
-            label: t('settings.sections.appearance'),
-            key: "appearance",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Sun) }),
+            label: t('settings.sections.dataManagement'),
+            key: "data-management",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Database) }),
             visible: true,
         },
         {
-            label: t('settings.sections.shortcuts'),
-            key: "shortcuts",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
-            visible: capabilities.globalShortcuts,
+            label: t('settings.sections.general'),
+            key: "general",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(SettingsNavigationIcon) }),
+            visible: true,
         },
         {
             label: t('settings.sections.startup'),
@@ -288,16 +253,16 @@ const menuOptions = computed(() => {
             visible: capabilities.tray,
         },
         {
+            label: t('settings.sections.shortcuts'),
+            key: "shortcuts",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) }),
+            visible: capabilities.globalShortcuts,
+        },
+        {
             label: t('settings.sections.networkProxy'),
             key: "network-proxy",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Wifi) }),
             visible: capabilities.systemProxy,
-        },
-        {
-            label: t('language.title'),
-            key: "language",
-            icon: () => h(NIcon, { size: 16 }, { default: () => h(Globe) }),
-            visible: true,
         },
         {
             label: t('settings.sections.about'),
@@ -305,24 +270,54 @@ const menuOptions = computed(() => {
             icon: () => h(NIcon, { size: 16 }, { default: () => h(InfoCircle) }),
             visible: true,
         },
-    ];
-
-    // 仅在开发环境中添加实验室菜单
-    if (isDevelopment) {
-        baseOptions.push({
+        ...(isDevelopment ? [{
             label: t('settings.sections.laboratory'),
             key: "laboratory",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(Flask) }),
             visible: true,
-        });
-    }
-
-    return baseOptions
-        .filter(option => option.visible)
+        }] : []),
+    ].filter(option => option.visible)
         .map(({ visible, ...option }) => option);
 });
 
-const visibleSettingKeys = computed(() => menuOptions.value.map(option => String(option.key)));
+const menuOptions = computed(() => {
+    const items = settingItems.value;
+    const pick = (...keys: string[]) => items.filter(item => keys.includes(String(item.key)));
+
+    return [
+        {
+            type: 'group' as const,
+            label: t('settings.groups.data'),
+            key: 'settings-group-data',
+            children: pick('cloud-backup', 'data-management'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.preferences'),
+            key: 'settings-group-preferences',
+            children: pick('general'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.system'),
+            key: 'settings-group-system',
+            children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy'),
+        },
+        {
+            type: 'group' as const,
+            label: t('settings.groups.other'),
+            key: 'settings-group-other',
+            children: pick('about', 'laboratory'),
+        },
+    ].filter(group => group.children.length > 0);
+});
+
+const compactMenuOptions = computed(() => settingItems.value.map(item => ({
+    label: item.label,
+    value: String(item.key),
+})));
+
+const visibleSettingKeys = computed(() => settingItems.value.map(option => String(option.key)));
 
 const ensureActiveSettingIsVisible = () => {
     if (!visibleSettingKeys.value.includes(activeSettingKey.value)) {
@@ -333,32 +328,24 @@ const ensureActiveSettingIsVisible = () => {
         // 当前设置区域信息
 const currentSectionInfo = computed(() => {
     const key = activeSettingKey.value;
-            const section = {
-            "close-behavior": Power,
-            "startup-behavior": Rocket,
-            appearance: Sun,
-            language: Globe,
-            "data-management": Database,
-            "cloud-backup": Cloud,
-            shortcuts: Keyboard,
-            "network-proxy": Wifi,
-            about: InfoCircle,
-            laboratory: Flask
-        };
+    const item = settingItems.value.find(option => option.key === key);
+    const sectionsWithDescription = new Set([
+        'cloud-backup',
+        'data-management',
+        'shortcuts',
+        'network-proxy',
+    ]);
+
     return {
-        title: t(`settings.sectionDescriptions.${key}.title`),
-        icon: section[key as keyof typeof section] || Database,
-        description: t(`settings.sectionDescriptions.${key}.description`)
+        title: item?.label || t(`settings.sectionDescriptions.${key}.title`),
+        description: sectionsWithDescription.has(key)
+            ? t(`settings.sectionDescriptions.${key}.description`)
+            : '',
     };
 });
 
 const currentSectionTitle = computed(() => currentSectionInfo.value.title);
-const currentSectionIcon = computed(() => currentSectionInfo.value.icon);
-const currentSectionDescription = computed(
-    () => activeSettingKey.value === 'cloud-backup' && !capabilities.icloud
-        ? t('cloudBackup.webdavOnlySectionDescription')
-        : currentSectionInfo.value.description
-);
+const currentSectionDescription = computed(() => currentSectionInfo.value.description);
 
 // 处理菜单选择
 const handleMenuSelect = (key: string) => {
@@ -389,9 +376,7 @@ const loadSettings = async () => {
         
         // 快捷键配置
         if (prefs.shortcuts) {
-            settings.shortcuts.showInterface = prefs.shortcuts.showInterface || settings.shortcuts.showInterface;
-            settings.shortcuts.copyPrompt = prefs.shortcuts.copyPrompt || settings.shortcuts.copyPrompt;
-            settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
+            settings.shortcuts = prefs.shortcuts as typeof settings.shortcuts;
         }
 
         // 网络代理配置
@@ -428,7 +413,6 @@ const updateSetting = async () => {
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
-                shortcuts: settings.shortcuts,
                 networkProxy: settings.networkProxy,
             })
         );
@@ -509,27 +493,6 @@ const updateSettingsSmart = async (fieldsToUpdate: string[] | null = null) => {
     }
 };
 
-// 重置设置
-const resetSettings = async () => {
-    loading.reset = true;
-    try {
-        const defaultPrefs = await preferencesClient.reset();
-        Object.assign(settings, defaultPrefs);
-
-        // 重置主题
-        await setThemeSource(settings.themeSource);
-
-        message.success(t('settingsMessages.settingsReset'));
-        console.log(t('settingsMessages.settingsResetLog'), defaultPrefs);
-    } catch (error) {
-        console.error(t('settingsMessages.resetSettingsFailed'), error);
-        message.error(t('settingsMessages.resetSettingsFailed'));
-    }
-    loading.reset = false;
-};
-
-
-
 // 组件挂载时加载设置
 onMounted(async () => {
     initLocale(); // 初始化语言设置
@@ -539,8 +502,9 @@ onMounted(async () => {
 
 // 监听 props 变化，自动跳转到对应设置页面
 watch(() => props.targetSection, (newTargetSection) => {
-    if (newTargetSection && newTargetSection !== activeSettingKey.value) {
-        activeSettingKey.value = newTargetSection;
+    const normalizedTargetSection = normalizeSettingKey(newTargetSection);
+    if (normalizedTargetSection && normalizedTargetSection !== activeSettingKey.value) {
+        activeSettingKey.value = normalizedTargetSection;
         ensureActiveSettingIsVisible();
     }
 }, { immediate: true });
@@ -552,11 +516,192 @@ watch(menuOptions, () => {
 
 <style scoped>
 .settings-page {
-    padding: 24px;
-    overflow-y: auto;
+    width: 100%;
+    height: calc(100vh - 24px);
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-body);
+}
+
+.settings-command-bar {
+    flex: 0 0 60px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--section-gap);
+    padding: 0 var(--page-padding);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-primary);
+}
+
+.page-identity {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.page-identity-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    display: grid;
+    place-items: center;
+    color: var(--accent-primary);
+    border-radius: var(--radius-panel);
+    background: var(--surface-secondary);
+}
+
+.page-title {
+    display: block;
+    font-size: var(--font-size-lg);
+    line-height: 1.25;
+}
+
+.page-subtitle {
+    display: block;
+    max-width: 320px;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-xs);
+}
+
+.settings-save-status {
+    flex: 0 0 auto;
+    color: var(--content-secondary);
+}
+
+.settings-workspace {
+    flex: 1;
+    height: 0;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.settings-navigation {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--border-default);
+    background: var(--surface-primary);
+}
+
+.settings-navigation-scrollbar {
+    height: 100%;
+}
+
+.settings-navigation-scrollbar :deep(.n-scrollbar-container) {
+    overscroll-behavior: contain;
+}
+
+.settings-navigation-inner {
+    padding: 8px;
+}
+
+.settings-navigation :deep(.n-menu) {
+    width: 100%;
+}
+
+.settings-compact-navigation {
+    display: none;
+}
+
+.settings-detail {
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-body);
+}
+
+.settings-section-header {
+    flex: 0 0 auto;
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--section-gap);
+    padding: 10px var(--page-padding);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-primary);
+}
+
+.settings-section-title {
+    display: block;
+    font-size: var(--font-size-xl);
+    line-height: 1.25;
+}
+
+.settings-section-description {
+    display: block;
+    margin-top: 3px;
+    font-size: var(--font-size-sm);
+}
+
+.settings-content-scrollbar {
+    flex: 1;
+    height: 0;
+    min-height: 0;
+}
+
+.settings-content-scrollbar :deep(.n-scrollbar-container) {
+    overscroll-behavior: contain;
+}
+
+.settings-content-inner {
+    width: 100%;
+    max-width: 1120px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: var(--page-padding);
 }
 
 .n-form-item {
     margin-bottom: 0;
+}
+
+.settings-content-inner :deep(.n-divider:not(.n-divider--vertical)) {
+    margin: 0;
+}
+
+@media (max-width: 860px) {
+    .settings-workspace {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .settings-navigation {
+        display: none;
+    }
+
+    .settings-compact-navigation {
+        display: block;
+        flex: 0 0 auto;
+        padding: var(--compact-padding) var(--page-padding);
+        border-bottom: 1px solid var(--border-default);
+        background: var(--surface-secondary);
+    }
+
+    .settings-detail {
+        flex: 1 1 auto;
+        height: 0;
+    }
+
+    .settings-compact-navigation .n-select {
+        max-width: 320px;
+    }
+
+    .page-subtitle { display: none; }
 }
 </style>

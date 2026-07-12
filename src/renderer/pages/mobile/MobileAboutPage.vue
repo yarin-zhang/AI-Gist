@@ -82,7 +82,7 @@
         </div>
 
         <!-- 检查失败提示 -->
-        <ion-item v-if="checkError" lines="none" color="danger" class="error-item">
+        <ion-item v-if="checkError" lines="none" class="error-item">
           <ion-label class="ion-text-wrap">
             <p>{{ checkError }}</p>
           </ion-label>
@@ -283,16 +283,19 @@ onMounted(async () => {
 .release-notes {
   margin-top: 12px;
   padding: 12px;
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
-  color: var(--ion-color-dark);
+  color: var(--content-primary);
 }
 
 .error-item {
+  --background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
+  --border-color: color-mix(in srgb, var(--accent-error) 28%, var(--border-default));
   margin: 0 16px 8px;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
 }
 </style>

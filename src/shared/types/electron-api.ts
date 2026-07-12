@@ -14,7 +14,8 @@ import type {
 // 导入云端备份类型
 import type {
   CloudStorageConfig,
-  CloudBackupInfo
+  CloudBackupInfo,
+  CloudBackupCreateOptions
 } from './cloud-backup';
 import type {
   CloudSyncManifest,
@@ -27,6 +28,20 @@ import type {
 import type {
   CloudSyncSnapshot
 } from '../cloud-sync-engine';
+import type {
+  PasteCapability,
+  PromptShortcutBinding,
+  ShortcutCommandId,
+  ShortcutExecutionRequest,
+  ShortcutInvocation,
+  ShortcutState,
+} from './preferences';
+import type {
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '../cloud-sync-v2-repository';
 
 /**
  * Electron API 接口定义
@@ -45,6 +60,10 @@ export default interface ElectronApi {
     hideToTray: () => Promise<void>
     getSize: () => Promise<{ width: number; height: number } | null>
     getContentSize: () => Promise<{ width: number; height: number } | null>
+  }
+
+  lifecycle: {
+    onFlushRequested: (callback: (options: { reason: string; timeoutMs: number }) => Promise<any>) => () => void
   }
   
   theme: {
@@ -108,7 +127,7 @@ export default interface ElectronApi {
     deleteStorageConfig: (id: string) => Promise<{ success: boolean; error?: string }>
     testStorageConnection: (config: CloudStorageConfig) => Promise<{ success: boolean; error?: string }>
     getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>
-    createBackup: (storageId: string, description?: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
+    createBackup: (storageId: string, options?: string | CloudBackupCreateOptions) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
     restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
     deleteBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message?: string; error?: string }>
     getSyncManifest: (storageId: string) => Promise<
@@ -136,6 +155,15 @@ export default interface ElectronApi {
       storageId: string,
       snapshot: CloudSyncSnapshot
     ) => Promise<{ success: boolean; error?: string }>
+    readCloudSyncV2Object: (storageId: string, path: string) => Promise<CloudSyncV2StoredObject | null>
+    writeCloudSyncV2Object: (
+      storageId: string,
+      path: string,
+      data: Uint8Array,
+      options?: CloudSyncV2ObjectWriteOptions
+    ) => Promise<CloudSyncV2ObjectWriteResult>
+    listCloudSyncV2Objects: (storageId: string, prefix: string) => Promise<CloudSyncV2StoredObjectInfo[]>
+    deleteCloudSyncV2Object: (storageId: string, path: string) => Promise<void>
   }
 
   // 应用信息和更新
@@ -209,6 +237,22 @@ export default interface ElectronApi {
 }
 
 export interface ShortcutsAPI {
+  getState: () => Promise<ShortcutState>;
+  validate: (accelerator: string, excludeId?: string) => Promise<{ valid: boolean; error?: string }>;
+  updateCommand: (commandId: ShortcutCommandId, patch: { accelerator?: string; enabled?: boolean }) => Promise<ShortcutState>;
+  upsertPromptBinding: (binding: Omit<PromptShortcutBinding, 'id'> & { id?: string }) => Promise<ShortcutState>;
+  removePromptBinding: (id: string) => Promise<ShortcutState>;
+  resolveLegacyBinding: (id: string, promptUUID: string) => Promise<void>;
+  markInvalidTarget: (id: string) => Promise<void>;
+  launcherReady: () => void;
+  showLauncher: () => Promise<void>;
+  openLauncher: () => Promise<void>;
+  hideLauncher: () => Promise<void>;
+  executeText: (request: ShortcutExecutionRequest) => Promise<{ success: boolean; pasted: boolean; warning?: string }>;
+  navigateMain: (target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => Promise<void>;
+  requestPastePermission: () => Promise<PasteCapability>;
+  onLauncherInvocation: (callback: (invocation: ShortcutInvocation) => void) => () => void;
+  onNavigateMain: (callback: (payload: { target: 'home' | 'new-prompt' | 'shortcuts'; promptUUID?: string }) => void) => () => void;
   // 注册默认快捷键
   registerDefaults: () => Promise<{ success: boolean; error?: string }>;
   

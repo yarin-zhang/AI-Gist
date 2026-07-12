@@ -9,7 +9,132 @@ import type { SyncTombstone } from '@shared/types/database';
 import { getCloudSyncRecordKey } from '@shared/cloud-sync-engine';
 
 const SYNC_TOMBSTONE_STORE = 'syncTombstones';
+const LOCAL_SYNC_METADATA_STORE = 'syncMetadata';
 const DATABASE_DEBUG_STORAGE_KEY = 'ai-gist.debug.database';
+
+interface DatabaseIndexSchema {
+  keyPath: string | string[];
+  unique: boolean;
+}
+
+interface DatabaseStoreSchema {
+  keyPath: string | string[];
+  autoIncrement?: boolean;
+  indexes: Record<string, DatabaseIndexSchema>;
+}
+
+export interface DatabaseSchemaIssue {
+  kind: 'missing-store' | 'store-key-path' | 'missing-index' | 'index-key-path' | 'index-unique';
+  storeName: string;
+  indexName?: string;
+  expected: string;
+  actual: string;
+  repairableDuringUpgrade: boolean;
+}
+
+export interface DatabaseHealthStatus {
+  healthy: boolean;
+  missingStores: string[];
+  currentVersion: number;
+  needsRepair: boolean;
+  schemaIssues: DatabaseSchemaIssue[];
+}
+
+const DATABASE_SCHEMA: Record<string, DatabaseStoreSchema> = {
+  categories: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      name: { keyPath: 'name', unique: true },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  prompts: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      categoryId: { keyPath: 'categoryId', unique: false },
+      isFavorite: { keyPath: 'isFavorite', unique: false },
+      title: { keyPath: 'title', unique: false },
+      tags: { keyPath: 'tags', unique: false },
+      useCount: { keyPath: 'useCount', unique: false },
+      createdAt: { keyPath: 'createdAt', unique: false },
+      updatedAt: { keyPath: 'updatedAt', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  promptVariables: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      promptId: { keyPath: 'promptId', unique: false },
+      name: { keyPath: 'name', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  promptHistories: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      promptId: { keyPath: 'promptId', unique: false },
+      version: { keyPath: 'version', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  ai_configs: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      configId: { keyPath: 'configId', unique: true },
+      type: { keyPath: 'type', unique: false },
+      enabled: { keyPath: 'enabled', unique: false },
+      isPreferred: { keyPath: 'isPreferred', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  quick_optimization_configs: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      name: { keyPath: 'name', unique: false },
+      enabled: { keyPath: 'enabled', unique: false },
+      sortOrder: { keyPath: 'sortOrder', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  ai_generation_history: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      historyId: { keyPath: 'historyId', unique: true },
+      configId: { keyPath: 'configId', unique: false },
+      status: { keyPath: 'status', unique: false },
+      createdAt: { keyPath: 'createdAt', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  settings: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      key: { keyPath: 'key', unique: true }
+    }
+  },
+  [SYNC_TOMBSTONE_STORE]: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      storeName: { keyPath: 'storeName', unique: false },
+      collectionName: { keyPath: 'collectionName', unique: false },
+      recordKey: { keyPath: 'recordKey', unique: false },
+      deletedAt: { keyPath: 'deletedAt', unique: false }
+    }
+  },
+  [LOCAL_SYNC_METADATA_STORE]: {
+    keyPath: 'key',
+    indexes: {}
+  }
+};
 
 const SYNC_COLLECTION_BY_STORE: Record<string, string> = {
   categories: 'categories',
@@ -29,10 +154,10 @@ const SYNC_COLLECTION_BY_STORE: Record<string, string> = {
 export class BaseDatabaseService {
   protected db: IDBDatabase | null = null;
   protected readonly dbName = 'AIGistDB';
-  protected readonly dbVersion = 11; // 增加版本号以支持同步删除标记
+  protected readonly dbVersion = 12; // 增加本地同步元数据存储，避免 localStorage 容量降级
   protected initializationPromise: Promise<void> | null = null;
   protected isInitialized = false;
-  private currentDbVersion = 11; // 添加一个可变的版本号变量
+  private currentDbVersion = 12; // 添加一个可变的版本号变量
 
   /**
    * 初始化数据库连接
@@ -53,16 +178,51 @@ export class BaseDatabaseService {
     // 创建初始化 Promise
     this.initializationPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.currentDbVersion);
+      let settled = false;
+      let upgradeFailure: Error | null = null;
+
+      const rejectInitialization = (error: Error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        this.initializationPromise = null;
+        reject(error);
+      };
 
       request.onerror = () => {
-        console.error('Failed to open database:', request.error);
-        this.initializationPromise = null; // 重置，允许重试
-        reject(new Error('Failed to open database'));
+        const cause = upgradeFailure?.message || request.error?.message || '未知错误';
+        const error = new Error(`[DATABASE_OPEN_FAILED] 无法打开数据库 ${this.dbName} v${this.currentDbVersion}: ${cause}`);
+        console.error(error.message, request.error);
+        rejectInitialization(error);
+      };
+
+      request.onblocked = (event) => {
+        const error = new Error(
+          `[DATABASE_UPGRADE_BLOCKED] 数据库 ${this.dbName} 从版本 ${event.oldVersion} ` +
+          `升级到 ${event.newVersion ?? this.currentDbVersion} 被其他窗口或旧连接阻塞，请关闭其他应用窗口后重试`
+        );
+        console.error(error.message);
+        rejectInitialization(error);
       };
 
       request.onsuccess = (event) => {
-        this.db = (event.target as IDBOpenDBRequest).result;
+        const openedDb = (event.target as IDBOpenDBRequest).result;
+        if (settled) {
+          openedDb.close();
+          return;
+        }
+
+        this.db = openedDb;
+        this.db.onversionchange = (versionEvent) => {
+          console.warn(
+            `[DATABASE_VERSION_CHANGE] 数据库 ${this.dbName} 收到版本变更通知: ` +
+            `${versionEvent.oldVersion} -> ${versionEvent.newVersion ?? 'deleted'}，当前连接已安全关闭`
+          );
+          this.close();
+        };
         this.isInitialized = true;
+        settled = true;
         console.log('Database initialized successfully');
         resolve();
       };
@@ -75,8 +235,32 @@ export class BaseDatabaseService {
         console.log(`数据库升级: 从版本 ${event.oldVersion} 到版本 ${event.newVersion}`);
         console.log('现有对象存储:', Array.from(db.objectStoreNames));
         
-        // 确保创建所有必要的对象存储
-        this.createObjectStores(db);
+        try {
+          if (!transaction) {
+            throw new Error('[DATABASE_UPGRADE_NO_TRANSACTION] 数据库升级事务不存在');
+          }
+
+          // 确保创建所有必要的对象存储，并修复既有 store 的索引定义。
+          this.createObjectStores(db, transaction, error => {
+            if (!upgradeFailure) {
+              upgradeFailure = error;
+              console.error(error.message);
+            }
+            try {
+              transaction.abort();
+            } catch {
+              // 事务可能已由 IndexedDB 自动中止。
+            }
+          });
+        } catch (error) {
+          upgradeFailure = error instanceof Error ? error : new Error(String(error));
+          console.error('数据库 schema 升级失败:', upgradeFailure);
+          try {
+            transaction?.abort();
+          } catch {
+            // 事务可能已由 IndexedDB 自动中止。
+          }
+        }
         
         // 等待事务完成
         if (transaction) {
@@ -100,156 +284,168 @@ export class BaseDatabaseService {
    * 在数据库升级时调用，定义数据库结构
    * @param db IDBDatabase 数据库实例
    */
-  private createObjectStores(db: IDBDatabase): void {
+  private createObjectStores(
+    db: IDBDatabase,
+    transaction: IDBTransaction,
+    failUpgrade: (error: Error) => void
+  ): void {
     console.log('开始创建对象存储...');
-    
-    try {
-      // 创建 categories 表
-      if (!db.objectStoreNames.contains('categories')) {
-        console.log('创建 categories 对象存储');
-        const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
-        categoryStore.createIndex('name', 'name', { unique: true });
-        categoryStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
+    for (const [storeName, schema] of Object.entries(DATABASE_SCHEMA)) {
+      let store: IDBObjectStore;
+      if (!db.objectStoreNames.contains(storeName)) {
+        console.log(`创建 ${storeName} 对象存储`);
+        store = db.createObjectStore(storeName, {
+          keyPath: schema.keyPath,
+          autoIncrement: schema.autoIncrement ?? false
+        });
       } else {
-        console.log('categories 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
+        store = transaction.objectStore(storeName);
+        if (!this.keyPathsEqual(store.keyPath, schema.keyPath)) {
+          throw new Error(
+            `[DATABASE_STORE_KEY_PATH_MISMATCH] ${storeName} 主键路径错误: ` +
+            `期望 ${this.formatKeyPath(schema.keyPath)}，实际 ${this.formatKeyPath(store.keyPath)}；` +
+            'IndexedDB 不支持原地修改 store 主键，请通过版本化数据迁移处理'
+          );
+        }
       }
 
-      // 创建 prompts 表
-      if (!db.objectStoreNames.contains('prompts')) {
-        console.log('创建 prompts 对象存储');
-        const promptStore = db.createObjectStore('prompts', { keyPath: 'id', autoIncrement: true });
-        promptStore.createIndex('categoryId', 'categoryId', { unique: false });
-        promptStore.createIndex('isFavorite', 'isFavorite', { unique: false });
-        promptStore.createIndex('title', 'title', { unique: false });
-        promptStore.createIndex('tags', 'tags', { unique: false });
-        promptStore.createIndex('useCount', 'useCount', { unique: false });
-        promptStore.createIndex('createdAt', 'createdAt', { unique: false });
-        promptStore.createIndex('updatedAt', 'updatedAt', { unique: false });
-        promptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('prompts 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
+      for (const [indexName, indexSchema] of Object.entries(schema.indexes)) {
+        this.ensureIndexSchema(store, indexName, indexSchema, failUpgrade);
       }
-
-      // 创建 promptVariables 表
-      if (!db.objectStoreNames.contains('promptVariables')) {
-        console.log('创建 promptVariables 对象存储');
-        const variableStore = db.createObjectStore('promptVariables', { keyPath: 'id', autoIncrement: true });
-        variableStore.createIndex('promptId', 'promptId', { unique: false });
-        variableStore.createIndex('name', 'name', { unique: false });
-        variableStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('promptVariables 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
-      }
-
-      // 创建 promptHistories 表
-      if (!db.objectStoreNames.contains('promptHistories')) {
-        console.log('创建 promptHistories 对象存储');
-        const historyStore = db.createObjectStore('promptHistories', { keyPath: 'id', autoIncrement: true });
-        historyStore.createIndex('promptId', 'promptId', { unique: false });
-        historyStore.createIndex('version', 'version', { unique: false });
-        historyStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('promptHistories 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
-      }
-
-      // 创建 ai_configs 表
-      if (!db.objectStoreNames.contains('ai_configs')) {
-        console.log('创建 ai_configs 对象存储');
-        const configStore = db.createObjectStore('ai_configs', { keyPath: 'id', autoIncrement: true });
-        configStore.createIndex('configId', 'configId', { unique: true });
-        configStore.createIndex('type', 'type', { unique: false });
-        configStore.createIndex('enabled', 'enabled', { unique: false });
-        configStore.createIndex('isPreferred', 'isPreferred', { unique: false });
-        configStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('ai_configs 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
-      }
-
-      // 创建 quick_optimization_configs 表
-      if (!db.objectStoreNames.contains('quick_optimization_configs')) {
-        console.log('创建 quick_optimization_configs 对象存储');
-        const quickOptStore = db.createObjectStore('quick_optimization_configs', { keyPath: 'id', autoIncrement: true });
-        quickOptStore.createIndex('name', 'name', { unique: false });
-        quickOptStore.createIndex('enabled', 'enabled', { unique: false });
-        quickOptStore.createIndex('sortOrder', 'sortOrder', { unique: false });
-        quickOptStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('quick_optimization_configs 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
-      }
-
-      // 创建 ai_generation_history 表
-      if (!db.objectStoreNames.contains('ai_generation_history')) {
-        console.log('创建 ai_generation_history 对象存储');
-        const generationStore = db.createObjectStore('ai_generation_history', { keyPath: 'id', autoIncrement: true });
-        generationStore.createIndex('historyId', 'historyId', { unique: true });
-        generationStore.createIndex('configId', 'configId', { unique: false });
-        generationStore.createIndex('status', 'status', { unique: false });
-        generationStore.createIndex('createdAt', 'createdAt', { unique: false });
-        generationStore.createIndex('uuid', 'uuid', { unique: true }); // UUID索引
-      } else {
-        console.log('ai_generation_history 对象存储已存在');
-        // 在版本升级期间，不创建新的事务
-        // 索引会在下次数据库操作时自动检查
-      }
-
-      // 创建 settings 表
-      if (!db.objectStoreNames.contains('settings')) {
-        console.log('创建 settings 对象存储');
-        const settingsStore = db.createObjectStore('settings', { keyPath: 'id', autoIncrement: true });
-        settingsStore.createIndex('key', 'key', { unique: true });
-      } else {
-        console.log('settings 对象存储已存在');
-      }
-
-      // 创建 syncTombstones 表，用于记录硬删除并在多端同步中传播删除
-      if (!db.objectStoreNames.contains(SYNC_TOMBSTONE_STORE)) {
-        console.log('创建 syncTombstones 对象存储');
-        const tombstoneStore = db.createObjectStore(SYNC_TOMBSTONE_STORE, { keyPath: 'id', autoIncrement: true });
-        tombstoneStore.createIndex('storeName', 'storeName', { unique: false });
-        tombstoneStore.createIndex('collectionName', 'collectionName', { unique: false });
-        tombstoneStore.createIndex('recordKey', 'recordKey', { unique: false });
-        tombstoneStore.createIndex('deletedAt', 'deletedAt', { unique: false });
-      } else {
-        console.log('syncTombstones 对象存储已存在');
-      }
-      
-      console.log('对象存储创建完成，最终对象存储列表:', Array.from(db.objectStoreNames));
-    } catch (error) {
-      console.error('创建对象存储时出错:', error);
-      throw error;
     }
+
+    console.log('对象存储 schema 检查完成，最终对象存储列表:', Array.from(db.objectStoreNames));
   }
 
-  /**
-   * 确保索引存在，如果不存在则创建
-   * @param store IDBObjectStore 对象存储
-   * @param indexName string 索引名称
-   * @param keyPath string 索引键路径
-   * @param options IDBIndexParameters 索引选项
-   */
-  private ensureIndexExists(store: IDBObjectStore, indexName: string, keyPath: string, options: IDBIndexParameters): void {
-    try {
-      if (!Array.from(store.indexNames).includes(indexName)) {
-        console.log(`为对象存储 ${store.name} 添加 ${indexName} 索引`);
-        store.createIndex(indexName, keyPath, options);
-      } else {
-        console.log(`索引 ${store.name}.${indexName} 已存在`);
+  private ensureIndexSchema(
+    store: IDBObjectStore,
+    indexName: string,
+    schema: DatabaseIndexSchema,
+    failUpgrade: (error: Error) => void
+  ): void {
+    const exists = store.indexNames.contains(indexName);
+    if (exists) {
+      const existing = store.index(indexName);
+      if (this.keyPathsEqual(existing.keyPath, schema.keyPath) && existing.unique === schema.unique) {
+        return;
       }
-    } catch (error) {
-      console.warn(`添加索引 ${store.name}.${indexName} 失败:`, error);
     }
+
+    const createIndex = () => {
+      if (store.indexNames.contains(indexName)) {
+        store.deleteIndex(indexName);
+      }
+      store.createIndex(indexName, schema.keyPath, { unique: schema.unique });
+      console.log(`已修复索引 ${store.name}.${indexName}`);
+    };
+
+    if (!schema.unique) {
+      createIndex();
+      return;
+    }
+
+    this.scanForUniqueIndexDuplicates(store, indexName, schema.keyPath, createIndex, failUpgrade);
+  }
+
+  private scanForUniqueIndexDuplicates(
+    store: IDBObjectStore,
+    indexName: string,
+    keyPath: string | string[],
+    onSafe: () => void,
+    onDuplicate: (error: Error) => void
+  ): void {
+    const seen = new Map<string, IDBValidKey>();
+    const request = store.openCursor();
+
+    request.onerror = () => {
+      onDuplicate(new Error(
+        `[DATABASE_UNIQUE_INDEX_SCAN_FAILED] 检查 ${store.name}.${indexName} 历史重复数据失败: ` +
+        `${request.error?.message || '未知错误'}`
+      ));
+    };
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        onSafe();
+        return;
+      }
+
+      const indexKey = this.readKeyPath(cursor.value, keyPath);
+      if (this.isIndexableKey(indexKey)) {
+        const fingerprint = this.serializeIndexedDbKey(indexKey);
+        const firstPrimaryKey = seen.get(fingerprint);
+        if (firstPrimaryKey !== undefined) {
+          onDuplicate(new Error(
+            `[DATABASE_UNIQUE_INDEX_DUPLICATE] 无法创建唯一索引 ${store.name}.${indexName}: ` +
+            `键 ${this.formatDiagnosticKey(indexKey)} 在主键 ` +
+            `${this.formatDiagnosticKey(firstPrimaryKey)} 与 ${this.formatDiagnosticKey(cursor.primaryKey)} 中重复；` +
+            '数据保持原状，请先归并重复记录后重试升级'
+          ));
+          return;
+        }
+        seen.set(fingerprint, cursor.primaryKey);
+      }
+
+      cursor.continue();
+    };
+  }
+
+  private readKeyPath(value: unknown, keyPath: string | string[]): unknown {
+    if (Array.isArray(keyPath)) {
+      const values = keyPath.map(path => this.readKeyPath(value, path));
+      return values.some(item => item === undefined) ? undefined : values;
+    }
+
+    return keyPath.split('.').reduce<unknown>((current, segment) => {
+      if (current === null || typeof current !== 'object') {
+        return undefined;
+      }
+      return (current as Record<string, unknown>)[segment];
+    }, value);
+  }
+
+  private isIndexableKey(value: unknown): value is IDBValidKey {
+    if (typeof value === 'string') return true;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (value instanceof Date) return Number.isFinite(value.getTime());
+    if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) return true;
+    if (ArrayBuffer.isView(value)) return true;
+    return Array.isArray(value) && value.length > 0 && value.every(item => this.isIndexableKey(item));
+  }
+
+  private serializeIndexedDbKey(value: IDBValidKey): string {
+    return JSON.stringify(this.normalizeIndexedDbKey(value));
+  }
+
+  private normalizeIndexedDbKey(value: IDBValidKey): unknown {
+    if (typeof value === 'string') return ['string', value];
+    if (typeof value === 'number') return ['number', Object.is(value, -0) ? 0 : value];
+    if (value instanceof Date) return ['date', value.getTime()];
+    if (Array.isArray(value)) return ['array', value.map(item => this.normalizeIndexedDbKey(item))];
+    const bytes = value instanceof ArrayBuffer
+      ? new Uint8Array(value)
+      : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return ['binary', Array.from(bytes)];
+  }
+
+  private keyPathsEqual(actual: string | string[] | null, expected: string | string[]): boolean {
+    if (typeof actual === 'string' && typeof expected === 'string') {
+      return actual === expected;
+    }
+    return Array.isArray(actual) && Array.isArray(expected) &&
+      actual.length === expected.length && actual.every((item, index) => item === expected[index]);
+  }
+
+  private formatKeyPath(keyPath: string | string[] | null): string {
+    return keyPath === null ? 'null' : JSON.stringify(keyPath);
+  }
+
+  private formatDiagnosticKey(key: unknown): string {
+    if (key instanceof Date) return key.toISOString();
+    if (key instanceof ArrayBuffer || ArrayBuffer.isView(key)) return '<binary-key>';
+    const serialized = JSON.stringify(key);
+    return serialized && serialized.length > 160 ? `${serialized.slice(0, 157)}...` : (serialized ?? String(key));
   }
 
   /**
@@ -298,6 +494,8 @@ export class BaseDatabaseService {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
+      let result: T | undefined;
+      let settled = false;
       
       const now = new Date();
       
@@ -313,11 +511,15 @@ export class BaseDatabaseService {
       const request = store.add(dataWithTimestamps);
 
       request.onsuccess = () => {
-        const result = {
+        result = {
           ...dataWithTimestamps,
           id: request.result as number,
         } as T;
-        
+      };
+
+      transaction.oncomplete = () => {
+        if (settled || !result) return;
+        settled = true;
         emitDataChange({
           storeName,
           action: 'create',
@@ -326,9 +528,16 @@ export class BaseDatabaseService {
         resolve(result);
       };
 
-      request.onerror = () => {
-        reject(new Error(`Failed to add record to ${storeName}: ${request.error?.message}`));
+      const rejectTransaction = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(
+          `Failed to add record to ${storeName}: ${request.error?.message || transaction.error?.message || '事务未提交'}`
+        ));
       };
+      request.onerror = rejectTransaction;
+      transaction.onerror = rejectTransaction;
+      transaction.onabort = rejectTransaction;
     });
   }
 
@@ -430,6 +639,8 @@ export class BaseDatabaseService {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
+      let result: T | undefined;
+      let settled = false;
       
       // 先获取现有数据
       const getRequest = store.get(id);
@@ -437,7 +648,9 @@ export class BaseDatabaseService {
       getRequest.onsuccess = () => {
         const existingData = getRequest.result;
         if (!existingData) {
+          settled = true;
           reject(new Error(`Record with id ${id} not found in ${storeName}`));
+          try { transaction.abort(); } catch { /* transaction already finishing */ }
           return;
         }
 
@@ -451,22 +664,37 @@ export class BaseDatabaseService {
         const putRequest = store.put(updatedData);
         
         putRequest.onsuccess = () => {
-          emitDataChange({
-            storeName,
-            action: 'update',
-            id
-          });
-          resolve(updatedData as T);
+          result = updatedData as T;
         };
 
         putRequest.onerror = () => {
-          reject(new Error(`Failed to update record in ${storeName}: ${putRequest.error?.message}`));
+          if (!settled) {
+            settled = true;
+            reject(new Error(`Failed to update record in ${storeName}: ${putRequest.error?.message}`));
+          }
         };
       };
 
       getRequest.onerror = () => {
-        reject(new Error(`Failed to get record for update in ${storeName}: ${getRequest.error?.message}`));
+        if (!settled) {
+          settled = true;
+          reject(new Error(`Failed to get record for update in ${storeName}: ${getRequest.error?.message}`));
+        }
       };
+
+      transaction.oncomplete = () => {
+        if (settled || !result) return;
+        settled = true;
+        emitDataChange({ storeName, action: 'update', id });
+        resolve(result);
+      };
+      const rejectTransaction = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(`Failed to update record in ${storeName}: ${transaction.error?.message || '事务未提交'}`));
+      };
+      transaction.onerror = rejectTransaction;
+      transaction.onabort = rejectTransaction;
     });
   }
 
@@ -483,6 +711,8 @@ export class BaseDatabaseService {
       const transaction = db.transaction(this.getDeleteTransactionStores(db, storeName), 'readwrite');
       const store = transaction.objectStore(storeName);
       const getRequest = store.get(id);
+      let deletePrepared = false;
+      let settled = false;
 
       getRequest.onsuccess = () => {
         const existingRecord = getRequest.result;
@@ -494,25 +724,45 @@ export class BaseDatabaseService {
             storeName,
             existingRecord,
             () => {
-              emitDataChange({
-                storeName,
-                action: 'delete',
-                id
-              });
-              resolve();
+              deletePrepared = true;
             },
-            reject
+            error => {
+              if (!settled) {
+                settled = true;
+                reject(error);
+              }
+            }
           );
         };
 
         request.onerror = () => {
-          reject(new Error(`Failed to delete record from ${storeName}: ${request.error?.message}`));
+          if (!settled) {
+            settled = true;
+            reject(new Error(`Failed to delete record from ${storeName}: ${request.error?.message}`));
+          }
         };
       };
 
       getRequest.onerror = () => {
-        reject(new Error(`Failed to get record for delete from ${storeName}: ${getRequest.error?.message}`));
+        if (!settled) {
+          settled = true;
+          reject(new Error(`Failed to get record for delete from ${storeName}: ${getRequest.error?.message}`));
+        }
       };
+
+      transaction.oncomplete = () => {
+        if (settled || !deletePrepared) return;
+        settled = true;
+        emitDataChange({ storeName, action: 'delete', id });
+        resolve();
+      };
+      const rejectTransaction = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(`Failed to delete record from ${storeName}: ${transaction.error?.message || '事务未提交'}`));
+      };
+      transaction.onerror = rejectTransaction;
+      transaction.onabort = rejectTransaction;
     });
   }
 
@@ -576,16 +826,10 @@ export class BaseDatabaseService {
   }
 
   /**
-   * 检查数据库健康状态
-   * 验证所有必需的对象存储是否存在
-   * @returns Promise<{ healthy: boolean; missingStores: string[]; currentVersion: number }> 健康状态信息
+   * 检查数据库健康状态。
+   * 除 store 是否存在外，还验证每个 store 的 keyPath，以及所有必需索引的 keyPath/unique。
    */
-  async checkDatabaseHealth(): Promise<{ 
-    healthy: boolean; 
-    missingStores: string[]; 
-    currentVersion: number;
-    needsRepair: boolean;
-  }> {
+  async checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
     try {
       await this.waitForInitialization();
       
@@ -594,36 +838,90 @@ export class BaseDatabaseService {
           healthy: false,
           missingStores: [],
           currentVersion: 0,
-          needsRepair: true
+          needsRepair: true,
+          schemaIssues: []
         };
       }
 
-      const requiredStores = [
-        'categories',
-        'prompts',
-        'promptVariables',
-        'promptHistories',
-        'ai_configs',
-        'ai_generation_history',
-        'settings',
-        SYNC_TOMBSTONE_STORE
-      ];
-
       const missingStores: string[] = [];
+      const schemaIssues: DatabaseSchemaIssue[] = [];
       const existingStores = Array.from(this.db.objectStoreNames);
 
-      for (const storeName of requiredStores) {
+      for (const storeName of Object.keys(DATABASE_SCHEMA)) {
         if (!existingStores.includes(storeName)) {
           missingStores.push(storeName);
+          schemaIssues.push({
+            kind: 'missing-store',
+            storeName,
+            expected: 'present',
+            actual: 'missing',
+            repairableDuringUpgrade: true
+          });
         }
       }
 
-      const healthy = missingStores.length === 0;
+      const inspectableStores = Object.keys(DATABASE_SCHEMA).filter(storeName => existingStores.includes(storeName));
+      if (inspectableStores.length > 0) {
+        const transaction = this.db.transaction(inspectableStores, 'readonly');
+        for (const storeName of inspectableStores) {
+          const store = transaction.objectStore(storeName);
+          const storeSchema = DATABASE_SCHEMA[storeName];
+
+          if (!this.keyPathsEqual(store.keyPath, storeSchema.keyPath)) {
+            schemaIssues.push({
+              kind: 'store-key-path',
+              storeName,
+              expected: this.formatKeyPath(storeSchema.keyPath),
+              actual: this.formatKeyPath(store.keyPath),
+              repairableDuringUpgrade: false
+            });
+          }
+
+          for (const [indexName, indexSchema] of Object.entries(storeSchema.indexes)) {
+            if (!store.indexNames.contains(indexName)) {
+              schemaIssues.push({
+                kind: 'missing-index',
+                storeName,
+                indexName,
+                expected: `${this.formatKeyPath(indexSchema.keyPath)}, unique=${indexSchema.unique}`,
+                actual: 'missing',
+                repairableDuringUpgrade: true
+              });
+              continue;
+            }
+
+            const index = store.index(indexName);
+            if (!this.keyPathsEqual(index.keyPath, indexSchema.keyPath)) {
+              schemaIssues.push({
+                kind: 'index-key-path',
+                storeName,
+                indexName,
+                expected: this.formatKeyPath(indexSchema.keyPath),
+                actual: this.formatKeyPath(index.keyPath),
+                repairableDuringUpgrade: true
+              });
+            }
+            if (index.unique !== indexSchema.unique) {
+              schemaIssues.push({
+                kind: 'index-unique',
+                storeName,
+                indexName,
+                expected: String(indexSchema.unique),
+                actual: String(index.unique),
+                repairableDuringUpgrade: true
+              });
+            }
+          }
+        }
+      }
+
+      const healthy = schemaIssues.length === 0;
       const needsRepair = !healthy || this.db.version < this.currentDbVersion;
 
       console.log('数据库健康检查结果:', {
         healthy,
         missingStores,
+        schemaIssues,
         currentVersion: this.db.version,
         expectedVersion: this.currentDbVersion,
         needsRepair,
@@ -634,7 +932,8 @@ export class BaseDatabaseService {
         healthy,
         missingStores,
         currentVersion: this.db.version,
-        needsRepair
+        needsRepair,
+        schemaIssues
       };
     } catch (error) {
       console.error('数据库健康检查失败:', error);
@@ -642,14 +941,15 @@ export class BaseDatabaseService {
         healthy: false,
         missingStores: [],
         currentVersion: 0,
-        needsRepair: true
+        needsRepair: true,
+        schemaIssues: []
       };
     }
   }
 
   /**
-   * 修复数据库
-   * 通过删除并重新创建数据库来修复缺失的对象存储
+   * 修复数据库。
+   * IndexedDB 只允许在版本升级事务中修改 schema；本方法绝不删除数据库。
    * @returns Promise<boolean> 修复是否成功
    */
   async repairDatabase(): Promise<{ success: boolean; message: string }> {
@@ -674,45 +974,37 @@ export class BaseDatabaseService {
         needsRepair: healthStatus.needsRepair
       });
 
-      // 关闭当前连接
-      this.close();
-
-      // 如果缺失关键表，需要完全重建数据库
-      if (healthStatus.missingStores.length > 0) {
-        console.log('准备删除并重建数据库...');
-        
-        // 删除现有数据库
-        await this.deleteDatabase();
-        
-        // 重新创建数据库
-        console.log('重新创建数据库...');
+      // 低版本数据库可以安全进入当前声明版本的 onupgradeneeded 流程。
+      if (healthStatus.currentVersion < this.currentDbVersion) {
+        this.close();
         await this.initialize();
       } else {
-        // 如果只是版本问题，尝试版本升级
-        console.log('尝试通过版本升级修复...');
-        
-        // 强制升级到更高版本
-        this.currentDbVersion = this.currentDbVersion + 1;
-        await this.initialize();
-        
-        // 恢复原版本号
-        this.currentDbVersion = this.currentDbVersion - 1;
+        const issueSummary = healthStatus.schemaIssues
+          .map(issue => `${issue.storeName}${issue.indexName ? `.${issue.indexName}` : ''}:${issue.kind}`)
+          .join(', ');
+        return {
+          success: false,
+          message:
+            `[DATABASE_SCHEMA_REPAIR_REQUIRES_UPGRADE] 当前数据库已是 v${healthStatus.currentVersion}，` +
+            `IndexedDB 无法在不提升版本的情况下修改 schema。未删除任何数据。` +
+            `请安装包含下一次数据库版本迁移的应用版本。问题: ${issueSummary || '未知 schema 问题'}`
+        };
       }
 
       // 再次检查健康状态
       const newHealthStatus = await this.checkDatabaseHealth();
       
       if (newHealthStatus.healthy) {
-        console.log('数据库修复成功');
+        console.log('数据库 schema 升级成功');
         return {
           success: true,
-          message: `数据库修复成功，已创建 ${healthStatus.missingStores.length} 个缺失的对象存储`
+          message: '数据库 schema 升级成功，数据保持完整'
         };
       } else {
-        console.error('数据库修复失败，仍有缺失的对象存储:', newHealthStatus.missingStores);
+        console.error('数据库修复失败，仍有 schema 问题:', newHealthStatus.schemaIssues);
         return {
           success: false,
-          message: `数据库修复失败，仍缺失: ${newHealthStatus.missingStores.join(', ')}`
+          message: `数据库修复失败，仍有 ${newHealthStatus.schemaIssues.length} 个 schema 问题`
         };
       }
     } catch (error) {
@@ -722,37 +1014,6 @@ export class BaseDatabaseService {
         message: `数据库修复失败: ${error instanceof Error ? error.message : '未知错误'}`
       };
     }
-  }
-
-  /**
-   * 删除数据库
-   * 彻底删除IndexedDB数据库
-   * @returns Promise<void>
-   */
-  private async deleteDatabase(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      console.log(`准备删除数据库: ${this.dbName}`);
-      
-      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
-      
-      deleteRequest.onsuccess = () => {
-        console.log(`数据库 ${this.dbName} 已删除`);
-        resolve();
-      };
-      
-      deleteRequest.onerror = () => {
-        console.error('删除数据库失败:', deleteRequest.error);
-        reject(new Error(`删除数据库失败: ${deleteRequest.error?.message || '未知错误'}`));
-      };
-      
-      deleteRequest.onblocked = () => {
-        console.warn('删除数据库被阻塞，可能有其他连接正在使用');
-        // 等待一段时间后重试
-        setTimeout(() => {
-          reject(new Error('删除数据库被阻塞，请关闭所有应用窗口后重试'));
-        }, 5000);
-      };
-    });
   }
 
   /**

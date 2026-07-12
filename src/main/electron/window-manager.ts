@@ -2,11 +2,12 @@
 import { join } from 'path';
 
 // 第三方库导入
-import { BrowserWindow, dialog, app } from 'electron';
+import { BrowserWindow, dialog, app, nativeTheme } from 'electron';
 
 // 本地模块导入
 import { getAppIconPath } from './utils';
 import { preferencesManager } from './preferences-manager';
+import designTokens from '../../renderer/design-tokens.json';
 
 /**
  * 常量定义
@@ -19,8 +20,8 @@ const CONSTANTS = {
     MIN_HEIGHT: 660
   },
   BACKGROUND_COLORS: {
-    DARK: '#101014',
-    LIGHT: '#ffffff'
+    DARK: designTokens.palette.dark.surface.body,
+    LIGHT: designTokens.palette.light.surface.body
   },
   DIALOG_BUTTONS: {
     QUIT: '退出',
@@ -101,7 +102,9 @@ class WindowManager {
       case 'light':
         return CONSTANTS.BACKGROUND_COLORS.LIGHT;
       default:
-        return CONSTANTS.BACKGROUND_COLORS.LIGHT; // 默认使用浅色，系统主题会在渲染进程中处理
+        return nativeTheme.shouldUseDarkColors
+          ? CONSTANTS.BACKGROUND_COLORS.DARK
+          : CONSTANTS.BACKGROUND_COLORS.LIGHT;
     }
   }
 
@@ -361,13 +364,7 @@ class WindowManager {
     console.log(CONSTANTS.LOG_MESSAGES.QUIT_START);
     this.isQuitting = true;
     
-    // 确保窗口关闭
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.destroy();
-      this.mainWindow = null;
-    }
-    
-    // 触发应用退出
+    // 保留渲染进程直到 before-quit 完成待同步数据刷新。
     app.quit();
   }
 

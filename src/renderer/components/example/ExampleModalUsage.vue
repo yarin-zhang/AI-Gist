@@ -6,7 +6,7 @@
         <CommonModal v-model:show="showModal" :min-header-height="minHeaderHeight" :min-footer-height="minFooterHeight"
             :content-padding="contentPadding" :header-resizable="false" :footer-resizable="false">
             <template #header>
-                <NText :style="{ fontSize: '20px', fontWeight: 600 }">
+                <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">
                     示例标题
                 </NText>
                 <NText depth="3">
@@ -28,13 +28,13 @@
                     <p>内容区域内边距: {{ contentPadding }}px</p>
 
                     <div
-                        style="height: 120px; margin: 16px 0; padding: 16px; border: 1px solid aliceblue; border-radius: 4px; background: #f8f9fa;">
+                        style="height: 120px; margin: 16px 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary);">
                         <p>这是一个固定高度的内容区域，用于测试滚动</p>
                         <p>NSplit 会自动处理内容区域的高度调整</p>
                     </div>
 
                     <div
-                        style="height: 200px; background: linear-gradient(45deg, #74b9ff, #0984e3); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; margin: 16px 0;">
+                        style="height: 200px; background: var(--surface-tertiary); border: 1px solid var(--border-default); border-radius: var(--radius-panel); display: flex; align-items: center; justify-content: center; color: var(--content-primary); margin: 16px 0;">
                         测试内容区域滚动
                     </div>
                 </div>

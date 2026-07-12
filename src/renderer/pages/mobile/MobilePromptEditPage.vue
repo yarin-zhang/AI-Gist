@@ -636,8 +636,8 @@ ion-textarea {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 8px;
-  background: var(--ion-color-light);
+  border-radius: var(--radius-image, 8px);
+  background: var(--surface-secondary);
   display: block;
 }
 

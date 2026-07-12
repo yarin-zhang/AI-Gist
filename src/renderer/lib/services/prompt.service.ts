@@ -430,13 +430,55 @@ export class PromptService extends BaseDatabaseService {
    * @returns Promise<Prompt> 更新后的提示词记录
    */
   async incrementPromptUseCount(id: number): Promise<Prompt> {
-    const prompt = await this.getById<Prompt>('prompts', id);
-    if (!prompt) {
-      throw new Error('Prompt not found');
-    }
-    
-    return this.update<Prompt>('prompts', id, {
-      useCount: prompt.useCount + 1,
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['prompts'], 'readwrite');
+      const store = transaction.objectStore('prompts');
+      const getRequest = store.get(id);
+      let updatedPrompt: Prompt | undefined;
+      let settled = false;
+
+      const rejectTransaction = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
+      getRequest.onsuccess = () => {
+        const prompt = getRequest.result as Prompt | undefined;
+        if (!prompt) {
+          rejectTransaction(new Error('Prompt not found'));
+          try { transaction.abort(); } catch { /* transaction already finishing */ }
+          return;
+        }
+
+        updatedPrompt = {
+          ...prompt,
+          useCount: Number(prompt.useCount || 0) + 1,
+          updatedAt: new Date(),
+        };
+        const putRequest = store.put(this.cleanDataForStorage(updatedPrompt));
+        putRequest.onerror = () => rejectTransaction(new Error(
+          `Failed to increment prompt use count: ${putRequest.error?.message || 'transaction failed'}`
+        ));
+      };
+
+      getRequest.onerror = () => rejectTransaction(new Error(
+        `Failed to read prompt use count: ${getRequest.error?.message || 'transaction failed'}`
+      ));
+
+      transaction.oncomplete = () => {
+        if (settled || !updatedPrompt) return;
+        settled = true;
+        emitDataChange({ storeName: 'prompts', action: 'update', id });
+        resolve(updatedPrompt);
+      };
+      transaction.onerror = () => rejectTransaction(new Error(
+        `Failed to increment prompt use count: ${transaction.error?.message || 'transaction failed'}`
+      ));
+      transaction.onabort = () => rejectTransaction(new Error(
+        `Failed to increment prompt use count: ${transaction.error?.message || 'transaction aborted'}`
+      ));
     });
   }
 

@@ -75,6 +75,7 @@ import { computed, onUnmounted, watch } from 'vue'
 import { IonIcon } from '@ionic/vue'
 import { heart } from 'ionicons/icons'
 import type { Prompt, Category } from '@shared/types'
+import { getTagsArray } from '~/lib/utils/tag-colors'
 
 interface WaterfallItem {
   prompt: Prompt
@@ -105,9 +106,7 @@ const getFirstLine = (content: string | undefined) => {
 }
 
 const getTagList = (prompt: Prompt): string[] => {
-  if (!prompt.tags) return []
-  if (Array.isArray(prompt.tags)) return prompt.tags
-  return prompt.tags.split(',').map(t => t.trim()).filter(Boolean)
+  return getTagsArray(prompt.tags)
 }
 
 const buildImageUrl = (prompt: Prompt): string | null => {
@@ -188,19 +187,13 @@ onUnmounted(() => {
 }
 
 .waterfall-card {
-  background: var(--ion-card-background, var(--ion-item-background, #fff));
+  background: var(--surface-primary);
   border-radius: 10px;
   overflow: hidden;
-  /* iOS native separator color: rgba(60,60,67,0.29) */
-  border: 1px solid rgba(60, 60, 67, 0.15);
+  border: 1px solid var(--border-default);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: opacity 0.15s;
-}
-
-/* 暗色模式下不显示边框（使用 .ion-palette-dark 兼容 Android） */
-:global(.ion-palette-dark) .waterfall-card {
-  border: none;
 }
 
 .waterfall-card:active {
@@ -210,6 +203,8 @@ onUnmounted(() => {
 .card-image-wrapper {
   width: 100%;
   line-height: 0;
+  border-radius: var(--radius-image, 8px);
+  overflow: hidden;
 }
 
 .card-image {
@@ -217,6 +212,7 @@ onUnmounted(() => {
   height: auto;
   display: block;
   object-fit: cover;
+  border-radius: var(--radius-image, 8px);
 }
 
 .card-content {
@@ -226,7 +222,7 @@ onUnmounted(() => {
 .card-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--ion-text-color, #222);
+  color: var(--content-primary);
   margin: 0 0 4px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -237,7 +233,7 @@ onUnmounted(() => {
 
 .card-desc {
   font-size: 12px;
-  color: var(--ion-color-medium, #888);
+  color: var(--content-secondary);
   margin: 0 0 6px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -257,8 +253,8 @@ onUnmounted(() => {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 10px;
-  background: var(--ion-color-light, #f4f5f8);
-  color: var(--ion-color-medium, #888);
+  background: var(--surface-secondary);
+  color: var(--content-secondary);
   white-space: nowrap;
 }
 

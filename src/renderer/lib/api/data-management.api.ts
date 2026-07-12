@@ -443,12 +443,18 @@ export class DataManagementAPI {
         const result = await (window as any).databaseAPI.replaceAllData(data);
         return {
           success: result.success,
+          error: result.error,
+          operationId: result.operationId,
+          errorCode: result.errorCode,
+          phase: result.phase,
+          failures: result.failures,
+          warnings: result.warnings,
           imported: {
-            categories: data.categories?.length || 0,
-            prompts: data.prompts?.length || 0,
-            aiConfigs: data.aiConfigs?.length || 0,
-            aiHistory: data.aiHistory?.length || 0,
-            settings: data.settings?.length || 0
+            categories: result.imported?.categories || 0,
+            prompts: result.imported?.prompts || 0,
+            aiConfigs: result.imported?.aiConfigs || 0,
+            aiHistory: result.imported?.history || 0,
+            settings: result.imported?.settings || 0
           }
         };
       }

@@ -29,19 +29,20 @@ export const defaultPreferences: UserPreferences = {
     backupInterval: 24
   },
   shortcuts: {
-    showInterface: {
-      key: 'Ctrl+Shift+G',
-      description: '显示界面',
-      enabled: true,
-      type: 'show-interface'
+    version: 2,
+    defaultAction: 'copy',
+    commands: {
+      launcher: {
+        accelerator: 'CommandOrControl+Shift+G',
+        enabled: true
+      },
+      showMainWindow: {
+        accelerator: '',
+        enabled: false
+      }
     },
-    copyPrompt: {
-      key: 'Ctrl+Shift+Alt+C',
-      description: '复制提示词',
-      enabled: true,
-      type: 'copy-prompt'
-    },
-    promptTriggers: []
+    promptBindings: [],
+    recentPromptUUIDs: []
   },
   networkProxy: {
     mode: 'system',
@@ -81,15 +82,18 @@ function mergePreferences(input?: Partial<UserPreferences> | null): UserPreferen
     shortcuts: {
       ...base.shortcuts!,
       ...(input.shortcuts || {}),
-      showInterface: {
-        ...base.shortcuts!.showInterface,
-        ...(input.shortcuts?.showInterface || {})
+      commands: {
+        launcher: {
+          ...base.shortcuts!.commands.launcher,
+          ...(input.shortcuts?.commands?.launcher || {})
+        },
+        showMainWindow: {
+          ...base.shortcuts!.commands.showMainWindow,
+          ...(input.shortcuts?.commands?.showMainWindow || {})
+        }
       },
-      copyPrompt: {
-        ...base.shortcuts!.copyPrompt,
-        ...(input.shortcuts?.copyPrompt || {})
-      },
-      promptTriggers: input.shortcuts?.promptTriggers || base.shortcuts!.promptTriggers
+      promptBindings: input.shortcuts?.promptBindings || base.shortcuts!.promptBindings,
+      recentPromptUUIDs: input.shortcuts?.recentPromptUUIDs || base.shortcuts!.recentPromptUUIDs
     },
     networkProxy: {
       ...base.networkProxy!,
@@ -175,4 +179,3 @@ export const preferencesClient = {
     return resetWebPreferences();
   }
 };
-

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { AlertTriangle, Clock, Cloud, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
+import { AlertTriangle, CircleCheck, Clock, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
@@ -23,8 +23,9 @@ const emit = defineEmits<{
 const visualState = computed(() => {
   if (status.value.status === 'syncing') return 'syncing';
   if (status.value.status === 'error') return 'error';
-  if (status.value.status === 'scheduled') return 'scheduled';
+  if (status.value.status === 'scheduled' && status.value.pendingChanges) return 'scheduled';
   if (status.value.lastResult?.success || status.value.lastSyncAt) return 'success';
+  if (status.value.status === 'scheduled') return 'scheduled';
   return 'idle';
 });
 
@@ -32,15 +33,15 @@ const statusIcon = computed(() => {
   if (visualState.value === 'syncing') return Refresh;
   if (visualState.value === 'scheduled') return Clock;
   if (visualState.value === 'error') return AlertTriangle;
-  if (visualState.value === 'success') return Cloud;
+  if (visualState.value === 'success') return CircleCheck;
   return CloudOff;
 });
 
 const primaryText = computed(() => {
   if (status.value.status === 'syncing') return '正在同步';
   if (status.value.status === 'error') return '同步遇到问题';
-  if (status.value.status === 'scheduled') return '等待下次同步';
-  if (status.value.lastResult?.success) return '云同步正常';
+  if (visualState.value === 'scheduled') return '等待下次同步';
+  if (visualState.value === 'success') return '云同步正常';
   return '云同步待机';
 });
 
@@ -49,11 +50,15 @@ const detailText = computed(() => {
     return getFriendlyCloudSyncError(status.value.error);
   }
 
-  if (status.value.lastResult?.success) {
+  if (visualState.value === 'success' && status.value.lastResult?.success) {
     return getCloudSyncResultMessage(status.value.lastResult.action);
   }
 
-  if (status.value.status === 'scheduled') {
+  if (visualState.value === 'success') {
+    return '本机与云端数据已同步';
+  }
+
+  if (visualState.value === 'scheduled') {
     return '应用会在同步周期到达后检查云端变化';
   }
 
@@ -87,7 +92,7 @@ const lastSyncText = computed(() => {
 });
 
 const ariaLabel = computed(() => {
-  const action = hasErrorDetail.value ? '点击查看错误详情' : '点击打开云备份设置';
+    const action = hasErrorDetail.value ? '点击查看错误详情' : '点击打开数据同步设置';
   return `${primaryText.value}，${detailText.value}。${action}`;
 });
 
@@ -279,42 +284,49 @@ onUnmounted(() => {
   display: grid;
   width: 24px;
   height: 22px;
+  box-sizing: border-box;
+  flex: 0 0 24px;
   place-items: center;
-  color: #5f6368;
-  background: transparent;
-  border: 0;
-  border-radius: 4px;
+  padding: 0;
+  color: var(--content-secondary);
+  line-height: 1;
+  appearance: none;
+  background: var(--surface-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
   cursor: pointer;
   transition: color 160ms ease, background-color 160ms ease;
 }
 
 .cloud-sync-button:hover,
 .cloud-sync-button:focus-visible {
-  background: rgb(15 23 42 / 8%);
+  border-color: var(--border-default);
+  background: var(--surface-secondary);
   outline: none;
 }
 
 .cloud-sync-button.is-success {
-  color: #12845f;
+  color: var(--accent-success);
 }
 
 .cloud-sync-button.is-scheduled {
-  color: #3267b1;
+  color: var(--accent-info);
 }
 
 .cloud-sync-button.is-syncing {
-  color: #7b5c00;
+  color: var(--accent-warning);
 }
 
 .cloud-sync-button.is-error {
-  color: #c23934;
+  color: var(--accent-error);
 }
 
 .cloud-sync-button.is-attention {
-  color: #9a6700;
+  color: var(--accent-warning);
 }
 
 .cloud-sync-icon {
+  display: block;
   width: 15px;
   height: 15px;
 }
@@ -333,13 +345,14 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  color: #f8fafc;
+  color: var(--content-primary);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
-  background: rgb(17 24 39 / 94%);
-  border-radius: 6px;
-  box-shadow: 0 12px 30px rgb(15 23 42 / 22%);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
   pointer-events: none;
 }
 
@@ -358,13 +371,13 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  color: #111827;
+  color: var(--content-primary);
   font-size: 12px;
   line-height: 1.5;
-  background: #ffffff;
-  border: 1px solid rgb(148 163 184 / 35%);
-  border-radius: 8px;
-  box-shadow: 0 16px 36px rgb(15 23 42 / 24%);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
 }
 
 .cloud-sync-detail-header {
@@ -387,7 +400,7 @@ onUnmounted(() => {
 }
 
 .cloud-sync-detail-header span {
-  color: #475569;
+  color: var(--content-secondary);
   overflow-wrap: anywhere;
 }
 
@@ -397,17 +410,18 @@ onUnmounted(() => {
   height: 24px;
   flex: 0 0 auto;
   place-items: center;
-  color: #64748b;
-  background: transparent;
-  border: 0;
-  border-radius: 4px;
+  color: var(--content-secondary);
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 
 .cloud-sync-panel-icon-button:hover,
 .cloud-sync-panel-icon-button:focus-visible {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: var(--content-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-tertiary);
   outline: none;
 }
 
@@ -422,7 +436,7 @@ onUnmounted(() => {
   gap: 4px;
   margin: 0;
   padding-left: 18px;
-  color: #334155;
+  color: var(--content-secondary);
 }
 
 .cloud-sync-raw-error {
@@ -430,16 +444,16 @@ onUnmounted(() => {
   max-height: 160px;
   margin: 0;
   padding: 9px;
-  color: #1f2937;
+  color: var(--content-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
   overflow: auto;
   overflow-wrap: anywhere;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  background: var(--surface-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
 }
 
 .cloud-sync-detail-actions {
@@ -454,25 +468,25 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   padding: 0 9px;
-  color: #1f2937;
+  color: var(--content-primary);
   font-size: 12px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 
 .cloud-sync-panel-button:hover,
 .cloud-sync-panel-button:focus-visible {
-  border-color: #94a3b8;
-  background: #f8fafc;
+  border-color: var(--border-strong);
+  background: var(--surface-secondary);
   outline: none;
 }
 
 .cloud-sync-panel-button:disabled {
-  color: #94a3b8;
+  color: var(--content-tertiary);
   cursor: not-allowed;
-  background: #f8fafc;
+  background: var(--surface-secondary);
 }
 
 .cloud-sync-panel-button svg {
@@ -490,57 +504,4 @@ onUnmounted(() => {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .cloud-sync-button {
-    color: #c5c8d0;
-  }
-
-  .cloud-sync-button:hover,
-  .cloud-sync-button:focus-visible {
-    background: rgb(255 255 255 / 12%);
-  }
-
-  .cloud-sync-detail-panel {
-    color: #e5e7eb;
-    background: #111827;
-    border-color: rgb(148 163 184 / 28%);
-  }
-
-  .cloud-sync-detail-header span,
-  .cloud-sync-actions-list {
-    color: #cbd5e1;
-  }
-
-  .cloud-sync-panel-icon-button {
-    color: #cbd5e1;
-  }
-
-  .cloud-sync-panel-icon-button:hover,
-  .cloud-sync-panel-icon-button:focus-visible {
-    color: #f8fafc;
-    background: rgb(255 255 255 / 10%);
-  }
-
-  .cloud-sync-raw-error {
-    color: #e5e7eb;
-    background: #0f172a;
-    border-color: rgb(148 163 184 / 28%);
-  }
-
-  .cloud-sync-panel-button {
-    color: #e5e7eb;
-    background: #111827;
-    border-color: rgb(148 163 184 / 42%);
-  }
-
-  .cloud-sync-panel-button:hover,
-  .cloud-sync-panel-button:focus-visible {
-    background: rgb(255 255 255 / 8%);
-  }
-
-  .cloud-sync-panel-button:disabled {
-    color: #64748b;
-    background: #111827;
-  }
-}
 </style>

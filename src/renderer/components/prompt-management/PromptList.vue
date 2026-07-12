@@ -1,10 +1,10 @@
 <template>
     <div class="prompt-list">
         <!-- 搜索和过滤器 -->
-        <NCard>
+        <section class="prompt-filter-bar ui-toolbar">
             <NFlex vertical :size="getCardSpacing()">
-                <NFlex>
-                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" style="flex: 1"
+                <NFlex wrap align="center" class="prompt-toolbar-row">
+                    <NInput v-model:value="searchText" :placeholder="t('promptManagement.searchPrompt')" class="prompt-search-input"
                         @input="handleSearch" clearable>
                         <template #prefix>
                             <NIcon>
@@ -13,8 +13,8 @@
                         </template>
                     </NInput>
                     <NSelect v-model:value="sortType" :options="sortOptions" :placeholder="t('promptManagement.sortBy')"
-                        style="width: 160px; margin-right: 8px" />
-                    <NButton :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
+                        class="prompt-sort-select" />
+                    <NButton secondary :type="showAdvancedFilter ? 'primary' : 'default'" @click="toggleAdvancedFilter">
                         <template #icon>
                             <NIcon>
                                 <Tag />
@@ -22,23 +22,15 @@
                         </template>
                         {{ t('promptManagement.advancedFilter') }}
                     </NButton>
-                    <NButton :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
+                    <NButton secondary :type="showFavoritesOnly ? 'primary' : 'default'" @click="toggleFavoritesFilter">
                         <template #icon>
                             <NIcon>
-                                <Heart />
+                                <Star />
                             </NIcon>
                         </template>
                         {{ t('promptManagement.favorites') }}
                     </NButton>
-                    <NButton @click="$emit('manage-categories')">
-                        <template #icon>
-                            <NIcon>
-                                <Folder />
-                            </NIcon>
-                        </template>
-                        {{ t('promptManagement.categories') }}
-                    </NButton>
-                    <NButtonGroup>
+                    <NButtonGroup v-if="!hideViewSwitcher">
                         <NButton :type="viewMode === 'grid' ? 'primary' : 'default'" @click="setViewMode('grid')">
                             <template #icon>
                                 <NIcon>
@@ -64,7 +56,7 @@
                 </NFlex>
                 <!-- 搜索提示信息 -->
                 <div v-if="searchText.trim() || selectedTag || selectedCategory || showFavoritesOnly"
-                    style="padding: 6px 12px; border-radius: 6px; font-size: 12px; color: var(--n-text-color-disabled);">
+                    class="active-filter-summary">
                     <NFlex justify="space-between" align="center">
                         <NFlex align="center">
                             <NIcon size="14" style="margin-right: 4px; vertical-align: middle;">
@@ -92,7 +84,7 @@
                 </div>
 
                 <!-- 分类和标签筛选区域 (仅在高级筛选开启时显示) -->
-                <div v-if="showAdvancedFilter">
+                <div v-if="showAdvancedFilter" class="advanced-filter-panel">
                     <!-- 分类快捷筛选 -->
                     <div v-if="categories.length > 0" :style="{ padding: categoriesExpanded ? '4px 0' : '2px 0' }">
                         <NFlex justify="space-between" align="center" style="margin-bottom: 6px;">
@@ -169,19 +161,20 @@
                     </div>
                 </div>
             </NFlex>
-        </NCard> <!-- 提示词列表 -->
-        <div v-if="initialLoading" style="text-align: center; padding: 40px;">
-            <NSpin size="large" />
-        </div>
-        <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) ||
-            (viewMode === 'tree' && treeData.length === 0) ||
-            (viewMode === 'table' && prompts.length === 0)" style="text-align: center; padding: 40px;">
-            <NEmpty :description="t('promptManagement.noPrompts')" />
-        </div>
-        <div v-else>
+        </section>
+
+        <div class="prompt-list-body">
+            <div v-if="initialLoading" class="prompt-list-state">
+                <NSpin size="large" />
+            </div>
+            <div v-else-if="(viewMode === 'grid' && prompts.length === 0 && !hasNextPage) ||
+                (viewMode === 'table' && prompts.length === 0)" class="prompt-list-state">
+                <NEmpty :description="t('promptManagement.noPrompts')" />
+            </div>
+            <div v-else class="prompt-list-results">
             <!-- 批量操作工具栏 (仅在表格视图且有选中项时显示) -->
-            <div v-if="viewMode === 'table' && selectedRows.length > 0" style="margin-bottom: 16px;">
-                <NCard>
+            <div v-if="viewMode === 'table' && selectedRows.length > 0" class="batch-action-bar">
+                <NCard size="small">
                     <NFlex justify="space-between" align="center">
                         <NText>{{ t('promptManagement.selectedPrompts', { count: selectedRows.length }) }}</NText>
                         <NFlex size="small">
@@ -205,29 +198,34 @@
                 </NCard>
             </div>
 
-            <!-- 树形表格视图 -->
-            <div v-if="viewMode === 'tree'" style="margin-top: 16px;">
-                <NDataTable :columns="treeTableColumns" :data="treeData" :loading="initialLoading"
-                    :row-key="(row: TreeNode) => row.type === 'category' ? `category-${(row.data as CategoryWithRelations).id}` : `prompt-${(row.data as PromptWithRelations).id}`"
-                    v-model:checked-row-keys="selectedRowKeys" :max-height="600" :scroll-x="1280"
-                    :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" default-expand-all />
-            </div>
+            <!-- Finder 风格文件夹视图 -->
+            <PromptFolderExplorer v-if="viewMode === 'tree'" :categories="categories" :prompts="prompts"
+                :category-counts="categoryCountMap" :active-category-id="selectedCategory"
+                :total-count="statistics.totalCount" :loading="initialLoading" :global-results="folderGlobalResults"
+                :moving-prompt-id="movingPromptId" :supports-global-shortcuts="supportsGlobalShortcuts"
+                :resolve-image-url="getImageUrlFromBlob"
+                @navigate="handleFolderNavigate" @open="$emit('view', $event)"
+                @prompt-action="handleFolderPromptAction" @move="handleMovePrompt"
+                @manage-categories="$emit('manage-categories')" />
 
             <!-- 表格视图 -->
-            <div v-else-if="viewMode === 'table'" style="margin-top: 16px;">
-                <NDataTable :columns="tableColumns" :data="prompts" :loading="initialLoading || loadingMore"
+            <div v-else-if="viewMode === 'table'" class="data-view-surface table-view-table">
+                <NDataTable :columns="redesignedTableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" :max-height="600" :scroll-x="1280" remote />
+                    :pagination="tablePagination" flex-height style="height: 100%" :scroll-x="980"
+                    :row-props="getTableRowProps" remote />
             </div>
 
             <!-- 网格视图 (原有的无限滚动) -->
-            <div v-else> <!-- 无限滚动容器 -->
+            <div v-else class="grid-scroll-region"> <!-- 无限滚动容器 -->
                 <NInfiniteScroll :distance="100" @load="handleLoadMore" :style="{ minHeight: '400px' }">
                     <div class="prompt-grid">
-                        <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" hoverable
+                        <NCard v-for="prompt in prompts" :key="prompt.id" class="prompt-card" size="small"
                             @click="$emit('view', prompt)">
                             <template #header>
-                                <NText strong>{{ prompt.title }}</NText>
+                                <div class="prompt-card-title-block">
+                                    <NText strong class="prompt-card-title">{{ prompt.title }}</NText>
+                                </div>
                             </template>
 
                             <template #header-extra>
@@ -241,15 +239,15 @@
                                         </template>
                                     </NButton>
                                     <NButton size="small" text @click.stop="toggleFavorite(prompt.id!)"
-                                        :type="prompt.isFavorite ? 'error' : 'default'">
+                                        :type="prompt.isFavorite ? 'warning' : 'default'">
                                         <template #icon>
-                                            <NIcon>
-                                                <Heart />
+                                            <NIcon :color="prompt.isFavorite ? 'var(--accent-warning)' : undefined">
+                                                <Star />
                                             </NIcon>
                                         </template>
                                     </NButton>
 
-                                    <NDropdown :options="getPromptActions(prompt)"
+                                    <NDropdown :options="getPromptActions(prompt)" :icon-size="16"
                                         @select="(key) => handlePromptAction(key, prompt)">
                                         <NButton size="small" text @click.stop>
                                             <template #icon>
@@ -262,54 +260,26 @@
                                 </NFlex>
                             </template>
 
-                            <!-- 描述和图片并排显示 -->
-                            <NFlex align="start" size="medium" style="min-height: 80px;">
+                            <NFlex align="center" size="medium" class="prompt-card-main">
                                 <!-- 左侧：描述或内容预览 -->
                                 <div style="flex: 1; min-width: 0;">
                                     <NText depth="3" v-if="prompt.description" class="description-text">
                                         {{ prompt.description }}
                                     </NText>
-                                    <NText depth="3" v-if="!prompt.description" style="font-size: 12px;"
+                                    <NText depth="3" v-if="!prompt.description"
                                         class="content-preview-text">
                                         {{ prompt.content.substring(0, 100) }}{{ prompt.content.length > 100 ? '...' : '' }}
                                     </NText>
                                 </div>
                                 
                                 <!-- 右侧：图片预览 -->
-                                <div v-if="hasValidImage(prompt)" style="flex-shrink: 0;" @click.stop>
-                                    <NCarousel
-                                        autoplay
-                                        :show-dots="false"
-                                        :touchable="true"
-                                        mousewheel
-                                        v-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1"
-                                        direction="vertical"
-                                        dot-placement="bottom"
-                                        style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden;"
-                                        @click.stop
-                                    >
-                                        <NImage
-                                            v-for="(blob, index) in prompt.imageBlobs"
-                                            :key="index"
-                                            :src="getImageUrlFromBlob(blob)"
-                                            width="60"
-                                            height="60"
-                                            object-fit="cover"
-                                            style="border-radius: 6px;"
-                                            :preview-disabled="false"
-                                            :lazy="true"
-                                            @error="handleImageError"
-                                            fallback-src=""
-                                            @click.stop
-                                        />
-                                    </NCarousel>
+                                <div v-if="hasValidImage(prompt)" class="prompt-card-thumbnail" @click.stop>
                                     <NImage
-                                        v-else-if="prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1"
                                         :src="getImageUrl(prompt.imageBlobs)"
-                                        width="60"
-                                        height="60"
+                                        width="72"
+                                        height="72"
                                         object-fit="cover"
-                                        style="border-radius: 6px;"
+                                        style="border-radius: var(--radius-image);"
                                         :preview-disabled="false"
                                         :lazy="true"
                                         @error="handleImageError"
@@ -320,41 +290,28 @@
                             </NFlex>
 
                             <template #footer>
-                                <NFlex justify="space-between" align="center">
-                                    <!-- 标签区域 -->
-                                    <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
-                                        <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small"
-                                            type="info">
-                                            {{ t('promptManagement.variableCount', { count: prompt.variables.length })
-                                            }}
+                                <div class="prompt-card-footer">
+                                    <div class="prompt-card-taxonomy">
+                                        <NTag v-if="supportsGlobalShortcuts && shortcutBindingFor(prompt.uuid)" size="small" type="success" :bordered="false">
+                                            <template #icon><NIcon><Keyboard /></NIcon></template>
+                                            {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
                                         </NTag>
-                                        <NTag v-if="prompt.category" size="small"
-                                            :color="getCategoryTagColor(prompt.category)">
-                                            <template #icon>
-                                                <NIcon>
-                                                    <Box />
-                                                </NIcon>
-                                            </template>
+                                        <NTag v-if="prompt.category" size="small" :bordered="false"
+                                            :color="getCategoryTagColor(prompt.category)" class="prompt-card-taxonomy-tag">
                                             {{ prompt.category.name }}
                                         </NTag>
-                                        <template v-if="prompt.tags">
-                                            <NTag v-for="tag in getTagsArray(prompt.tags)" :key="tag" size="small"
-                                                :bordered="false" :color="getTagColor(tag)"
-                                                :class="{ 'highlighted-tag': isTagMatched(tag) }">
-                                                <template #icon>
-                                                    <NIcon>
-                                                        <Tag />
-                                                    </NIcon>
-                                                </template>
-                                                {{ tag }}
-                                            </NTag>
-                                        </template>
-                                    </NFlex>
-                                    <!-- 使用次数区域 -->
-                                    <NText depth="3" style="font-size: 12px; flex-shrink: 0; margin-left: 12px;">
-                                        {{ t('promptManagement.useCount', { count: prompt.useCount }) }}
-                                    </NText>
-                                </NFlex>
+                                        <NTag v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag"
+                                            size="small" :bordered="false" :color="getTagColor(tag)"
+                                            class="prompt-card-taxonomy-tag">
+                                            {{ tag }}
+                                        </NTag>
+                                        <NText v-if="getTagsArray(prompt.tags).length > 2" depth="3"
+                                            class="prompt-card-tag-overflow">
+                                            +{{ getTagsArray(prompt.tags).length - 2 }}
+                                        </NText>
+                                    </div>
+                                    <NText depth="3" class="prompt-card-date">{{ formatDate(prompt.updatedAt) }}</NText>
+                                </div>
                             </template>
                         </NCard>
                     </div>
@@ -371,8 +328,18 @@
                     </template>
                 </NInfiniteScroll>
             </div>
+            </div>
         </div>
     </div>
+    <ShortcutBindingModal
+        v-if="supportsGlobalShortcuts && shortcutBindingPrompt"
+        :show="showShortcutBindingModal"
+        :prompt-uuid="shortcutBindingPrompt.uuid"
+        :prompt-title="shortcutBindingPrompt.title"
+        :existing-binding="shortcutBindingFor(shortcutBindingPrompt.uuid)"
+        @close="showShortcutBindingModal = false"
+        @saved="handleShortcutBindingSaved"
+    />
 </template>
 
 <script setup lang="ts">
@@ -399,7 +366,7 @@ import {
 } from 'naive-ui'
 import {
     Search,
-    Heart,
+    Star,
     DotsVertical,
     Edit,
     Trash,
@@ -411,41 +378,55 @@ import {
     Folder,
     List,
     GridDots,
-    Keyboard
+    Keyboard,
+    FileText
 } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
 import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
-import { jinjaService } from '@/lib/utils/jinja.service'
+import { getRuntimeVariables, renderPromptContent } from '@/lib/utils/prompt-runtime'
+import { recordPromptUsage } from '@/lib/utils/prompt-usage'
+import { onDataChange } from '@/lib/services/data-change-events'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
+import type { PromptShortcutBinding, ShortcutState } from '@shared/types/preferences'
+import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue'
+import PromptFolderExplorer from '@/components/prompt-management/PromptFolderExplorer.vue'
+import { PlatformDetector } from '@shared/platform'
 
 interface Emits {
     (e: 'edit', prompt: any): void
     (e: 'view', prompt: any): void
     (e: 'refresh'): void
     (e: 'manage-categories'): void
+    (e: 'view-mode-change', mode: 'grid' | 'table' | 'tree'): void
 }
 
-// 树形数据结构类型
-interface TreeNode {
-    type: 'category' | 'prompt';
-    data: CategoryWithRelations | PromptWithRelations;
-    children?: TreeNode[];
+interface Props {
+    forcedViewMode?: 'grid' | 'table' | 'tree'
+    hideViewSwitcher?: boolean
 }
+
+const props = withDefaults(defineProps<Props>(), {
+    forcedViewMode: 'grid',
+    hideViewSwitcher: false,
+})
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
 const { t } = useI18n()
 const { waitForDatabase } = useDatabase()
+const supportsGlobalShortcuts = PlatformDetector.getCapabilities().globalShortcuts
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
 // 响应式数据
 const prompts = ref<PromptWithRelations[]>([])
+const shortcutState = ref<ShortcutState | null>(null)
+const shortcutBindingPrompt = ref<PromptWithRelations | null>(null)
+const showShortcutBindingModal = ref(false)
 const categories = ref<CategoryWithRelations[]>([])
-const treeData = ref<TreeNode[]>([])
 const statistics = ref<{
     totalCount: number;
     categoryStats: Array<{ id: string | null, name: string, count: number }>;
@@ -461,6 +442,13 @@ const searchText = ref('')
 const selectedCategory = ref<number | null>(null)
 const showFavoritesOnly = ref(false)
 const selectedTag = ref<string>('') // 添加专门的标签搜索状态
+const movingPromptId = ref<number | null>(null)
+const folderInitialized = ref(false)
+const folderPromptCache = ref<PromptWithRelations[]>([])
+let folderLoadRequestId = 0
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let realtimeRefreshPending = false
+let realtimeRefreshPromise: Promise<void> | null = null
 
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
@@ -486,7 +474,7 @@ const categoriesExpanded = ref(true) // 高级筛选开启时默认展开
 const tagsExpanded = ref(true) // 高级筛选开启时默认展开
 
 // 视图模式状态
-const viewMode = ref<'grid' | 'table' | 'tree'>('grid') // 'grid' | 'table' | 'tree'
+const viewMode = ref<'grid' | 'table' | 'tree'>(props.forcedViewMode) // 'grid' | 'table' | 'tree'
 
 // 表格多选相关状态
 const selectedRowKeys = ref<(string | number)[]>([])
@@ -565,302 +553,119 @@ const popularTags = computed(() => {
     return statistics.value.popularTags || []
 })
 
-// 树形表格列定义
-const treeTableColumns = computed(() => [
-    {
-        type: 'selection' as const
-    },
-    {
-        title: t('promptManagement.title'),
-        key: 'name',
-        width: 300,
-        ellipsis: {
-            tooltip: true
-        },
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                const category = row.data as CategoryWithRelations
-                return h(
-                    NFlex,
-                    { align: 'center', size: 'small' },
-                    {
-                        default: () => [
-                            h(NIcon, { size: 16, color: category.color }, { default: () => h(Folder) }),
-                            h(NText, { strong: true }, { default: () => category.name }),
-                            h(NTag, { size: 'small', type: 'info' }, { default: () => t('promptManagement.categoryPromptCount', { count: category.prompts?.length || 0 }) })
-                        ]
-                    }
-                )
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return h(
-                    NButton,
-                    {
-                        text: true,
-                        type: 'primary',
-                        onClick: () => emit('view', prompt)
-                    },
-                    { default: () => prompt.title }
-                )
-            }
-        }
-    },
-    {
-        title: t('promptManagement.preview'),
-        key: 'preview',
-        width: 80,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                if (!hasValidImage(prompt)) {
-                    return '-'
-                }
-                
-                if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length > 1) {
-                    return h(
-                        NCarousel,
-                        {
-                            autoplay: true,
-                            showDots: false,
-                            touchable: true,
-                            mousewheel: true,
-                            direction: 'vertical',
-                            dotPlacement: 'bottom',
-                            style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
-                        },
-                        {
-                            default: () => prompt.imageBlobs!.map((blob: Blob, index: number) =>
-                                h(
-                                    NImage,
-                                    {
-                                        src: getImageUrlFromBlob(blob),
-                                        width: 50,
-                                        height: 50,
-                                        objectFit: 'cover',
-                                        style: 'border-radius: 4px;',
-                                        previewDisabled: false,
-                                        lazy: true,
-                                        onError: handleImageError,
-                                        fallbackSrc: ''
-                                    }
-                                )
-                            )
-                        }
-                    )
-                } else if (prompt.imageBlobs && Array.isArray(prompt.imageBlobs) && prompt.imageBlobs.length === 1) {
-                    return h(
-                        NImage,
-                        {
-                            src: getImageUrl(prompt.imageBlobs),
-                            width: 50,
-                            height: 50,
-                            objectFit: 'cover',
-                            style: 'border-radius: 4px;',
-                            previewDisabled: false,
-                            lazy: true,
-                            onError: handleImageError,
-                            fallbackSrc: ''
-                        }
-                    )
-                }
-                
-                return '-'
-            }
-        }
-    },
-    {
-        title: t('promptManagement.description'),
-        key: 'description',
-        width: 300,
-        ellipsis: {
-            tooltip: true
-        },
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                const category = row.data as CategoryWithRelations
-                return category.description || '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                if (prompt.description) {
-                    return prompt.description
-                }
-                const preview = prompt.content?.substring(0, 100) || ''
-                return preview + (prompt.content?.length > 100 ? '...' : '')
-            }
-        }
-    },
-    {
-        title: t('promptManagement.tags'),
-        key: 'tags',
-        width: 200,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                if (!prompt.tags) return '-'
-                const tags = getTagsArray(prompt.tags)
-                if (tags.length === 0) return '-'
-                return h(
-                    NFlex,
-                    { size: 'small', wrap: true },
-                    {
-                        default: () => tags.slice(0, 3).map(tag =>
-                            h(
-                                NTag,
-                                {
-                                    size: 'small',
-                                    bordered: false,
-                                    color: getTagColor(tag),
-                                    class: isTagMatched(tag) ? 'highlighted-tag' : ''
-                                },
-                                {
-                                    default: () => tag,
-                                    icon: () => h(NIcon, null, { default: () => h(Tag) })
-                                }
-                            )
-                        ).concat(
-                            tags.length > 3 ? [h(NText, { depth: 3, style: { fontSize: '12px' } }, { default: () => `+${tags.length - 3}` })] : []
-                        )
-                    }
-                )
-            }
-        }
-    },
-    {
-        title: t('promptManagement.variable'),
-        key: 'variables',
-        width: 80,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                const count = prompt.variables?.length || 0
-                return count > 0 ? h(
-                    NTag,
-                    { size: 'small', type: 'info' },
-                    { default: () => t('promptManagement.variableCount', { count }) }
-                ) : '-'
-            }
-        }
-    },
-    {
-        title: t('common.copy'),
-        key: 'copy',
-        width: 80,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return h(
-                    NButton,
-                    {
-                        size: 'small',
-                        text: true,
-                        type: 'default',
-                        onClick: (e: Event) => {
-                            e.stopPropagation()
-                            handleCopyPrompt(prompt)
-                        }
-                    },
-                    {
-                        icon: () => h(NIcon, null, { default: () => h(Copy) })
-                    }
-                )
-            }
-        }
-    },
-    {
-        title: t('promptManagement.favorites'),
-        key: 'isFavorite',
-        width: 80,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return h(
-                    NButton,
-                    {
-                        size: 'small',
-                        text: true,
-                        type: prompt.isFavorite ? 'error' : 'default',
-                        onClick: (e: Event) => {
-                            e.stopPropagation()
-                            toggleFavorite(prompt.id!)
-                        }
-                    },
-                    {
-                        icon: () => h(NIcon, null, { default: () => h(Heart) })
-                    }
-                )
-            }
-        }
-    },
-    {
-        title: t('promptManagement.sortOptions.useCount'),
-        key: 'useCount',
-        width: 100,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return t('promptManagement.useCount', { count: prompt.useCount || 0 })
-            }
-        }
-    },
-    {
-        title: t('promptManagement.update'),
-        key: 'updatedAt',
-        width: 120,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                const category = row.data as CategoryWithRelations
-                return new Date(category.updatedAt).toLocaleDateString()
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return new Date(prompt.updatedAt).toLocaleDateString()
-            }
-        }
-    },
-    {
-        title: t('promptManagement.select'),
-        key: 'actions',
-        width: 120,
-        render: (row: TreeNode) => {
-            if (row.type === 'category') {
-                return '-'
-            } else {
-                const prompt = row.data as PromptWithRelations
-                return h(
-                    NDropdown,
-                    {
-                        options: getPromptActions(prompt),
-                        onSelect: (key: string) => handlePromptAction(key, prompt)
-                    },
-                    {
-                        default: () => h(
-                            NButton,
-                            {
-                                size: 'small',
-                                text: true,
-                                onClick: (e: Event) => e.stopPropagation()
-                            },
-                            {
-                                icon: () => h(NIcon, null, { default: () => h(DotsVertical) })
-                            }
-                        )
-                    }
-                )
-            }
-        }
+const categoryCountMap = computed(() => Object.fromEntries(
+    statistics.value.categoryStats
+        .filter(stat => stat.id !== null)
+        .map(stat => [Number(stat.id), stat.count])
+))
+
+const folderGlobalResults = computed(() => selectedCategory.value === null && Boolean(
+    searchText.value.trim() || selectedTag.value || showFavoritesOnly.value
+))
+
+const formatDate = (date: Date | string) => new Date(date).toLocaleDateString()
+
+const renderPromptThumbnail = (prompt: PromptWithRelations) => {
+    if (!hasValidImage(prompt)) {
+        return h('span', { class: 'table-prompt-placeholder' }, [
+            h(NIcon, { size: 17 }, { default: () => h(FileText) })
+        ])
     }
-])
+    return h(NImage, {
+        src: getImageUrl(prompt.imageBlobs),
+        width: 40,
+        height: 40,
+        objectFit: 'cover',
+        previewDisabled: true,
+        lazy: true,
+        onError: handleImageError,
+        fallbackSrc: '',
+        class: 'table-prompt-thumbnail'
+    })
+}
+
+const renderPromptIdentity = (prompt: PromptWithRelations) => h(
+    'div',
+    { class: 'table-prompt-cell' },
+    [
+        renderPromptThumbnail(prompt),
+        h('div', { class: 'table-prompt-copy' }, [
+            h(NText, { strong: true, class: 'table-prompt-title' }, { default: () => prompt.title }),
+            h(NText, { depth: 3, class: 'table-prompt-description' }, {
+                default: () => prompt.description || prompt.content?.slice(0, 90) || '-'
+            })
+        ])
+    ]
+)
+
+const renderCategoryCell = (prompt: PromptWithRelations) => {
+    if (!prompt.category) return h(NText, { depth: 3 }, { default: () => t('promptManagement.noCategory') })
+    return h('span', { class: 'table-category-cell' }, [
+        h('span', {
+            class: 'category-color-dot',
+            style: { background: prompt.category.color || 'var(--content-secondary)' }
+        }),
+        prompt.category.name
+    ])
+}
+
+const renderTagsCell = (prompt: PromptWithRelations) => {
+    const tags = getTagsArray(prompt.tags || '')
+    if (!tags.length) return '-'
+    return h(NFlex, { size: 5, wrap: false, class: 'table-tags' }, {
+        default: () => [
+            ...tags.slice(0, 2).map(tag => h(NTag, {
+                size: 'small',
+                bordered: false,
+                color: getTagColor(tag)
+            }, { default: () => tag })),
+            ...(tags.length > 2
+                ? [h(NText, { depth: 3, class: 'table-tag-overflow' }, { default: () => `+${tags.length - 2}` })]
+                : [])
+        ]
+    })
+}
+
+const renderRowActions = (prompt: PromptWithRelations) => h(NFlex, { size: 3, justify: 'end', wrap: false }, {
+    default: () => [
+        h(NButton, {
+            size: 'small', quaternary: true, circle: true,
+            onClick: (event: Event) => { event.stopPropagation(); handleCopyPrompt(prompt) }
+        }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Copy) }) }),
+        h(NButton, {
+            size: 'small', quaternary: true, circle: true,
+            type: prompt.isFavorite ? 'warning' : 'default',
+            onClick: (event: Event) => { event.stopPropagation(); toggleFavorite(prompt.id!) }
+        }, {
+            icon: () => h(NIcon, {
+                size: 16,
+                color: prompt.isFavorite ? 'var(--accent-warning)' : undefined,
+            }, { default: () => h(Star) })
+        }),
+        h(NDropdown, {
+            options: getPromptActions(prompt),
+            iconSize: 16,
+            onSelect: (key: string) => handlePromptAction(key, prompt)
+        }, {
+            default: () => h(NButton, {
+                size: 'small', quaternary: true, circle: true,
+                onClick: (event: Event) => event.stopPropagation()
+            }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(DotsVertical) }) })
+        })
+    ]
+})
+
+const isInteractiveRowTarget = (event: MouseEvent) => {
+    const target = event.target
+    return target instanceof HTMLElement && Boolean(target.closest('button, a, input, .n-checkbox, .n-dropdown, .n-image'))
+}
+
+const getTableRowProps = (row: PromptWithRelations) => ({
+    class: 'prompt-data-row',
+    onClick: (event: MouseEvent) => {
+        if (!isInteractiveRowTarget(event)) emit('view', row)
+    }
+})
 
 // 表格列定义
 const tableColumns = computed(() => [
@@ -905,7 +710,7 @@ const tableColumns = computed(() => [
                         mousewheel: true,
                         direction: 'vertical',
                         dotPlacement: 'bottom',
-                        style: 'width: 50px; height: 50px; border-radius: 4px; overflow: hidden;'
+                        style: 'width: 50px; height: 50px; border-radius: var(--radius-image); overflow: hidden;'
                     },
                     {
                         default: () => row.imageBlobs!.map((blob: Blob, index: number) =>
@@ -916,7 +721,7 @@ const tableColumns = computed(() => [
                                     width: 50,
                                     height: 50,
                                     objectFit: 'cover',
-                                    style: 'border-radius: 4px;',
+                                    style: 'border-radius: var(--radius-image);',
                                     previewDisabled: false,
                                     lazy: true,
                                     onError: handleImageError,
@@ -934,7 +739,7 @@ const tableColumns = computed(() => [
                         width: 50,
                         height: 50,
                         objectFit: 'cover',
-                        style: 'border-radius: 4px;',
+                        style: 'border-radius: var(--radius-image);',
                         previewDisabled: false,
                         lazy: true,
                         onError: handleImageError,
@@ -1058,26 +863,41 @@ const tableColumns = computed(() => [
                 {
                     size: 'small',
                     text: true,
-                    type: row.isFavorite ? 'error' : 'default',
+                    type: row.isFavorite ? 'warning' : 'default',
                     onClick: (e: Event) => {
                         e.stopPropagation()
                         toggleFavorite(row.id!)
                     }
                 },
                 {
-                    icon: () => h(NIcon, null, { default: () => h(Heart) })
+                    icon: () => h(NIcon, {
+                        color: row.isFavorite ? 'var(--accent-warning)' : undefined,
+                    }, { default: () => h(Star) })
                 }
             )
         }
     },
-    {
+    ...(supportsGlobalShortcuts ? [{
         title: t('promptManagement.shortcutTrigger'),
         key: 'isShortcutTrigger',
         width: 100,
         render: (row: PromptWithRelations) => {
-
+            const binding = shortcutBindingFor(row.uuid)
+            return h(
+                NButton,
+                {
+                    size: 'small',
+                    text: true,
+                    type: binding ? 'primary' : 'default',
+                    onClick: (event: Event) => {
+                        event.stopPropagation()
+                        openShortcutBinding(row)
+                    }
+                },
+                { default: () => binding ? displayAccelerator(binding.accelerator) : t('shortcuts.assign') }
+            )
         }
-    },
+    }] : []),
     {
         title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
@@ -1121,29 +941,92 @@ const tableColumns = computed(() => [
     }
 ])
 
-// 加载树形数据
-const loadTreeData = async () => {
+const redesignedTableColumns = computed(() => {
+    const source = tableColumns.value
+    const titleFor = (key: string, fallback: string) => source.find(column => column.key === key)?.title || fallback
+    return [
+        { type: 'selection' as const, width: 42 },
+        {
+            title: titleFor('title', t('promptManagement.title')),
+            key: 'title',
+            width: 420,
+            render: renderPromptIdentity
+        },
+        {
+            title: titleFor('category', t('promptManagement.category')),
+            key: 'category',
+            width: 160,
+            render: renderCategoryCell
+        },
+        {
+            title: titleFor('tags', t('promptManagement.tags')),
+            key: 'tags',
+            width: 190,
+            render: renderTagsCell
+        },
+        {
+            title: titleFor('updatedAt', t('promptManagement.update')),
+            key: 'updatedAt',
+            width: 120,
+            render: (row: PromptWithRelations) => formatDate(row.updatedAt)
+        },
+        {
+            title: '',
+            key: 'actions',
+            width: 126,
+            render: renderRowActions
+        }
+    ]
+})
+
+// 加载文件夹视图数据。根目录默认只展示未分类提示词；存在内容筛选时跨分类展示结果。
+const applyFolderLocation = (categoryId = selectedCategory.value) => {
+    const globalResults = categoryId === null && Boolean(
+        searchText.value.trim() || selectedTag.value || showFavoritesOnly.value
+    )
+    prompts.value = globalResults
+        ? [...folderPromptCache.value]
+        : categoryId !== null
+            ? folderPromptCache.value.filter(prompt => prompt.categoryId === categoryId)
+            : folderPromptCache.value.filter(prompt => !prompt.categoryId)
+    totalCount.value = prompts.value.length
+}
+
+const loadFolderData = async (showLoading = !folderInitialized.value) => {
+    const requestId = ++folderLoadRequestId
     try {
-        initialLoading.value = true
-        treeData.value = await api.categories.getTreeWithPrompts.query()
-        // 同时更新统计信息
-        statistics.value = await api.prompts.getStatistics.query()
-        totalCount.value = statistics.value.totalCount || 0
+        if (showLoading) initialLoading.value = true
+        const filters = {
+            search: searchText.value || undefined,
+            tags: selectedTag.value || undefined,
+            isFavorite: showFavoritesOnly.value || undefined,
+            sortBy: sortType.value,
+        }
+        const [result, latestStatistics] = await Promise.all([
+            api.prompts.getAll.query(filters),
+            api.prompts.getStatistics.query(),
+        ])
+        if (requestId !== folderLoadRequestId) return
+        folderPromptCache.value = result.data || []
+        applyFolderLocation()
+        statistics.value = latestStatistics
+        folderInitialized.value = true
     } catch (error) {
-        message.error(t('promptManagement.loadTreeDataFailed'))
+        if (requestId !== folderLoadRequestId) return
+        message.error(t('promptManagement.loadFolderDataFailed'))
         console.error(error)
     } finally {
-        initialLoading.value = false
+        if (showLoading) initialLoading.value = false
     }
 }
 
 // 加载数据
-const loadPrompts = async (reset = true) => {
+const loadPrompts = async (reset = true, showLoading = reset) => {
     try {
         if (reset) {
-            initialLoading.value = true
+            if (showLoading) initialLoading.value = true
             currentPage.value = 1
-            prompts.value = []
+            if (showLoading) prompts.value = []
         } else {
             loadingMore.value = true
         }        // 加载统计信息（仅在首次加载时）
@@ -1195,6 +1078,7 @@ const loadPrompts = async (reset = true) => {
 // 切换视图模式
 const setViewMode = (mode: 'grid' | 'table' | 'tree') => {
     viewMode.value = mode
+    emit('view-mode-change', mode)
     // 切换到表格视图时清除选择并重新加载数据
     if (mode === 'table') {
         clearSelection()
@@ -1202,13 +1086,17 @@ const setViewMode = (mode: 'grid' | 'table' | 'tree') => {
         currentPage.value = 1
         loadPromptsForTable()
     } else if (mode === 'tree') {
-        // 切换到树形视图时加载树形数据
-        loadTreeData()
+        // 切换到文件夹视图时显示一次局部加载状态，避免短暂展示其他视图的数据。
+        loadFolderData(true)
     } else {
         // 切换到网格视图时重新加载数据
         loadPrompts(true)
     }
 }
+
+watch(() => props.forcedViewMode, (mode) => {
+    if (mode !== viewMode.value) setViewMode(mode)
+})
 
 // 清除选择
 const clearSelection = () => {
@@ -1237,7 +1125,7 @@ const handleBatchDelete = async () => {
         if (viewMode.value === 'table') {
             await loadPromptsForTable()
         } else if (viewMode.value === 'tree') {
-            await loadTreeData()
+            await loadFolderData()
         } else {
             await loadPrompts(true) // 重新加载数据
         }
@@ -1260,9 +1148,9 @@ const handleLoadMore = () => {
 }
 
 // 专门为表格视图加载数据的函数
-const loadPromptsForTable = async () => {
+const loadPromptsForTable = async (showLoading = true) => {
     try {
-        loadingMore.value = true
+        if (showLoading) loadingMore.value = true
 
         // 根据过滤条件加载显示的提示词（分页）
         const filters = {
@@ -1298,15 +1186,15 @@ const loadPromptsForTable = async () => {
         message.error(t('promptManagement.loadPromptsFailed'))
         console.error(error)
     } finally {
-        loadingMore.value = false
+        if (showLoading) loadingMore.value = false
     }
 }
 
-const loadCategories = async () => {
+const loadCategories = async (includeStatistics = true) => {
     try {
         categories.value = await api.categories.getAll.query()
         // 每次加载分类时都同时更新统计信息，确保计数准确
-        await loadStatistics()
+        if (includeStatistics) await loadStatistics()
     } catch (error) {
         message.error(t('promptManagement.loadCategoriesFailed'))
         console.error(error)
@@ -1320,7 +1208,7 @@ const handleSearch = () => {
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else if (viewMode.value === 'tree') {
-        loadTreeData()
+        loadFolderData()
     } else {
         loadPrompts(true) // 重置加载
     }
@@ -1333,7 +1221,7 @@ watch(sortType, () => {
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else if (viewMode.value === 'tree') {
-        loadTreeData()
+        loadFolderData()
     } else {
         loadPrompts(true) // 排序方式变化时重新加载数据
     }
@@ -1345,22 +1233,54 @@ const handleCategoryFilter = () => {
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else if (viewMode.value === 'tree') {
-        loadTreeData()
+        loadFolderData()
     } else {
         loadPrompts(true) // 重置加载
     }
 }
 
 const handleCategoryQuickFilter = (categoryId: number | null) => {
+    if (viewMode.value === 'tree') {
+        handleFolderNavigate(categoryId)
+        return
+    }
     selectedCategory.value = categoryId
     // 重置页码
     currentPage.value = 1
     if (viewMode.value === 'table') {
         loadPromptsForTable()
-    } else if (viewMode.value === 'tree') {
-        loadTreeData()
     } else {
         loadPrompts(true) // 重置加载
+    }
+}
+
+const handleFolderNavigate = (categoryId: number | null) => {
+    if (selectedCategory.value === categoryId) return
+    selectedCategory.value = categoryId
+    currentPage.value = 1
+    applyFolderLocation(categoryId)
+}
+
+const handleMovePrompt = async (prompt: PromptWithRelations, targetCategoryId: number | null) => {
+    if (!prompt.id || (prompt.categoryId ?? null) === targetCategoryId || movingPromptId.value !== null) return
+
+    movingPromptId.value = prompt.id
+
+    try {
+        await api.prompts.update.mutate({
+            id: prompt.id,
+            data: { categoryId: targetCategoryId ?? undefined },
+        })
+        await loadFolderData(false)
+        message.success(t('promptManagement.movePromptSuccess', {
+            name: targetCategoryId === null ? t('promptManagement.promptRoot') : getCategoryName(targetCategoryId),
+        }))
+        emit('refresh')
+    } catch (error) {
+        message.error(t('promptManagement.movePromptFailed'))
+        console.error('移动提示词失败:', error)
+    } finally {
+        movingPromptId.value = null
     }
 }
 
@@ -1379,7 +1299,7 @@ const toggleFavoritesFilter = () => {
     if (viewMode.value === 'table') {
         loadPromptsForTable()
     } else if (viewMode.value === 'tree') {
-        loadTreeData()
+        loadFolderData()
     } else {
         loadPrompts(true) // 重置加载
     }
@@ -1398,8 +1318,14 @@ const toggleAdvancedFilter = () => {
 const clearAllFilters = () => {
     searchText.value = ''
     selectedTag.value = ''
-    selectedCategory.value = null
     showFavoritesOnly.value = false
+    if (viewMode.value === 'tree') {
+        currentPage.value = 1
+        selectedCategory.value = null
+        loadFolderData(false)
+        return
+    }
+    selectedCategory.value = null
     handleSearch()
 }
 
@@ -1412,6 +1338,7 @@ const toggleFavorite = async (promptId: number) => {
         }
 
         await api.prompts.toggleFavorite.mutate(promptId)
+        if (viewMode.value === 'tree' && showFavoritesOnly.value) await loadFolderData()
         message.success(t('promptManagement.updateFavoriteSuccess'))
         emit('refresh')
     } catch (error) {
@@ -1456,17 +1383,22 @@ const getPromptActions = (prompt: PromptWithRelations) => [
     {
         label: t('promptManagement.edit'),
         key: 'edit',
-        icon: () => h(NIcon, null, { default: () => h(Edit) })
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Edit) })
     },
     {
         label: t('promptManagement.copyOriginalContent'),
         key: 'copyOriginal',
-        icon: () => h(NIcon, null, { default: () => h(Copy) })
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Copy) })
     },
+    ...(supportsGlobalShortcuts ? [{
+        label: shortcutBindingFor(prompt.uuid) ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding'),
+        key: 'shortcut',
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) })
+    }] : []),
     {
-        label: t('promptManagement.delete'),
+        label: () => h(NText, { type: 'error' }, { default: () => t('promptManagement.delete') }),
         key: 'delete',
-        icon: () => h(NIcon, null, { default: () => h(Trash) })
+        icon: () => h(NIcon, { size: 16, color: 'var(--error-color)' }, { default: () => h(Trash) })
     }
 ]
 
@@ -1484,55 +1416,74 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
         case 'copyOriginal':
             handleCopyOriginalPrompt(prompt)
             break
+        case 'shortcut':
+            openShortcutBinding(prompt)
+            break
         case 'delete':
             handleDeletePrompt(prompt)
             break
     }
 }
 
+const handleFolderPromptAction = (action: string, prompt: PromptWithRelations) => {
+    switch (action) {
+        case 'view':
+            emit('view', prompt)
+            break
+        case 'copy':
+            handleCopyPrompt(prompt)
+            break
+        case 'favorite':
+            if (prompt.id) toggleFavorite(prompt.id)
+            break
+        default:
+            handlePromptAction(action, prompt)
+    }
+}
+
+const shortcutBindingFor = (promptUUID: string): PromptShortcutBinding | undefined =>
+    shortcutState.value?.preferences.promptBindings.find(binding => binding.promptUUID === promptUUID)
+
+const displayAccelerator = (accelerator: string) => {
+    if (!navigator.platform.includes('Mac')) return accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Control/g, 'Ctrl')
+    return accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '')
+}
+
+const openShortcutBinding = (prompt: PromptWithRelations) => {
+    shortcutBindingPrompt.value = prompt
+    showShortcutBindingModal.value = true
+}
+
+const handleShortcutBindingSaved = async () => {
+    showShortcutBindingModal.value = false
+    shortcutState.value = await window.electronAPI.shortcuts.getState()
+}
+
 const handleCopyPrompt = async (prompt: PromptWithRelations) => {
     try {
-        let contentToCopy = prompt.content;
-
-        // 检查是否为 Jinja 模板
-        if (prompt.isJinjaTemplate) {
-            try {
-                // 生成默认变量值
-                const defaultVariables: Record<string, any> = {};
-                if (prompt.variables && prompt.variables.length > 0) {
-                    // 使用存储的变量配置
-                    prompt.variables.forEach((variable: any) => {
-                        defaultVariables[variable.name] = variable.defaultValue || `[${variable.name}]`;
-                    });
-                } else {
-                    // 从模板内容中提取变量
-                    const templateVariables = jinjaService.extractVariables(prompt.content);
-                    templateVariables.forEach(variableName => {
-                        defaultVariables[variableName] = `[${variableName}]`;
-                    });
-                }
-                
-                // 使用 Jinja 服务渲染模板
-                contentToCopy = jinjaService.render(prompt.content, defaultVariables);
-            } catch (error) {
-                console.error('Jinja 模板渲染失败:', error);
-                // 渲染失败时返回原始内容
-                contentToCopy = prompt.content;
-            }
-        } else {
-            // 变量模式：检查是否有变量配置
-            if (prompt.variables && prompt.variables.length > 0) {
-                // 变量替换逻辑
-                Object.entries(prompt.variables).forEach(([key, variable]: [string, any]) => {
-                    const regex = new RegExp(`\\{\\{${variable.name}\\}\\}`, "g");
-                    // 使用默认值替换变量，如果没有默认值则使用变量名
-                    const replacement = variable.defaultValue || `[${variable.name}]`;
-                    contentToCopy = contentToCopy.replace(regex, replacement);
-                });
-            }
+        const variables = Object.fromEntries(getRuntimeVariables(prompt).map(variable => [
+            variable.name,
+            variable.defaultValue === undefined || variable.defaultValue === ''
+                ? `[${variable.name}]`
+                : variable.defaultValue,
+        ]))
+        let contentToCopy = prompt.content
+        try {
+            contentToCopy = renderPromptContent(prompt, variables)
+        } catch (error) {
+            console.error('提示词默认变量渲染失败:', error)
         }
 
         await navigator.clipboard.writeText(contentToCopy)
+        if (prompt.id) {
+            const updated = await recordPromptUsage({
+                promptId: prompt.id,
+                content: contentToCopy,
+                variables,
+                incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+            })
+            prompt.useCount = updated.useCount
+        }
         message.success(t('promptManagement.copyPromptSuccess'))
     } catch (error) {
         message.error(t('promptManagement.copyFailed'))
@@ -1543,6 +1494,14 @@ const handleCopyPrompt = async (prompt: PromptWithRelations) => {
 const handleCopyOriginalPrompt = async (prompt: PromptWithRelations) => {
     try {
         await navigator.clipboard.writeText(prompt.content)
+        if (prompt.id) {
+            const updated = await recordPromptUsage({
+                promptId: prompt.id,
+                content: prompt.content,
+                incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+            })
+            prompt.useCount = updated.useCount
+        }
         message.success(t('promptManagement.copyOriginalContentSuccess'))
     } catch (error) {
         message.error(t('promptManagement.copyFailed'))
@@ -1557,7 +1516,7 @@ const handleDeletePrompt = async (prompt: PromptWithRelations) => {
             if (viewMode.value === 'table') {
                 await loadPromptsForTable()
             } else if (viewMode.value === 'tree') {
-                await loadTreeData()
+                await loadFolderData()
             } else {
                 await loadPrompts(true) // 重置加载
             }
@@ -1589,20 +1548,55 @@ const loadStatistics = async () => {
     }
 }
 
+const reloadRealtimeData = async (showLoading = false) => {
+    await loadCategories(false)
+    if (viewMode.value === 'table') {
+        await Promise.all([loadPromptsForTable(showLoading), loadStatistics()])
+    } else if (viewMode.value === 'tree') {
+        await loadFolderData(showLoading)
+    } else {
+        await loadPrompts(true, showLoading)
+    }
+}
+
+const runRealtimeRefresh = (showLoading = false): Promise<void> => {
+    realtimeRefreshPending = true
+    if (realtimeRefreshPromise) return realtimeRefreshPromise
+
+    realtimeRefreshPromise = (async () => {
+        try {
+            do {
+                realtimeRefreshPending = false
+                await reloadRealtimeData(showLoading)
+                showLoading = false
+            } while (realtimeRefreshPending)
+        } finally {
+            realtimeRefreshPromise = null
+        }
+    })()
+    return realtimeRefreshPromise
+}
+
+const scheduleRealtimeRefresh = () => {
+    realtimeRefreshPending = true
+    if (realtimeRefreshTimer) return
+
+    realtimeRefreshTimer = setTimeout(() => {
+        realtimeRefreshTimer = null
+        void runRealtimeRefresh()
+    }, 80)
+}
+
+const unsubscribeDataChanges = onDataChange(
+    ['prompts', 'categories', 'promptVariables'],
+    scheduleRealtimeRefresh,
+)
+
 // 组件挂载时加载数据
 onMounted(async () => {
+    if (supportsGlobalShortcuts && window.electronAPI?.shortcuts) shortcutState.value = await window.electronAPI.shortcuts.getState()
     await waitForDatabase()
-    // 先加载统计信息和分类，确保 totalCount 有正确值
-    await loadStatistics()
-    await loadCategories()
-    // 然后根据初始视图模式选择正确的加载方法
-    if (viewMode.value === 'table') {
-        await loadPromptsForTable()
-    } else if (viewMode.value === 'tree') {
-        await loadTreeData()
-    } else {
-        await loadPrompts(true) // 初始加载
-    }
+    await runRealtimeRefresh(true)
 })
 
 // 图片处理函数
@@ -1688,6 +1682,8 @@ const hasValidImage = (prompt: PromptWithRelations) => {
 
 // 组件卸载时清理URL缓存
 onBeforeUnmount(() => {
+    unsubscribeDataChanges()
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
     // 清理所有创建的Blob URL
     imageUrlCache.forEach(url => {
         URL.revokeObjectURL(url);
@@ -1702,44 +1698,176 @@ defineExpose({
         if (viewMode.value === 'table') {
             loadPromptsForTable()
         } else if (viewMode.value === 'tree') {
-            loadTreeData()
+            loadFolderData()
         } else {
             loadPrompts(true)
         }
     },
     loadCategories,
-    loadStatistics
+    loadStatistics,
+    setViewMode,
 })
 </script>
 
 <style scoped>
 .prompt-list {
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.prompt-filter-bar {
+    flex: 0 0 auto;
+    padding: var(--compact-padding);
+    background: var(--surface-secondary);
+}
+
+.prompt-filter-bar :deep(.n-button),
+.prompt-filter-bar :deep(.n-input),
+.prompt-filter-bar :deep(.n-base-selection) {
+    font-size: 14px;
+}
+
+.prompt-filter-bar :deep(.n-button__icon) {
+    font-size: 16px;
+}
+
+.prompt-toolbar-row { gap: 8px !important; }
+.prompt-search-input { flex: 1 1 320px; min-width: 240px; }
+.prompt-sort-select { width: 164px; }
+.active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--border-default); color: var(--content-secondary); font-size: 12px; }
+.advanced-filter-panel { max-height: min(30vh, 260px); margin-top: 4px; padding: 10px 6px 2px 2px; overflow-y: auto; border-top: 1px solid var(--border-default); }
+.batch-action-bar { margin-top: 12px; }
+.batch-action-bar :deep(.n-card) { box-shadow: none; }
+
+.prompt-list-body,
+.prompt-list-results {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.prompt-list-state {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    padding: 40px;
+    text-align: center;
+}
+
+.grid-scroll-region {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .prompt-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 16px;
-    margin-top: 16px;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
 }
 
 .prompt-card {
-    transition: all 0.3s ease;
+    min-height: 176px;
+    border-radius: var(--radius-panel);
+    min-width: 0;
+    transition: border-color .16s ease, background-color .16s ease;
     cursor: pointer;
+    box-shadow: none;
 }
 
 .prompt-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--border-strong);
+    background: var(--surface-secondary);
+    box-shadow: none;
 }
+
+.prompt-card :deep(.n-card-header) {
+    padding: 13px 13px 9px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    border-bottom: 0;
+}
+
+.prompt-card :deep(.n-card-header__main) {
+    flex: 1 1 auto;
+    overflow: hidden;
+    font-size: var(--font-size-base);
+    min-width: 0;
+}
+
+.prompt-card :deep(.n-card-header__extra) {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.prompt-card :deep(.n-card__content) {
+    padding: 10px 13px 12px;
+    font-size: var(--font-size-base);
+}
+
+.prompt-card :deep(.n-card__footer) {
+    padding: 9px 13px 11px;
+    border-top: 0;
+}
+
+.prompt-card :deep(.n-button__icon) { font-size: var(--font-size-lg); }
+
+.prompt-card-title-block { width: 100%; min-width: 0; overflow: hidden; }
+.prompt-card-title { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); }
+.prompt-card-main { min-height: 76px; }
+.prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--radius-image); }
+.prompt-card-footer { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.prompt-card-taxonomy-tag { flex: 0 1 auto; min-width: 0; max-width: 92px; }
+.prompt-card-taxonomy-tag :deep(.n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.prompt-card-tag-overflow { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+.prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.data-view-surface { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; overflow: hidden; border-radius: var(--radius-panel); }
+.data-view-surface :deep(.n-data-table) { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.data-view-surface :deep(.n-data-table-wrapper),
+.data-view-surface :deep(.n-data-table-base-table),
+.data-view-surface :deep(.n-data-table-base-table-body) { min-height: 0; }
+.data-view-surface :deep(.n-data-table-wrapper),
+.data-view-surface :deep(.n-data-table-base-table) { flex: 1 1 0; }
+.data-view-surface :deep(.n-data-table-th) { height: 40px; background: var(--surface-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.data-view-surface :deep(.n-data-table-td) { height: 58px; font-size: var(--font-size-base); }
+.data-view-surface :deep(.prompt-data-row) { cursor: pointer; }
+.data-view-surface :deep(.prompt-data-row:hover .n-data-table-td) { background: var(--interactive-hover); }
+.data-view-surface :deep(.table-prompt-cell) { width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 11px; vertical-align: middle; }
+.data-view-surface :deep(.table-prompt-thumbnail), .data-view-surface :deep(.table-prompt-placeholder) { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--radius-image); }
+.data-view-surface :deep(.table-prompt-placeholder) { display: grid; place-items: center; border: 1px solid var(--border-default); color: var(--content-secondary); background: var(--surface-secondary); }
+.data-view-surface :deep(.table-prompt-copy) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.data-view-surface :deep(.table-prompt-title) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.data-view-surface :deep(.table-prompt-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.data-view-surface :deep(.category-color-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+.data-view-surface :deep(.table-tags) { overflow: hidden; }
+.data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }
+.data-view-surface :deep(.table-tags .n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.data-view-surface :deep(.table-tag-overflow) { font-size: 12px; }
 
 /* 高亮匹配的标签 */
 .highlighted-tag {
-    border: 1px solid var(--n-color-primary) !important;
-    transform: scale(1.02);
-    transition: all 0.3s ease;
+    background: var(--interactive-active) !important;
+    font-weight: var(--font-weight-medium);
 }
 
 /* 描述文本和内容预览的多行截断样式 */
@@ -1751,10 +1879,13 @@ defineExpose({
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.4;
-    max-height: calc(1.4em * 3);
-    /* 限制最大高度为3行 */
+    line-height: var(--line-height-normal);
     word-break: break-word;
+}
+
+@media (max-width: 900px) {
+    .prompt-sort-select { width: 140px; }
+    .prompt-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 }
 
 /* 轮播图样式 - 已移除，现在使用NImage组件 */

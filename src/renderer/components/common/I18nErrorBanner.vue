@@ -101,21 +101,16 @@ onMounted(() => {
     right: 0;
     z-index: 9999;
     padding: 16px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 2px solid var(--error-color);
+    background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
+    border-bottom: 1px solid var(--accent-error);
 }
 
 .error-item {
-    background: var(--error-color-suppl);
+    background: var(--surface-primary);
     padding: 8px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     margin: 4px 0;
-    border-left: 3px solid var(--error-color);
-}
-
-/* 深色主题适配 */
-[data-theme="dark"] .i18n-error-banner {
-    background: rgba(0, 0, 0, 0.95);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--accent-error);
 }
 </style>

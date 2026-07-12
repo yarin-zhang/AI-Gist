@@ -1,13 +1,15 @@
 <template>
-    <NCard>
-        <NFlex vertical :size="20">
+    <NCard size="small">
+        <NTabs v-model:value="activeBackupLocation" type="line" animated>
+            <NTabPane name="local" :tab="t('dataBackup.local')">
+                <NFlex vertical :size="16" style="padding-top: 4px;">
 
             <!-- 数据备份恢复 -->
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.backupManagement') }}</NText>
-                        <NFlex :size="12">
+                        <NText strong>{{ t('dataManagement.backupManagement') }}</NText>
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleCreateBackup" :loading="loading.backup">
                                 <template #icon>
                                     <NIcon>
@@ -38,7 +40,7 @@
                     <!-- 备份版本列表 -->
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
-                            <NText depth="2">{{ t('dataManagement.backupVersionList') }}</NText>
+                            <NText strong>{{ t('dataManagement.backupVersionList') }}</NText>
                             <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
                                 <NGridItem v-for="backup in paginatedBackups" :key="backup.id"
                                     span="6 600:5 900:4 1200:3 1500:2 1800:1">
@@ -59,7 +61,8 @@
                                         <template #action>
                                             <NFlex justify="space-between" align="center" style="width: 100%;">
                                                 <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
-                                                    negative-text="取消" positive-text="确定恢复" placement="top"
+                                                    :negative-text="t('common.cancel')"
+                                                    :positive-text="t('dataBackup.confirmRestore')" placement="top"
                                                     :show-icon="false">
                                                     <template #trigger>
                                                         <NButton type="primary" size="small"
@@ -78,7 +81,8 @@
                                                     </div>
                                                 </NPopconfirm>
                                                 <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
-                                                    negative-text="取消" positive-text="确定">
+                                                    :negative-text="t('common.cancel')"
+                                                    :positive-text="t('common.confirm')">
                                                     <template #trigger>
                                                         <NButton type="error" secondary size="small">
                                                             <template #icon>
@@ -99,7 +103,7 @@
 
                             <!-- 分页组件 -->
                             <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination v-model:page="currentPage" :page-size="pageSize"
+                                <NPagination v-model:page="currentPage" v-model:page-size="pageSize"
                                     :item-count="totalItems" show-size-picker show-quick-jumper
                                     :page-sizes="[6, 12, 18]" />
                             </div>
@@ -120,12 +124,12 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.fullBackupManagement') }}</NText>
+                        <NText strong>{{ t('dataManagement.fullBackupManagement') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.fullBackupDescription') }}
                         </NText>
 
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleExportFullBackup" :loading="loading.export">
                                 <template #icon>
                                     <NIcon>
@@ -153,7 +157,7 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.selectiveDataExport') }}</NText>
+                        <NText strong>{{ t('dataManagement.selectiveDataExport') }}</NText>
                         <NText depth="3" style="font-size: 12px; ">
                             {{ t('dataManagement.exportDescription') }}
                         </NText>
@@ -168,21 +172,21 @@
                                         @update:checked="handleTypeSelection('prompts', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.prompts }} 条</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.promptCount', { count: dataStats.prompts }) }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
                                         @update:checked="handleTypeSelection('categories', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.categories }} 个</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.categoryCount', { count: dataStats.categories }) }}</NTag>
                                         </NFlex>
                                     </NRadio>
                                     <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
                                         @update:checked="handleTypeSelection('aiConfigs', $event)">
                                         <NFlex align="center" :size="8">
                                             <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">{{ dataStats.aiConfigs }} 个</NTag>
+                                            <NTag size="small" type="info">{{ t('dataManagement.aiConfigCount', { count: dataStats.aiConfigs }) }}</NTag>
                                             <NTag size="small" type="warning">{{
                                                 t('dataManagement.containsSensitiveInfo') }}</NTag>
                                         </NFlex>
@@ -191,7 +195,7 @@
                             </NFlex>
                         </NCard>
 
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" type="primary"
                                 @click="handleExportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
                                 :loading="loading.export">
@@ -232,11 +236,11 @@
             <div>
                 <NFlex vertical :size="16">
                     <NFlex vertical :size="12">
-                        <NText depth="2">{{ t('dataManagement.databaseMaintenance') }}</NText>
+                        <NText strong>{{ t('dataManagement.databaseMaintenance') }}</NText>
                         <NText depth="3" style="font-size: 12px">
                             {{ t('dataManagement.maintenanceDescription') }}
                         </NText>
-                        <NFlex :size="12">
+                        <NFlex :size="12" wrap>
                             <NButton type="primary" @click="handleCheckDatabaseHealth">
                                 <template #icon>
                                     <NIcon>
@@ -289,7 +293,65 @@
             <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
                 {{ success }}
             </NAlert>
-        </NFlex>
+                </NFlex>
+            </NTabPane>
+
+            <NTabPane v-for="config in storageConfigs" :key="config.id" :name="config.id"
+                :tab="config.name" :disabled="!config.enabled" display-directive="show:lazy">
+                <CloudBackupLocationPane :config="config" />
+            </NTabPane>
+        </NTabs>
+
+        <NAlert v-if="storageConfigs.length === 0" type="info" style="margin-top: var(--section-gap);">
+            {{ t('dataBackup.noCloudStorageDescription') }}
+            <template #action>
+                <NButton size="small" secondary @click="emit('navigate-section', 'cloud-backup')">
+                    {{ t('dataBackup.configureCloudStorage') }}
+                </NButton>
+            </template>
+        </NAlert>
+
+        <NCollapse v-else style="margin-top: var(--section-gap);">
+            <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
+                <NFlex vertical :size="16" style="padding-top: 4px;">
+                    <NText depth="3" style="font-size: 12px;">
+                        {{ t('dataBackup.automaticBackupDescription') }}
+                    </NText>
+                    <NFlex align="center" justify="space-between" :size="12" wrap>
+                        <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
+                        <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
+                    </NFlex>
+                    <NFlex align="center" :size="12" wrap>
+                        <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080"
+                            :step="60" style="width: 180px;">
+                            <template #suffix>{{ t('dataBackup.minutes') }}</template>
+                        </NInputNumber>
+                        <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
+                            style="width: 160px;">
+                            <template #suffix>{{ t('dataBackup.copies') }}</template>
+                        </NInputNumber>
+                        <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
+                            {{ t('dataBackup.saveAutomaticBackupSettings') }}
+                        </NButton>
+                        <NButton secondary @click="runAutoBackupNow"
+                            :loading="autoBackupStatus.status === 'backing-up'">
+                            {{ t('dataBackup.createNow') }}
+                        </NButton>
+                    </NFlex>
+                    <NText depth="3" style="font-size: 12px;">
+                        {{ t('dataBackup.lastAutomaticBackup', {
+                            time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
+                        }) }}
+                        <template v-if="autoBackupStatus.nextBackupAt">
+                            · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
+                        </template>
+                        <template v-if="autoBackupStatus.error">
+                            · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+                        </template>
+                    </NText>
+                </NFlex>
+            </NCollapseItem>
+        </NCollapse>
     </NCard>
 </template>
 
@@ -309,6 +371,13 @@ import {
     NRadio,
     NGrid,
     NGridItem,
+    NTabs,
+    NTabPane,
+    NCollapse,
+    NCollapseItem,
+    NSwitch,
+    NInputNumber,
+    useMessage,
 } from "naive-ui";
 import {
     FileExport,
@@ -324,13 +393,33 @@ import {
     Archive,
     Folder,
 } from "@vicons/tabler";
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useDataManagement } from '@renderer/composables/useDataManagement';
 import { PlatformDetector } from '@shared/platform';
+import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
+import {
+    automaticBackupService,
+    DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
+    DEFAULT_AUTO_BACKUP_RETENTION,
+} from '@/lib/services/automatic-backup.service';
+import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
+import type { CloudStorageConfig } from '@shared/types/cloud-backup';
+import CloudBackupLocationPane from './CloudBackupLocationPane.vue';
 
 const { t } = useI18n();
+const message = useMessage();
 const capabilities = PlatformDetector.getCapabilities();
+const emit = defineEmits<{ 'navigate-section': [section: string] }>();
+
+const activeBackupLocation = ref('local');
+const storageConfigs = ref<CloudStorageConfig[]>([]);
+const autoBackupEnabled = ref(true);
+const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
+const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION);
+const autoBackupLoading = ref(false);
+const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus());
+let unsubscribeBackupStatus: (() => void) | null = null;
 
 // 使用数据管理 composable
 const {
@@ -457,16 +546,72 @@ const handleClearDatabase = async () => {
     await clearDatabase();
 };
 
+const loadStorageConfigs = async () => {
+    try {
+        storageConfigs.value = await CloudBackupAPI.getStorageConfigs();
+        if (activeBackupLocation.value !== 'local' &&
+            !storageConfigs.value.some(config => config.id === activeBackupLocation.value && config.enabled)) {
+            activeBackupLocation.value = 'local';
+        }
+    } catch (error) {
+        console.error('加载云端存储配置失败:', error);
+        message.error(t('dataBackup.loadStorageConfigsFailed'));
+    }
+};
+
+const loadAutomaticBackupSettings = async () => {
+    [autoBackupEnabled.value, autoBackupIntervalMinutes.value, autoBackupRetention.value] = await Promise.all([
+        automaticBackupService.getEnabled(),
+        automaticBackupService.getIntervalMinutes(),
+        automaticBackupService.getRetention(),
+    ]);
+};
+
+const saveAutoBackupEnabled = async (enabled: boolean) => {
+    autoBackupEnabled.value = await automaticBackupService.setEnabled(enabled);
+    message.success(enabled ? t('dataBackup.automaticBackupEnabled') : t('dataBackup.automaticBackupDisabled'));
+};
+
+const saveAutoBackupSettings = async () => {
+    autoBackupLoading.value = true;
+    try {
+        autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
+        autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value);
+        message.success(t('dataBackup.automaticBackupSettingsSaved'));
+    } catch (error) {
+        console.error('保存自动备份设置失败:', error);
+        message.error(t('dataBackup.automaticBackupSettingsSaveFailed'));
+    } finally {
+        autoBackupLoading.value = false;
+    }
+};
+
+const runAutoBackupNow = async () => {
+    await automaticBackupService.runNow('manual');
+    const status = automaticBackupService.getStatus();
+    if (status.error) message.error(status.error);
+    else message.success(t('dataBackup.automaticBackupCompleted'));
+};
+
+const formatBackupDate = (value: string) => new Date(value).toLocaleString();
+
 // 监听备份列表变化
 watch(() => backupList.value.length, (newLength, oldLength) => {
     console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
 });
+watch(pageSize, () => { currentPage.value = 1; });
 
 // 初始化
 onMounted(async () => {
+    unsubscribeBackupStatus = automaticBackupService.onStatusChange(status => {
+        autoBackupStatus.value = status;
+    });
     console.log('组件挂载，开始加载数据...');
-    // 加载备份列表
-    await getBackupList();
+    await Promise.all([
+        getBackupList(),
+        loadStorageConfigs(),
+        loadAutomaticBackupSettings(),
+    ]);
     console.log('备份列表加载完成，当前长度:', backupList.value.length);
     
     // 加载数据统计
@@ -476,6 +621,10 @@ onMounted(async () => {
     }
     console.log('数据统计加载完成');
 });
+
+onUnmounted(() => {
+    unsubscribeBackupStatus?.();
+});
 </script>
 
 <style scoped>
@@ -484,6 +633,6 @@ onMounted(async () => {
     justify-content: center;
     margin-top: 16px;
     padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-default);
 }
 </style>

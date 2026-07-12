@@ -2,14 +2,16 @@ html.ai-gist-mobile {
   --mobile-tabbar-height: 64px;
   --mobile-page-gutter: 16px;
   --mobile-touch-target: 44px;
-  --mobile-surface-border: rgb(17 24 39 / 10%);
-  --mobile-elevated-shadow: 0 12px 32px rgb(15 23 42 / 12%);
+  --mobile-surface-border: var(--border-default);
+  --mobile-elevated-shadow: var(--shadow-popover);
+  --ion-background-color: var(--surface-body);
+  --ion-text-color: var(--content-primary);
+  --ion-border-color: var(--border-default);
+  --ion-toolbar-background: var(--surface-primary);
+  --ion-tab-bar-background: var(--surface-primary);
+  --ion-item-background: var(--surface-primary);
+  --ion-card-background: var(--surface-primary);
   --ion-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-}
-
-html.ai-gist-mobile.ion-palette-dark {
-  --mobile-surface-border: rgb(255 255 255 / 12%);
-  --mobile-elevated-shadow: 0 14px 34px rgb(0 0 0 / 28%);
 }
 
 body.ai-gist-mobile {
@@ -18,10 +20,13 @@ body.ai-gist-mobile {
 }
 
 html.ai-gist-mobile ion-content {
+  --background: var(--surface-body);
   --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
 }
 
 html.ai-gist-mobile ion-toolbar {
+  --background: var(--surface-primary);
+  --border-color: var(--border-default);
   --min-height: 52px;
 }
 
@@ -30,10 +35,23 @@ html.ai-gist-mobile ion-title {
 }
 
 html.ai-gist-mobile ion-item {
+  --background: var(--surface-primary);
+  --border-color: var(--border-default);
   --min-height: var(--mobile-touch-target);
 }
 
+html.ai-gist-mobile ion-list {
+  background: var(--surface-primary);
+}
+
+html.ai-gist-mobile ion-card {
+  --background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+}
+
 html.ai-gist-mobile ion-tab-bar {
+  --background: var(--surface-primary);
+  border-top-color: var(--border-default);
   min-height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -52,11 +70,22 @@ html.ai-gist-mobile ion-fab-button {
 }
 
 html.ai-gist-mobile ion-modal ion-content {
+  --background: var(--surface-body);
   --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
 }
 
 html.ai-gist-mobile ion-searchbar {
+  --background: var(--surface-secondary);
+  --color: var(--content-primary);
+  --placeholder-color: var(--content-secondary);
   --box-shadow: none;
   padding-inline-start: 12px;
   padding-inline-end: 12px;
+}
+
+html.ai-gist-mobile ion-alert,
+html.ai-gist-mobile ion-action-sheet,
+html.ai-gist-mobile ion-loading,
+html.ai-gist-mobile ion-picker {
+  --background: var(--surface-primary);
 }

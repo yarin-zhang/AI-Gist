@@ -1,6 +1,7 @@
 import type {
   CloudBackupInfo,
   CloudStorageConfig,
+  CloudBackupCreateOptions,
   WebDAVConfig
 } from '@shared/types/cloud-backup';
 import {
@@ -26,6 +27,13 @@ import {
 import {
   assertValidCloudSyncSnapshotFile
 } from '@shared/cloud-sync-snapshots';
+import type {
+  CloudSyncV2ObjectStorageAdapter,
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '@shared/cloud-sync-v2-repository';
 import { DatabaseServiceManager } from './database-manager.service';
 
 const STORAGE_CONFIGS_KEY = 'ai-gist:web:cloud-storage-configs';
@@ -35,6 +43,17 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+interface CloudSyncV2ReadResponse {
+  path: string;
+  dataBase64: string;
+  etag?: string;
+  byteLength: number;
+}
+
+interface CloudSyncV2StatResponse extends CloudSyncV2StoredObjectInfo {
+  isDirectory?: boolean;
 }
 
 export class WebCloudBackupService {
@@ -147,17 +166,22 @@ export class WebCloudBackupService {
     return this.request<CloudBackupInfo[]>('/api/cloud/webdav/list-backups', { config });
   }
 
-  async createCloudBackup(storageId: string, description?: string): Promise<{
+  async createCloudBackup(storageId: string, options?: string | CloudBackupCreateOptions): Promise<{
     success: boolean;
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
   }> {
     try {
+      const normalizedOptions = typeof options === 'string' ? { description: options } : options;
       const config = await this.getWebDAVConfig(storageId);
-      const exportResult = await databaseService.exportAllDataForBackup();
-      if (!exportResult.success || !exportResult.data) {
-        throw new Error(exportResult.error || exportResult.message || '导出本地数据失败');
+      let backupDataToWrite = normalizedOptions?.data;
+      if (!backupDataToWrite) {
+        const exportResult = await databaseService.exportAllDataForBackup();
+        if (!exportResult.success || !exportResult.data) {
+          throw new Error(exportResult.error || exportResult.message || '导出本地数据失败');
+        }
+        backupDataToWrite = exportResult.data;
       }
 
       const createdAt = new Date().toISOString();
@@ -167,9 +191,13 @@ export class WebCloudBackupService {
       const backupData = createBackupPayload({
         id,
         name,
-        description: description || 'Web 端云端备份',
+        description: normalizedOptions?.description || 'Web 端云端备份',
         createdAt,
-        data: exportResult.data
+        data: backupDataToWrite,
+        backupType: normalizedOptions?.backupType,
+        trigger: normalizedOptions?.trigger,
+        deviceId: normalizedOptions?.deviceId,
+        dataChecksum: normalizedOptions?.dataChecksum
       });
 
       const backupInfo = await this.request<CloudBackupInfo>('/api/cloud/webdav/write-backup', {
@@ -323,6 +351,92 @@ export class WebCloudBackupService {
     }
   }
 
+  async readCloudSyncV2Object(
+    storageId: string,
+    path: string
+  ): Promise<CloudSyncV2StoredObject | null> {
+    const config = await this.getWebDAVConfig(storageId);
+    const result = await this.request<CloudSyncV2ReadResponse | null>('/api/cloud/webdav/sync-v2/read', {
+      config,
+      path: this.normalizeCloudSyncV2TransportPath(path)
+    });
+    if (!result) {
+      return null;
+    }
+    this.normalizeCloudSyncV2TransportPath(result.path);
+    const data = this.decodeBase64(result.dataBase64);
+    if (result.byteLength !== data.byteLength) {
+      throw new Error(`sync-v2 对象长度校验失败: ${path}`);
+    }
+    return { data, etag: result.etag };
+  }
+
+  async writeCloudSyncV2Object(
+    storageId: string,
+    path: string,
+    data: Uint8Array,
+    options: CloudSyncV2ObjectWriteOptions = {}
+  ): Promise<CloudSyncV2ObjectWriteResult> {
+    if (!(data instanceof Uint8Array)) {
+      throw new Error('sync-v2 对象内容必须是 Uint8Array');
+    }
+    if (options.ifAbsent && options.expectedEtag !== undefined) {
+      throw new Error('ifAbsent 与 expectedEtag 不能同时使用');
+    }
+    const config = await this.getWebDAVConfig(storageId);
+    return this.request<CloudSyncV2ObjectWriteResult>('/api/cloud/webdav/sync-v2/write', {
+      config,
+      path: this.normalizeCloudSyncV2TransportPath(path),
+      dataBase64: this.encodeBase64(data),
+      ifMatch: options.expectedEtag,
+      ifNoneMatch: options.ifAbsent ? '*' : undefined
+    });
+  }
+
+  async listCloudSyncV2Objects(
+    storageId: string,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    const config = await this.getWebDAVConfig(storageId);
+    const objects = await this.request<CloudSyncV2StoredObjectInfo[]>('/api/cloud/webdav/sync-v2/list', {
+      config,
+      prefix: this.normalizeCloudSyncV2TransportPath(prefix)
+    });
+    return objects.map(object => ({
+      ...object,
+      path: this.toCanonicalCloudSyncV2Path(object.path)
+    }));
+  }
+
+  async statCloudSyncV2Object(
+    storageId: string,
+    path: string
+  ): Promise<CloudSyncV2StatResponse | null> {
+    const config = await this.getWebDAVConfig(storageId);
+    const result = await this.request<CloudSyncV2StatResponse | null>('/api/cloud/webdav/sync-v2/stat', {
+      config,
+      path: this.normalizeCloudSyncV2TransportPath(path)
+    });
+    return result ? { ...result, path: this.toCanonicalCloudSyncV2Path(result.path) } : null;
+  }
+
+  async deleteCloudSyncV2Object(storageId: string, path: string): Promise<void> {
+    const config = await this.getWebDAVConfig(storageId);
+    await this.request('/api/cloud/webdav/sync-v2/delete', {
+      config,
+      path: this.normalizeCloudSyncV2TransportPath(path)
+    });
+  }
+
+  createCloudSyncV2ObjectStorageAdapter(storageId: string): CloudSyncV2ObjectStorageAdapter {
+    return {
+      read: path => this.readCloudSyncV2Object(storageId, path),
+      write: (path, data, options) => this.writeCloudSyncV2Object(storageId, path, data, options),
+      delete: path => this.deleteCloudSyncV2Object(storageId, path),
+      list: prefix => this.listCloudSyncV2Objects(storageId, prefix)
+    };
+  }
+
   private saveStorageConfigs(configs: CloudStorageConfig[]): void {
     localStorage.setItem(STORAGE_CONFIGS_KEY, JSON.stringify(configs));
   }
@@ -402,6 +516,47 @@ export class WebCloudBackupService {
   private isRevisionConflictError(error: unknown): boolean {
     return /manifest 已被其他设备更新|Precondition|412|If-Match|If-None-Match|已被其他设备更新/i
       .test(this.formatError(error));
+  }
+
+  private normalizeCloudSyncV2TransportPath(path: string): string {
+    if (typeof path !== 'string' || !path || path.length > 2048 || /[%\\\0\r\n?#]/.test(path) || /^[a-zA-Z]:/.test(path)) {
+      throw new Error('sync-v2 对象路径无效');
+    }
+    const relative = path.startsWith('/') ? path.slice(1) : path;
+    if (relative.startsWith('/') || relative.endsWith('/')) {
+      throw new Error('sync-v2 对象路径必须是规范路径');
+    }
+    const segments = relative.split('/');
+    if (segments.some(segment => !segment || segment === '.' || segment === '..') ||
+        segments[0] !== 'AI-Gist-Backup' || segments[1] !== 'sync-v2') {
+      throw new Error('sync-v2 对象路径超出允许的命名空间');
+    }
+    return segments.join('/');
+  }
+
+  private toCanonicalCloudSyncV2Path(path: string): string {
+    return `/${this.normalizeCloudSyncV2TransportPath(path)}`;
+  }
+
+  private encodeBase64(data: Uint8Array): string {
+    const chunks: string[] = [];
+    for (let offset = 0; offset < data.byteLength; offset += 0x8000) {
+      chunks.push(String.fromCharCode(...data.subarray(offset, offset + 0x8000)));
+    }
+    return btoa(chunks.join(''));
+  }
+
+  private decodeBase64(input: string): Uint8Array {
+    if (typeof input !== 'string' ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input)) {
+      throw new Error('Web 后端返回了无效的 sync-v2 base64 内容');
+    }
+    const binary = atob(input);
+    const data = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      data[index] = binary.charCodeAt(index);
+    }
+    return data;
   }
 }
 

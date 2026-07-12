@@ -126,6 +126,7 @@ import {
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { recordPromptUsage } from '~/lib/utils/prompt-usage'
 import type { Prompt, Category } from '@shared/types'
 
 const { t } = useI18n()
@@ -242,7 +243,11 @@ const copyContent = async () => {
   try {
     await navigator.clipboard.writeText(prompt.value.content)
     try {
-      const updated = await api.prompts.incrementUseCount.mutate(prompt.value.id!)
+      const updated = await recordPromptUsage({
+        promptId: prompt.value.id!,
+        content: prompt.value.content,
+        incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
+      })
       prompt.value.useCount = updated.useCount
     } catch (usageError) {
       console.warn('更新提示词使用次数失败:', usageError)
@@ -439,10 +444,10 @@ onUnmounted(() => {
 }
 
 .prompt-content-wrapper {
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid var(--ion-color-light-shade);
+  border: 1px solid var(--border-default);
 }
 
 .prompt-content {
@@ -473,15 +478,15 @@ ion-chip {
 
 .prompt-image {
   width: calc(50% - 4px);
-  border-radius: 8px;
+  border-radius: var(--radius-image, 8px);
   object-fit: cover;
   aspect-ratio: 1;
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   cursor: pointer;
 }
 
 .preview-content {
-  --background: rgba(0, 0, 0, 0.9);
+  --background: var(--overlay-preview);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -491,6 +496,6 @@ ion-chip {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--radius-image, 8px);
 }
 </style>

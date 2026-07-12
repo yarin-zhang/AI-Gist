@@ -1,215 +1,165 @@
 <template>
     <div class="ai-generator">
-        <!-- 没有AI 配置时显示的空状态 -->
-        <n-empty v-if="configs.length === 0 && !loading" :description="t('aiGenerator.noConfigAvailable')" size="large" style="margin: 40px 0;">
-            <template #icon>
-                <n-icon size="48" :color="'var(--text-color-3)'">
-                    <Robot />
-                </n-icon>
-            </template>
-            <template #extra>
-                <n-space vertical align="center">
-                    <n-text depth="3" style="margin-bottom: 16px;">
-                        {{ t('aiGenerator.addConfigFirst') }}
-                    </n-text>
-                    <n-button type="primary" @click="navigateToAIConfig">
-                        <template #icon>
-                            <n-icon>
-                                <Plus />
-                            </n-icon>
-                        </template>
-                        {{ t('aiGenerator.addAIConfig') }}
-                    </n-button>
-                </n-space>
-            </template>
-        </n-empty> <!-- 有AI 配置时显示的生成工具 -->
-        <div v-if="configs.length > 0" class="ai-generator-layout">
-            <!-- 主要内容区 -->
-            <div class="main-content">
-                <n-card :title="t('aiGenerator.title')" class="generator-card">
-                    <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="top">
-                        <n-form-item :label="t('aiGenerator.requirement')" path="topic">
-                            <n-split v-model:size="splitSize" direction="horizontal" :min="0.3" :max="1"
-                                :default-size="1" :disabled="true" :style="{ height: '120px', width: '100%' }">
-                                <template #1>
-                                    <n-input v-model:value="formData.topic" type="textarea" :rows="4"
-                                        :placeholder="t('aiGenerator.requirementPlaceholder')" :style="{ height: '100%' }" />
-                                </template> <template #2>
-                                    <div style="height: 100%; position: relative;">
-                                        <n-input v-model:value="generatedResult" type="textarea" :rows="4"
-                                            :placeholder="t('aiGenerator.resultPlaceholder')" :readonly="autoSaveEnabled" show-count :style="{
-                                                height: '100%',
-                                                backgroundColor: 'var(--code-color)',
-                                                opacity: generatedResult ? 1 : 0.7
-                                            }" />
-                                    </div>
-                                </template>
-                            </n-split>
-                        </n-form-item>
-                        <n-form-item>
-                            <n-space vertical style="width: 100%;">
-                            <n-space justify="space-between" align="center" style="width: 100%;">
-                                <n-space>
-                                    <n-button type="primary" @click="generatePrompt" :loading="generating"
-                                        :disabled="configs.length === 0 || generating">
-                                        <template #icon>
-                                            <n-icon>
-                                                <Bolt />
-                                            </n-icon>
-                                        </template>
-                                        {{ t('aiGenerator.generate') }}
-                                    </n-button>
-                                    
-                                    <!-- 停止生成按钮 -->
-                                    <n-button v-if="generating" @click="stopGeneration" type="error" ghost>
-                                        <template #icon>
-                                            <n-icon>
-                                                <X />
-                                            </n-icon>
-                                        </template>
-                                        {{ t('aiGenerator.stop') }}
-                                    </n-button>
-                                    <!-- 模型选择器 -->
-                                    <AIModelSelector 
-                                        ref="modelSelectorRef"
-                                        v-model:modelKey="selectedModelKey"
-                                        :placeholder="t('aiGenerator.selectModel')"
-                                        :disabled="generating"
-                                        style="min-width: 300px;"
-                                        @configChange="onModelSelect"
-                                    />
-                                    <n-button @click="toggleHistory" quaternary>
-                                        <template #icon>
-                                            <n-icon>
-                                                <History />
-                                            </n-icon>
-                                        </template>
-                                        {{ t('aiGenerator.history') }}
-                                    </n-button>
-                                </n-space>
-                                <n-space align="center">
-                                    <n-checkbox v-model:checked="autoSaveEnabled">
-                                        {{ t('aiGenerator.autoSave') }}
-                                    </n-checkbox>
-                                    <n-button v-if="!autoSaveEnabled && generatedResult" type="primary"
-                                        @click="manualSavePrompt">
-                                        <template #icon>
-                                            <n-icon>
-                                                <DeviceFloppy />
-                                            </n-icon>
-                                        </template>
-                                        {{ t('common.save') }}
-                                    </n-button>
-                                </n-space>
-                            </n-space>
-                            
-                            <!-- 生成状态显示栏 - 放置在按钮下方 -->
-                            <!-- <div v-if="generating" class="generation-status-bar" style="margin-top: 12px;">
-                                <n-space align="center">
-                                    <n-icon size="16" :color="'var(--primary-color)'" class="rotating">
-                                        <Bolt />
-                                    </n-icon>
-                                    <n-text>{{ getGenerationStatusText() }}</n-text>
-                                </n-space>
-                            </div> -->
-                            </n-space>
-                        </n-form-item>
-                    </n-form>
-                </n-card>
-            </div>
-
-            <!-- 历史记录区（在下方，可切换显示） -->
-            <div v-if="showHistory" class="history-section">
-                <n-card :title="t('aiGenerator.generationHistory')" class="history-card">
-                    <template #header-extra>
-                        <n-space>
-                            <n-button size="small" @click="loadHistory">
-                                <template #icon>
-                                    <n-icon>
-                                        <Refresh />
-                                    </n-icon>
-                                </template>
-                                {{ t('common.refresh') }}
-                            </n-button>
-                            <n-button size="small" @click="toggleHistory">
-                                <template #icon>
-                                    <n-icon>
-                                        <X />
-                                    </n-icon>
-                                </template>
-                                {{ t('common.close') }}
-                            </n-button>
-                        </n-space>
-                    </template>
-
-                    <n-list>
-                        <n-list-item v-for="item in paginatedHistory" :key="item.id">
-                            <template #prefix>
-                                <n-icon :color="item.status === 'success' ? '#18a058' : '#d03050'">
-                                    <Check v-if="item.status === 'success'" />
-                                    <AlertCircle v-else />
-                                </n-icon>
-                            </template>
-
-                            <n-thing>
-                                <template #header>{{ item.topic }}</template>
-                                <template #description>
-                                    <n-space align="center">
-                                        <n-space align="center" :size="4">
-                                            <n-icon v-if="isConfigPreferred(item.configId)" size="14" color="#f0c674">
-                                                <Star />
-                                            </n-icon>
-                                            <span>{{ getConfigNameOnly(item.configId) }}</span>
-                                        </n-space>
-                                        <span>{{ item.model }}</span>
-                                        <span>{{ formatDate(item.createdAt) }}</span>
-                                    </n-space>
-                                </template>
-                                <div v-if="item.status === 'success'" class="history-content">
-                                    {{ item.generatedPrompt.substring(0, 100) }}...
-                                </div>
-                                <div v-else class="error-message">
-                                    {{ t('aiGenerator.error') }}: {{ item.errorMessage }}
-                                </div>
-                            </n-thing>
-
-                            <template #suffix>
-                               <n-space vertical>
-                                    <n-space v-if="item.status === 'success'">
-                                        <n-button size="small" @click="copyHistoryItem(item)">{{ t('common.copy') }}</n-button>
-
-                                        <n-button size="small" @click="rewriteRequirement(item)">
-                                            {{ t('aiGenerator.rewrite') }}
-                                        </n-button>
-                                        <n-popconfirm @positive-click="deleteHistoryItem(item.id?.toString() || '')">
-                                            <template #trigger>
-                                                <n-button size="small">
-                                                    {{ t('common.delete') }}
-                                                </n-button>
-                                            </template>
-                                            {{ t('aiGenerator.confirmDeleteHistory') }}
-                                        </n-popconfirm>
-                                    </n-space>
-                                </n-space>
-                            </template>
-                        </n-list-item>
-                    </n-list>
-
-                    <n-empty v-if="history.length === 0" :description="t('aiGenerator.noHistory')" />
-
-                    <!-- 分页组件 -->
-                    <div v-if="history.length > 0" style="margin-top: 16px; display: flex; justify-content: center;">
-                        <n-pagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
-                            show-size-picker :page-sizes="[3, 5, 10]" @update:page-size="handlePageSizeChange"
-                            size="small" />
-                    </div>
-                </n-card>
-            </div>
+        <div v-if="loading" class="generator-state-shell">
+            <NSpin size="medium" />
         </div>
 
-        <!-- 保存提示词弹窗 -->
-        <PromptEditModal v-model:show="showSaveModal" :prompt="promptToSave" :categories="categories"
-            @saved="onPromptSaved" />
+        <div v-else-if="configs.length === 0" class="generator-state-shell">
+            <NEmpty :description="t('aiGenerator.noConfigAvailable')" size="large">
+                <template #icon>
+                    <NIcon size="40" color="var(--content-tertiary)"><Robot /></NIcon>
+                </template>
+                <template #extra>
+                    <div class="generator-empty-actions">
+                        <NText depth="3">{{ t('aiGenerator.addConfigFirst') }}</NText>
+                        <NButton type="primary" @click="navigateToAIConfig">
+                            <template #icon><NIcon size="16"><Plus /></NIcon></template>
+                            {{ t('aiGenerator.addAIConfig') }}
+                        </NButton>
+                    </div>
+                </template>
+            </NEmpty>
+        </div>
+
+        <NForm v-else ref="formRef" :model="formData" :rules="formRules" label-placement="top"
+            class="generator-workspace-form">
+            <div class="generator-workspace-grid">
+                <NCard size="small" class="generator-panel requirement-panel">
+                    <template #header>
+                        <div class="panel-heading">
+                            <NText strong>{{ t('aiGenerator.requirement') }}</NText>
+                            <NText depth="3" class="panel-description">{{ t('aiGenerator.requirementHint') }}</NText>
+                        </div>
+                    </template>
+
+                    <NFormItem path="topic" :show-label="false" :show-feedback="false"
+                        class="requirement-form-item">
+                        <NInput v-model:value="formData.topic" type="textarea"
+                            :placeholder="t('aiGenerator.requirementPlaceholder')" class="workspace-textarea"
+                            :readonly="generating" />
+                    </NFormItem>
+
+                    <div class="generator-control-panel">
+                        <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
+                            :placeholder="t('aiGenerator.selectModel')" :disabled="generating"
+                            class="generator-model-selector" @configChange="onModelSelect" />
+                        <div class="generator-action-row">
+                            <NTooltip trigger="hover">
+                                <template #trigger>
+                                    <NCheckbox v-model:checked="autoSaveEnabled" :disabled="generating">
+                                        {{ t('aiGenerator.autoSave') }}
+                                    </NCheckbox>
+                                </template>
+                                {{ t('aiGenerator.autoSaveHint') }}
+                            </NTooltip>
+                            <NFlex justify="end" align="center" size="small">
+                                <NButton v-if="generating" type="error" secondary @click="stopGeneration">
+                                    <template #icon><NIcon size="16"><X /></NIcon></template>
+                                    {{ t('aiGenerator.stop') }}
+                                </NButton>
+                                <NButton type="primary" :loading="generating"
+                                    :disabled="configs.length === 0 || generating" @click="generatePrompt">
+                                    <template #icon><NIcon size="16"><Bolt /></NIcon></template>
+                                    {{ t('aiGenerator.generate') }}
+                                </NButton>
+                            </NFlex>
+                        </div>
+                    </div>
+                </NCard>
+
+                <NCard size="small" class="generator-panel result-panel">
+                    <template #header>
+                        <div class="result-panel-header">
+                            <div class="panel-heading">
+                                <NText strong>
+                                    {{ showHistory ? t('aiGenerator.generationHistory') : t('aiGenerator.result') }}
+                                </NText>
+                                <NText v-if="!showHistory" depth="3" class="panel-description">
+                                    {{ t('aiGenerator.resultHint') }}
+                                </NText>
+                            </div>
+                            <NFlex align="center" size="small">
+                                <NTag v-if="generating && !showHistory" size="small" type="info">
+                                    {{ getGenerationStatusText() }}
+                                </NTag>
+                                <NButton v-if="showHistory" size="small" secondary @click="loadHistory">
+                                    <template #icon><NIcon size="16"><Refresh /></NIcon></template>
+                                    {{ t('common.refresh') }}
+                                </NButton>
+                                <NButton size="small" secondary @click="toggleHistory">
+                                    <template #icon>
+                                        <NIcon size="16"><X v-if="showHistory" /><History v-else /></NIcon>
+                                    </template>
+                                    {{ showHistory ? t('common.close') : t('aiGenerator.history') }}
+                                </NButton>
+                            </NFlex>
+                        </div>
+                    </template>
+
+                    <template v-if="showHistory">
+                        <NScrollbar class="history-scroll">
+                            <NList v-if="history.length > 0" class="history-list">
+                                <NListItem v-for="item in paginatedHistory" :key="item.id">
+                                    <template #prefix>
+                                        <NIcon size="16"
+                                            :color="item.status === 'success' ? 'var(--accent-success)' : 'var(--accent-error)'">
+                                            <Check v-if="item.status === 'success'" />
+                                            <AlertCircle v-else />
+                                        </NIcon>
+                                    </template>
+                                    <NThing>
+                                        <template #header>{{ item.topic }}</template>
+                                        <template #description>
+                                            <div class="history-meta">
+                                                <span class="history-config">
+                                                    <NIcon v-if="isConfigPreferred(item.configId)" size="14"
+                                                        color="var(--accent-warning)"><Star /></NIcon>
+                                                    {{ getConfigNameOnly(item.configId) }}
+                                                </span>
+                                                <span>{{ item.model }}</span>
+                                                <span>{{ formatDate(item.createdAt) }}</span>
+                                            </div>
+                                        </template>
+                                        <div v-if="item.status === 'success'" class="history-content">
+                                            {{ item.generatedPrompt.substring(0, 100) }}...
+                                        </div>
+                                        <div v-else class="error-message">
+                                            {{ t('aiGenerator.error') }}: {{ item.errorMessage }}
+                                        </div>
+                                    </NThing>
+                                    <template #suffix>
+                                        <NFlex v-if="item.status === 'success'" size="small">
+                                            <NButton size="tiny" @click="copyHistoryItem(item)">{{ t('common.copy') }}</NButton>
+                                            <NButton size="tiny" @click="rewriteRequirement(item)">{{ t('aiGenerator.rewrite') }}</NButton>
+                                            <NPopconfirm @positive-click="deleteHistoryItem(item.id?.toString() || '')">
+                                                <template #trigger>
+                                                    <NButton size="tiny" type="error" tertiary>{{ t('common.delete') }}</NButton>
+                                                </template>
+                                                {{ t('aiGenerator.confirmDeleteHistory') }}
+                                            </NPopconfirm>
+                                        </NFlex>
+                                    </template>
+                                </NListItem>
+                            </NList>
+                            <div v-else class="history-empty">
+                                <NEmpty :description="t('aiGenerator.noHistory')" size="small" />
+                            </div>
+                        </NScrollbar>
+                        <div v-if="history.length > 0" class="history-pagination">
+                            <NPagination v-model:page="currentPage" :page-count="totalPages" :page-size="pageSize"
+                                show-size-picker :page-sizes="[3, 5, 10]" size="small"
+                                @update:page-size="handlePageSizeChange" />
+                        </div>
+                    </template>
+
+                    <div v-else class="result-content">
+                        <NInput v-model:value="generatedResult" type="textarea" readonly show-count
+                            :placeholder="t('aiGenerator.resultPlaceholder')"
+                            class="workspace-textarea result-textarea" />
+                    </div>
+                </NCard>
+            </div>
+        </NForm>
     </div>
 </template>
 
@@ -225,20 +175,20 @@ import {
     NButton,
     NIcon,
     NTag,
-    NSpace,
     NThing,
-    NSelect,
     NEmpty,
     NText,
-    NSplit,
     NCheckbox,
     NPagination,
     useMessage,
-    NPopconfirm
+    NPopconfirm,
+    NScrollbar,
+    NSpin,
+    NFlex,
+    NTooltip,
 } from 'naive-ui'
-import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, DeviceFloppy, Star } from '@vicons/tabler'
+import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
-import PromptEditModal from '~/components/prompt-management/PromptEditModal.vue'
 import AIModelSelector from '~/components/common/AIModelSelector.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
@@ -246,8 +196,14 @@ import { useDatabase } from '~/composables/useDatabase'
 import { useI18n } from 'vue-i18n'
 
 const message = useMessage()
-const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
+const { waitForDatabase, safeDbOperation } = useDatabase()
 const { t } = useI18n()
+
+const props = withDefaults(defineProps<{
+    defaultAutoSave?: boolean
+}>(), {
+    defaultAutoSave: true,
+})
 
 // 事件定义
 interface Emits {
@@ -270,12 +226,8 @@ const selectedModelKey = ref<string>('') // 选中的模型key，格式为 "conf
 const generating = ref(false)
 const loading = ref(true)
 const showHistory = ref(false)
-const showSaveModal = ref(false)
-const promptToSave = ref<any>(null)
-const categories = ref<any[]>([])
-const splitSize = ref<number>(1) // 分隔大小，1表示全宽显示要求输入框
 const generatedResult = ref<string>('') // 存储生成的结果
-const autoSaveEnabled = ref<boolean>(true) // 立即保存开关
+const autoSaveEnabled = ref<boolean>(props.defaultAutoSave) // 立即保存开关
 
 // 分页相关状态
 const currentPage = ref<number>(1)
@@ -442,46 +394,13 @@ const stopGeneration = async () => {
         streamStats.isGenerationActive = false
         streamStats.contentGrowthRate = 0
         
-        // 恢复布局
-        animateSplit(splitSize.value, 1)
-        
         message.info('已停止生成')
     } catch (error) {
         console.error('停止生成失败:', error)
         // 即使API调用失败，也要重置前端状态
         generating.value = false
         generationControl.shouldStop = true
-        animateSplit(splitSize.value, 1)
         message.warning('停止生成时出现错误，但已重置界面状态')
-    }
-}
-
-// 手动保存提示词
-const manualSavePrompt = async () => {
-    if (!generatedResult.value.trim()) {
-        message.warning('没有内容可以保存')
-        return
-    }
-
-    try {
-        const promptData = {
-            title: `AI生成: ${formData.topic || '提示词生成'}`,
-            content: generatedResult.value,
-            description: ``,
-            tags: ['AI生成', '手动保存'],
-            categoryId: undefined,
-            isFavorite: false,
-            useCount: 0,
-            uuid: `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            isActive: true
-        }
-
-        await api.prompts.create.mutate(promptData)
-        message.success('提示词已保存')
-        emit('prompt-saved')
-    } catch (error) {
-        console.error('保存提示词失败:', error)
-        message.error('保存提示词失败: ' + (error as Error).message)
     }
 }
 
@@ -504,9 +423,6 @@ const generatePrompt = async () => {
         streamStats.isGenerationActive = true
         streamStats.contentGrowthRate = 0
         generatedResult.value = '' // 清空之前的结果
-
-        // 立即开始分隔动画，让用户看到右侧面板
-        animateSplit(1, 0.5)
 
         // 获取当前选中的配置 - 使用AIModelSelector组件
         const selectedConfig = modelSelectorRef.value?.selectedConfig
@@ -683,6 +599,13 @@ const generatePrompt = async () => {
             emit('prompt-saved')
         } else {
             message.success('提示词生成成功，您可以编辑后手动保存')
+            emit('prompt-generated', {
+                topic: result.topic || request.topic,
+                title: `AI生成: ${result.topic || request.topic || '提示词生成'}`,
+                content: result.generatedPrompt,
+                generatedPrompt: result.generatedPrompt,
+                tags: ['AI生成']
+            })
         }
 
         // 清空输入框，但保持结果显示
@@ -706,15 +629,12 @@ const generatePrompt = async () => {
             console.log('用户主动中断生成，不显示错误消息')
             // 用户主动中断，不显示错误消息，只是清理状态
             generatedResult.value = ''
-            await animateSplit(splitSize.value, 1)
             return
         }
         
         // 真正的错误才显示错误消息
         message.error('生成失败: ' + (error as Error).message)
 
-        // 失败时恢复分隔为1，清空结果
-        await animateSplit(splitSize.value, 1)
         generatedResult.value = ''
 
         // 保存错误记录
@@ -853,45 +773,6 @@ const deleteHistoryItem = async (id: string) => {
         message.error('删除失败: ' + (error as Error).message);
     }
 };
-// 分隔动画函数
-const animateSplit = async (from: number, to: number) => {
-    const duration = 600 // 动画持续时间
-    const steps = 20
-    const stepDuration = duration / steps
-    const stepSize = (to - from) / steps
-
-    for (let i = 0; i <= steps; i++) {
-        splitSize.value = Number((from + stepSize * i).toFixed(3)) // 保持3位小数精度
-        await new Promise(resolve => setTimeout(resolve, stepDuration))
-    }
-
-    splitSize.value = to
-}
-
-// 获取显示的模型名称
-const getDisplayModelName = () => {
-    if (!currentModel.value) {
-        return '选择模型'
-    }
-
-    const selectedConfig = configs.value.find(c => c.configId === currentConfigId.value)
-    if (selectedConfig) {
-        const prefix = selectedConfig.isPreferred ? '★ ' : ''
-        return `${prefix}${currentModel.value} (${selectedConfig.name})`
-    }
-
-    return currentModel.value || '选择模型'
-}
-
-// 获取配置名称
-const getConfigName = (configId: string) => {
-    const config = configs.value.find(c => c.configId === configId)
-    if (!config) return '未知配置'
-    
-    const prefix = config.isPreferred ? '★ ' : ''
-    return `${prefix}${config.name}`
-}
-
 // 获取配置名称（不带星标，用于图标显示）
 const getConfigNameOnly = (configId: string) => {
     const config = configs.value.find(c => c.configId === configId)
@@ -953,115 +834,58 @@ const getGenerationStatusText = () => {
     return '正在生成...'
 }
 
-// 提示词保存完成（保留此函数以防Modal组件需要）
-const onPromptSaved = () => {
-    message.success('提示词已保存')
-    showSaveModal.value = false
-    promptToSave.value = null
-}
-
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()
     loadConfigs()
-    loadCategories()
     // 不再自动加载历史记录，只在用户点击时加载
 })
-
-// 加载分类数据
-const loadCategories = async () => {
-    try {
-        console.log('开始加载分类数据')
-        const result = await api.categories.getAll.query()
-        console.log('成功获取到分类数据:', result)
-        categories.value = result
-    } catch (error) {
-        console.error('加载分类数据失败:', error)
-        message.error('加载分类数据失败: ' + (error as Error).message)
-        categories.value = []
-    }
-}
 
 
 </script>
 
 <style scoped>
-/* 尽可能采用 NaiveUI 默认组件 */
+.ai-generator { width: 100%; height: 100%; min-height: 0; }
+.generator-state-shell { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; padding: var(--content-padding); border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
+.generator-empty-actions { max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: var(--section-gap); text-align: center; }
+.generator-workspace-form { width: 100%; height: 100%; min-height: 0; }
+.generator-workspace-grid { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); gap: var(--section-gap); }
+.generator-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); box-shadow: none; }
+.generator-panel :deep(> .n-card-header) { min-height: 64px; flex: 0 0 auto; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.generator-panel :deep(> .n-card-header .n-card-header__main) { min-width: 0; }
+.generator-panel :deep(> .n-card-content) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: var(--content-padding); }
+.panel-heading { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.panel-heading > :first-child { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); }
+.panel-description { display: block; font-size: var(--font-size-xs); line-height: 1.45; }
+.result-panel-header { width: 100%; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
+.requirement-form-item { flex: 1 1 0; height: 0; min-height: 220px; }
+.requirement-form-item :deep(.n-form-item-blank) { height: 100%; min-height: 0; }
+.workspace-textarea { width: 100%; height: 100%; min-height: 0; }
+.workspace-textarea :deep(.n-input-wrapper),
+.workspace-textarea :deep(.n-input__textarea),
+.workspace-textarea :deep(.n-input__textarea-el) { height: 100%; min-height: 0; }
+.workspace-textarea :deep(.n-input__textarea-el) { resize: none; }
+.generator-control-panel { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--compact-padding); margin-top: var(--section-gap); padding-top: var(--section-gap); border-top: 1px solid var(--border-default); }
+.generator-model-selector { width: 100%; min-width: 0; }
+.generator-action-row { display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
+.result-content { flex: 1 1 0; height: 0; min-height: 0; }
+.result-textarea :deep(.n-input-wrapper) { background: var(--surface-secondary); }
+.history-scroll { flex: 1 1 0; height: 0; min-height: 0; }
+:deep(.history-scroll .n-scrollbar-content) { min-height: 100%; display: flex; flex-direction: column; }
+.history-list { background: transparent; }
+.history-list :deep(.n-list-item) { padding: var(--compact-padding) 0; }
+.history-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; color: var(--content-tertiary); font-size: var(--font-size-xs); }
+.history-config { display: inline-flex; align-items: center; gap: 4px; }
+.history-content { margin-top: 6px; color: var(--content-secondary); font-size: var(--font-size-xs); line-height: 1.5; word-break: break-word; }
+.error-message { margin-top: 6px; color: var(--error-color); font-size: var(--font-size-xs); line-height: 1.5; }
+.history-empty { flex: 1 1 0; min-height: 100%; display: grid; place-items: center; }
+.history-pagination { flex: 0 0 auto; display: flex; justify-content: center; margin-top: var(--compact-padding); padding-top: var(--compact-padding); border-top: 1px solid var(--border-default); }
 
-.ai-generator-layout {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.main-content {
-    flex: none;
-    width: 100%;
-}
-
-.history-section {
-    flex: none;
-    width: 100%;
-}
-
-.generator-card,
-.history-card {
-    height: fit-content;
-}
-
-.history-content {
-    font-size: 12px;
-    color: var(--text-color-3);
-    line-height: 1.4;
-    word-break: break-word;
-}
-
-.error-message {
-    font-size: 12px;
-    color: var(--error-color);
-    line-height: 1.4;
-}
-
-.generation-status-bar {
-    background-color: var(--primary-color-suppl);
-    border: 1px solid var(--primary-color);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 13px;
-}
-
-.rotating {
-    animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.generation-status-bar {
-    background: var(--info-color-suppl);
-    border: 1px solid var(--info-color);
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-bottom: 16px;
-    font-size: 14px;
-}
-
-.rotating {
-    animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+@media (max-width: 760px) {
+    .generator-workspace-form { overflow: auto; }
+    .generator-workspace-grid { height: auto; grid-template-columns: 1fr; }
+    .generator-panel { min-height: 480px; }
+    .result-panel-header, .generator-action-row { align-items: flex-start; flex-direction: column; }
+    .generator-action-row > :last-child { width: 100%; justify-content: flex-end; }
 }
 </style>

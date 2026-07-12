@@ -90,36 +90,3 @@
 		transform: translateX(0);
 	}
 }
-
-// 悬停动画
-.hover-lift {
-	transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	
-	&:hover {
-		transform: translateY(-2px);
-	}
-}
-
-.hover-scale {
-	transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	
-	&:hover {
-		transform: scale(1.02);
-	}
-}
-
-// 脉冲动画
-.pulse-glow {
-	animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse-glow {
-	0%, 100% {
-		opacity: 1;
-		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
-	}
-	50% {
-		opacity: 0.8;
-		box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
-	}
-} 

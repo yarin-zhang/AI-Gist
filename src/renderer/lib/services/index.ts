@@ -21,6 +21,8 @@ export { AIGenerationHistoryService } from './ai-generation-history.service';
 export { AppSettingsService } from './app-settings.service';
 export { DatabaseServiceManager } from './database-manager.service';
 export { CloudSyncService, cloudSyncService } from './cloud-sync.service';
+export { CloudSyncV2Coordinator } from './cloud-sync-v2-coordinator';
+export { AutomaticBackupService, automaticBackupService } from './automatic-backup.service';
 export { emitDataChange, onDataChange } from './data-change-events';
 export type { DataChangeEventPayload, DataStoreName, DataChangeAction } from './data-change-events';
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, nextTick, computed } from 'vue'
+import { ref, h, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
     NLayout,
@@ -10,14 +10,19 @@ import {
     MenuOption,
     NIcon,
     NFlex,
-    NText
+    NText,
+    NButton,
+    NTooltip
 } from 'naive-ui'
 import {
-    Home as HomeIcon,
-    Star as PromptIcon,
-    Settings as SettingsIcon,
-    Diamonds as AIIcon
+    ChevronLeft,
+    ChevronRight
 } from '@vicons/tabler'
+import {
+    AIConfigNavigationIcon,
+    PromptNavigationIcon,
+    SettingsNavigationIcon,
+} from '@/theme/navigation-icons'
 
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
@@ -27,26 +32,28 @@ import StatusBar from '~/components/common/StatusBar.vue'
 const { t } = useI18n()
 const currentView = ref('prompts')
 const settingsTargetSection = ref<string>()
+const appIcon = new URL('../assets/images/logo.png', import.meta.url).href
 
 // 组件引用
 const aiConfigPageRef = ref()
+const promptManagementPageRef = ref()
 
 // 菜单选项
 const menuOptions: MenuOption[] = [
     {
         label: t('mainPage.menu.prompts'),
         key: 'prompts',
-        icon: () => h(NIcon, null, { default: () => h(PromptIcon) })
+        icon: () => h(NIcon, null, { default: () => h(PromptNavigationIcon) })
     },
     {
         label: t('mainPage.menu.aiConfig'),
         key: 'ai-config',
-        icon: () => h(NIcon, null, { default: () => h(AIIcon) })
+        icon: () => h(NIcon, null, { default: () => h(AIConfigNavigationIcon) })
     },
     {
         label: t('mainPage.menu.settings'),
         key: 'settings',
-        icon: () => h(NIcon, null, { default: () => h(SettingsIcon) })
+        icon: () => h(NIcon, null, { default: () => h(SettingsNavigationIcon) })
     }
 ]
 
@@ -67,10 +74,12 @@ const handleNavigateToAIConfig = async () => {
     }
 }
 
-const handleOpenSettings = (targetSection?: string) => {
+const handleOpenSettings = async (targetSection?: string) => {
+    // 先清空旧目标，确保在设置页内切换后重复点击同一入口仍会触发定位。
+    settingsTargetSection.value = undefined;
     currentView.value = 'settings'
-    // 设置目标设置区域
     if (targetSection) {
+        await nextTick();
         settingsTargetSection.value = targetSection;
     }
 };
@@ -81,36 +90,135 @@ const collapseRef = ref(true)
 if (window.electronAPI?.sendMessage) {
     window.electronAPI.sendMessage('Hello from App.vue!')
 }
+
+let removeShortcutNavigation: (() => void) | undefined
+onMounted(() => {
+    if (!window.electronAPI?.shortcuts?.onNavigateMain) return
+    removeShortcutNavigation = window.electronAPI.shortcuts.onNavigateMain(async ({ target, promptUUID }) => {
+        if (target === 'shortcuts') {
+            handleOpenSettings('shortcuts')
+            return
+        }
+        currentView.value = 'prompts'
+        await nextTick()
+        if (target === 'new-prompt') promptManagementPageRef.value?.createPrompt?.()
+        else if (promptUUID) await promptManagementPageRef.value?.openPromptByUUID?.(promptUUID)
+    })
+})
+onBeforeUnmount(() => removeShortcutNavigation?.())
 </script>
 
 <template>
-    <div style="height: 100vh; ">
-        <NLayout>
-            <NLayout has-sider style="height: 100%; ">
-                <NLayoutSider bordered collapse-mode="width" :collapsed-width="64"
-                    @update:collapsed="collapseRef = $event" :default-collapsed="collapseRef" :width="260"
-                    show-trigger="bar">
-                    <NFlex vertical align="center" justify="center" style="padding: 20px; " v-if="!collapseRef">
-                        <NText strong style="font-size: 16px; ">
-                            {{ t('mainPage.title') }}
-                        </NText>
-                    </NFlex>
-                    <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
-                        :collapsed-width="64" :collapsed-icon-size="22" style="margin-top: 8px;" />
+    <div class="main-page-shell">
+        <div class="main-layout">
+            <NLayout has-sider class="main-layout-body">
+                <NLayoutSider bordered collapse-mode="width" :collapsed-width="56"
+                    :collapsed="collapseRef" :width="240" :native-scrollbar="false"
+                    content-style="height: 100%;">
+                    <div class="main-sider-content">
+                        <NFlex v-if="!collapseRef" align="center" :size="10" class="main-sider-brand">
+                            <img :src="appIcon" class="main-sider-brand-logo" alt="" />
+                            <NText strong>{{ t('mainPage.title') }}</NText>
+                        </NFlex>
+                        <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
+                            :collapsed="collapseRef" :collapsed-width="56" :collapsed-icon-size="20"
+                            class="main-sider-menu" />
+                        <div class="main-sider-toggle">
+                            <NTooltip placement="right">
+                                <template #trigger>
+                                    <NButton quaternary circle size="small" @click="collapseRef = !collapseRef">
+                                        <template #icon>
+                                            <NIcon size="16"><ChevronRight v-if="collapseRef" /><ChevronLeft v-else /></NIcon>
+                                        </template>
+                                    </NButton>
+                                </template>
+                                {{ collapseRef ? t('promptWorkspace.expandSidebar') : t('promptWorkspace.collapseSidebar') }}
+                            </NTooltip>
+                        </div>
+                    </div>
                 </NLayoutSider>
 
                 <NLayout>
-                    <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 24px);">
-                        <PromptManagementPage v-if="currentView === 'prompts'"
+                    <NLayoutContent content-style="overflow-y: auto; height: 100%;">
+                        <PromptManagementPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
                         <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />
                     </NLayoutContent>
                 </NLayout>
             </NLayout>
-            <NLayoutFooter bordered style="height: 24px; padding: 0;">
+            <NLayoutFooter bordered class="main-layout-footer">
                 <StatusBar @open-settings="handleOpenSettings" />
             </NLayoutFooter>
-        </NLayout>
+        </div>
     </div>
 </template>
+
+<style scoped>
+.main-page-shell,
+.main-layout {
+    width: 100%;
+    height: 100vh;
+    min-height: 0;
+}
+
+.main-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-layout-body {
+    flex: 1;
+    min-height: 0;
+}
+
+.main-layout-footer {
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+}
+
+.main-sider-content {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) 48px;
+    background: var(--surface-sidebar);
+}
+
+.main-sider-brand {
+    grid-row: 1;
+    min-height: 58px;
+    padding: 0 16px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border-default);
+    font-size: var(--n-font-size, 14px);
+}
+
+.main-sider-brand-logo {
+    display: block;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    object-fit: contain;
+    border-radius: var(--radius-image);
+}
+
+.main-sider-menu {
+    grid-row: 2;
+    min-height: 0;
+    padding-top: var(--spacing-sm);
+    overflow-y: auto;
+}
+
+.main-sider-toggle {
+    grid-row: 3;
+    height: 48px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-sidebar);
+    border-top: 1px solid var(--border-default);
+}
+</style>

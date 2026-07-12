@@ -8,6 +8,10 @@
       <!-- 右侧：状态指示器组 -->
       <NFlex class="status-bar-right" align="center" gap="8px">
         <CloudSyncStatusIndicator @activate="handleOpenSettings('cloud-backup')" />
+        <PromptLauncherStatusIndicator
+          v-if="capabilities.globalShortcuts"
+          @activate="handleOpenSettings('shortcuts')"
+        />
       </NFlex>
     </NFlex>
   </div>
@@ -16,6 +20,10 @@
 <script setup lang="ts">
 import { NFlex } from 'naive-ui'
 import CloudSyncStatusIndicator from '~/components/common/CloudSyncStatusIndicator.vue'
+import PromptLauncherStatusIndicator from '~/components/common/PromptLauncherStatusIndicator.vue'
+import { PlatformDetector } from '@shared/platform'
+
+const capabilities = PlatformDetector.getCapabilities()
 
 const emit = defineEmits<{
   openSettings: [targetSection?: string];
@@ -29,7 +37,7 @@ const handleOpenSettings = (targetSection?: string) => {
 <style scoped>
 .status-bar {
   height: 100%;
-  background-color: var(--n-color);
+  background-color: var(--surface-primary);
   font-size: 12px;
   overflow: visible;
 }

@@ -2,6 +2,30 @@ import {contextBridge, ipcRenderer} from 'electron';
 
 // 快捷键API
 const shortcutsAPI = {
+  getState: () => ipcRenderer.invoke('shortcuts:get-state'),
+  validate: (accelerator: string, excludeId?: string) => ipcRenderer.invoke('shortcuts:validate', accelerator, excludeId),
+  updateCommand: (commandId: string, patch: any) => ipcRenderer.invoke('shortcuts:update-command', commandId, patch),
+  upsertPromptBinding: (binding: any) => ipcRenderer.invoke('shortcuts:upsert-prompt-binding', binding),
+  removePromptBinding: (id: string) => ipcRenderer.invoke('shortcuts:remove-prompt-binding', id),
+  resolveLegacyBinding: (id: string, promptUUID: string) => ipcRenderer.invoke('shortcuts:resolve-legacy-binding', id, promptUUID),
+  markInvalidTarget: (id: string) => ipcRenderer.invoke('shortcuts:mark-invalid-target', id),
+  launcherReady: () => ipcRenderer.send('shortcuts:launcher-ready'),
+  showLauncher: () => ipcRenderer.invoke('shortcuts:show-launcher'),
+  openLauncher: () => ipcRenderer.invoke('shortcuts:open-launcher'),
+  hideLauncher: () => ipcRenderer.invoke('shortcuts:hide-launcher'),
+  executeText: (request: any) => ipcRenderer.invoke('shortcuts:execute-text', request),
+  navigateMain: (target: string, promptUUID?: string) => ipcRenderer.invoke('shortcuts:navigate-main', target, promptUUID),
+  requestPastePermission: () => ipcRenderer.invoke('shortcuts:request-paste-permission'),
+  onLauncherInvocation: (callback: (invocation: any) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, invocation: any) => callback(invocation);
+    ipcRenderer.on('shortcut:launcher-invocation', listener);
+    return () => ipcRenderer.removeListener('shortcut:launcher-invocation', listener);
+  },
+  onNavigateMain: (callback: (payload: any) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: any) => callback(payload);
+    ipcRenderer.on('shortcut:navigate-main', listener);
+    return () => ipcRenderer.removeListener('shortcut:navigate-main', listener);
+  },
   // 注册默认快捷键
   registerDefaults: () => ipcRenderer.invoke('shortcuts:register-defaults'),
   
@@ -25,9 +49,6 @@ const shortcutsAPI = {
   
   // 检查权限并尝试注册快捷键
   checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
-  
-  // 获取提示词内容
-  getPromptContent: (promptId: number) => ipcRenderer.invoke('shortcuts:get-prompt-content', promptId),
   
   // 监听快捷键事件
   onInsertData: (callback: (promptId?: number) => void) => {
@@ -59,6 +80,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hideToTray: () => ipcRenderer.invoke('hide-to-tray'),
     getSize: () => ipcRenderer.invoke('get-window-size'),
     getContentSize: () => ipcRenderer.invoke('get-content-size'),
+  },
+
+  lifecycle: {
+    onFlushRequested: (callback: (options: { reason: string; timeoutMs: number }) => Promise<any>) => {
+      const listener = async (_event: Electron.IpcRendererEvent, request: { id: string; reason: string; timeoutMs: number }) => {
+        try {
+          const result = await callback({ reason: request.reason, timeoutMs: request.timeoutMs });
+          ipcRenderer.send('cloud-sync:flush-response', { id: request.id, result });
+        } catch (error) {
+          ipcRenderer.send('cloud-sync:flush-response', {
+            id: request.id,
+            result: { success: false, skipped: false, timedOut: false, error: error instanceof Error ? error.message : String(error) }
+          });
+        }
+      };
+      ipcRenderer.on('cloud-sync:flush-request', listener);
+      return () => ipcRenderer.removeListener('cloud-sync:flush-request', listener);
+    }
   },
 
   // 主题管理
@@ -139,7 +178,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteStorageConfig: (id: string) => ipcRenderer.invoke('cloud:delete-storage-config', id),
     testStorageConnection: (config: any) => ipcRenderer.invoke('cloud:test-storage-connection', config),
     getBackupList: (storageId: string) => ipcRenderer.invoke('cloud:get-backup-list', storageId),
-    createBackup: (storageId: string, description?: string) => ipcRenderer.invoke('cloud:create-backup', storageId, description),
+    createBackup: (storageId: string, options?: any) => ipcRenderer.invoke('cloud:create-backup', storageId, options),
     restoreBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:restore-backup', storageId, backupId),
     deleteBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:delete-backup', storageId, backupId),
     getSyncManifest: (storageId: string) => ipcRenderer.invoke('cloud:get-sync-manifest', storageId),
@@ -150,6 +189,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('cloud:read-sync-snapshot', storageId, snapshot),
     saveSyncSnapshot: (storageId: string, snapshot: any) =>
       ipcRenderer.invoke('cloud:save-sync-snapshot', storageId, snapshot),
+    readCloudSyncV2Object: (storageId: string, path: string) =>
+      ipcRenderer.invoke('cloud:read-sync-v2-object', storageId, path),
+    writeCloudSyncV2Object: (storageId: string, path: string, data: Uint8Array, options?: any) =>
+      ipcRenderer.invoke('cloud:write-sync-v2-object', storageId, path, data, options),
+    listCloudSyncV2Objects: (storageId: string, prefix: string) =>
+      ipcRenderer.invoke('cloud:list-sync-v2-objects', storageId, prefix),
+    deleteCloudSyncV2Object: (storageId: string, path: string) =>
+      ipcRenderer.invoke('cloud:delete-sync-v2-object', storageId, path),
   },
   // 应用信息和更新
   app: {

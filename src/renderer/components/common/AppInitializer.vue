@@ -111,10 +111,10 @@ onMounted(() => {
   align-items: center;
   gap: 24px;
   padding: 40px;
-  background: var(--n-card-color);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--n-border-color);
+  background: var(--surface-primary);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-overlay);
+  border: 1px solid var(--border-default);
   min-width: 320px;
   text-align: center;
 }

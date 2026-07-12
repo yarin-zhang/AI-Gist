@@ -60,11 +60,12 @@ const retry = async () => {
   top: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(135deg, #e74c3c, #c0392b);
-  color: white;
+  background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
+  color: var(--content-primary);
   padding: 12px 20px;
   z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--accent-error);
+  box-shadow: none;
   transition: all 0.3s ease;
 }
 
@@ -83,17 +84,8 @@ const retry = async () => {
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.loading-spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
+  border: 2px solid var(--border-default);
+  border-top: 2px solid var(--accent-error);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -131,10 +123,10 @@ const retry = async () => {
 .retry-btn,
 .close-btn {
   padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-primary);
+  color: var(--content-primary);
+  border-radius: var(--radius-control);
   cursor: pointer;
   font-size: 12px;
   transition: all 0.2s ease;
@@ -142,8 +134,8 @@ const retry = async () => {
 
 .retry-btn:hover:not(:disabled),
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--surface-secondary);
+  border-color: var(--border-strong);
 }
 
 .retry-btn:disabled {

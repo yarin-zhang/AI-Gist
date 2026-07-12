@@ -9,6 +9,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { testDataGenerators } from '../helpers/test-utils'
 import { createBackupPayload } from '../../src/shared/backup-integrity'
+import {
+  createTransactionalIndexedDB,
+  type StoreDefinition,
+  type TransactionalIndexedDB
+} from '../helpers/transactional-indexeddb'
 
 // ---- mock 子服务（与 database-manager.test.ts 相同）----
 
@@ -100,6 +105,18 @@ global.fetch = vi.fn().mockResolvedValue({
 
 import { DatabaseServiceManager } from '~/lib/services/database-manager.service'
 
+const STORE_DEFINITIONS: Record<string, StoreDefinition> = {
+  categories: { indexes: { name: { keyPath: 'name', unique: true }, uuid: { keyPath: 'uuid', unique: true } } },
+  prompts: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
+  promptVariables: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
+  promptHistories: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
+  ai_configs: { indexes: { configId: { keyPath: 'configId', unique: true }, uuid: { keyPath: 'uuid', unique: true } } },
+  quick_optimization_configs: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
+  ai_generation_history: { indexes: { historyId: { keyPath: 'historyId', unique: true }, uuid: { keyPath: 'uuid', unique: true } } },
+  settings: { indexes: { key: { keyPath: 'key', unique: true } } },
+  syncTombstones: { indexes: {} }
+}
+
 // ---- 测试数据 ----
 
 const mockCategory = testDataGenerators.createMockCategory({ id: 1, name: '分类A' })
@@ -175,35 +192,43 @@ function makeDesktopBackupFile(data = baseData) {
 describe('跨平台备份兼容性', () => {
   let manager: DatabaseServiceManager
   let restoredRecords: Record<string, any[]>
-  let restoredCounters: Record<string, number>
+  let indexedDb: TransactionalIndexedDB
 
   const resetRestoredCapture = () => {
     restoredRecords = {}
-    restoredCounters = {
-      categories: 10,
-      prompts: 20,
-      promptVariables: 30,
-      promptHistories: 40,
-      ai_configs: 50,
-      quick_optimization_configs: 60,
-      ai_generation_history: 70,
-      settings: 80
-    }
+  }
+
+  const restoreAndCapture = async (data: any) => {
+    const result = await manager.replaceAllData(data)
+    restoredRecords = Object.fromEntries(
+      Object.keys(STORE_DEFINITIONS).map(storeName => [storeName, indexedDb.snapshot(storeName)])
+    )
+    return result
+  }
+
+  const seedBackupData = (data: typeof baseData) => {
+    indexedDb.seed('categories', data.categories || [])
+    indexedDb.seed('prompts', data.prompts || [])
+    indexedDb.seed('promptVariables', data.promptVariables || [])
+    indexedDb.seed('promptHistories', data.promptHistories || [])
+    indexedDb.seed('ai_configs', data.aiConfigs || [])
+    indexedDb.seed('quick_optimization_configs', data.quickOptimizationConfigs || [])
+    indexedDb.seed('ai_generation_history', data.aiHistory || [])
+    indexedDb.seed('settings', (data.settings || []).map((setting: any, index: number) => ({
+      id: setting.id ?? index + 1,
+      ...setting
+    })))
+    indexedDb.seed('syncTombstones', [])
   }
 
   beforeEach(() => {
     ;(DatabaseServiceManager as any).instance = undefined
     manager = DatabaseServiceManager.getInstance()
     resetRestoredCapture()
-
-    vi.spyOn(manager as any, 'addRestoredRecord').mockImplementation(async (storeName: string, data: any) => {
-      const id = restoredCounters[storeName] ?? 900
-      restoredCounters[storeName] = id + 1
-      const restored = { ...data, id }
-      restoredRecords[storeName] = restoredRecords[storeName] || []
-      restoredRecords[storeName].push(restored)
-      return restored
-    })
+    indexedDb = createTransactionalIndexedDB(STORE_DEFINITIONS)
+    ;(manager.category as any).db = indexedDb.db
+    vi.spyOn(manager, 'waitForInitialization').mockResolvedValue(undefined)
+    seedBackupData(baseData)
 
     mockCategoryService.checkObjectStoreExists.mockResolvedValue(true)
     mockCategoryService.repairDatabase.mockResolvedValue({ success: true })
@@ -240,7 +265,7 @@ describe('跨平台备份兼容性', () => {
       const mobileFile = makeMobileBackupFile()
 
       // 桌面端恢复时，从备份文件中取出 .data 字段传给 replaceAllData
-      const result = await manager.replaceAllData(mobileFile.data)
+      const result = await restoreAndCapture(mobileFile.data)
 
       expect(result.success).toBe(true)
       expect(restoredRecords.categories).toHaveLength(1)
@@ -255,7 +280,7 @@ describe('跨平台备份兼容性', () => {
       }
       const mobileFile = makeMobileBackupFile(dataWithImages)
 
-      const result = await manager.replaceAllData(mobileFile.data)
+      const result = await restoreAndCapture(mobileFile.data)
 
       expect(result.success).toBe(true)
       const promptArg = restoredRecords.prompts[0]
@@ -263,14 +288,14 @@ describe('跨平台备份兼容性', () => {
     })
 
     it('移动端备份的分类 ID 映射在桌面端恢复时正确处理', async () => {
-      const result = await manager.replaceAllData(baseData)
+      const result = await restoreAndCapture(baseData)
 
       expect(result.success).toBe(true)
-      // prompt 的 categoryId 应该映射到新创建的分类 ID (10)
+      // 原子恢复会按稳定顺序重新分配确定性的数字 ID。
       const promptArg = restoredRecords.prompts[0]
-      expect(promptArg.categoryId).toBe(10)
+      expect(promptArg.categoryId).toBe(1)
       const historyArg = restoredRecords.promptHistories[0]
-      expect(historyArg.promptId).toBe(20)
+      expect(historyArg.promptId).toBe(1)
     })
   })
 
@@ -305,7 +330,7 @@ describe('跨平台备份兼容性', () => {
       const desktopFile = makeDesktopBackupFile()
 
       // 模拟移动端恢复流程：result.data = backupData.data
-      const result = await manager.replaceAllData(desktopFile.data)
+      const result = await restoreAndCapture(desktopFile.data)
 
       expect(result.success).toBe(true)
       expect(restoredRecords.categories).toHaveLength(1)
@@ -323,7 +348,7 @@ describe('跨平台备份兼容性', () => {
       resetRestoredCapture()
 
       // 恢复
-      const restoreResult = await manager.replaceAllData(exportResult.data!)
+      const restoreResult = await restoreAndCapture(exportResult.data!)
       expect(restoreResult.success).toBe(true)
       expect(restoredRecords.categories).toHaveLength(1)
       expect(restoredRecords.prompts).toHaveLength(1)
@@ -338,6 +363,8 @@ describe('跨平台备份兼容性', () => {
       mockPromptService.getAllPromptHistories.mockResolvedValue([
         { ...mockPromptHistory, imageBlobs: [blob] }
       ])
+      indexedDb.seed('prompts', [{ ...mockPrompt, imageBlobs: [blob] }])
+      indexedDb.seed('promptHistories', [{ ...mockPromptHistory, imageBlobs: [blob] }])
 
       // 备份（序列化图片）
       const exportResult = await manager.exportAllDataForBackup()
@@ -351,7 +378,7 @@ describe('跨平台备份兼容性', () => {
       // 恢复（反序列化图片）
       resetRestoredCapture()
 
-      const restoreResult = await manager.replaceAllData(exportResult.data!)
+      const restoreResult = await restoreAndCapture(exportResult.data!)
       expect(restoreResult.success).toBe(true)
 
       const promptArg = restoredRecords.prompts[0]
@@ -370,26 +397,30 @@ describe('跨平台备份兼容性', () => {
       mockCategoryService.getBasicCategories.mockResolvedValue([cat1, cat2])
       mockPromptService.getAllPromptsForTags.mockResolvedValue([p1, p2, p3])
       mockPromptService.getAllPromptHistories.mockResolvedValue([])
+      indexedDb.seed('categories', [cat1, cat2])
+      indexedDb.seed('prompts', [p1, p2, p3])
+      indexedDb.seed('promptHistories', [])
 
       const exportResult = await manager.exportAllDataForBackup()
 
       resetRestoredCapture()
 
-      const restoreResult = await manager.replaceAllData(exportResult.data!)
+      const restoreResult = await restoreAndCapture(exportResult.data!)
       expect(restoreResult.success).toBe(true)
 
       const restoredPrompts = restoredRecords.prompts
       expect(restoredPrompts).toHaveLength(3)
 
-      // p1 和 p3 的 categoryId 应该映射到 cat1 的新 ID (10)
-      // p2 的 categoryId 应该映射到 cat2 的新 ID (11)
+      // 数字 ID 可因稳定 UUID 排序而变化，关系必须指向对应分类。
       const p1Arg = restoredPrompts.find((prompt: any) => prompt.title === '提示词1')
       const p2Arg = restoredPrompts.find((prompt: any) => prompt.title === '提示词2')
       const p3Arg = restoredPrompts.find((prompt: any) => prompt.title === '提示词3')
+      const restoredCat1 = restoredRecords.categories.find((category: any) => category.name === '分类1')
+      const restoredCat2 = restoredRecords.categories.find((category: any) => category.name === '分类2')
 
-      expect(p1Arg?.categoryId).toBe(10)
-      expect(p2Arg?.categoryId).toBe(11)
-      expect(p3Arg?.categoryId).toBe(10)
+      expect(p1Arg?.categoryId).toBe(restoredCat1?.id)
+      expect(p2Arg?.categoryId).toBe(restoredCat2?.id)
+      expect(p3Arg?.categoryId).toBe(restoredCat1?.id)
     })
   })
 

@@ -10,6 +10,7 @@ import { BrowserWindow } from 'electron';
 // 本地模块导入
 import { 
   CloudStorageConfig, 
+  CloudBackupCreateOptions,
   WebDAVConfig, 
   ICloudConfig, 
   CloudBackupInfo, 
@@ -29,6 +30,7 @@ import {
   getCloudSyncSnapshotFileName,
   getCloudSyncSnapshotRevisionFromFileName,
   getCloudSyncSnapshotsDirectoryRelativePath,
+  getCloudSyncV2DirectoryPath,
   isCloudBackupFileName,
   joinCloudPath
 } from '@shared/cloud-backup-paths';
@@ -47,6 +49,12 @@ import {
 import type {
   CloudSyncRemoteSnapshotInfo
 } from '@shared/cloud-sync-snapshots';
+import type {
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '@shared/cloud-sync-v2-repository';
 import {
   assertValidCloudSyncSnapshotFile,
   createCloudSyncSnapshotFile
@@ -149,6 +157,7 @@ export class CloudBackupManager {
     this.setupConfigManagementHandlers();
     this.setupBackupManagementHandlers();
     this.setupSyncManifestHandlers();
+    this.setupSyncV2ObjectStorageHandlers();
   }
 
   /**
@@ -287,7 +296,7 @@ export class CloudBackupManager {
     });
 
     // 创建云端备份
-    ipcMain.handle('cloud:create-backup', async (_, storageId: string, description?: string): Promise<CloudBackupResult> => {
+    ipcMain.handle('cloud:create-backup', async (_, storageId: string, options?: string | CloudBackupCreateOptions): Promise<CloudBackupResult> => {
       try {
         const config = this.getStorageConfig(storageId);
         // 直接通过数据库服务导出数据，然后创建备份
@@ -296,26 +305,30 @@ export class CloudBackupManager {
           throw new Error('没有找到主窗口，无法访问数据库');
         }
         
-        // 从渲染进程获取数据（使用备份专用方法，确保图片 Blob 被序列化为 base64）
-        const exportResult = await mainWindow.webContents.executeJavaScript(`
-          (async () => {
-            try {
-              if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
-                throw new Error('数据库API未初始化');
+        const normalizedOptions = typeof options === 'string' ? { description: options } : options;
+        let backupDataToWrite = normalizedOptions?.data;
+        if (!backupDataToWrite) {
+          // 手动备份未携带预导出数据时，再从渲染进程读取。
+          const exportResult = await mainWindow.webContents.executeJavaScript(`
+            (async () => {
+              try {
+                if (!window.databaseAPI || !window.databaseAPI.databaseServiceManager) {
+                  throw new Error('数据库API未初始化');
+                }
+                const databaseServiceManager = window.databaseAPI.databaseServiceManager;
+                return await databaseServiceManager.exportAllDataForBackup();
+              } catch (error) {
+                return {
+                  success: false,
+                  error: error.message || '未知错误'
+                };
               }
-              const databaseServiceManager = window.databaseAPI.databaseServiceManager;
-              return await databaseServiceManager.exportAllDataForBackup();
-            } catch (error) {
-              return {
-                success: false,
-                error: error.message || '未知错误'
-              };
-            }
-          })()
-        `);
-        
-        if (!exportResult.success) {
-          throw new Error(`获取数据失败: ${exportResult.error}`);
+            })()
+          `);
+          if (!exportResult.success) {
+            throw new Error(`获取数据失败: ${exportResult.error}`);
+          }
+          backupDataToWrite = exportResult.data;
         }
         
         // 创建本地备份信息
@@ -326,9 +339,13 @@ export class CloudBackupManager {
         const localBackup = createBackupPayload({
           id: backupId,
           name: backupName,
-          description: description || '云端备份',
+          description: normalizedOptions?.description || '云端备份',
           createdAt: timestamp,
-          data: exportResult.data
+          data: backupDataToWrite,
+          backupType: normalizedOptions?.backupType,
+          trigger: normalizedOptions?.trigger,
+          deviceId: normalizedOptions?.deviceId,
+          dataChecksum: normalizedOptions?.dataChecksum
         });
         
         const provider = this.createProvider(config);
@@ -491,6 +508,30 @@ export class CloudBackupManager {
         };
       }
     });
+  }
+
+  /**
+   * Exposes only the protocol-v2 object namespace to the renderer. Paths are
+   * validated before a provider is created so IPC callers cannot use this as
+   * a general-purpose cloud filesystem API.
+   */
+  private setupSyncV2ObjectStorageHandlers(): void {
+    ipcMain.handle('cloud:read-sync-v2-object', async (_, storageId: string, objectPath: string) =>
+      this.readCloudSyncV2Object(storageId, objectPath));
+
+    ipcMain.handle('cloud:write-sync-v2-object', async (
+      _,
+      storageId: string,
+      objectPath: string,
+      data: Uint8Array,
+      options?: CloudSyncV2ObjectWriteOptions
+    ) => this.writeCloudSyncV2Object(storageId, objectPath, data, options));
+
+    ipcMain.handle('cloud:list-sync-v2-objects', async (_, storageId: string, prefix: string) =>
+      this.listCloudSyncV2Objects(storageId, prefix));
+
+    ipcMain.handle('cloud:delete-sync-v2-object', async (_, storageId: string, objectPath: string) =>
+      this.deleteCloudSyncV2Object(storageId, objectPath));
   }
 
   // ==================== 配置验证和创建 ====================
@@ -974,6 +1015,236 @@ export class CloudBackupManager {
 
       throw new Error(`云同步快照 ${normalizedSnapshot.revision} 已存在但内容不一致`);
     }
+  }
+
+  private async readCloudSyncV2Object(
+    storageId: string,
+    objectPath: string
+  ): Promise<CloudSyncV2StoredObject | null> {
+    const canonicalPath = this.assertCloudSyncV2ObjectPath(objectPath);
+    const { provider, providerPath } = await this.createCloudSyncV2ProviderContext(storageId, canonicalPath);
+    const info = await this.getCloudFileInfo(provider, providerPath);
+    if (info?.isDirectory) {
+      throw new Error(`云同步 v2 对象路径指向目录: ${canonicalPath}`);
+    }
+
+    try {
+      const data = await provider.readFile(providerPath);
+      return {
+        data: Uint8Array.from(data),
+        etag: info?.etag || (await this.getCloudFileInfo(provider, providerPath))?.etag
+      };
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async writeCloudSyncV2Object(
+    storageId: string,
+    objectPath: string,
+    data: Uint8Array,
+    options: CloudSyncV2ObjectWriteOptions = {}
+  ): Promise<CloudSyncV2ObjectWriteResult> {
+    const canonicalPath = this.assertCloudSyncV2ObjectPath(objectPath, false);
+    const bytes = this.copyCloudSyncV2Bytes(data);
+    if (options.ifAbsent && options.expectedEtag !== undefined) {
+      throw new Error('云同步 v2 条件写不能同时指定 ifAbsent 和 expectedEtag');
+    }
+    if (options.expectedEtag !== undefined && !options.expectedEtag.trim()) {
+      throw new Error('云同步 v2 expectedEtag 不能为空');
+    }
+
+    const { config, provider, providerPath } = await this.createCloudSyncV2ProviderContext(storageId, canonicalPath);
+    if (config.type === 'icloud' && (options.ifAbsent || options.expectedEtag !== undefined)) {
+      // Desktop iCloud's stat-then-rename sequence is not an atomic CAS across
+      // processes. Refuse conditional writes so v2 can never silently lose a
+      // concurrent manifest update.
+      return { status: 'precondition_failed' };
+    }
+    try {
+      const writeResult = await provider.writeFile(providerPath, bytes, {
+        ifNoneMatch: options.ifAbsent,
+        ifMatch: options.expectedEtag
+      });
+      const etag = writeResult?.etag || (await this.getCloudFileInfo(provider, providerPath))?.etag;
+      return { status: 'written', etag };
+    } catch (error) {
+      if (!this.isCloudSyncRevisionConflictError(error)) {
+        throw error;
+      }
+      const current = await this.getCloudFileInfo(provider, providerPath).catch(() => null);
+      return { status: 'precondition_failed', etag: current?.etag };
+    }
+  }
+
+  private async listCloudSyncV2Objects(
+    storageId: string,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    const canonicalPrefix = this.assertCloudSyncV2ObjectPath(prefix);
+    const { provider, providerPath } = await this.createCloudSyncV2ProviderContext(storageId, canonicalPrefix);
+    const exactInfo = await this.getCloudFileInfo(provider, providerPath);
+    if (exactInfo && !exactInfo.isDirectory) {
+      return [{ path: canonicalPrefix, etag: exactInfo.etag, byteLength: exactInfo.size }];
+    }
+
+    const objects: CloudSyncV2StoredObjectInfo[] = [];
+    await this.collectCloudSyncV2Objects(provider, canonicalPrefix, providerPath, objects);
+    if (objects.length > 0 || exactInfo?.isDirectory) {
+      return objects.sort((left, right) => left.path.localeCompare(right.path));
+    }
+
+    // Object-store prefixes may end in a partial filename rather than a real
+    // directory. Fall back to its parent and retain only matching object keys.
+    const canonicalParent = path.posix.dirname(canonicalPrefix);
+    if (canonicalParent === canonicalPrefix || !this.isCloudSyncV2PathInNamespace(canonicalParent)) {
+      return [];
+    }
+    const parentObjects: CloudSyncV2StoredObjectInfo[] = [];
+    await this.collectCloudSyncV2Objects(
+      provider,
+      canonicalParent,
+      path.posix.dirname(providerPath),
+      parentObjects
+    );
+    return parentObjects
+      .filter(object => object.path.startsWith(canonicalPrefix))
+      .sort((left, right) => left.path.localeCompare(right.path));
+  }
+
+  private async deleteCloudSyncV2Object(storageId: string, objectPath: string): Promise<void> {
+    const canonicalPath = this.assertCloudSyncV2ObjectPath(objectPath, false);
+    const { provider, providerPath } = await this.createCloudSyncV2ProviderContext(storageId, canonicalPath);
+    try {
+      await provider.deleteFile(providerPath);
+    } catch (error) {
+      // Object-store delete is idempotent.
+      if (!this.isNotFoundError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private async createCloudSyncV2ProviderContext(
+    storageId: string,
+    canonicalPath: string
+  ): Promise<{ config: CloudStorageConfig; provider: CloudStorageProvider; providerPath: string }> {
+    await this.loadConfigs();
+    const config = this.getStorageConfig(storageId);
+    const provider = this.createProvider(config);
+    return {
+      config,
+      provider,
+      providerPath: this.getCloudSyncV2ProviderPath(config, canonicalPath)
+    };
+  }
+
+  private async collectCloudSyncV2Objects(
+    provider: CloudStorageProvider,
+    canonicalDirectory: string,
+    providerDirectory: string,
+    output: CloudSyncV2StoredObjectInfo[]
+  ): Promise<void> {
+    let entries: CloudFileInfo[];
+    try {
+      entries = await provider.listFiles(providerDirectory);
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return;
+      }
+      throw error;
+    }
+
+    for (const entry of entries) {
+      const name = entry.name || path.posix.basename((entry.path || '').replace(/\\/g, '/'));
+      if (!this.isSafeCloudSyncV2ChildName(name)) {
+        continue;
+      }
+      const canonicalChild = this.assertCloudSyncV2ObjectPath(`${canonicalDirectory}/${name}`);
+      const providerChild = this.joinProviderCloudPath(providerDirectory, name);
+      if (entry.isDirectory) {
+        await this.collectCloudSyncV2Objects(provider, canonicalChild, providerChild, output);
+        continue;
+      }
+
+      const currentInfo = await this.getCloudFileInfo(provider, providerChild);
+      output.push({
+        path: canonicalChild,
+        etag: currentInfo?.etag || entry.etag,
+        byteLength: currentInfo?.size ?? entry.size
+      });
+    }
+  }
+
+  private assertCloudSyncV2ObjectPath(objectPath: string, allowRoot = true): string {
+    const root = getCloudSyncV2DirectoryPath();
+    if (typeof objectPath !== 'string' || objectPath.length === 0 || objectPath !== objectPath.trim()) {
+      throw new Error('云同步 v2 对象路径无效');
+    }
+    if (
+      objectPath.includes('\\') ||
+      objectPath.includes('%') ||
+      objectPath.includes('?') ||
+      objectPath.includes('#') ||
+      this.containsControlCharacter(objectPath) ||
+      objectPath.includes('//') ||
+      objectPath.endsWith('/')
+    ) {
+      throw new Error('云同步 v2 对象路径包含不安全字符');
+    }
+
+    const segments = objectPath.split('/').slice(1);
+    if (!objectPath.startsWith('/') || segments.some(segment => !segment || segment === '.' || segment === '..')) {
+      throw new Error('云同步 v2 对象路径不是规范绝对路径');
+    }
+    if (!this.isCloudSyncV2PathInNamespace(objectPath)) {
+      throw new Error('云同步 v2 对象路径超出允许的命名空间');
+    }
+    if (!allowRoot && objectPath === root) {
+      throw new Error('云同步 v2 根目录不能作为对象写入或删除');
+    }
+    return objectPath;
+  }
+
+  private getCloudSyncV2ProviderPath(config: CloudStorageConfig, canonicalPath: string): string {
+    if (config.type === 'webdav' && this.isWebDAVUrlAtBackupDir((config as WebDAVConfig).url)) {
+      return canonicalPath.replace(getCloudBackupDirectoryPath(), '') || '/';
+    }
+    return canonicalPath;
+  }
+
+  private isCloudSyncV2PathInNamespace(objectPath: string): boolean {
+    const root = getCloudSyncV2DirectoryPath();
+    return objectPath === root || objectPath.startsWith(`${root}/`);
+  }
+
+  private joinProviderCloudPath(directory: string, name: string): string {
+    return `${directory.replace(/\/+$/, '')}/${name}`;
+  }
+
+  private isSafeCloudSyncV2ChildName(name: string): boolean {
+    return !!name &&
+      name !== '.' &&
+      name !== '..' &&
+      !/[\\/%?#]/.test(name) &&
+      !this.containsControlCharacter(name);
+  }
+
+  private containsControlCharacter(value: string): boolean {
+    return [...value].some(character => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127;
+    });
+  }
+
+  private copyCloudSyncV2Bytes(data: Uint8Array): Buffer {
+    if (!(data instanceof Uint8Array)) {
+      throw new Error('云同步 v2 对象内容必须是 Uint8Array');
+    }
+    return Buffer.from(data);
   }
 
   // ==================== 存储提供者管理 ====================

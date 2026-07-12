@@ -277,7 +277,7 @@ export function useDataManagement() {
           return true;
         }
 
-        throw new Error(result?.message || '恢复失败');
+        throw new Error(result?.error || result?.message || '恢复失败');
       }
 
       // 2. 从文件系统读取备份数据
@@ -296,7 +296,7 @@ export function useDataManagement() {
         success.value = '备份恢复成功';
         return true;
       } else {
-        throw new Error(result?.message || '恢复失败');
+        throw new Error(result?.error || result?.message || '恢复失败');
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : '恢复备份失败';

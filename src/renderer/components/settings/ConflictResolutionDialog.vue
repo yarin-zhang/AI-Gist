@@ -24,13 +24,13 @@
                 </NAlert>
 
                 <!-- 解决策略选择 -->
-                <NCard title="🎯 选择解决策略" size="small">
+                <NCard title="选择解决策略" size="small">
                     <NRadioGroup v-model:value="selectedStrategy">
                         <NFlex vertical :size="16">
                             <div class="strategy-option">
                                 <NRadio value="use_local">
                                     <NFlex align="center" :size="12">
-                                        <NIcon size="20" color="#18a058">
+                                        <NIcon size="20" color="var(--accent-success)">
                                             <Database />
                                         </NIcon>
                                         <div>
@@ -46,7 +46,7 @@
                             <div class="strategy-option">
                                 <NRadio value="use_remote">
                                     <NFlex align="center" :size="12">
-                                        <NIcon size="20" color="#2080f0">
+                                        <NIcon size="20" color="var(--accent-primary)">
                                             <Cloud />
                                         </NIcon>
                                         <div>
@@ -62,7 +62,7 @@
                             <div class="strategy-option">
                                 <NRadio value="merge_smart">
                                     <NFlex align="center" :size="12">
-                                        <NIcon size="20" color="#f0a020">
+                                        <NIcon size="20" color="var(--accent-warning)">
                                             <GitMerge />
                                         </NIcon>
                                         <div>
@@ -78,7 +78,7 @@
                             <div class="strategy-option">
                                 <NRadio value="merge_manual">
                                     <NFlex align="center" :size="12">
-                                        <NIcon size="20" color="#d03050">
+                                        <NIcon size="20" color="var(--accent-error)">
                                             <Settings />
                                         </NIcon>
                                         <div>
@@ -98,7 +98,7 @@
                 <div v-if="selectedStrategy === 'merge_smart' || selectedStrategy === 'merge_manual'">
                     <!-- 智能合并预览 -->
                     <div v-if="selectedStrategy === 'merge_smart'">
-                        <NCard title="🤖 智能合并预览" size="small">
+                        <NCard title="智能合并预览" size="small">
                             <NFlex vertical :size="12">
                                 <NAlert type="info" show-icon>
                                     智能合并将自动处理以下规则：
@@ -133,7 +133,7 @@
                     </div>
                     <!-- 手动合并详细控制 -->
                     <div v-if="selectedStrategy === 'merge_manual'">
-                        <NCard title="🔧 精细控制选项" size="small">
+                        <NCard title="精细控制选项" size="small">
                             <NFlex vertical :size="16">
                                 <!-- 操作提示 -->
                                 <NAlert type="info" show-icon>
@@ -685,50 +685,53 @@ const handleCancel = () => {
 <style scoped>
 .strategy-option {
     padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
     transition: all 0.2s ease;
 }
 
 .strategy-option:hover {
-    background-color: var(--hover-color);
-    border-color: var(--primary-color);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-strong);
 }
 
 .diff-item {
     padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
     margin-bottom: 8px;
     transition: all 0.2s ease;
 }
 
 .diff-item:hover {
-    border-color: var(--primary-color);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: var(--border-strong);
+    background: var(--surface-secondary);
+    box-shadow: none;
 }
 
 .added-item {
-    border-left: 4px solid #18a058;
-    background-color: rgba(24, 160, 88, 0.05);
+    border-left: 4px solid var(--accent-success);
+    background-color: color-mix(in srgb, var(--accent-success) 8%, var(--surface-primary));
 }
 
 .modified-item {
-    border-left: 4px solid #f0a020;
-    background-color: rgba(240, 160, 32, 0.05);
+    border-left: 4px solid var(--accent-warning);
+    background-color: color-mix(in srgb, var(--accent-warning) 8%, var(--surface-primary));
     padding: 16px;
     margin-bottom: 16px;
 }
 
 .deleted-item {
-    border-left: 4px solid #d03050;
-    background-color: rgba(208, 48, 80, 0.05);
+    border-left: 4px solid var(--accent-error);
+    background-color: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
 }
 
 .item-header {
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-default);
 }
 
 .item-content {
@@ -739,20 +742,20 @@ const handleCancel = () => {
 .version-option {
     flex: 1;
     padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: var(--card-color);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background-color: var(--surface-secondary);
 }
 
 .version-option:hover {
-    border-color: var(--primary-color);
+    border-color: var(--border-strong);
 }
 
 .version-preview {
     margin-top: 8px;
     max-height: 200px;
     overflow-y: auto;
-    background-color: var(--code-bg-color, #f5f5f5);
+    background-color: var(--surface-tertiary);
 }
 
 .version-preview pre {
@@ -767,16 +770,8 @@ const handleCancel = () => {
 .merge-summary {
     padding: 12px;
     background-color: var(--info-color-suppl);
-    border-radius: 6px;
-    border: 1px solid var(--info-color);
+    border-radius: var(--radius-control);
+    border: 1px solid var(--accent-info);
 }
 
-/* 深色模式适配 */
-[data-theme="dark"] .version-preview {
-    background-color: #2d2d2d;
-}
-
-[data-theme="dark"] .version-preview pre {
-    color: #e0e0e0;
-}
 </style>

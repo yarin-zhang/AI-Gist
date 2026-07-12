@@ -2,7 +2,8 @@ import type {
   CloudStorageConfig, 
   WebDAVConfig, 
   ICloudConfig, 
-  CloudBackupInfo 
+  CloudBackupInfo,
+  CloudBackupCreateOptions
 } from '@shared/types/cloud-backup';
 import type {
   CloudSyncManifest,
@@ -15,9 +16,17 @@ import type {
 import type {
   CloudSyncSnapshot
 } from '@shared/cloud-sync-engine';
+import type {
+  CloudSyncV2ObjectStorageAdapter,
+  CloudSyncV2ObjectWriteOptions,
+  CloudSyncV2ObjectWriteResult,
+  CloudSyncV2StoredObject,
+  CloudSyncV2StoredObjectInfo
+} from '@shared/cloud-sync-v2-repository';
 import { PlatformDetector } from '@shared/platform';
 import { mobileCloudBackupService } from '../services/mobile-cloud-backup.service';
 import { webCloudBackupService } from '../services/web-cloud-backup.service';
+import { DatabaseServiceManager } from '../services/database-manager.service';
 
 const getCloudBackupClient = () => {
   if (PlatformDetector.isElectron()) {
@@ -161,21 +170,40 @@ export class CloudBackupAPI {
   /**
    * 创建云端备份
    */
-  static async createCloudBackup(storageId: string, description?: string): Promise<{
+  static async createCloudBackup(
+    storageId: string,
+    options?: string | CloudBackupCreateOptions
+  ): Promise<{
     success: boolean;
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
   }> {
-    const client = getCloudBackupClient();
-    if (client) {
-      return await client.createCloudBackup(storageId, description);
+    const normalizedOptions = typeof options === 'string' ? { description: options } : options;
+    if (PlatformDetector.isWeb()) {
+      return await webCloudBackupService.createCloudBackup(storageId, normalizedOptions);
+    }
+
+    if (PlatformDetector.isMobile()) {
+      let backupData = normalizedOptions?.data;
+      if (!backupData) {
+        const exportResult = await DatabaseServiceManager.getInstance().exportAllDataForBackup();
+        if (!exportResult.success || !exportResult.data) {
+          return {
+            success: false,
+            message: '云端备份创建失败',
+            error: exportResult.error || exportResult.message || '导出本地数据失败'
+          };
+        }
+        backupData = exportResult.data;
+      }
+      return await mobileCloudBackupService.createCloudBackup(storageId, backupData, normalizedOptions);
     }
 
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.createBackup(storageId, description);
+    return await window.electronAPI.cloud.createBackup(storageId, normalizedOptions);
   }
 
   /**
@@ -189,13 +217,42 @@ export class CloudBackupAPI {
   }> {
     const client = getCloudBackupClient();
     if (client) {
-      return await client.restoreCloudBackup(storageId, backupId);
+      const downloaded = await client.restoreCloudBackup(storageId, backupId) as any;
+      if (!PlatformDetector.isMobile() || !downloaded.success) {
+        return downloaded;
+      }
+      if (!downloaded.data) {
+        return {
+          success: false,
+          message: '云端备份恢复失败',
+          error: '备份下载成功但缺少可恢复数据'
+        };
+      }
+      const { dataRestoreService } = await import('../services/data-restore.service');
+      const restored = await dataRestoreService.restore(downloaded.data, {
+        source: 'cloud-backup',
+        backupId
+      });
+      return {
+        success: restored.success,
+        message: restored.success ? '云端备份恢复成功' : '云端备份恢复失败',
+        backupInfo: downloaded.backupInfo,
+        error: restored.success ? undefined : (restored.error || restored.message)
+      };
     }
 
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.restoreBackup(storageId, backupId);
+    const restored = await window.electronAPI.cloud.restoreBackup(storageId, backupId);
+    if (restored.success) {
+      const { cloudSyncService } = await import('../services/cloud-sync.service');
+      await cloudSyncService.suspendEnabledStoragesAfterRestore({
+        source: 'cloud-backup',
+        backupId
+      });
+    }
+    return restored;
   }
 
   /**
@@ -309,5 +366,51 @@ export class CloudBackupAPI {
     }
 
     return await window.electronAPI.cloud.saveSyncSnapshot(storageId, snapshot);
+  }
+
+  static async readCloudSyncV2Object(
+    storageId: string,
+    path: string
+  ): Promise<CloudSyncV2StoredObject | null> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.readCloudSyncV2Object(storageId, path);
+  }
+
+  static async writeCloudSyncV2Object(
+    storageId: string,
+    path: string,
+    data: Uint8Array,
+    options?: CloudSyncV2ObjectWriteOptions
+  ): Promise<CloudSyncV2ObjectWriteResult> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.writeCloudSyncV2Object(storageId, path, data, options);
+  }
+
+  static async listCloudSyncV2Objects(
+    storageId: string,
+    prefix: string
+  ): Promise<CloudSyncV2StoredObjectInfo[]> {
+    this.assertElectronCloudSyncV2Available();
+    return await window.electronAPI.cloud.listCloudSyncV2Objects(storageId, prefix);
+  }
+
+  static async deleteCloudSyncV2Object(storageId: string, path: string): Promise<void> {
+    this.assertElectronCloudSyncV2Available();
+    await window.electronAPI.cloud.deleteCloudSyncV2Object(storageId, path);
+  }
+
+  static createCloudSyncV2ObjectStorageAdapter(storageId: string): CloudSyncV2ObjectStorageAdapter {
+    return {
+      read: path => this.readCloudSyncV2Object(storageId, path),
+      write: (path, data, options) => this.writeCloudSyncV2Object(storageId, path, data, options),
+      list: prefix => this.listCloudSyncV2Objects(storageId, prefix),
+      delete: path => this.deleteCloudSyncV2Object(storageId, path)
+    };
+  }
+
+  private static assertElectronCloudSyncV2Available(): void {
+    if (!PlatformDetector.isElectron() || !this.isElectronAvailable()) {
+      throw new Error('Electron cloud sync v2 API not available');
+    }
   }
 }

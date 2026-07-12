@@ -1,15 +1,23 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import i18n from './i18n'
-import { initDatabase, databaseService, cloudSyncService } from './lib/services'
+import { initDatabase, databaseService, cloudSyncService, automaticBackupService } from './lib/services'
 import type { SupportedLocale } from '@shared/types/preferences'
 import { PlatformDetector } from '@shared/platform'
 import './tailwind.css'
 import './assets/scss/index.scss'
 import { setupMobileDebug } from './utils/mobile-debug'
 import { installWebRuntimeBridge } from './lib/platform/web-runtime-bridge'
+import { applyDocumentTheme, getSystemThemePreference, resolveTheme, type ThemeSource } from './theme/runtime'
 
 installWebRuntimeBridge()
+document.documentElement.classList.toggle('desktop-shell', PlatformDetector.isDesktopShell())
+document.documentElement.classList.toggle('mobile-shell', PlatformDetector.isMobileShell())
+const isLauncherSurface = new URLSearchParams(window.location.search).get('surface') === 'launcher'
+if (isLauncherSurface) {
+  document.documentElement.classList.add('ai-gist-launcher')
+  document.body.classList.add('ai-gist-launcher')
+}
 // 设置移动端调试
 setupMobileDebug()
 
@@ -47,28 +55,12 @@ function initLocale() {
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
-  const html = document.documentElement
-  const body = document.body
-
-  // 检查保存的主题设置
-  const savedTheme = localStorage.getItem('theme') as 'system' | 'light' | 'dark' | null
-
-  let isDark = false
-
-  if (savedTheme === 'dark') {
-    isDark = true
-  } else if (savedTheme === 'light') {
-    isDark = false
-  } else {
-    // 默认或 system：检查系统主题偏好
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-
-  html.classList.toggle('ion-palette-dark', isDark)
-  html.classList.toggle('dark', isDark)
-  html.classList.toggle('light', !isDark)
-  body.classList.toggle('dark', isDark)
-  body.classList.toggle('light', !isDark)
+  const savedTheme = localStorage.getItem('theme') as ThemeSource | null
+  const source = savedTheme && ['system', 'light', 'dark'].includes(savedTheme) ? savedTheme : 'system'
+  applyDocumentTheme(
+    resolveTheme(source, getSystemThemePreference()),
+    PlatformDetector.isMobileShell() ? 'mobile' : 'desktop'
+  )
 }
 
 // 移除初始加载屏幕（同时隐藏原生 SplashScreen）
@@ -203,10 +195,31 @@ async function startApp() {
 
     app.mount('#app');
 
-    await cloudSyncService.startAutoSyncFromSettings({
-      platform: PlatformDetector.getPlatform(),
-      deviceName: navigator.userAgent
-    });
+    if (!isLauncherSurface) {
+      await cloudSyncService.startAutoSyncFromSettings({
+        platform: PlatformDetector.getPlatform(),
+        deviceName: navigator.userAgent,
+        startupDelayMs: PlatformDetector.isMobile() ? 0 : undefined
+      });
+      await automaticBackupService.startFromSettings();
+
+      if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
+        window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) =>
+          cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs })
+        );
+      }
+
+      if (PlatformDetector.isMobile()) {
+        const { App: CapApp } = await import('@capacitor/app');
+        CapApp.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) {
+            cloudSyncService.scheduleSync('resume', { delayMs: 0 });
+          } else if (cloudSyncService.hasPendingChanges()) {
+            void cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
+          }
+        });
+      }
+    }
 
     // Vue 应用挂载完成后移除加载屏幕
     removeInitialLoading();

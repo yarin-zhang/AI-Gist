@@ -1,15 +1,7 @@
 <template>
-    <NCard>
-        <NFlex vertical :size="16">
-            <NFlex vertical :size="12">
-                <NText depth="2">{{ t('language.title') }}</NText>
-                <NText depth="3" style="font-size: 12px;">
-                    {{ t('language.description') }}
-                </NText>
-            </NFlex>
-            
-            <NFlex vertical :size="12">
-                <NText depth="2" style="font-size: 14px;">{{ t('language.selectLanguage') }}：</NText>
+    <NCard size="small">
+        <NFlex vertical :size="12">
+                <NText strong>{{ t('language.selectLanguage') }}</NText>
                 <NSelect
                     v-model:value="currentLocale"
                     :options="supportedLocales.map(locale => ({
@@ -17,10 +9,9 @@
                         value: locale.code
                     }))"
                     :placeholder="t('language.selectLanguage')"
-                    style="max-width: 200px;"
+                    style="max-width: 280px;"
                     @update:value="switchLocale"
                 />
-            </NFlex>
         </NFlex>
     </NCard>
 </template>

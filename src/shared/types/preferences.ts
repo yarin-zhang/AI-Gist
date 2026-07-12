@@ -7,6 +7,71 @@
  */
 export type SupportedLocale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP';
 
+export type ShortcutAction = 'copy' | 'paste';
+
+export type ShortcutCommandId = 'launcher' | 'showMainWindow';
+
+export interface ShortcutCommandBinding {
+  accelerator: string;
+  enabled: boolean;
+}
+
+export interface PromptShortcutBinding {
+  id: string;
+  promptUUID: string;
+  accelerator: string;
+  action: ShortcutAction;
+  enabled: boolean;
+}
+
+export interface ShortcutPreferences {
+  version: 2;
+  defaultAction: ShortcutAction;
+  commands: Record<ShortcutCommandId, ShortcutCommandBinding>;
+  promptBindings: PromptShortcutBinding[];
+  recentPromptUUIDs: string[];
+}
+
+export type ShortcutRegistrationState =
+  | 'registered'
+  | 'disabled'
+  | 'conflict'
+  | 'unsupported'
+  | 'invalid-target';
+
+export interface ShortcutRegistrationStatus {
+  id: string;
+  accelerator: string;
+  state: ShortcutRegistrationState;
+  message?: string;
+}
+
+export interface PasteCapability {
+  supported: boolean;
+  permissionGranted: boolean;
+  reason?: string;
+}
+
+export interface ShortcutInvocation {
+  kind: 'launcher' | 'prompt';
+  bindingId?: string;
+  promptUUID?: string;
+  action?: ShortcutAction;
+}
+
+export interface ShortcutExecutionRequest {
+  promptUUID: string;
+  title: string;
+  content: string;
+  action: ShortcutAction;
+}
+
+export interface ShortcutState {
+  preferences: ShortcutPreferences;
+  registrations: ShortcutRegistrationStatus[];
+  pasteCapability: PasteCapability;
+}
+
 /**
  * 快捷键配置
  */
@@ -56,12 +121,7 @@ export interface UserPreferences {
     autoBackup: boolean;
     backupInterval: number;
   };
-  // 新增：快捷键配置
-  shortcuts?: {
-    showInterface: ShortcutConfig;
-    copyPrompt: ShortcutConfig;
-    promptTriggers: ShortcutConfig[];
-  };
+  shortcuts?: ShortcutPreferences;
   // 新增：网络代理配置
   networkProxy?: {
     mode: 'direct' | 'system' | 'manual';
@@ -90,5 +150,3 @@ export interface ThemeInfo {
   shouldUseHighContrastColors: boolean;
   shouldUseInvertedColorScheme: boolean;
 }
-
-

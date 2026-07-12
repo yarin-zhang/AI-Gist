@@ -29,10 +29,10 @@ function setViewportSignals({
       (query.includes('hover: none') && hoverNone),
     media: query,
     onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
     dispatchEvent: () => false
   })) as any
 }
@@ -59,6 +59,8 @@ describe('PlatformDetector web capability matrix', () => {
     expect(capabilities.fileExport).toBe(true)
     expect(capabilities.localBackupDirectory).toBe(false)
     expect(capabilities.globalShortcuts).toBe(false)
+    expect(capabilities.tray).toBe(false)
+    expect(capabilities.startup).toBe(false)
     expect(capabilities.systemProxy).toBe(false)
     expect(capabilities.icloud).toBe(false)
     expect(capabilities.webdavSync).toBe(true)

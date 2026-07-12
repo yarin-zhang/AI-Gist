@@ -32,6 +32,13 @@ export function useWindowSize() {
 
   // 更新窗口尺寸
   const updateWindowSize = async () => {
+    const viewportSize = {
+      width: window.innerWidth || 1080,
+      height: window.innerHeight || 720
+    }
+    windowSize.value = viewportSize
+    contentSize.value = viewportSize
+
     try {
       if (window.electronAPI) {
         const size = await window.electronAPI.window.getSize()
@@ -71,16 +78,15 @@ export function useWindowSize() {
     if (resizeObserver) {
       resizeObserver.disconnect()
     }
-  })  // 计算模态框最大高度（窗口高度的 100%，充满整个页面）
-  const modalMaxHeight = computed(() => {
-    // console.log('计算模态框最大高度:', contentSize.value.height)
-    return Math.max(contentSize.value.height, 600)
   })
 
-  // 计算模态框宽度（窗口宽度的 100%，充满整个页面）
+  // Desktop overlays share a 12px viewport gutter on every side.
+  const modalMaxHeight = computed(() => {
+    return Math.max(0, contentSize.value.height - 24)
+  })
+
   const modalWidth = computed(() => {
-    // console.log('计算模态框最大宽度:', contentSize.value.width)
-    return Math.max(contentSize.value.width, 800)
+    return Math.max(0, contentSize.value.width - 24)
   })
 
   return {

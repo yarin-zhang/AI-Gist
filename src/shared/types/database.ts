@@ -48,8 +48,10 @@ export interface Prompt {
   isJinjaTemplate?: boolean; // 是否为 Jinja 模板
   imageBlobs?: Blob[]; // 图片数据数组，支持多张图片
 
-  shortcutKey?: string; // 快捷键组合
-  isShortcutTrigger?: boolean; // 是否作为全局快捷键触发提示词
+  /** @deprecated 仅用于迁移旧数据；新快捷键绑定保存在本机偏好设置中。 */
+  shortcutKey?: string;
+  /** @deprecated 仅用于迁移旧数据。 */
+  isShortcutTrigger?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

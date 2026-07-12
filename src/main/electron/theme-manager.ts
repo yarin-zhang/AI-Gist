@@ -3,6 +3,7 @@ import { nativeTheme, BrowserWindow } from 'electron';
 
 // 本地模块导入
 import { SystemTheme } from '@shared/types';
+import designTokens from '../../renderer/design-tokens.json';
 
 /**
  * 常量定义
@@ -14,8 +15,8 @@ const CONSTANTS = {
     DARK: 'dark'
   },
   BACKGROUND_COLORS: {
-    DARK: '#101014',
-    LIGHT: '#ffffff'
+    DARK: designTokens.palette.dark.surface.body,
+    LIGHT: designTokens.palette.light.surface.body
   },
   LOG_MESSAGES: {
     INIT_START: '初始化主题管理器...',

@@ -130,6 +130,39 @@ describe('CloudSyncService', () => {
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain(savedManifest.latestSnapshot.revision)
   })
 
+  it('keeps a successful v1 result when an enabled v2 shadow publish fails', async () => {
+    const v2Coordinator = {
+      mirrorSuccessfulV1Sync: vi.fn().mockResolvedValue({
+        status: 'failed',
+        warning: '后台完整性验证失败（network）；正式同步结果不受影响'
+      }),
+      getRolloutState: vi.fn(),
+      setRolloutMode: vi.fn()
+    }
+    const { service } = createService(baseData, undefined, { v2Coordinator: v2Coordinator as any })
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.action).toBe('uploaded')
+    expect(result.v2MirrorStatus).toBe('failed')
+    expect(result.warnings).toContain('后台完整性验证失败（network）；正式同步结果不受影响')
+  })
+
+  it('keeps a successful v1 result when the v2 coordinator itself throws', async () => {
+    const v2Coordinator = {
+      mirrorSuccessfulV1Sync: vi.fn().mockRejectedValue(new DOMException('quota', 'QuotaExceededError')),
+      getRolloutState: vi.fn(),
+      setRolloutMode: vi.fn()
+    }
+    const { service } = createService(baseData, undefined, { v2Coordinator: v2Coordinator as any })
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result).toMatchObject({ success: true, action: 'uploaded', v2MirrorStatus: 'failed' })
+    expect(result.warnings).toContain('后台完整性验证状态记录失败；正式同步已成功且不受影响')
+  })
+
   it('fails before upload when the local sync export is missing a required collection', async () => {
     const incompleteLocalData = { ...baseData }
     delete (incompleteLocalData as any).promptHistories
@@ -613,7 +646,7 @@ describe('CloudSyncService', () => {
     }))
   })
 
-  it('continues sync when noncritical local sync metadata cannot be stored', async () => {
+  it('reports a warning when the complete local sync base cannot be stored anywhere', async () => {
     const storage = new MemoryStorage()
     const storageSetSpy = vi.spyOn(storage, 'setItem')
       .mockImplementation((key: string, value: string) => {
@@ -643,10 +676,7 @@ describe('CloudSyncService', () => {
         '保存云同步设备 ID 失败:',
         expect.any(Error)
       )
-      expect(warnSpy).toHaveBeenCalledWith(
-        '保存本地同步状态失败:',
-        expect.any(Error)
-      )
+      expect(result.warnings?.[0]).toContain('完整本地同步基线保存失败')
     } finally {
       warnSpy.mockRestore()
     }
@@ -680,7 +710,7 @@ describe('CloudSyncService', () => {
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain(result.remoteRevision)
   })
 
-  it('saves lightweight local sync state when base snapshot exceeds storage quota', async () => {
+  it('does not silently downgrade to a revision-only state when the base snapshot exceeds quota', async () => {
     const storage = new MemoryStorage()
     vi.spyOn(storage, 'setItem')
       .mockImplementation((key: string, value: string) => {
@@ -696,13 +726,35 @@ describe('CloudSyncService', () => {
       const result = await service.syncNow('cfg-1')
 
       expect(result.success).toBe(true)
-      const savedState = JSON.parse(storage.getItem('ai_gist_cloud_sync_state:cfg-1')!)
-      expect(savedState.lastKnownRevision).toBe(result.remoteRevision)
-      expect(savedState.baseSnapshot).toBeUndefined()
-      expect(warnSpy).not.toHaveBeenCalled()
+      expect(result.warnings?.[0]).toContain('完整本地同步基线保存失败')
+      expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toBeNull()
     } finally {
       warnSpy.mockRestore()
     }
+  })
+
+  it('stores the complete sync base in IndexedDB metadata instead of localStorage', async () => {
+    const storage = new MemoryStorage()
+    vi.spyOn(storage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key.startsWith('ai_gist_cloud_sync_state:')) throw new Error('localStorage quota')
+      MemoryStorage.prototype.setItem.call(storage, key, value)
+    })
+    const metadata = new Map<string, any>()
+    const database = {
+      exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, message: 'ok', data: baseData }),
+      replaceAllData: vi.fn().mockResolvedValue({ success: true, atomic: true, message: 'ok' }),
+      getLocalSyncMetadata: vi.fn(async (key: string) => metadata.get(key) || null),
+      setLocalSyncMetadata: vi.fn(async (key: string, value: any) => { metadata.set(key, value) }),
+      removeLocalSyncMetadata: vi.fn(async (key: string) => { metadata.delete(key) })
+    }
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), { storage, database })
+
+    const result = await service.syncNow('cfg-1')
+
+    expect(result.success).toBe(true)
+    const savedState = metadata.get('ai_gist_cloud_sync_state:cfg-1')
+    expect(savedState.baseSnapshot.revision).toBe(result.remoteRevision)
+    expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toBeNull()
   })
 
   it('fails sync when a saved manifest cannot be read back with the same revision', async () => {
@@ -824,6 +876,33 @@ describe('CloudSyncService', () => {
     expect(diagnosis.copyText).toContain('连续失败次数: 2')
   })
 
+  it('redacts credentials, prompt content and image bytes from copyable diagnostics', () => {
+    const diagnosis = getCloudSyncErrorDiagnosis(
+      'request https://alice:super-secret@example.com failed ' +
+      'Authorization: Bearer token-value password=hunter2 ' +
+      'prompt=private-text data:image/png;base64,AAAAABBBBBCCCCCDDDD',
+      { storageId: 'cfg-1', reason: 'manual' }
+    )
+
+    expect(diagnosis.copyText).not.toContain('super-secret')
+    expect(diagnosis.copyText).not.toContain('token-value')
+    expect(diagnosis.copyText).not.toContain('hunter2')
+    expect(diagnosis.copyText).not.toContain('private-text')
+    expect(diagnosis.copyText).not.toContain('AAAAABBBBB')
+    expect(diagnosis.copyText).toContain('已隐藏')
+  })
+
+  it.each([
+    'prompt=my very secret instruction',
+    'x-api-key: sk-production-secret',
+    'password is correct horse battery staple',
+    "{'content': 'private prompt with spaces'}"
+  ])('redacts the entire ambiguous sensitive error: %s', rawError => {
+    const diagnosis = getCloudSyncErrorDiagnosis(rawError, { storageId: 'cfg-1' })
+    expect(diagnosis.copyText).not.toContain(rawError)
+    expect(diagnosis.rawError).toContain('fingerprint=')
+  })
+
   it('classifies WebDAV authentication errors as user-fixable diagnostics', () => {
     const diagnosis = getCloudSyncErrorDiagnosis('401 Unauthorized', {
       storageId: 'webdav-1',
@@ -835,6 +914,35 @@ describe('CloudSyncService', () => {
     expect(diagnosis.canAutoRetry).toBe(false)
     expect(diagnosis.message).toContain('用户名')
     expect(diagnosis.copyText).toContain('401 Unauthorized')
+  })
+
+  it('classifies Android WebDAV Failed to connect errors as transient network failures', async () => {
+    const { service, cloudClient } = createService(baseData)
+    cloudClient.getCloudSyncManifest.mockRejectedValue(new Error(
+      '读取云同步 manifest 失败，且备份副本不可用: ' +
+      'GET 请求失败: Failed to connect to /198.18.0.1:18765；' +
+      '备份副本错误: GET 请求失败: Failed to connect to /198.18.0.1:18765'
+    ))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual', platform: 'android' })
+    const diagnosis = getCloudSyncErrorDiagnosis(result, {
+      storageId: 'cfg-1',
+      reason: 'manual',
+      platform: 'android'
+    })
+
+    expect(result).toMatchObject({
+      success: false,
+      errorCode: 'REMOTE_NETWORK',
+      diagnostic: {
+        phase: 'read-remote',
+        retryClass: 'transient'
+      }
+    })
+    expect(diagnosis.title).toBe('无法连接到云存储')
+    expect(diagnosis.canAutoRetry).toBe(true)
+    expect(diagnosis.copyText).toContain('错误代码: REMOTE_NETWORK')
+    expect(diagnosis.copyText).toContain('重试类型: transient')
   })
 
   it('fails sync when a saved manifest reads back the same revision with different data', async () => {
@@ -1264,6 +1372,238 @@ describe('CloudSyncService', () => {
     expect(storage.getItem('ai_gist_cloud_sync_state:cfg-1')).toContain('rev-base')
   })
 
+  it('repairs business-unique collisions before publishing a merged snapshot', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      categories: [
+        baseData.categories[0],
+        {
+          id: 99,
+          uuid: 'cat-other-device',
+          name: 'Base',
+          description: 'Created independently on another device',
+          createdAt: '2026-01-02T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z'
+        }
+      ]
+    }, 'device-b', 'rev-remote')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, cloudClient, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.businessKeyMerges).toHaveLength(1)
+    expect(result.warnings?.[0]).toContain('自动归并 1 组')
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
+      categories: [expect.objectContaining({ uuid: 'cat-1', name: 'Base' })]
+    }))
+    const savedManifest = cloudClient.saveCloudSyncManifest.mock.calls.at(-1)?.[1]
+    expect(savedManifest.latestSnapshot.data.categories).toHaveLength(1)
+    expect(savedManifest.latestSnapshot.data.categories[0]).toMatchObject({
+      uuid: 'cat-1',
+      name: 'Base',
+      description: 'Created independently on another device'
+    })
+  })
+
+  it('automatically keeps orphaned prompts as uncategorized instead of blocking sync', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const orphanedPrompts = Array.from({ length: 6 }, (_, index) => ({
+      id: index + 10,
+      uuid: `orphan-prompt-${index + 1}`,
+      title: `Orphan ${index + 1}`,
+      categoryId: 999,
+      updatedAt: '2026-07-11T00:00:00.000Z'
+    }))
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      prompts: orphanedPrompts
+    }, 'device-b', 'rev-orphaned')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-07-11T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result.success).toBe(true)
+    expect(result.relationRepairs).toHaveLength(6)
+    expect(result.warnings).toContain('已自动修复 6 条失效的可选关联；相关提示词已保留为未分类')
+    const restored = database.replaceAllData.mock.calls[0][0]
+    expect(restored.prompts).toHaveLength(6)
+    expect(restored.prompts.every(
+      (prompt: any) => prompt.categoryId === undefined && prompt.categoryUuid === undefined
+    )).toBe(true)
+  })
+
+  it('does not rollback or repeat an identical deterministic atomic apply failure', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Remote edit', updatedAt: '2026-01-03T00:00:00.000Z' }]
+    }, 'device-b', 'rev-remote')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-01-03T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    const { service, database, storage } = createService(baseData, manifest)
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+    database.replaceAllData.mockResolvedValue({
+      success: false,
+      atomic: true,
+      message: '数据替换失败',
+      error: '写入 prompts 记录失败: quota',
+      errorCode: 'QUOTA_EXCEEDED',
+      retryable: false,
+      failures: [{
+        phase: 'write',
+        code: 'QUOTA_EXCEEDED',
+        collection: 'prompts',
+        storeName: 'prompts',
+        recordKey: 'uuid:prompt-1',
+        businessKey: 'prompt=secret instruction',
+        errorName: 'QuotaExceededError',
+        message: 'password is secret-password',
+        retryable: false
+      }]
+    })
+
+    const first = await service.syncNow('cfg-1', { reason: 'manual' })
+    const second = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(first).toMatchObject({
+      success: false,
+      errorCode: 'LOCAL_APPLY_QUOTA',
+      diagnostic: {
+        phase: 'apply-local',
+        retryClass: 'user-action',
+        failures: [expect.objectContaining({ recordKey: 'uuid:prompt-1' })]
+      }
+    })
+    expect(second.diagnostic?.fingerprint).toBe(first.diagnostic?.fingerprint)
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    const diagnosis = getCloudSyncErrorDiagnosis(first, { storageId: 'cfg-1', reason: 'manual' })
+    expect(diagnosis.title).toBe('本地存储空间不足')
+    expect(diagnosis.copyText).toContain('错误代码: LOCAL_APPLY_QUOTA')
+    expect(diagnosis.copyText).toContain('recordKey=uuid:prompt-1')
+    expect(JSON.stringify(first.diagnostic)).not.toContain('secret-password')
+    expect(JSON.stringify(first.diagnostic)).not.toContain('secret instruction')
+  })
+
+  it('restarts the merge instead of overwriting an edit made after local export', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      categories: [
+        ...baseData.categories,
+        { id: 2, uuid: 'cat-remote', name: 'Remote category', updatedAt: '2026-01-02T00:00:00.000Z' }
+      ]
+    }, 'device-b', 'rev-remote')
+    let manifest: any = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    }
+    let currentData: any = baseData
+    let listener: ((change: any) => void) | undefined
+    let releaseManifest!: () => void
+    let notifyManifestStarted!: () => void
+    const manifestStarted = new Promise<void>(resolve => { notifyManifestStarted = resolve })
+    const manifestGate = new Promise<void>(resolve => { releaseManifest = resolve })
+    let manifestReads = 0
+    const cloudClient = {
+      getCloudSyncManifest: vi.fn(async () => {
+        manifestReads += 1
+        if (manifestReads === 1) {
+          notifyManifestStarted()
+          await manifestGate
+        }
+        return manifest
+      }),
+      saveCloudSyncManifest: vi.fn(async (_storageId: string, nextManifest: any) => {
+        manifest = nextManifest
+        return { success: true }
+      })
+    }
+    const database = {
+      exportAllDataForSync: vi.fn(async () => ({ success: true, message: 'ok', data: currentData })),
+      replaceAllData: vi.fn(async () => ({ success: true, atomic: true, message: 'ok' }))
+    }
+    const storage = new MemoryStorage()
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+    const service = new CloudSyncService({
+      cloudClient,
+      database,
+      storage,
+      createDeviceId: () => 'device-a',
+      subscribeToDataChanges: nextListener => {
+        listener = nextListener
+        return () => undefined
+      }
+    })
+    service.startAutoSync({ syncOnStart: false, retryMs: 0, pollIntervalMs: 0 })
+
+    const syncing = service.syncNow('cfg-1', { reason: 'manual' })
+    await manifestStarted
+    currentData = {
+      ...baseData,
+      prompts: [{
+        ...baseData.prompts[0],
+        title: 'Local edit made during sync',
+        updatedAt: '2026-01-03T00:00:00.000Z'
+      }]
+    }
+    listener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    releaseManifest()
+
+    const result = await syncing
+
+    expect(result.success).toBe(true)
+    expect(database.exportAllDataForSync).toHaveBeenCalledTimes(2)
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+    expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
+      prompts: [expect.objectContaining({ title: 'Local edit made during sync' })],
+      categories: expect.arrayContaining([expect.objectContaining({ uuid: 'cat-remote' })])
+    }))
+    service.stopAutoSync()
+  })
+
   it('ignores corrupted local base snapshots before merging', async () => {
     const localData = {
       ...baseData,
@@ -1671,6 +2011,118 @@ describe('CloudSyncService', () => {
       status: 'success',
       pending: false
     })
+
+    service.stopAutoSync()
+  })
+
+  it('coalesces a pending automatic sync into a successful manual sync for the only enabled storage', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    let cloudManifest: any = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    let releaseSave!: () => void
+    let notifySaveStarted!: () => void
+    const saveStarted = new Promise<void>(resolve => {
+      notifySaveStarted = resolve
+    })
+    const releaseSavePromise = new Promise<void>(resolve => {
+      releaseSave = resolve
+    })
+    const { service, cloudClient } = createService(baseData, cloudManifest, {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    cloudClient.getCloudSyncManifest.mockImplementation(async () => cloudManifest)
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (_storageId: string, manifest: any) => {
+      cloudManifest = manifest
+      notifySaveStarted()
+      await releaseSavePromise
+      return { success: true }
+    })
+
+    service.startAutoSync({
+      syncOnStart: false,
+      debounceMs: 25,
+      pollIntervalMs: 0,
+      retryMs: 0
+    })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    const manualSync = service.syncNow('cfg-1', { reason: 'manual' })
+    await saveStarted
+    await vi.advanceTimersByTimeAsync(25)
+    releaseSave()
+    const result = await manualSync
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(result.success).toBe(true)
+    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(service.getStatus()).toMatchObject({ status: 'success', pending: false })
+
+    service.stopAutoSync()
+  })
+
+  it('keeps the pending automatic sync when a manual sync covers only one of multiple enabled storages', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const secondConfig = {
+      ...enabledWebDAVConfig,
+      id: 'cfg-2',
+      name: 'Second WebDAV'
+    }
+    const manifests: Record<string, any> = {
+      'cfg-1': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+      'cfg-2': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    }
+    const { service, cloudClient } = createService(baseData, manifests['cfg-1'], {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => manifests[storageId])
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      manifests[storageId] = manifest
+      return { success: true }
+    })
+
+    service.startAutoSync({
+      syncOnStart: false,
+      debounceMs: 25,
+      pollIntervalMs: 0,
+      retryMs: 0
+    })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    const manualResult = await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(manualResult.success).toBe(true)
+    expect(service.hasPendingChanges()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(25)
+
+    expect(cloudClient.saveCloudSyncManifest.mock.calls.map(call => call[0])).toEqual(['cfg-1', 'cfg-2'])
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(service.getStatus()).toMatchObject({ status: 'success', pending: false })
 
     service.stopAutoSync()
   })
@@ -2105,6 +2557,66 @@ describe('CloudSyncService', () => {
     service.stopAutoSync()
   })
 
+  it('syncs every enabled storage after edits made during a single-storage retry', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    let currentData = baseData
+    let firstStorageReadAttempts = 0
+    const secondConfig = { ...enabledWebDAVConfig, id: 'cfg-2', name: 'Second WebDAV' }
+    const manifests: Record<string, any> = {
+      'cfg-1': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+      'cfg-2': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    }
+    const reads: string[] = []
+    const { service, cloudClient, database } = createService(baseData, manifests['cfg-1'], {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    database.exportAllDataForSync.mockImplementation(async () => ({ success: true, message: 'ok', data: currentData }))
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => {
+      reads.push(storageId)
+      if (storageId === 'cfg-1' && firstStorageReadAttempts++ === 0) throw new Error('ECONNRESET')
+      return manifests[storageId]
+    })
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      manifests[storageId] = manifest
+      return { success: true }
+    })
+
+    service.startAutoSync({
+      syncOnStart: false,
+      debounceMs: 0,
+      pollIntervalMs: 0,
+      retryMs: 50
+    })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(service.getStatus()).toMatchObject({ status: 'error', storageId: 'cfg-1' })
+    const secondReadsBeforeEdit = reads.filter(storageId => storageId === 'cfg-2').length
+
+    currentData = {
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Edited during retry', updatedAt: '2026-07-11T00:00:00.000Z' }]
+    }
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+
+    await vi.advanceTimersByTimeAsync(50)
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(reads.filter(storageId => storageId === 'cfg-2').length).toBeGreaterThan(secondReadsBeforeEdit)
+    expect(manifests['cfg-2'].latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'Edited during retry' })
+    ]))
+    expect(service.hasPendingChanges()).toBe(false)
+    service.stopAutoSync()
+  })
+
   it('does not schedule another upload from data changes emitted while applying remote data', async () => {
     vi.useFakeTimers()
     let dataChangeListener: ((change: any) => void) | undefined
@@ -2167,6 +2679,291 @@ describe('CloudSyncService', () => {
       pending: false
     })
 
+    service.stopAutoSync()
+  })
+
+  it('persists pending local changes and clears them after an explicit flush succeeds', async () => {
+    let dataChangeListener: ((change: any) => void) | undefined
+    const { service, storage } = createService(baseData, createEmptyCloudSyncManifest(), {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+
+    service.startAutoSync({ syncOnStart: false, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    expect(service.hasPendingChanges()).toBe(true)
+    expect(storage.getItem('ai_gist_cloud_sync_pending_change')).toContain('changedAt')
+
+    const result = await service.flushPendingSync({ reason: 'shutdown', timeoutMs: 1000 })
+
+    expect(result).toMatchObject({ success: true, skipped: false, timedOut: false })
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(storage.getItem('ai_gist_cloud_sync_pending_change')).toBeNull()
+    service.stopAutoSync()
+  })
+
+  it('attempts every enabled storage during a lifecycle flush even when one fails', async () => {
+    let dataChangeListener: ((change: any) => void) | undefined
+    const secondConfig = { ...enabledWebDAVConfig, id: 'cfg-2', name: 'Second WebDAV' }
+    const { service, cloudClient } = createService(baseData, createEmptyCloudSyncManifest(), {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    let secondManifest = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => {
+      if (storageId === 'cfg-1') throw new Error('ECONNRESET')
+      return secondManifest
+    })
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      if (storageId === 'cfg-2') secondManifest = manifest
+      return { success: true }
+    })
+    service.startAutoSync({ syncOnStart: false, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+
+    const result = await service.flushPendingSync({ reason: 'shutdown', timeoutMs: 1000 })
+
+    expect(result).toMatchObject({ success: false, skipped: false, timedOut: false })
+    expect(cloudClient.getCloudSyncManifest.mock.calls.some(([storageId]) => storageId === 'cfg-2')).toBe(true)
+    expect(service.hasPendingChanges()).toBe(true)
+    service.stopAutoSync()
+  })
+
+  it('waits for an active multi-storage scheduled run before performing an exit flush', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    let releaseFirstRead!: () => void
+    let notifyFirstRead!: () => void
+    const firstReadStarted = new Promise<void>(resolve => { notifyFirstRead = resolve })
+    const firstReadGate = new Promise<void>(resolve => { releaseFirstRead = resolve })
+    const secondConfig = { ...enabledWebDAVConfig, id: 'cfg-2', name: 'Second WebDAV' }
+    const manifests: Record<string, any> = {
+      'cfg-1': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+      'cfg-2': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    }
+    const { service, cloudClient } = createService(baseData, manifests['cfg-1'], {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    let firstRead = true
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => {
+      if (storageId === 'cfg-1' && firstRead) {
+        firstRead = false
+        notifyFirstRead()
+        await firstReadGate
+      }
+      return manifests[storageId]
+    })
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      manifests[storageId] = manifest
+      return { success: true }
+    })
+    service.startAutoSync({ syncOnStart: false, debounceMs: 0, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    await vi.advanceTimersByTimeAsync(0)
+    await firstReadStarted
+
+    const flush = service.flushPendingSync({ reason: 'shutdown', timeoutMs: 1000 })
+    releaseFirstRead()
+    const result = await flush
+
+    expect(result).toMatchObject({ success: true, skipped: true, timedOut: false })
+    expect(cloudClient.saveCloudSyncManifest.mock.calls.filter(([storageId]) => storageId === 'cfg-1')).toHaveLength(1)
+    expect(cloudClient.saveCloudSyncManifest.mock.calls.filter(([storageId]) => storageId === 'cfg-2')).toHaveLength(1)
+    expect(service.hasPendingChanges()).toBe(false)
+    service.stopAutoSync()
+  })
+
+  it('retries every failed storage and clears the covered dirty version after recovery', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const attempts: Record<string, number> = { 'cfg-1': 0, 'cfg-2': 0 }
+    const secondConfig = { ...enabledWebDAVConfig, id: 'cfg-2', name: 'Second WebDAV' }
+    const manifests: Record<string, any> = {
+      'cfg-1': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+      'cfg-2': createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    }
+    const { service, cloudClient } = createService(baseData, manifests['cfg-1'], {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, secondConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    cloudClient.getCloudSyncManifest.mockImplementation(async (storageId: string) => {
+      attempts[storageId] += 1
+      if (attempts[storageId] === 1) throw new Error(`temporary ${storageId}`)
+      return manifests[storageId]
+    })
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (storageId: string, manifest: any) => {
+      manifests[storageId] = manifest
+      return { success: true }
+    })
+    service.startAutoSync({ syncOnStart: false, debounceMs: 0, pollIntervalMs: 0, retryMs: 50 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(attempts['cfg-1']).toBeGreaterThan(1)
+    expect(attempts['cfg-2']).toBeGreaterThan(1)
+    expect(service.hasPendingChanges()).toBe(false)
+    service.stopAutoSync()
+  })
+
+  it('keeps the pending marker and can resume syncing after a lifecycle flush times out', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const { service, cloudClient, database, storage } = createService(baseData, createEmptyCloudSyncManifest(), {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    let releaseOldRead!: () => void
+    const oldReadGate = new Promise<void>(resolve => { releaseOldRead = resolve })
+    let firstRead = true
+    let recoveredManifest: any = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    cloudClient.getCloudSyncManifest.mockImplementation(async () => {
+      if (firstRead) {
+        firstRead = false
+        await oldReadGate
+      }
+      return recoveredManifest
+    })
+    service.startAutoSync({ syncOnStart: false, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    })
+
+    const flush = service.flushPendingSync({ reason: 'shutdown', timeoutMs: 250 })
+    await vi.advanceTimersByTimeAsync(250)
+    const result = await flush
+
+    expect(result).toMatchObject({ success: false, timedOut: true })
+    expect(service.hasPendingChanges()).toBe(true)
+    expect(storage.getItem('ai_gist_cloud_sync_pending_change')).not.toBeNull()
+
+    database.exportAllDataForSync.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      data: {
+        ...baseData,
+        prompts: [{ ...baseData.prompts[0], title: 'New data after timeout', updatedAt: '2026-07-11T00:00:00.000Z' }]
+      }
+    })
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (_storageId: string, manifest: any) => {
+      recoveredManifest = manifest
+      return { success: true }
+    })
+    service.scheduleSync('resume', { delayMs: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(service.getStatus()).toMatchObject({ status: 'success', pending: false })
+    expect(service.hasPendingChanges()).toBe(false)
+    expect(recoveredManifest.latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'New data after timeout' })
+    ]))
+
+    releaseOldRead()
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(recoveredManifest.latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'New data after timeout' })
+    ]))
+    service.stopAutoSync()
+  })
+
+  it('reconciles a superseded manifest write that completes after timeout recovery', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    let currentData: any = baseData
+    let remoteManifest: any = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    let releaseOldSave!: () => void
+    const oldSaveGate = new Promise<void>(resolve => { releaseOldSave = resolve })
+    let saveAttempts = 0
+    const secondConfigClient = {
+      getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+    }
+    const { service, cloudClient, database } = createService(baseData, remoteManifest, {
+      configClient: secondConfigClient,
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+    database.exportAllDataForSync.mockImplementation(async () => ({ success: true, message: 'ok', data: currentData }))
+    cloudClient.getCloudSyncManifest.mockImplementation(async () => remoteManifest)
+    cloudClient.saveCloudSyncManifest.mockImplementation(async (_storageId: string, manifest: any, options?: any) => {
+      saveAttempts += 1
+      if (saveAttempts === 1) await oldSaveGate
+      const currentRevision = remoteManifest.latestSnapshot?.revision || null
+      if (options?.expectedRevision !== undefined && options.expectedRevision !== currentRevision) {
+        return { success: false, conflict: true, error: 'manifest changed' }
+      }
+      remoteManifest = manifest
+      return { success: true }
+    })
+    service.startAutoSync({ syncOnStart: false, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+
+    const flush = service.flushPendingSync({ reason: 'shutdown', timeoutMs: 250 })
+    await vi.advanceTimersByTimeAsync(250)
+    expect(await flush).toMatchObject({ timedOut: true })
+
+    currentData = {
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Newest data', updatedAt: '2026-07-11T00:00:00.000Z' }]
+    }
+    service.scheduleSync('resume', { delayMs: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(remoteManifest.latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'Newest data' })
+    ]))
+
+    releaseOldSave()
+    for (let index = 0; index < 12; index += 1) await Promise.resolve()
+    expect(service.getStatus()).toMatchObject({ status: 'scheduled', reason: 'retry' })
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(remoteManifest.latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: 'Newest data' })
+    ]))
+    expect(saveAttempts).toBeGreaterThanOrEqual(2)
     service.stopAutoSync()
   })
 })

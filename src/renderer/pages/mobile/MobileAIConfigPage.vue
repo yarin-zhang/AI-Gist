@@ -29,7 +29,7 @@
       <!-- 配置内容 -->
       <div v-else>
         <!-- 全局首选项状态显示 -->
-        <ion-card v-if="preferredConfig" color="primary">
+        <ion-card v-if="preferredConfig" class="status-card preferred-status">
           <ion-card-content>
             <div class="preferred-alert">
               <div class="preferred-info">
@@ -47,7 +47,7 @@
         </ion-card>
 
         <!-- 多配置无首选项警告 -->
-        <ion-card v-else-if="configs.length > 1" color="warning">
+        <ion-card v-else-if="configs.length > 1" class="status-card warning-status">
           <ion-card-content>
             <div class="warning-alert">
               <ion-icon :icon="warningOutline"></ion-icon>
@@ -414,6 +414,21 @@ ion-chip {
 
 ion-card {
   margin: 16px;
+}
+
+.status-card {
+  color: var(--content-primary);
+  box-shadow: none;
+}
+
+.preferred-status {
+  --background: color-mix(in srgb, var(--accent-primary) 8%, var(--surface-primary));
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--border-default));
+}
+
+.warning-status {
+  --background: color-mix(in srgb, var(--accent-warning) 10%, var(--surface-primary));
+  border-color: color-mix(in srgb, var(--accent-warning) 28%, var(--border-default));
 }
 
 ion-content {

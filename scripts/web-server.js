@@ -15,6 +15,9 @@ const CLOUD_SYNC_DIR = 'sync';
 const CLOUD_SYNC_SNAPSHOTS_DIR = 'snapshots';
 const CLOUD_SYNC_SNAPSHOT_FILE_EXTENSION = '.json';
 const CLOUD_SYNC_SNAPSHOT_FILE_KIND = 'ai-gist-cloud-sync-snapshot';
+const CLOUD_SYNC_V2_RELATIVE_ROOT = `${CLOUD_BACKUP_DIR}/sync-v2`;
+const MAX_SYNC_V2_LIST_OBJECTS = 100000;
+const MAX_SYNC_V2_LIST_DEPTH = 16;
 const CLOUD_BACKUP_FILE_PREFIX = 'backup-';
 const CLOUD_BACKUP_FILE_EXTENSION = '.json';
 const BACKUP_PAYLOAD_SCHEMA_VERSION = 1;
@@ -200,6 +203,127 @@ async function readWebDAVText(client, remotePath) {
     return content.toString('utf8');
   }
   return String(content);
+}
+
+function assertCloudSyncV2TransportPath(input, options = {}) {
+  if (typeof input !== 'string' || input.length === 0 || input.length > 2048) {
+    throw new Error('sync-v2 对象路径无效');
+  }
+  if (/[%\\\0\r\n?#]/.test(input) || input.startsWith('/') || /^[a-zA-Z]:/.test(input)) {
+    throw new Error('sync-v2 对象路径必须是未编码的相对路径');
+  }
+
+  const segments = input.split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
+    throw new Error('sync-v2 对象路径包含非法路径段');
+  }
+  if (segments[0] !== CLOUD_BACKUP_DIR || segments[1] !== 'sync-v2') {
+    throw new Error('sync-v2 对象路径超出允许的命名空间');
+  }
+  if (options.requireObject && segments.length <= 2) {
+    throw new Error('sync-v2 对象操作必须指向具体文件');
+  }
+  return segments.join('/');
+}
+
+function decodeStrictBase64(input) {
+  if (typeof input !== 'string') {
+    throw new Error('sync-v2 对象内容必须使用 base64 编码');
+  }
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input)) {
+    throw new Error('sync-v2 对象 base64 内容无效');
+  }
+  return Buffer.from(input, 'base64');
+}
+
+function normalizeWebDAVBinary(content) {
+  if (Buffer.isBuffer(content)) {
+    return content;
+  }
+  if (content instanceof ArrayBuffer) {
+    return Buffer.from(content);
+  }
+  if (ArrayBuffer.isView(content)) {
+    return Buffer.from(content.buffer, content.byteOffset, content.byteLength);
+  }
+  if (typeof content === 'string') {
+    return Buffer.from(content, 'binary');
+  }
+  throw new Error('WebDAV 返回了不支持的二进制对象格式');
+}
+
+function isWebDAVNotFoundError(error) {
+  return /404|not\s*found|does not exist/i.test(formatErrorMessage(error));
+}
+
+async function statWebDAVObject(client, remotePath) {
+  try {
+    const stat = await client.stat(remotePath);
+    return {
+      path: remotePath,
+      etag: typeof stat?.etag === 'string' ? stat.etag : undefined,
+      byteLength: typeof stat?.size === 'number' ? stat.size : undefined,
+      isDirectory: stat?.type === 'directory'
+    };
+  } catch (error) {
+    if (isWebDAVNotFoundError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function readStableWebDAVBinary(client, remotePath) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = await statWebDAVObject(client, remotePath);
+    if (!before) {
+      return null;
+    }
+    if (before.isDirectory) {
+      throw new Error(`sync-v2 对象路径指向目录: ${remotePath}`);
+    }
+
+    let content;
+    try {
+      content = normalizeWebDAVBinary(
+        await client.getFileContents(remotePath, { format: 'binary' })
+      );
+    } catch (error) {
+      if (isWebDAVNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+    const after = await statWebDAVObject(client, remotePath);
+    if (!after) {
+      continue;
+    }
+    if (before.etag && after.etag && before.etag !== after.etag) {
+      continue;
+    }
+    if (after.byteLength !== undefined && after.byteLength !== content.byteLength) {
+      continue;
+    }
+    return { content, stat: after };
+  }
+  throw new Error(`sync-v2 对象在读取过程中持续变化: ${remotePath}`);
+}
+
+function normalizeConditionalHeader(input, name) {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (typeof input !== 'string' || !input.trim() || input.length > 512 || /[\0\r\n]/.test(input)) {
+    throw new Error(`${name} 条件无效`);
+  }
+  return input.trim() === '*' ? '*' : normalizeIfMatchHeaderValue(input);
+}
+
+function etagMatches(currentEtag, expectedEtag) {
+  if (!currentEtag) {
+    return false;
+  }
+  return normalizeIfMatchHeaderValue(currentEtag) === normalizeIfMatchHeaderValue(expectedEtag);
 }
 
 function encodeCloudSyncSnapshotRevision(revision) {
@@ -548,7 +672,11 @@ async function listWebDAVBackups({ config }) {
         cloudPath,
         storageId: config.id,
         version: backupData.version,
-        checksum: parsedBackup.checksum
+        checksum: parsedBackup.checksum,
+        backupType: backupData.backupType,
+        trigger: backupData.trigger,
+        deviceId: backupData.deviceId,
+        dataChecksum: backupData.dataChecksum
       });
     } catch (error) {
       console.warn(`[web] 跳过无法解析的备份文件 ${cloudPath}:`, error);
@@ -576,7 +704,11 @@ async function writeWebDAVBackup({ config, fileName, backupData }) {
     cloudPath,
     storageId: config.id,
     version: backupPayload.version,
-    checksum: parsedBackup.checksum
+    checksum: parsedBackup.checksum,
+    backupType: backupPayload.backupType,
+    trigger: backupPayload.trigger,
+    deviceId: backupPayload.deviceId,
+    dataChecksum: backupPayload.dataChecksum
   };
 }
 
@@ -764,6 +896,163 @@ async function saveWebDAVSyncSnapshot({ config, snapshot }) {
   }
 
   return { ok: true };
+}
+
+async function readWebDAVSyncV2Object({ config, path }) {
+  const relativePath = assertCloudSyncV2TransportPath(path, { requireObject: true });
+  const remotePath = normalizeRemotePath(relativePath);
+  const client = await createWebDAVClient(config);
+  const result = await readStableWebDAVBinary(client, remotePath);
+  if (!result) {
+    return null;
+  }
+  return {
+    path: remotePath,
+    dataBase64: result.content.toString('base64'),
+    etag: result.stat.etag,
+    byteLength: result.content.byteLength
+  };
+}
+
+async function statWebDAVSyncV2Object({ config, path }) {
+  const relativePath = assertCloudSyncV2TransportPath(path);
+  const remotePath = normalizeRemotePath(relativePath);
+  const client = await createWebDAVClient(config);
+  return statWebDAVObject(client, remotePath);
+}
+
+async function writeWebDAVSyncV2Object({ config, path, dataBase64, ifMatch, ifNoneMatch }) {
+  const relativePath = assertCloudSyncV2TransportPath(path, { requireObject: true });
+  const remotePath = normalizeRemotePath(relativePath);
+  const content = decodeStrictBase64(dataBase64);
+  const normalizedIfMatch = normalizeConditionalHeader(ifMatch, 'If-Match');
+  const normalizedIfNoneMatch = normalizeConditionalHeader(ifNoneMatch, 'If-None-Match');
+  if (normalizedIfMatch !== undefined && normalizedIfNoneMatch !== undefined) {
+    throw new Error('If-Match 与 If-None-Match 不能同时使用');
+  }
+
+  const client = await createWebDAVClient(config);
+  const current = await statWebDAVObject(client, remotePath);
+  if (current?.isDirectory) {
+    throw new Error(`sync-v2 对象路径指向目录: ${remotePath}`);
+  }
+  if (normalizedIfMatch !== undefined && (!current || !etagMatches(current.etag, normalizedIfMatch))) {
+    return { status: 'precondition_failed', etag: current?.etag };
+  }
+  if (normalizedIfNoneMatch === '*' && current) {
+    return { status: 'precondition_failed', etag: current.etag };
+  }
+  if (normalizedIfNoneMatch !== undefined && normalizedIfNoneMatch !== '*' &&
+      current && etagMatches(current.etag, normalizedIfNoneMatch)) {
+    return { status: 'precondition_failed', etag: current.etag };
+  }
+
+  await ensureWebDAVNestedDirectory(client, Path.posix.dirname(remotePath));
+  const headers = {};
+  if (normalizedIfMatch !== undefined) {
+    headers['If-Match'] = normalizedIfMatch;
+  }
+  if (normalizedIfNoneMatch !== undefined) {
+    headers['If-None-Match'] = normalizedIfNoneMatch;
+  }
+
+  try {
+    await client.putFileContents(remotePath, content, {
+      overwrite: normalizedIfNoneMatch === '*' ? false : true,
+      headers
+    });
+  } catch (error) {
+    if (isRevisionConflictError(error) || /already exists/i.test(formatErrorMessage(error))) {
+      const latest = await statWebDAVObject(client, remotePath).catch(() => null);
+      return { status: 'precondition_failed', etag: latest?.etag };
+    }
+    throw error;
+  }
+
+  const written = await statWebDAVObject(client, remotePath);
+  if (!written || written.isDirectory ||
+      (written.byteLength !== undefined && written.byteLength !== content.byteLength)) {
+    throw new Error(`sync-v2 对象写入后校验失败: ${remotePath}`);
+  }
+  return { status: 'written', etag: written.etag };
+}
+
+async function deleteWebDAVSyncV2Object({ config, path }) {
+  const relativePath = assertCloudSyncV2TransportPath(path, { requireObject: true });
+  const remotePath = normalizeRemotePath(relativePath);
+  const client = await createWebDAVClient(config);
+  const current = await statWebDAVObject(client, remotePath);
+  if (!current) {
+    return { ok: true };
+  }
+  if (current.isDirectory) {
+    throw new Error('sync-v2 transport 不允许删除目录');
+  }
+  try {
+    await client.deleteFile(remotePath);
+  } catch (error) {
+    if (!isWebDAVNotFoundError(error)) {
+      throw error;
+    }
+  }
+  return { ok: true };
+}
+
+async function listWebDAVSyncV2Objects({ config, prefix = CLOUD_SYNC_V2_RELATIVE_ROOT }) {
+  const relativePrefix = assertCloudSyncV2TransportPath(prefix);
+  const remotePrefix = normalizeRemotePath(relativePrefix);
+  const client = await createWebDAVClient(config);
+  const rootStat = await statWebDAVObject(client, remotePrefix);
+  if (!rootStat) {
+    return [];
+  }
+  if (!rootStat.isDirectory) {
+    return [{
+      path: remotePrefix,
+      etag: rootStat.etag,
+      byteLength: rootStat.byteLength
+    }];
+  }
+
+  const objects = [];
+  const pending = [{ path: remotePrefix, depth: 0 }];
+  const visited = new Set();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || visited.has(current.path)) {
+      continue;
+    }
+    visited.add(current.path);
+    if (current.depth > MAX_SYNC_V2_LIST_DEPTH) {
+      throw new Error('sync-v2 对象目录层级超出安全限制');
+    }
+
+    const response = await client.getDirectoryContents(current.path);
+    const entries = Array.isArray(response) ? response : response.data || [];
+    for (const entry of entries) {
+      const basename = entry?.basename || Path.posix.basename(entry?.filename || entry?.path || '');
+      if (!basename || basename === '.' || basename === '..' || /[/\\%\0\r\n]/.test(basename)) {
+        throw new Error('WebDAV 返回了非法的 sync-v2 对象名称');
+      }
+      const childRelativePath = assertCloudSyncV2TransportPath(
+        `${current.path.replace(/^\/+/, '')}/${basename}`
+      );
+      const childPath = normalizeRemotePath(childRelativePath);
+      if (entry?.type === 'directory') {
+        pending.push({ path: childPath, depth: current.depth + 1 });
+        continue;
+      }
+      objects.push({
+        path: childPath,
+        etag: typeof entry?.etag === 'string' ? entry.etag : undefined,
+        byteLength: typeof entry?.size === 'number' ? entry.size : undefined
+      });
+      if (objects.length > MAX_SYNC_V2_LIST_OBJECTS) {
+        throw new Error('sync-v2 对象数量超出安全限制');
+      }
+    }
+  }
+  return objects.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 async function tryReadWebDAVSyncManifestFileWithMeta(client, remotePath) {
@@ -1454,6 +1743,11 @@ const apiRoutes = {
   '/api/cloud/webdav/list-sync-snapshots': listWebDAVSyncSnapshots,
   '/api/cloud/webdav/read-sync-snapshot': readWebDAVSyncSnapshot,
   '/api/cloud/webdav/save-sync-snapshot': saveWebDAVSyncSnapshot,
+  '/api/cloud/webdav/sync-v2/read': readWebDAVSyncV2Object,
+  '/api/cloud/webdav/sync-v2/write': writeWebDAVSyncV2Object,
+  '/api/cloud/webdav/sync-v2/list': listWebDAVSyncV2Objects,
+  '/api/cloud/webdav/sync-v2/stat': statWebDAVSyncV2Object,
+  '/api/cloud/webdav/sync-v2/delete': deleteWebDAVSyncV2Object,
   '/api/ai/test-config': testAIConfig,
   '/api/ai/test-model': testAIModel,
   '/api/ai/models': getAIModels,
