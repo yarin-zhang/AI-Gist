@@ -19,14 +19,6 @@
             </nav>
 
             <div class="page-actions">
-                <NButton quaternary size="small" @click="showCategoryManagement = true">
-                    <template #icon><NIcon size="16"><Folder /></NIcon></template>
-                    <span class="action-label">{{ t('promptManagement.categories') }}</span>
-                </NButton>
-                <NButton secondary size="small" @click="showAIGenerator = true">
-                    <template #icon><NIcon size="16"><Stars /></NIcon></template>
-                    <span class="action-label">{{ t('promptManagement.aiGenerate') }}</span>
-                </NButton>
                 <NButton type="primary" size="small" @click="handleCreatePrompt">
                     <template #icon><NIcon size="16"><Plus /></NIcon></template>
                     <span class="action-label">{{ t('promptManagement.createPrompt') }}</span>
@@ -75,6 +67,11 @@
             @cancel-edit="handleCloseWorkspaceModal"
             @open-quick-optimization-config="showQuickOptimizationModal = true" />
 
+        <PromptCreationModal ref="creationModalRef" :show="showCreationModal" :categories="categories"
+            @request-close="handleCloseCreationModal" @saved="handleCreatedPromptSaved"
+            @navigate-to-ai-config="handleNavigateToAIConfig"
+            @open-quick-optimization-config="showQuickOptimizationModal = true" />
+
         <CategoryManageModal v-model:show="showCategoryManagement" :categories="categories"
             @updated="handleCategoriesUpdated" />
 
@@ -82,27 +79,21 @@
             @update:show="showQuickOptimizationModal = $event"
             @configs-updated="handleQuickOptimizationConfigsUpdated" />
 
-        <NDrawer v-model:show="showAIGenerator" :width="560" placement="right">
-            <NDrawerContent :title="t('promptManagement.aiGenerate')" closable>
-                <AIGeneratorComponent @prompt-generated="handlePromptGenerated" @prompt-saved="handleListRefresh"
-                    @navigate-to-ai-config="handleNavigateToAIConfig" />
-            </NDrawerContent>
-        </NDrawer>
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDrawer, NDrawerContent, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
+import { NButton, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
 import { Folder, GridDots, LayoutSidebarRight, List, Plus, Stars } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import PromptLibrarySidebar from '@/components/prompt-management/PromptLibrarySidebar.vue'
 import PromptWorkspace, { type PromptWorkspaceMode } from '@/components/prompt-management/PromptWorkspace.vue'
 import PromptWorkspaceModal from '@/components/prompt-management/PromptWorkspaceModal.vue'
+import PromptCreationModal from '@/components/prompt-management/PromptCreationModal.vue'
 import CategoryManageModal from '@/components/prompt-management/CategoryManageModal.vue'
 import QuickOptimizationConfigModal from '@/components/ai/QuickOptimizationConfigModal.vue'
-import AIGeneratorComponent from '@/components/ai/AIGeneratorComponent.vue'
 import PromptList from '@/components/prompt-management/PromptList.vue'
 import { api } from '@/lib/api'
 import { useDatabase } from '@/composables/useDatabase'
@@ -126,11 +117,12 @@ const libraryPaneSize = ref(storedLibraryPaneSize && /^\d+(\.\d+)?px$/.test(stor
     ? storedLibraryPaneSize
     : '268px')
 const showCategoryManagement = ref(false)
-const showAIGenerator = ref(false)
 const showQuickOptimizationModal = ref(false)
 const showWorkspaceModal = ref(false)
+const showCreationModal = ref(false)
 const workspaceRef = ref<any>()
 const modalWorkspaceRef = ref<any>()
+const creationModalRef = ref<any>()
 const promptListRef = ref<any>()
 const promptDrafts = ref<Record<number, Record<string, any>>>({})
 type PromptDisplayMode = 'workspace' | 'grid' | 'table' | 'tree'
@@ -149,7 +141,10 @@ const selectedDraft = computed(() => {
     return id ? promptDrafts.value[id] || {} : {}
 })
 
-const activeWorkspaceRef = () => showWorkspaceModal.value ? modalWorkspaceRef.value : workspaceRef.value
+const activeWorkspaceRef = () => {
+    if (showCreationModal.value) return creationModalRef.value
+    return showWorkspaceModal.value ? modalWorkspaceRef.value : workspaceRef.value
+}
 const hasUnsavedChanges = () => Boolean(activeWorkspaceRef()?.hasUnsavedChanges)
 
 const loadPrompts = async () => {
@@ -261,39 +256,28 @@ const handleRequestMode = async (mode: PromptWorkspaceMode) => {
 
 const handleCreatePrompt = async () => {
     if (!(await confirmDiscardChanges())) return
-    selectedPrompt.value = null
-    workspaceMode.value = 'edit'
-    displayMode.value = 'workspace'
-    localStorage.setItem('prompt_display_mode', 'workspace')
+    activeWorkspaceRef()?.discardChanges?.()
+    showWorkspaceModal.value = false
+    workspaceMode.value = 'use'
+    showCreationModal.value = true
+}
+
+const handleCloseCreationModal = async () => {
+    if (!showCreationModal.value) return
+    if (!(await confirmDiscardChanges())) return
+    creationModalRef.value?.discardChanges?.()
+    showCreationModal.value = false
+}
+
+const handleCreatedPromptSaved = async (savedPrompt?: PromptWithRelations) => {
+    showCreationModal.value = false
+    await handlePromptSaved(savedPrompt)
 }
 
 const handleCancelNewPrompt = async () => {
     if (!(await confirmDiscardChanges())) return
     selectedPrompt.value = null
     workspaceMode.value = 'use'
-}
-
-const handlePromptGenerated = async (generatedPrompt: any) => {
-    if (!(await confirmDiscardChanges())) return
-    selectedPrompt.value = {
-        uuid: `generated-draft-${Date.now()}`,
-        title: generatedPrompt.title || `${t('promptManagement.aiGenerate')}: ${generatedPrompt.topic || ''}`,
-        content: generatedPrompt.content || generatedPrompt.generatedPrompt || '',
-        description: generatedPrompt.description || '',
-        tags: [t('promptManagement.aiGenerate')],
-        variables: [],
-        isFavorite: false,
-        useCount: 0,
-        isActive: true,
-        isJinjaTemplate: false,
-        imageBlobs: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-    }
-    workspaceMode.value = 'edit'
-    displayMode.value = 'workspace'
-    localStorage.setItem('prompt_display_mode', 'workspace')
-    showAIGenerator.value = false
 }
 
 const handlePromptSaved = async (savedPrompt?: PromptWithRelations) => {

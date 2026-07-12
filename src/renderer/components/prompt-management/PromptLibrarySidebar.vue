@@ -34,11 +34,21 @@
                                 <NButton v-if="activeFilter !== 'all' || searchText" text size="tiny" @click="clearFilters">
                                     {{ t('common.clear') }}
                                 </NButton>
-                                <NDropdown :options="libraryOptions" @select="handleLibraryAction">
-                                    <NButton quaternary circle size="tiny" :aria-label="t('common.actions')">
-                                        <template #icon><NIcon size="16"><Dots /></NIcon></template>
+                                <NDropdown :options="sortOptions" :icon-size="16" @select="handleSortAction">
+                                    <NButton quaternary circle size="tiny" :aria-label="t('promptWorkspace.sortBy')">
+                                        <template #icon><NIcon size="15"><ArrowsSort /></NIcon></template>
                                     </NButton>
                                 </NDropdown>
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NButton quaternary circle size="tiny" :type="selectionMode ? 'primary' : 'default'"
+                                            :aria-label="t('promptWorkspace.selectMultiple')"
+                                            @click="selectionMode ? exitSelectionMode() : selectionMode = true">
+                                            <template #icon><NIcon size="15"><Check /></NIcon></template>
+                                        </NButton>
+                                    </template>
+                                    {{ t('promptWorkspace.selectMultiple') }}
+                                </NTooltip>
                             </NFlex>
                         </div>
 
@@ -109,11 +119,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NText } from 'naive-ui'
+import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NText, NTooltip } from 'naive-ui'
 import {
-    ArrowsSort, Check, Clock, Dots, Heart, ListDetails, Search, Settings, Star
+    ArrowsSort, Check, Clock, Heart, ListDetails, Search, Settings, Star
 } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 
@@ -194,23 +204,14 @@ const resultHeading = computed(() => {
     return props.categories.find(category => category.id === categoryId)?.name || t('promptWorkspace.allPrompts')
 })
 
-const libraryOptions = computed(() => [
-    {
-        label: t('promptWorkspace.sortBy'), key: 'sort', icon: () => h(ArrowsSort),
-        children: [
-            { label: t('promptWorkspace.sortUpdated'), key: 'sort:updated' },
-            { label: t('promptWorkspace.sortUsage'), key: 'sort:usage' },
-            { label: t('promptWorkspace.sortTitle'), key: 'sort:title' },
-        ],
-    },
-    { label: t('promptWorkspace.selectMultiple'), key: 'select', icon: () => h(Check) },
-    { label: t('promptManagement.categories'), key: 'categories', icon: () => h(Settings) },
+const sortOptions = computed(() => [
+    { label: t('promptWorkspace.sortUpdated'), key: 'updated' },
+    { label: t('promptWorkspace.sortUsage'), key: 'usage' },
+    { label: t('promptWorkspace.sortTitle'), key: 'title' },
 ])
 
-const handleLibraryAction = (key: string) => {
-    if (key.startsWith('sort:')) sortBy.value = key.split(':')[1] as typeof sortBy.value
-    else if (key === 'select') selectionMode.value = true
-    else if (key === 'categories') emit('manage-categories')
+const handleSortAction = (key: string) => {
+    sortBy.value = key as typeof sortBy.value
 }
 
 const handlePromptClick = (prompt: PromptWithRelations) => {

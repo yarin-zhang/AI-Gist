@@ -27,11 +27,15 @@
                             :aria-label="t('promptManagement.favorites')" @click="$emit('toggle-favorite')">
                             <template #icon><NIcon size="16"><Star /></NIcon></template>
                         </NButton>
-                        <NDropdown v-if="prompt?.id" :options="moreOptions" @select="handleMoreAction">
-                            <NButton circle quaternary size="small" :aria-label="t('common.actions')">
-                                <template #icon><NIcon size="17"><Dots /></NIcon></template>
-                            </NButton>
-                        </NDropdown>
+                        <NTooltip v-if="prompt?.id">
+                            <template #trigger>
+                                <NButton circle quaternary size="small" type="error"
+                                    :aria-label="t('common.delete')" @click="$emit('delete')">
+                                    <template #icon><NIcon size="16"><Trash /></NIcon></template>
+                                </NButton>
+                            </template>
+                            {{ t('common.delete') }}
+                        </NTooltip>
                         <span v-if="closable" class="workspace-control-divider" />
                         <NButton v-if="closable" circle quaternary size="small"
                             :aria-label="t('common.close')" @click="$emit('close')">
@@ -85,10 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NIcon, NText } from 'naive-ui'
-import { Dots, Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Trash, X } from '@vicons/tabler'
+import { NButton, NIcon, NText, NTooltip } from 'naive-ui'
+import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Trash, X } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import PromptUseWorkspace from './PromptUseWorkspace.vue'
 import PromptEditModal from './PromptEditModal.vue'
@@ -120,14 +124,6 @@ const { t } = useI18n()
 const editRef = ref<any>()
 
 const hasUnsavedChanges = computed(() => Boolean(editRef.value?.hasUnsavedChanges))
-const moreOptions = computed(() => [
-    { label: t('common.delete'), key: 'delete', icon: () => h(Trash) },
-])
-
-const handleMoreAction = (key: string) => {
-    if (key === 'delete') emit('delete')
-}
-
 const handleEditVisibility = (show: boolean) => {
     if (!show && props.mode === 'edit') {
         if (props.prompt?.id) emit('request-mode', 'use')

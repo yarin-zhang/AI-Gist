@@ -249,6 +249,12 @@ const message = useMessage()
 const { isDatabaseReady, waitForDatabase, safeDbOperation } = useDatabase()
 const { t } = useI18n()
 
+const props = withDefaults(defineProps<{
+    defaultAutoSave?: boolean
+}>(), {
+    defaultAutoSave: true,
+})
+
 // 事件定义
 interface Emits {
     (e: 'navigate-to-ai-config'): void
@@ -275,7 +281,7 @@ const promptToSave = ref<any>(null)
 const categories = ref<any[]>([])
 const splitSize = ref<number>(1) // 分隔大小，1表示全宽显示要求输入框
 const generatedResult = ref<string>('') // 存储生成的结果
-const autoSaveEnabled = ref<boolean>(true) // 立即保存开关
+const autoSaveEnabled = ref<boolean>(props.defaultAutoSave) // 立即保存开关
 
 // 分页相关状态
 const currentPage = ref<number>(1)
@@ -683,6 +689,13 @@ const generatePrompt = async () => {
             emit('prompt-saved')
         } else {
             message.success('提示词生成成功，您可以编辑后手动保存')
+            emit('prompt-generated', {
+                topic: result.topic || request.topic,
+                title: `AI生成: ${result.topic || request.topic || '提示词生成'}`,
+                content: result.generatedPrompt,
+                generatedPrompt: result.generatedPrompt,
+                tags: ['AI生成']
+            })
         }
 
         // 清空输入框，但保持结果显示

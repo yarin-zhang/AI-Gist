@@ -256,7 +256,7 @@
                                         </template>
                                     </NButton>
 
-                                    <NDropdown :options="getPromptActions(prompt)"
+                                    <NDropdown :options="getPromptActions(prompt)" :icon-size="16"
                                         @select="(key) => handlePromptAction(key, prompt)">
                                         <NButton size="small" text @click.stop>
                                             <template #icon>
@@ -623,6 +623,7 @@ const renderRowActions = (prompt: PromptWithRelations) => h(NFlex, { size: 3, ju
         }, { icon: () => h(NIcon, { size: 16 }, { default: () => h(Heart) }) }),
         h(NDropdown, {
             options: getPromptActions(prompt),
+            iconSize: 16,
             onSelect: (key: string) => handlePromptAction(key, prompt)
         }, {
             default: () => h(NButton, {
@@ -1653,22 +1654,22 @@ const getPromptActions = (prompt: PromptWithRelations) => [
     {
         label: t('promptManagement.edit'),
         key: 'edit',
-        icon: () => h(NIcon, null, { default: () => h(Edit) })
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Edit) })
     },
     {
         label: t('promptManagement.copyOriginalContent'),
         key: 'copyOriginal',
-        icon: () => h(NIcon, null, { default: () => h(Copy) })
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Copy) })
     },
     ...(supportsGlobalShortcuts ? [{
         label: shortcutBindingFor(prompt.uuid) ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding'),
         key: 'shortcut',
-        icon: () => h(NIcon, null, { default: () => h(Keyboard) })
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Keyboard) })
     }] : []),
     {
-        label: t('promptManagement.delete'),
+        label: () => h(NText, { type: 'error' }, { default: () => t('promptManagement.delete') }),
         key: 'delete',
-        icon: () => h(NIcon, null, { default: () => h(Trash) })
+        icon: () => h(NIcon, { size: 16, color: 'var(--error-color)' }, { default: () => h(Trash) })
     }
 ]
 
