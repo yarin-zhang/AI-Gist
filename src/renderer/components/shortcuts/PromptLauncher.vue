@@ -25,7 +25,10 @@
             :key="item.key"
             :ref="element => setResultElement(element, index)"
             class="launcher-result"
-            :class="{ 'launcher-result--selected': index === selectedIndex }"
+            :class="{
+              'launcher-result--selected': index === selectedIndex,
+              'launcher-result--with-extra': item.kind === 'prompt' && hasPromptExtra(item.prompt),
+            }"
             role="option"
             :aria-selected="index === selectedIndex"
             @mouseenter="selectResult(index)"
@@ -44,12 +47,56 @@
                 <NText depth="3" class="result-description">{{ item.description }}</NText>
               </template>
               <template #header-extra>
-                <NText v-if="item.kind === 'prompt' && bindingFor(item.prompt.uuid)" depth="3" class="result-meta">
-                  {{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}
-                </NText>
-                <NText v-else-if="item.kind === 'prompt' && runtimeVariables(item.prompt).length" depth="3" class="result-meta">
-                  {{ t('shortcuts.variablesCount', { count: runtimeVariables(item.prompt).length }) }}
-                </NText>
+                <NFlex
+                  v-if="item.kind === 'prompt' && hasPromptExtra(item.prompt)"
+                  :size="6"
+                  :wrap="false"
+                  align="center"
+                  justify="end"
+                  class="result-extra"
+                >
+                  <NFlex
+                    v-if="item.prompt.category?.name || promptTags(item.prompt).length"
+                    :size="4"
+                    :wrap="false"
+                    align="center"
+                    justify="end"
+                    class="result-taxonomy"
+                  >
+                    <NTag
+                      v-if="item.prompt.category?.name"
+                      size="small"
+                      :bordered="false"
+                      :color="getCategoryTagColor(item.prompt.category)"
+                      class="result-category"
+                    >
+                      {{ item.prompt.category.name }}
+                    </NTag>
+                    <NTag
+                      v-for="tag in visiblePromptTags(item.prompt)"
+                      :key="tag"
+                      size="small"
+                      :bordered="false"
+                      :color="getTagColor(tag)"
+                      class="result-tag"
+                    >
+                      {{ tag }}
+                    </NTag>
+                    <NText v-if="hiddenPromptTagCount(item.prompt)" depth="3" class="result-tag-overflow">
+                      +{{ hiddenPromptTagCount(item.prompt) }}
+                    </NText>
+                  </NFlex>
+                  <NDivider
+                    v-if="hasPromptTaxonomy(item.prompt) && (bindingFor(item.prompt.uuid) || runtimeVariables(item.prompt).length)"
+                    vertical
+                  />
+                  <NText v-if="bindingFor(item.prompt.uuid)" depth="3" class="result-meta">
+                    {{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}
+                  </NText>
+                  <NText v-else-if="runtimeVariables(item.prompt).length" depth="3" class="result-meta">
+                    {{ t('shortcuts.variablesCount', { count: runtimeVariables(item.prompt).length }) }}
+                  </NText>
+                </NFlex>
               </template>
             </NThing>
           </NListItem>
@@ -147,7 +194,7 @@
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import {
   NAlert, NButton, NCard, NDivider, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput, NInputNumber,
-  NList, NListItem, NModal, NScrollbar, NSelect, NSwitch, NText, NThing, type InputInst, type ScrollbarInst,
+  NList, NListItem, NModal, NScrollbar, NSelect, NSwitch, NTag, NText, NThing, type InputInst, type ScrollbarInst,
 } from 'naive-ui';
 import { FilePlus, FileText, Search, Settings, X } from '@vicons/tabler';
 import { useI18n } from 'vue-i18n';
@@ -161,6 +208,7 @@ import {
 } from '@/lib/utils/prompt-runtime';
 import ShortcutBindingModal from './ShortcutBindingModal.vue';
 import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
+import { useTagColors } from '@/composables/useTagColors';
 
 type PromptResult = { kind: 'prompt'; key: string; label: string; description: string; prompt: PromptWithRelations };
 type CommandResult = {
@@ -170,6 +218,7 @@ type CommandResult = {
 type LauncherResult = PromptResult | CommandResult;
 
 const { t } = useI18n();
+const { getCategoryTagColor, getTagColor, getTagsArray } = useTagColors();
 const searchInput = ref<InputInst | null>(null);
 const resultScrollbar = ref<ScrollbarInst | null>(null);
 const prompts = ref<PromptWithRelations[]>([]);
@@ -208,8 +257,28 @@ const commands = computed<CommandResult[]>(() => [
   { kind: 'command', key: 'command:settings', label: t('shortcuts.commandManage'), description: t('shortcuts.commandManageDesc'), icon: markRaw(Settings), target: 'shortcuts' },
 ]);
 
+function promptTags(prompt: PromptWithRelations): string[] {
+  return getTagsArray(prompt.tags);
+}
+
 function normalizedTags(prompt: PromptWithRelations): string {
-  return Array.isArray(prompt.tags) ? prompt.tags.join(' ') : String(prompt.tags || '');
+  return promptTags(prompt).join(' ');
+}
+
+function visiblePromptTags(prompt: PromptWithRelations): string[] {
+  return promptTags(prompt).slice(0, 3);
+}
+
+function hiddenPromptTagCount(prompt: PromptWithRelations): number {
+  return Math.max(promptTags(prompt).length - 3, 0);
+}
+
+function hasPromptTaxonomy(prompt: PromptWithRelations): boolean {
+  return Boolean(prompt.category?.name || promptTags(prompt).length);
+}
+
+function hasPromptExtra(prompt: PromptWithRelations): boolean {
+  return Boolean(hasPromptTaxonomy(prompt) || bindingFor(prompt.uuid) || runtimeVariables(prompt).length);
 }
 
 function scorePrompt(prompt: PromptWithRelations, search: string): number {
@@ -245,7 +314,7 @@ const results = computed<LauncherResult[]>(() => {
     .slice(0, 12)
     .map(({ prompt }): PromptResult => ({
       kind: 'prompt', key: `prompt:${prompt.uuid}`, label: prompt.title,
-      description: [prompt.category?.name, normalizedTags(prompt)].filter(Boolean).join(' · ') || prompt.content.slice(0, 80),
+      description: prompt.description?.trim() || prompt.content.slice(0, 80),
       prompt,
     }));
   const commandResults = commands.value.filter(command => !needle || `${command.label} ${command.description}`.toLowerCase().includes(needle));
@@ -525,8 +594,7 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   box-sizing: border-box;
-  padding: 8px;
-  background: var(--surface-body);
+  background: var(--surface-primary);
 }
 
 .launcher-card {
@@ -535,7 +603,8 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--radius-panel);
+  border: 0;
+  border-radius: 0;
 }
 
 .launcher-card :deep(.n-card-content) {
@@ -606,6 +675,20 @@ onBeforeUnmount(() => {
 
 .launcher-card :deep(.launcher-result .n-thing-main) {
   min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.launcher-card :deep(.launcher-result .n-thing) {
+  min-width: 0;
+  width: 100%;
+}
+
+.launcher-card :deep(.launcher-result .n-thing-avatar-header-wrapper),
+.launcher-card :deep(.launcher-result .n-thing-header-wrapper) {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .launcher-card :deep(.launcher-result .n-thing-avatar) {
@@ -619,18 +702,69 @@ onBeforeUnmount(() => {
   gap: var(--spacing-sm);
 }
 
+.launcher-card :deep(.launcher-result .n-thing-header__extra) {
+  min-width: 0;
+  flex: 0 1 60%;
+  width: 60%;
+  max-width: 60%;
+}
+
+.launcher-card :deep(.launcher-result--with-extra .n-thing-header__title) {
+  flex: 0 1 38%;
+  max-width: 38%;
+}
+
 .launcher-card :deep(.launcher-result .n-thing-main__description) {
   min-width: 0;
+  width: 100%;
+  overflow: hidden;
   line-height: var(--line-height-tight);
 }
 
 .result-description {
   display: block;
-  max-width: 470px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-xs);
+}
+
+.result-extra,
+.result-taxonomy {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.result-extra {
+  width: 100%;
+}
+
+.result-taxonomy {
+  flex: 1 1 auto;
+}
+
+.result-category,
+.result-tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 112px;
+}
+
+.result-taxonomy :deep(.n-tag__content) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-tag-overflow {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+  color: var(--content-tertiary);
 }
 
 .result-icon {

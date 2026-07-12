@@ -134,6 +134,10 @@ const visualState = await evaluate(launcher, `(() => {
     const value = getComputedStyle(element);
     return { backgroundColor: value.backgroundColor, opacity: value.opacity };
   };
+  const resultViewport = document.querySelector('.result-scrollbar .n-scrollbar-container');
+  const resultViewportRect = resultViewport?.getBoundingClientRect();
+  const optionRects = Array.from(document.querySelectorAll('[role="option"]'))
+    .map(option => option.getBoundingClientRect());
   return {
     html: styles(document.documentElement),
     body: styles(document.body),
@@ -152,7 +156,15 @@ const visualState = await evaluate(launcher, `(() => {
     header: document.querySelector('.n-card-header')?.getBoundingClientRect().toJSON(),
     content: document.querySelector('.n-card-content')?.getBoundingClientRect().toJSON(),
     footer: document.querySelector('.n-card__footer')?.getBoundingClientRect().toJSON(),
-    scrollbar: document.querySelector('.result-scrollbar .n-scrollbar-container')?.getBoundingClientRect().toJSON(),
+    scrollbar: resultViewportRect?.toJSON(),
+    density: {
+      optionHeights: optionRects.map(rect => rect.height),
+      fullyVisibleOptionCount: resultViewportRect
+        ? optionRects.filter(rect => rect.top >= resultViewportRect.top - 1 && rect.bottom <= resultViewportRect.bottom + 1).length
+        : 0,
+      titleFontSize: getComputedStyle(document.querySelector('.n-thing-header__title')).fontSize,
+      descriptionFontSize: getComputedStyle(document.querySelector('.result-description')).fontSize,
+    },
     documentScroll: {
       windowX: scrollX,
       windowY: scrollY,
@@ -230,6 +242,9 @@ if (!visualState.header || visualState.header.top < -1) {
 }
 if (!visualState.content || !visualState.scrollbar || visualState.scrollbar.bottom > visualState.content.bottom + 1) {
   throw new Error('Launcher result scroller exceeds its content region');
+}
+if (before.optionCount >= 6 && visualState.density.fullyVisibleOptionCount < 6) {
+  throw new Error('Launcher result density is too low to show six complete options');
 }
 if (!scrollValidation.isVisible) throw new Error('Keyboard selection did not scroll fully into view');
 if (scrollValidation.documentScrollTop !== 0 || visualState.documentScroll.windowY !== 0) {
