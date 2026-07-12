@@ -72,11 +72,11 @@ describe('structured prompt editor wiring', () => {
     for (const source of [regular, structured, inspector, fillCanvas, useWorkspace, jinja]) {
       expect(source).toContain('box-sizing: border-box')
     }
-    expect(regular).toContain('padding-bottom: 8px')
+    expect(regular).toContain('padding-bottom: var(--content-padding)')
     expect(regular).toContain(':show-variables-button="compactInspector"')
     expect(regular).not.toContain('class="drawer-trigger"')
     expect(jinja).toMatch(/\.jinja-editor-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 320px/s)
-    expect(jinja).toContain('padding-bottom: 8px')
+    expect(jinja).toContain('padding-bottom: var(--content-padding)')
     expect(jinja).toContain(':show-variables-button="compactInspector"')
     expect(jinja).toContain('ResizeObserver')
     expect(structured).toContain("'request-open-variables': []")
