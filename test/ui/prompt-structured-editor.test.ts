@@ -37,6 +37,10 @@ describe('structured prompt editor wiring', () => {
 
     expect(regular).toContain('<VariableInspector')
     expect(jinja).toContain('<VariableInspector')
+    expect(jinja).toContain('source-only')
+    expect(jinja).toContain('<QuickOptimizationActions')
+    expect(jinja).toContain('#toolbar-prefix')
+    expect(jinja).toContain('#toolbar-extra')
     expect(inspector).toContain('typeTextarea')
     expect(inspector).toContain('typeNumber')
     expect(inspector).toContain('typeBoolean')
@@ -48,7 +52,7 @@ describe('structured prompt editor wiring', () => {
     const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
     const structuredEditor = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
 
-    expect(useWorkspace).toMatch(/\.use-workspace\s*\{[^}]*padding:\s*8px var\(--content-padding\) 0/s)
+    expect(useWorkspace).toMatch(/\.use-workspace\s*\{[^}]*padding:\s*var\(--content-padding\) var\(--content-padding\) 0/s)
     expect(useWorkspace).toMatch(/\.use-action-bar\s*\{[^}]*height:\s*58px/s)
     expect(fillCanvas).toContain('padding: var(--content-padding)')
     expect(fillCanvas).not.toContain('clamp(20px, 4vw, 48px)')
@@ -63,15 +67,21 @@ describe('structured prompt editor wiring', () => {
     const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
     const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
     const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
+    const jinja = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
 
-    for (const source of [regular, structured, inspector, fillCanvas, useWorkspace]) {
+    for (const source of [regular, structured, inspector, fillCanvas, useWorkspace, jinja]) {
       expect(source).toContain('box-sizing: border-box')
     }
-    expect(regular).toMatch(/\.editor-secondary-toolbar\s*\{[^}]*flex:\s*0 0 46px/s)
     expect(regular).toContain('padding-bottom: 8px')
     expect(regular).toContain(':show-variables-button="compactInspector"')
     expect(regular).not.toContain('class="drawer-trigger"')
+    expect(jinja).toMatch(/\.jinja-editor-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 320px/s)
+    expect(jinja).toContain('padding-bottom: 8px')
+    expect(jinja).toContain(':show-variables-button="compactInspector"')
+    expect(jinja).toContain('ResizeObserver')
     expect(structured).toContain("'request-open-variables': []")
+    expect(structured).toContain('<slot name="toolbar-prefix" />')
+    expect(structured).toContain('<slot name="toolbar-extra" />')
     expect(structured).toContain('@media (max-width: 620px)')
     expect(useWorkspace).toContain('@click="openHistory"')
     expect(useWorkspace).toContain('historyPromptId')

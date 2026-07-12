@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.use-workspace { box-sizing: border-box; height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 0; padding: 8px var(--content-padding) 0; background: var(--surface-primary); }
+.use-workspace { box-sizing: border-box; height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 0; padding: var(--content-padding) var(--content-padding) 0; background: var(--surface-primary); }
 .use-workspace > :first-child { flex: 1; min-height: 0; }
 .prompt-attachments { min-height: 36px; display: flex; align-items: center; gap: var(--compact-padding); }
 .attachments-label { flex: 0 0 auto; font-size: 12px; }

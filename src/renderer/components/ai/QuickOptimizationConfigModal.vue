@@ -11,7 +11,24 @@
         </template>
 
         <template #content="{ contentHeight }">
-            <div class="optimization-workspace" :style="{ height: `${contentHeight}px` }">
+            <div class="optimization-content" :style="{ height: `${contentHeight}px` }">
+                <div class="optimization-guide ui-toolbar">
+                    <div class="guide-copy">
+                        <span class="guide-icon"><NIcon size="18"><Bulb /></NIcon></span>
+                        <div>
+                            <NText strong class="guide-title">{{ t('quickOptimization.workspace.guideTitle') }}</NText>
+                            <NText depth="3" class="guide-description">
+                                {{ t('quickOptimization.workspace.guideDescription') }}
+                            </NText>
+                        </div>
+                    </div>
+                    <NButton size="small" secondary :disabled="loading || saving" @click="createExampleDraft">
+                        <template #icon><NIcon size="16"><Plus /></NIcon></template>
+                        {{ t('quickOptimization.workspace.addExample') }}
+                    </NButton>
+                </div>
+
+                <div class="optimization-workspace">
                 <aside class="optimization-library">
                     <div class="library-summary">
                         <div>
@@ -68,7 +85,9 @@
                 <main v-if="selectedConfig || creating" class="optimization-editor">
                     <header class="editor-header">
                         <div>
-                            <NText strong class="editor-title">{{ creating ? t('quickOptimization.addConfig') : selectedConfig?.name }}</NText>
+                            <NText strong class="editor-title">
+                                {{ creating ? (draft.name || t('quickOptimization.addConfig')) : selectedConfig?.name }}
+                            </NText>
                             <NText depth="3" class="editor-subtitle">{{ creating ? t('quickOptimization.workspace.createDescription') : t('quickOptimization.workspace.editDescription') }}</NText>
                         </div>
                         <NFlex v-if="selectedConfig && !creating" size="small">
@@ -125,11 +144,23 @@
                                         <NText strong>{{ t('quickOptimization.promptTemplate') }}</NText>
                                         <NText depth="3">{{ t('quickOptimization.workspace.templateHelp') }}</NText>
                                     </div>
-                                    <NTag size="small">{{ t('quickOptimization.workspace.contentVariable') }}</NTag>
+                                    <NTooltip>
+                                        <template #trigger>
+                                            <NButton size="small" secondary class="variable-insert-button"
+                                                @mousedown.prevent @click="insertContentVariable">
+                                                <template #icon><NIcon size="16"><Braces /></NIcon></template>
+                                                {{ t('quickOptimization.workspace.contentVariable') }}
+                                            </NButton>
+                                        </template>
+                                        {{ t('quickOptimization.workspace.insertVariableHint') }}
+                                    </NTooltip>
                                 </div>
                                 <NFormItem path="prompt" :show-label="false">
-                                    <NInput v-model:value="draft.prompt" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" show-count
-                                        class="template-input" :placeholder="t('quickOptimization.promptTemplatePlaceholder')" />
+                                    <NInput ref="templateInputRef" v-model:value="draft.prompt" type="textarea"
+                                        :autosize="{ minRows: 12, maxRows: 28 }" show-count class="template-input"
+                                        :placeholder="t('quickOptimization.promptTemplatePlaceholder')"
+                                        @focus="rememberTemplateCursor" @click="rememberTemplateCursor"
+                                        @keyup="rememberTemplateCursor" @select="rememberTemplateCursor" />
                                 </NFormItem>
                             </section>
                         </NForm>
@@ -140,6 +171,7 @@
                     <NEmpty :description="t('quickOptimization.workspace.selectConfig')">
                         <template #extra><NButton type="primary" size="small" @click="createDraft">{{ t('quickOptimization.addConfig') }}</NButton></template>
                     </NEmpty>
+                </div>
                 </div>
             </div>
         </template>
@@ -159,13 +191,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
     NButton, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput, NResult, NScrollbar,
-    NSpin, NSwitch, NTag, NText, NTooltip, useDialog, useMessage,
+    NSpin, NSwitch, NText, NTooltip, useDialog, useMessage,
 } from 'naive-ui'
-import { ArrowDown, ArrowUp, Plus, Settings, Trash } from '@vicons/tabler'
+import { ArrowDown, ArrowUp, Braces, Bulb, Plus, Settings, Trash } from '@vicons/tabler'
 import type { CreateQuickOptimizationConfig, QuickOptimizationConfig, UpdateQuickOptimizationConfig } from '@shared/types/ai'
 import CommonModal from '@/components/common/CommonModal.vue'
 import { api } from '@/lib/api'
@@ -190,7 +222,9 @@ const togglingId = ref<number | null>(null)
 const selectedId = ref<number | null>(null)
 const creating = ref(false)
 const formRef = ref<any>()
+const templateInputRef = ref<any>()
 const snapshot = ref('')
+const templateSelection = reactive({ start: 0, end: 0 })
 
 const draft = reactive({
     name: '',
@@ -215,6 +249,8 @@ const applyDraft = (config?: QuickOptimizationConfig) => {
     draft.description = config?.description || ''
     draft.prompt = config?.prompt || ''
     draft.enabled = config?.enabled ?? true
+    templateSelection.start = draft.prompt.length
+    templateSelection.end = draft.prompt.length
     snapshot.value = serializeDraft()
 }
 
@@ -260,6 +296,46 @@ const createDraft = async () => {
     applyDraft()
 }
 
+const createExampleDraft = async () => {
+    if (!(await confirmDiscard())) return
+    creating.value = true
+    selectedId.value = null
+    applyDraft()
+    draft.name = t('quickOptimization.workspace.exampleName')
+    draft.description = t('quickOptimization.workspace.exampleDescription')
+    draft.prompt = t('quickOptimization.workspace.examplePrompt')
+    draft.enabled = enabledCount.value < 5
+    templateSelection.start = draft.prompt.length
+    templateSelection.end = draft.prompt.length
+}
+
+const getTemplateTextarea = () => {
+    const textareaRef = templateInputRef.value?.textareaElRef
+    return textareaRef?.value || textareaRef
+}
+
+const rememberTemplateCursor = (event: Event) => {
+    const target = event.target as HTMLTextAreaElement
+    if (typeof target?.selectionStart !== 'number') return
+    templateSelection.start = target.selectionStart
+    templateSelection.end = target.selectionEnd
+}
+
+const insertContentVariable = () => {
+    const token = '{{content}}'
+    const start = Math.min(templateSelection.start, draft.prompt.length)
+    const end = Math.min(Math.max(templateSelection.end, start), draft.prompt.length)
+    draft.prompt = `${draft.prompt.slice(0, start)}${token}${draft.prompt.slice(end)}`
+    const cursor = start + token.length
+    templateSelection.start = cursor
+    templateSelection.end = cursor
+    nextTick(() => {
+        const textarea = getTemplateTextarea()
+        templateInputRef.value?.focus?.()
+        textarea?.setSelectionRange?.(cursor, cursor)
+    })
+}
+
 const saveDraft = async () => {
     try { await formRef.value?.validate() } catch { return }
     if (draft.enabled && !selectedConfig.value?.enabled && enabledCount.value >= 5) {
@@ -269,11 +345,13 @@ const saveDraft = async () => {
     saving.value = true
     try {
         const data = { name: draft.name.trim(), description: draft.description.trim() || undefined, prompt: draft.prompt, enabled: draft.enabled }
+        let savedConfig: QuickOptimizationConfig | null = null
         if (creating.value) {
-            await api.quickOptimizationConfigs.create.mutate({ ...data, sortOrder: configs.value.length + 1 } as CreateQuickOptimizationConfig)
+            savedConfig = await api.quickOptimizationConfigs.create.mutate({ ...data, sortOrder: configs.value.length + 1 } as CreateQuickOptimizationConfig)
         } else if (selectedConfig.value?.id) {
-            await api.quickOptimizationConfigs.update.mutate({ id: selectedConfig.value.id, data: data as UpdateQuickOptimizationConfig })
+            savedConfig = await api.quickOptimizationConfigs.update.mutate({ id: selectedConfig.value.id, data: data as UpdateQuickOptimizationConfig })
         }
+        if (savedConfig?.id) selectedId.value = savedConfig.id
         await loadConfigs()
         emit('configs-updated')
     } catch (error) { message.error(t('quickOptimization.workspace.saveFailed', { error: (error as Error).message })) }
@@ -356,7 +434,15 @@ watch(() => props.show, show => { if (show) loadConfigs() })
 .modal-title-icon { width: 36px; height: 36px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
 .modal-title { display: block; font-size: var(--font-size-xl); line-height: var(--line-height-normal); overflow-wrap: anywhere; }
 .modal-subtitle, .editor-subtitle, .library-summary .n-text:last-child, .section-heading .n-text:last-child { display: block; margin-top: 3px; font-size: var(--font-size-sm); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
-.optimization-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: hidden; background: var(--surface-primary); }
+.optimization-content { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-primary); }
+.optimization-guide { flex: 0 0 auto; min-height: 70px; padding: 10px var(--content-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); border-width: 0 0 1px; }
+.guide-copy { min-width: 0; display: flex; align-items: center; gap: var(--compact-padding); }
+.guide-copy > div { min-width: 0; }
+.guide-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-primary); }
+.guide-title, .guide-description { display: block; line-height: var(--line-height-normal); }
+.guide-title { font-size: var(--font-size-base); }
+.guide-description { max-width: 820px; margin-top: 2px; font-size: var(--font-size-sm); white-space: normal; overflow-wrap: anywhere; }
+.optimization-workspace { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: hidden; background: var(--surface-primary); }
 .optimization-library { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border-default); background: var(--surface-primary); }
 .library-summary { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: var(--compact-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 .library-summary > div { min-width: 0; }
@@ -386,7 +472,7 @@ watch(() => props.show, show => { if (show) loadConfigs() })
 .switch-field { min-height: 34px; display: flex; align-items: center; gap: 9px; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .section-heading > div { min-width: 0; }
-.section-heading .n-tag { flex: 0 0 auto; }
+.variable-insert-button { flex: 0 0 auto; }
 .template-input :deep(.n-input__textarea-el) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .editor-empty { display: grid; place-items: center; background: var(--surface-body); }
 .dirty-indicator { min-height: 20px; font-size: var(--font-size-xs); }
@@ -395,5 +481,10 @@ watch(() => props.show, show => { if (show) loadConfigs() })
     .optimization-workspace { grid-template-columns: 270px minmax(0, 1fr); }
     .form-grid { grid-template-columns: 1fr; }
     .form-span-2 { grid-column: auto; }
+}
+
+@media (max-width: 720px) {
+    .optimization-guide { align-items: stretch; flex-direction: column; }
+    .optimization-guide > .n-button { align-self: flex-start; }
 }
 </style>

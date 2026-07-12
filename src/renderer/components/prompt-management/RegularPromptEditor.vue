@@ -8,64 +8,13 @@
         @select-variable="selectVariable" @request-add-variable="addVariable"
         @request-open-variables="showInspectorDrawer = true" />
 
-      <div class="editor-secondary-toolbar ui-toolbar">
-        <div class="optimization-summary">
-          <NIcon size="16"><Stars /></NIcon>
-          <div>
-            <NText>{{ t('promptManagement.quickOptimization') }}</NText>
-            <NText v-if="isStreaming" depth="3" class="streaming-status">
-              {{ t('promptManagement.generating') }} · {{ streamStats.charCount }} {{ t('promptManagement.characters') }}
-            </NText>
-          </div>
-        </div>
-        <NFlex size="small">
-          <NButton v-if="isStreaming" size="small" type="error" secondary @click="$emit('stop-optimization')">
-            {{ t('promptManagement.stopGeneration') }}
-          </NButton>
-          <NButton v-else size="small" :disabled="!content.trim() || optimizing !== null"
-            @click="showOptimization = !showOptimization">
-            <template #icon><NIcon size="16"><Wand /></NIcon></template>
-            {{ t('promptEditor.aiOptimize') }}
-          </NButton>
-          <NTooltip>
-            <template #trigger>
-              <NButton size="small" quaternary @click="$emit('open-quick-optimization-config')">
-                <template #icon><NIcon size="16"><Settings /></NIcon></template>
-              </NButton>
-            </template>
-            {{ t('promptEditor.configureOptimization') }}
-          </NTooltip>
-        </NFlex>
-      </div>
-
-      <NCard v-if="showOptimization && !isStreaming" size="small" class="optimization-panel">
-        <div class="optimization-grid">
-          <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
-            :placeholder="t('promptManagement.aiModelPlaceholder')" :disabled="optimizing !== null" />
-          <NFlex size="small" wrap>
-            <NButton v-for="config in quickOptimizationConfigs" :key="config.id" size="small"
-              :loading="optimizing === config.name" :disabled="!content.trim() || optimizing !== null"
-              @click="$emit('optimize-prompt', config.id)">
-              {{ config.name }}
-            </NButton>
-            <NButton size="small" :disabled="!content.trim() || optimizing !== null"
-              @click="showManualInput = !showManualInput">
-              {{ t('promptManagement.manualAdjustment') }}
-            </NButton>
-          </NFlex>
-        </div>
-        <div v-if="showManualInput" class="manual-adjustment">
-          <NInput v-model:value="manualInstruction" type="textarea" :rows="3" maxlength="500" show-count
-            :placeholder="t('promptManagement.manualAdjustmentPlaceholder')" />
-          <NFlex justify="end" size="small">
-            <NButton size="small" @click="cancelManualAdjustment">{{ t('common.cancel') }}</NButton>
-            <NButton size="small" type="primary" :loading="optimizing === 'manual'"
-              :disabled="!manualInstruction.trim()" @click="applyManualAdjustment">
-              {{ t('promptManagement.confirmAdjustment') }}
-            </NButton>
-          </NFlex>
-        </div>
-      </NCard>
+      <QuickOptimizationActions ref="quickOptimizationRef" :content="content"
+        :quick-optimization-configs="quickOptimizationConfigs" :optimizing="optimizing"
+        :is-streaming="isStreaming" :stream-stats="streamStats"
+        @optimize-prompt="$emit('optimize-prompt', $event)"
+        @stop-optimization="$emit('stop-optimization')"
+        @open-quick-optimization-config="$emit('open-quick-optimization-config')"
+        @manual-adjustment="$emit('manual-adjustment', $event)" />
     </div>
 
     <VariableInspector v-if="!compactInspector" :variables="localVariables" :active-names="parsed.variableNames"
@@ -88,12 +37,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  NButton, NCard, NDrawer, NDrawerContent, NFlex, NIcon, NInput, NText, NTooltip,
-  useMessage,
-} from 'naive-ui'
-import { Settings, Stars, Wand } from '@vicons/tabler'
-import AIModelSelector from '@/components/common/AIModelSelector.vue'
+import { NDrawer, NDrawerContent } from 'naive-ui'
 import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
 import {
   createVariable, parsePromptTemplate, reconcilePromptVariables, removeVariableOccurrences,
@@ -101,6 +45,7 @@ import {
 } from '@/lib/utils/prompt-template'
 import StructuredPromptEditor from './StructuredPromptEditor.vue'
 import VariableInspector from './VariableInspector.vue'
+import QuickOptimizationActions from './QuickOptimizationActions.vue'
 
 interface Props {
   content: string
@@ -122,15 +67,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const message = useMessage()
 const editorWorkspace = ref<HTMLElement>()
 const structuredEditorRef = ref<InstanceType<typeof StructuredPromptEditor>>()
-const modelSelectorRef = ref<any>()
-const selectedModelKey = ref('')
+const quickOptimizationRef = ref<InstanceType<typeof QuickOptimizationActions>>()
 const selectedVariable = ref('')
-const showOptimization = ref(false)
-const showManualInput = ref(false)
-const manualInstruction = ref('')
 const compactInspector = ref(false)
 const showInspectorDrawer = ref(false)
 let resizeObserver: ResizeObserver | null = null
@@ -215,24 +155,13 @@ const removeVariable = (name: string) => {
   selectedVariable.value = remaining[0]?.name || ''
 }
 
-const cancelManualAdjustment = () => {
-  showManualInput.value = false
-  manualInstruction.value = ''
-}
-
-const applyManualAdjustment = () => {
-  const instruction = manualInstruction.value.trim()
-  if (!instruction) {
-    message.warning(t('promptManagement.enterAdjustmentInstruction'))
-    return
-  }
-  emit('manual-adjustment', instruction)
-  cancelManualAdjustment()
-}
-
 defineExpose({
-  modelSelectorRef,
-  selectedModelKey,
+  get modelSelectorRef() {
+    return quickOptimizationRef.value?.modelSelectorRef
+  },
+  get selectedModelKey() {
+    return quickOptimizationRef.value?.selectedModelKey
+  },
   focus: () => structuredEditorRef.value?.focus(),
   insertVariable: (name: string) => structuredEditorRef.value?.insertVariable(name),
 })
@@ -242,16 +171,5 @@ defineExpose({
 .regular-editor-workspace { position: relative; box-sizing: border-box; width: 100%; height: 100%; min-height: 0; padding-bottom: 8px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); }
 .editor-primary-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--compact-padding); }
 .editor-primary-column > :first-child { flex: 1; min-height: 220px; }
-.editor-secondary-toolbar { flex: 0 0 46px; min-height: 46px; padding: 6px var(--compact-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); }
-.optimization-summary { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.optimization-summary > :deep(.n-icon) { color: var(--accent-primary); }
-.streaming-status { display: block; font-size: 12px; }
-.optimization-panel { flex: 0 0 auto; border: 1px solid var(--border-default); background: var(--surface-secondary); }
-.optimization-grid { display: grid; grid-template-columns: minmax(220px, 1fr) auto; align-items: center; gap: var(--compact-padding); }
-.manual-adjustment { margin-top: var(--compact-padding); padding-top: var(--compact-padding); display: flex; flex-direction: column; gap: var(--compact-padding); border-top: 1px solid var(--border-default); }
 .regular-editor-workspace.compact { grid-template-columns: minmax(0, 1fr); }
-@media (max-width: 720px) {
-  .optimization-grid { grid-template-columns: 1fr; }
-  .optimization-summary > div { display: none; }
-}
 </style>

@@ -1084,7 +1084,9 @@
     "typeSelect": "選択", "typeNumber": "数値", "typeBoolean": "切り替え", "typeList": "リスト", "typeDict": "辞書",
     "variableNameRequired": "変数名を入力してください", "variableNameInvalid": "名前に括弧や改行は使用できません",
     "variableNameDuplicate": "変数名は重複できません", "defaultVariableName": "変数{index}",
-    "aiOptimize": "AI 最適化", "configureOptimization": "クイック最適化設定を管理"
+    "aiOptimize": "AI 最適化", "configureOptimization": "クイック最適化設定を管理",
+    "quickOptimizationHint": "アクションをクリックすると現在のプロンプトをすぐに調整できます。足りない場合のみ手動調整を使用します。",
+    "quickOptimizationEmpty": "有効なクイックアクションがありません。設定から追加できます。"
   },
   "promptFill": {
     "viewMode": "使用ビュー", "fill": "入力", "result": "最終結果",
@@ -1115,6 +1117,13 @@
       "contentVariable": "変数：{'{{'}content{'}}'}",
       "continueEditing": "編集を続ける",
       "createDescription": "プロンプトエディターから直接利用できる最適化アクションを作成します。",
+      "guideTitle": "頻繁なプロンプト調整をワンクリック操作に",
+      "guideDescription": "各アクションは現在のプロンプトを再利用可能なテンプレートに挿入し、選択した AI に送信します。翻訳、拡張、簡潔化、表現改善、構成変更などに利用できます。",
+      "addExample": "充実した例を使用",
+      "insertVariableHint": "下のテンプレート内の現在のカーソル位置にこの変数を挿入します",
+      "exampleName": "表現と構成を改善",
+      "exampleDescription": "意図、変数、重要な制約を維持しながら、表現を明確にし、構成と実行しやすさを改善します",
+      "examplePrompt": "あなたはプロのプロンプト編集者です。元の意図を変えずに、以下のプロンプトを改善してください。\n\n改善要件：\n1. 曖昧、重複、不自然な表現を修正する。\n2. 目的、背景、制約、出力要件が明確になるよう情報を再構成する。\n3. 実行に必要な詳細を補うが、業務上の事実を捏造しない。\n4. すべての変数、書式記号、重要な制約を保持する。\n5. 変更説明は付けず、改善後の完全なプロンプトだけを出力する。\n\n元のプロンプト：\n{'{{'}content{'}}'}",
       "deleteConfirm": "クイック最適化設定「{name}」を削除しますか？",
       "discardChanges": "変更を破棄",
       "editDescription": "名前、説明、AIへ送信するテンプレートを編集します。",

@@ -1084,7 +1084,9 @@
     "typeSelect": "Select", "typeNumber": "Number", "typeBoolean": "Toggle", "typeList": "List", "typeDict": "Dictionary",
     "variableNameRequired": "Enter a variable name", "variableNameInvalid": "Names cannot contain braces or line breaks",
     "variableNameDuplicate": "Variable names must be unique", "defaultVariableName": "Variable {index}",
-    "aiOptimize": "AI optimize", "configureOptimization": "Manage quick optimization settings"
+    "aiOptimize": "AI optimize", "configureOptimization": "Manage quick optimization settings",
+    "quickOptimizationHint": "Click an action to update this prompt immediately. Use manual adjustment only when the shortcuts are not enough.",
+    "quickOptimizationEmpty": "No quick actions are enabled. Add one in settings."
   },
   "promptFill": {
     "viewMode": "Use view", "fill": "Fill", "result": "Final result",
@@ -1115,6 +1117,13 @@
       "contentVariable": "Variable: {'{{'}content{'}}'}",
       "continueEditing": "Continue Editing",
       "createDescription": "Create an optimization action that is directly available in the prompt editor.",
+      "guideTitle": "Turn frequent prompt edits into one-click actions",
+      "guideDescription": "Each action inserts the current prompt into a reusable template and sends it to the selected AI. Use actions for translation, expansion, tightening, wording, or structural changes.",
+      "addExample": "Use rich example",
+      "insertVariableHint": "Insert this variable at the current cursor position in the template below",
+      "exampleName": "Improve wording and structure",
+      "exampleDescription": "Make the prompt clearer, better structured, and easier to execute while preserving its intent, variables, and key constraints",
+      "examplePrompt": "You are a professional prompt editor. Improve the prompt below without changing its original intent.\n\nRequirements:\n1. Fix vague, repetitive, or unnatural wording.\n2. Reorganize the information so the goal, context, constraints, and output requirements are clear.\n3. Add necessary execution details, but do not invent business facts.\n4. Preserve every variable, formatting marker, and key constraint.\n5. Output only the complete improved prompt without explaining the changes.\n\nOriginal prompt:\n{'{{'}content{'}}'}",
       "deleteConfirm": "Delete the quick optimization configuration “{name}”?",
       "discardChanges": "Discard Changes",
       "editDescription": "Edit the name, description, and template sent to the AI.",

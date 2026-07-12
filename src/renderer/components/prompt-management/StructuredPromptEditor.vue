@@ -2,7 +2,7 @@
   <div class="structured-editor">
     <div class="structured-editor-toolbar ui-toolbar">
       <div class="editor-view-switch" role="group" :aria-label="t('promptEditor.viewMode')">
-        <NButton size="small" :type="visualMode ? 'primary' : 'default'"
+        <NButton v-if="!sourceOnly" size="small" :type="visualMode ? 'primary' : 'default'"
           :secondary="visualMode" :quaternary="!visualMode" @click="setVisualMode(true)">
           <template #icon><NIcon size="16"><LayoutCards /></NIcon></template>
           <span class="view-mode-label">{{ t('promptEditor.visual') }}</span>
@@ -12,21 +12,23 @@
           <template #icon><NIcon size="16"><Code /></NIcon></template>
           <span class="view-mode-label">{{ t('promptEditor.source') }}</span>
         </NButton>
+        <slot name="toolbar-prefix" />
       </div>
 
       <div class="editor-toolbar-actions">
+        <slot name="toolbar-extra" />
         <NText v-if="!showVariablesButton" depth="3" class="variable-count">
-          {{ t('promptEditor.variableCount', { count: variableCount }) }}
+          {{ t('promptEditor.variableCount', { count: displayedVariableCount }) }}
         </NText>
         <NTooltip v-else>
           <template #trigger>
             <NButton size="small" class="variables-toolbar-button" @click="$emit('request-open-variables')">
               <template #icon><NIcon size="16"><AdjustmentsHorizontal /></NIcon></template>
               <span class="toolbar-button-label">{{ t('promptEditor.variables') }}</span>
-              <span class="toolbar-button-count">{{ variableCount }}</span>
+              <span class="toolbar-button-count">{{ displayedVariableCount }}</span>
             </NButton>
           </template>
-          {{ t('promptEditor.variables') }} · {{ variableCount }}
+          {{ t('promptEditor.variables') }} · {{ displayedVariableCount }}
         </NTooltip>
         <NTooltip>
           <template #trigger>
@@ -74,11 +76,15 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   placeholder?: string
   showVariablesButton?: boolean
+  sourceOnly?: boolean
+  variableCount?: number
 }>(), {
   selectedVariable: '',
   readonly: false,
   placeholder: '',
   showVariablesButton: false,
+  sourceOnly: false,
+  variableCount: undefined,
 })
 
 const emit = defineEmits<{
@@ -90,9 +96,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const editorHost = ref<HTMLElement>()
-const visualMode = ref(true)
+const visualMode = ref(!props.sourceOnly)
 const diagnosticCount = ref(parsePromptTemplate(props.content).diagnostics.length)
-const variableCount = computed(() => parsePromptTemplate(props.content).variableNames.length)
+const displayedVariableCount = computed(() => (
+  props.variableCount ?? parsePromptTemplate(props.content).variableNames.length
+))
 const readonlyCompartment = new Compartment()
 let editorView: EditorView | null = null
 let lastSelection = EditorSelection.cursor(props.content.length)
@@ -185,8 +193,9 @@ const buildDecorations = (doc: Text, visual: boolean, selected: string) => {
 
 const variableDecorations = StateField.define<DecorationState>({
   create(state) {
-    const built = buildDecorations(state.doc, true, props.selectedVariable)
-    return { visual: true, selected: props.selectedVariable, ...built }
+    const visual = !props.sourceOnly
+    const built = buildDecorations(state.doc, visual, props.selectedVariable)
+    return { visual, selected: props.selectedVariable, ...built }
   },
   update(value, transaction) {
     let visual = value.visual
@@ -271,7 +280,7 @@ const refreshDecorations = (selected = props.selectedVariable || '') => {
 }
 
 const setVisualMode = (value: boolean) => {
-  visualMode.value = value
+  visualMode.value = props.sourceOnly ? false : value
   refreshDecorations()
   editorView?.focus()
 }

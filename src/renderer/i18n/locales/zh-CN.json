@@ -1084,7 +1084,9 @@
     "typeSelect": "选择", "typeNumber": "数字", "typeBoolean": "开关", "typeList": "列表", "typeDict": "字典",
     "variableNameRequired": "请输入变量名称", "variableNameInvalid": "名称不能包含花括号或换行",
     "variableNameDuplicate": "变量名称不能重复", "defaultVariableName": "变量{index}",
-    "aiOptimize": "AI 优化", "configureOptimization": "管理快速优化配置"
+    "aiOptimize": "AI 优化", "configureOptimization": "管理快速优化配置",
+    "quickOptimizationHint": "点击一个动作立即调整当前提示词；快捷动作不够用时再选择手动调整。",
+    "quickOptimizationEmpty": "尚未启用快捷动作，可在设置中添加"
   },
   "promptFill": {
     "viewMode": "使用视图", "fill": "填写", "result": "最终结果",
@@ -1115,6 +1117,13 @@
       "contentVariable": "变量：{'{{'}content{'}}'}",
       "continueEditing": "继续编辑",
       "createDescription": "创建一个可在提示词编辑器中直接使用的优化动作。",
+      "guideTitle": "把高频提示词调整变成一键动作",
+      "guideDescription": "每个动作会把当前提示词代入模板并交给所选 AI 处理，适合翻译、扩写、精简、改进措辞或调整结构等重复操作。",
+      "addExample": "使用丰富示例",
+      "insertVariableHint": "点击后插入到下方模板的当前光标位置",
+      "exampleName": "改进措辞与结构",
+      "exampleDescription": "在保留原意、变量和关键约束的前提下，让表达更清晰、结构更合理、要求更容易执行",
+      "examplePrompt": "你是一名专业的提示词编辑。请在不改变原始意图的前提下，改进下方提示词。\n\n优化要求：\n1. 修正含糊、重复或不自然的措辞；\n2. 重组信息层级，使目标、背景、约束和输出要求更清晰；\n3. 补足有助于执行的必要细节，但不要虚构业务信息；\n4. 保留所有变量、格式标记和关键限制；\n5. 只输出优化后的完整提示词，不解释修改过程。\n\n原始提示词：\n{'{{'}content{'}}'}",
       "deleteConfirm": "确定删除快速优化配置“{name}”吗？",
       "discardChanges": "放弃修改",
       "editDescription": "修改名称、说明和实际发送给 AI 的模板。",

@@ -1,682 +1,377 @@
 <template>
-    <NSplit direction="horizontal" :style="{ height: `${contentHeight}px` }" :default-size="0.6" :min="0.3" :max="0.8"
-        :resize-trigger-size="20" :disabled="modalWidth <= 800" class="prompt-editor-split">
-        <!-- 左侧：模板编辑区 -->
-        <template #1>
-            <NCard :title="t('promptManagement.jinjaTemplate')" size="small" :style="{ height: '100%' }"
-                class="editor-shell-panel editor-content-panel">
-                <template #header-extra>
-                    <NTooltip placement="top">
-                        <template #trigger>
-                            <NButton size="small" type="info" @click="showSyntaxHelp = true"
-                                :disabled="isStreaming || optimizing !== null">
-                                <template #icon>
-                                    <NIcon>
-                                        <Help />
-                                    </NIcon>
-                                </template>
-                                {{ t('promptManagement.jinjaSyntaxHelp') }}
-                            </NButton>
-                        </template>
-                        <NFlex vertical size="small">
-                            <NText>{{ t('promptManagement.jinjaSupportTooltip') }}</NText>
-                            <NButton size="tiny" text type="primary" @click="openJinjaWebsite">
-                                {{ t('promptManagement.jinjaSupportLearnMore') }}
-                            </NButton>
-                        </NFlex>
-                    </NTooltip>
-                </template>
-                <NScrollbar ref="contentScrollbarRef" :style="{ height: `${contentHeight - 130}px` }">
-                    <NFlex vertical size="medium" style="padding-right: 12px;">
-                        <NFormItem path="content" style="flex: 1;" :show-label="false">
-                            <NInput ref="jinjaContentInputRef" :value="content"
-                                @update:value="(value) => $emit('update:content', value)"
-                                @click="rememberJinjaCursor" @keyup="rememberJinjaCursor" @select="rememberJinjaCursor"
-                                type="textarea" show-count :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
-                                :style="{
-                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                    backgroundColor: isStreaming ? 'var(--success-color-suppl)' : undefined,
-                                    border: isStreaming ? '1px solid var(--success-color)' : undefined
-                                }" :autosize="{ minRows: 9 }" :readonly="isStreaming" />
-                        </NFormItem>
-                    </NFlex>
-
-                    <!-- 快速插入变量 -->
-                    <div v-if="jinjaVariables.length > 0" style="margin-top: 8px;">
-                        <NText depth="3" style="font-size: 12px; margin-bottom: 8px; display: block;">
-                            {{ t('promptManagement.quickInsertVariables') }}
-                        </NText>
-                        <NFlex size="small" wrap>
-                            <NButton v-for="variable in jinjaVariables" :key="variable.name" size="tiny"
-                                @click="insertVariableToTemplate(variable.name)"
-                                :disabled="isStreaming || optimizing !== null || !variable.name">
-                                {{ variable.name }}
-                            </NButton>
-                        </NFlex>
-                    </div>
-
-                    <NAlert type="info" :show-icon="false" style="margin: 8px 0;">
-                        <NFlex justify="space-between" align="center">
-                            <div>
-                                <NFlex align="center" size="small">
-                                    <NText depth="3" style="font-size: 12px;">
-                                        {{ t('promptManagement.quickOptimization') }}
-                                    </NText>
-                                    <NButton size="tiny" text @click="$emit('open-quick-optimization-config')"
-                                        style="padding: 2px; margin-left: 4px;">
-                                        <template #icon>
-                                            <NIcon size="12">
-                                                <Settings />
-                                            </NIcon>
-                                        </template>
-                                    </NButton>
-                                </NFlex>
-                                <!-- 流式传输状态显示 -->
-                                <div v-if="isStreaming" style="margin-top: 4px;">
-                                    <NText type="success" style="font-size: var(--font-size-xs);">
-                                        {{ t('promptManagement.generating') }} ({{ streamStats.charCount }} {{
-                                        t('promptManagement.characters') }})
-                                    </NText>
-                                </div>
-                            </div>
-                            <NFlex size="small">
-                                <!-- 停止按钮 -->
-                                <NButton v-if="isStreaming" size="small" type="error"
-                                    @click="$emit('stop-optimization')">
-                                    {{ t('promptManagement.stopGeneration') }}
-                                </NButton>
-                                <!-- 优化按钮 -->
-                                <template v-else>
-                                    <NButton v-for="config in quickOptimizationConfigs" :key="config.id" size="small"
-                                        @click="$emit('optimize-prompt', config.id)"
-                                        :loading="optimizing === config.name"
-                                        :disabled="!content.trim() || optimizing !== null">
-                                        {{ config.name }}
-                                    </NButton>
-                                    <NButton size="small" @click="showManualAdjustment"
-                                        :disabled="!content.trim() || optimizing !== null">
-                                        {{ t('promptManagement.manualAdjustment') }}
-                                    </NButton>
-                                </template>
-                            </NFlex>
-                        </NFlex>
-                    </NAlert>
-
-                    <!-- AI模型选择器 -->
-                    <div style="margin-top: 8px;">
-                        <AIModelSelector ref="modelSelectorRef" v-model:modelKey="selectedModelKey"
-                            :placeholder="t('promptManagement.aiModelPlaceholder')"
-                            :disabled="isStreaming || optimizing !== null" />
-                    </div>
-
-                    <!-- 手动调整输入框 -->
-                    <div v-if="showManualInput" style="margin-top: 8px;">
-                        <NCard size="small" :title="t('promptManagement.manualAdjustmentTitle')">
-                            <NFlex vertical size="small">
-                                <NInput v-model:value="manualInstruction" type="textarea"
-                                    :placeholder="t('promptManagement.manualAdjustmentPlaceholder')" :rows="3"
-                                    :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" show-count
-                                    :maxlength="500" />
-                                <NFlex justify="space-between" align="center">
-                                    <NText depth="3" style="font-size: 12px;">
-                                        {{ t('promptManagement.manualAdjustmentTip') }}
-                                    </NText>
-                                    <NFlex size="small">
-                                        <NButton size="small" @click="hideManualAdjustment">
-                                            {{ t('promptManagement.cancelAdjustment') }}
-                                        </NButton>
-                                        <NButton size="small" type="primary" @click="applyManualAdjustment"
-                                            :loading="optimizing === 'manual'" :disabled="!manualInstruction.trim()">
-                                            {{ t('promptManagement.confirmAdjustment') }}
-                                        </NButton>
-                                    </NFlex>
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
-                    </div>
-                </NScrollbar>
-            </NCard>
+  <div ref="editorWorkspace" class="jinja-editor-workspace" :class="{ compact: compactInspector }">
+    <div class="jinja-primary-column">
+      <StructuredPromptEditor ref="structuredEditorRef" :content="content" :variables="jinjaVariables"
+        :selected-variable="selectedJinjaVariable" :readonly="isStreaming" source-only
+        :variable-count="jinjaActiveNames.length"
+        :show-variables-button="compactInspector" :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
+        @update:content="$emit('update:content', $event)" @select-variable="selectVariable"
+        @request-add-variable="addJinjaVariable" @request-open-variables="showInspectorDrawer = true">
+        <template #toolbar-prefix>
+          <div class="template-status" :class="{ invalid: !templateValidation.isValid }">
+            <NIcon size="16">
+              <CircleCheck v-if="templateValidation.isValid" />
+              <AlertCircle v-else />
+            </NIcon>
+            <NText depth="3" class="template-status-detail">
+              {{ templateValidation.isValid
+                ? t('promptManagement.templateValidMessage')
+                : templateValidation.error || t('promptManagement.templateInvalid') }}
+            </NText>
+          </div>
         </template>
-
-        <template #resize-trigger>
-            <div class="prompt-editor-resize-handle" aria-hidden="true" />
+        <template #toolbar-extra>
+          <NTooltip>
+            <template #trigger>
+              <NButton size="small" quaternary :disabled="!content.trim()" @click="openPreview">
+                <template #icon><NIcon size="16"><Eye /></NIcon></template>
+                <span class="toolbar-label">{{ t('promptManagement.preview') }}</span>
+              </NButton>
+            </template>
+            {{ t('promptManagement.jinjaTemplatePreview') }}
+          </NTooltip>
+          <NTooltip>
+            <template #trigger>
+              <NButton size="small" quaternary @click="showSyntaxHelp = true">
+                <template #icon><NIcon size="16"><Help /></NIcon></template>
+                <span class="toolbar-label">{{ t('promptManagement.jinjaSyntaxHelp') }}</span>
+              </NButton>
+            </template>
+            {{ t('promptManagement.jinjaSupportTooltip') }}
+          </NTooltip>
         </template>
+      </StructuredPromptEditor>
 
-        <!-- 右侧：Jinja变量配置区 -->
-        <template #2>
-            <div class="jinja-inspector-column">
-                <div v-if="content.trim()" class="jinja-validation ui-toolbar">
-                    <NText :type="templateValidation.isValid ? 'success' : 'error'" class="validation-text">
-                        {{ templateValidation.isValid
-                            ? t('promptManagement.templateValidMessage')
-                            : templateValidation.error }}
-                    </NText>
-                    <NButton size="small" @click="showTemplatePreview = true" :disabled="!content.trim()">
-                        <template #icon><NIcon size="16"><Eye /></NIcon></template>
-                        {{ t('promptManagement.preview') }}
-                    </NButton>
-                </div>
-                <VariableInspector :variables="jinjaVariables" :active-names="jinjaActiveNames"
-                    :occurrences="jinjaOccurrenceCounts" :selected-variable="selectedJinjaVariable" jinja
-                    :readonly="isStreaming || optimizing !== null" @select="selectedJinjaVariable = $event"
-                    @request-add="addJinjaVariable" @request-insert="insertVariableToTemplate"
-                    @request-remove="removeJinjaVariableByName" @update-variable="updateJinjaVariable" />
+      <QuickOptimizationActions ref="quickOptimizationRef" :content="content"
+        :quick-optimization-configs="quickOptimizationConfigs" :optimizing="optimizing"
+        :is-streaming="isStreaming" :stream-stats="streamStats"
+        @optimize-prompt="$emit('optimize-prompt', $event)"
+        @stop-optimization="$emit('stop-optimization')"
+        @open-quick-optimization-config="$emit('open-quick-optimization-config')"
+        @manual-adjustment="$emit('manual-adjustment', $event)" />
+    </div>
+
+    <VariableInspector v-if="!compactInspector" :variables="jinjaVariables" :active-names="jinjaActiveNames"
+      :occurrences="jinjaOccurrenceCounts" :selected-variable="selectedJinjaVariable" jinja
+      :readonly="isStreaming || optimizing !== null" @select="selectVariable"
+      @request-add="addJinjaVariable" @request-insert="insertVariableToTemplate"
+      @request-remove="removeJinjaVariableByName" @update-variable="updateJinjaVariable" />
+
+    <NDrawer v-model:show="showInspectorDrawer" :width="360" placement="right">
+      <NDrawerContent :title="t('promptEditor.variables')" closable body-content-style="padding: 0; overflow: hidden;">
+        <VariableInspector :variables="jinjaVariables" :active-names="jinjaActiveNames"
+          :occurrences="jinjaOccurrenceCounts" :selected-variable="selectedJinjaVariable" jinja
+          :readonly="isStreaming || optimizing !== null" @select="selectVariable"
+          @request-add="addJinjaVariable" @request-insert="insertVariableToTemplate"
+          @request-remove="removeJinjaVariableByName" @update-variable="updateJinjaVariable" />
+      </NDrawerContent>
+    </NDrawer>
+
+    <NDrawer v-model:show="showTemplatePreview" :width="640" placement="right">
+      <NDrawerContent :title="t('promptManagement.jinjaTemplatePreview')" closable
+        body-content-style="padding: 16px; overflow: hidden;">
+        <div class="preview-canvas">
+          <PromptFillCanvas :prompt="previewPrompt" :values="previewVariableValues" compact
+            @update:values="previewVariableValues = $event" />
+        </div>
+      </NDrawerContent>
+    </NDrawer>
+
+    <NDrawer v-model:show="showSyntaxHelp" :width="520" placement="right">
+      <NDrawerContent :title="t('promptManagement.jinjaSyntaxHelp')" closable>
+        <NFlex vertical size="medium">
+          <NText depth="3">{{ t('promptManagement.jinjaSyntaxHelpDesc') }}</NText>
+          <NCard v-for="(examples, category) in syntaxHelp" :key="category" size="small" class="syntax-card">
+            <template #header>
+              <NText strong>{{ syntaxCategoryLabel(category) }}</NText>
+            </template>
+            <div class="syntax-list">
+              <button v-for="example in examples" :key="example.code" type="button" class="syntax-example"
+                @click="copySyntaxCode(example.code)">
+                <code>{{ example.code }}</code>
+                <NIcon size="16"><Copy /></NIcon>
+              </button>
             </div>
-        </template>
-    </NSplit>
-
-    <!-- Jinja语法帮助模态框 -->
-    <CommonModal :show="showSyntaxHelp" @update:show="showSyntaxHelp = false" @close="showSyntaxHelp = false">
-        <template #header>
-            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
-                {{ t('promptManagement.jinjaSyntaxHelp') }}
-            </NText>
-        </template>
-
-        <template #content="{ contentHeight }">
-            <NScrollbar :style="{ height: `${contentHeight}px` }">
-                <NFlex vertical size="medium" style="padding-right: 12px;">
-                    <NCard v-for="(examples, category) in syntaxHelp" :key="category" size="small">
-                        <template #header>
-                            <NText strong>{{ t(`promptManagement.jinja${category.charAt(0).toUpperCase() +
-                                category.slice(1)}`) }}</NText>
-                        </template>
-                        <NFlex vertical size="small">
-                            <NFlex v-for="example in examples" :key="example.code" align="center" size="small"
-                                style="padding: 8px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary);">
-                                <NInput :value="example.code" readonly size="small" :style="{
-                                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                                    fontSize: '12px',
-                                    flex: 1,
-                                    cursor: 'pointer'
-                                }" @click="copySyntaxCode(example.code)" />
-                                <NButton size="tiny" text type="primary" @click="copySyntaxCode(example.code)"
-                                    style="margin-left: 8px;">
-                                    <template #icon>
-                                        <NIcon size="14">
-                                            <Copy />
-                                        </NIcon>
-                                    </template>
-                                </NButton>
-                                <NText depth="3" style="font-size: 12px; margin-left: 8px; min-width: 80px;">
-                                    {{ t(`promptManagement.jinjaSyntaxExamples.${example.description}`) }}
-                                </NText>
-                            </NFlex>
-                        </NFlex>
-                    </NCard>
-                </NFlex>
-            </NScrollbar>
-        </template>
-
-        <template #footer>
-            <NFlex justify="space-between" align="center">
-                <div>
-                    <NText depth="3">
-                        {{ t('promptManagement.jinjaSyntaxHelpDesc') }}
-                    </NText>
-                </div>
-                <div>
-                    <NFlex size="small">
-                        <NButton @click="showSyntaxHelp = false">{{ t('common.close') }}</NButton>
-                        <NButton type="primary" @click="openJinjaWebsite">
-                            {{ t('promptManagement.jinjaSupportLearnMore') }}
-                        </NButton>
-                    </NFlex>
-                </div>
-            </NFlex>
-        </template>
-    </CommonModal>
-
-    <!-- 模板预览模态框 -->
-    <CommonModal :show="showTemplatePreview" @update:show="showTemplatePreview = false"
-        @close="showTemplatePreview = false">
-        <template #header>
-            <NText :style="{ fontSize: '18px', fontWeight: 600 }">
-                {{ t('promptManagement.jinjaTemplatePreview') }}
-            </NText>
-        </template>
-
-        <template #content="{ contentHeight }">
-            <NFlex vertical size="medium" :style="{ height: `${contentHeight}px` }">
-                <!-- 原始模板 -->
-                <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.originalTemplate')
-                        }}</NText>
-                    <NInput :value="content" type="textarea" readonly :rows="6"
-                        :style="{ fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace' }" />
-                </div>
-
-                <!-- 变量值 -->
-                <div v-if="Object.keys(previewVariableValues).length > 0">
-                    <NText strong style="margin-bottom: 8px; display: block;">{{ t('promptManagement.previewVariables')
-                        }}</NText>
-                    <NFlex vertical size="small">
-                        <NFlex v-for="(value, key) in previewVariableValues" :key="key" align="center" size="small">
-                            <NTag size="small" type="primary" :bordered="false">{{ key }}</NTag>
-                            <NInput v-model:value="previewVariableValues[key]" size="small" />
-                        </NFlex>
-                    </NFlex>
-                </div>
-
-                <!-- 渲染结果 -->
-                <div>
-                    <NText strong style="margin-bottom: 8px; display: block;">{{
-                        t('promptManagement.jinjaRenderedContent') }}</NText>
-                    <NInput :value="previewRenderedContent" type="textarea" readonly :rows="8" :style="{
-                        fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                        backgroundColor: 'var(--success-color-suppl)'
-                    }" />
-                </div>
-            </NFlex>
-        </template>
-
-        <template #footer>
-            <NFlex justify="space-between" align="center">
-                <div>
-                    <NText depth="3">
-                        {{ t('promptManagement.jinjaTemplateSuccess') }}
-                    </NText>
-                </div>
-                <div>
-                    <NFlex size="small">
-                        <NButton @click="showTemplatePreview = false">{{ t('common.close') }}</NButton>
-                        <NButton type="primary" @click="copyToClipboard(previewRenderedContent)">
-                            <template #icon>
-                                <NIcon>
-                                    <Copy />
-                                </NIcon>
-                            </template>
-                            {{ t('promptManagement.copyResult') }}
-                        </NButton>
-                    </NFlex>
-                </div>
-            </NFlex>
-        </template>
-    </CommonModal>
+          </NCard>
+          <NButton secondary @click="openJinjaWebsite">
+            {{ t('promptManagement.jinjaSupportLearnMore') }}
+          </NButton>
+        </NFlex>
+      </NDrawerContent>
+    </NDrawer>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, reactive } from "vue";
-import { useI18n } from 'vue-i18n';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
-    NFormItem,
-    NInput,
-    NCard,
-    NFlex,
-    NText,
-    NButton,
-    NIcon,
-    NAlert,
-    NScrollbar,
-    NSplit,
-    NTooltip,
-    NTag,
-    useMessage,
-} from "naive-ui";
-import { Plus, Settings, Help, Eye, Copy } from "@vicons/tabler";
-import { useWindowSize } from "@/composables/useWindowSize";
-import AIModelSelector from "@/components/common/AIModelSelector.vue";
-import CommonModal from "@/components/common/CommonModal.vue";
-import VariableInspector from "@/components/prompt-management/VariableInspector.vue";
-import { jinjaService } from "@/lib/utils/jinja.service";
-import type { EditablePromptVariable } from "@/lib/utils/prompt-template";
+  NButton, NCard, NDrawer, NDrawerContent, NFlex, NIcon, NText, NTooltip,
+  useMessage,
+} from 'naive-ui'
+import { AlertCircle, CircleCheck, Copy, Eye, Help } from '@vicons/tabler'
+import type { PromptVariable, PromptWithRelations } from '@shared/types/database'
+import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
+import { createPromptDraft } from '@/lib/utils/prompt-template'
+import { jinjaService } from '@/lib/utils/jinja.service'
+import PromptFillCanvas from './PromptFillCanvas.vue'
+import QuickOptimizationActions from './QuickOptimizationActions.vue'
+import StructuredPromptEditor from './StructuredPromptEditor.vue'
+import VariableInspector from './VariableInspector.vue'
 
-interface JinjaVariable extends EditablePromptVariable {
-    name: string;
-    type: 'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'text' | 'textarea' | 'select' | 'number' | 'boolean';
-    defaultValue?: string;
-    required: boolean;
-    options?: string[];
-    placeholder?: string;
-    description?: string;
-}
+type JinjaVariable = EditablePromptVariable
 
 interface Props {
-    content: string;
-    contentHeight: number;
-    quickOptimizationConfigs: any[];
-    optimizing: string | null;
-    isStreaming: boolean;
-    streamStats: any;
-    variables?: JinjaVariable[];
+  content: string
+  contentHeight: number
+  quickOptimizationConfigs: any[]
+  optimizing: string | null
+  isStreaming: boolean
+  streamStats: { charCount?: number }
+  variables?: JinjaVariable[]
 }
 
-interface Emits {
-    (e: "update:content", value: string): void;
-    (e: "update:variables", variables: JinjaVariable[], source?: "auto" | "user"): void;
-    (e: "optimize-prompt", configId: number): void;
-    (e: "stop-optimization"): void;
-    (e: "open-quick-optimization-config"): void;
-    (e: "manual-adjustment", instruction: string): void;
-}
+const props = defineProps<Props>()
+const emit = defineEmits<{
+  (e: 'update:content', value: string): void
+  (e: 'update:variables', variables: JinjaVariable[], source?: 'auto' | 'user'): void
+  (e: 'optimize-prompt', configId: number): void
+  (e: 'stop-optimization'): void
+  (e: 'open-quick-optimization-config'): void
+  (e: 'manual-adjustment', instruction: string): void
+}>()
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+const { t } = useI18n()
+const message = useMessage()
+const editorWorkspace = ref<HTMLElement>()
+const structuredEditorRef = ref<InstanceType<typeof StructuredPromptEditor>>()
+const quickOptimizationRef = ref<InstanceType<typeof QuickOptimizationActions>>()
+const selectedJinjaVariable = ref('')
+const jinjaVariables = ref<JinjaVariable[]>([])
+const compactInspector = ref(false)
+const showInspectorDrawer = ref(false)
+const showSyntaxHelp = ref(false)
+const showTemplatePreview = ref(false)
+const previewVariableValues = ref<Record<string, any>>({})
+const templateValidation = ref<{ isValid: boolean; error?: string }>({ isValid: true })
+let resizeObserver: ResizeObserver | null = null
+let validationTimer: number | null = null
+let syncingFromProps = false
 
-const { t } = useI18n();
-const message = useMessage();
-const contentScrollbarRef = ref();
-const jinjaContentInputRef = ref<any>();
-const lastJinjaCursor = ref(props.content.length);
-const modelSelectorRef = ref();
-const selectedModelKey = ref("");
+const cloneVariables = (variables: JinjaVariable[]) => variables.map(variable => ({
+  ...variable,
+  options: variable.options ? [...variable.options] : undefined,
+  validation: variable.validation ? { ...variable.validation } : undefined,
+}))
 
-// 手动调整状态
-const showManualInput = ref(false);
-const manualInstruction = ref("");
+const variableSignature = (variables: JinjaVariable[]) => JSON.stringify(variables.map(variable => ({
+  name: variable.name,
+  type: variable.type,
+  options: variable.options || [],
+  defaultValue: variable.defaultValue || '',
+  required: variable.required !== false,
+  placeholder: variable.placeholder || '',
+  description: variable.description || '',
+})))
 
-// 语法帮助和预览状态
-const showSyntaxHelp = ref(false);
-const showTemplatePreview = ref(false);
-const previewVariableValues = ref<Record<string, string>>({});
-
-// 获取窗口尺寸用于响应式布局
-const { modalWidth } = useWindowSize();
-
-// 防抖相关
-const debounceTimer = ref<number | null>(null);
-const DEBOUNCE_DELAY = 500;
-
-// 模板验证状态
-const templateValidation = ref<{ isValid: boolean; error?: string }>({ isValid: true, error: '' });
-
-// Jinja变量列表
-const jinjaVariables = ref<JinjaVariable[]>([]);
-const initializingJinjaVariables = ref(false);
-const selectedJinjaVariable = ref('');
 const jinjaActiveNames = computed(() => {
-    try { return jinjaService.extractVariables(props.content); }
-    catch { return []; }
-});
+  try { return jinjaService.extractVariables(props.content) }
+  catch { return [] }
+})
+
 const jinjaOccurrenceCounts = computed(() => Object.fromEntries(
-    jinjaActiveNames.value.map(name => [name, Math.max(1, (props.content.match(new RegExp(`\\b${escapeRegExp(name)}\\b`, 'g')) || []).length)])
-));
+  jinjaActiveNames.value.map(name => [
+    name,
+    Math.max(1, (props.content.match(new RegExp(`\\b${escapeRegExp(name)}\\b`, 'g')) || []).length),
+  ])
+))
 
-// 初始化变量列表
+const syntaxHelp = computed(() => jinjaService.getSyntaxHelp())
+
+const previewPrompt = computed<PromptWithRelations>(() => ({
+  id: 0,
+  uuid: 'jinja-preview',
+  title: t('promptManagement.jinjaTemplatePreview'),
+  content: props.content,
+  description: '',
+  tags: [],
+  variables: jinjaVariables.value.map((variable, index): PromptVariable => ({
+    ...variable,
+    uuid: variable.uuid || `jinja-preview-${index}`,
+    promptId: 0,
+    type: variable.type as PromptVariable['type'],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })),
+  isFavorite: false,
+  useCount: 0,
+  isActive: true,
+  isJinjaTemplate: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}))
+
 const initializeJinjaVariables = () => {
-    initializingJinjaVariables.value = true;
-    if (props.variables && props.variables.length > 0) {
-        // 如果有传入的变量，使用传入的变量
-        jinjaVariables.value = [...props.variables];
-    } else {
-        // 否则从模板内容中提取变量
-        const extractedVariables = extractVariablesFromContent();
-        jinjaVariables.value = extractedVariables;
-    }
-    selectedJinjaVariable.value = jinjaVariables.value[0]?.name || '';
-    nextTick(() => {
-        initializingJinjaVariables.value = false;
-    });
-};
+  syncingFromProps = true
+  const provided = props.variables?.length ? props.variables : jinjaActiveNames.value.map(name => ({
+    name,
+    type: 'str',
+    required: true,
+  }))
+  jinjaVariables.value = cloneVariables(provided)
+  selectedJinjaVariable.value = jinjaVariables.value[0]?.name || ''
+  nextTick(() => { syncingFromProps = false })
+}
 
-// 从模板内容中提取变量
-const extractVariablesFromContent = (): JinjaVariable[] => {
-    if (!props.content.trim()) return [];
-
-    try {
-        const variableNames = jinjaService.extractVariables(props.content);
-        return variableNames.map(name => ({
-            name,
-            type: 'str',
-            required: true,
-        }));
-    } catch (error) {
-        console.error('提取变量失败:', error);
-        return [];
-    }
-};
-
-// 语法帮助信息
-const syntaxHelp = computed(() => jinjaService.getSyntaxHelp());
-
-// 预览渲染内容
-const previewRenderedContent = computed(() => {
-    if (!props.content.trim()) return '';
-
-    try {
-        return jinjaService.render(props.content, previewVariableValues.value);
-    } catch (error) {
-        return `模板渲染错误: ${error instanceof Error ? error.message : String(error)}`;
-    }
-});
-
-// 更新预览变量值
-const updatePreviewVariableValues = () => {
-    const newValues: Record<string, string> = {};
-    jinjaVariables.value.forEach(variable => {
-        if (variable.name) {
-            newValues[variable.name] = variable.defaultValue || `[${variable.name}]`;
-        }
-    });
-    previewVariableValues.value = newValues;
-};
-
-// 验证模板语法
 const validateTemplate = (content: string) => {
-    if (!content.trim()) {
-        templateValidation.value = { isValid: true, error: '' };
-        return;
-    }
+  if (!content.trim()) {
+    templateValidation.value = { isValid: true }
+    return
+  }
+  templateValidation.value = jinjaService.validateTemplate(content)
+}
 
-    try {
-        const result = jinjaService.validateTemplate(content);
-        templateValidation.value = result;
-    } catch (error) {
-        templateValidation.value = {
-            isValid: false,
-            error: error instanceof Error ? error.message : String(error)
-        };
-    }
-};
+const scheduleValidation = (content: string) => {
+  if (validationTimer !== null) window.clearTimeout(validationTimer)
+  validationTimer = window.setTimeout(() => {
+    validateTemplate(content)
+    validationTimer = null
+  }, 250)
+}
 
-// 防抖的模板验证
-const debouncedValidateTemplate = (content: string) => {
-    if (debounceTimer.value) {
-        clearTimeout(debounceTimer.value);
-    }
+const syncExtractedVariables = () => {
+  const existingNames = new Set(jinjaVariables.value.map(variable => variable.name))
+  const additions = jinjaActiveNames.value
+    .filter(name => !existingNames.has(name))
+    .map(name => ({ name, type: 'str', required: true }))
+  if (!additions.length) return
+  jinjaVariables.value = [...jinjaVariables.value, ...additions]
+  emitVariables('auto')
+}
 
-    debounceTimer.value = setTimeout(() => {
-        validateTemplate(content);
-        debounceTimer.value = null;
-    }, DEBOUNCE_DELAY) as unknown as number;
-};
+watch(() => props.content, content => {
+  scheduleValidation(content)
+  syncExtractedVariables()
+})
 
-// 显示手动调整输入框
-const showManualAdjustment = () => {
-    showManualInput.value = true;
-    manualInstruction.value = "";
+watch(() => props.variables, variables => {
+  if (syncingFromProps || !variables) return
+  if (variableSignature(variables) === variableSignature(jinjaVariables.value)) return
+  jinjaVariables.value = cloneVariables(variables)
+  if (!jinjaVariables.value.some(variable => variable.name === selectedJinjaVariable.value)) {
+    selectedJinjaVariable.value = jinjaVariables.value[0]?.name || ''
+  }
+}, { deep: true })
 
-    // 使用 nextTick 确保 DOM 更新后再滚动
-    nextTick(() => {
-        // 滚动到底部以显示手动调整输入框
-        if (contentScrollbarRef.value) {
-            contentScrollbarRef.value.scrollTo({ top: 999999, behavior: 'smooth' });
-        }
-    });
-};
+onMounted(() => {
+  initializeJinjaVariables()
+  validateTemplate(props.content)
+  if (!editorWorkspace.value) return
+  resizeObserver = new ResizeObserver(entries => {
+    compactInspector.value = (entries[0]?.contentRect.width || 0) < 860
+  })
+  resizeObserver.observe(editorWorkspace.value)
+})
 
-// 隐藏手动调整输入框
-const hideManualAdjustment = () => {
-    showManualInput.value = false;
-    manualInstruction.value = "";
-};
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  if (validationTimer !== null) window.clearTimeout(validationTimer)
+})
 
-// 应用手动调整
-const applyManualAdjustment = () => {
-    if (!manualInstruction.value.trim()) {
-        message.warning(t('promptManagement.enterAdjustmentInstruction'));
-        return;
-    }
+const emitVariables = (source: 'auto' | 'user' = 'user') => {
+  emit('update:variables', cloneVariables(jinjaVariables.value), source)
+}
 
-    if (!props.content.trim()) {
-        message.warning(t('promptManagement.enterPromptContentFirst'));
-        return;
-    }
+const selectVariable = (name: string) => {
+  selectedJinjaVariable.value = name
+  if (compactInspector.value) showInspectorDrawer.value = true
+}
 
-    emit("manual-adjustment", manualInstruction.value.trim());
-    hideManualAdjustment();
-};
-
-// 打开Jinja官网
-const openJinjaWebsite = () => {
-    if ((window as any).electronAPI?.shell?.openExternal) {
-        (window as any).electronAPI.shell.openExternal('https://jinja.palletsprojects.com/en/stable/');
-    } else {
-        window.open('https://jinja.palletsprojects.com/en/stable/', '_blank');
-    }
-};
-
-// 复制到剪贴板
-const copyToClipboard = async (text: string) => {
-    try {
-        await navigator.clipboard.writeText(text);
-        message.success(t('promptManagement.copySuccess'));
-    } catch (error) {
-        console.error('复制失败:', error);
-        message.error(t('promptManagement.copyFailed'));
-    }
-};
-
-// 复制语法代码
-const copySyntaxCode = async (code: string) => {
-    try {
-        await navigator.clipboard.writeText(code);
-        message.success(t('promptManagement.jinjaSyntaxCopySuccess'));
-    } catch (error) {
-        console.error('复制语法代码失败:', error);
-        message.error(t('promptManagement.jinjaSyntaxCopyFailed'));
-    }
-};
-
-// 添加Jinja变量
 const addJinjaVariable = () => {
-    let index = 1;
-    const names = new Set(jinjaVariables.value.map(variable => variable.name));
-    while (names.has(`variable${index}`)) index += 1;
-    const name = `variable${index}`;
-    jinjaVariables.value.push({
-        name,
-        type: 'str',
-        required: true,
-    });
-    selectedJinjaVariable.value = name;
-    insertVariableToTemplate(name);
-    // 通知父组件变量已更新
-    emit('update:variables', [...jinjaVariables.value]);
-};
+  const names = new Set(jinjaVariables.value.map(variable => variable.name))
+  let index = 1
+  while (names.has(`variable${index}`)) index += 1
+  const variable: JinjaVariable = { name: `variable${index}`, type: 'str', required: true }
+  jinjaVariables.value = [...jinjaVariables.value, variable]
+  selectedJinjaVariable.value = variable.name
+  emitVariables()
+  nextTick(() => structuredEditorRef.value?.insertVariable(variable.name))
+}
 
-// 移除Jinja变量
-const removeJinjaVariable = (index: number) => {
-    jinjaVariables.value.splice(index, 1);
-    // 通知父组件变量已更新
-    emit('update:variables', [...jinjaVariables.value]);
-};
+const insertVariableToTemplate = (name: string) => {
+  structuredEditorRef.value?.insertVariable(name)
+  showInspectorDrawer.value = false
+}
 
 const removeJinjaVariableByName = (name: string) => {
-    const index = jinjaVariables.value.findIndex(variable => variable.name === name);
-    if (index >= 0) removeJinjaVariable(index);
-    selectedJinjaVariable.value = jinjaVariables.value[0]?.name || '';
-};
+  jinjaVariables.value = jinjaVariables.value.filter(variable => variable.name !== name)
+  selectedJinjaVariable.value = jinjaVariables.value[0]?.name || ''
+  emitVariables()
+}
 
 const updateJinjaVariable = ({ previousName, variable }: { previousName: string; variable: EditablePromptVariable }) => {
-    const index = jinjaVariables.value.findIndex(item => item.name === previousName);
-    if (index < 0) return;
-    jinjaVariables.value[index] = variable as JinjaVariable;
-    if (previousName !== variable.name) {
-        const tagPattern = /({[{%][\s\S]*?[}%]})/g;
-        const namePattern = new RegExp(`\\b${escapeRegExp(previousName)}\\b`, 'g');
-        emit('update:content', props.content.replace(tagPattern, tag => tag.replace(namePattern, variable.name)));
-        selectedJinjaVariable.value = variable.name;
-    }
-    emit('update:variables', [...jinjaVariables.value]);
-};
+  jinjaVariables.value = jinjaVariables.value.map(item => item.name === previousName ? variable : item)
+  if (previousName !== variable.name) {
+    const tagPattern = /({[{%][\s\S]*?[}%]})/g
+    const namePattern = new RegExp(`\\b${escapeRegExp(previousName)}\\b`, 'g')
+    emit('update:content', props.content.replace(tagPattern, tag => tag.replace(namePattern, variable.name)))
+    selectedJinjaVariable.value = variable.name
+  }
+  emitVariables()
+}
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const openPreview = () => {
+  previewVariableValues.value = createPromptDraft(jinjaVariables.value, {})
+  showTemplatePreview.value = true
+}
 
-// 插入变量到模板
-const insertVariableToTemplate = (variableName: string) => {
-    const cursor = Math.min(lastJinjaCursor.value, props.content.length);
-    const placeholder = `{{ ${variableName} }}`;
-    const newContent = `${props.content.slice(0, cursor)}${placeholder}${props.content.slice(cursor)}`;
-    emit('update:content', newContent);
-    lastJinjaCursor.value = cursor + placeholder.length;
-    nextTick(() => {
-        const textareaRef = jinjaContentInputRef.value?.textareaElRef;
-        const textarea = textareaRef?.value || textareaRef;
-        jinjaContentInputRef.value?.focus?.();
-        textarea?.setSelectionRange?.(lastJinjaCursor.value, lastJinjaCursor.value);
-    });
-};
+const copySyntaxCode = async (code: string) => {
+  await navigator.clipboard.writeText(code)
+  message.success(t('promptManagement.jinjaSyntaxCopySuccess'))
+}
 
-const rememberJinjaCursor = (event: Event) => {
-    const target = event.target as HTMLTextAreaElement;
-    if (typeof target.selectionStart === 'number') lastJinjaCursor.value = target.selectionStart;
-};
+const syntaxCategoryLabel = (category: string) => t(
+  `promptManagement.jinja${category.charAt(0).toUpperCase()}${category.slice(1)}`
+)
 
-// 监听内容变化，验证模板并更新变量（使用防抖）
-watch(
-    () => props.content,
-    (newContent) => {
-        if (newContent) {
-            debouncedValidateTemplate(newContent);
-            // 当内容变化时，重新提取变量
-            const extractedVariables = extractVariablesFromContent();
-            if (extractedVariables.length > 0) {
-                // 合并现有变量和新提取的变量
-                const existingNames = new Set(jinjaVariables.value.map(v => v.name));
-                const newVariables = extractedVariables.filter(v => !existingNames.has(v.name));
-                if (newVariables.length > 0) {
-                    jinjaVariables.value.push(...newVariables);
-                }
-            }
-        } else {
-            // 如果内容为空，立即清空验证状态
-            if (debounceTimer.value) {
-                clearTimeout(debounceTimer.value);
-                debounceTimer.value = null;
-            }
-            templateValidation.value = { isValid: true, error: '' };
-            // 清空变量列表
-            jinjaVariables.value = [];
-        }
-    }
-);
+const openJinjaWebsite = () => {
+  const url = 'https://jinja.palletsprojects.com/en/stable/'
+  if ((window as any).electronAPI?.shell?.openExternal) (window as any).electronAPI.shell.openExternal(url)
+  else window.open(url, '_blank')
+}
 
-// 监听Jinja变量变化，更新预览变量值并通知父组件
-watch(
-    () => jinjaVariables.value,
-    (newVariables) => {
-        updatePreviewVariableValues();
-        const source = initializingJinjaVariables.value ? 'auto' : 'user';
-        // 通知父组件变量已更新 - 使用 nextTick 避免递归更新
-        nextTick(() => {
-            emit('update:variables', [...newVariables], source);
-        });
-    },
-    { deep: true }
-);
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// 暴露方法给父组件
 defineExpose({
-    modelSelectorRef,
-    selectedModelKey,
-    jinjaVariables,
-    initializeJinjaVariables,
-});
+  get modelSelectorRef() {
+    return quickOptimizationRef.value?.modelSelectorRef
+  },
+  get selectedModelKey() {
+    return quickOptimizationRef.value?.selectedModelKey
+  },
+  jinjaVariables,
+  initializeJinjaVariables,
+})
 </script>
 
 <style scoped>
-.prompt-editor-split { background: var(--surface-body); }
-.editor-shell-panel { border: 1px solid var(--border-default) !important; border-radius: var(--radius-panel) !important; background: var(--surface-primary); }
-.editor-shell-panel :deep(> .n-card-header) { min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-.editor-shell-panel :deep(> .n-card-header .n-card-header__main) { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); }
-.editor-shell-panel :deep(> .n-card__content) { padding: 14px 16px; }
-.variable-config-card { border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); box-shadow: none; }
-.variable-config-card :deep(.n-card-header__main) { font-size: var(--font-size-base); }
-.prompt-editor-split :deep(.n-split__resize-trigger-wrapper) { position: relative; background: transparent; }
-.prompt-editor-resize-handle { width: 100%; height: 100%; background: transparent; }
-.jinja-inspector-column { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: var(--compact-padding); }
-.jinja-inspector-column > :last-child { flex: 1; min-height: 0; }
-.jinja-validation { min-height: 46px; padding: 6px var(--compact-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); }
-.validation-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.jinja-editor-workspace { box-sizing: border-box; position: relative; width: 100%; height: 100%; min-height: 0; padding-bottom: 8px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); }
+.jinja-primary-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--compact-padding); }
+.jinja-primary-column > :first-child { flex: 1; min-height: 220px; }
+.template-status { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.template-status > :deep(.n-icon) { flex: 0 0 auto; color: var(--accent-success); }
+.template-status.invalid > :deep(.n-icon) { color: var(--accent-error); }
+.template-status-detail { display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.jinja-editor-workspace.compact { grid-template-columns: minmax(0, 1fr); }
+.preview-canvas { height: calc(100vh - 96px); min-height: 320px; }
+.syntax-card { border: 1px solid var(--border-default); background: var(--surface-primary); }
+.syntax-list { display: flex; flex-direction: column; gap: 6px; }
+.syntax-example { width: 100%; min-height: 36px; padding: 7px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: var(--radius-control); color: var(--content-primary); background: var(--surface-secondary); font: inherit; text-align: left; cursor: pointer; }
+.syntax-example:hover { background: var(--surface-tertiary); }
+.syntax-example:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
+.syntax-example code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+.syntax-example :deep(.n-icon) { flex: 0 0 auto; color: var(--content-secondary); }
+@media (max-width: 720px) {
+  .template-status-detail, .toolbar-label { display: none; }
+}
 </style>
