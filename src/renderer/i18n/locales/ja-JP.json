@@ -381,7 +381,18 @@
     "updateSuccess": "ストレージ構成が正常に更新されました",
     "username": "ユーザー名",
     "usernamePlaceholder": "ユーザー名を入力してください",
-    "webdavInfo": "WebDAV は Nut Cloud や Nextcloud などのサービスをサポートします"
+    "webdavInfo": "WebDAV は Nut Cloud や Nextcloud などのサービスをサポートします",
+    "mobileICloudUnsupported": "モバイル版 iCloud は現在、実際のデバイス間同期に対応していません。WebDAV を使用してください。",
+    "restoreDecisionTitle": "復元後のクラウド処理",
+    "restoreDecisionDescription": "ローカル復元が完了しました。クラウドを上書きするか再マージするまで同期は一時停止されます。",
+    "mergeWithCloud": "クラウドと再マージ",
+    "mergeWithCloudSuccess": "クラウドとの再マージが完了しました",
+    "overwriteCloud": "復元データでクラウドを上書き",
+    "overwriteCloudSuccess": "復元データをクラウドへ安全に公開しました",
+    "overwriteCloudWarning": "現在のクラウドライブラリを安全バックアップしてから復元データで置き換えます。確認中にクラウドが更新された場合、処理は安全に中止されます。",
+    "syncStatus": "同期状態",
+    "lastSyncAt": "前回の同期",
+    "syncStatusValues": { "idle": "同期待機中", "scheduled": "同期予定", "syncing": "同期中", "success": "同期成功", "error": "同期の確認が必要", "paused": "復元後に一時停止" }
   },
   "common": {
     "actions": "操作する",
@@ -437,6 +448,7 @@
     "fullBackupManagement": "完全バックアップ管理",
     "importFullBackup": "完全バックアップをインポート",
     "importWarning": "⚠️ バックアップをインポートすると、既存のすべてのデータ（プロンプト、カテゴリ、AI設定など）が完全に上書きされます。この操作は元に戻せません！現在のデータのバックアップを先に作成することをお勧めします。",
+    "restorePreview": "バックアップには {total} 件のレコード（プロンプト {prompts} 件、カテゴリ {categories} 件）が含まれています。",
     "maintenanceDescription": "データ異常が発生した場合、データベースの修復を試してください",
     "noBackups": "バックアップバージョンがありません。先にバックアップを作成してください",
     "openBackupDirectory": "バックアップディレクトリを開く",

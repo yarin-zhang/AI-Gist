@@ -381,7 +381,18 @@
     "updateSuccess": "Storage configuration updated successfully",
     "username": "username",
     "usernamePlaceholder": "Please enter username",
-    "webdavInfo": "WebDAV supports services such as Nut Cloud and Nextcloud"
+    "webdavInfo": "WebDAV supports services such as Nut Cloud and Nextcloud",
+    "mobileICloudUnsupported": "Mobile iCloud does not currently provide real cross-device sync. Use WebDAV instead.",
+    "restoreDecisionTitle": "Cloud handling after restore",
+    "restoreDecisionDescription": "Local restore is complete. Cloud sync remains paused until you overwrite or merge with the cloud library.",
+    "mergeWithCloud": "Merge with cloud",
+    "mergeWithCloudSuccess": "Cloud data merged successfully",
+    "overwriteCloud": "Overwrite cloud with restored data",
+    "overwriteCloudSuccess": "Restored data was safely published to the cloud",
+    "overwriteCloudWarning": "A safety backup of the current cloud library will be created before it is replaced. The operation stops safely if the cloud changes during confirmation.",
+    "syncStatus": "Sync status",
+    "lastSyncAt": "Last sync",
+    "syncStatusValues": { "idle": "Waiting to sync", "scheduled": "Sync scheduled", "syncing": "Syncing", "success": "Sync successful", "error": "Sync needs attention", "paused": "Paused after restore" }
   },
   "common": {
     "actions": "operate",
@@ -437,6 +448,7 @@
     "fullBackupManagement": "Full Backup Management",
     "importFullBackup": "Import Full Backup",
     "importWarning": "⚠️ Importing backup will completely overwrite all existing data (including prompts, categories, AI configurations, etc.), this operation cannot be undone! It is recommended to create a backup of current data first.",
+    "restorePreview": "The backup contains {total} records, including {prompts} prompts and {categories} categories.",
     "maintenanceDescription": "When encountering data anomalies, you can try to repair the database",
     "noBackups": "No backup versions yet, please create a backup first",
     "openBackupDirectory": "Open Backup Directory",

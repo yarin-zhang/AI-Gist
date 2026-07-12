@@ -33,11 +33,14 @@ export interface WebDavPlugin {
     method: string
     username?: string
     password?: string
+    headers?: Record<string, string>
     body?: string
+    bodyBase64?: string
     contentType?: string
+    responseType?: 'text' | 'base64'
     connectTimeout?: number
     readTimeout?: number
-  }): Promise<{ status: number; body: string }>
+  }): Promise<{ status: number; body: string; headers?: Record<string, string> }>
 }
 
 const WebDav = registerPlugin<WebDavPlugin>('WebDav')

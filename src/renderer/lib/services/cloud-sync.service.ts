@@ -13,6 +13,7 @@ import {
   applyCloudSyncTombstones,
   createCloudSyncSemanticChecksum,
   createCloudSyncSnapshot,
+  getCloudSyncRecordKey,
   mergeCloudSyncData,
   normalizeCloudSyncDataSet,
   validateCloudSyncDataSetShape,
@@ -61,6 +62,7 @@ const LOCAL_STATE_STORAGE_PREFIX = 'ai_gist_cloud_sync_state';
 const LAST_AUTO_ATTEMPT_STORAGE_KEY = 'ai_gist_cloud_sync_last_auto_attempt_at';
 const PENDING_CHANGE_STORAGE_KEY = 'ai_gist_cloud_sync_pending_change';
 const CONFLICT_LOG_STORAGE_KEY = 'ai_gist_cloud_sync_conflict_log';
+const RESTORE_SUSPENSIONS_STORAGE_KEY = 'ai_gist_cloud_sync_restore_suspensions';
 const MAX_CONFLICT_LOG_ENTRIES = 50;
 export const CLOUD_SYNC_INTERVAL_SETTING_KEY = 'cloud.sync.intervalMinutes';
 export const CLOUD_SYNC_ENABLED_SETTING_KEY = 'cloud.sync.enabled';
@@ -104,7 +106,7 @@ export type CloudSyncRunReason =
   | 'resume'
   | 'config-change'
   | 'retry';
-export type CloudSyncLifecycleStatus = 'idle' | 'scheduled' | 'syncing' | 'success' | 'error';
+export type CloudSyncLifecycleStatus = 'idle' | 'scheduled' | 'syncing' | 'success' | 'error' | 'paused';
 
 export interface CloudSyncResult {
   success: boolean;
@@ -135,6 +137,7 @@ export type CloudSyncErrorCode =
   | 'REMOTE_PATH'
   | 'REMOTE_CORRUPT'
   | 'PROTOCOL_INCOMPATIBLE'
+  | 'RESTORE_DECISION_REQUIRED'
   | 'SYNC_CANCELLED'
   | 'UNKNOWN_SYNC_ERROR';
 
@@ -161,6 +164,15 @@ export interface CloudSyncOptions extends CloudSyncMergeOptions {
   reason?: CloudSyncRunReason;
   /** Explicitly retry an unchanged deterministic failure after the user fixed external conditions. */
   forceRetry?: boolean;
+  /** Internal escape hatch used only after the user resolves a restore decision. */
+  allowSuspended?: boolean;
+}
+
+export interface CloudSyncRestoreSuspension {
+  storageId: string;
+  restoredAt: string;
+  backupId?: string;
+  source: 'local-file' | 'cloud-backup';
 }
 
 export interface CloudSyncCloudClient {
@@ -318,6 +330,7 @@ export class CloudSyncService {
   };
   private pendingChangeVersion = 0;
   private lastLocalChangeAt: string | undefined;
+  private restoreSuspensions = new Map<string, CloudSyncRestoreSuspension>();
 
   constructor(deps: CloudSyncServiceDeps = {}) {
     this.cloudClient = deps.cloudClient;
@@ -333,6 +346,7 @@ export class CloudSyncService {
       allowExperimentalShadow: ENABLE_EXPERIMENTAL_CLOUD_SYNC_V2_SHADOW
     });
     this.restorePendingChangeState();
+    this.restoreRestoreSuspensions();
     this.status.conflictLogCount = this.getConflictLog().length;
   }
 
@@ -344,6 +358,17 @@ export class CloudSyncService {
   }
 
   async syncNow(storageId: string, options: CloudSyncOptions = {}): Promise<CloudSyncResult> {
+    if (!options.allowSuspended && this.restoreSuspensions.has(storageId)) {
+      return {
+        success: false,
+        appliedLocal: false,
+        uploadedRemote: false,
+        conflicts: [],
+        summary: createEmptySummary(),
+        error: '恢复后的云端处理方式尚未确认；自动同步已暂停',
+        errorCode: 'RESTORE_DECISION_REQUIRED'
+      };
+    }
     const running = this.runningSyncs.get(storageId);
     if (running) {
       this.queueAutoSyncAfterRunning(storageId, options.reason || 'manual');
@@ -546,6 +571,229 @@ export class CloudSyncService {
 
   hasPendingChanges(): boolean {
     return this.pendingChangeVersion > 0;
+  }
+
+  getRestoreSuspensions(): CloudSyncRestoreSuspension[] {
+    return [...this.restoreSuspensions.values()].sort((left, right) =>
+      left.restoredAt.localeCompare(right.restoredAt)
+    );
+  }
+
+  isStorageSuspendedAfterRestore(storageId: string): boolean {
+    return this.restoreSuspensions.has(storageId);
+  }
+
+  async suspendEnabledStoragesAfterRestore(input: {
+    backupId?: string;
+    source: CloudSyncRestoreSuspension['source'];
+  }): Promise<CloudSyncRestoreSuspension[]> {
+    const restoredAt = new Date().toISOString();
+    const storageIds = await this.resolveAllEnabledStorageIds();
+    const suspensions = storageIds.map(storageId => ({
+      storageId,
+      restoredAt,
+      backupId: input.backupId,
+      source: input.source
+    }));
+    suspensions.forEach(suspension => this.restoreSuspensions.set(suspension.storageId, suspension));
+    storageIds.forEach(storageId => {
+      this.syncGenerations.set(storageId, (this.syncGenerations.get(storageId) || 0) + 1);
+      this.runningSyncs.delete(storageId);
+    });
+    this.persistRestoreSuspensions();
+    this.clearScheduledTimer();
+    this.updateStatus({
+      status: suspensions.length > 0 ? 'paused' : this.status.status,
+      pending: false,
+      error: suspensions.length > 0 ? '恢复完成，云端同步已暂停，等待选择覆盖云端或重新合并' : undefined,
+      nextSyncAt: undefined
+    });
+    return suspensions;
+  }
+
+  clearRestoreSuspension(storageId: string): void {
+    if (!this.restoreSuspensions.delete(storageId)) return;
+    this.persistRestoreSuspensions();
+  }
+
+  async resumeRestoreWithMerge(storageId: string, options: CloudSyncOptions = {}): Promise<CloudSyncResult> {
+    const previous = this.restoreSuspensions.get(storageId);
+    this.clearRestoreSuspension(storageId);
+    const result = await this.syncNow(storageId, {
+      ...options,
+      reason: 'manual',
+      forceRetry: true,
+      allowSuspended: true
+    });
+    if (!result.success && previous) {
+      this.restoreSuspensions.set(storageId, previous);
+      this.persistRestoreSuspensions();
+    }
+    return result;
+  }
+
+  async publishRestoredDataToCloud(
+    storageId: string,
+    options: Pick<CloudSyncOptions, 'deviceName' | 'platform'> = {}
+  ): Promise<CloudSyncResult> {
+    if (!this.restoreSuspensions.has(storageId)) {
+      return {
+        success: false,
+        appliedLocal: false,
+        uploadedRemote: false,
+        conflicts: [],
+        summary: createEmptySummary(),
+        error: '该存储没有待处理的恢复决策',
+        errorCode: 'RESTORE_DECISION_REQUIRED'
+      };
+    }
+
+    const generation = (this.syncGenerations.get(storageId) || 0) + 1;
+    this.syncGenerations.set(storageId, generation);
+    const operationId = generateUUID();
+    let phase: CloudSyncStructuredDiagnostic['phase'] = 'export';
+    try {
+      const deviceId = this.getOrCreateDeviceId();
+      const now = new Date().toISOString();
+      const localData = await this.exportLocalData();
+      const localChangeVersionAtExport = this.pendingChangeVersion;
+      phase = 'read-remote';
+      const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+      const remoteSnapshot = manifest.latestSnapshot;
+      if (remoteSnapshot) this.assertValidRemoteSnapshot(remoteSnapshot);
+      const remoteData = remoteSnapshot
+        ? applyCloudSyncTombstones(remoteSnapshot.data)
+        : normalizeCloudSyncDataSet({});
+      let safetyBackupCreated = false;
+
+      if (remoteSnapshot) {
+        const safetyBackup = await CloudBackupAPI.createCloudBackup(storageId, {
+          description: `恢复前云端安全备份 - ${new Date().toLocaleString()}`,
+          data: remoteSnapshot.data,
+          backupType: 'manual',
+          trigger: 'pre-restore-cloud-overwrite',
+          deviceId,
+          dataChecksum: remoteSnapshot.dataChecksum
+        });
+        if (!safetyBackup.success) {
+          throw new Error(safetyBackup.error || safetyBackup.message || '创建恢复前云端安全备份失败');
+        }
+        safetyBackupCreated = true;
+      }
+
+      phase = 'merge';
+      const restoredWithTombstones = this.createRestoredOverwriteData(localData, remoteData, now);
+      const contract = reconcileCloudSyncDataContract(restoredWithTombstones, remoteData);
+      if (!contract.valid) throw new CloudSyncContractError(contract.issues);
+      const snapshot = createCloudSyncSnapshot(contract.data, deviceId);
+
+      phase = 'write-remote';
+      if (this.pendingChangeVersion !== localChangeVersionAtExport) {
+        throw new CloudSyncLocalChangedError('确认覆盖云端期间本机数据发生变化，请重新确认后再试');
+      }
+      await this.saveManifest(
+        storageId,
+        this.buildManifest(manifest, snapshot, [], deviceId, now, {
+          ...options,
+          reason: 'manual',
+          prefer: 'local'
+        }),
+        getCloudSyncManifestRevision(manifest),
+        generation
+      );
+
+      const localChangedDuringPublish = this.pendingChangeVersion !== localChangeVersionAtExport;
+      if (!localChangedDuringPublish && !dataSetsEqual(localData, contract.data)) {
+        phase = 'apply-local';
+        await this.replaceLocalDataForSync(contract.data, localData);
+      }
+      const stateWarning = await this.saveLocalState(storageId, deviceId, snapshot, now);
+      this.clearRestoreSuspension(storageId);
+      this.clearPendingChange(localChangeVersionAtExport);
+      return {
+        success: true,
+        action: 'uploaded',
+        localRevision: snapshot.revision,
+        remoteRevision: snapshot.revision,
+        appliedLocal: !localChangedDuringPublish && !dataSetsEqual(localData, contract.data),
+        uploadedRemote: true,
+        conflicts: [],
+        summary: {
+          added: 0,
+          updated: 0,
+          deleted: Math.max(
+            0,
+            (contract.data.syncTombstones || []).length - (localData.syncTombstones || []).length
+          ),
+          kept: Object.values(contract.data).reduce(
+            (sum, records) => sum + (Array.isArray(records) ? records.length : 0),
+            0
+          ),
+          conflicts: 0
+        },
+        warnings: mergeWarnings(
+          mergeWarnings(
+            safetyBackupCreated ? ['已创建恢复前云端安全备份'] : [],
+            localChangedDuringPublish ? '发布期间检测到新的本机编辑，已保留并等待下一次同步' : undefined
+          ),
+          stateWarning
+        )
+      };
+    } catch (error) {
+      const diagnostic = createCloudSyncStructuredDiagnostic(error, {
+        operationId,
+        phase,
+        storageId
+      });
+      return {
+        success: false,
+        appliedLocal: false,
+        uploadedRemote: false,
+        conflicts: [],
+        summary: createEmptySummary(),
+        error: diagnostic.message,
+        errorCode: diagnostic.code,
+        diagnostic
+      };
+    }
+  }
+
+  private createRestoredOverwriteData(
+    restoredData: CloudSyncDataSet,
+    remoteData: CloudSyncDataSet,
+    deletedAt: string
+  ): CloudSyncDataSet {
+    const result = normalizeCloudSyncDataSet(restoredData);
+    const tombstones = [...(result.syncTombstones || [])];
+    const existing = new Set(tombstones.map(item => `${item.collectionName}:${item.recordKey}`));
+    const collections = [
+      'categories',
+      'prompts',
+      'promptVariables',
+      'promptHistories',
+      'aiConfigs',
+      'quickOptimizationConfigs',
+      'aiHistory',
+      'settings'
+    ];
+
+    for (const collection of collections) {
+      const restoredKeys = new Set((result[collection] || []).map(record => getCloudSyncRecordKey(collection, record)));
+      for (const record of remoteData[collection] || []) {
+        const recordKey = getCloudSyncRecordKey(collection, record);
+        const tombstoneKey = `${collection}:${recordKey}`;
+        if (restoredKeys.has(recordKey) || existing.has(tombstoneKey)) continue;
+        tombstones.push({
+          collectionName: collection,
+          recordKey,
+          recordUuid: typeof record?.uuid === 'string' ? record.uuid : undefined,
+          deletedAt
+        });
+        existing.add(tombstoneKey);
+      }
+    }
+
+    return normalizeCloudSyncDataSet({ ...result, syncTombstones: tombstones });
   }
 
   async flushPendingSync(options: {
@@ -2027,20 +2275,60 @@ export class CloudSyncService {
 
   private async resolveStorageIds(storageId?: string): Promise<string[]> {
     if (storageId) {
-      return [storageId];
+      return this.restoreSuspensions.has(storageId) ? [] : [storageId];
     }
 
     if (this.autoSyncOptions?.storageIds?.length) {
-      return this.autoSyncOptions.storageIds;
+      return this.autoSyncOptions.storageIds.filter(id => !this.restoreSuspensions.has(id));
     }
 
     try {
       const configs = await this.getConfigClient().getStorageConfigs();
       return configs
         .filter(config => config.enabled)
-        .map(config => config.id);
+        .map(config => config.id)
+        .filter(id => !this.restoreSuspensions.has(id));
     } catch (error) {
       throw new Error(`获取自动同步存储配置失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async resolveAllEnabledStorageIds(): Promise<string[]> {
+    if (this.autoSyncOptions?.storageIds?.length) {
+      return [...this.autoSyncOptions.storageIds];
+    }
+    const configs = await this.getConfigClient().getStorageConfigs();
+    return configs.filter(config => config.enabled).map(config => config.id);
+  }
+
+  private restoreRestoreSuspensions(): void {
+    try {
+      const raw = this.storage?.getItem(RESTORE_SUSPENSIONS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      this.restoreSuspensions = new Map(
+        parsed
+          .filter((item): item is CloudSyncRestoreSuspension =>
+            !!item && typeof item.storageId === 'string' && typeof item.restoredAt === 'string' &&
+            (item.source === 'local-file' || item.source === 'cloud-backup'))
+          .map(item => [item.storageId, item])
+      );
+    } catch {
+      this.restoreSuspensions.clear();
+    }
+  }
+
+  private persistRestoreSuspensions(): void {
+    try {
+      const values = this.getRestoreSuspensions();
+      if (values.length === 0) {
+        this.storage?.removeItem(RESTORE_SUSPENSIONS_STORAGE_KEY);
+      } else {
+        this.storage?.setItem(RESTORE_SUSPENSIONS_STORAGE_KEY, JSON.stringify(values));
+      }
+    } catch (error) {
+      console.warn('保存恢复后的同步暂停状态失败:', error);
     }
   }
 
@@ -2563,6 +2851,15 @@ export function getCloudSyncErrorDiagnosis(
       '查看详情中的失败阶段、集合和记录键',
       '重启应用后再试一次',
       '如果错误指纹未变化，请复制详情反馈'
+    ];
+  } else if (structuredDiagnostic?.code === 'RESTORE_DECISION_REQUIRED' || rawError.includes('恢复后的云端处理方式')) {
+    title = '恢复后的云端同步已暂停';
+    message = '请先选择用恢复数据覆盖云端，或与云端最新数据重新合并。';
+    canUserFix = true;
+    suggestedActions = [
+      '返回数据同步页面处理恢复决策',
+      '确认是否需要保留云端恢复后的新增数据',
+      '完成选择后再继续同步'
     ];
   } else if (isCloudSyncInstabilityError(rawError)) {
     title = '云端同步状态暂时不一致';

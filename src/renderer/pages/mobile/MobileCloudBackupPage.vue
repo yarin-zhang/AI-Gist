@@ -65,6 +65,54 @@
         </div>
       </ion-list>
 
+      <ion-list v-if="restoreSuspensions.length > 0">
+        <ion-list-header>
+          <ion-label>{{ t('cloudBackup.restoreDecisionTitle') }}</ion-label>
+        </ion-list-header>
+        <ion-item v-for="suspension in restoreSuspensions" :key="suspension.storageId" color="warning">
+          <ion-label>
+            <h3>{{ getStorageName(suspension.storageId) }}</h3>
+            <p>{{ t('cloudBackup.restoreDecisionDescription') }}</p>
+          </ion-label>
+        </ion-item>
+        <div class="sync-interval-actions">
+          <ion-button
+            v-for="suspension in restoreSuspensions"
+            :key="`${suspension.storageId}-merge`"
+            size="small"
+            fill="outline"
+            :disabled="loading.restoreDecision"
+            @click="resolveRestoreDecision(suspension.storageId, 'merge')"
+          >
+            {{ t('cloudBackup.mergeWithCloud') }}
+          </ion-button>
+          <ion-button
+            v-for="suspension in restoreSuspensions"
+            :key="`${suspension.storageId}-overwrite`"
+            size="small"
+            color="danger"
+            :disabled="loading.restoreDecision"
+            @click="confirmRestoreOverwrite(suspension.storageId)"
+          >
+            {{ t('cloudBackup.overwriteCloud') }}
+          </ion-button>
+        </div>
+      </ion-list>
+
+      <ion-list>
+        <ion-list-header>
+          <ion-label>{{ t('cloudBackup.syncStatus') }}</ion-label>
+        </ion-list-header>
+        <ion-item>
+          <ion-label>
+            <h3>{{ getSyncStatusLabel() }}</h3>
+            <p v-if="syncStatus.lastSyncAt">{{ t('cloudBackup.lastSyncAt') }}: {{ formatDate(syncStatus.lastSyncAt) }}</p>
+            <p v-if="syncStatus.error">{{ syncStatus.error }}</p>
+          </ion-label>
+          <ion-badge slot="end" :color="getSyncStatusColor()">{{ getSyncStatusBadge() }}</ion-badge>
+        </ion-item>
+      </ion-list>
+
       <!-- 存储配置列表 -->
       <ion-list v-if="storageConfigs.length > 0">
         <ion-list-header>
@@ -129,14 +177,6 @@
               <ion-input v-model="configForm.name" :placeholder="t('cloudBackup.configNamePlaceholder')"></ion-input>
             </ion-item>
 
-            <ion-item>
-              <ion-label position="stacked">{{ t('cloudBackup.storageType') }}</ion-label>
-              <ion-select v-model="configForm.type" interface="action-sheet">
-                <ion-select-option value="webdav">WebDAV</ion-select-option>
-                <ion-select-option value="icloud">iCloud Drive</ion-select-option>
-              </ion-select>
-            </ion-item>
-
             <!-- WebDAV 配置 -->
             <template v-if="configForm.type === 'webdav'">
               <ion-item>
@@ -151,34 +191,6 @@
                 <ion-label position="stacked">{{ t('cloudBackup.password') }}</ion-label>
                 <ion-input v-model="configForm.password" type="password" :placeholder="t('cloudBackup.passwordPlaceholder')"></ion-input>
               </ion-item>
-            </template>
-
-            <!-- iCloud Drive 配置 -->
-            <template v-if="configForm.type === 'icloud'">
-              <!-- Android 平台不支持提示 -->
-              <ion-item v-if="platform === 'android'" lines="none">
-                <ion-note color="warning">
-                  {{ t('cloudBackup.androidNotSupported') }}
-                </ion-note>
-              </ion-item>
-
-              <!-- iOS 平台 iCloud 不可用提示 -->
-              <ion-item v-else-if="!iCloudAvailable" lines="none">
-                <ion-note color="warning">
-                  {{ t('cloudBackup.icloudNotAvailable') }}
-                </ion-note>
-              </ion-item>
-
-              <!-- iCloud 配置表单 -->
-              <template v-else>
-                <ion-item>
-                  <ion-label position="stacked">{{ t('cloudBackup.icloudPath') }}</ion-label>
-                  <ion-input v-model="configForm.path" placeholder="AI-Gist-Backup"></ion-input>
-                </ion-item>
-                <ion-note class="ion-padding">
-                  {{ t('cloudBackup.icloudPathNote') }}
-                </ion-note>
-              </template>
             </template>
 
             <ion-item>
@@ -271,7 +283,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import {
@@ -293,10 +305,7 @@ import {
   IonFabButton,
   IonModal,
   IonInput,
-  IonSelect,
-  IonSelectOption,
   IonToggle,
-  IonNote,
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
@@ -319,6 +328,7 @@ import {
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { mobileCloudBackupService } from '~/lib/services/mobile-cloud-backup.service'
+import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import {
   cloudSyncService,
   DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES,
@@ -332,10 +342,13 @@ import {
   DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
   DEFAULT_AUTO_BACKUP_RETENTION
 } from '~/lib/services/automatic-backup.service'
-import { databaseService } from '~/lib/db'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { CloudStorageConfig, CloudBackupInfo } from '@shared/types/cloud-backup'
-import type { CloudSyncResult } from '~/lib/services/cloud-sync.service'
+import type {
+  CloudSyncResult,
+  CloudSyncRestoreSuspension,
+  CloudSyncStatus
+} from '~/lib/services/cloud-sync.service'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -350,24 +363,26 @@ const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
 const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const selectedConfig = ref<CloudStorageConfig | null>(null)
 const editingConfig = ref<CloudStorageConfig | null>(null)
-const iCloudAvailable = ref(false)
+const restoreSuspensions = ref<CloudSyncRestoreSuspension[]>(cloudSyncService.getRestoreSuspensions())
+const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus())
+let unsubscribeSyncStatus: (() => void) | null = null
 
 const showAddConfigModal = ref(false)
 const showBackupModal = ref(false)
 
 const configForm = ref({
   name: '',
-  type: 'webdav' as 'webdav' | 'icloud',
+  type: 'webdav' as const,
   enabled: true,
   url: '',
   username: '',
-  password: '',
-  path: 'AI-Gist-Backup'
+  password: ''
 })
 
 const loading = ref({
   createBackup: false,
   restoreBackup: false,
+  restoreDecision: false,
   syncNow: false,
   saveSyncInterval: false,
   testConnection: false
@@ -376,17 +391,7 @@ const loading = ref({
 const isConfigValid = computed(() => {
   if (!configForm.value.name.trim()) return false
 
-  if (configForm.value.type === 'webdav') {
-    return !!(configForm.value.url.trim() && configForm.value.username.trim() && configForm.value.password)
-  } else if (configForm.value.type === 'icloud') {
-    // Android 不支持 iCloud
-    if (platform === 'android') return false
-    // iOS 需要 iCloud 可用
-    if (!iCloudAvailable.value) return false
-    return !!configForm.value.path.trim()
-  }
-
-  return false
+  return !!(configForm.value.url.trim() && configForm.value.username.trim() && configForm.value.password)
 })
 
 const handleSyncIntervalInput = (event: CustomEvent<{ value?: string | number | null }>) => {
@@ -444,17 +449,6 @@ const saveSyncInterval = async () => {
   }
 }
 
-// 检查 iCloud 可用性
-const checkICloudAvailability = async () => {
-  try {
-    const result = await mobileCloudBackupService.isICloudAvailable()
-    iCloudAvailable.value = result.available
-  } catch (error) {
-    console.error('检查 iCloud 可用性失败:', error)
-    iCloudAvailable.value = false
-  }
-}
-
 // 加载存储配置
 const loadStorageConfigs = async () => {
   try {
@@ -467,6 +461,10 @@ const loadStorageConfigs = async () => {
 
 // 选择存储
 const selectStorage = async (config: CloudStorageConfig) => {
+  if (config.type !== 'webdav') {
+    await showToast(t('cloudBackup.mobileICloudUnsupported'), 'warning')
+    return
+  }
   selectedConfig.value = config
   showBackupModal.value = true
   await loadBackupList(config.id)
@@ -474,6 +472,10 @@ const selectStorage = async (config: CloudStorageConfig) => {
 
 // 编辑配置
 const editConfig = (config: CloudStorageConfig) => {
+  if (config.type !== 'webdav') {
+    void showToast(t('cloudBackup.mobileICloudUnsupported'), 'warning')
+    return
+  }
   editingConfig.value = config
   configForm.value = {
     name: config.name,
@@ -481,8 +483,7 @@ const editConfig = (config: CloudStorageConfig) => {
     enabled: config.enabled,
     url: (config as any).url || '',
     username: (config as any).username || '',
-    password: (config as any).password || '',
-    path: (config as any).path || 'AI-Gist-Backup'
+    password: (config as any).password || ''
   }
   showAddConfigModal.value = true
 }
@@ -536,8 +537,7 @@ const resetConfigForm = () => {
     enabled: true,
     url: '',
     username: '',
-    password: '',
-    path: 'AI-Gist-Backup'
+    password: ''
   }
 }
 
@@ -582,13 +582,9 @@ const saveConfig = async () => {
       name: configForm.value.name.trim(),
       type: configForm.value.type,
       enabled: configForm.value.enabled,
-      ...(configForm.value.type === 'webdav' ? {
-        url: configForm.value.url.trim(),
-        username: configForm.value.username.trim(),
-        password: configForm.value.password
-      } : {
-        path: configForm.value.path.trim()
-      })
+      url: configForm.value.url.trim(),
+      username: configForm.value.username.trim(),
+      password: configForm.value.password
     }
 
     let result
@@ -631,17 +627,13 @@ const testConfigConnection = async () => {
       name: configForm.value.name.trim(),
       type: configForm.value.type,
       enabled: configForm.value.enabled,
-      ...(configForm.value.type === 'webdav' ? {
-        url: configForm.value.url.trim(),
-        username: configForm.value.username.trim(),
-        password: configForm.value.password
-      } : {
-        path: configForm.value.path.trim()
-      })
+      url: configForm.value.url.trim(),
+      username: configForm.value.username.trim(),
+      password: configForm.value.password
     } as CloudStorageConfig)
 
     if (result.success) {
-      await showToast(t('aiConfig.connectionTestSuccess'))
+      await showToast(result.warning || t('aiConfig.connectionTestSuccess'), result.warning ? 'warning' : 'success')
     } else {
       await showToast(result.error || t('aiConfig.connectionTestFailed'), 'danger')
     }
@@ -672,18 +664,14 @@ const createBackup = async () => {
   try {
     await loadingEl.present()
 
-    // 导出数据（备份专用，含图片序列化）
-    const exportResult = await databaseService.exportAllDataForBackup()
-    if (!exportResult.success) {
-      throw new Error(exportResult.error || t('cloudBackup.exportFailed'))
-    }
-
-    // 创建云端备份
     const timestamp = new Date().toLocaleString()
-    const result = await mobileCloudBackupService.createCloudBackup(
+    const result = await CloudBackupAPI.createCloudBackup(
       selectedConfig.value.id,
-      exportResult.data,
-      `${t('cloudBackup.mobileBackup')} - ${timestamp}`
+      {
+        description: `${t('cloudBackup.mobileBackup')} - ${timestamp}`,
+        backupType: 'manual',
+        trigger: 'manual'
+      }
     )
 
     if (result.success) {
@@ -799,6 +787,64 @@ const copySyncErrorDetails = async (copyText: string) => {
   }
 }
 
+const getStorageName = (storageId: string) =>
+  storageConfigs.value.find(config => config.id === storageId)?.name || storageId
+
+const getSyncStatusLabel = () => {
+  if (restoreSuspensions.value.length > 0) return t('cloudBackup.restoreDecisionDescription')
+  return t(`cloudBackup.syncStatusValues.${syncStatus.value.status}`)
+}
+
+const getSyncStatusBadge = () => restoreSuspensions.value.length > 0 ? 'paused' : syncStatus.value.status
+
+const getSyncStatusColor = () => {
+  if (restoreSuspensions.value.length > 0 || ['error', 'paused'].includes(syncStatus.value.status)) return 'warning'
+  if (syncStatus.value.status === 'success') return 'success'
+  if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'primary'
+  return 'medium'
+}
+
+const resolveRestoreDecision = async (storageId: string, decision: 'merge' | 'overwrite') => {
+  loading.value.restoreDecision = true
+  try {
+    const result = decision === 'merge'
+      ? await cloudSyncService.resumeRestoreWithMerge(storageId, {
+          platform,
+          deviceName: getDeviceLabel()
+        })
+      : await cloudSyncService.publishRestoredDataToCloud(storageId, {
+          platform,
+          deviceName: getDeviceLabel()
+        })
+    if (!result.success) {
+      await presentSyncErrorDetails(result)
+      return
+    }
+    restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
+    await showToast(decision === 'merge'
+      ? t('cloudBackup.mergeWithCloudSuccess')
+      : t('cloudBackup.overwriteCloudSuccess'))
+  } finally {
+    loading.value.restoreDecision = false
+  }
+}
+
+const confirmRestoreOverwrite = async (storageId: string) => {
+  const alert = await alertController.create({
+    header: t('cloudBackup.overwriteCloud'),
+    message: t('cloudBackup.overwriteCloudWarning'),
+    buttons: [
+      { text: t('common.cancel'), role: 'cancel' },
+      {
+        text: t('common.confirm'),
+        role: 'destructive',
+        handler: () => { void resolveRestoreDecision(storageId, 'overwrite') }
+      }
+    ]
+  })
+  await alert.present()
+}
+
 const escapeHtml = (value: string) => {
   return value
     .replace(/&/g, '&amp;')
@@ -846,29 +892,18 @@ const performRestore = async (backup: CloudBackupInfo) => {
     }
 
     // 从云端获取备份数据
-    const result = await mobileCloudBackupService.restoreCloudBackup(
+    const result = await CloudBackupAPI.restoreCloudBackup(
       selectedConfig.value.id,
       backup.id
     )
 
-    if (!result.success || !result.data) {
+    if (!result.success) {
       throw new Error(result.error || t('cloudBackup.restoreFailed'))
-    }
-
-    // 恢复到数据库
-    const restoreResult = await databaseService.replaceAllData(result.data)
-
-    if (!restoreResult.success) {
-      throw new Error(restoreResult.error || t('cloudBackup.restoreFailed'))
     }
 
     await loadingEl.dismiss()
     showToast(t('cloudBackup.restoreSuccess'))
-
-    // 延迟刷新页面
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+    restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
   } catch (error) {
     await loadingEl.dismiss()
     console.error('恢复备份失败:', error)
@@ -928,7 +963,7 @@ const getConfigDescription = (config: CloudStorageConfig) => {
   if (config.type === 'webdav') {
     return (config as any).url
   } else {
-    return `iCloud Drive - ${(config as any).path || 'AI-Gist-Backup'}`
+    return t('cloudBackup.mobileICloudUnsupported')
   }
 }
 
@@ -1001,11 +1036,16 @@ const showToast = async (message: string, color: string = 'success') => {
 }
 
 onMounted(() => {
+  unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => {
+    syncStatus.value = status
+    restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
+  })
   loadSyncInterval()
   loadAutomationSettings()
   loadStorageConfigs()
-  checkICloudAvailability()
 })
+
+onUnmounted(() => unsubscribeSyncStatus?.())
 </script>
 
 <style scoped>

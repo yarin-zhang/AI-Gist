@@ -113,6 +113,7 @@ import { useTheme } from '~/composables/useTheme'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { databaseService } from '~/lib/db'
+import { dataRestoreService } from '~/lib/services/data-restore.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { createBackupPayload } from '@shared/backup-integrity'
 import { getCssVars } from '~/theme'
@@ -226,7 +227,9 @@ const performExport = async () => {
       name: `ai-gist-backup-${createdAt.split('T')[0]}-${backupId.slice(0, 8)}`,
       description: t('dataManagement.exportFullBackup'),
       createdAt,
-      data: result.data
+      data: result.data,
+      backupType: 'manual',
+      trigger: 'manual-file-export'
     })
     const jsonString = JSON.stringify(backupPayload, null, 2)
     const fileName = `${backupPayload.name}.json`
@@ -269,10 +272,26 @@ const handleImport = async () => {
       const file = e.target?.files?.[0]
       if (!file) return
 
+      let prepared
+      try {
+        prepared = dataRestoreService.parseFileContent(await file.text())
+      } catch (error) {
+        console.error('Import validation error:', error)
+        await showToast(error instanceof Error ? error.message : t('settingsMessages.dataImportFailed'), 'danger')
+        return
+      }
+
       // 确认导入操作
       const alert = await alertController.create({
         header: t('common.warning'),
-        message: t('dataManagement.importWarning'),
+        message: [
+          t('dataManagement.importWarning'),
+          `<br><br>${t('dataManagement.restorePreview', {
+            total: prepared.preview.total,
+            prompts: prepared.preview.prompts,
+            categories: prepared.preview.categories
+          })}`
+        ].join(''),
         buttons: [
           {
             text: t('common.cancel'),
@@ -281,7 +300,7 @@ const handleImport = async () => {
           {
             text: t('common.confirm'),
             handler: async () => {
-              await performImport(file)
+              await performImport(prepared.payload)
             }
           }
         ]
@@ -298,7 +317,7 @@ const handleImport = async () => {
 }
 
 // 执行导入
-const performImport = async (file: File) => {
+const performImport = async (importData: unknown) => {
   const loading = await loadingController.create({
     message: t('common.loading')
   })
@@ -306,17 +325,9 @@ const performImport = async (file: File) => {
   try {
     await loading.present()
 
-    // 读取文件内容
-    const text = await file.text()
-    const importData = JSON.parse(text)
-
-    // 验证数据格式（与桌面端一致）
-    if (!importData || typeof importData !== 'object') {
-      throw new Error('无效的备份文件格式')
-    }
-
-    // 导入到数据库
-    const result = await databaseService.replaceAllData(importData)
+    const result = await dataRestoreService.restore(importData, {
+      source: 'local-file'
+    })
 
     if (!result || !result.success) {
       throw new Error(result?.error || result?.message || '导入失败')
@@ -324,11 +335,20 @@ const performImport = async (file: File) => {
 
     await loading.dismiss()
     showToast(t('settingsMessages.dataImportSuccess'))
-
-    // 延迟刷新页面以确保数据同步
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+    if (result.suspensions?.length) {
+      const decisionAlert = await alertController.create({
+        header: t('cloudBackup.restoreDecisionTitle'),
+        message: t('cloudBackup.restoreDecisionDescription'),
+        buttons: [
+          { text: t('common.close'), role: 'cancel' },
+          {
+            text: t('dataSync.title'),
+            handler: () => { void router.push('/mobile/cloud-backup') }
+          }
+        ]
+      })
+      await decisionAlert.present()
+    }
   } catch (error) {
     await loading.dismiss()
     console.error('Import error:', error)

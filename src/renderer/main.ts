@@ -222,7 +222,8 @@ async function startApp() {
     if (!isLauncherSurface) {
       await cloudSyncService.startAutoSyncFromSettings({
         platform: PlatformDetector.getPlatform(),
-        deviceName: navigator.userAgent
+        deviceName: navigator.userAgent,
+        startupDelayMs: PlatformDetector.isMobile() ? 0 : undefined
       });
       await automaticBackupService.startFromSettings();
 

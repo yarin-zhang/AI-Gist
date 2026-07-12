@@ -381,7 +381,18 @@
     "updateSuccess": "儲存配置更新成功",
     "username": "使用者名稱",
     "usernamePlaceholder": "請輸入使用者名稱",
-    "webdavInfo": "WebDAV 支援堅果雲、Nextcloud 等服務"
+    "webdavInfo": "WebDAV 支援堅果雲、Nextcloud 等服務",
+    "mobileICloudUnsupported": "行動端 iCloud 目前不具備真正的跨裝置同步能力，請使用 WebDAV",
+    "restoreDecisionTitle": "還原後的雲端處理",
+    "restoreDecisionDescription": "本機還原已完成，雲端同步保持暫停，等待選擇覆蓋雲端或重新合併",
+    "mergeWithCloud": "與雲端重新合併",
+    "mergeWithCloudSuccess": "已與雲端重新合併",
+    "overwriteCloud": "用還原資料覆蓋雲端",
+    "overwriteCloudSuccess": "還原資料已安全發佈到雲端",
+    "overwriteCloudWarning": "將先建立還原前雲端安全備份，再用目前還原資料取代雲端資料庫。確認期間若雲端有變更，操作會安全中止。",
+    "syncStatus": "同步狀態",
+    "lastSyncAt": "上次同步",
+    "syncStatusValues": { "idle": "等待同步", "scheduled": "已排程同步", "syncing": "正在同步", "success": "同步成功", "error": "同步需要處理", "paused": "還原後已暫停" }
   },
   "common": {
     "actions": "操作",
@@ -437,6 +448,7 @@
     "fullBackupManagement": "完整備份管理",
     "importFullBackup": "導入完整備份",
     "importWarning": "⚠️ 導入備份將會完全覆蓋現有的所有資料（包括提示詞、分類、AI配置等），此操作不可撤銷！\n建議先建立目前資料的備份。",
+    "restorePreview": "備份包含 {total} 筆記錄，其中提示詞 {prompts} 筆、分類 {categories} 筆。",
     "maintenanceDescription": "當遇到數據異常時，可嘗試修復數據庫",
     "noBackups": "暫無備份版本，請先創建備份",
     "openBackupDirectory": "打開備份目錄",

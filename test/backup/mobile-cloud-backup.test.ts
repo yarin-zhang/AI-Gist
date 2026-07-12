@@ -71,6 +71,30 @@ import {
 
 const mockCapacitorHttp = CapacitorHttp as unknown as { request: ReturnType<typeof vi.fn> }
 
+function mockSuccessfulWebDAVProbe() {
+  let probeBody = ''
+  let probeUrl = ''
+  mockCapacitorHttp.request.mockImplementation(async (request: any) => {
+    if (request.method === 'OPTIONS') return { status: 200, data: '', headers: {} }
+    if (request.method === 'MKCOL') return { status: 201, data: '', headers: {} }
+    if (request.method === 'PUT') {
+      if (probeBody && request.headers?.['If-None-Match'] === '*') {
+        return { status: 412, data: '', headers: { etag: '"probe"' } }
+      }
+      probeBody = request.data
+      probeUrl = request.url
+      return { status: 201, data: '', headers: { etag: '"probe"' } }
+    }
+    if (request.method === 'GET') return { status: 200, data: probeBody, headers: { etag: '"probe"' } }
+    if (request.method === 'PROPFIND') {
+      const name = probeUrl.split('/').pop()
+      return { status: 207, data: makePropfindXml([{ name, path: new URL(probeUrl).pathname }]), headers: {} }
+    }
+    if (request.method === 'DELETE') return { status: 204, data: '', headers: {} }
+    return { status: 500, data: '', headers: {} }
+  })
+}
+
 // ---- 测试数据 ----
 
 const webdavConfig = {
@@ -286,7 +310,7 @@ describe('MobileCloudBackupService', () => {
 
   describe('WebDAV 连接', () => {
     it('连接成功（207 响应）', async () => {
-      mockCapacitorHttp.request.mockResolvedValue({ status: 207, data: '' })
+      mockSuccessfulWebDAVProbe()
       await saveConfig(service)
 
       const result = await service.testStorageConnection(webdavConfig)
@@ -302,7 +326,7 @@ describe('MobileCloudBackupService', () => {
     })
 
     it('URL 末尾斜杠被正确处理（不产生双斜杠）', async () => {
-      mockCapacitorHttp.request.mockResolvedValue({ status: 207, data: '' })
+      mockSuccessfulWebDAVProbe()
       await saveConfig(service)
 
       await service.testStorageConnection(webdavConfig)
@@ -987,7 +1011,7 @@ describe('MobileCloudBackupService — Android 平台', () => {
     mockWebDavPropfind
       .mockResolvedValueOnce({ status: 207, body: xml })
       .mockResolvedValueOnce({ status: 404, body: '' })
-    mockCapacitorHttp.request.mockResolvedValueOnce({ status: 200, data: backupFile })
+    mockWebDavRequest.mockResolvedValueOnce({ status: 200, body: JSON.stringify(backupFile), headers: {} })
 
     const backups = await service.getCloudBackupList('cfg-1')
 
@@ -1008,7 +1032,7 @@ describe('MobileCloudBackupService — Android 平台', () => {
     mockWebDavPropfind
       .mockResolvedValueOnce({ status: 404, body: '' })
       .mockResolvedValueOnce({ status: 207, body: legacyXml })
-    mockCapacitorHttp.request.mockResolvedValueOnce({ status: 200, data: backupFile })
+    mockWebDavRequest.mockResolvedValueOnce({ status: 200, body: JSON.stringify(backupFile), headers: {} })
 
     const backups = await service.getCloudBackupList('cfg-1')
 
@@ -1019,13 +1043,15 @@ describe('MobileCloudBackupService — Android 平台', () => {
 
   it('创建备份时用原生 MKCOL 建目录，并通过 PUT 写入统一目录', async () => {
     await saveConfig(service)
-    mockCapacitorHttp.request.mockResolvedValueOnce({ status: 201, data: '' })
+    mockWebDavRequest
+      .mockResolvedValueOnce({ status: 201, body: '', headers: {} })
+      .mockResolvedValueOnce({ status: 201, body: '', headers: {} })
 
     const result = await service.createCloudBackup('cfg-1', mockExportData, 'Android 测试备份')
 
     expect(result.success).toBe(true)
     expect(mockWebDavRequest.mock.calls[0][0].method).toBe('MKCOL')
-    const putCall = mockCapacitorHttp.request.mock.calls.find((call: any[]) => call[0].method === 'PUT')![0]
+    const putCall = mockWebDavRequest.mock.calls.find((call: any[]) => call[0].method === 'PUT')![0]
     expect(putCall.url).toContain('/AI-Gist-Backup/')
     expect(result.backupInfo?.cloudPath).toContain('/AI-Gist-Backup/')
   })
@@ -1041,9 +1067,9 @@ describe('MobileCloudBackupService — Android 平台', () => {
     mockWebDavPropfind
       .mockResolvedValueOnce({ status: 207, body: xml })
       .mockResolvedValueOnce({ status: 404, body: '' })
-    mockCapacitorHttp.request
-      .mockResolvedValueOnce({ status: 200, data: backupFile })
-      .mockResolvedValueOnce({ status: 200, data: backupFile })
+    mockWebDavRequest
+      .mockResolvedValueOnce({ status: 200, body: JSON.stringify(backupFile), headers: {} })
+      .mockResolvedValueOnce({ status: 200, body: JSON.stringify(backupFile), headers: {} })
 
     const result = await service.restoreCloudBackup('cfg-1', 'android-restore-001')
 
@@ -1063,14 +1089,14 @@ describe('MobileCloudBackupService — Android 平台', () => {
     mockWebDavPropfind
       .mockResolvedValueOnce({ status: 207, body: xml })
       .mockResolvedValueOnce({ status: 404, body: '' })
-    mockCapacitorHttp.request
-      .mockResolvedValueOnce({ status: 200, data: backupFile })
-      .mockResolvedValueOnce({ status: 204, data: '' })
+    mockWebDavRequest
+      .mockResolvedValueOnce({ status: 200, body: JSON.stringify(backupFile), headers: {} })
+      .mockResolvedValueOnce({ status: 204, body: '', headers: {} })
 
     const result = await service.deleteCloudBackup('cfg-1', 'android-del-001')
 
     expect(result.success).toBe(true)
-    const deleteCall = mockCapacitorHttp.request.mock.calls.find((call: any[]) => call[0].method === 'DELETE')![0]
+    const deleteCall = mockWebDavRequest.mock.calls.find((call: any[]) => call[0].method === 'DELETE')![0]
     expect(deleteCall.url).toContain('/AI-Gist-Backup/')
   })
 })

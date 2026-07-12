@@ -217,7 +217,28 @@ export class CloudBackupAPI {
   }> {
     const client = getCloudBackupClient();
     if (client) {
-      return await client.restoreCloudBackup(storageId, backupId);
+      const downloaded = await client.restoreCloudBackup(storageId, backupId) as any;
+      if (!PlatformDetector.isMobile() || !downloaded.success) {
+        return downloaded;
+      }
+      if (!downloaded.data) {
+        return {
+          success: false,
+          message: '云端备份恢复失败',
+          error: '备份下载成功但缺少可恢复数据'
+        };
+      }
+      const { dataRestoreService } = await import('../services/data-restore.service');
+      const restored = await dataRestoreService.restore(downloaded.data, {
+        source: 'cloud-backup',
+        backupId
+      });
+      return {
+        success: restored.success,
+        message: restored.success ? '云端备份恢复成功' : '云端备份恢复失败',
+        backupInfo: downloaded.backupInfo,
+        error: restored.success ? undefined : (restored.error || restored.message)
+      };
     }
 
     if (!this.isElectronAvailable()) {
