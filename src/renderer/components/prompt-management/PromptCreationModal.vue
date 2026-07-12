@@ -17,18 +17,12 @@
                     <button type="button" class="creation-method" :class="{ active: activeMethod === 'editor' }"
                         @click="activeMethod = 'editor'">
                         <span class="creation-method-icon"><NIcon size="16"><FilePlus /></NIcon></span>
-                        <span>
-                            <strong>{{ t('promptWorkspace.blankPrompt') }}</strong>
-                            <small>{{ t('promptManagement.edit') }}</small>
-                        </span>
+                        <strong>{{ t('promptWorkspace.manualCreate') }}</strong>
                     </button>
                     <button type="button" class="creation-method" :class="{ active: activeMethod === 'ai' }"
                         @click="activeMethod = 'ai'">
                         <span class="creation-method-icon"><NIcon size="16"><Stars /></NIcon></span>
-                        <span>
-                            <strong>{{ t('promptManagement.aiGenerate') }}</strong>
-                            <small>{{ t('aiGenerator.generate') }}</small>
-                        </span>
+                        <strong>{{ t('promptManagement.aiGenerate') }}</strong>
                     </button>
                 </aside>
 
@@ -38,11 +32,11 @@
                         @update:show="handleEditorVisibility" @saved="handleSaved"
                         @open-quick-optimization-config="$emit('open-quick-optimization-config')" />
 
-                    <NScrollbar v-if="activeMethod === 'ai'" class="ai-creation-pane">
+                    <div v-if="activeMethod === 'ai'" class="ai-creation-pane">
                         <AIGeneratorComponent :default-auto-save="false" @prompt-generated="handleGeneratedPrompt"
                             @prompt-saved="handleAIPromptSaved"
                             @navigate-to-ai-config="$emit('navigate-to-ai-config')" />
-                    </NScrollbar>
+                    </div>
                 </main>
             </div>
         </div>
@@ -52,7 +46,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NModal, NScrollbar, NText } from 'naive-ui'
+import { NButton, NIcon, NModal, NText } from 'naive-ui'
 import { FilePlus, Stars, X } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import PromptEditModal from './PromptEditModal.vue'
@@ -129,18 +123,16 @@ defineExpose({
 .creation-subtitle { display: block; margin-top: 1px; font-size: var(--font-size-xs); }
 .creation-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 188px minmax(0, 1fr); }
 .creation-methods { padding: var(--compact-padding) var(--spacing-sm); border-right: 1px solid var(--border-default); background: var(--surface-secondary); }
-.creation-method { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 8px 9px; border: 0; border-radius: var(--radius-panel); color: var(--content-primary); background: transparent; cursor: pointer; text-align: left; font: inherit; }
+.creation-method { width: 100%; min-height: 46px; display: flex; align-items: center; gap: 10px; padding: 8px 9px; border: 0; border-radius: var(--radius-panel); color: var(--content-primary); background: transparent; cursor: pointer; text-align: left; font: inherit; }
 .creation-method + .creation-method { margin-top: 6px; }
 .creation-method:hover { background: var(--interactive-hover); }
 .creation-method.active { background: var(--surface-tertiary); font-weight: var(--font-weight-medium); }
 .creation-method-icon { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: var(--radius-control); color: var(--content-secondary); background: var(--surface-primary); }
-.creation-method strong, .creation-method small { display: block; }
 .creation-method strong { font-size: var(--font-size-base); font-weight: var(--font-weight-medium); }
-.creation-method small { margin-top: 2px; color: var(--content-secondary); font-size: var(--font-size-xs); }
 .creation-content { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-body); }
 .creation-content :deep(.prompt-edit-embedded) { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; }
-.ai-creation-pane { height: 100%; }
-.ai-creation-pane :deep(.n-scrollbar-content) { padding: var(--content-padding); }
+.ai-creation-pane { box-sizing: border-box; flex: 1 1 0; width: 100%; height: 100%; min-height: 0; padding: var(--content-padding); overflow: hidden; }
+.ai-creation-pane :deep(.ai-generator) { width: 100%; height: 100%; min-height: 0; }
 .ai-creation-pane :deep(.generator-card), .ai-creation-pane :deep(.history-card) { border-radius: var(--radius-panel); box-shadow: none; }
 
 @media (max-width: 760px) {
@@ -149,6 +141,5 @@ defineExpose({
     .creation-methods { display: flex; gap: 6px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--border-default); }
     .creation-method + .creation-method { margin-top: 0; }
     .creation-method { min-height: 42px; }
-    .creation-method small { display: none; }
 }
 </style>

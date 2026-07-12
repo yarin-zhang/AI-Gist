@@ -54,7 +54,8 @@
             <div v-else class="legacy-view-surface">
                 <PromptList ref="promptListRef" :forced-view-mode="displayMode" hide-view-switcher
                     @view="handleClassicViewPrompt" @edit="handleClassicEditPrompt"
-                    @refresh="handleListRefresh" @view-mode-change="handleLegacyViewModeChange" />
+                    @refresh="handleListRefresh" @manage-categories="showCategoryManagement = true"
+                    @view-mode-change="handleLegacyViewModeChange" />
             </div>
         </div>
 
@@ -359,6 +360,7 @@ const updateSelectedDraft = (value: Record<string, any>) => {
 
 const handleCategoriesUpdated = async () => {
     await Promise.all([loadCategories(), loadPrompts()])
+    await promptListRef.value?.loadCategories?.()
     if (selectedPrompt.value?.id) {
         selectedPrompt.value = prompts.value.find(prompt => prompt.id === selectedPrompt.value?.id) || selectedPrompt.value
     }

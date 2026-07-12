@@ -28,13 +28,37 @@ describe('prompt management detail regressions', () => {
     expect(list).toContain('class="prompt-filter-bar ui-toolbar"')
     expect(list).not.toContain('position: sticky')
     expect(list).not.toContain("calc(100vh - 250px)")
-    expect(list.match(/\bflex-height\b/g)?.length).toBe(2)
+    expect(list.match(/\bflex-height\b/g)?.length).toBe(1)
     expect(list).toContain('grid-scroll-region')
     expect(list).toContain('.n-data-table-base-table-body) { min-height: 0; }')
     expect(list).toMatch(/\.advanced-filter-panel\s*\{[^}]*overflow-y:\s*auto/s)
-    expect(list).toMatch(/key:\s*'name',[\s\S]*?tree:\s*true/)
-    expect(list).toMatch(/\.folder-category-cell\)[^}]*display:\s*inline-flex/)
+    expect(list).toContain('<PromptFolderExplorer v-if="viewMode === \'tree\'"')
+    expect(list).not.toContain('redesignedTreeTableColumns')
     expect(page).toContain('overflow: hidden')
+  })
+
+  it('uses a Finder-style folder explorer for prompt classification', () => {
+    const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const explorer = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
+
+    expect(explorer).toContain('class="folder-explorer ui-surface"')
+    expect(explorer).toContain('class="folder-sidebar ui-surface-muted"')
+    expect(explorer).toContain('class="prompt-file-lines"')
+    expect(explorer).toContain('clip-path: polygon(0 0, 100% 100%, 0 100%)')
+    expect(explorer).toContain('@dblclick="navigateTo(category.id || null)"')
+    expect(explorer).toContain('@dblclick="openPrompt(prompt)"')
+    expect(explorer).toContain('@dragstart="handleDragStart($event, prompt)"')
+    expect(explorer).toContain('handleDragLeave($event, `category-${category.id}`)')
+    expect(explorer).toContain('event.dataTransfer.setDragImage(preview')
+    expect(explorer).toContain("emit('move', prompt, categoryId)")
+    expect(list).toContain('api.prompts.update.mutate({')
+    expect(list).toContain('data: { categoryId: targetCategoryId ?? undefined }')
+    expect(list).toContain('await loadFolderData(false)')
+    expect(list).toContain('await loadFolderData(false, categoryId, true)')
+    expect(list).toContain('const requestId = ++folderLoadRequestId')
+    expect(list).toMatch(/handleFolderNavigate = async[\s\S]*?await loadFolderData\(false, categoryId, true\)/)
+    expect(list).not.toContain('prompts.value = prompts.value.filter(item => item.id !== prompt.id)')
+    expect(list).toContain('const globalResults = targetCategoryId === null')
   })
 
   it('lets the card grid consume the full desktop workspace width', () => {
@@ -45,11 +69,17 @@ describe('prompt management detail regressions', () => {
     expect(list).toMatch(/\.prompt-grid\s*\{[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*grid-template-columns:\s*repeat\(auto-fill, minmax\(286px, 1fr\)\)/s)
   })
 
-  it('keeps category management out of the legacy view toolbar', () => {
+  it('places category management in the folder sidebar instead of the filter toolbar', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const explorer = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
+    const page = readRendererFile('pages/PromptManagementPage.vue')
+    const toolbarMarkup = list.slice(0, list.indexOf('<PromptFolderExplorer'))
 
-    expect(list).not.toContain("$emit('manage-categories')")
-    expect(list).not.toContain("(e: 'manage-categories')")
+    expect(toolbarMarkup).not.toContain("$emit('manage-categories')")
+    expect(explorer).toContain('class="folder-category-settings"')
+    expect(explorer).toContain("emit('manage-categories')")
+    expect(list).toContain("(e: 'manage-categories'): void")
+    expect(page).toContain('@manage-categories="showCategoryManagement = true"')
   })
 
   it('records usage for copy actions in every legacy prompt view', () => {
@@ -78,6 +108,25 @@ describe('prompt management detail regressions', () => {
     expect(regularEditor).toContain(':show-feedback="false"')
     expect(regularEditor).toMatch(/\.prompt-content-field\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
     expect(regularEditor).not.toContain('contentHeight - 130')
+  })
+
+  it('uses a cohesive full-height workspace for AI-assisted prompt creation', () => {
+    const creation = readRendererFile('components/prompt-management/PromptCreationModal.vue')
+    const generator = readRendererFile('components/ai/AIGeneratorComponent.vue')
+
+    expect(creation).toContain("t('promptWorkspace.manualCreate')")
+    expect(creation).toContain("t('promptManagement.aiGenerate')")
+    expect(creation).not.toContain('<small>')
+    expect(creation).toMatch(/\.ai-creation-pane\s*\{[^}]*padding:\s*var\(--content-padding\)[^}]*overflow:\s*hidden/s)
+    expect(generator).toContain('class="generator-workspace-grid"')
+    expect(generator).toContain('class="generator-panel requirement-panel"')
+    expect(generator).toContain('class="generator-panel result-panel"')
+    expect(generator).toContain('class="workspace-textarea result-textarea"')
+    expect(generator).not.toContain('<n-split')
+    expect(generator).toMatch(/\.generator-workspace-grid\s*\{[^}]*height:\s*100%[^}]*grid-template-columns:/s)
+    expect(generator).toMatch(/\.generator-panel\s*\{[^}]*height:\s*100%[^}]*display:\s*flex[^}]*overflow:\s*hidden/s)
+    expect(generator).toMatch(/\.requirement-form-item\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
+    expect(generator).toMatch(/\.history-scroll\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
   })
 
   it('anchors the main sidebar toggle to the bottom of the sidebar region', () => {
