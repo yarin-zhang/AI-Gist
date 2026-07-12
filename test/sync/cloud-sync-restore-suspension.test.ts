@@ -109,5 +109,11 @@ describe('CloudSyncService restore suspensions', () => {
     ]))
     expect(replaceAllData).toHaveBeenCalled()
     expect(service.getRestoreSuspensions()).toEqual([])
+    expect(service.getStatus()).toMatchObject({
+      status: 'success',
+      storageId: config.id,
+      lastResult: { success: true, action: 'uploaded' },
+      error: undefined
+    })
   })
 })

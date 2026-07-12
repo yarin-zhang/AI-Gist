@@ -244,7 +244,15 @@ export class CloudBackupAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.restoreBackup(storageId, backupId);
+    const restored = await window.electronAPI.cloud.restoreBackup(storageId, backupId);
+    if (restored.success) {
+      const { cloudSyncService } = await import('../services/cloud-sync.service');
+      await cloudSyncService.suspendEnabledStoragesAfterRestore({
+        source: 'cloud-backup',
+        backupId
+      });
+    }
+    return restored;
   }
 
   /**

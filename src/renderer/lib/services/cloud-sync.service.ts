@@ -710,7 +710,7 @@ export class CloudSyncService {
       const stateWarning = await this.saveLocalState(storageId, deviceId, snapshot, now);
       this.clearRestoreSuspension(storageId);
       this.clearPendingChange(localChangeVersionAtExport);
-      return {
+      const result: CloudSyncResult = {
         success: true,
         action: 'uploaded',
         localRevision: snapshot.revision,
@@ -739,6 +739,19 @@ export class CloudSyncService {
           stateWarning
         )
       };
+      this.failureCount = 0;
+      this.updateStatus({
+        status: 'success',
+        pending: false,
+        storageId,
+        reason: 'manual',
+        lastSyncAt: now,
+        failureCount: 0,
+        lastResult: result,
+        error: undefined,
+        nextSyncAt: undefined
+      });
+      return result;
     } catch (error) {
       const diagnostic = createCloudSyncStructuredDiagnostic(error, {
         operationId,
