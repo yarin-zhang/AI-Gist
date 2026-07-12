@@ -1,21 +1,36 @@
 <template>
     <div class="settings-page">
-        <div class="settings-layout">
+        <header class="settings-command-bar">
+            <div class="page-identity">
+                <span class="page-identity-icon"><NIcon size="18"><SettingsIcon /></NIcon></span>
+                <div>
+                    <NText strong class="page-title">{{ t('settings.title') }}</NText>
+                    <NText depth="3" class="page-subtitle">{{ t('settings.subtitle') }}</NText>
+                </div>
+            </div>
+
+            <NFlex v-if="saving" align="center" :size="8" class="settings-save-status">
+                <NSpin size="small" />
+                <NText depth="3">{{ t('settings.saving') }}</NText>
+            </NFlex>
+        </header>
+
+        <div class="settings-workspace">
             <aside class="settings-navigation" :aria-label="t('settings.settingsMenu')">
                 <NScrollbar class="settings-navigation-scrollbar" trigger="hover">
-                    <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
-                    <NMenu
-                        v-model:value="activeSettingKey"
-                        :options="menuOptions"
-                        :root-indent="8"
-                        :indent="16"
-                        @update:value="handleMenuSelect"
-                    />
+                    <div class="settings-navigation-inner">
+                        <NMenu
+                            v-model:value="activeSettingKey"
+                            :options="menuOptions"
+                            :root-indent="8"
+                            :indent="16"
+                            @update:value="handleMenuSelect"
+                        />
+                    </div>
                 </NScrollbar>
             </aside>
 
             <div class="settings-compact-navigation">
-                <NText strong class="settings-navigation-title">{{ t('settings.title') }}</NText>
                 <NSelect
                     v-model:value="activeSettingKey"
                     :options="compactMenuOptions"
@@ -24,7 +39,7 @@
                 />
             </div>
 
-            <main class="settings-content">
+            <main class="settings-detail">
                 <header class="settings-section-header">
                     <div>
                         <NText strong class="settings-section-title">{{ currentSectionTitle }}</NText>
@@ -32,13 +47,11 @@
                             {{ currentSectionDescription }}
                         </NText>
                     </div>
-                    <NFlex v-if="saving" align="center" :size="8">
-                        <NSpin size="small" />
-                        <NText depth="3">{{ t('settings.saving') }}</NText>
-                    </NFlex>
                 </header>
 
-                <NFlex vertical :size="16">
+                <NScrollbar class="settings-content-scrollbar" trigger="hover">
+                    <div class="settings-content-inner">
+                        <NFlex vertical :size="16">
                         <!-- 数据同步设置 -->
                         <DataSyncSettings v-if="capabilities.cloudBackup && activeSettingKey === 'cloud-backup'" />
 
@@ -83,8 +96,9 @@
                         <NCard v-if="activeSettingKey === 'laboratory' && isDevelopment">
                             <LaboratoryPanel />
                         </NCard>
-
-                </NFlex>
+                        </NFlex>
+                    </div>
+                </NScrollbar>
             </main>
         </div>
     </div>
@@ -502,36 +516,82 @@ watch(menuOptions, () => {
 
 <style scoped>
 .settings-page {
-    height: 100%;
+    width: 100%;
+    height: calc(100vh - 24px);
+    min-width: 0;
     min-height: 0;
-    box-sizing: border-box;
-    padding: var(--page-padding);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background: var(--surface-body);
 }
 
-.settings-navigation-title {
-    display: block;
-    font-size: var(--font-size-2xl);
-    line-height: var(--line-height-tight);
-    margin-bottom: var(--spacing-xl);
+.settings-command-bar {
+    flex: 0 0 60px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--section-gap);
+    padding: 0 var(--page-padding);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-primary);
 }
 
-.settings-layout {
+.page-identity {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.page-identity-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
     display: grid;
-    grid-template-columns: 208px minmax(0, 1fr);
-    gap: var(--section-gap);
-    height: 100%;
+    place-items: center;
+    color: var(--accent-primary);
+    border-radius: var(--radius-panel);
+    background: var(--surface-secondary);
+}
+
+.page-title {
+    display: block;
+    font-size: var(--font-size-lg);
+    line-height: 1.25;
+}
+
+.page-subtitle {
+    display: block;
+    max-width: 320px;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-xs);
+}
+
+.settings-save-status {
+    flex: 0 0 auto;
+    color: var(--content-secondary);
+}
+
+.settings-workspace {
+    flex: 1;
+    height: 0;
+    min-width: 0;
     min-height: 0;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    overflow: hidden;
 }
 
 .settings-navigation {
+    height: 100%;
     min-height: 0;
     overflow: hidden;
-    padding: var(--content-padding) var(--spacing-sm);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-panel);
+    border-right: 1px solid var(--border-default);
     background: var(--surface-primary);
 }
 
@@ -543,6 +603,10 @@ watch(menuOptions, () => {
     overscroll-behavior: contain;
 }
 
+.settings-navigation-inner {
+    padding: 8px;
+}
+
 .settings-navigation :deep(.n-menu) {
     width: 100%;
 }
@@ -551,34 +615,56 @@ watch(menuOptions, () => {
     display: none;
 }
 
-.settings-content {
+.settings-detail {
+    height: 100%;
     min-width: 0;
     min-height: 0;
-    max-width: 1120px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0 var(--spacing-xs) var(--page-padding) 0;
-    background: transparent;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-body);
 }
 
 .settings-section-header {
+    flex: 0 0 auto;
+    min-height: 76px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: var(--section-gap);
-    margin-bottom: var(--section-gap);
+    padding: 10px var(--page-padding);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-primary);
 }
 
 .settings-section-title {
     display: block;
     font-size: var(--font-size-xl);
-    line-height: 1.3;
+    line-height: 1.25;
 }
 
 .settings-section-description {
     display: block;
-    margin-top: 4px;
-    font-size: var(--font-size-base);
+    margin-top: 3px;
+    font-size: var(--font-size-sm);
+}
+
+.settings-content-scrollbar {
+    flex: 1;
+    height: 0;
+    min-height: 0;
+}
+
+.settings-content-scrollbar :deep(.n-scrollbar-container) {
+    overscroll-behavior: contain;
+}
+
+.settings-content-inner {
+    width: 100%;
+    max-width: 1120px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: var(--page-padding);
 }
 
 .n-form-item {
@@ -590,7 +676,7 @@ watch(menuOptions, () => {
 }
 
 @media (max-width: 860px) {
-    .settings-layout {
+    .settings-workspace {
         display: flex;
         flex-direction: column;
     }
@@ -602,19 +688,20 @@ watch(menuOptions, () => {
     .settings-compact-navigation {
         display: block;
         flex: 0 0 auto;
-        margin-bottom: var(--section-gap);
+        padding: var(--compact-padding) var(--page-padding);
+        border-bottom: 1px solid var(--border-default);
+        background: var(--surface-secondary);
     }
 
-    .settings-content {
+    .settings-detail {
         flex: 1 1 auto;
+        height: 0;
     }
 
     .settings-compact-navigation .n-select {
         max-width: 320px;
     }
 
-    .settings-section-title {
-        font-size: var(--font-size-xl);
-    }
+    .page-subtitle { display: none; }
 }
 </style>

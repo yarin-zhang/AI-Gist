@@ -27,8 +27,10 @@ describe('settings sync and backup information architecture', () => {
   it('uses concise grouped navigation and a compact narrow-window selector', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
     expectInOrder(source, [
-      'class="settings-navigation"',
+      'class="settings-command-bar"',
       "{{ t('settings.title') }}",
+      'class="settings-workspace"',
+      'class="settings-navigation"',
       '<NMenu',
     ]);
     expectInOrder(source, [
@@ -41,7 +43,7 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain(':options="compactMenuOptions"');
     expect(source).toContain(':root-indent="8"');
     expect(source).toContain(':indent="16"');
-    expect(source).not.toContain("{{ t('settings.subtitle') }}");
+    expect(source).toContain("{{ t('settings.subtitle') }}");
     expect(source).not.toContain("{{ t('settings.autoSave') }}");
     expect(source).not.toContain("t('settings.resetToDefault')");
     expect(source).not.toContain('const resetSettings');
@@ -75,12 +77,16 @@ describe('settings sync and backup information architecture', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
     const style = source.slice(source.indexOf('<style scoped>'));
 
-    expect(style).toMatch(/\.settings-page\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/s);
-    expect(style).toMatch(/\.settings-layout\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s);
+    expect(style).toMatch(/\.settings-page\s*\{[^}]*height:\s*calc\(100vh - 24px\);[^}]*overflow:\s*hidden;/s);
+    expect(style).toMatch(/\.settings-command-bar\s*\{[^}]*flex:\s*0 0 60px/s);
+    expect(style).toMatch(/\.settings-workspace\s*\{[^}]*height:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s);
     expect(source).toContain('<NScrollbar class="settings-navigation-scrollbar" trigger="hover">');
     expect(style).toMatch(/\.settings-navigation\s*\{[^}]*overflow:\s*hidden;/s);
     expect(style).toMatch(/\.settings-navigation-scrollbar\s*\{[^}]*height:\s*100%;/s);
-    expect(style).toMatch(/\.settings-content\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(style).toMatch(/\.settings-detail\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(style).toMatch(/\.settings-section-header\s*\{[^}]*flex:\s*0 0 auto/s);
+    expect(source).toContain('<NScrollbar class="settings-content-scrollbar" trigger="hover">');
+    expect(style).toMatch(/\.settings-content-scrollbar\s*\{[^}]*height:\s*0;[^}]*min-height:\s*0;/s);
     expect(style).not.toContain('position: sticky');
     expect(source).not.toContain('handleNavigationScroll');
     expect(source).not.toContain('isNavigationScrolling');
