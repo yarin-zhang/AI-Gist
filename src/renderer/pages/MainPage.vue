@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, nextTick, computed } from 'vue'
+import { ref, h, nextTick, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
     NLayout,
@@ -30,6 +30,7 @@ const settingsTargetSection = ref<string>()
 
 // 组件引用
 const aiConfigPageRef = ref()
+const promptManagementPageRef = ref()
 
 // 菜单选项
 const menuOptions: MenuOption[] = [
@@ -81,6 +82,22 @@ const collapseRef = ref(true)
 if (window.electronAPI?.sendMessage) {
     window.electronAPI.sendMessage('Hello from App.vue!')
 }
+
+let removeShortcutNavigation: (() => void) | undefined
+onMounted(() => {
+    if (!window.electronAPI?.shortcuts?.onNavigateMain) return
+    removeShortcutNavigation = window.electronAPI.shortcuts.onNavigateMain(async ({ target, promptUUID }) => {
+        if (target === 'shortcuts') {
+            handleOpenSettings('shortcuts')
+            return
+        }
+        currentView.value = 'prompts'
+        await nextTick()
+        if (target === 'new-prompt') promptManagementPageRef.value?.createPrompt?.()
+        else if (promptUUID) await promptManagementPageRef.value?.openPromptByUUID?.(promptUUID)
+    })
+})
+onBeforeUnmount(() => removeShortcutNavigation?.())
 </script>
 
 <template>
@@ -101,7 +118,7 @@ if (window.electronAPI?.sendMessage) {
 
                 <NLayout>
                     <NLayoutContent content-style="overflow-y: auto; height: calc(100vh - 24px);">
-                        <PromptManagementPage v-if="currentView === 'prompts'"
+                        <PromptManagementPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
                         <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />

@@ -2,6 +2,29 @@ import {contextBridge, ipcRenderer} from 'electron';
 
 // 快捷键API
 const shortcutsAPI = {
+  getState: () => ipcRenderer.invoke('shortcuts:get-state'),
+  validate: (accelerator: string, excludeId?: string) => ipcRenderer.invoke('shortcuts:validate', accelerator, excludeId),
+  updateCommand: (commandId: string, patch: any) => ipcRenderer.invoke('shortcuts:update-command', commandId, patch),
+  upsertPromptBinding: (binding: any) => ipcRenderer.invoke('shortcuts:upsert-prompt-binding', binding),
+  removePromptBinding: (id: string) => ipcRenderer.invoke('shortcuts:remove-prompt-binding', id),
+  resolveLegacyBinding: (id: string, promptUUID: string) => ipcRenderer.invoke('shortcuts:resolve-legacy-binding', id, promptUUID),
+  markInvalidTarget: (id: string) => ipcRenderer.invoke('shortcuts:mark-invalid-target', id),
+  launcherReady: () => ipcRenderer.send('shortcuts:launcher-ready'),
+  showLauncher: () => ipcRenderer.invoke('shortcuts:show-launcher'),
+  hideLauncher: () => ipcRenderer.invoke('shortcuts:hide-launcher'),
+  executeText: (request: any) => ipcRenderer.invoke('shortcuts:execute-text', request),
+  navigateMain: (target: string, promptUUID?: string) => ipcRenderer.invoke('shortcuts:navigate-main', target, promptUUID),
+  requestPastePermission: () => ipcRenderer.invoke('shortcuts:request-paste-permission'),
+  onLauncherInvocation: (callback: (invocation: any) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, invocation: any) => callback(invocation);
+    ipcRenderer.on('shortcut:launcher-invocation', listener);
+    return () => ipcRenderer.removeListener('shortcut:launcher-invocation', listener);
+  },
+  onNavigateMain: (callback: (payload: any) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: any) => callback(payload);
+    ipcRenderer.on('shortcut:navigate-main', listener);
+    return () => ipcRenderer.removeListener('shortcut:navigate-main', listener);
+  },
   // 注册默认快捷键
   registerDefaults: () => ipcRenderer.invoke('shortcuts:register-defaults'),
   
@@ -25,9 +48,6 @@ const shortcutsAPI = {
   
   // 检查权限并尝试注册快捷键
   checkPermissions: () => ipcRenderer.invoke('shortcuts:check-permissions'),
-  
-  // 获取提示词内容
-  getPromptContent: (promptId: number) => ipcRenderer.invoke('shortcuts:get-prompt-content', promptId),
   
   // 监听快捷键事件
   onInsertData: (callback: (promptId?: number) => void) => {

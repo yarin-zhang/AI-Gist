@@ -8,7 +8,7 @@ import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
 import { NetworkProxyManager } from './network-proxy';
-import { UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
+import type { PromptShortcutBinding, ShortcutCommandId, ShortcutExecutionRequest, UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
  * IPC 处理器管理器
@@ -269,6 +269,22 @@ class IpcHandlers {
    * 设置快捷键处理器
    */
   private setupShortcutHandlers() {
+    const manager = ShortcutManager.getInstance();
+
+    ipcMain.handle('shortcuts:get-state', () => manager.getState());
+    ipcMain.handle('shortcuts:validate', (_, accelerator: string, excludeId?: string) => manager.validateAccelerator(accelerator, excludeId));
+    ipcMain.handle('shortcuts:update-command', (_, commandId: ShortcutCommandId, patch: { accelerator?: string; enabled?: boolean }) => manager.updateCommand(commandId, patch));
+    ipcMain.handle('shortcuts:upsert-prompt-binding', (_, binding: Omit<PromptShortcutBinding, 'id'> & { id?: string }) => manager.upsertPromptBinding(binding));
+    ipcMain.handle('shortcuts:remove-prompt-binding', (_, id: string) => manager.removePromptBinding(id));
+    ipcMain.handle('shortcuts:resolve-legacy-binding', (_, id: string, promptUUID: string) => manager.resolveLegacyBinding(id, promptUUID));
+    ipcMain.handle('shortcuts:mark-invalid-target', (_, id: string) => manager.markBindingInvalid(id));
+    ipcMain.handle('shortcuts:show-launcher', () => manager.showLauncherWindow());
+    ipcMain.handle('shortcuts:hide-launcher', () => manager.hideLauncherWindow());
+    ipcMain.handle('shortcuts:execute-text', (_, request: ShortcutExecutionRequest) => manager.executeText(request));
+    ipcMain.handle('shortcuts:navigate-main', (_, target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => manager.navigateMain(target, promptUUID));
+    ipcMain.handle('shortcuts:request-paste-permission', () => manager.getPasteCapability(true));
+    ipcMain.on('shortcuts:launcher-ready', event => manager.markLauncherReady(event.sender.id));
+
     // 注册默认快捷键
     ipcMain.handle('shortcuts:register-defaults', () => {
       try {
@@ -338,17 +354,6 @@ class IpcHandlers {
       }
     });
 
-    // 获取提示词内容
-    ipcMain.handle('shortcuts:get-prompt-content', async (_, promptId: number) => {
-      try {
-        // 这里应该调用数据库服务来获取提示词内容
-        // 临时返回示例内容
-        return { success: true, content: `示例提示词内容 (ID: ${promptId})` };
-      } catch (error) {
-        console.error('获取提示词内容失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
   }
 
   /**
@@ -394,14 +399,14 @@ class IpcHandlers {
     ipcMain.handle('proxy:test-connection-real-time', async (event, proxyConfig?: any) => {
       console.log('收到测试连接请求，代理配置:', proxyConfig);
       
-      const results: Array<{
+      const results: {
         name: string;
         url: string;
         description: string;
         success: boolean;
         responseTime?: number;
         error?: string;
-      }> = [];
+      }[] = [];
       
       const testResult = await NetworkProxyManager.testProxyConnectionRealTime((result) => {
         results.push(result);
@@ -506,7 +511,19 @@ class IpcHandlers {
     ipcMain.removeHandler('shortcuts:is-available');
     ipcMain.removeHandler('shortcuts:get-registered');
     ipcMain.removeHandler('shortcuts:check-permissions');
-    ipcMain.removeHandler('shortcuts:get-prompt-content');
+    ipcMain.removeHandler('shortcuts:get-state');
+    ipcMain.removeHandler('shortcuts:validate');
+    ipcMain.removeHandler('shortcuts:update-command');
+    ipcMain.removeHandler('shortcuts:upsert-prompt-binding');
+    ipcMain.removeHandler('shortcuts:remove-prompt-binding');
+    ipcMain.removeHandler('shortcuts:resolve-legacy-binding');
+    ipcMain.removeHandler('shortcuts:mark-invalid-target');
+    ipcMain.removeHandler('shortcuts:show-launcher');
+    ipcMain.removeHandler('shortcuts:hide-launcher');
+    ipcMain.removeHandler('shortcuts:execute-text');
+    ipcMain.removeHandler('shortcuts:navigate-main');
+    ipcMain.removeHandler('shortcuts:request-paste-permission');
+    ipcMain.removeAllListeners('shortcuts:launcher-ready');
     
     // 清理 AI 服务管理器的活跃生成请求
     aiServiceManager.stopAllGenerations();

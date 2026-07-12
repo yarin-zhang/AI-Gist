@@ -10,6 +10,11 @@ import { setupMobileDebug } from './utils/mobile-debug'
 import { installWebRuntimeBridge } from './lib/platform/web-runtime-bridge'
 
 installWebRuntimeBridge()
+const isLauncherSurface = new URLSearchParams(window.location.search).get('surface') === 'launcher'
+if (isLauncherSurface) {
+  document.documentElement.classList.add('ai-gist-launcher')
+  document.body.classList.add('ai-gist-launcher')
+}
 // 设置移动端调试
 setupMobileDebug()
 
@@ -203,27 +208,29 @@ async function startApp() {
 
     app.mount('#app');
 
-    await cloudSyncService.startAutoSyncFromSettings({
-      platform: PlatformDetector.getPlatform(),
-      deviceName: navigator.userAgent
-    });
-    await automaticBackupService.startFromSettings();
-
-    if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
-      window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) =>
-        cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs })
-      );
-    }
-
-    if (PlatformDetector.isMobile()) {
-      const { App: CapApp } = await import('@capacitor/app');
-      CapApp.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          cloudSyncService.scheduleSync('resume', { delayMs: 0 });
-        } else if (cloudSyncService.hasPendingChanges()) {
-          void cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
-        }
+    if (!isLauncherSurface) {
+      await cloudSyncService.startAutoSyncFromSettings({
+        platform: PlatformDetector.getPlatform(),
+        deviceName: navigator.userAgent
       });
+      await automaticBackupService.startFromSettings();
+
+      if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
+        window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) =>
+          cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs })
+        );
+      }
+
+      if (PlatformDetector.isMobile()) {
+        const { App: CapApp } = await import('@capacitor/app');
+        CapApp.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) {
+            cloudSyncService.scheduleSync('resume', { delayMs: 0 });
+          } else if (cloudSyncService.hasPendingChanges()) {
+            void cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
+          }
+        });
+      }
     }
 
     // Vue 应用挂载完成后移除加载屏幕

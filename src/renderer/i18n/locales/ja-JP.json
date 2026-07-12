@@ -1102,7 +1102,20 @@
     "trigger": "ショートカットキートリガー",
     "triggerDesc": "選択したプロンプトワードをトリガーするためのショートカットキー（Ctrl Shift P）",
     "triggerFixed": "このショートカットキーはCTRLシフトPに固定されており、変更できません",
-    "waitingInput": "入力を待っています..."
+    "waitingInput": "入力を待っています...",
+    "assign": "設定", "assignPromptBinding": "プロンプトショートカットを設定", "editPromptBinding": "ショートカットを編集",
+    "assignPromptBindingDesc": "このグローバルキーでプロンプトを直接呼び出します。",
+    "actionCopy": "コピー", "actionPaste": "自動貼り付け", "pasteFallbackHint": "利用できない場合はコピーに切り替えます。",
+    "launcherPlaceholder": "プロンプト、タグ、カテゴリ、コマンドを検索…", "variablesCount": "{count} 個の変数",
+    "noLauncherResults": "一致する結果がありません", "navigate": "選択", "actions": "アクション", "fillVariablesDesc": "変数を入力します。",
+    "copyAndPaste": "コピーして貼り付け", "commandOpenApp": "AI Gist を開く", "commandOpenAppDesc": "メインウィンドウを表示",
+    "commandNewPrompt": "新規プロンプト", "commandNewPromptDesc": "エディタを開く", "commandManage": "ショートカット管理", "commandManageDesc": "設定を開く",
+    "autoPasteUnavailable": "自動貼り付けは利用できません", "requestPermission": "権限を要求", "globalCommands": "グローバルコマンド",
+    "launcherCommand": "プロンプトランチャー", "launcherCommandDesc": "任意のアプリから検索", "behavior": "呼び出し動作",
+    "defaultAction": "既定のアクション", "defaultActionDesc": "Enter の既定動作", "promptBindings": "プロンプト直接キー",
+    "noPromptBindings": "ショートカットはまだありません", "disabled": "無効", "conflict": "競合", "unsupported": "未対応",
+    "invalidTarget": "プロンプトがありません", "missingPrompt": "プロンプトが見つかりません",
+    "assignFromPromptHint": "プロンプト一覧または詳細から設定できます。", "notSet": "未設定"
   },
   "startup": {
     "autoStart": "自動起動",

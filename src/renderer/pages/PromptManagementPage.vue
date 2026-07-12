@@ -280,6 +280,16 @@ const handleQuickOptimizationConfigsUpdated = () => {
     }
 };
 
+const openPromptByUUID = async (promptUUID: string) => {
+    const prompt = await api.prompts.getByUUID.query(promptUUID)
+    if (prompt) handleViewPrompt(prompt)
+}
+
+defineExpose({
+    createPrompt: handleCreatePrompt,
+    openPromptByUUID,
+})
+
 // 生命周期
 onMounted(async () => {
     // 等待数据库就绪后再加载数据

@@ -29,6 +29,14 @@ import type {
   CloudSyncSnapshot
 } from '../cloud-sync-engine';
 import type {
+  PasteCapability,
+  PromptShortcutBinding,
+  ShortcutCommandId,
+  ShortcutExecutionRequest,
+  ShortcutInvocation,
+  ShortcutState,
+} from './preferences';
+import type {
   CloudSyncV2ObjectWriteOptions,
   CloudSyncV2ObjectWriteResult,
   CloudSyncV2StoredObject,
@@ -229,6 +237,21 @@ export default interface ElectronApi {
 }
 
 export interface ShortcutsAPI {
+  getState: () => Promise<ShortcutState>;
+  validate: (accelerator: string, excludeId?: string) => Promise<{ valid: boolean; error?: string }>;
+  updateCommand: (commandId: ShortcutCommandId, patch: { accelerator?: string; enabled?: boolean }) => Promise<ShortcutState>;
+  upsertPromptBinding: (binding: Omit<PromptShortcutBinding, 'id'> & { id?: string }) => Promise<ShortcutState>;
+  removePromptBinding: (id: string) => Promise<ShortcutState>;
+  resolveLegacyBinding: (id: string, promptUUID: string) => Promise<void>;
+  markInvalidTarget: (id: string) => Promise<void>;
+  launcherReady: () => void;
+  showLauncher: () => Promise<void>;
+  hideLauncher: () => Promise<void>;
+  executeText: (request: ShortcutExecutionRequest) => Promise<{ success: boolean; pasted: boolean; warning?: string }>;
+  navigateMain: (target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => Promise<void>;
+  requestPastePermission: () => Promise<PasteCapability>;
+  onLauncherInvocation: (callback: (invocation: ShortcutInvocation) => void) => () => void;
+  onNavigateMain: (callback: (payload: { target: 'home' | 'new-prompt' | 'shortcuts'; promptUUID?: string }) => void) => () => void;
   // 注册默认快捷键
   registerDefaults: () => Promise<{ success: boolean; error?: string }>;
   

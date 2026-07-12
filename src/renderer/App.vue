@@ -23,13 +23,14 @@ import MainPage from '~/pages/MainPage.vue'
 import DatabaseStatusBanner from '~/components/common/DatabaseStatusBanner.vue'
 import AppInitializer from '~/components/common/AppInitializer.vue'
 import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
-import ShortcutListener from '~/components/common/ShortcutListener.vue'
 import NotificationHandler from '~/components/common/NotificationHandler.vue'
 import MobileBackButtonHandler from '~/components/mobile/MobileBackButtonHandler.vue'
+import PromptLauncher from '~/components/shortcuts/PromptLauncher.vue'
 
 // 检测运行壳：Web 桌面浏览器使用桌面壳，Web 手机浏览器和原生移动端使用移动壳
 const isDesktopShell = PlatformDetector.isDesktopShell()
 const isNativeMobile = PlatformDetector.isMobile()
+const isLauncherSurface = new URLSearchParams(window.location.search).get('surface') === 'launcher'
 
 // 使用主题管理
 const { naiveTheme, getThemeOverrides, initTheme } = useTheme()
@@ -88,14 +89,13 @@ onMounted(async () => {
             <NDialogProvider>
                 <AppInitializer>
                     <!-- 国际化错误检测横幅 -->
-                    <I18nErrorBanner />
+                    <I18nErrorBanner v-if="!isLauncherSurface" />
                     <!-- 数据库状态横幅 -->
-                    <DatabaseStatusBanner />
-                    <!-- 快捷键监听器 -->
-                    <ShortcutListener />
+                    <DatabaseStatusBanner v-if="!isLauncherSurface" />
                     <!-- 通知处理器 -->
-                    <NotificationHandler />
-                    <MainPage />
+                    <NotificationHandler v-if="!isLauncherSurface" />
+                    <PromptLauncher v-if="isLauncherSurface" />
+                    <MainPage v-else />
                 </AppInitializer>
             </NDialogProvider>
         </NMessageProvider>

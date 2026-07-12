@@ -323,6 +323,10 @@
                                 <NFlex justify="space-between" align="center">
                                     <!-- 标签区域 -->
                                     <NFlex size="small" align="center" wrap style="flex: 1; min-width: 0;">
+                                        <NTag v-if="supportsGlobalShortcuts && shortcutBindingFor(prompt.uuid)" size="small" type="success" :bordered="false">
+                                            <template #icon><NIcon><Keyboard /></NIcon></template>
+                                            {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
+                                        </NTag>
                                         <NTag v-if="prompt.variables && prompt.variables.length > 0" size="small"
                                             type="info">
                                             {{ t('promptManagement.variableCount', { count: prompt.variables.length })
@@ -373,6 +377,15 @@
             </div>
         </div>
     </div>
+    <ShortcutBindingModal
+        v-if="supportsGlobalShortcuts && shortcutBindingPrompt"
+        :show="showShortcutBindingModal"
+        :prompt-uuid="shortcutBindingPrompt.uuid"
+        :prompt-title="shortcutBindingPrompt.title"
+        :existing-binding="shortcutBindingFor(shortcutBindingPrompt.uuid)"
+        @close="showShortcutBindingModal = false"
+        @saved="handleShortcutBindingSaved"
+    />
 </template>
 
 <script setup lang="ts">
@@ -419,6 +432,9 @@ import { useTagColors } from '@/composables/useTagColors'
 import { useDatabase } from '@/composables/useDatabase'
 import { jinjaService } from '@/lib/utils/jinja.service'
 import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/database'
+import type { PromptShortcutBinding, ShortcutState } from '@shared/types/preferences'
+import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue'
+import { PlatformDetector } from '@shared/platform'
 
 interface Emits {
     (e: 'edit', prompt: any): void
@@ -438,12 +454,16 @@ const emit = defineEmits<Emits>()
 const message = useMessage()
 const { t } = useI18n()
 const { waitForDatabase } = useDatabase()
+const supportsGlobalShortcuts = PlatformDetector.getCapabilities().globalShortcuts
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors()
 
 // 响应式数据
 const prompts = ref<PromptWithRelations[]>([])
+const shortcutState = ref<ShortcutState | null>(null)
+const shortcutBindingPrompt = ref<PromptWithRelations | null>(null)
+const showShortcutBindingModal = ref(false)
 const categories = ref<CategoryWithRelations[]>([])
 const treeData = ref<TreeNode[]>([])
 const statistics = ref<{
@@ -1070,14 +1090,27 @@ const tableColumns = computed(() => [
             )
         }
     },
-    {
+    ...(supportsGlobalShortcuts ? [{
         title: t('promptManagement.shortcutTrigger'),
         key: 'isShortcutTrigger',
         width: 100,
         render: (row: PromptWithRelations) => {
-
+            const binding = shortcutBindingFor(row.uuid)
+            return h(
+                NButton,
+                {
+                    size: 'small',
+                    text: true,
+                    type: binding ? 'primary' : 'default',
+                    onClick: (event: Event) => {
+                        event.stopPropagation()
+                        openShortcutBinding(row)
+                    }
+                },
+                { default: () => binding ? displayAccelerator(binding.accelerator) : t('shortcuts.assign') }
+            )
         }
-    },
+    }] : []),
     {
         title: t('promptManagement.sortOptions.useCount'),
         key: 'useCount',
@@ -1463,6 +1496,11 @@ const getPromptActions = (prompt: PromptWithRelations) => [
         key: 'copyOriginal',
         icon: () => h(NIcon, null, { default: () => h(Copy) })
     },
+    ...(supportsGlobalShortcuts ? [{
+        label: shortcutBindingFor(prompt.uuid) ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding'),
+        key: 'shortcut',
+        icon: () => h(NIcon, null, { default: () => h(Keyboard) })
+    }] : []),
     {
         label: t('promptManagement.delete'),
         key: 'delete',
@@ -1484,10 +1522,31 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
         case 'copyOriginal':
             handleCopyOriginalPrompt(prompt)
             break
+        case 'shortcut':
+            openShortcutBinding(prompt)
+            break
         case 'delete':
             handleDeletePrompt(prompt)
             break
     }
+}
+
+const shortcutBindingFor = (promptUUID: string): PromptShortcutBinding | undefined =>
+    shortcutState.value?.preferences.promptBindings.find(binding => binding.promptUUID === promptUUID)
+
+const displayAccelerator = (accelerator: string) => {
+    if (!navigator.platform.includes('Mac')) return accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Control/g, 'Ctrl')
+    return accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '')
+}
+
+const openShortcutBinding = (prompt: PromptWithRelations) => {
+    shortcutBindingPrompt.value = prompt
+    showShortcutBindingModal.value = true
+}
+
+const handleShortcutBindingSaved = async () => {
+    showShortcutBindingModal.value = false
+    shortcutState.value = await window.electronAPI.shortcuts.getState()
 }
 
 const handleCopyPrompt = async (prompt: PromptWithRelations) => {
@@ -1591,6 +1650,7 @@ const loadStatistics = async () => {
 
 // 组件挂载时加载数据
 onMounted(async () => {
+    if (supportsGlobalShortcuts && window.electronAPI?.shortcuts) shortcutState.value = await window.electronAPI.shortcuts.getState()
     await waitForDatabase()
     // 先加载统计信息和分类，确保 totalCount 有正确值
     await loadStatistics()

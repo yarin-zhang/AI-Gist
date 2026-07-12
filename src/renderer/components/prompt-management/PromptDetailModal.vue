@@ -27,7 +27,10 @@
         <!-- Header 额外区域 - 操作按钮 -->
         <template #header-extra>
             <NFlex size="small">
-
+                <NButton v-if="supportsGlobalShortcuts" @click="openShortcutBinding">
+                    <template #icon><NIcon><Keyboard /></NIcon></template>
+                    {{ currentShortcutBinding ? displayAccelerator(currentShortcutBinding.accelerator) : t('shortcuts.assign') }}
+                </NButton>
                 <NButton @click="toggleFavorite" :type="prompt.isFavorite ? 'error' : 'default'">
                     <template #icon>
                         <NIcon>
@@ -862,7 +865,15 @@
         </template>
     </CommonModal>
 
-
+    <ShortcutBindingModal
+        v-if="supportsGlobalShortcuts && prompt"
+        :show="showShortcutBindingModal"
+        :prompt-uuid="prompt.uuid"
+        :prompt-title="prompt.title"
+        :existing-binding="currentShortcutBinding"
+        @close="showShortcutBindingModal = false"
+        @saved="handleShortcutBindingSaved"
+    />
 </template>
 
 <script setup lang="ts">
@@ -919,6 +930,9 @@ import CommonModal from "@/components/common/CommonModal.vue";
 import AIModelSelector from "@/components/common/AIModelSelector.vue";
 import type { AIGenerationHistory } from "../../../shared/types/ai";
 import { jinjaService } from "@/lib/utils/jinja.service";
+import ShortcutBindingModal from "@/components/shortcuts/ShortcutBindingModal.vue";
+import type { PromptShortcutBinding, ShortcutState } from "@shared/types/preferences";
+import { PlatformDetector } from "@shared/platform";
 
 interface Props {
     show: boolean;
@@ -937,6 +951,26 @@ const emit = defineEmits<Emits>();
 
 const message = useMessage();
 const { t } = useI18n();
+const supportsGlobalShortcuts = PlatformDetector.getCapabilities().globalShortcuts;
+const shortcutState = ref<ShortcutState | null>(null);
+const showShortcutBindingModal = ref(false);
+const currentShortcutBinding = computed<PromptShortcutBinding | undefined>(() =>
+    shortcutState.value?.preferences.promptBindings.find(binding => binding.promptUUID === props.prompt?.uuid)
+);
+
+const displayAccelerator = (accelerator: string) => navigator.platform.includes('Mac')
+    ? accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '')
+    : accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Control/g, 'Ctrl');
+
+const openShortcutBinding = async () => {
+    shortcutState.value = await window.electronAPI.shortcuts.getState();
+    showShortcutBindingModal.value = true;
+};
+
+const handleShortcutBindingSaved = async () => {
+    showShortcutBindingModal.value = false;
+    shortcutState.value = await window.electronAPI.shortcuts.getState();
+};
 
 // 使用标签颜色 composable
 const { getTagColor, getTagsArray, getCategoryTagColor } = useTagColors();

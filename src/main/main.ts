@@ -49,6 +49,7 @@ function cleanupResources(): void {
   ipcHandlers.cleanup();
   trayManager.destroy();
   themeManager.cleanup();
+  ShortcutManager.getInstance().destroy();
 }
 
 function beginGracefulQuit(timeoutMs: number, source: string): void {

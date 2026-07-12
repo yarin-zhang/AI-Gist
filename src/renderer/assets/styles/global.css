@@ -61,6 +61,20 @@ html, body, #app {
   background-color: var(--app-bg-color, #ffffff);
 }
 
+html.ai-gist-launcher,
+html.ai-gist-launcher.light,
+html.ai-gist-launcher.dark,
+body.ai-gist-launcher,
+body.ai-gist-launcher.light,
+body.ai-gist-launcher.dark,
+body.ai-gist-launcher #app {
+  background: transparent !important;
+}
+
+body.ai-gist-launcher #initial-loading {
+  display: none;
+}
+
 /* 为窗口拖拽区域设置背景色 */
 html.light {
   background-color: #ffffff !important;

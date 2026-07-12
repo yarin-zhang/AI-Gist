@@ -65,9 +65,7 @@
                             @update:model-value="(val) => { settings.closeBehaviorMode = val.closeBehaviorMode; settings.closeAction = val.closeAction; updateSetting(); }" />
 
                         <!-- 快捷键设置 -->
-                        <ShortcutSettings v-if="capabilities.globalShortcuts && activeSettingKey === 'shortcuts'"
-                            :model-value="settings.shortcuts"
-                            @update:model-value="(val: any) => { settings.shortcuts = val; updateSetting(); }" />
+                        <ShortcutSettings v-if="capabilities.globalShortcuts && activeSettingKey === 'shortcuts'" />
 
                         <!-- 网络代理设置 -->
                         <NetworkProxySettings v-if="capabilities.systemProxy && activeSettingKey === 'network-proxy'"
@@ -181,19 +179,20 @@ const settings = reactive({
     },
     // 快捷键设置
     shortcuts: {
-        showInterface: {
-            key: 'Ctrl+Shift+G',
-            description: '显示界面',
-            enabled: true,
-            type: 'show-interface' as const
+        version: 2 as const,
+        defaultAction: 'copy' as const,
+        commands: {
+            launcher: {
+                accelerator: 'CommandOrControl+Shift+G',
+                enabled: true,
+            },
+            showMainWindow: {
+                accelerator: '',
+                enabled: false,
+            },
         },
-        copyPrompt: {
-            key: 'Ctrl+Shift+Alt+C',
-            description: '复制提示词',
-            enabled: true,
-            type: 'copy-prompt' as const
-        },
-        promptTriggers: []
+        promptBindings: [],
+        recentPromptUUIDs: [],
     },
     // 网络代理设置
     networkProxy: {
@@ -363,9 +362,7 @@ const loadSettings = async () => {
         
         // 快捷键配置
         if (prefs.shortcuts) {
-            settings.shortcuts.showInterface = prefs.shortcuts.showInterface || settings.shortcuts.showInterface;
-            settings.shortcuts.copyPrompt = prefs.shortcuts.copyPrompt || settings.shortcuts.copyPrompt;
-            settings.shortcuts.promptTriggers = prefs.shortcuts.promptTriggers || [];
+            settings.shortcuts = prefs.shortcuts as typeof settings.shortcuts;
         }
 
         // 网络代理配置
@@ -402,7 +399,6 @@ const updateSetting = async () => {
                 autoLaunch: settings.autoLaunch,
                 themeSource: settings.themeSource,
                 dataSync: settings.dataSync,
-                shortcuts: settings.shortcuts,
                 networkProxy: settings.networkProxy,
             })
         );
