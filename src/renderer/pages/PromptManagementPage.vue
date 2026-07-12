@@ -500,7 +500,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
 .view-switcher { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .view-switcher-item { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: var(--radius-control); color: var(--content-secondary); background: transparent; cursor: pointer; font: inherit; font-size: var(--font-size-base); }
 .view-switcher-item:hover { color: var(--content-primary); background: var(--interactive-hover); }
-.view-switcher-item.active { color: var(--content-primary); background: var(--surface-primary); font-weight: var(--font-weight-medium); }
+.view-switcher-item.active { color: var(--content-primary); background: var(--surface-tertiary); font-weight: var(--font-weight-medium); }
 .prompt-page-content { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .workspace-shell-split { flex: 1; min-width: 0; min-height: 0; }
 .workspace-shell-split :deep(.n-split__resize-trigger-wrapper) { position: relative; z-index: 2; overflow: visible; background: transparent; }

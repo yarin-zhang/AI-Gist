@@ -540,9 +540,9 @@ onIonViewWillEnter(() => {
 }
 
 .section-content {
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
-  border: 1px solid var(--ion-color-light-shade);
+  border: 1px solid var(--border-default);
   overflow: hidden;
 }
 

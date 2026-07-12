@@ -4,11 +4,11 @@
 
 @layer components {
   .btn-modern {
-    @apply bg-accent-primary text-white px-4 py-2 rounded-lg hover:bg-accent-primary/90 transition-all duration-200 shadow-sm;
+    @apply bg-accent-primary text-white px-4 py-2 rounded-lg hover:bg-accent-primary/90 transition-colors duration-200;
   }
   
   .card-modern {
-    @apply bg-surface-primary border border-border-default rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+    @apply bg-surface-primary border border-border-default rounded-lg hover:border-border-strong transition-colors duration-200;
   }
   
   .input-modern {

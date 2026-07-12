@@ -60,7 +60,7 @@ const retry = async () => {
   top: 0;
   left: 0;
   right: 0;
-  background: color-mix(in srgb, var(--accent-error) 9%, var(--surface-primary));
+  background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
   color: var(--content-primary);
   padding: 12px 20px;
   z-index: 1000;

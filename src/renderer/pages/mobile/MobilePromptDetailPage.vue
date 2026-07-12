@@ -444,10 +444,10 @@ onUnmounted(() => {
 }
 
 .prompt-content-wrapper {
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid var(--ion-color-light-shade);
+  border: 1px solid var(--border-default);
 }
 
 .prompt-content {
@@ -481,12 +481,12 @@ ion-chip {
   border-radius: var(--radius-image, 8px);
   object-fit: cover;
   aspect-ratio: 1;
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   cursor: pointer;
 }
 
 .preview-content {
-  --background: rgba(0, 0, 0, 0.9);
+  --background: var(--overlay-preview);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -99,13 +99,13 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       fontWeightStrong: tokens.typography.fontWeights.semibold
     },
     Card: {
-      color: surface.secondary,
-      colorModal: surface.secondary,
-      colorPopover: surface.secondary,
-      colorEmbedded: surface.tertiary,
-      colorEmbeddedModal: surface.tertiary,
-      colorEmbeddedPopover: surface.tertiary,
-      actionColor: surface.tertiary,
+      color: surface.primary,
+      colorModal: surface.primary,
+      colorPopover: surface.primary,
+      colorEmbedded: surface.secondary,
+      colorEmbeddedModal: surface.secondary,
+      colorEmbeddedPopover: surface.secondary,
+      actionColor: surface.secondary,
       borderColor: border.default,
       borderRadius: tokens.component.panelRadius,
       boxShadow: "none",
@@ -114,6 +114,15 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       titleFontSizeLarge: tokens.typography.fontSizes.lg,
       titleFontSizeHuge: tokens.typography.fontSizes.lg,
       titleFontWeight: tokens.typography.fontWeights.semibold
+    },
+    Layout: {
+      color: surface.body,
+      headerColor: surface.primary,
+      footerColor: surface.primary,
+      siderColor: surface.sidebar,
+      headerBorderColor: border.default,
+      footerBorderColor: border.default,
+      siderBorderColor: border.default
     },
     Button: {
       fontSizeTiny: tokens.typography.fontSizes.xs,
@@ -162,7 +171,8 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
     Modal: {
       color: surface.primary,
       textColor: content.primary,
-      boxShadow: tokens.elevation.overlay
+      boxShadow: tokens.elevation.overlay,
+      colorModal: surface.primary
     },
     Drawer: {
       color: surface.primary,
@@ -200,7 +210,8 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       colorLoading: accent.primary
     },
     Tag: {
-      colorBordered: "rgba(0, 0, 0, 0.08)"
+      colorBordered: interactive.hover,
+      border: `1px solid ${border.default}`
     }
   }
 }
@@ -208,7 +219,7 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
 // 获取 CSS 变量
 export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> {
   const palette = tokens.palette[themeName]
-  const { surface, content, accent, border, interactive } = palette
+  const { surface, content, accent, border, interactive, overlay } = palette
   
   return {
     // 表面颜色
@@ -240,6 +251,10 @@ export function getCssVars(themeName: 'light' | 'dark'): Record<string, string> 
     "interactive-hover": interactive.hover,
     "interactive-active": interactive.active,
     "interactive-focus": interactive.focus,
+
+    // 浮层遮罩
+    "overlay-backdrop": overlay.backdrop,
+    "overlay-preview": overlay.preview,
     
     // 间距
     "spacing-xs": tokens.spacing.xs,

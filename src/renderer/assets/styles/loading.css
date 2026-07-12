@@ -17,7 +17,7 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 
   /* 浅色主题 */
-  background: var(--surface-body, #f5f6f8);
+  background: var(--surface-body, #f4f6f8);
   color: var(--content-primary, #1f2328);
 }
 
@@ -52,36 +52,36 @@
 /* 桌面端暗色模式（Naive UI 使用 html.dark / body.dark） */
 html.dark #initial-loading,
 body.dark #initial-loading {
-  background: var(--surface-body, #101014);
-  color: var(--content-primary, #e5e5e5);
+  background: var(--surface-body, #0f1115);
+  color: var(--content-primary, #efeff1);
 }
 
 html.dark #initial-loading .spinner,
 body.dark #initial-loading .spinner {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-default, #343b47);
   border-top-color: var(--accent-primary, #60a5fa);
 }
 
 /* 移动端暗色模式（Ionic 使用 html.ion-palette-dark） */
 html.ion-palette-dark #initial-loading {
-  background: #101014;
-  color: #e5e5e5;
+  background: var(--surface-body, #0f1115);
+  color: var(--content-primary, #efeff1);
 }
 
 html.ion-palette-dark #initial-loading .spinner {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-default, #343b47);
   border-top-color: var(--accent-primary, #60a5fa);
 }
 
 /* 系统暗色模式后备（主题未初始化前防止闪白） */
 @media (prefers-color-scheme: dark) {
   #initial-loading {
-    background: #101014;
-    color: #e5e5e5;
+    background: var(--surface-body, #0f1115);
+    color: var(--content-primary, #efeff1);
   }
 
   #initial-loading .spinner {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-default, #343b47);
     border-top-color: var(--accent-primary, #60a5fa);
   }
 }

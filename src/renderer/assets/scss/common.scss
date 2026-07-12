@@ -169,24 +169,6 @@
 	border: 1px solid var(--border-subtle);
 }
 
-.text-gradient {
-	background: linear-gradient(135deg, var(--accent-primary), var(--accent-info));
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	background-clip: text;
-}
-
-.glass-effect {
-	background: rgba(255, 255, 255, 0.1);
-	backdrop-filter: blur(10px);
-	border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.dark .glass-effect {
-	background: rgba(0, 0, 0, 0.2);
-	border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
 /*
 	DOES NOT WORK ON FIREFOX!
 	:has() CSS relational pseudo-class not yet supported by Firefox
@@ -219,12 +201,12 @@ ion-toast.mobile-toast {
 }
 
 ion-toast.mobile-toast-success {
-	--background: #ffffff;
-	--border-color: rgba(15, 23, 42, 0.12);
+	--background: var(--surface-primary);
+	--border-color: var(--border-default);
 	--border-style: solid;
 	--border-width: 1px;
 	--button-color: var(--ion-color-primary);
-	--color: #111827;
+	--color: var(--content-primary);
 }
 
 /* Naive UI Split: keep a generous drag hit-area without rendering a heavy bar. */

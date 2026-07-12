@@ -637,7 +637,7 @@ onUnmounted(() => {
   padding: 8px 16px;
   color: var(--ion-color-medium);
   font-size: 13px;
-  border-bottom: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--border-default);
 }
 
 .view-mode-segment {

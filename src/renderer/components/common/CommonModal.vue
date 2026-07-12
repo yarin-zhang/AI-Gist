@@ -318,7 +318,7 @@ onUnmounted(() => resizeObserver?.disconnect());
 
 /* 明确设置模态框的背景，避免透明问题 */
 :deep(.n-modal-container) {
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--overlay-backdrop);
 }
 
 :deep(.n-modal) {

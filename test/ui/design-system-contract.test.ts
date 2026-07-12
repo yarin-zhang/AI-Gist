@@ -41,6 +41,32 @@ describe('desktop design-system contract', () => {
     expect(tokens.component.contentPadding).toBe('16px');
   });
 
+  it('keeps light and dark surfaces on the same semantic luminance ladder', () => {
+    const tokens = JSON.parse(readFileSync(resolve(rendererRoot, 'design-tokens.json'), 'utf8'));
+    const rgbLuminance = (value: string): number => {
+      const [r, g, b] = value.match(/\d+/g)!.slice(0, 3).map(Number).map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+
+    const light = tokens.palette.light.surface;
+    const dark = tokens.palette.dark.surface;
+    expect(light.sidebar).toBe(light.primary);
+    expect(dark.sidebar).toBe(dark.primary);
+    expect(rgbLuminance(light.primary)).toBeGreaterThan(rgbLuminance(light.secondary));
+    expect(rgbLuminance(light.secondary)).toBeGreaterThan(rgbLuminance(light.body));
+    expect(rgbLuminance(light.body)).toBeGreaterThan(rgbLuminance(light.tertiary));
+    expect(rgbLuminance(dark.body)).toBeLessThan(rgbLuminance(dark.primary));
+    expect(rgbLuminance(dark.primary)).toBeLessThan(rgbLuminance(dark.secondary));
+    expect(rgbLuminance(dark.secondary)).toBeLessThan(rgbLuminance(dark.tertiary));
+    expect(tokens.palette.light.overlay.backdrop).toBeTruthy();
+    expect(tokens.palette.dark.overlay.preview).toBeTruthy();
+  });
+
   it('does not revive deprecated desktop theme variables', () => {
     const deprecated = /--app-|var\(--(?:border-color|text-color|code-color)/;
     const offenders = desktopFiles
@@ -87,6 +113,36 @@ describe('desktop design-system contract', () => {
     expect(globalStyles).toContain('.n-input__textarea-el');
     expect(globalStyles).toContain('user-select: text');
     expect(globalStyles).not.toContain('-webkit-app-region: no-drag');
+  });
+
+  it('maps desktop and mobile structural surfaces to canonical tokens', () => {
+    const themeSource = readFileSync(resolve(rendererRoot, 'theme/index.ts'), 'utf8');
+    const mobileStyles = readFileSync(resolve(rendererRoot, 'assets/styles/mobile.css'), 'utf8');
+    const mobileFiles = collectFiles(rendererRoot).filter(path => (
+      path.includes('/pages/mobile/')
+      || path.includes('/components/mobile/')
+      || path.endsWith('/pages/MobileMainPage.vue')
+    ));
+    const mobileSource = mobileFiles.map(path => readFileSync(path, 'utf8')).join('\n');
+
+    expect(themeSource).toMatch(/Card:\s*\{[\s\S]*?color:\s*surface\.primary/);
+    expect(themeSource).toMatch(/Layout:\s*\{[\s\S]*?color:\s*surface\.body/);
+    expect(mobileStyles).toContain('--ion-background-color: var(--surface-body)');
+    expect(mobileStyles).toContain('--ion-item-background: var(--surface-primary)');
+    expect(mobileStyles).toContain('--ion-card-background: var(--surface-primary)');
+    expect(mobileSource).not.toContain('background: var(--ion-color-light)');
+    expect(mobileSource).not.toContain('border: 1px solid var(--ion-color-light-shade)');
+  });
+
+  it('does not retain deprecated decorative surface helpers', () => {
+    const common = readFileSync(resolve(rendererRoot, 'assets/scss/common.scss'), 'utf8');
+    const animations = readFileSync(resolve(rendererRoot, 'assets/scss/common-animations.scss'), 'utf8');
+    const tailwind = readFileSync(resolve(rendererRoot, 'tailwind.css'), 'utf8');
+    expect(common).not.toContain('.glass-effect');
+    expect(common).not.toContain('.text-gradient');
+    expect(animations).not.toContain('.hover-lift');
+    expect(animations).not.toContain('.pulse-glow');
+    expect(tailwind).not.toMatch(/card-modern[\s\S]*shadow-/);
   });
 
   it('uses a focus-trap-compatible root for every raw Naive UI modal', () => {

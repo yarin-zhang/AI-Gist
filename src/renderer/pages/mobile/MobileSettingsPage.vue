@@ -116,11 +116,10 @@ import { databaseService } from '~/lib/db'
 import { dataRestoreService } from '~/lib/services/data-restore.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { createBackupPayload } from '@shared/backup-integrity'
-import { getCssVars } from '~/theme'
 
 const router = useRouter()
 const { t, currentLocale, switchLocale } = useI18n()
-const { themeSource } = useTheme()
+const { themeSource, setThemeSource } = useTheme()
 
 const currentLanguage = ref(currentLocale.value)
 const currentTheme = ref(themeSource.value || 'system')
@@ -149,36 +148,7 @@ const handleThemeChange = async (event: any) => {
   localStorage.setItem('theme', newTheme)
   currentTheme.value = newTheme
 
-  // 应用主题
-  applyTheme(newTheme)
-}
-
-// 应用主题函数
-const applyTheme = (theme: 'system' | 'light' | 'dark') => {
-  const html = document.documentElement
-
-  let isDark = false
-
-  if (theme === 'system') {
-    // 使用系统主题
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  } else {
-    isDark = theme === 'dark'
-  }
-
-  // 1. Ionic 官方暗色调色板（控制 Ionic 组件颜色变量）
-  html.classList.toggle('ion-palette-dark', isDark)
-
-  // 2. 同步应用层主题类（global.css 中 html.dark/html.light 控制背景色等变量）
-  const body = document.body
-  html.classList.toggle('dark', isDark)
-  html.classList.toggle('light', !isDark)
-  body.classList.toggle('dark', isDark)
-  body.classList.toggle('light', !isDark)
-
-  for (const [key, value] of Object.entries(getCssVars(isDark ? 'dark' : 'light'))) {
-    html.style.setProperty(`--${key}`, value)
-  }
+  await setThemeSource(newTheme)
 }
 
 // 导出数据
@@ -371,7 +341,7 @@ const navigateToAbout = () => {
   router.push('/mobile/about')
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 加载应用版本
   // appVersion.value = window.electronAPI?.getAppVersion() || '1.0.0'
 
@@ -380,10 +350,10 @@ onMounted(() => {
 
   if (savedTheme) {
     currentTheme.value = savedTheme
-    applyTheme(savedTheme)
+    await setThemeSource(savedTheme)
   } else {
     // 默认使用系统主题
-    applyTheme('system')
+    await setThemeSource('system')
   }
 })
 </script>

@@ -8,7 +8,7 @@ import './tailwind.css'
 import './assets/scss/index.scss'
 import { setupMobileDebug } from './utils/mobile-debug'
 import { installWebRuntimeBridge } from './lib/platform/web-runtime-bridge'
-import { getCssVars } from './theme'
+import { applyDocumentTheme, getSystemThemePreference, resolveTheme, type ThemeSource } from './theme/runtime'
 
 installWebRuntimeBridge()
 document.documentElement.classList.toggle('desktop-shell', PlatformDetector.isDesktopShell())
@@ -55,35 +55,12 @@ function initLocale() {
 
 // 预设初始主题类，避免闪烁
 function setInitialTheme() {
-  const html = document.documentElement
-  const body = document.body
-
-  // 检查保存的主题设置
-  const savedTheme = localStorage.getItem('theme') as 'system' | 'light' | 'dark' | null
-
-  let isDark = false
-
-  if (savedTheme === 'dark') {
-    isDark = true
-  } else if (savedTheme === 'light') {
-    isDark = false
-  } else {
-    // 默认或 system：检查系统主题偏好
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-
-  html.classList.toggle('ion-palette-dark', isDark)
-  html.classList.toggle('dark', isDark)
-  html.classList.toggle('light', !isDark)
-  body.classList.toggle('dark', isDark)
-  body.classList.toggle('light', !isDark)
-}
-
-function applyInitialDesignTokens() {
-  const themeName = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-  for (const [key, value] of Object.entries(getCssVars(themeName))) {
-    document.documentElement.style.setProperty(`--${key}`, value)
-  }
+  const savedTheme = localStorage.getItem('theme') as ThemeSource | null
+  const source = savedTheme && ['system', 'light', 'dark'].includes(savedTheme) ? savedTheme : 'system'
+  applyDocumentTheme(
+    resolveTheme(source, getSystemThemePreference()),
+    PlatformDetector.isMobileShell() ? 'mobile' : 'desktop'
+  )
 }
 
 // 移除初始加载屏幕（同时隐藏原生 SplashScreen）
@@ -114,7 +91,6 @@ async function startApp() {
   try {
     // 立即设置初始主题和语言
     setInitialTheme()
-    applyInitialDesignTokens()
     initLocale()
     
     await initDatabase();

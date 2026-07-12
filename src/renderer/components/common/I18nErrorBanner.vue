@@ -101,7 +101,7 @@ onMounted(() => {
     right: 0;
     z-index: 9999;
     padding: 16px;
-    background: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
+    background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
     border-bottom: 1px solid var(--accent-error);
 }
 

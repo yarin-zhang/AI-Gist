@@ -713,19 +713,19 @@ const handleCancel = () => {
 
 .added-item {
     border-left: 4px solid var(--accent-success);
-    background-color: color-mix(in srgb, var(--accent-success) 6%, var(--surface-primary));
+    background-color: color-mix(in srgb, var(--accent-success) 8%, var(--surface-primary));
 }
 
 .modified-item {
     border-left: 4px solid var(--accent-warning);
-    background-color: color-mix(in srgb, var(--accent-warning) 6%, var(--surface-primary));
+    background-color: color-mix(in srgb, var(--accent-warning) 8%, var(--surface-primary));
     padding: 16px;
     margin-bottom: 16px;
 }
 
 .deleted-item {
     border-left: 4px solid var(--accent-error);
-    background-color: color-mix(in srgb, var(--accent-error) 6%, var(--surface-primary));
+    background-color: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
 }
 
 .item-header {

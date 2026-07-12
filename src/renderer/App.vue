@@ -65,16 +65,9 @@ const naiveDateLocale = computed(() => {
     }
 })
 
-// 初始化主题
+// 初始化主题。桌面、Web 与移动端共用同一套主题解析和 token 应用链路。
 onMounted(async () => {
-    // 只在桌面壳初始化主题，移动端由设置页面管理
-    if (!isDesktopShell) {
-        console.log('[App] 移动端环境，跳过 initTheme')
-        return
-    }
-
     try {
-        console.log('[App] 桌面壳环境，初始化主题')
         await initTheme()
     } catch (error) {
         console.error('❌ [App] 主题初始化失败:', error)

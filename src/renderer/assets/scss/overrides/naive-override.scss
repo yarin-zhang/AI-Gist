@@ -1,7 +1,7 @@
 // 模态框样式
 .n-modal-mask {
 	backdrop-filter: blur(8px);
-	background-color: rgba(0, 0, 0, 0.4);
+	background-color: var(--overlay-backdrop);
 }
 
 .n-modal,
@@ -15,7 +15,7 @@
 
 // 卡片样式
 .n-card {
-	background: var(--surface-secondary);
+	background: var(--surface-primary);
 	border-color: var(--border-default);
 	border-radius: var(--radius-panel);
 	box-shadow: none;
@@ -26,6 +26,7 @@
 		justify-content: space-between;
 		padding: 14px var(--content-padding);
 		border-bottom: 1px solid var(--border-default);
+		background: var(--surface-secondary);
 
 		.n-card-header__main {
 			min-width: 0 !important;
@@ -40,6 +41,10 @@
 		}
 	}
 
+	.n-card__action {
+		background: var(--surface-secondary);
+	}
+
 	> .n-card-content,
 	> .n-card__content {
 		padding: var(--content-padding);
@@ -52,11 +57,16 @@
 	}
 }
 
+/* A card nested inside another structural card is grouped content. */
+.desktop-shell .n-card .n-card {
+	background: var(--surface-secondary);
+}
+
 // 图片预览
 .n-image-preview-container {
 	.n-image-preview-overlay {
 		backdrop-filter: blur(8px);
-		background-color: rgba(0, 0, 0, 0.8);
+		background-color: var(--overlay-preview);
 	}
 	
 	.n-image-preview-toolbar {

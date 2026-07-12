@@ -69,7 +69,7 @@
         <ion-list-header>
           <ion-label>{{ t('cloudBackup.restoreDecisionTitle') }}</ion-label>
         </ion-list-header>
-        <ion-item v-for="suspension in restoreSuspensions" :key="suspension.storageId" color="warning">
+        <ion-item v-for="suspension in restoreSuspensions" :key="suspension.storageId" class="restore-suspension-item">
           <ion-label>
             <h3>{{ getStorageName(suspension.storageId) }}</h3>
             <p>{{ t('cloudBackup.restoreDecisionDescription') }}</p>
@@ -1077,6 +1077,11 @@ onUnmounted(() => unsubscribeSyncStatus?.())
   padding: 0 16px 12px;
 }
 
+.restore-suspension-item {
+  --background: color-mix(in srgb, var(--accent-warning) 10%, var(--surface-primary));
+  --border-color: color-mix(in srgb, var(--accent-warning) 28%, var(--border-default));
+}
+
 .connection-test-button {
   width: 100%;
   margin: 8px 0;
@@ -1086,12 +1091,12 @@ onUnmounted(() => unsubscribeSyncStatus?.())
   max-height: 220px;
   padding: 10px;
   overflow: auto;
-  color: var(--ion-color-dark);
+  color: var(--content-primary);
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: var(--ion-color-light);
+  background: var(--surface-secondary);
   border-radius: 8px;
 }
 </style>
