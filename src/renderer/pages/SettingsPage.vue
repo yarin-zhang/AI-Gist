@@ -547,23 +547,6 @@ watch(menuOptions, () => {
     width: 100%;
 }
 
-.settings-navigation :deep(.n-menu-item-content) {
-    border-radius: var(--radius-control);
-}
-
-.settings-navigation :deep(.n-menu-item-content:hover) {
-    background: var(--surface-secondary);
-}
-
-.settings-navigation :deep(.n-menu-item-content--selected) {
-    background: var(--surface-tertiary);
-    font-weight: var(--font-weight-medium);
-}
-
-.settings-navigation :deep(.n-menu-item-content__icon) {
-    flex: 0 0 auto;
-}
-
 .settings-compact-navigation {
     display: none;
 }

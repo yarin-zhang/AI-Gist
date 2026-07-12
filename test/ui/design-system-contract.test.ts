@@ -73,4 +73,17 @@ describe('desktop design-system contract', () => {
     const prompt = readFileSync(resolve(root, 'docs/AI_UI_DESIGN_PROMPT.md'), 'utf8');
     expect(prompt).toContain('They do not gain a selection border');
   });
+
+  it('preserves Naive UI menu rendering and native input editing semantics', () => {
+    const mainPage = readFileSync(resolve(rendererRoot, 'pages/MainPage.vue'), 'utf8');
+    const settingsPage = readFileSync(resolve(rendererRoot, 'pages/SettingsPage.vue'), 'utf8');
+    const globalStyles = readFileSync(resolve(rendererRoot, 'assets/styles/global.css'), 'utf8');
+
+    expect(mainPage).not.toMatch(/n-menu-item-content(?:--selected)?[^}]*background/s);
+    expect(settingsPage).not.toMatch(/n-menu-item-content(?:--selected)?[^}]*background/s);
+    expect(globalStyles).not.toMatch(/body\s*\{[^}]*user-select:\s*none/s);
+    expect(globalStyles).toContain('.n-input__input-el');
+    expect(globalStyles).toContain('-webkit-app-region: no-drag');
+    expect(globalStyles).toContain('user-select: text');
+  });
 });

@@ -43,7 +43,9 @@ The desktop design language is **tinted surfaces with restrained boundary border
 ### Navigation and selection
 
 - Selected rows, cards, tabs, and navigation items use a neutral tinted surface and, where useful, stronger text weight. They do not gain a selection border.
-- Keep menu padding on the menu container, not as margins on Naive UI menu-item content; this preserves collapsed-menu icon geometry.
+- Do not add horizontal padding or item margins to a collapsible `NMenu`: its `collapsed-width`, icon size, and internal 8px inset already determine the icon geometry. Apply only vertical spacing outside that calculation.
+- Naive UI Menu paints hover and selection through `.n-menu-item-content::before`; configure these states with Menu theme overrides and do not add a second background to `.n-menu-item-content`.
+- Never disable text selection globally. Native inputs, textareas, selects, and editable regions must retain focus, caret, selection, and Electron `no-drag` behavior.
 - Do not use large blue blocks, gradients, glowing borders, scale animations, or “AI-style” selection treatments.
 - Preserve the user’s current view when opening global create/edit/detail workflows.
 

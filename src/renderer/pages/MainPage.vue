@@ -167,24 +167,7 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 .main-sider-menu {
     flex: 1;
     min-height: 0;
-    padding: var(--spacing-sm);
-}
-
-.main-sider-menu :deep(.n-menu-item-content) {
-    border-radius: var(--radius-control);
-}
-
-.main-sider-menu :deep(.n-menu-item-content:hover) {
-    background: var(--surface-secondary);
-}
-
-.main-sider-menu :deep(.n-menu-item-content--selected) {
-    background: var(--surface-tertiary);
-    font-weight: var(--font-weight-medium);
-}
-
-.main-sider-menu :deep(.n-menu-item-content__icon) {
-    flex: 0 0 auto;
+    padding-top: var(--spacing-sm);
 }
 
 .main-sider-toggle {

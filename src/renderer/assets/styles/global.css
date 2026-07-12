@@ -15,10 +15,6 @@ html {
 }
 
 body {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -27,6 +23,25 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
   /* 默认背景色，会被主题类覆盖 */
   background-color: #ffffff;
+}
+
+/* Keep native editing semantics inside Electron and Web shells. */
+input,
+textarea,
+select,
+[contenteditable="true"],
+.n-input,
+.n-base-selection {
+  -webkit-app-region: no-drag;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.n-input__input-el,
+.n-input__textarea-el {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* 主题样式变量和背景色 */

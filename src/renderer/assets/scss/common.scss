@@ -39,25 +39,6 @@
 	font-size: var(--font-size-lg);
 }
 
-/* Desktop typography roles: controls and navigation use the body size. */
-.desktop-shell .n-button,
-.desktop-shell .n-input,
-.desktop-shell .n-base-selection,
-.desktop-shell .n-menu,
-.desktop-shell .n-tabs,
-.desktop-shell .n-data-table,
-.desktop-shell .n-form-item-label,
-.desktop-shell .n-dropdown-option-body__label {
-	font-size: var(--font-size-base);
-}
-
-.desktop-shell .n-form-item-feedback,
-.desktop-shell .n-form-item-label__asterisk,
-.desktop-shell .n-base-selection-tags,
-.desktop-shell .n-tag {
-	font-size: var(--font-size-xs);
-}
-
 .n-image {
 	overflow: hidden;
 }
