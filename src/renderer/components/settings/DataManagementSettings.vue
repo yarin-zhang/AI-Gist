@@ -576,8 +576,22 @@ const saveAutoBackupSettings = async () => {
     autoBackupLoading.value = true;
     try {
         autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
-        autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value);
-        message.success(t('dataBackup.automaticBackupSettingsSaved'));
+        const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value);
+        autoBackupRetention.value = retentionResult.retention;
+        if (retentionResult.warnings.length > 0) {
+            message.warning(t('dataBackup.automaticBackupRetentionWarning', {
+                error: retentionResult.warnings.join('；')
+            }));
+        } else if (retentionResult.deferredCount > 0) {
+            message.info(t('dataBackup.automaticBackupRetentionDeferred', {
+                count: retentionResult.deletedCount,
+                deferred: retentionResult.deferredCount
+            }));
+        } else {
+            message.success(t('dataBackup.automaticBackupRetentionApplied', {
+                count: retentionResult.deletedCount
+            }));
+        }
     } catch (error) {
         console.error('保存自动备份设置失败:', error);
         message.error(t('dataBackup.automaticBackupSettingsSaveFailed'));
@@ -590,7 +604,8 @@ const runAutoBackupNow = async () => {
     await automaticBackupService.runNow('manual');
     const status = automaticBackupService.getStatus();
     if (status.error) message.error(status.error);
-    else message.success(t('dataBackup.automaticBackupCompleted'));
+    else if (status.lastRunAction === 'unchanged') message.success(t('dataBackup.automaticBackupUnchanged'));
+    else message.success(t('dataBackup.automaticBackupCreatedAndRotated', { count: status.deletedCount || 0 }));
 };
 
 const formatBackupDate = (value: string) => new Date(value).toLocaleString();

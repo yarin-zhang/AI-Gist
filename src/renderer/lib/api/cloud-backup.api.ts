@@ -3,7 +3,8 @@ import type {
   WebDAVConfig, 
   ICloudConfig, 
   CloudBackupInfo,
-  CloudBackupCreateOptions
+  CloudBackupCreateOptions,
+  CloudBackupDeleteTarget
 } from '@shared/types/cloud-backup';
 import type {
   CloudSyncManifest,
@@ -258,20 +259,20 @@ export class CloudBackupAPI {
   /**
    * 删除云端备份
    */
-  static async deleteCloudBackup(storageId: string, backupId: string): Promise<{
+  static async deleteCloudBackup(storageId: string, backup: CloudBackupDeleteTarget): Promise<{
     success: boolean;
     message?: string;
     error?: string;
   }> {
     const client = getCloudBackupClient();
     if (client) {
-      return await client.deleteCloudBackup(storageId, backupId);
+      return await client.deleteCloudBackup(storageId, backup);
     }
 
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.deleteBackup(storageId, backupId);
+    return await window.electronAPI.cloud.deleteBackup(storageId, backup);
   }
 
   /**
@@ -366,6 +367,21 @@ export class CloudBackupAPI {
     }
 
     return await window.electronAPI.cloud.saveSyncSnapshot(storageId, snapshot);
+  }
+
+  static async deleteCloudSyncSnapshot(
+    storageId: string,
+    snapshot: CloudSyncRemoteSnapshotInfo | string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = getCloudBackupClient();
+    if (client) {
+      return await client.deleteCloudSyncSnapshot(storageId, snapshot);
+    }
+
+    if (!this.isElectronAvailable()) {
+      return { success: false, error: 'Electron API not available' };
+    }
+    return await window.electronAPI.cloud.deleteSyncSnapshot(storageId, snapshot);
   }
 
   static async readCloudSyncV2Object(

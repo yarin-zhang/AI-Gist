@@ -15,7 +15,8 @@ import type {
 import type {
   CloudStorageConfig,
   CloudBackupInfo,
-  CloudBackupCreateOptions
+  CloudBackupCreateOptions,
+  CloudBackupDeleteTarget
 } from './cloud-backup';
 import type {
   CloudSyncManifest,
@@ -129,7 +130,7 @@ export default interface ElectronApi {
     getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>
     createBackup: (storageId: string, options?: string | CloudBackupCreateOptions) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
     restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
-    deleteBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message?: string; error?: string }>
+    deleteBackup: (storageId: string, backup: CloudBackupDeleteTarget) => Promise<{ success: boolean; message?: string; error?: string }>
     getSyncManifest: (storageId: string) => Promise<
       CloudSyncManifest |
       { success: true; manifest: CloudSyncManifest } |
@@ -154,6 +155,10 @@ export default interface ElectronApi {
     saveSyncSnapshot: (
       storageId: string,
       snapshot: CloudSyncSnapshot
+    ) => Promise<{ success: boolean; error?: string }>
+    deleteSyncSnapshot: (
+      storageId: string,
+      snapshot: CloudSyncRemoteSnapshotInfo | string
     ) => Promise<{ success: boolean; error?: string }>
     readCloudSyncV2Object: (storageId: string, path: string) => Promise<CloudSyncV2StoredObject | null>
     writeCloudSyncV2Object: (

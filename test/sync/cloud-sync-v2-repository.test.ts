@@ -5,6 +5,7 @@ import { encodeCloudSyncV2Canonical } from '@shared/cloud-sync-protocol-v2';
 import {
   CloudSyncV2RepositoryError,
   cleanupArtifacts,
+  cleanupArtifactsUsingRetention,
   publishMigrationArtifacts,
   readManifest,
   type CloudSyncV2ObjectStorageAdapter,
@@ -190,5 +191,21 @@ describe('cloud sync v2 repository', () => {
       getCloudSyncV2ArtifactPath('checkpoints', stale.checkpoint.checkpointId)
     ]));
     expect(storage.objects.has(quarantinePath)).toBe(true);
+  });
+
+  it('aborts retention cleanup when the manifest head commit is missing', async () => {
+    const storage = new MemoryObjectStorage();
+    const artifacts = await migration('missing-head');
+    await publishMigrationArtifacts(storage, artifacts);
+    storage.objects.delete(getCloudSyncV2ArtifactPath('commits', artifacts.commit.commitId));
+
+    await expect(cleanupArtifactsUsingRetention(storage, artifacts.manifest, {
+      recentCommitCount: 1
+    })).rejects.toMatchObject<Partial<CloudSyncV2RepositoryError>>({
+      code: 'artifact_readback_failed'
+    });
+    expect(storage.objects.has(
+      getCloudSyncV2ArtifactPath('checkpoints', artifacts.checkpoint.checkpointId)
+    )).toBe(true);
   });
 });

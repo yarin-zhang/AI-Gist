@@ -20,6 +20,7 @@ const MAX_SYNC_V2_LIST_OBJECTS = 100000;
 const MAX_SYNC_V2_LIST_DEPTH = 16;
 const CLOUD_BACKUP_FILE_PREFIX = 'backup-';
 const CLOUD_BACKUP_FILE_EXTENSION = '.json';
+const CLOUD_BACKUP_MANIFEST_FILE = 'backup-manifest.json';
 const BACKUP_PAYLOAD_SCHEMA_VERSION = 1;
 const REQUIRED_SYNC_COLLECTIONS = [
   'categories',
@@ -136,6 +137,14 @@ function normalizeRemotePath(...parts) {
     .map(part => String(part).replace(/^\/+|\/+$/g, ''))
     .filter(Boolean)
     .join('/')}`;
+}
+
+function isCloudBackupFileName(name) {
+  return typeof name === 'string' &&
+    name.startsWith(CLOUD_BACKUP_FILE_PREFIX) &&
+    name.endsWith(CLOUD_BACKUP_FILE_EXTENSION) &&
+    name !== CLOUD_BACKUP_MANIFEST_FILE &&
+    name.length > CLOUD_BACKUP_FILE_PREFIX.length + CLOUD_BACKUP_FILE_EXTENSION.length;
 }
 
 async function createWebDAVClient(config) {
@@ -655,7 +664,7 @@ async function listWebDAVBackups({ config }) {
 
   for (const entry of list) {
     const name = entry.basename || Path.basename(entry.filename || entry.path || '');
-    if (!name.startsWith(CLOUD_BACKUP_FILE_PREFIX) || !name.endsWith(CLOUD_BACKUP_FILE_EXTENSION)) {
+    if (!isCloudBackupFileName(name)) {
       continue;
     }
 
@@ -668,6 +677,7 @@ async function listWebDAVBackups({ config }) {
         name: backupData.name || name,
         description: backupData.description,
         createdAt: backupData.createdAt,
+        modifiedAt: typeof entry.lastmod === 'string' ? entry.lastmod : undefined,
         size: Number(entry.size) || Buffer.byteLength(JSON.stringify(backupData)),
         cloudPath,
         storageId: config.id,
@@ -691,24 +701,33 @@ async function writeWebDAVBackup({ config, fileName, backupData }) {
   await ensureWebDAVDirectory(client);
   const parsedBackup = parseBackupPayload(backupData);
   const backupPayload = parsedBackup.payload;
-  const safeName = Path.basename(fileName || backupPayload?.name || `${CLOUD_BACKUP_FILE_PREFIX}${Date.now()}${CLOUD_BACKUP_FILE_EXTENSION}`);
+  const safeName = Path.basename(
+    fileName || `${CLOUD_BACKUP_FILE_PREFIX}${backupPayload.id || Date.now()}${CLOUD_BACKUP_FILE_EXTENSION}`
+  );
+  if (!isCloudBackupFileName(safeName)) {
+    throw new Error('备份写入路径超出允许的命名空间');
+  }
   const cloudPath = normalizeRemotePath(CLOUD_BACKUP_DIR, safeName);
   const content = JSON.stringify(backupPayload, null, 2);
   await client.putFileContents(cloudPath, content, { overwrite: true });
+  const verified = parseBackupPayload(JSON.parse(await readWebDAVText(client, cloudPath)));
+  if (verified.payload.id !== backupPayload.id || verified.checksum !== parsedBackup.checksum) {
+    throw new Error('备份写入后的远端读回校验失败');
+  }
   return {
-    id: backupPayload.id,
-    name: backupPayload.name || safeName,
-    description: backupPayload.description,
-    createdAt: backupPayload.createdAt,
+    id: verified.payload.id,
+    name: verified.payload.name || safeName,
+    description: verified.payload.description,
+    createdAt: verified.payload.createdAt,
     size: Buffer.byteLength(content),
     cloudPath,
     storageId: config.id,
-    version: backupPayload.version,
-    checksum: parsedBackup.checksum,
-    backupType: backupPayload.backupType,
-    trigger: backupPayload.trigger,
-    deviceId: backupPayload.deviceId,
-    dataChecksum: backupPayload.dataChecksum
+    version: verified.payload.version,
+    checksum: verified.checksum,
+    backupType: verified.payload.backupType,
+    trigger: verified.payload.trigger,
+    deviceId: verified.payload.deviceId,
+    dataChecksum: verified.payload.dataChecksum
   };
 }
 
@@ -718,8 +737,17 @@ async function readWebDAVBackup({ config, cloudPath }) {
 }
 
 async function deleteWebDAVBackup({ config, cloudPath }) {
+  const normalizedPath = normalizeRemotePath(cloudPath);
+  const fileName = Path.posix.basename(normalizedPath);
+  if (!isCloudBackupFileName(fileName) || normalizedPath !== normalizeRemotePath(CLOUD_BACKUP_DIR, fileName)) {
+    throw new Error('备份删除路径超出允许的命名空间');
+  }
   const client = await createWebDAVClient(config);
-  await client.deleteFile(cloudPath);
+  try {
+    await client.deleteFile(normalizedPath);
+  } catch (error) {
+    if (!isWebDAVNotFoundError(error)) throw error;
+  }
   return { ok: true };
 }
 
@@ -895,6 +923,21 @@ async function saveWebDAVSyncSnapshot({ config, snapshot }) {
     throw new Error(`云同步快照 ${normalizedSnapshot.revision} 已存在但内容不一致`);
   }
 
+  return { ok: true };
+}
+
+async function deleteWebDAVSyncSnapshot({ config, snapshot }) {
+  const client = await createWebDAVClient(config);
+  const revision = typeof snapshot === 'string' ? snapshot : snapshot?.revision;
+  if (typeof revision !== 'string' || !revision) {
+    throw new Error('云同步快照 revision 不能为空');
+  }
+  const snapshotPath = getCloudSyncSnapshotPath(revision);
+  try {
+    await client.deleteFile(snapshotPath);
+  } catch (error) {
+    if (!isWebDAVNotFoundError(error)) throw error;
+  }
   return { ok: true };
 }
 
@@ -1743,6 +1786,7 @@ const apiRoutes = {
   '/api/cloud/webdav/list-sync-snapshots': listWebDAVSyncSnapshots,
   '/api/cloud/webdav/read-sync-snapshot': readWebDAVSyncSnapshot,
   '/api/cloud/webdav/save-sync-snapshot': saveWebDAVSyncSnapshot,
+  '/api/cloud/webdav/delete-sync-snapshot': deleteWebDAVSyncSnapshot,
   '/api/cloud/webdav/sync-v2/read': readWebDAVSyncV2Object,
   '/api/cloud/webdav/sync-v2/write': writeWebDAVSyncV2Object,
   '/api/cloud/webdav/sync-v2/list': listWebDAVSyncV2Objects,

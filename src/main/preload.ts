@@ -180,7 +180,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getBackupList: (storageId: string) => ipcRenderer.invoke('cloud:get-backup-list', storageId),
     createBackup: (storageId: string, options?: any) => ipcRenderer.invoke('cloud:create-backup', storageId, options),
     restoreBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:restore-backup', storageId, backupId),
-    deleteBackup: (storageId: string, backupId: string) => ipcRenderer.invoke('cloud:delete-backup', storageId, backupId),
+    deleteBackup: (storageId: string, backup: any) => ipcRenderer.invoke('cloud:delete-backup', storageId, backup),
     getSyncManifest: (storageId: string) => ipcRenderer.invoke('cloud:get-sync-manifest', storageId),
     saveSyncManifest: (storageId: string, manifest: any, options?: any) =>
       ipcRenderer.invoke('cloud:save-sync-manifest', storageId, manifest, options),
@@ -189,6 +189,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('cloud:read-sync-snapshot', storageId, snapshot),
     saveSyncSnapshot: (storageId: string, snapshot: any) =>
       ipcRenderer.invoke('cloud:save-sync-snapshot', storageId, snapshot),
+    deleteSyncSnapshot: (storageId: string, snapshot: any) =>
+      ipcRenderer.invoke('cloud:delete-sync-snapshot', storageId, snapshot),
     readCloudSyncV2Object: (storageId: string, path: string) =>
       ipcRenderer.invoke('cloud:read-sync-v2-object', storageId, path),
     writeCloudSyncV2Object: (storageId: string, path: string, data: Uint8Array, options?: any) =>

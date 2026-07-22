@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   AutomaticBackupService,
+  createAutomaticBackupSemanticChecksum,
   DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
   DEFAULT_AUTO_BACKUP_RETENTION,
   normalizeAutomaticBackupInterval,
@@ -32,8 +33,13 @@ const configs = [
   }
 ]
 
-function createService(overrides: { failStorageId?: string } = {}) {
-  const automaticBackups = Array.from({ length: 22 }, (_, index) => ({
+function createService(overrides: {
+  failStorageId?: string
+  automaticBackupCount?: number
+  data?: any
+  retention?: number
+} = {}) {
+  const automaticBackups = Array.from({ length: overrides.automaticBackupCount ?? 22 }, (_, index) => ({
     id: `automatic-${index}`,
     name: `automatic-${index}`,
     createdAt: new Date(Date.UTC(2026, 6, 11, 0, 0, 22 - index)).toISOString(),
@@ -73,7 +79,8 @@ function createService(overrides: { failStorageId?: string } = {}) {
       backupInfo
     }
   })
-  const deleteCloudBackup = vi.fn(async (storageId: string, backupId: string) => {
+  const deleteCloudBackup = vi.fn(async (storageId: string, target: string | { id: string }) => {
+    const backupId = typeof target === 'string' ? target : target.id
     remoteBackups[storageId] = remoteBackups[storageId].filter(backup => backup.id !== backupId)
     return { success: true }
   })
@@ -86,14 +93,18 @@ function createService(overrides: { failStorageId?: string } = {}) {
   const settings = {
     getBooleanValue: vi.fn().mockResolvedValue(true),
     setBooleanValue: vi.fn().mockResolvedValue({}),
-    getNumberValue: vi.fn().mockImplementation(async (key: string, fallback: number) => fallback),
+    getNumberValue: vi.fn().mockImplementation(async (key: string, fallback: number) =>
+      key === 'cloud.backup.auto.retention' && overrides.retention !== undefined
+        ? overrides.retention
+        : fallback
+    ),
     setNumberValue: vi.fn().mockResolvedValue({})
   }
   const database = {
     exportAllDataForBackup: vi.fn().mockResolvedValue({
       success: true,
       message: 'ok',
-      data: { prompts: [{ id: 1, title: 'Protected' }], settings: [] }
+      data: overrides.data || { prompts: [{ id: 1, title: 'Protected' }], settings: [] }
     })
   }
   const service = new AutomaticBackupService({
@@ -136,9 +147,18 @@ describe('automatic backup settings', () => {
     expect(createCloudBackup).toHaveBeenCalledWith('storage-b', expect.objectContaining({
       backupType: 'automatic'
     }))
-    expect(deleteCloudBackup).not.toHaveBeenCalledWith(expect.anything(), 'manual-keep')
-    expect(deleteCloudBackup).toHaveBeenCalledWith('storage-a', 'automatic-20')
-    expect(deleteCloudBackup).toHaveBeenCalledWith('storage-b', 'automatic-21')
+    expect(deleteCloudBackup).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 'manual-keep' })
+    )
+    expect(deleteCloudBackup).toHaveBeenCalledWith(
+      'storage-a',
+      expect.objectContaining({ id: 'automatic-20' })
+    )
+    expect(deleteCloudBackup).toHaveBeenCalledWith(
+      'storage-b',
+      expect.objectContaining({ id: 'automatic-21' })
+    )
   })
 
   it('continues backing up later storage targets when an earlier storage fails', async () => {
@@ -162,5 +182,100 @@ describe('automatic backup settings', () => {
 
     expect(createCloudBackup.mock.calls.filter(([storageId]) => storageId === 'storage-a')).toHaveLength(2)
     expect(createCloudBackup.mock.calls.filter(([storageId]) => storageId === 'storage-b')).toHaveLength(1)
+  })
+
+  it('compares only with the newest automatic backup so rolling back data creates a new latest version', async () => {
+    const rolledBackData = { prompts: [{ id: 1, title: 'Version A' }], settings: [] }
+    const newerData = { prompts: [{ id: 1, title: 'Version B' }], settings: [] }
+    const { service, createCloudBackup, remoteBackups } = createService({
+      automaticBackupCount: 0,
+      data: rolledBackData
+    })
+
+    for (const config of configs) {
+      remoteBackups[config.id] = [
+        {
+          id: `newer-${config.id}`,
+          name: `newer-${config.id}`,
+          createdAt: '2026-07-11T02:00:00.000Z',
+          size: 10,
+          storageId: config.id,
+          backupType: 'automatic',
+          dataChecksum: createAutomaticBackupSemanticChecksum(newerData)
+        },
+        {
+          id: `older-${config.id}`,
+          name: `older-${config.id}`,
+          createdAt: '2026-07-11T01:00:00.000Z',
+          size: 10,
+          storageId: config.id,
+          backupType: 'automatic',
+          dataChecksum: createAutomaticBackupSemanticChecksum(rolledBackData)
+        }
+      ]
+    }
+
+    await service.runNow('interval')
+
+    expect(createCloudBackup).toHaveBeenCalledTimes(2)
+    expect(service.getStatus()).toMatchObject({ status: 'success', lastRunAction: 'created' })
+  })
+
+  it('rotates hundreds of automatic versions in one listing pass per storage and never deletes manual backups', async () => {
+    const data = { prompts: [{ id: 1, title: 'Current' }], settings: [] }
+    const { service, cloudClient, createCloudBackup, deleteCloudBackup, remoteBackups } = createService({
+      automaticBackupCount: 300,
+      data,
+      retention: 20
+    })
+    const checksum = createAutomaticBackupSemanticChecksum(data)
+    for (const config of configs) {
+      remoteBackups[config.id][0].dataChecksum = checksum
+    }
+
+    await service.runNow('interval')
+
+    expect(createCloudBackup).not.toHaveBeenCalled()
+    expect(cloudClient.getCloudBackupList).toHaveBeenCalledTimes(2)
+    expect(deleteCloudBackup).toHaveBeenCalledTimes(560)
+    for (const config of configs) {
+      expect(remoteBackups[config.id].filter(backup => backup.backupType === 'automatic')).toHaveLength(20)
+      expect(remoteBackups[config.id]).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'manual-keep', backupType: 'manual' })
+      ]))
+    }
+  })
+
+  it('lowering retention immediately and independently cleans automatic backups and sync recovery snapshots', async () => {
+    const { service, cloudClient, remoteBackups } = createService({ automaticBackupCount: 30 })
+    const snapshots: Record<string, any[]> = Object.fromEntries(configs.map(config => [
+      config.id,
+      Array.from({ length: 30 }, (_, index) => ({
+        revision: `snapshot-${index}`,
+        path: `/AI-Gist-Backup/sync/snapshots/snapshot-${index}.json`,
+        modifiedAt: new Date(Date.UTC(2026, 5, 1, 0, 0, 30 - index)).toISOString()
+      }))
+    ]))
+    Object.assign(cloudClient, {
+      getCloudSyncManifest: vi.fn(async () => ({
+        latestSnapshot: { revision: 'snapshot-0' }
+      })),
+      listCloudSyncSnapshots: vi.fn(async (storageId: string) => snapshots[storageId]),
+      deleteCloudSyncSnapshot: vi.fn(async (storageId: string, target: any) => {
+        const revision = typeof target === 'string' ? target : target.revision
+        snapshots[storageId] = snapshots[storageId].filter(snapshot => snapshot.revision !== revision)
+        return { success: true }
+      })
+    })
+
+    const result = await service.setRetention(5)
+
+    expect(result).toMatchObject({ retention: 5, deletedCount: 100, deferredCount: 0, warnings: [] })
+    for (const config of configs) {
+      expect(remoteBackups[config.id].filter(backup => backup.backupType === 'automatic')).toHaveLength(5)
+      expect(remoteBackups[config.id].some(backup => backup.id === 'manual-keep')).toBe(true)
+      expect(snapshots[config.id]).toHaveLength(5)
+      expect(snapshots[config.id].some(snapshot => snapshot.revision === 'snapshot-0')).toBe(true)
+    }
   })
 })

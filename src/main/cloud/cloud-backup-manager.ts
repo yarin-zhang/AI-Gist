@@ -11,6 +11,7 @@ import { BrowserWindow } from 'electron';
 import { 
   CloudStorageConfig, 
   CloudBackupCreateOptions,
+  CloudBackupDeleteTarget,
   WebDAVConfig, 
   ICloudConfig, 
   CloudBackupInfo, 
@@ -395,12 +396,16 @@ export class CloudBackupManager {
     });
 
     // 删除云端备份
-    ipcMain.handle('cloud:delete-backup', async (_, storageId: string, backupId: string) => {
+    ipcMain.handle('cloud:delete-backup', async (_, storageId: string, backup: CloudBackupDeleteTarget) => {
       try {
         const config = this.getStorageConfig(storageId);
         const provider = this.createProvider(config);
-        const backupFile = await this.findBackupFile(provider, config, backupId);
-        await provider.deleteFile(backupFile.path);
+        const backupFile = await this.resolveBackupFileForDelete(provider, config, backup);
+        try {
+          await provider.deleteFile(backupFile.path);
+        } catch (error) {
+          if (!this.isNotFoundError(error)) throw error;
+        }
         
         return { 
           success: true, 
@@ -506,6 +511,19 @@ export class CloudBackupManager {
           success: false,
           error: this.getErrorMessage(error)
         };
+      }
+    });
+
+    ipcMain.handle('cloud:delete-sync-snapshot', async (
+      _,
+      storageId: string,
+      snapshot: CloudSyncRemoteSnapshotInfo | string
+    ) => {
+      try {
+        await this.deleteCloudSyncSnapshot(storageId, snapshot);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: this.getErrorMessage(error) };
       }
     });
   }
@@ -741,6 +759,7 @@ export class CloudBackupManager {
           cloudPath: file.path,
           storageId,
           checksum: parsedBackup.checksum,
+          modifiedAt: file.modifiedAt,
         });
       } catch (error) {
         this.debugWarn(`${CONSTANTS.ERROR_MESSAGES.BACKUP_PARSE_FAILED}: ${file.path}`, error);
@@ -777,6 +796,32 @@ export class CloudBackupManager {
     }
 
     return backupFile;
+  }
+
+  private async resolveBackupFileForDelete(
+    provider: CloudStorageProvider,
+    config: CloudStorageConfig,
+    backup: CloudBackupDeleteTarget
+  ): Promise<{ path: string }> {
+    if (typeof backup === 'string' || !backup.cloudPath) {
+      return this.findBackupFile(provider, config, typeof backup === 'string' ? backup : backup.id);
+    }
+
+    const normalizedPath = backup.cloudPath.replace(/\\/g, '/');
+    const fileName = path.posix.basename(normalizedPath);
+    if (!isCloudBackupFileName(fileName)) {
+      throw new Error('备份删除路径无效');
+    }
+
+    const allowedPaths = new Set([
+      this.getCloudPath(config, fileName).replace(/\\/g, '/'),
+      `/${fileName}`,
+      fileName
+    ]);
+    if (!allowedPaths.has(normalizedPath)) {
+      throw new Error('备份删除路径超出允许的命名空间');
+    }
+    return { path: backup.cloudPath };
   }
 
   /**
@@ -1014,6 +1059,23 @@ export class CloudBackupManager {
       }
 
       throw new Error(`云同步快照 ${normalizedSnapshot.revision} 已存在但内容不一致`);
+    }
+  }
+
+  private async deleteCloudSyncSnapshot(
+    storageId: string,
+    snapshot: CloudSyncRemoteSnapshotInfo | string
+  ): Promise<void> {
+    await this.loadConfigs();
+    const config = this.getStorageConfig(storageId);
+    const provider = this.createProvider(config);
+    const revision = typeof snapshot === 'string' ? snapshot : snapshot.revision;
+    if (!revision) throw new Error('云同步快照 revision 不能为空');
+    const snapshotPath = this.getSyncSnapshotCloudPath(config, revision);
+    try {
+      await provider.deleteFile(snapshotPath);
+    } catch (error) {
+      if (!this.isNotFoundError(error)) throw error;
     }
   }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CloudSyncV2Coordinator,
   evaluateCloudSyncV2DeviceFreshness
@@ -9,6 +9,7 @@ import {
   encodeCloudSyncV2Canonical
 } from '../../src/shared/cloud-sync-protocol-v2';
 import {
+  getCloudSyncV2ArtifactPath,
   getCloudSyncV2ManifestBackupPath,
   getCloudSyncV2ManifestPath
 } from '../../src/shared/cloud-backup-paths';
@@ -104,6 +105,144 @@ describe('CloudSyncV2Coordinator', () => {
     expect(first.status).toBe('published');
     expect(second).toMatchObject({ status: 'already-current', headId: first.headId });
     expect((await coordinator.getRolloutState('cfg')).migrationState).toBe('verified');
+  });
+
+  it('本地发布缓存丢失时以远端 head 的 source revision 判重，不重复导出或写入', async () => {
+    const firstMetadata = metadataStore();
+    const storage = memoryStorage();
+    const first = new CloudSyncV2Coordinator({ database: firstMetadata, storageFactory: () => storage });
+    await first.setRolloutMode('cfg', 'shadow');
+    const initial = await first.mirrorSuccessfulV1Sync({
+      storageId: 'cfg', revision: 'r1', deviceId: 'd1', exportData: async () => ({})
+    });
+    const writeSpy = vi.spyOn(storage, 'write');
+    const exportData = vi.fn(async () => ({}));
+    const recoveredMetadata = metadataStore();
+    const recovered = new CloudSyncV2Coordinator({
+      database: recoveredMetadata,
+      storageFactory: () => storage
+    });
+    await recovered.setRolloutMode('cfg', 'shadow');
+
+    const result = await recovered.mirrorSuccessfulV1Sync({
+      storageId: 'cfg', revision: 'r1', deviceId: 'd1', exportData
+    });
+
+    expect(result).toMatchObject({ status: 'already-current', headId: initial.headId });
+    expect(exportData).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await recovered.getRolloutState('cfg')).toMatchObject({
+      migrationState: 'verified',
+      lastSourceRevision: 'r1',
+      verifiedHead: initial.headId
+    });
+  });
+
+  it('每次成功发布后按现有保留数量轮换 v2 提交和检查点', async () => {
+    const metadata = metadataStore();
+    const storage = memoryStorage();
+    const coordinator = new CloudSyncV2Coordinator({
+      database: metadata,
+      storageFactory: () => storage,
+      getRetention: () => 2
+    });
+    await coordinator.setRolloutMode('cfg', 'shadow');
+
+    for (const revision of ['r1', 'r2', 'r3']) {
+      const result = await coordinator.mirrorSuccessfulV1Sync({
+        storageId: 'cfg', revision, deviceId: 'd1', exportData: async () => ({ revision })
+      });
+      expect(result.status).toBe('published');
+    }
+
+    const objects = await storage.list('/AI-Gist-Backup/sync-v2');
+    expect(objects.filter(object => object.path.includes('/commits/'))).toHaveLength(2);
+    expect(objects.filter(object => object.path.includes('/checkpoints/'))).toHaveLength(2);
+    const state = await coordinator.getRolloutState('cfg');
+    expect(await storage.read(getCloudSyncV2ArtifactPath('commits', state.verifiedHead!))).not.toBeNull();
+  });
+
+  it('启动时相同 revision 只执行一次历史清理，后续轮询不产生远端写入', async () => {
+    const seedMetadata = metadataStore();
+    const storage = memoryStorage();
+    const seed = new CloudSyncV2Coordinator({
+      database: seedMetadata,
+      storageFactory: () => storage,
+      getRetention: () => 100
+    });
+    await seed.setRolloutMode('cfg', 'shadow');
+    for (const revision of ['r1', 'r2', 'r3']) {
+      await seed.mirrorSuccessfulV1Sync({
+        storageId: 'cfg', revision, deviceId: 'd1', exportData: async () => ({ revision })
+      });
+    }
+
+    const metadata = metadataStore();
+    const coordinator = new CloudSyncV2Coordinator({
+      database: metadata,
+      storageFactory: () => storage,
+      getRetention: () => 1
+    });
+    await coordinator.setRolloutMode('cfg', 'shadow');
+    const writeSpy = vi.spyOn(storage, 'write');
+    const deleteSpy = vi.spyOn(storage, 'delete');
+    const exportData = vi.fn(async () => ({}));
+
+    const first = await coordinator.mirrorSuccessfulV1Sync({
+      storageId: 'cfg', revision: 'r3', deviceId: 'd1', exportData
+    });
+    const deleteCountAfterStartup = deleteSpy.mock.calls.length;
+    for (let index = 0; index < 12; index += 1) {
+      const result = await coordinator.mirrorSuccessfulV1Sync({
+        storageId: 'cfg', revision: 'r3', deviceId: 'd1', exportData
+      });
+      expect(result.status).toBe('already-current');
+    }
+
+    expect(first.status).toBe('already-current');
+    expect(deleteCountAfterStartup).toBeGreaterThan(0);
+    expect(deleteSpy).toHaveBeenCalledTimes(deleteCountAfterStartup);
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(exportData).not.toHaveBeenCalled();
+  });
+
+  it('历史删除失败只返回警告，不把成功同步变成失败或重新发布', async () => {
+    const seedMetadata = metadataStore();
+    const base = memoryStorage();
+    const seed = new CloudSyncV2Coordinator({
+      database: seedMetadata,
+      storageFactory: () => base,
+      getRetention: () => 100
+    });
+    await seed.setRolloutMode('cfg', 'shadow');
+    for (const revision of ['r1', 'r2', 'r3']) {
+      await seed.mirrorSuccessfulV1Sync({
+        storageId: 'cfg', revision, deviceId: 'd1', exportData: async () => ({ revision })
+      });
+    }
+    const failingStorage: CloudSyncV2ObjectStorageAdapter = {
+      read: path => base.read(path),
+      write: (path, data, options) => base.write(path, data, options),
+      list: prefix => base.list(prefix),
+      delete: async () => { throw new Error('delete denied'); }
+    };
+    const metadata = metadataStore();
+    const coordinator = new CloudSyncV2Coordinator({
+      database: metadata,
+      storageFactory: () => failingStorage,
+      getRetention: () => 1
+    });
+    await coordinator.setRolloutMode('cfg', 'shadow');
+    const exportData = vi.fn(async () => ({}));
+
+    const result = await coordinator.mirrorSuccessfulV1Sync({
+      storageId: 'cfg', revision: 'r3', deviceId: 'd1', exportData
+    });
+
+    expect(result.status).toBe('already-current');
+    expect(result.warning).toContain('旧版本清理失败');
+    expect(result.warning).toContain('delete denied');
+    expect(exportData).not.toHaveBeenCalled();
   });
 
   it('备用 manifest 写失败后会在相同 revision 的下一次影子同步修复', async () => {

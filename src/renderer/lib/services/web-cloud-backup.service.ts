@@ -2,12 +2,14 @@ import type {
   CloudBackupInfo,
   CloudStorageConfig,
   CloudBackupCreateOptions,
+  CloudBackupDeleteTarget,
   WebDAVConfig
 } from '@shared/types/cloud-backup';
 import {
   CLOUD_BACKUP_FILE_EXTENSION,
   CLOUD_BACKUP_FILE_PREFIX,
-  getCloudBackupFilePath
+  getCloudBackupFilePath,
+  isCloudBackupFileName
 } from '@shared/cloud-backup-paths';
 import {
   createBackupPayload,
@@ -258,17 +260,21 @@ export class WebCloudBackupService {
     }
   }
 
-  async deleteCloudBackup(storageId: string, backupId: string): Promise<{
+  async deleteCloudBackup(storageId: string, backup: CloudBackupDeleteTarget): Promise<{
     success: boolean;
     message?: string;
     error?: string;
   }> {
     try {
       const config = await this.getWebDAVConfig(storageId);
-      const backupInfo = await this.findBackupInfo(storageId, backupId);
+      const backupInfo = typeof backup === 'string' || !backup.cloudPath
+        ? await this.findBackupInfo(storageId, typeof backup === 'string' ? backup : backup.id)
+        : backup;
+      const cloudPath = backupInfo.cloudPath || getCloudBackupFilePath(backupInfo.name || '');
+      this.assertBackupDeletePath(cloudPath);
       await this.request('/api/cloud/webdav/delete-backup', {
         config,
-        cloudPath: backupInfo.cloudPath || getCloudBackupFilePath(backupInfo.name)
+        cloudPath
       });
       return { success: true, message: '云端备份删除成功' };
     } catch (error) {
@@ -345,6 +351,21 @@ export class WebCloudBackupService {
         config,
         snapshot: assertValidCloudSyncSnapshotFile(snapshot)
       });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: this.formatError(error) };
+    }
+  }
+
+  async deleteCloudSyncSnapshot(
+    storageId: string,
+    snapshot: CloudSyncRemoteSnapshotInfo | string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const config = await this.getWebDAVConfig(storageId);
+      const revision = typeof snapshot === 'string' ? snapshot : snapshot.revision;
+      if (!revision) throw new Error('云同步快照 revision 不能为空');
+      await this.request('/api/cloud/webdav/delete-sync-snapshot', { config, snapshot: revision });
       return { success: true };
     } catch (error) {
       return { success: false, error: this.formatError(error) };
@@ -465,6 +486,15 @@ export class WebCloudBackupService {
       throw new Error('备份文件不存在');
     }
     return backup;
+  }
+
+  private assertBackupDeletePath(cloudPath: string): void {
+    const normalized = cloudPath.replace(/\\/g, '/');
+    const fileName = normalized.split('/').filter(Boolean).at(-1) || '';
+    if (!isCloudBackupFileName(fileName) ||
+        normalized !== getCloudBackupFilePath(fileName)) {
+      throw new Error('备份删除路径超出允许的命名空间');
+    }
   }
 
   private async request<T = unknown>(path: string, body: any): Promise<T> {

@@ -13,6 +13,7 @@ import {
   createCloudSyncSnapshot,
   type CloudSyncDataSet
 } from '@shared/cloud-sync-engine'
+import { createBackupPayload } from '@shared/backup-integrity'
 import {
   getCloudSyncSnapshotPath,
   getCloudSyncV2DirectoryPath,
@@ -110,6 +111,31 @@ describe('web server API handler', () => {
       },
       conflicts: []
     }
+    const backupPayload = createBackupPayload({
+      id: 'web-proxy-backup-1',
+      name: 'backup-web-proxy-backup-1',
+      createdAt: '2026-06-13T20:00:00.000Z',
+      data,
+      backupType: 'automatic',
+      dataChecksum: createCloudSyncDataChecksum(data)
+    })
+
+    const writtenBackup = await postApi(apiBaseUrl, '/api/cloud/webdav/write-backup', {
+      config,
+      fileName: 'backup-web-proxy-backup-1.json',
+      backupData: backupPayload
+    })
+    expect(writtenBackup).toMatchObject({
+      status: 200,
+      payload: {
+        success: true,
+        data: {
+          id: backupPayload.id,
+          checksum: backupPayload.checksum,
+          cloudPath: '/AI-Gist-Backup/backup-web-proxy-backup-1.json'
+        }
+      }
+    })
 
     const emptyManifest = await postApi(apiBaseUrl, '/api/cloud/webdav/get-sync-manifest', { config })
     expect(emptyManifest.status).toBe(200)
@@ -203,6 +229,37 @@ describe('web server API handler', () => {
     expect(backupManifestFile.latestSnapshot.revision).toBe(snapshot.revision)
     expect(snapshotFile.kind).toBe('ai-gist-cloud-sync-snapshot')
     expect(snapshotFile.snapshot.data.prompts[0].imageBlobs).toEqual([WEB_IMAGE])
+
+    const deletedSnapshot = await postApi(apiBaseUrl, '/api/cloud/webdav/delete-sync-snapshot', {
+      config,
+      snapshot: snapshot.revision
+    })
+    const deletedSnapshotAgain = await postApi(apiBaseUrl, '/api/cloud/webdav/delete-sync-snapshot', {
+      config,
+      snapshot: snapshot.revision
+    })
+    const snapshotsAfterDelete = await postApi(apiBaseUrl, '/api/cloud/webdav/list-sync-snapshots', { config })
+    expect(deletedSnapshot).toMatchObject({ status: 200, payload: { success: true } })
+    expect(deletedSnapshotAgain).toMatchObject({ status: 200, payload: { success: true } })
+    expect(snapshotsAfterDelete.payload.data).toEqual([])
+
+    const rejectedDelete = await postApi(apiBaseUrl, '/api/cloud/webdav/delete-backup', {
+      config,
+      cloudPath: '/outside/backup-escape.json'
+    })
+    expect(rejectedDelete.status).toBe(500)
+    expect(rejectedDelete.payload.error).toContain('命名空间')
+
+    const deletedBackup = await postApi(apiBaseUrl, '/api/cloud/webdav/delete-backup', {
+      config,
+      cloudPath: writtenBackup.payload.data.cloudPath
+    })
+    const deletedBackupAgain = await postApi(apiBaseUrl, '/api/cloud/webdav/delete-backup', {
+      config,
+      cloudPath: writtenBackup.payload.data.cloudPath
+    })
+    expect(deletedBackup).toMatchObject({ status: 200, payload: { success: true } })
+    expect(deletedBackupAgain).toMatchObject({ status: 200, payload: { success: true } })
   })
 
   it('uses the newer backup manifest in the WebDAV proxy before accepting writes', async () => {

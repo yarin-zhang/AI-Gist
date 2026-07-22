@@ -392,7 +392,12 @@ describe('MobileCloudBackupService', () => {
   describe('createCloudBackup (WebDAV)', () => {
     it('成功上传备份文件', async () => {
       await saveConfig(service)
-      mockCapacitorHttp.request.mockResolvedValue({ status: 201, data: '' })
+      let uploaded = ''
+      mockCapacitorHttp.request.mockImplementation(async (request: any) => {
+        if (request.method === 'PUT') uploaded = request.data
+        if (request.method === 'GET') return { status: 200, data: JSON.parse(uploaded), headers: {} }
+        return { status: 201, data: '', headers: {} }
+      })
 
       const result = await service.createCloudBackup('cfg-1', mockExportData, '测试备份')
 
@@ -675,6 +680,10 @@ describe('MobileCloudBackupService', () => {
       expect(loadedSnapshot.data.prompts?.[0].imageBlobs).toEqual([imageDataUrl])
       expect(loadedSnapshot.data.promptHistories?.[0].imageBlobs).toEqual([imageDataUrl])
       expect(loadedSnapshot.dataChecksum).toBe(createCloudSyncDataChecksum(loadedSnapshot.data))
+
+      expect((await service.deleteCloudSyncSnapshot('cfg-icloud', 'icloud-snapshot-rev')).success).toBe(true)
+      expect(files.has(snapshotPath)).toBe(false)
+      expect((await service.deleteCloudSyncSnapshot('cfg-icloud', 'icloud-snapshot-rev')).success).toBe(true)
     })
 
     it('iCloud manifest expectedRevision 不匹配时拒绝覆盖已有远端版本', async () => {
@@ -860,9 +869,12 @@ describe('MobileCloudBackupService', () => {
     it('完整的备份-恢复流程', async () => {
       await saveConfig(service)
 
-      mockCapacitorHttp.request
-        .mockResolvedValueOnce({ status: 201, data: '' }) // MKCOL
-        .mockResolvedValueOnce({ status: 201, data: '' }) // PUT
+      let uploaded = ''
+      mockCapacitorHttp.request.mockImplementation(async (request: any) => {
+        if (request.method === 'PUT') uploaded = request.data
+        if (request.method === 'GET') return { status: 200, data: JSON.parse(uploaded), headers: {} }
+        return { status: 201, data: '', headers: {} }
+      })
       const backupResult = await service.createCloudBackup('cfg-1', mockExportData, '移动端备份')
       expect(backupResult.success).toBe(true)
 
@@ -871,6 +883,7 @@ describe('MobileCloudBackupService', () => {
       const xml = makePropfindXml([{ name: `backup-${backupId}.json`, path: `/backup/AI-Gist-Backup/backup-${backupId}.json` }])
 
       // 恢复
+      mockCapacitorHttp.request.mockReset()
       mockCapacitorHttp.request
         .mockResolvedValueOnce({ status: 207, data: xml })
         .mockResolvedValueOnce({ status: 200, data: mobileBackup })
@@ -904,6 +917,46 @@ describe('MobileCloudBackupService', () => {
 
       const deleteCall = mockCapacitorHttp.request.mock.calls.find((call: any[]) => call[0].method === 'DELETE')![0]
       expect(deleteCall.method).toBe('DELETE')
+    })
+
+    it('使用已列出的远端引用直接删除，不再重复 PROPFIND', async () => {
+      await saveConfig(service)
+      mockCapacitorHttp.request.mockResolvedValue({ status: 204, data: '', headers: {} })
+
+      const result = await service.deleteCloudBackup('cfg-1', {
+        id: 'direct-001',
+        name: 'backup-direct-001',
+        cloudPath: '/AI-Gist-Backup/backup-direct-001.json'
+      })
+
+      expect(result.success).toBe(true)
+      expect(mockCapacitorHttp.request).toHaveBeenCalledTimes(1)
+      expect(mockCapacitorHttp.request.mock.calls[0][0]).toMatchObject({ method: 'DELETE' })
+    })
+
+    it('拒绝删除统一备份目录之外的远端引用', async () => {
+      await saveConfig(service)
+
+      const result = await service.deleteCloudBackup('cfg-1', {
+        id: 'escape',
+        name: 'backup-escape',
+        cloudPath: '/other/backup-escape.json'
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('命名空间')
+      expect(mockCapacitorHttp.request).not.toHaveBeenCalled()
+    })
+
+    it('按 revision 直接删除同步快照且 404 视为幂等成功', async () => {
+      await saveConfig(service)
+      mockCapacitorHttp.request.mockResolvedValue({ status: 404, data: '', headers: {} })
+
+      const result = await service.deleteCloudSyncSnapshot('cfg-1', 'revision/mobile')
+
+      expect(result.success).toBe(true)
+      expect(mockCapacitorHttp.request.mock.calls[0][0]).toMatchObject({ method: 'DELETE' })
+      expect(mockCapacitorHttp.request.mock.calls[0][0].url).toContain('revision~2Fmobile.json')
     })
   })
 
@@ -1043,9 +1096,14 @@ describe('MobileCloudBackupService — Android 平台', () => {
 
   it('创建备份时用原生 MKCOL 建目录，并通过 PUT 写入统一目录', async () => {
     await saveConfig(service)
+    let uploaded = ''
     mockWebDavRequest
       .mockResolvedValueOnce({ status: 201, body: '', headers: {} })
-      .mockResolvedValueOnce({ status: 201, body: '', headers: {} })
+      .mockImplementationOnce(async (request: any) => {
+        uploaded = request.body
+        return { status: 201, body: '', headers: {} }
+      })
+      .mockImplementationOnce(async () => ({ status: 200, body: uploaded, headers: {} }))
 
     const result = await service.createCloudBackup('cfg-1', mockExportData, 'Android 测试备份')
 
