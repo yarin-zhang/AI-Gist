@@ -168,6 +168,12 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       itemIconColorActive: content.primary,
       itemIconColorActiveHover: content.primary
     },
+    Tooltip: {
+      color: surface.primary,
+      textColor: content.primary,
+      borderRadius: tokens.component.panelRadius,
+      boxShadow: tokens.elevation.popover
+    },
     Modal: {
       color: surface.primary,
       textColor: content.primary,
