@@ -323,11 +323,11 @@
     "addSuccess": "儲存配置新增成功",
     "androidNotSupported": "Android 平台暫不支援 iCloud Drive，請使用 WebDAV",
     "autoSync": "自動同步",
-    "backupDescription": "查看、還原或手動刪除舊版本留下的雲端備份檔案",
-    "backupDirectoryCreated": "此位置沒有舊版雲端備份目錄。",
-    "backupManagement": "舊版雲端備份",
-    "cloudBackup": "舊版雲端備份",
-    "cloudBackupList": "舊版雲端備份列表",
+    "backupDescription": "手動建立、檢視、還原或刪除此儲存位置中的雲端備份；自動備份不會上傳至雲端",
+    "backupDirectoryCreated": "此位置尚未建立雲端備份目錄，請手動建立雲端備份。",
+    "backupManagement": "雲端備份",
+    "cloudBackup": "雲端備份",
+    "cloudBackupList": "雲端備份列表",
     "configName": "配置名稱",
     "configNamePlaceholder": "請輸入配置名稱",
     "configuredStorage": "已配置的存儲",
@@ -353,7 +353,7 @@
     "loadBackupsFailed": "載入備份清單失敗",
     "loadConfigsFailed": "載入儲存配置失敗",
     "mobileBackup": "行動端雲端備份",
-    "noCloudBackups": "暫無雲端備份，請先創建備份",
+    "noCloudBackups": "暫無雲端備份，可視需要手動建立",
     "noStorageConfig": "暫無儲存配置，請先新增儲存配置",
     "noStorageSelected": "未選擇儲存配置",
     "password": "密碼",
@@ -552,8 +552,8 @@
     "automaticBackupRetentionApplied": "保留策略已生效，清理 {count} 個舊版本",
     "automaticBackupRetentionDeferred": "已清理 {count} 個舊版本；{deferred} 個剛寫入的版本將在安全視窗後重試",
     "automaticBackupRetentionWarning": "策略已儲存，但部分舊版本清理失敗：{error}",
-    "cloudBackup": "舊版雲端備份",
-    "cloudLocationDescription": "僅用於查看、還原或手動刪除舊版本留下的雲端備份；新備份不會寫入這裡。",
+    "cloudBackup": "雲端備份",
+    "cloudLocationDescription": "只有在你點擊建立時才會上傳完整備份；自動備份一律保存在本機，不會自動上傳或輪替雲端備份。",
     "configureCloudStorage": "前往資料同步設定",
     "confirmDeleteCloudBackup": "確定要刪除此雲端備份嗎？",
     "confirmRestore": "確定還原",
@@ -572,8 +572,8 @@
     "manualCloudBackupDescription": "手動雲端備份 - {time}",
     "minutes": "分鐘",
     "nextAutomaticBackup": "下次執行：{time}",
-    "noCloudBackups": "此位置沒有舊版雲端備份",
-    "noCloudStorageDescription": "尚未設定雲端儲存；已有舊版雲端備份可在對應儲存位置中查看。",
+    "noCloudBackups": "此位置暫無雲端備份，可視需要手動建立",
+    "noCloudStorageDescription": "尚未設定雲端儲存；設定後可視需要手動建立雲端備份，自動備份仍只保存在本機。",
     "none": "暫無",
     "refreshBackupList": "重新整理列表",
     "restore": "還原",
@@ -1178,7 +1178,7 @@
         "title": "資料同步"
       },
       "dataManagement": {
-        "description": "建立和管理本機復原歷史，並相容查看舊版雲端備份",
+        "description": "建立和管理本機復原歷史，並視需要手動建立雲端備份",
         "title": "資料備份"
       },
       "language": {
@@ -1208,7 +1208,7 @@
         "title": "資料同步"
       },
       "data-management": {
-        "description": "建立、還原和管理本機備份，並相容舊版雲端備份",
+        "description": "建立、還原和管理本機備份，也可視需要手動建立雲端備份",
         "title": "資料備份"
       },
       "laboratory": {

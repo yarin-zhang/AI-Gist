@@ -323,11 +323,11 @@
     "addSuccess": "存储配置添加成功",
     "androidNotSupported": "Android 平台暂不支持 iCloud Drive，请使用 WebDAV",
     "autoSync": "自动同步",
-    "backupDescription": "查看、恢复或手动删除旧版本留下的云端备份文件",
-    "backupDirectoryCreated": "此位置没有旧版云端备份目录。",
-    "backupManagement": "旧版云端备份",
-    "cloudBackup": "旧版云端备份",
-    "cloudBackupList": "旧版云端备份列表",
+    "backupDescription": "手动创建、查看、恢复或删除此存储位置中的云端备份；自动备份不会上传到云端",
+    "backupDirectoryCreated": "此位置还没有云端备份目录，请手动创建云端备份。",
+    "backupManagement": "云端备份",
+    "cloudBackup": "云端备份",
+    "cloudBackupList": "云端备份列表",
     "configName": "配置名称",
     "configNamePlaceholder": "请输入配置名称",
     "configuredStorage": "已配置的存储",
@@ -353,7 +353,7 @@
     "loadBackupsFailed": "加载备份列表失败",
     "loadConfigsFailed": "加载存储配置失败",
     "mobileBackup": "移动端云端备份",
-    "noCloudBackups": "暂无云端备份，请先创建备份",
+    "noCloudBackups": "暂无云端备份，可按需手动创建",
     "noStorageConfig": "暂无存储配置，请先添加存储配置",
     "noStorageSelected": "未选择存储配置",
     "password": "密码",
@@ -552,8 +552,8 @@
     "automaticBackupRetentionApplied": "保留策略已生效，清理 {count} 个旧版本",
     "automaticBackupRetentionDeferred": "已清理 {count} 个旧版本；{deferred} 个刚写入的版本将在安全窗口后重试",
     "automaticBackupRetentionWarning": "策略已保存，但部分旧版本清理失败：{error}",
-    "cloudBackup": "旧版云端备份",
-    "cloudLocationDescription": "仅用于查看、恢复或手动删除旧版本留下的云端备份；新备份不会写入这里。",
+    "cloudBackup": "云端备份",
+    "cloudLocationDescription": "仅在你点击创建时上传完整备份；自动备份始终保存在本机，不会自动上传或轮换云端备份。",
     "configureCloudStorage": "前往数据同步配置",
     "confirmDeleteCloudBackup": "确定要删除这个云端备份吗？",
     "confirmRestore": "确定恢复",
@@ -572,8 +572,8 @@
     "manualCloudBackupDescription": "手动云端备份 - {time}",
     "minutes": "分钟",
     "nextAutomaticBackup": "下次执行：{time}",
-    "noCloudBackups": "此位置没有旧版云端备份",
-    "noCloudStorageDescription": "尚未配置云端存储；已有旧版云端备份可在对应存储位置中查看。",
+    "noCloudBackups": "此位置暂无云端备份，可按需手动创建",
+    "noCloudStorageDescription": "尚未配置云端存储；配置后可按需手动创建云端备份，自动备份仍只保存在本机。",
     "none": "暂无",
     "refreshBackupList": "刷新列表",
     "restore": "恢复",
@@ -1187,7 +1187,7 @@
       },
       "dataManagement": {
         "title": "数据备份",
-        "description": "创建和管理本机恢复历史，并兼容查看旧版云端备份"
+        "description": "创建和管理本机恢复历史，并按需手动创建云端备份"
       }
     },
     "sectionDescriptions": {
@@ -1208,7 +1208,7 @@
         "title": "数据同步"
       },
       "data-management": {
-        "description": "创建、恢复和管理本机备份，并兼容旧版云端备份",
+        "description": "创建、恢复和管理本机备份，也可按需手动创建云端备份",
         "title": "数据备份"
       },
       "laboratory": {

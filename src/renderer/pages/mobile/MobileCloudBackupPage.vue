@@ -213,7 +213,11 @@
         <ion-content>
           <!-- 同步操作 -->
           <div class="action-buttons">
-            <ion-button expand="block" @click="syncCloudData()" :disabled="loading.syncNow">
+            <ion-button expand="block" @click="createBackup" :disabled="loading.createBackup">
+              <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
+              {{ t('cloudBackup.createCloudBackup') }}
+            </ion-button>
+            <ion-button expand="block" fill="outline" @click="syncCloudData()" :disabled="loading.syncNow">
               <ion-icon :icon="syncOutline" slot="start"></ion-icon>
               {{ t('cloudBackup.syncNow') }}
             </ion-button>
@@ -294,6 +298,7 @@ import {
   cloudOutline,
   cloudOfflineOutline,
   addOutline,
+  cloudUploadOutline,
   downloadOutline,
   trashOutline,
   documentOutline,
@@ -348,6 +353,7 @@ const configForm = ref({
 })
 
 const loading = ref({
+  createBackup: false,
   restoreBackup: false,
   restoreDecision: false,
   syncNow: false,
@@ -593,6 +599,44 @@ const testConfigConnection = async () => {
 const closeConfigModal = () => {
   showAddConfigModal.value = false
   resetConfigForm()
+}
+
+// 仅在用户明确操作时创建云端备份；自动备份始终由本地备份服务处理。
+const createBackup = async () => {
+  if (!selectedConfig.value || loading.value.createBackup) return
+
+  const loadingEl = await loadingController.create({
+    message: t('cloudBackup.creatingBackup')
+  })
+
+  loading.value.createBackup = true
+
+  try {
+    await loadingEl.present()
+
+    const timestamp = new Date().toLocaleString()
+    const result = await CloudBackupAPI.createCloudBackup(
+      selectedConfig.value.id,
+      {
+        description: `${t('cloudBackup.mobileBackup')} - ${timestamp}`,
+        backupType: 'manual',
+        trigger: 'manual'
+      }
+    )
+
+    if (result.success) {
+      await showToast(t('cloudBackup.createSuccess'))
+      await loadBackupList(selectedConfig.value.id)
+    } else {
+      await showToast(getFriendlyBackupError(result.error), 'danger')
+    }
+  } catch (error) {
+    console.error('创建备份失败:', error)
+    await showToast(getFriendlyBackupError(error instanceof Error ? error.message : String(error)), 'danger')
+  } finally {
+    await loadingEl.dismiss()
+    loading.value.createBackup = false
+  }
 }
 
 // 立即同步
@@ -887,6 +931,27 @@ const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// 将技术错误转换为用户友好的备份错误提示
+const getFriendlyBackupError = (error?: string): string => {
+  if (!error) return t('cloudBackup.createFailed')
+  if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
+    return '存储服务认证失败，请检查用户名和密码是否正确'
+  }
+  if (error.includes('404') || error.includes('Not Found')) {
+    return '备份目录不存在，请确认 WebDAV 服务器上的路径配置正确'
+  }
+  if (error.includes('ECONNREFUSED') || error.includes('Network') || error.includes('network') || error.includes('fetch')) {
+    return '无法连接到存储服务器，请检查网络连接和服务器地址'
+  }
+  if (error.includes('timeout') || error.includes('Timeout')) {
+    return '连接超时，请检查网络状态或稍后重试'
+  }
+  if (error.includes('数据库') || error.includes('database')) {
+    return '读取本地数据失败，请尝试重启应用后再备份'
+  }
+  return `${t('cloudBackup.createFailed')}：${error}`
 }
 
 // 将技术错误转换为用户友好的恢复错误提示

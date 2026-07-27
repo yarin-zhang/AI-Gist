@@ -323,11 +323,11 @@
     "addSuccess": "ストレージ構成が正常に追加されました",
     "androidNotSupported": "Android プラットフォームは現在 iCloud Drive をサポートしていません。WebDAV を使用してください。",
     "autoSync": "自動同期",
-    "backupDescription": "旧バージョンが残したクラウドバックアップを表示、復元、または手動削除します",
-    "backupDirectoryCreated": "この保存先には旧クラウドバックアップ用フォルダーがありません。",
-    "backupManagement": "旧クラウドバックアップ",
-    "cloudBackup": "旧クラウドバックアップ",
-    "cloudBackupList": "旧クラウドバックアップ一覧",
+    "backupDescription": "この保存先のクラウドバックアップを手動で作成、表示、復元、削除できます。自動バックアップはクラウドにアップロードされません。",
+    "backupDirectoryCreated": "この保存先にはクラウドバックアップ用フォルダーがまだありません。手動でクラウドバックアップを作成してください。",
+    "backupManagement": "クラウドバックアップ",
+    "cloudBackup": "クラウドバックアップ",
+    "cloudBackupList": "クラウドバックアップ一覧",
     "configName": "構成名",
     "configNamePlaceholder": "構成名を入力してください",
     "configuredStorage": "設定済みストレージ",
@@ -353,7 +353,7 @@
     "loadBackupsFailed": "バックアップリストのロードに失敗しました",
     "loadConfigsFailed": "ストレージ構成のロードに失敗しました",
     "mobileBackup": "モバイルクラウドバックアップ",
-    "noCloudBackups": "クラウドバックアップがありません。先にバックアップを作成してください",
+    "noCloudBackups": "クラウドバックアップはまだありません。必要なときに手動で作成できます。",
     "noStorageConfig": "ストレージ構成はまだありません。最初にストレージ構成を追加してください。",
     "noStorageSelected": "ストレージ構成が選択されていません",
     "password": "パスワード",
@@ -552,8 +552,8 @@
     "automaticBackupRetentionApplied": "保持ポリシーを適用し、古いバージョンを {count} 件削除しました",
     "automaticBackupRetentionDeferred": "古いバージョンを {count} 件削除しました。書き込まれたばかりの {deferred} 件は安全待機時間後に再試行します",
     "automaticBackupRetentionWarning": "ポリシーは保存されましたが、一部の古いバージョンを削除できませんでした：{error}",
-    "cloudBackup": "旧クラウドバックアップ",
-    "cloudLocationDescription": "旧バージョンが残したクラウドバックアップの表示、復元、手動削除専用です。新しいバックアップはここには保存されません。",
+    "cloudBackup": "クラウドバックアップ",
+    "cloudLocationDescription": "［クラウドバックアップを作成］をクリックした場合にのみ完全バックアップをアップロードします。自動バックアップは常にこの端末に保存され、クラウドへの自動アップロードやローテーションは行いません。",
     "configureCloudStorage": "データ同期を設定",
     "confirmDeleteCloudBackup": "このクラウドバックアップを削除しますか？",
     "confirmRestore": "復元する",
@@ -572,8 +572,8 @@
     "manualCloudBackupDescription": "手動クラウドバックアップ - {time}",
     "minutes": "分",
     "nextAutomaticBackup": "次回実行：{time}",
-    "noCloudBackups": "この保存先には旧クラウドバックアップがありません",
-    "noCloudStorageDescription": "クラウドストレージが未設定です。既存の旧クラウドバックアップは対応する保存先から確認できます。",
+    "noCloudBackups": "この保存先にはクラウドバックアップがありません。必要なときに手動で作成できます。",
+    "noCloudStorageDescription": "クラウドストレージが未設定です。設定後は必要に応じてクラウドバックアップを手動作成できますが、自動バックアップは引き続きこの端末内にのみ保存されます。",
     "none": "なし",
     "refreshBackupList": "一覧を更新",
     "restore": "復元",
@@ -1178,7 +1178,7 @@
         "title": "データ同期"
       },
       "dataManagement": {
-        "description": "ローカル復元履歴を作成・管理し、旧クラウドバックアップも表示します",
+        "description": "ローカル復元履歴を作成・管理し、必要に応じてクラウドバックアップを手動作成します",
         "title": "データバックアップ"
       },
       "language": {
@@ -1208,7 +1208,7 @@
         "title": "データ同期"
       },
       "data-management": {
-        "description": "ローカルバックアップを作成、復元、管理し、旧クラウドバックアップにも対応します",
+        "description": "ローカルバックアップを作成、復元、管理し、必要に応じてクラウドバックアップを手動作成します",
         "title": "データバックアップ"
       },
       "laboratory": {
