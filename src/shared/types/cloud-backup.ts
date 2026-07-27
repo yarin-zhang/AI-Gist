@@ -43,6 +43,7 @@ export interface CloudBackupInfo {
   name: string;
   description?: string;
   createdAt: string;
+  modifiedAt?: string;
   size: number;
   localPath?: string; // 本地备份文件路径
   cloudPath?: string; // 云端备份文件路径
@@ -54,6 +55,14 @@ export interface CloudBackupInfo {
   deviceId?: string;
   dataChecksum?: string;
 }
+
+export interface CloudBackupDeleteReference {
+  id: string;
+  cloudPath?: string;
+  name?: string;
+}
+
+export type CloudBackupDeleteTarget = string | CloudBackupDeleteReference;
 
 export interface CloudStorageProvider {
   // 测试连接

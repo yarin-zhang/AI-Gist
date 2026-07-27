@@ -219,6 +219,44 @@ describe('WebCloudBackupService', () => {
     expect(replaceSpy).not.toHaveBeenCalled()
   })
 
+  it('deletes listed backup references directly without re-listing and rejects out-of-namespace paths', async () => {
+    saveWebDAVConfig()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(apiResponse({ ok: true }))
+    const service = WebCloudBackupService.getInstance()
+
+    const deleted = await service.deleteCloudBackup(webdavConfig.id, {
+      id: 'backup-direct',
+      name: 'backup-direct',
+      cloudPath: '/AI-Gist-Backup/backup-backup-direct.json'
+    })
+    const rejected = await service.deleteCloudBackup(webdavConfig.id, {
+      id: 'escape',
+      name: 'escape',
+      cloudPath: '/other/backup-escape.json'
+    })
+
+    expect(deleted.success).toBe(true)
+    expect(rejected.success).toBe(false)
+    expect(rejected.error).toContain('命名空间')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('/api/cloud/webdav/delete-backup')
+    expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({
+      cloudPath: '/AI-Gist-Backup/backup-backup-direct.json'
+    })
+  })
+
+  it('exposes direct sync snapshot deletion to the Web backend', async () => {
+    saveWebDAVConfig()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(apiResponse({ ok: true }))
+    const service = WebCloudBackupService.getInstance()
+
+    const result = await service.deleteCloudSyncSnapshot(webdavConfig.id, 'revision/direct')
+
+    expect(result.success).toBe(true)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('/api/cloud/webdav/delete-sync-snapshot')
+    expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({ snapshot: 'revision/direct' })
+  })
+
   it('exposes a binary-safe sync-v2 repository adapter with conditional writes', async () => {
     saveWebDAVConfig()
     let stored: { dataBase64: string; etag: string } | null = null

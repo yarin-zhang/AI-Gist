@@ -228,6 +228,150 @@ describe('CloudSyncService', () => {
     expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
   })
 
+  it('twelve unchanged polling intervals create no additional snapshot, manifest, or v2 publications', async () => {
+    let cloudManifest = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
+    const snapshots = new Map<string, any>()
+    const cloudClient = {
+      getCloudSyncManifest: vi.fn(async () => cloudManifest),
+      saveCloudSyncSnapshot: vi.fn(async (_storageId: string, snapshot: any) => {
+        snapshots.set(snapshot.revision, snapshot)
+        return { success: true }
+      }),
+      readCloudSyncSnapshot: vi.fn(async (_storageId: string, target: any) => {
+        const revision = typeof target === 'string' ? target : target.revision
+        const snapshot = snapshots.get(revision)
+        if (!snapshot) throw new Error('snapshot not found')
+        return snapshot
+      }),
+      listCloudSyncSnapshots: vi.fn(async () => [...snapshots.values()].map(snapshot => ({
+        revision: snapshot.revision,
+        path: `/AI-Gist-Backup/sync/snapshots/${snapshot.revision}.json`,
+        modifiedAt: snapshot.createdAt
+      }))),
+      deleteCloudSyncSnapshot: vi.fn(async (_storageId: string, target: any) => {
+        snapshots.delete(typeof target === 'string' ? target : target.revision)
+        return { success: true }
+      }),
+      saveCloudSyncManifest: vi.fn(async (_storageId: string, manifest: any) => {
+        cloudManifest = manifest
+        return { success: true }
+      })
+    }
+    const v2Coordinator = {
+      mirrorSuccessfulV1Sync: vi.fn().mockResolvedValue({ status: 'already-current' }),
+      getRolloutState: vi.fn(),
+      setRolloutMode: vi.fn()
+    }
+    const database = {
+      exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, message: 'ok', data: baseData }),
+      replaceAllData: vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+    }
+    const service = new CloudSyncService({
+      cloudClient,
+      database,
+      storage: new MemoryStorage(),
+      createDeviceId: () => 'device-a',
+      v2Coordinator: v2Coordinator as any
+    })
+
+    const first = await service.syncNow('cfg-1', { reason: 'interval' })
+    const unchangedResults = []
+    for (let index = 0; index < 12; index += 1) {
+      unchangedResults.push(await service.syncNow('cfg-1', { reason: 'interval' }))
+    }
+
+    expect(first).toMatchObject({ success: true, action: 'uploaded' })
+    expect(unchangedResults.every(result => result.success && result.action === 'noop')).toBe(true)
+    expect(cloudClient.saveCloudSyncSnapshot).toHaveBeenCalledTimes(1)
+    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
+    expect(cloudClient.listCloudSyncSnapshots).toHaveBeenCalledTimes(1)
+    expect(cloudClient.deleteCloudSyncSnapshot).not.toHaveBeenCalled()
+    expect(v2Coordinator.mirrorSuccessfulV1Sync).toHaveBeenCalledTimes(13)
+  })
+
+  it('a startup no-op immediately cleans accumulated sync snapshots while protecting the manifest head', async () => {
+    const currentSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'snapshot-0')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-06-01T00:00:00.000Z'),
+      latestSnapshot: currentSnapshot,
+      baseSnapshot: currentSnapshot
+    }
+    let snapshots = Array.from({ length: 25 }, (_, index) => ({
+      revision: `snapshot-${index}`,
+      path: `/AI-Gist-Backup/sync/snapshots/snapshot-${index}.json`,
+      modifiedAt: new Date(Date.UTC(2026, 5, 1, 0, 0, 25 - index)).toISOString()
+    }))
+    const cloudClient = {
+      getCloudSyncManifest: vi.fn().mockResolvedValue(manifest),
+      saveCloudSyncManifest: vi.fn().mockResolvedValue({ success: true }),
+      listCloudSyncSnapshots: vi.fn(async () => snapshots),
+      deleteCloudSyncSnapshot: vi.fn(async (_storageId: string, target: any) => {
+        const revision = typeof target === 'string' ? target : target.revision
+        snapshots = snapshots.filter(snapshot => snapshot.revision !== revision)
+        return { success: true }
+      })
+    }
+    const settings = {
+      getNumberValue: vi.fn(async (key: string, fallback: number) =>
+        key === 'cloud.backup.auto.retention' ? 5 : fallback
+      ),
+      setNumberValue: vi.fn()
+    }
+    const { service } = createService(baseData, manifest, { cloudClient, settings })
+
+    const result = await service.syncNow('cfg-1', { reason: 'startup' })
+
+    expect(result).toMatchObject({ success: true, action: 'noop', uploadedRemote: false })
+    expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+    expect(cloudClient.deleteCloudSyncSnapshot).toHaveBeenCalledTimes(20)
+    expect(snapshots).toHaveLength(5)
+    expect(snapshots.some(snapshot => snapshot.revision === currentSnapshot.revision)).toBe(true)
+  })
+
+  it('snapshot retention deletion failure stays a warning and retries without re-uploading data', async () => {
+    const currentSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'snapshot-current')
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-06-01T00:00:00.000Z'),
+      latestSnapshot: currentSnapshot,
+      baseSnapshot: currentSnapshot
+    }
+    const snapshots = [
+      {
+        revision: currentSnapshot.revision,
+        path: '/AI-Gist-Backup/sync/snapshots/snapshot-current.json',
+        modifiedAt: '2026-06-01T00:00:02.000Z'
+      },
+      {
+        revision: 'snapshot-stale',
+        path: '/AI-Gist-Backup/sync/snapshots/snapshot-stale.json',
+        modifiedAt: '2026-06-01T00:00:01.000Z'
+      }
+    ]
+    const cloudClient = {
+      getCloudSyncManifest: vi.fn().mockResolvedValue(manifest),
+      saveCloudSyncManifest: vi.fn().mockResolvedValue({ success: true }),
+      listCloudSyncSnapshots: vi.fn().mockResolvedValue(snapshots),
+      deleteCloudSyncSnapshot: vi.fn().mockResolvedValue({ success: false, error: 'delete denied' })
+    }
+    const settings = {
+      getNumberValue: vi.fn(async (key: string, fallback: number) =>
+        key === 'cloud.backup.auto.retention' ? 1 : fallback
+      ),
+      setNumberValue: vi.fn()
+    }
+    const { service } = createService(baseData, manifest, { cloudClient, settings })
+
+    const first = await service.syncNow('cfg-1', { reason: 'startup' })
+    const second = await service.syncNow('cfg-1', { reason: 'interval' })
+
+    expect(first).toMatchObject({ success: true, action: 'noop' })
+    expect(second).toMatchObject({ success: true, action: 'noop' })
+    expect(first.warnings?.join(' ')).toContain('旧恢复版本清理失败')
+    expect(cloudClient.listCloudSyncSnapshots).toHaveBeenCalledTimes(2)
+    expect(cloudClient.deleteCloudSyncSnapshot).toHaveBeenCalledTimes(2)
+    expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+  })
+
   it('does not upload when a new device has only regenerated local numeric ids', async () => {
     const remoteData = {
       categories: [

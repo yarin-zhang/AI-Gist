@@ -9,11 +9,16 @@ import {
 import { getCloudSyncV2ArtifactPath } from '@shared/cloud-backup-paths';
 import { createCloudSyncV2MigrationArtifacts } from '@shared/cloud-sync-v2-migration';
 import {
+  cleanupArtifactsUsingRetention,
   publishMigrationArtifacts,
   repairManifestBackup,
   readManifest,
   type CloudSyncV2ObjectStorageAdapter
 } from '@shared/cloud-sync-v2-repository';
+import {
+  DEFAULT_AUTO_BACKUP_RETENTION,
+  normalizeAutomaticBackupRetention
+} from './cloud-retention-settings';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ROLLOUT_METADATA_PREFIX = 'cloud-sync-v2-rollout:';
@@ -66,6 +71,7 @@ export interface CloudSyncV2CoordinatorDeps {
   storageFactory: (storageId: string) => CloudSyncV2ObjectStorageAdapter | null;
   now?: () => Date;
   allowExperimentalShadow?: boolean;
+  getRetention?: () => number | Promise<number>;
 }
 
 export function evaluateCloudSyncV2DeviceFreshness(input: {
@@ -101,12 +107,15 @@ export class CloudSyncV2Coordinator {
   private readonly storageFactory: CloudSyncV2CoordinatorDeps['storageFactory'];
   private readonly now: () => Date;
   private readonly allowExperimentalShadow: boolean;
+  private readonly getRetention: () => number | Promise<number>;
+  private readonly maintainedRetentionByStorage = new Map<string, number>();
 
   constructor(deps: CloudSyncV2CoordinatorDeps) {
     this.database = deps.database;
     this.storageFactory = deps.storageFactory;
     this.now = deps.now || (() => new Date());
     this.allowExperimentalShadow = deps.allowExperimentalShadow !== false;
+    this.getRetention = deps.getRetention || (() => DEFAULT_AUTO_BACKUP_RETENTION);
   }
 
   async getRolloutState(storageId: string): Promise<CloudSyncV2RolloutState> {
@@ -150,37 +159,56 @@ export class CloudSyncV2Coordinator {
     if (!storage) {
       return this.recordFailure(input.storageId, rollout, 'transport_unavailable', '后台完整性验证暂不可用');
     }
+    const configuredRetention = await this.resolveRetention();
 
-    if (rollout.lastSourceRevision === input.revision && rollout.verifiedHead) {
-      if (!rollout.backupRepairRequired) {
-        return { status: 'already-current', headId: rollout.verifiedHead };
-      }
-      try {
-        const repair = await repairManifestBackup(storage);
-        if (repair.repaired) {
-          await this.saveRolloutState(input.storageId, {
-            ...rollout,
-            backupRepairRequired: false,
-            updatedAt: this.now().toISOString()
-          });
-          return { status: 'already-current', headId: rollout.verifiedHead };
-        }
-        return {
-          status: 'already-current',
-          headId: rollout.verifiedHead,
-          warning: '后台完整性验证的备用索引修复仍未完成'
-        };
-      } catch {
-        return {
-          status: 'already-current',
-          headId: rollout.verifiedHead,
-          warning: '后台完整性验证的备用索引修复仍未完成'
-        };
-      }
+    if (
+      rollout.lastSourceRevision === input.revision &&
+      rollout.verifiedHead &&
+      !rollout.backupRepairRequired &&
+      this.maintainedRetentionByStorage.get(input.storageId) === configuredRetention
+    ) {
+      return { status: 'already-current', headId: rollout.verifiedHead };
     }
 
     try {
       const current = await readManifest(storage);
+      if (current?.manifest.head?.revision === input.revision) {
+        const headId = current.manifest.head.id;
+        let backupRepairRequired = !!rollout.backupRepairRequired;
+        let repairWarning: string | undefined;
+        if (backupRepairRequired) {
+          try {
+            const repair = await repairManifestBackup(storage);
+            backupRepairRequired = !repair.repaired;
+            if (!repair.repaired) repairWarning = '后台完整性验证的备用索引修复仍未完成';
+          } catch {
+            repairWarning = '后台完整性验证的备用索引修复仍未完成';
+          }
+        }
+        await this.saveRolloutState(input.storageId, {
+          ...rollout,
+          migrationState: 'verified',
+          verifiedHead: headId,
+          lastSourceRevision: input.revision,
+          lastV2SeenAt: this.now().toISOString(),
+          lastErrorCode: undefined,
+          localEpoch: current.manifest.epoch,
+          baseCommitId: headId,
+          backupRepairRequired,
+          updatedAt: this.now().toISOString()
+        });
+        const cleanupWarning = await this.maintainRetention(
+          input.storageId,
+          storage,
+          current.manifest,
+          configuredRetention
+        );
+        return {
+          status: 'already-current',
+          headId,
+          warning: joinWarnings(repairWarning, cleanupWarning)
+        };
+      }
       if (current) {
         if (!isCloudSyncV2WriterAllowed(current.manifest, CLOUD_SYNC_V2_PROTOCOL_VERSION)) {
           return this.recordFailure(
@@ -271,12 +299,22 @@ export class CloudSyncV2Coordinator {
           status: 'active'
         });
       }
+      const cleanupWarning = await this.maintainRetention(
+        input.storageId,
+        storage,
+        artifacts.manifest,
+        configuredRetention,
+        true
+      );
       return {
         status: 'published',
         headId: artifacts.commit.commitId,
-        warning: publishResult.backupWarning
-          ? '后台完整性验证的备用索引尚未修复，下次同步会自动重试'
-          : undefined
+        warning: joinWarnings(
+          publishResult.backupWarning
+            ? '后台完整性验证的备用索引尚未修复，下次同步会自动重试'
+            : undefined,
+          cleanupWarning
+        )
       };
     } catch (error) {
       const code = typeof error === 'object' && error && 'code' in error
@@ -288,6 +326,36 @@ export class CloudSyncV2Coordinator {
         code,
         `后台完整性验证失败（${code}）；正式同步结果不受影响`
       );
+    }
+  }
+
+  private async maintainRetention(
+    storageId: string,
+    storage: CloudSyncV2ObjectStorageAdapter,
+    manifest: CloudSyncV2Manifest,
+    retention: number,
+    force = false
+  ): Promise<string | undefined> {
+    if (!force && this.maintainedRetentionByStorage.get(storageId) === retention) return undefined;
+    try {
+      await cleanupArtifactsUsingRetention(storage, manifest, {
+        now: this.now(),
+        recentCommitCount: retention
+      });
+      this.maintainedRetentionByStorage.set(storageId, retention);
+      return undefined;
+    } catch (error) {
+      return `后台完整性验证已完成，但旧版本清理失败，将在后续同步重试：${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  }
+
+  private async resolveRetention(): Promise<number> {
+    try {
+      return normalizeAutomaticBackupRetention(await this.getRetention());
+    } catch {
+      return DEFAULT_AUTO_BACKUP_RETENTION;
     }
   }
 
@@ -332,4 +400,9 @@ function normalizeRolloutState(
     return { mode: 'off', updatedAt: now };
   }
   return { ...value, updatedAt: value.updatedAt || now };
+}
+
+function joinWarnings(...warnings: (string | undefined)[]): string | undefined {
+  const values = warnings.filter((warning): warning is string => !!warning);
+  return values.length > 0 ? values.join('；') : undefined;
 }

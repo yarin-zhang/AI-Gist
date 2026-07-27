@@ -8,6 +8,7 @@ import {
 import type { CloudSyncV2MigrationArtifacts } from './cloud-sync-v2-migration';
 import {
   encodeCloudSyncV2Canonical,
+  selectCloudSyncV2Retention,
   validateCloudSyncV2ArtifactBytes,
   validateCloudSyncV2Checkpoint,
   validateCloudSyncV2Commit,
@@ -20,6 +21,7 @@ import {
   type CloudSyncV2DeltaSegment,
   type CloudSyncV2Manifest,
   type CloudSyncV2QuarantineBundle,
+  type CloudSyncV2RetentionOptions,
   type CloudSyncV2RetentionResult
 } from './cloud-sync-protocol-v2';
 
@@ -140,6 +142,10 @@ export interface CloudSyncV2CleanupResult {
   deletedPaths: string[];
   retainedPaths: string[];
   skippedPaths: string[];
+}
+
+export interface CloudSyncV2RetentionCleanupResult extends CloudSyncV2CleanupResult {
+  retention: CloudSyncV2RetentionResult;
 }
 
 export interface CloudSyncV2ManifestBackupRepairResult {
@@ -347,9 +353,10 @@ export async function repairManifestBackup(
  */
 export async function cleanupArtifacts(
   storage: CloudSyncV2ObjectStorageAdapter,
-  retention: CloudSyncV2RetentionResult
+  retention: CloudSyncV2RetentionResult,
+  listedObjects?: CloudSyncV2StoredObjectInfo[]
 ): Promise<CloudSyncV2CleanupResult> {
-  const objects = await storage.list(getCloudSyncV2DirectoryPath());
+  const objects = listedObjects || await storage.list(getCloudSyncV2DirectoryPath());
   const byPath = new Map(objects.map(object => [object.path, object]));
   const keep = new Set<string>();
   const skipped = new Set<string>();
@@ -400,10 +407,69 @@ export async function cleanupArtifacts(
   return { deletedPaths, retainedPaths, skippedPaths: [...skipped].sort() };
 }
 
+/**
+ * Builds a retention inventory from validated remote commits/checkpoints and
+ * then garbage-collects unreachable v2 artifacts from the same directory
+ * listing. Invalid history aborts cleanup conservatively.
+ */
+export async function cleanupArtifactsUsingRetention(
+  storage: CloudSyncV2ObjectStorageAdapter,
+  manifest: CloudSyncV2Manifest,
+  options: CloudSyncV2RetentionOptions = {}
+): Promise<CloudSyncV2RetentionCleanupResult> {
+  const objects = await storage.list(getCloudSyncV2DirectoryPath());
+  const byPath = new Map(objects.map(object => [object.path, object]));
+  const commits: CloudSyncV2Commit[] = [];
+  const checkpoints: CloudSyncV2Checkpoint[] = [];
+
+  for (const object of objects) {
+    const classified = classifyArtifactPath(object.path);
+    if (classified?.directory === 'commits') {
+      const commit = await readListedJsonArtifact(storage, byPath, object.path, 'commit') as CloudSyncV2Commit;
+      assertArtifactStoredAtCanonicalPath(object.path, 'commits', commit.commitId);
+      commits.push(commit);
+    } else if (classified?.directory === 'checkpoints') {
+      const checkpoint = await readListedJsonArtifact(storage, byPath, object.path, 'checkpoint') as CloudSyncV2Checkpoint;
+      assertArtifactStoredAtCanonicalPath(object.path, 'checkpoints', checkpoint.checkpointId);
+      checkpoints.push(checkpoint);
+    }
+  }
+
+  const head = manifest.head;
+  if (head && !commits.some(commit => commit.commitId === head.id)) {
+    throw new CloudSyncV2RepositoryError('artifact_readback_failed', 'Current manifest head is missing; cleanup aborted', {
+      path: getCloudSyncV2ArtifactPath('commits', head.id)
+    });
+  }
+
+  const retention = selectCloudSyncV2Retention({
+    ...options,
+    head: manifest.head
+      ? { commitId: manifest.head.id, revision: manifest.head.revision }
+      : undefined,
+    commits: commits.map(commit => ({
+      commitId: commit.commitId,
+      revision: commit.revision,
+      createdAt: commit.createdAt,
+      parents: commit.parents.map(parent => ({ commitId: parent.id, revision: parent.revision })),
+      checkpointIds: commit.checkpoint ? [commit.checkpoint.id] : []
+    })),
+    checkpoints: checkpoints.map(checkpoint => ({
+      checkpointId: checkpoint.checkpointId,
+      revision: checkpoint.revision,
+      createdAt: checkpoint.createdAt
+    })),
+    deviceAcks: manifest.deviceAcks
+  });
+  const cleanup = await cleanupArtifacts(storage, retention, objects);
+  return { ...cleanup, retention };
+}
+
 export const publishCloudSyncV2MigrationArtifacts = publishMigrationArtifacts;
 export const readCloudSyncV2Manifest = readManifest;
 export const validateCloudSyncV2Artifact = validateArtifact;
 export const cleanupCloudSyncV2Artifacts = cleanupArtifacts;
+export const cleanupCloudSyncV2ArtifactsUsingRetention = cleanupArtifactsUsingRetention;
 
 async function publishImmutableArtifact(
   storage: CloudSyncV2ObjectStorageAdapter,
@@ -628,6 +694,19 @@ function classifyArtifactPath(path: string): { directory: CloudSyncV2ArtifactDir
   const relative = path.slice(root.length);
   const match = relative.match(/^(commits|checkpoints|deltas|blobs|quarantine)\/[^/]+\.(json|bin)$/);
   return match ? { directory: match[1] as CloudSyncV2ArtifactDirectory } : null;
+}
+
+function assertArtifactStoredAtCanonicalPath(
+  path: string,
+  directory: 'commits' | 'checkpoints',
+  artifactId: string
+): void {
+  if (path !== getCloudSyncV2ArtifactPath(directory, artifactId)) {
+    throw new CloudSyncV2RepositoryError('artifact_invalid', 'Artifact path does not match its content-derived ID', {
+      path,
+      details: { artifactId }
+    });
+  }
 }
 
 function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {

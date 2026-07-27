@@ -13,6 +13,7 @@ import type {
   CloudStorageConfig,
   CloudBackupInfo,
   CloudBackupCreateOptions,
+  CloudBackupDeleteTarget,
   CloudBackupResult,
   CloudRestoreResult,
   CloudFileInfo
@@ -588,6 +589,47 @@ export class MobileCloudBackupService {
     }
   }
 
+  async deleteCloudSyncSnapshot(
+    storageId: string,
+    snapshot: CloudSyncRemoteSnapshotInfo | string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const config = await this.getStorageConfigOrThrow(storageId)
+      const revision = typeof snapshot === 'string' ? snapshot : snapshot.revision
+      if (!revision) throw new Error('云同步快照 revision 不能为空')
+
+      if (config.type === 'webdav') {
+        const snapshotPath = getCloudSyncSnapshotPath(revision)
+        const response = await this.requestWebDAV(
+          config as any,
+          this.buildWebDAVUrlFromCloudPath(config as any, snapshotPath),
+          'DELETE'
+        )
+        if (response.status !== 404 && (response.status < 200 || response.status >= 300)) {
+          throw new Error(`删除云同步快照失败（HTTP ${response.status}）`)
+        }
+        return { success: true }
+      }
+
+      if (config.type === 'icloud') {
+        const dirPath = (config as any).path || CLOUD_BACKUP_DIR
+        try {
+          await Filesystem.deleteFile({
+            path: this.getICloudSyncSnapshotPath(dirPath, revision),
+            directory: Directory.Documents
+          })
+        } catch (error) {
+          if (!this.isNotFoundError(error)) throw error
+        }
+        return { success: true }
+      }
+
+      return { success: false, error: '不支持的存储类型' }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
   async readCloudSyncV2Object(
     storageId: string,
     path: string
@@ -858,7 +900,8 @@ export class MobileCloudBackupService {
             backupType: backupData.backupType,
             trigger: backupData.trigger,
             deviceId: backupData.deviceId,
-            dataChecksum: backupData.dataChecksum
+            dataChecksum: backupData.dataChecksum,
+            modifiedAt: file.modifiedAt
           })
         } else {
           this.debugLog('读取备份文件失败，状态码:', fileResponse.status, file.name)
@@ -1189,7 +1232,10 @@ export class MobileCloudBackupService {
               backupType: backupData.backupType,
               trigger: backupData.trigger,
               deviceId: backupData.deviceId,
-              dataChecksum: backupData.dataChecksum
+              dataChecksum: backupData.dataChecksum,
+              ...(Number.isFinite(file.mtime)
+                ? { modifiedAt: new Date(file.mtime).toISOString() }
+                : {})
             })
           } catch (error) {
             this.debugLog('解析 iCloud 备份文件失败:', file.name, error)
@@ -1293,21 +1339,21 @@ export class MobileCloudBackupService {
         directory: Directory.Documents
       })
 
-      return (result.files || [])
-        .map((file: any) => typeof file === 'string' ? file : file.name)
-        .filter((name: unknown): name is string => typeof name === 'string')
-        .map(name => {
-          const revision = getCloudSyncSnapshotRevisionFromFileName(name)
-          if (!revision) {
-            return null
-          }
-
-          return {
-            revision,
-            path: this.getICloudSyncSnapshotPath(dirPath, revision)
-          }
+      const snapshots: CloudSyncRemoteSnapshotInfo[] = []
+      for (const file of result.files || []) {
+        const name = typeof file === 'string' ? file : file.name
+        if (typeof name !== 'string') continue
+        const revision = getCloudSyncSnapshotRevisionFromFileName(name)
+        if (!revision) continue
+        snapshots.push({
+          revision,
+          path: this.getICloudSyncSnapshotPath(dirPath, revision),
+          ...(typeof file === 'object' && Number.isFinite(file.mtime)
+            ? { modifiedAt: new Date(file.mtime).toISOString() }
+            : {})
         })
-        .filter((info): info is CloudSyncRemoteSnapshotInfo => !!info)
+      }
+      return snapshots
     } catch (error) {
       if (this.isNotFoundError(error)) {
         return []
@@ -1625,19 +1671,24 @@ export class MobileCloudBackupService {
 
       this.debugLog('上传响应状态:', response.status)
       if (response.status >= 200 && response.status < 300) {
+        const readback = await this.requestWebDAV(config, fileUrl, 'GET', { responseType: 'json' })
+        if (readback.status !== 200) {
+          throw new Error(`备份写入后的远端读回失败（HTTP ${readback.status}）`)
+        }
+        const verifiedBackup = this.verifyBackupReadback(readback.data, backupData)
         const backupInfo: CloudBackupInfo = {
-          id: backupData.id,
-          name: backupData.name,
-          description: backupData.description,
-          createdAt: backupData.createdAt,
+          id: verifiedBackup.id,
+          name: verifiedBackup.name,
+          description: verifiedBackup.description,
+          createdAt: verifiedBackup.createdAt,
           size: new Blob([jsonString]).size,
           cloudPath,
           storageId: config.id,
-          checksum: backupData.checksum,
-          backupType: backupData.backupType,
-          trigger: backupData.trigger,
-          deviceId: backupData.deviceId,
-          dataChecksum: backupData.dataChecksum
+          checksum: verifiedBackup.checksum,
+          backupType: verifiedBackup.backupType,
+          trigger: verifiedBackup.trigger,
+          deviceId: verifiedBackup.deviceId,
+          dataChecksum: verifiedBackup.dataChecksum
         }
 
         this.debugLog('备份创建成功:', backupInfo)
@@ -1725,20 +1776,26 @@ export class MobileCloudBackupService {
         directory: Directory.Documents,
         encoding: Encoding.UTF8
       })
+      const readback = await Filesystem.readFile({
+        path: `${dirPath}/${fileName}`,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8
+      })
+      const verifiedBackup = this.verifyBackupReadback(readback.data, backupData)
 
       const backupInfo: CloudBackupInfo = {
-        id: backupData.id,
-        name: backupData.name,
-        description: backupData.description,
-        createdAt: backupData.createdAt,
+        id: verifiedBackup.id,
+        name: verifiedBackup.name,
+        description: verifiedBackup.description,
+        createdAt: verifiedBackup.createdAt,
         size: new Blob([jsonString]).size,
         cloudPath: `${dirPath}/${fileName}`,
         storageId: config.id,
-        checksum: backupData.checksum,
-        backupType: backupData.backupType,
-        trigger: backupData.trigger,
-        deviceId: backupData.deviceId,
-        dataChecksum: backupData.dataChecksum
+        checksum: verifiedBackup.checksum,
+        backupType: verifiedBackup.backupType,
+        trigger: verifiedBackup.trigger,
+        deviceId: verifiedBackup.deviceId,
+        dataChecksum: verifiedBackup.dataChecksum
       }
 
       return {
@@ -1904,7 +1961,7 @@ export class MobileCloudBackupService {
   /**
    * 删除云端备份
    */
-  async deleteCloudBackup(storageId: string, backupId: string): Promise<{
+  async deleteCloudBackup(storageId: string, backup: CloudBackupDeleteTarget): Promise<{
     success: boolean
     message?: string
     error?: string
@@ -1918,9 +1975,9 @@ export class MobileCloudBackupService {
       }
 
       if (config.type === 'webdav') {
-        return await this.deleteWebDAVBackup(config as any, backupId)
+        return await this.deleteWebDAVBackup(config as any, backup)
       } else if (config.type === 'icloud') {
-        return await this.deleteICloudBackup(config as any, backupId)
+        return await this.deleteICloudBackup(config as any, backup)
       }
 
       return { success: false, error: '不支持的存储类型' }
@@ -1936,26 +1993,28 @@ export class MobileCloudBackupService {
   /**
    * 删除 WebDAV 备份
    */
-  private async deleteWebDAVBackup(config: any, backupId: string): Promise<{
+  private async deleteWebDAVBackup(config: any, target: CloudBackupDeleteTarget): Promise<{
     success: boolean
     message?: string
     error?: string
   }> {
     try {
-      // 获取备份列表找到对应的备份
-      const backups = await this.listWebDAVBackups(config)
-      const backup = backups.find(b => b.id === backupId)
+      const backup = typeof target === 'string' || !target.cloudPath
+        ? (await this.listWebDAVBackups(config)).find(b => b.id === (typeof target === 'string' ? target : target.id))
+        : target
 
       if (!backup || !backup.cloudPath) {
-        return { success: false, error: '备份不存在' }
+        return { success: true, message: '备份文件已不存在' }
       }
+
+      this.assertMobileBackupDeletePath(config, backup.cloudPath)
 
       // 删除文件
       const fileUrl = this.buildWebDAVUrlFromCloudPath(config, backup.cloudPath)
 
       const response = await this.requestWebDAV(config, fileUrl, 'DELETE')
 
-      if (response.status >= 200 && response.status < 300) {
+      if (response.status === 404 || (response.status >= 200 && response.status < 300)) {
         return {
           success: true,
           message: '云端备份删除成功'
@@ -1964,9 +2023,7 @@ export class MobileCloudBackupService {
 
       const deleteErrMsg = response.status === 401 || response.status === 403
         ? '认证失败，请检查用户名和密码'
-        : response.status === 404
-          ? '备份文件不存在，可能已被删除'
-          : `删除失败（HTTP ${response.status}）`
+        : `删除失败（HTTP ${response.status}）`
       return {
         success: false,
         error: deleteErrMsg
@@ -1980,7 +2037,7 @@ export class MobileCloudBackupService {
   /**
    * 删除 iCloud 备份
    */
-  private async deleteICloudBackup(config: any, backupId: string): Promise<{
+  private async deleteICloudBackup(config: any, target: CloudBackupDeleteTarget): Promise<{
     success: boolean
     message?: string
     error?: string
@@ -1994,19 +2051,25 @@ export class MobileCloudBackupService {
         }
       }
 
-      // 获取备份列表找到对应的备份
-      const backups = await this.listICloudBackups(config)
-      const backup = backups.find(b => b.id === backupId)
+      const backup = typeof target === 'string' || !target.cloudPath
+        ? (await this.listICloudBackups(config)).find(b => b.id === (typeof target === 'string' ? target : target.id))
+        : target
 
       if (!backup || !backup.cloudPath) {
-        return { success: false, error: '备份不存在' }
+        return { success: true, message: '备份文件已不存在' }
       }
 
+      this.assertMobileBackupDeletePath(config, backup.cloudPath)
+
       // 删除文件
-      await Filesystem.deleteFile({
-        path: backup.cloudPath,
-        directory: Directory.Documents
-      })
+      try {
+        await Filesystem.deleteFile({
+          path: backup.cloudPath,
+          directory: Directory.Documents
+        })
+      } catch (error) {
+        if (!this.isNotFoundError(error)) throw error
+      }
 
       return {
         success: true,
@@ -2030,6 +2093,25 @@ export class MobileCloudBackupService {
     return this.isWebDAVUrlAtBackupDir(baseUrl)
       ? baseUrl
       : this.joinUrlPath(baseUrl, CLOUD_BACKUP_DIR)
+  }
+
+  private assertMobileBackupDeletePath(config: any, cloudPath: string): void {
+    const normalized = normalizeCloudPath(cloudPath)
+    const fileName = normalized.split('/').filter(Boolean).at(-1) || ''
+    if (!isCloudBackupFileName(fileName)) {
+      throw new Error('备份删除路径无效')
+    }
+
+    if (config.type === 'webdav') {
+      const allowed = new Set([getCloudBackupFilePath(fileName), joinCloudPath(fileName)])
+      if (!allowed.has(normalized)) throw new Error('备份删除路径超出允许的命名空间')
+      return
+    }
+
+    const base = normalizeCloudPath(config.path || CLOUD_BACKUP_DIR)
+    if (normalized !== joinCloudPath(base, fileName)) {
+      throw new Error('备份删除路径超出允许的命名空间')
+    }
   }
 
   private isWebDAVUrlAtBackupDir(url: string): boolean {
@@ -2415,6 +2497,15 @@ export class MobileCloudBackupService {
   private isNotFoundError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error)
     return /404|not\s*found|no such file|does not exist|不存在|未找到/i.test(message)
+  }
+
+  private verifyBackupReadback(data: unknown, expected: any): any {
+    const parsedInput = typeof data === 'string' ? JSON.parse(data) : data
+    const verified = parseBackupPayload(parsedInput).payload
+    if (verified.id !== expected.id || verified.checksum !== expected.checksum) {
+      throw new Error('备份写入后的远端读回校验失败')
+    }
+    return verified
   }
 
   private formatErrorMessage(error: unknown): string {

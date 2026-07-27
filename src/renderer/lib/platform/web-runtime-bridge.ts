@@ -75,7 +75,9 @@ export function installWebRuntimeBridge(): void {
         .then(snapshotData => ({ success: true, snapshot: snapshotData }))
         .catch(error => ({ success: false, error: error instanceof Error ? error.message : String(error) })),
       saveSyncSnapshot: (storageId: string, snapshot: any) =>
-        webCloudBackupService.saveCloudSyncSnapshot(storageId, snapshot)
+        webCloudBackupService.saveCloudSyncSnapshot(storageId, snapshot),
+      deleteSyncSnapshot: (storageId: string, snapshot: any) =>
+        webCloudBackupService.deleteCloudSyncSnapshot(storageId, snapshot)
     }
   };
 }

@@ -47,7 +47,7 @@
         <ion-item>
           <ion-label>
             <h3>自动恢复快照</h3>
-            <p>每 6 小时创建完整备份，并仅清理旧的自动快照</p>
+            <p>仅在数据变化时创建完整备份；保留份数同时约束自动备份和同步恢复版本</p>
           </ion-label>
           <ion-toggle slot="end" :checked="autoBackupEnabled" @ionChange="saveAutoBackupEnabled"></ion-toggle>
         </ion-item>
@@ -432,8 +432,15 @@ const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | nu
 
 const saveAutoBackupSettings = async () => {
   autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
-  autoBackupRetention.value = await automaticBackupService.setRetention(autoBackupRetention.value)
-  await showToast('自动恢复快照策略已保存')
+  const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value)
+  autoBackupRetention.value = retentionResult.retention
+  if (retentionResult.warnings.length > 0) {
+    await showToast(`策略已保存，但部分旧版本清理失败：${retentionResult.warnings.join('；')}`, 'warning')
+  } else if (retentionResult.deferredCount > 0) {
+    await showToast(`已清理 ${retentionResult.deletedCount} 个旧版本；${retentionResult.deferredCount} 个刚写入的版本将在安全窗口后重试`)
+  } else {
+    await showToast(`保留策略已生效，已清理 ${retentionResult.deletedCount} 个旧版本`)
+  }
 }
 
 const saveSyncInterval = async () => {
