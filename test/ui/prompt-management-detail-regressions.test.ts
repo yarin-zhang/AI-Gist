@@ -91,6 +91,29 @@ describe('prompt management detail regressions', () => {
     expect(page).toContain('@manage-categories="showCategoryManagement = true"')
   })
 
+  it('lets users persistently adjust category order', () => {
+    const modal = readRendererFile('components/prompt-management/CategoryManageModal.vue')
+    const folder = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
+    const service = readRendererFile('lib/services/category.service.ts')
+
+    expect(modal).toContain('<GripVertical />')
+    expect(modal).toContain(':draggable="orderedCategories.length > 1')
+    expect(modal).toContain('@dragstart="handleCategoryDragStart($event, category)"')
+    expect(modal).toContain('@dragover.prevent="handleCategoryDragOver($event, category)"')
+    expect(modal).toContain('@drop.prevent="handleCategoryDrop(category)"')
+    expect(modal).toContain("dropPosition === 'before'")
+    expect(modal).toContain("dropPosition === 'after'")
+    expect(modal).toContain('event.dataTransfer.setDragImage(item, 24, 24)')
+    expect(modal).not.toContain('aria-keyshortcuts')
+    expect(modal).not.toContain('@keydown.up')
+    expect(modal).not.toContain('@keydown.down')
+    expect(modal).not.toContain('handleMove')
+    expect(modal).toContain('api.categories.reorder.mutate')
+    expect(service).toContain('async reorderCategories(')
+    expect(service).toContain('sortCategoriesByOrder(await this.getAll<Category>')
+    expect(folder).toContain('sortCategoriesByOrder(props.categories)')
+  })
+
   it('records usage for copy actions in every legacy prompt view', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
 

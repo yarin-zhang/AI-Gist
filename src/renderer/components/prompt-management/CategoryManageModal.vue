@@ -18,71 +18,93 @@
                             </NText>
                         </template>
                         <NScrollbar :style="{ height: `${contentHeight - 80}px` }">
-                            <NFlex vertical size="medium" style="padding-right: 12px;" v-if="categories.length > 0">
-                                <NCard v-for="category in categories" :key="category.id" size="small" hoverable>
-                                    <NFlex justify="space-between" align="center">
-                                        <NFlex align="center" size="medium">
-                                            <div class="color-indicator"
-                                                :style="{ backgroundColor: category.color || 'var(--accent-success)' }">
-                                            </div>
-                                            <div v-if="editingCategory?.id === category.id" style="min-width: 200px;">
-                                                <NFlex vertical size="small">
-                                                    <NInput v-model:value="editingCategory!.name" size="small"
-                                                        :placeholder="t('promptManagement.categoryName')" />
-                                                    <NColorPicker v-model:value="editingCategory!.color"
-                                                        :modes="['hex']" :swatches="COLOR_SWATCHES" size="small"
-                                                        style="width: 100%;" />
-                                                </NFlex>
-                                            </div>
-                                            <div v-else>
-                                                <NFlex vertical size="small">
-                                                    <NText strong>{{ category.name }}</NText>
-                                                    <NText depth="3" style="font-size: 12px;">
-                                                        {{ t('promptManagement.categoryPromptCount', {
-                                                            count:
-                                                        getCategoryPromptCount(category.id) }) }}
-                                                    </NText>
-                                                </NFlex>
-                                            </div>
-                                        </NFlex>
+                            <NFlex vertical size="medium" style="padding-right: 12px;" v-if="orderedCategories.length > 0">
+                                <div v-for="category in orderedCategories" :key="category.id"
+                                    class="category-order-item" :class="{
+                                        dragging: draggingCategoryId === category.id,
+                                        'drop-before': dropTargetCategoryId === category.id && dropPosition === 'before',
+                                        'drop-after': dropTargetCategoryId === category.id && dropPosition === 'after',
+                                    }" @dragover.prevent="handleCategoryDragOver($event, category)"
+                                    @drop.prevent="handleCategoryDrop(category)">
+                                    <NCard size="small" hoverable>
+                                        <NFlex justify="space-between" align="center">
+                                            <NFlex align="center" size="medium">
+                                                <div class="color-indicator"
+                                                    :style="{ backgroundColor: category.color || 'var(--accent-success)' }">
+                                                </div>
+                                                <div v-if="editingCategory?.id === category.id" style="min-width: 200px;">
+                                                    <NFlex vertical size="small">
+                                                        <NInput v-model:value="editingCategory!.name" size="small"
+                                                            :placeholder="t('promptManagement.categoryName')" />
+                                                        <NColorPicker v-model:value="editingCategory!.color"
+                                                            :modes="['hex']" :swatches="COLOR_SWATCHES" size="small"
+                                                            style="width: 100%;" />
+                                                    </NFlex>
+                                                </div>
+                                                <div v-else>
+                                                    <NFlex vertical size="small">
+                                                        <NText strong>{{ category.name }}</NText>
+                                                        <NText depth="3" style="font-size: 12px;">
+                                                            {{ t('promptManagement.categoryPromptCount', {
+                                                                count:
+                                                            getCategoryPromptCount(category.id) }) }}
+                                                        </NText>
+                                                    </NFlex>
+                                                </div>
+                                            </NFlex>
 
-                                        <NFlex size="small">
-                                            <div v-if="editingCategory?.id === category.id">
-                                                <NFlex size="small">
-                                                    <NButton size="small" type="primary" @click="handleSaveEdit"
-                                                        :loading="updating">
-                                                        {{ t('common.save') }}
-                                                    </NButton>
-                                                    <NButton size="small" @click="handleCancelEdit">
-                                                        {{ t('common.cancel') }}
-                                                    </NButton>
-                                                </NFlex>
-                                            </div>
-                                            <div v-else>
-                                                <NFlex size="small">
-                                                    <NButton size="small" text @click="handleEdit(category)">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Edit />
-                                                            </NIcon>
-                                                        </template>
-                                                        {{ t('common.edit') }}
-                                                    </NButton>
-                                                    <NButton size="small" text type="error"
-                                                        @click="handleDelete(category)"
-                                                        :disabled="getCategoryPromptCount(category.id) > 0">
-                                                        <template #icon>
-                                                            <NIcon>
-                                                                <Trash />
-                                                            </NIcon>
-                                                        </template>
-                                                        {{ t('common.delete') }}
-                                                    </NButton>
-                                                </NFlex>
-                                            </div>
+                                            <NFlex size="small">
+                                                <div v-if="editingCategory?.id === category.id">
+                                                    <NFlex size="small">
+                                                        <NButton size="small" type="primary" @click="handleSaveEdit"
+                                                            :loading="updating">
+                                                            {{ t('common.save') }}
+                                                        </NButton>
+                                                        <NButton size="small" @click="handleCancelEdit">
+                                                            {{ t('common.cancel') }}
+                                                        </NButton>
+                                                    </NFlex>
+                                                </div>
+                                                <div v-else>
+                                                    <NFlex size="small">
+                                                        <NTooltip>
+                                                            <template #trigger>
+                                                                <NButton size="small" quaternary circle
+                                                                    class="category-drag-handle"
+                                                                    :draggable="orderedCategories.length > 1 && !reordering && editingCategory === null"
+                                                                    :aria-label="t('promptManagement.categoryDragHandle', { name: category.name })"
+                                                                    :disabled="orderedCategories.length < 2 || reordering || editingCategory !== null"
+                                                                    @dragstart="handleCategoryDragStart($event, category)"
+                                                                    @dragend="handleCategoryDragEnd">
+                                                                    <template #icon><NIcon size="16"><GripVertical /></NIcon></template>
+                                                                </NButton>
+                                                            </template>
+                                                            {{ t('promptManagement.categoryDragHint') }}
+                                                        </NTooltip>
+                                                        <NButton size="small" text @click="handleEdit(category)">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Edit />
+                                                                </NIcon>
+                                                            </template>
+                                                            {{ t('common.edit') }}
+                                                        </NButton>
+                                                        <NButton size="small" text type="error"
+                                                            @click="handleDelete(category)"
+                                                            :disabled="getCategoryPromptCount(category.id) > 0">
+                                                            <template #icon>
+                                                                <NIcon>
+                                                                    <Trash />
+                                                                </NIcon>
+                                                            </template>
+                                                            {{ t('common.delete') }}
+                                                        </NButton>
+                                                    </NFlex>
+                                                </div>
+                                            </NFlex>
                                         </NFlex>
-                                    </NFlex>
-                                </NCard>
+                                    </NCard>
+                                </div>
                             </NFlex>
                             <NEmpty v-else :description="t('promptManagement.noCategories')" size="large">
                                 <template #icon>
@@ -136,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, watch } from 'vue'
 import {
     NCard,
     NFlex,
@@ -150,19 +172,26 @@ import {
     NEmpty,
     NScrollbar,
     NSplit,
+    NTooltip,
     useMessage,
     useDialog
 } from 'naive-ui'
-import { Edit, Trash } from '@vicons/tabler'
+import { Edit, GripVertical, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
 import { useWindowSize } from '@/composables/useWindowSize'
 import CommonModal from '@/components/common/CommonModal.vue'
 import { useI18n } from 'vue-i18n'
+import type { Category } from '@shared/types/database'
+import {
+    reorderCategoriesByDrop,
+    sortCategoriesByOrder,
+    type CategoryDropPosition,
+} from '@/lib/utils/category-order'
 
 interface Props {
     show: boolean
-    categories: any[]
+    categories: Category[]
 }
 
 interface Emits {
@@ -196,6 +225,11 @@ const editingCategory = ref<{
 } | null>(null)
 const creating = ref(false)
 const updating = ref(false)
+const reordering = ref(false)
+const orderedCategories = ref<Category[]>([])
+const draggingCategoryId = ref<number | null>(null)
+const dropTargetCategoryId = ref<number | null>(null)
+const dropPosition = ref<CategoryDropPosition | null>(null)
 
 // 统计信息
 const statistics = ref<{
@@ -311,6 +345,82 @@ const handleCancelEdit = () => {
     editingCategory.value = null
 }
 
+const persistCategoryOrder = async (nextOrder: Category[], previousOrder: Category[]) => {
+    orderedCategories.value = nextOrder
+    reordering.value = true
+
+    try {
+        await api.categories.reorder.mutate(nextOrder.flatMap((item, sortOrder) => (
+            item.id ? [{ id: item.id, sortOrder }] : []
+        )))
+        message.success(t('promptManagement.categoryOrderUpdatedSuccess'))
+        emit('updated')
+    } catch (error) {
+        orderedCategories.value = previousOrder
+        message.error(t('promptManagement.categoryOrderUpdatedFailed'))
+        console.error(error)
+    } finally {
+        reordering.value = false
+    }
+}
+
+const resetCategoryDragState = () => {
+    draggingCategoryId.value = null
+    dropTargetCategoryId.value = null
+    dropPosition.value = null
+}
+
+const handleCategoryDragStart = (event: DragEvent, category: Category) => {
+    if (!category.id || editingCategory.value || reordering.value || !event.dataTransfer) {
+        event.preventDefault()
+        return
+    }
+
+    draggingCategoryId.value = category.id
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(category.id))
+
+    const item = (event.currentTarget as HTMLElement | null)?.closest('.category-order-item') as HTMLElement | null
+    if (item) event.dataTransfer.setDragImage(item, 24, 24)
+}
+
+const handleCategoryDragOver = (event: DragEvent, category: Category) => {
+    if (!draggingCategoryId.value || draggingCategoryId.value === category.id || !category.id) {
+        dropTargetCategoryId.value = null
+        dropPosition.value = null
+        return
+    }
+
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    const item = event.currentTarget as HTMLElement
+    const bounds = item.getBoundingClientRect()
+    dropTargetCategoryId.value = category.id
+    dropPosition.value = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+}
+
+const handleCategoryDrop = async (targetCategory: Category) => {
+    const sourceId = draggingCategoryId.value
+    const position = dropPosition.value
+    const previousOrder = [...orderedCategories.value]
+    resetCategoryDragState()
+
+    if (!sourceId || !targetCategory.id || !position || sourceId === targetCategory.id || reordering.value) return
+
+    const nextOrder = reorderCategoriesByDrop(
+        previousOrder,
+        sourceId,
+        targetCategory.id,
+        position,
+    )
+
+    if (nextOrder.every((category, index) => category.id === previousOrder[index]?.id)) return
+    await persistCategoryOrder(nextOrder, previousOrder)
+}
+
+const handleCategoryDragEnd = () => {
+    resetCategoryDragState()
+}
+
 const handleDelete = (category: any) => {
     const promptCount = getCategoryPromptCount(category.id)
     if (promptCount > 0) {
@@ -340,6 +450,7 @@ const handleDelete = (category: any) => {
 
 const handleClose = () => {
     editingCategory.value = null
+    resetCategoryDragState()
     emit('update:show', false)
 }
 
@@ -347,6 +458,7 @@ const handleClose = () => {
 watch(() => props.show, async (show) => {
     if (!show) {
         editingCategory.value = null
+        resetCategoryDragState()
     } else {
         // 当模态框显示时，加载最新的统计信息
         console.log('CategoryManageModal - Modal opened, loading statistics...')
@@ -361,14 +473,44 @@ watch(() => props.show, async (show) => {
 
 // 监听分类数据变化，重新加载统计信息
 watch(() => props.categories, async (newCategories) => {
+    if (!reordering.value) {
+        orderedCategories.value = sortCategoriesByOrder(newCategories)
+    }
     if (props.show && newCategories.length > 0) {
         console.log('CategoryManageModal - Categories changed, reloading statistics...')
         await loadStatistics()
     }
-}, { deep: true })
+}, { deep: true, immediate: true })
 </script>
 
 <style scoped>
+.category-order-item {
+    position: relative;
+}
+
+.category-order-item::before,
+.category-order-item::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    border-radius: var(--radius-control);
+    background: var(--accent-primary);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.category-order-item::before { top: -7px; }
+.category-order-item::after { bottom: -7px; }
+.category-order-item.drop-before::before,
+.category-order-item.drop-after::after { opacity: 1; }
+.category-order-item.dragging { opacity: .46; }
+.category-order-item.dragging :deep(.n-card) { box-shadow: var(--shadow-popover); }
+.category-drag-handle { cursor: grab; color: var(--content-secondary); }
+.category-drag-handle:active { cursor: grabbing; }
+
 .color-indicator {
     width: 16px;
     height: 16px;

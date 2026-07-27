@@ -6,6 +6,8 @@
 import { BaseDatabaseService } from './base-database.service';
 import { Category, CategoryWithRelations, Prompt, PromptWithRelations, PromptVariable } from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
+import { emitDataChange } from './data-change-events';
+import { getNextCategorySortOrder, sortCategoriesByOrder } from '../utils/category-order';
 
 /**
  * 分类数据服务类
@@ -32,8 +34,12 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<Category> 创建成功的分类记录（包含生成的ID、UUID和时间戳）
    */
   async createCategory(data: Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<Category> {
+    const categories = await this.getAll<Category>('categories');
     const categoryWithUUID = {
       ...data,
+      sortOrder: Number.isFinite(Number(data.sortOrder))
+        ? Number(data.sortOrder)
+        : getNextCategorySortOrder(categories),
       uuid: generateUUID(),
       createdAt: new Date(),
       updatedAt: new Date()
@@ -47,7 +53,7 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<CategoryWithRelations[]> 包含关联数据的分类列表
    */
   async getAllCategories(): Promise<CategoryWithRelations[]> {
-    const categories = await this.getAll<Category>('categories');
+    const categories = sortCategoriesByOrder(await this.getAll<Category>('categories'));
     const prompts = await this.getAll<Prompt>('prompts');
     
     return categories.map(category => ({
@@ -62,7 +68,7 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<Category[]> 分类基本信息列表
    */
   async getBasicCategories(): Promise<Category[]> {
-    return this.getAll<Category>('categories');
+    return sortCategoriesByOrder(await this.getAll<Category>('categories'));
   }
 
   /**
@@ -113,6 +119,72 @@ export class CategoryService extends BaseDatabaseService {
    */
   async updateCategory(id: number, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Category> {
     return this.update<Category>('categories', id, data);
+  }
+
+  /**
+   * 按用户指定的顺序重新排列分类。
+   * 所有排序值在同一个 IndexedDB 事务中写入，避免只保存部分顺序。
+   */
+  async reorderCategories(categories: { id: number; sortOrder: number }[]): Promise<void> {
+    if (!categories.length) return;
+
+    const ids = new Set(categories.map(category => category.id));
+    if (ids.size !== categories.length) {
+      throw new Error('Category reorder contains duplicate ids');
+    }
+    if (categories.some(category => !Number.isFinite(category.sortOrder))) {
+      throw new Error('Category reorder contains an invalid sort order');
+    }
+
+    const db = await this.ensureDB();
+    const updatedAt = new Date();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(['categories'], 'readwrite');
+      const store = transaction.objectStore('categories');
+      let failure: Error | null = null;
+
+      const abort = (error: Error) => {
+        if (failure) return;
+        failure = error;
+        try { transaction.abort(); } catch { /* transaction already finishing */ }
+      };
+
+      categories.forEach(({ id, sortOrder }) => {
+        const getRequest = store.get(id);
+        getRequest.onerror = () => abort(new Error(
+          `Failed to load category ${id}: ${getRequest.error?.message || 'transaction failed'}`
+        ));
+        getRequest.onsuccess = () => {
+          const category = getRequest.result as Category | undefined;
+          if (!category) {
+            abort(new Error(`Category ${id} not found`));
+            return;
+          }
+
+          const putRequest = store.put(this.cleanDataForStorage({
+            ...category,
+            sortOrder,
+            updatedAt,
+          }));
+          putRequest.onerror = () => abort(new Error(
+            `Failed to reorder category ${id}: ${putRequest.error?.message || 'transaction failed'}`
+          ));
+        };
+      });
+
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(failure || new Error('Category reorder transaction aborted'));
+      transaction.onerror = () => {
+        failure ||= new Error(transaction.error?.message || 'Category reorder transaction failed');
+      };
+    });
+
+    categories.forEach(({ id }) => emitDataChange({
+      storeName: 'categories',
+      action: 'update',
+      id,
+    }));
   }
 
   /**
@@ -322,7 +394,7 @@ export class CategoryService extends BaseDatabaseService {
       data: PromptWithRelations;
     }[];
   }[]> {
-    const categories = await this.getAll<Category>('categories');
+    const categories = sortCategoriesByOrder(await this.getAll<Category>('categories'));
     const prompts = await this.getAll<Prompt>('prompts');
     const variables = await this.getAll<PromptVariable>('promptVariables');
 
