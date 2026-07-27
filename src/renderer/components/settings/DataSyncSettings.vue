@@ -296,7 +296,11 @@ const formRules: FormRules = {
 const canUseICloudConfig = computed(() => configForm.value.type !== 'icloud' || iCloudAvailability.value?.available !== false);
 const storageDescriptionText = computed(() => capabilities.icloud
     ? t('dataSync.storageDescription') : t('dataSync.webdavOnlyStorageDescription'));
+const hasScheduledRetry = computed(() =>
+    syncStatus.value.status === 'error' && syncStatus.value.pending && !!syncStatus.value.nextSyncAt
+);
 const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() => {
+    if (hasScheduledRetry.value) return 'warning';
     if (syncStatus.value.status === 'error') return 'error';
     if (!autoSyncEnabled.value) return 'warning';
     if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'info';
@@ -304,6 +308,7 @@ const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() =>
     return 'info';
 });
 const statusTitle = computed(() => {
+    if (hasScheduledRetry.value) return t('dataSync.statusRetryScheduled');
     if (syncStatus.value.status === 'error') return t('dataSync.statusError');
     if (!autoSyncEnabled.value) return t('dataSync.statusPaused');
     if (syncStatus.value.status === 'syncing') return t('dataSync.statusSyncing');
@@ -312,6 +317,12 @@ const statusTitle = computed(() => {
     return storageConfigs.value.length ? t('dataSync.statusReady') : t('dataSync.statusNotConfigured');
 });
 const statusDescription = computed(() => {
+    if (hasScheduledRetry.value) {
+        return t('dataSync.statusRetryScheduledDescription', {
+            error: syncStatus.value.error || t('dataSync.statusErrorDescription'),
+            time: formatDate(syncStatus.value.nextSyncAt!),
+        });
+    }
     if (syncStatus.value.status === 'error') return syncStatus.value.error || t('dataSync.statusErrorDescription');
     if (!autoSyncEnabled.value) return t('dataSync.statusPausedDescription');
     if (storageConfigs.value.length === 0) return t('dataSync.statusNotConfiguredDescription');

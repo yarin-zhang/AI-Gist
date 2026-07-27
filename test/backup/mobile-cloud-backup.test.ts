@@ -501,13 +501,13 @@ describe('MobileCloudBackupService', () => {
         .map((call: any[]) => call[0])
         .filter((call: any) => call.method === 'PUT')
       expect(putCalls.map((call: any) => call.url)).toEqual([
-        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.backup.json',
-        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.json'
+        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.json',
+        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.backup.json'
       ])
       expect(JSON.parse(putCalls[0].data).kind).toBe('ai-gist-cloud-sync-manifest')
     })
 
-    it('WebDAV manifest 备份副本写入失败时不推进主文件', async () => {
+    it('WebDAV manifest 先发布主文件，备份副本写入失败时返回错误', async () => {
       await saveConfig(service)
       const manifest = createEmptyCloudSyncManifest('2026-03-12T00:00:00.000Z')
       mockCapacitorHttp.request
@@ -524,7 +524,7 @@ describe('MobileCloudBackupService', () => {
         .map((call: any[]) => call[0])
         .filter((call: any) => call.method === 'PUT')
       expect(putCalls.map((call: any) => call.url)).toEqual([
-        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.backup.json'
+        'https://dav.example.com/backup/AI-Gist-Backup/sync-manifest.json'
       ])
     })
 
@@ -593,8 +593,8 @@ describe('MobileCloudBackupService', () => {
 
       expect(result.success).toBe(true)
       expect((Filesystem.writeFile as any).mock.calls.map((call: any[]) => call[0].path)).toEqual([
-        'AI-Gist-Backup/sync-manifest.backup.json',
-        'AI-Gist-Backup/sync-manifest.json'
+        'AI-Gist-Backup/sync-manifest.json',
+        'AI-Gist-Backup/sync-manifest.backup.json'
       ])
     })
 

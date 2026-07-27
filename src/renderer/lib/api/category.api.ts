@@ -122,6 +122,18 @@ export class CategoryApiClient {
     },
 
     /**
+     * 调整分类顺序
+     */
+    reorder: {
+      /**
+       * 按数组顺序持久化分类排序
+       */
+      mutate: async (categories: { id: number; sortOrder: number }[]): Promise<void> => {
+        return this.categoryService.reorderCategories(categories);
+      }
+    },
+
+    /**
      * 删除分类
      */
     delete: {

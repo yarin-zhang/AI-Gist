@@ -262,7 +262,7 @@ describe('web server API handler', () => {
     expect(deletedBackupAgain).toMatchObject({ status: 200, payload: { success: true } })
   })
 
-  it('uses the newer backup manifest in the WebDAV proxy before accepting writes', async () => {
+  it('treats the primary WebDAV manifest as authoritative and uses backup only as fallback', async () => {
     webdavServer = new TestWebDAVServer({
       port: 18769,
       username: 'testuser',
@@ -325,28 +325,29 @@ describe('web server API handler', () => {
     const loadedManifest = await postApi(apiBaseUrl, '/api/cloud/webdav/get-sync-manifest', { config })
     expect(loadedManifest.status).toBe(200)
     expect(loadedManifest.payload.data.latestSnapshot).toMatchObject({
-      revision: newerBackupSnapshot.revision,
-      dataChecksum: createCloudSyncDataChecksum(newerData)
+      revision: stalePrimarySnapshot.revision,
+      dataChecksum: createCloudSyncDataChecksum(oldData)
     })
     expect(loadedManifest.payload.data.latestSnapshot.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        title: 'Web 端备份 manifest 较新标题'
+        title: 'Web 端主 manifest 旧标题'
       })
     ]))
     expect(loadedManifest.payload.data.latestSnapshot.data.settings).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'theme',
-        value: 'newer-backup'
+        value: 'old-primary'
       })
     ]))
 
+    const replacementSnapshot = createCloudSyncSnapshot(createWebSyncDataSet({
+      promptTitle: '基于权威主 manifest 的更新',
+      settingValue: 'primary-authoritative'
+    }), 'web-device-a', 'web-proxy-primary-replacement')
     const attemptedOverwrite = await postApi(apiBaseUrl, '/api/cloud/webdav/save-sync-manifest', {
       config,
       manifest: createWebManifest(
-        createCloudSyncSnapshot(createWebSyncDataSet({
-          promptTitle: '错误覆盖旧主 manifest',
-          settingValue: 'bad-overwrite'
-        }), 'web-device-a', 'web-proxy-bad-overwrite'),
+        replacementSnapshot,
         {
           updatedAt: '2026-06-13T21:11:00.000Z',
           deviceId: 'web-device-a'
@@ -354,11 +355,10 @@ describe('web server API handler', () => {
       ),
       options: { expectedRevision: stalePrimarySnapshot.revision }
     })
-    expect(attemptedOverwrite.status).toBe(500)
+    expect(attemptedOverwrite.status).toBe(200)
     expect(attemptedOverwrite.payload).toMatchObject({
-      success: false
+      success: true
     })
-    expect(attemptedOverwrite.payload.error).toContain('web-proxy-backup-newer')
 
     const primaryAfterRejectedWrite = JSON.parse(await fsp.readFile(
       path.join(backupDir, 'sync-manifest.json'),
@@ -368,8 +368,8 @@ describe('web server API handler', () => {
       path.join(backupDir, 'sync-manifest.backup.json'),
       'utf-8'
     ))
-    expect(primaryAfterRejectedWrite.latestSnapshot.revision).toBe(stalePrimarySnapshot.revision)
-    expect(backupAfterRejectedWrite.latestSnapshot.revision).toBe(newerBackupSnapshot.revision)
+    expect(primaryAfterRejectedWrite.latestSnapshot.revision).toBe(replacementSnapshot.revision)
+    expect(backupAfterRejectedWrite.latestSnapshot.revision).toBe(replacementSnapshot.revision)
   })
 
   it('provides a namespace-restricted binary sync-v2 transport with CAS semantics', async () => {

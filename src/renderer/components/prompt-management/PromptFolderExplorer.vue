@@ -163,6 +163,7 @@ import {
 } from '@vicons/tabler'
 import { useI18n } from 'vue-i18n'
 import type { CategoryWithRelations, PromptWithRelations } from '@shared/types/database'
+import { sortCategoriesByOrder } from '@/lib/utils/category-order'
 
 interface Props {
     categories: CategoryWithRelations[]
@@ -197,10 +198,7 @@ const selectedKey = ref<string | null>(null)
 const draggingPromptId = ref<number | null>(null)
 const dropTargetKey = ref<string | null>(null)
 
-const sortedCategories = computed(() => [...props.categories].sort((left, right) => {
-    const sortDifference = (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER)
-    return sortDifference || left.name.localeCompare(right.name)
-}))
+const sortedCategories = computed(() => sortCategoriesByOrder(props.categories))
 
 const activeCategory = computed(() => props.activeCategoryId === null
     ? null

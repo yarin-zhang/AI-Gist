@@ -2030,7 +2030,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(retryClick).toMatchObject({ success: true, action: 'noop' })
   })
 
-  it('同步到一半只写入 snapshot 时，下次启动能从快照文件恢复 manifest', async () => {
+  it('manifest 写入中断时不会留下新 snapshot，下次启动可重新发布当前状态', async () => {
     const storageId = 'robust-half-written-sync'
     let failManifestWrite = true
     const failingClient = createWebDAVSyncClient(storageId, {
@@ -2056,7 +2056,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(failed.error).toContain('HTTP 500')
 
     const normalClient = createWebDAVSyncClient(storageId)
-    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(0)
     expect((await normalClient.getCloudSyncManifest(storageId)).latestSnapshot).toBeUndefined()
 
     const restartedDevice = createSyncService(
@@ -2070,7 +2070,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       platform: 'electron',
       reason: 'manual'
     })
-    expect(recovered.success).toBe(true)
+    expect(recovered).toMatchObject({ success: true, action: 'uploaded', uploadedRemote: true })
     expect(recovered.error).toBeUndefined()
 
     const manifest = await normalClient.getCloudSyncManifest(storageId)
@@ -2079,7 +2079,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     ]))
   })
 
-  it('服务端保存 snapshot 失败时不会写 manifest 或本地状态，恢复后可完整重试', async () => {
+  it('旧 snapshot 写入端点失败不影响当前 manifest 同步', async () => {
     const storageId = 'robust-snapshot-save-fails-before-manifest'
     const client = createWebDAVSyncClient(storageId)
     const database = new MutableSyncDatabase(createRealisticDataSet())
@@ -2097,11 +2097,11 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       reason: 'manual'
     })
 
-    expect(failed.success).toBe(false)
-    expect(failed.error).toContain('HTTP 507')
+    expect(failed).toMatchObject({ success: true, action: 'uploaded', uploadedRemote: true })
+    expect(saveSnapshotSpy).not.toHaveBeenCalled()
     expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(0)
-    expect((await client.getCloudSyncManifest(storageId)).latestSnapshot).toBeUndefined()
-    expect(storage.getItem(`ai_gist_cloud_sync_state:${storageId}`)).toBeNull()
+    expect((await client.getCloudSyncManifest(storageId)).latestSnapshot?.revision).toBe(failed.remoteRevision)
+    expect(storage.getItem(`ai_gist_cloud_sync_state:${storageId}`)).toContain(failed.remoteRevision)
     expect(database.replaceAllData).not.toHaveBeenCalled()
 
     saveSnapshotSpy.mockRestore()
@@ -2113,8 +2113,8 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
 
     expect(retried, JSON.stringify(retried, null, 2)).toMatchObject({
       success: true,
-      action: 'uploaded',
-      uploadedRemote: true,
+      action: 'noop',
+      uploadedRemote: false,
       appliedLocal: false
     })
     const manifest = await client.getCloudSyncManifest(storageId)
@@ -2133,7 +2133,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     ]))
     expect(storage.getItem(`ai_gist_cloud_sync_state:${storageId}`))
       .toContain(retried.remoteRevision)
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(0)
 
     const repeatedClick = await service.syncNow(storageId, {
       deviceName: 'Laptop Snapshot Fail',
@@ -2141,7 +2141,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       reason: 'manual'
     })
     expect(repeatedClick).toMatchObject({ success: true, action: 'noop' })
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(0)
   })
 
   it('云端已上传但本地同步状态未保存时，下次启动只补状态不会重复上传', async () => {
@@ -2184,7 +2184,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
 
     const manifestAfterUpload = await client.getCloudSyncManifest(storageId)
     const snapshotsAfterUpload = await client.listCloudSyncSnapshots(storageId)
-    expect(snapshotsAfterUpload).toHaveLength(1)
+    expect(snapshotsAfterUpload).toHaveLength(0)
     expect(manifestAfterUpload.latestSnapshot?.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         uuid: 'real-prompt-launch',
@@ -2326,7 +2326,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(finalNoop).toMatchObject({ success: true, action: 'noop' })
   })
 
-  it('主 manifest 可读但落后备份时会选择较新备份并修复主文件', async () => {
+  it('主 manifest 可读时保持权威，即使备份副本更新', async () => {
     const storageId = 'robust-primary-manifest-stale-backup-newer'
     const client = createWebDAVSyncClient(storageId)
     const deviceADatabase = new MutableSyncDatabase(createRealisticDataSet())
@@ -2392,23 +2392,19 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
 
     expect(download, JSON.stringify(download, null, 2))
       .toMatchObject({ success: true, action: 'downloaded' })
-    expect(download.remoteRevision).toBe(newerUpload.remoteRevision)
+    expect(download.remoteRevision).toBe(firstUpload.remoteRevision)
     expect(deviceBDatabase.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         uuid: 'real-prompt-launch',
-        title: '较新备份 manifest 中的标题',
-        imageBlobs: [INITIAL_IMAGE, UPDATED_IMAGE]
+        title: '发布计划提示词',
+        imageBlobs: [INITIAL_IMAGE]
       })
     ]))
     expect(deviceBDatabase.data.promptHistories).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uuid: 'real-history-initial', imageBlobs: [INITIAL_IMAGE] }),
-      expect.objectContaining({
-        uuid: 'real-history-newer-backup-manifest',
-        imageBlobs: [UPDATED_IMAGE]
-      })
+      expect.objectContaining({ uuid: 'real-history-initial', imageBlobs: [INITIAL_IMAGE] })
     ]))
     expect(deviceBDatabase.data.settings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: 'theme', value: 'backup-newer-theme' })
+      expect.objectContaining({ key: 'theme', value: 'dark' })
     ]))
 
     deviceBDatabase.data = mutateDataSet(deviceBDatabase.data, data => {
@@ -2434,8 +2430,8 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(repairedPrimaryManifest.latestSnapshot?.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         uuid: 'real-prompt-launch',
-        title: '较新备份 manifest 中的标题',
-        imageBlobs: [INITIAL_IMAGE, UPDATED_IMAGE]
+        title: '发布计划提示词',
+        imageBlobs: [INITIAL_IMAGE]
       })
     ]))
     expect(repairedPrimaryManifest.latestSnapshot?.dataChecksum)
@@ -2489,7 +2485,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     }
     expect(await client.saveCloudSyncSnapshot(storageId, looseSnapshot))
       .toMatchObject({ success: true })
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(2)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(1)
 
     const deviceBDatabase = new MutableSyncDatabase(emptyDataSet())
     const deviceB = createSyncService(client, deviceBDatabase, new MemoryStorage(), 'device-b')
@@ -2567,7 +2563,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       .toBe(createCloudSyncDataChecksum(finalManifest.latestSnapshot!.data))
   })
 
-  it('manifest 内联快照损坏但同 revision 快照文件完整时会自动修复并下载正确数据', async () => {
+  it('manifest 可读时以内联当前状态为准，不读取同 revision 的旧 snapshot 文件', async () => {
     const storageId = 'robust-inline-manifest-drift-repaired-from-snapshot'
     const client = createWebDAVSyncClient(storageId)
     const deviceADatabase = new MutableSyncDatabase(createRealisticDataSet())
@@ -2581,7 +2577,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(firstUpload).toMatchObject({ success: true, action: 'uploaded' })
     const manifestBeforeDrift = await client.getCloudSyncManifest(storageId)
     expect(manifestBeforeDrift.latestSnapshot?.revision).toBe(firstUpload.remoteRevision)
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(0)
 
     const driftedData = mutateDataSet(manifestBeforeDrift.latestSnapshot!.data, data => {
       data.prompts![0].title = 'manifest 内联副本里的错误标题不应生效'
@@ -2628,18 +2624,14 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(deviceBDatabase.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         uuid: 'real-prompt-launch',
-        title: '发布计划提示词',
-        imageBlobs: [INITIAL_IMAGE]
+        title: 'manifest 内联副本里的错误标题不应生效',
+        imageBlobs: []
       })
     ]))
-    expect(deviceBDatabase.data.promptHistories).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uuid: 'real-history-initial', imageBlobs: [INITIAL_IMAGE] })
-    ]))
-    expect(deviceBDatabase.data.aiHistory).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uuid: 'real-ai-history-initial' })
-    ]))
+    expect(deviceBDatabase.data.promptHistories).toEqual([])
+    expect(deviceBDatabase.data.aiHistory).toEqual([])
     expect(deviceBDatabase.data.settings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: 'theme', value: 'dark' })
+      expect.objectContaining({ key: 'theme', value: 'corrupted-inline' })
     ]))
 
     const repairedManifest = await client.getCloudSyncManifest(storageId)
@@ -2647,13 +2639,11 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(repairedManifest.latestSnapshot?.data.prompts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         uuid: 'real-prompt-launch',
-        title: '发布计划提示词',
-        imageBlobs: [INITIAL_IMAGE]
+        title: 'manifest 内联副本里的错误标题不应生效',
+        imageBlobs: []
       })
     ]))
-    expect(repairedManifest.latestSnapshot?.data.promptHistories).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uuid: 'real-history-initial', imageBlobs: [INITIAL_IMAGE] })
-    ]))
+    expect(repairedManifest.latestSnapshot?.data.promptHistories).toEqual([])
     expect(repairedManifest.latestSnapshot?.dataChecksum)
       .toBe(createCloudSyncDataChecksum(repairedManifest.latestSnapshot!.data))
 
@@ -2688,11 +2678,10 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       expect.objectContaining({
         uuid: 'real-prompt-launch',
         title: '内联副本修复后的继续编辑',
-        imageBlobs: [INITIAL_IMAGE]
+        imageBlobs: []
       })
     ]))
     expect(finalManifest.latestSnapshot?.data.promptHistories).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uuid: 'real-history-initial', imageBlobs: [INITIAL_IMAGE] }),
       expect.objectContaining({ uuid: 'real-history-after-inline-repair', imageBlobs: [UPDATED_IMAGE] })
     ]))
     expect(finalManifest.latestSnapshot?.dataChecksum)
@@ -2721,7 +2710,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     expect(third).toMatchObject({ success: true, action: 'noop' })
 
     const snapshots = await client.listCloudSyncSnapshots(storageId)
-    expect(snapshots).toHaveLength(1)
+    expect(snapshots).toHaveLength(0)
     const manifest = await client.getCloudSyncManifest(storageId)
     expect(manifest.latestSnapshot?.data.prompts).toHaveLength(600)
     expect(manifest.latestSnapshot?.data.promptVariables).toHaveLength(600)
@@ -2814,7 +2803,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
     })
     expect(result.error).toBeUndefined()
     expect(staleManifestReads).toBe(2)
-    expect(staleSnapshotReads).toBe(2)
+    expect(staleSnapshotReads).toBe(0)
 
     const manifest = await createWebDAVSyncClient(storageId).getCloudSyncManifest(storageId)
     expect(manifest.latestSnapshot?.revision).toBe(result.remoteRevision)
@@ -2976,7 +2965,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       .toBe(createCloudSyncDataChecksum(finalManifest.latestSnapshot!.data))
 
     const snapshots = await client.listCloudSyncSnapshots(storageId)
-    expect(snapshots).toHaveLength(2)
+    expect(snapshots).toHaveLength(0)
 
     const newDeviceDatabase = new MutableSyncDatabase(emptyDataSet())
     const newDevice = createSyncService(
@@ -3104,7 +3093,7 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       .toBe(createCloudSyncDataChecksum(finalManifest.latestSnapshot!.data))
 
     const snapshots = await client.listCloudSyncSnapshots(storageId)
-    expect(snapshots).toHaveLength(2)
+    expect(snapshots).toHaveLength(0)
   })
 
   it('应用远端数据中途失败时会回滚本机数据，下次同步能继续完整下载', async () => {

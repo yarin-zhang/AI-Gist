@@ -44,25 +44,6 @@
             {{ t('cloudBackup.saveSyncInterval') }}
           </ion-button>
         </div>
-        <ion-item>
-          <ion-label>
-            <h3>自动恢复快照</h3>
-            <p>仅在数据变化时创建完整备份；保留份数同时约束自动备份和同步恢复版本</p>
-          </ion-label>
-          <ion-toggle slot="end" :checked="autoBackupEnabled" @ionChange="saveAutoBackupEnabled"></ion-toggle>
-        </ion-item>
-        <ion-item>
-          <ion-label>快照间隔（分钟）</ion-label>
-          <ion-input slot="end" type="number" :value="autoBackupIntervalMinutes" @ionInput="handleAutoBackupIntervalInput"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label>保留份数</ion-label>
-          <ion-input slot="end" type="number" :value="autoBackupRetention" @ionInput="handleAutoBackupRetentionInput"></ion-input>
-        </ion-item>
-        <div class="sync-interval-actions">
-          <ion-button size="small" fill="outline" @click="saveAutoBackupSettings">保存快照策略</ion-button>
-          <ion-button size="small" fill="outline" @click="automaticBackupService.runNow('manual')">立即创建</ion-button>
-        </div>
       </ion-list>
 
       <ion-list v-if="restoreSuspensions.length > 0">
@@ -230,7 +211,7 @@
           </ion-toolbar>
         </ion-header>
         <ion-content>
-          <!-- 操作按钮 -->
+          <!-- 同步操作 -->
           <div class="action-buttons">
             <ion-button expand="block" @click="createBackup" :disabled="loading.createBackup">
               <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
@@ -337,11 +318,6 @@ import {
   getCloudSyncResultMessage,
   getCloudSyncErrorDiagnosis
 } from '~/lib/services/cloud-sync.service'
-import {
-  automaticBackupService,
-  DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
-  DEFAULT_AUTO_BACKUP_RETENTION
-} from '~/lib/services/automatic-backup.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { CloudStorageConfig, CloudBackupInfo } from '@shared/types/cloud-backup'
 import type {
@@ -358,9 +334,6 @@ const storageConfigs = ref<CloudStorageConfig[]>([])
 const currentBackups = ref<CloudBackupInfo[]>([])
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES)
 const autoSyncEnabled = ref(true)
-const autoBackupEnabled = ref(true)
-const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
-const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const selectedConfig = ref<CloudStorageConfig | null>(null)
 const editingConfig = ref<CloudStorageConfig | null>(null)
 const restoreSuspensions = ref<CloudSyncRestoreSuspension[]>(cloudSyncService.getRestoreSuspensions())
@@ -407,40 +380,10 @@ const loadSyncInterval = async () => {
 
 const loadAutomationSettings = async () => {
   autoSyncEnabled.value = await cloudSyncService.getAutoSyncEnabled()
-  autoBackupEnabled.value = await automaticBackupService.getEnabled()
-  autoBackupIntervalMinutes.value = await automaticBackupService.getIntervalMinutes()
-  autoBackupRetention.value = await automaticBackupService.getRetention()
 }
 
 const saveAutoSyncEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
   autoSyncEnabled.value = await cloudSyncService.setAutoSyncEnabled(event.detail.checked)
-}
-
-const saveAutoBackupEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
-  autoBackupEnabled.value = await automaticBackupService.setEnabled(event.detail.checked)
-}
-
-const handleAutoBackupIntervalInput = (event: CustomEvent<{ value?: string | number | null }>) => {
-  const value = Number(event.detail.value)
-  if (Number.isFinite(value)) autoBackupIntervalMinutes.value = value
-}
-
-const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | number | null }>) => {
-  const value = Number(event.detail.value)
-  if (Number.isFinite(value)) autoBackupRetention.value = value
-}
-
-const saveAutoBackupSettings = async () => {
-  autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
-  const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value)
-  autoBackupRetention.value = retentionResult.retention
-  if (retentionResult.warnings.length > 0) {
-    await showToast(`策略已保存，但部分旧版本清理失败：${retentionResult.warnings.join('；')}`, 'warning')
-  } else if (retentionResult.deferredCount > 0) {
-    await showToast(`已清理 ${retentionResult.deletedCount} 个旧版本；${retentionResult.deferredCount} 个刚写入的版本将在安全窗口后重试`)
-  } else {
-    await showToast(`保留策略已生效，已清理 ${retentionResult.deletedCount} 个旧版本`)
-  }
 }
 
 const saveSyncInterval = async () => {
@@ -658,9 +601,9 @@ const closeConfigModal = () => {
   resetConfigForm()
 }
 
-// 创建备份
+// 仅在用户明确操作时创建云端备份；自动备份始终由本地备份服务处理。
 const createBackup = async () => {
-  if (!selectedConfig.value) return
+  if (!selectedConfig.value || loading.value.createBackup) return
 
   const loadingEl = await loadingController.create({
     message: t('cloudBackup.creatingBackup')
@@ -682,16 +625,14 @@ const createBackup = async () => {
     )
 
     if (result.success) {
-      showToast(t('cloudBackup.createSuccess'))
+      await showToast(t('cloudBackup.createSuccess'))
       await loadBackupList(selectedConfig.value.id)
     } else {
-      const friendlyError = getFriendlyBackupError(result.error)
-      showToast(friendlyError, 'danger')
+      await showToast(getFriendlyBackupError(result.error), 'danger')
     }
   } catch (error) {
     console.error('创建备份失败:', error)
-    const friendlyError = getFriendlyBackupError(error instanceof Error ? error.message : String(error))
-    showToast(friendlyError, 'danger')
+    await showToast(getFriendlyBackupError(error instanceof Error ? error.message : String(error)), 'danger')
   } finally {
     await loadingEl.dismiss()
     loading.value.createBackup = false
@@ -799,10 +740,17 @@ const getStorageName = (storageId: string) =>
 
 const getSyncStatusLabel = () => {
   if (restoreSuspensions.value.length > 0) return t('cloudBackup.restoreDecisionDescription')
+  if (syncStatus.value.status === 'error' && syncStatus.value.pending && syncStatus.value.nextSyncAt) {
+    return t('cloudBackup.syncStatusValues.scheduled')
+  }
   return t(`cloudBackup.syncStatusValues.${syncStatus.value.status}`)
 }
 
-const getSyncStatusBadge = () => restoreSuspensions.value.length > 0 ? 'paused' : syncStatus.value.status
+const getSyncStatusBadge = () => {
+  if (restoreSuspensions.value.length > 0) return 'paused'
+  if (syncStatus.value.status === 'error' && syncStatus.value.pending && syncStatus.value.nextSyncAt) return 'retry'
+  return syncStatus.value.status
+}
 
 const getSyncStatusColor = () => {
   if (restoreSuspensions.value.length > 0 || ['error', 'paused'].includes(syncStatus.value.status)) return 'warning'
@@ -994,7 +942,7 @@ const formatSize = (size: number) => {
 
 // 将技术错误转换为用户友好的备份错误提示
 const getFriendlyBackupError = (error?: string): string => {
-  if (!error) return '备份创建失败，请稍后重试'
+  if (!error) return t('cloudBackup.createFailed')
   if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
     return '存储服务认证失败，请检查用户名和密码是否正确'
   }
@@ -1010,7 +958,7 @@ const getFriendlyBackupError = (error?: string): string => {
   if (error.includes('数据库') || error.includes('database')) {
     return '读取本地数据失败，请尝试重启应用后再备份'
   }
-  return `备份失败：${error}`
+  return `${t('cloudBackup.createFailed')}：${error}`
 }
 
 // 将技术错误转换为用户友好的恢复错误提示

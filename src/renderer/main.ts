@@ -204,9 +204,25 @@ async function startApp() {
       await automaticBackupService.startFromSettings();
 
       if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
-        window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) =>
-          cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs })
-        );
+        window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) => {
+          const backupFlush = automaticBackupService.flushPendingBackup({ reason: 'shutdown', timeoutMs });
+          const syncFlush = cloudSyncService.flushPendingSync({ reason: 'shutdown', timeoutMs });
+          return Promise.allSettled([backupFlush, syncFlush]);
+        });
+      }
+
+      if (!PlatformDetector.isMobile()) {
+        window.addEventListener('blur', () => {
+          void automaticBackupService.flushPendingBackup({ reason: 'blur', timeoutMs: 1500 });
+        });
+        window.addEventListener('pagehide', () => {
+          void automaticBackupService.flushPendingBackup({ reason: 'background', timeoutMs: 1500 });
+        });
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') {
+            void automaticBackupService.flushPendingBackup({ reason: 'background', timeoutMs: 1500 });
+          }
+        });
       }
 
       if (PlatformDetector.isMobile()) {
@@ -214,8 +230,10 @@ async function startApp() {
         CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
             cloudSyncService.scheduleSync('resume', { delayMs: 0 });
-          } else if (cloudSyncService.hasPendingChanges()) {
-            void cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
+          } else {
+            const backupFlush = automaticBackupService.flushPendingBackup({ reason: 'background', timeoutMs: 3000 });
+            const syncFlush = cloudSyncService.flushPendingSync({ reason: 'background', timeoutMs: 3000 });
+            void Promise.allSettled([backupFlush, syncFlush]);
           }
         });
       }

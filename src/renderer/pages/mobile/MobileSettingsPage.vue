@@ -57,6 +57,91 @@
           <ion-label>{{ t('dataBackup.title') }}</ion-label>
         </ion-list-header>
 
+        <ion-item>
+          <ion-label>
+            <h3>{{ t('dataBackup.automaticBackupSettings') }}</h3>
+            <p>{{ t('dataBackup.automaticBackupDescription') }}</p>
+            <p>{{ t('dataBackup.automaticBackupLifecycleDescription') }}</p>
+          </ion-label>
+          <ion-toggle
+            slot="end"
+            :checked="autoBackupEnabled"
+            @ionChange="saveAutoBackupEnabled"
+          ></ion-toggle>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>{{ t('dataBackup.automaticBackupInterval') }}</ion-label>
+          <ion-select
+            slot="end"
+            interface="action-sheet"
+            :value="autoBackupIntervalSelection"
+            @ionChange="handleAutoBackupIntervalSelection"
+          >
+            <ion-select-option v-for="option in autoBackupIntervalOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <ion-item v-if="autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL">
+          <ion-label>{{ t('dataBackup.customIntervalMinutes') }}</ion-label>
+          <ion-input
+            class="backup-number-input"
+            slot="end"
+            type="number"
+            inputmode="numeric"
+            :min="MIN_AUTO_BACKUP_INTERVAL_MINUTES"
+            :max="MAX_AUTO_BACKUP_INTERVAL_MINUTES"
+            :value="autoBackupIntervalMinutes"
+            @ionInput="handleAutoBackupIntervalInput"
+          ></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>{{ t('dataBackup.automaticBackupRetention') }}</ion-label>
+          <ion-input
+            class="backup-number-input"
+            slot="end"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            max="100"
+            :value="autoBackupRetention"
+            @ionInput="handleAutoBackupRetentionInput"
+          ></ion-input>
+        </ion-item>
+
+        <div class="backup-policy-actions">
+          <ion-button
+            size="small"
+            fill="outline"
+            :disabled="autoBackupSaving"
+            @click="saveAutoBackupSettings"
+          >
+            {{ t('dataBackup.saveAutomaticBackupSettings') }}
+          </ion-button>
+          <ion-button
+            size="small"
+            fill="outline"
+            :disabled="autoBackupStatus.status === 'backing-up'"
+            @click="runAutoBackupNow"
+          >
+            {{ t('dataBackup.createNow') }}
+          </ion-button>
+        </div>
+
+        <ion-item lines="none">
+          <ion-note>
+            {{ t('dataBackup.lastAutomaticBackup', {
+              time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
+            }) }}
+            <template v-if="autoBackupStatus.nextBackupAt">
+              · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
+            </template>
+          </ion-note>
+        </ion-item>
+
         <ion-item button @click="handleExport">
           <ion-icon :icon="downloadOutline" slot="start"></ion-icon>
           <ion-label>{{ t('dataManagement.exportFullBackup') }}</ion-label>
@@ -83,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
@@ -99,6 +184,9 @@ import {
   IonSelectOption,
   IonIcon,
   IonNote,
+  IonInput,
+  IonToggle,
+  IonButton,
   alertController,
   loadingController
 } from '@ionic/vue'
@@ -116,6 +204,15 @@ import { databaseService } from '~/lib/db'
 import { dataRestoreService } from '~/lib/services/data-restore.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { createBackupPayload } from '@shared/backup-integrity'
+import {
+  automaticBackupService,
+  AUTOMATIC_BACKUP_INTERVAL_PRESETS,
+  DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
+  DEFAULT_AUTO_BACKUP_RETENTION,
+  MAX_AUTO_BACKUP_INTERVAL_MINUTES,
+  MIN_AUTO_BACKUP_INTERVAL_MINUTES,
+  type AutomaticBackupStatus
+} from '~/lib/services/automatic-backup.service'
 
 const router = useRouter()
 const { t, currentLocale, switchLocale } = useI18n()
@@ -124,6 +221,30 @@ const { themeSource, setThemeSource } = useTheme()
 const currentLanguage = ref(currentLocale.value)
 const currentTheme = ref(themeSource.value || 'system')
 const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '')
+const CUSTOM_AUTO_BACKUP_INTERVAL = 'custom' as const
+type AutoBackupIntervalSelection = number | typeof CUSTOM_AUTO_BACKUP_INTERVAL
+const autoBackupEnabled = ref(true)
+const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
+const autoBackupIntervalSelection = ref<AutoBackupIntervalSelection>(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
+const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
+const autoBackupSaving = ref(false)
+const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus())
+let unsubscribeAutoBackupStatus: (() => void) | null = null
+const formatAutomaticBackupInterval = (minutes: number) => {
+  if (minutes < 60) return t('dataBackup.backupEveryMinutes', { count: minutes })
+  if (minutes < 1440) return t('dataBackup.backupEveryHours', { count: minutes / 60 })
+  if (minutes === 1440) return t('dataBackup.backupEveryDay')
+  return t('dataBackup.backupEveryDays', { count: minutes / 1440 })
+}
+const autoBackupIntervalOptions = computed(() => [
+  ...AUTOMATIC_BACKUP_INTERVAL_PRESETS.map(minutes => ({
+    label: formatAutomaticBackupInterval(minutes),
+    value: minutes
+  })),
+  { label: t('dataBackup.customInterval'), value: CUSTOM_AUTO_BACKUP_INTERVAL }
+])
+const isAutomaticBackupIntervalPreset = (minutes: number) =>
+  (AUTOMATIC_BACKUP_INTERVAL_PRESETS as readonly number[]).includes(minutes)
 
 const createBackupId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -150,6 +271,81 @@ const handleThemeChange = async (event: any) => {
 
   await setThemeSource(newTheme)
 }
+
+const loadAutoBackupSettings = async () => {
+  const [enabled, intervalMinutes, retention] = await Promise.all([
+    automaticBackupService.getEnabled(),
+    automaticBackupService.getIntervalMinutes(),
+    automaticBackupService.getRetention()
+  ])
+  autoBackupEnabled.value = enabled
+  autoBackupIntervalMinutes.value = intervalMinutes
+  autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(intervalMinutes)
+    ? intervalMinutes
+    : CUSTOM_AUTO_BACKUP_INTERVAL
+  autoBackupRetention.value = retention
+}
+
+const saveAutoBackupEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
+  autoBackupEnabled.value = await automaticBackupService.setEnabled(event.detail.checked)
+  await showToast(t(autoBackupEnabled.value
+    ? 'dataBackup.automaticBackupEnabled'
+    : 'dataBackup.automaticBackupDisabled'))
+}
+
+const handleAutoBackupIntervalInput = (event: CustomEvent<{ value?: string | number | null }>) => {
+  const value = Number(event.detail.value)
+  if (Number.isFinite(value)) autoBackupIntervalMinutes.value = value
+}
+
+const handleAutoBackupIntervalSelection = (event: CustomEvent<{ value: AutoBackupIntervalSelection }>) => {
+  autoBackupIntervalSelection.value = event.detail.value
+  if (typeof event.detail.value === 'number') autoBackupIntervalMinutes.value = event.detail.value
+}
+
+const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | number | null }>) => {
+  const value = Number(event.detail.value)
+  if (Number.isFinite(value)) autoBackupRetention.value = value
+}
+
+const saveAutoBackupSettings = async () => {
+  autoBackupSaving.value = true
+  try {
+    autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
+    autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
+      ? autoBackupIntervalMinutes.value
+      : CUSTOM_AUTO_BACKUP_INTERVAL
+    const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value)
+    autoBackupRetention.value = retentionResult.retention
+    if (retentionResult.warnings.length > 0) {
+      await showToast(t('dataBackup.automaticBackupRetentionWarning', {
+        error: retentionResult.warnings.join('；')
+      }), 'warning')
+    } else {
+      await showToast(t('dataBackup.automaticBackupRetentionApplied', {
+        count: retentionResult.deletedCount
+      }))
+    }
+  } catch (error) {
+    await showToast(t('dataBackup.automaticBackupSettingsSaveFailed'), 'danger')
+  } finally {
+    autoBackupSaving.value = false
+  }
+}
+
+const runAutoBackupNow = async () => {
+  await automaticBackupService.runNow('manual')
+  const status = automaticBackupService.getStatus()
+  if (status.status === 'error') {
+    await showToast(t('dataBackup.automaticBackupFailed', { error: status.error || '' }), 'danger')
+  } else if (status.lastRunAction === 'unchanged') {
+    await showToast(t('dataBackup.automaticBackupUnchanged'))
+  } else {
+    await showToast(t('dataBackup.automaticBackupCreatedAndRotated', { count: status.deletedCount || 0 }))
+  }
+}
+
+const formatBackupDate = (value: string) => new Date(value).toLocaleString()
 
 // 导出数据
 const handleExport = async () => {
@@ -342,6 +538,11 @@ const navigateToAbout = () => {
 }
 
 onMounted(async () => {
+  unsubscribeAutoBackupStatus = automaticBackupService.onStatusChange(status => {
+    autoBackupStatus.value = status
+  })
+  await loadAutoBackupSettings()
+
   // 加载应用版本
   // appVersion.value = window.electronAPI?.getAppVersion() || '1.0.0'
 
@@ -356,6 +557,8 @@ onMounted(async () => {
     await setThemeSource('system')
   }
 })
+
+onUnmounted(() => unsubscribeAutoBackupStatus?.())
 </script>
 
 <style scoped>
@@ -364,5 +567,16 @@ ion-list-header {
   font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.backup-number-input {
+  width: 88px;
+  text-align: right;
+}
+
+.backup-policy-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
 }
 </style>

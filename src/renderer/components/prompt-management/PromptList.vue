@@ -362,7 +362,8 @@ import {
     NButtonGroup,
     NImage,
     NCarousel,
-    useMessage
+    useMessage,
+    useDialog
 } from 'naive-ui'
 import {
     Search,
@@ -414,6 +415,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 const message = useMessage()
+const dialog = useDialog()
 const { t } = useI18n()
 const { waitForDatabase } = useDatabase()
 const supportsGlobalShortcuts = PlatformDetector.getCapabilities().globalShortcuts
@@ -1420,7 +1422,9 @@ const handlePromptAction = (action: string, prompt: PromptWithRelations) => {
             openShortcutBinding(prompt)
             break
         case 'delete':
-            handleDeletePrompt(prompt)
+            // NDropdown emits select before it hides itself. Open the dialog on the
+            // next task so the dropdown can finish its focus restoration first.
+            window.setTimeout(() => handleDeletePrompt(prompt), 0)
             break
     }
 }
@@ -1509,25 +1513,31 @@ const handleCopyOriginalPrompt = async (prompt: PromptWithRelations) => {
     }
 }
 
-const handleDeletePrompt = async (prompt: PromptWithRelations) => {
-    if (confirm(t('promptManagement.confirmDeletePrompt', { title: prompt.title }))) {
-        try {
-            await api.prompts.delete.mutate(prompt.id!)
-            if (viewMode.value === 'table') {
-                await loadPromptsForTable()
-            } else if (viewMode.value === 'tree') {
-                await loadFolderData()
-            } else {
-                await loadPrompts(true) // 重置加载
+const handleDeletePrompt = (prompt: PromptWithRelations) => {
+    dialog.error({
+        title: t('common.confirm'),
+        content: t('promptManagement.confirmDeletePrompt', { title: prompt.title }),
+        positiveText: t('common.delete'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: async () => {
+            try {
+                await api.prompts.delete.mutate(prompt.id!)
+                if (viewMode.value === 'table') {
+                    await loadPromptsForTable()
+                } else if (viewMode.value === 'tree') {
+                    await loadFolderData()
+                } else {
+                    await loadPrompts(true) // 重置加载
+                }
+                await loadStatistics() // 重新加载统计信息
+                message.success(t('promptManagement.deleteSuccess'))
+                emit('refresh')
+            } catch (error) {
+                message.error(t('promptManagement.deleteFailed'))
+                console.error(error)
             }
-            await loadStatistics() // 重新加载统计信息
-            message.success(t('promptManagement.deleteSuccess'))
-            emit('refresh')
-        } catch (error) {
-            message.error(t('promptManagement.deleteFailed'))
-            console.error(error)
-        }
-    }
+        },
+    })
 }
 
 // 加载统计信息

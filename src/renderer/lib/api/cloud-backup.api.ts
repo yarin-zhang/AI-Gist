@@ -169,7 +169,8 @@ export class CloudBackupAPI {
   }
 
   /**
-   * 创建云端备份
+   * 仅用于用户明确触发的手动云端备份。
+   * 自动备份和同步维护流程不得调用此方法，以免产生持续上传和云端轮换流量。
    */
   static async createCloudBackup(
     storageId: string,

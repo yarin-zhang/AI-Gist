@@ -1351,12 +1351,8 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         createCloudSyncDataChecksum(manifest.latestSnapshot!.data)
       )
 
-      const snapshot = await service.readCloudSyncSnapshot(storageId, manifest.latestSnapshot!.revision)
-      expect(snapshot.dataChecksum).toBe(createCloudSyncDataChecksum(snapshot.data))
-      expect(snapshot.data).toEqual(manifest.latestSnapshot!.data)
-
       const snapshots = await service.listCloudSyncSnapshots(storageId)
-      expect(snapshots).toHaveLength(1)
+      expect(snapshots).toHaveLength(0)
     })
 
     it('桌面 WebDAVProvider 连续三次手动同步等价 JSON 数据时不会持续生成新版本', async () => {
@@ -1428,7 +1424,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
 
       const manifest = await cloudClient.getCloudSyncManifest(storageId)
       const snapshots = await cloudClient.listCloudSyncSnapshots(storageId)
-      expect(snapshots).toHaveLength(1)
+      expect(snapshots).toHaveLength(0)
       expect(manifest.latestSnapshot?.revision).toBe(firstSync.remoteRevision)
       expect(manifest.latestSnapshot?.dataChecksum).toBe(
         createCloudSyncDataChecksum(manifest.latestSnapshot!.data)
@@ -1692,7 +1688,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         expect(webThirdClickAfterUpdate).toMatchObject({ success: true, action: 'noop' })
 
         const remoteSnapshots = await webRuntime.client.listCloudSyncSnapshots(storageId)
-        expect(remoteSnapshots).toHaveLength(2)
+        expect(remoteSnapshots).toHaveLength(0)
 
         const desktopDownload = await desktopDevice.syncNow(storageId, {
           deviceName: 'Desktop Device',

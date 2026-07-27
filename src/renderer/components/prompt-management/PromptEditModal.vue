@@ -509,6 +509,7 @@ import {
     NImage,
     NP,
     useMessage,
+    useDialog,
 } from "naive-ui";
 import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo } from "@vicons/tabler";
 import { api } from "@/lib/api";
@@ -555,6 +556,7 @@ const emit = defineEmits<Emits>();
 const { t } = useI18n()
 const { getTagColor, getTagsArray } = useTagColors()
 const message = useMessage();
+const dialog = useDialog();
 const formRef = ref();
 const contentScrollbarRef = ref(); // 内容区域滚动条引用
 const saving = ref(false);
@@ -2169,6 +2171,16 @@ onBeforeUnmount(() => {
 });
 
 // Jinja 相关方法
+const confirmContentReset = (content: string, onConfirm: () => void) => {
+    dialog.warning({
+        title: t('common.confirm'),
+        content,
+        positiveText: t('common.confirm'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: onConfirm,
+    });
+};
+
 const toggleJinjaMode = () => {
     if (isJinjaEnabled.value) {
         // 从 Jinja 模式切换到变量模式
@@ -2178,12 +2190,12 @@ const toggleJinjaMode = () => {
         // 从变量模式切换到 Jinja 模式
         if (formData.value.content.trim()) {
             // 如果有现有内容，提示用户确认
-            if (confirm(t('promptManagement.jinjaClearContentMessage'))) {
+            confirmContentReset(t('promptManagement.jinjaClearContentMessage'), () => {
                 isJinjaEnabled.value = true;
                 formData.value.content = '';
                 formData.value.variables = [];
                 message.success(t('promptManagement.jinjaEnabled'));
-            }
+            });
         } else {
             // 没有内容，直接切换
             isJinjaEnabled.value = true;
@@ -2212,12 +2224,12 @@ const switchToRegularMode = () => {
         // 从 Jinja 模式切换到常规模式
         if (formData.value.content.trim()) {
             // 如果有现有内容，提示用户确认
-            if (confirm(t('promptManagement.regularModeClearContentMessage'))) {
+            confirmContentReset(t('promptManagement.regularModeClearContentMessage'), () => {
                 isJinjaEnabled.value = false;
                 formData.value.content = '';
                 formData.value.variables = [];
                 message.success(t('promptManagement.regularModeEnabled'));
-            }
+            });
         } else {
             // 没有内容，直接切换
             isJinjaEnabled.value = false;
@@ -2231,12 +2243,12 @@ const switchToJinjaMode = () => {
         // 从常规模式切换到 Jinja 模式
         if (formData.value.content.trim()) {
             // 如果有现有内容，提示用户确认
-            if (confirm(t('promptManagement.jinjaClearContentMessage'))) {
+            confirmContentReset(t('promptManagement.jinjaClearContentMessage'), () => {
                 isJinjaEnabled.value = true;
                 formData.value.content = '';
                 formData.value.variables = [];
                 message.success(t('promptManagement.jinjaEnabled'));
-            }
+            });
         } else {
             // 没有内容，直接切换
             isJinjaEnabled.value = true;

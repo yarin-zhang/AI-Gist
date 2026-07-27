@@ -293,6 +293,66 @@
             <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
                 {{ success }}
             </NAlert>
+
+            <NCollapse>
+                <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
+                    <NFlex vertical :size="16" style="padding-top: 4px;">
+                        <NText depth="3" style="font-size: 12px;">
+                            {{ t('dataBackup.automaticBackupDescription') }}
+                        </NText>
+                        <NText depth="3" style="font-size: 12px;">
+                            {{ t('dataBackup.automaticBackupLifecycleDescription') }}
+                        </NText>
+                        <NFlex align="center" justify="space-between" :size="12" wrap>
+                            <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
+                            <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
+                        </NFlex>
+                        <NFlex align="end" :size="12" wrap>
+                            <NFlex vertical :size="4">
+                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.automaticBackupInterval') }}</NText>
+                                <NSelect v-model:value="autoBackupIntervalSelection"
+                                    :options="autoBackupIntervalOptions"
+                                    style="width: 220px;"
+                                    @update:value="handleAutoBackupIntervalSelection" />
+                            </NFlex>
+                            <NFlex v-if="autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL" vertical :size="4">
+                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.customIntervalMinutes') }}</NText>
+                                <NInputNumber v-model:value="autoBackupIntervalMinutes"
+                                    :min="MIN_AUTO_BACKUP_INTERVAL_MINUTES"
+                                    :max="MAX_AUTO_BACKUP_INTERVAL_MINUTES"
+                                    :step="1" style="width: 180px;">
+                                    <template #suffix>{{ t('dataBackup.minutes') }}</template>
+                                </NInputNumber>
+                            </NFlex>
+                            <NFlex vertical :size="4">
+                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.automaticBackupRetention') }}</NText>
+                                <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
+                                    style="width: 160px;">
+                                    <template #suffix>{{ t('dataBackup.copies') }}</template>
+                                </NInputNumber>
+                            </NFlex>
+                            <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
+                                {{ t('dataBackup.saveAutomaticBackupSettings') }}
+                            </NButton>
+                            <NButton secondary @click="runAutoBackupNow"
+                                :loading="autoBackupStatus.status === 'backing-up'">
+                                {{ t('dataBackup.createNow') }}
+                            </NButton>
+                        </NFlex>
+                        <NText depth="3" style="font-size: 12px;">
+                            {{ t('dataBackup.lastAutomaticBackup', {
+                                time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
+                            }) }}
+                            <template v-if="autoBackupStatus.nextBackupAt">
+                                · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
+                            </template>
+                            <template v-if="autoBackupStatus.error">
+                                · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+                            </template>
+                        </NText>
+                    </NFlex>
+                </NCollapseItem>
+            </NCollapse>
                 </NFlex>
             </NTabPane>
 
@@ -311,47 +371,6 @@
             </template>
         </NAlert>
 
-        <NCollapse v-else style="margin-top: var(--section-gap);">
-            <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
-                <NFlex vertical :size="16" style="padding-top: 4px;">
-                    <NText depth="3" style="font-size: 12px;">
-                        {{ t('dataBackup.automaticBackupDescription') }}
-                    </NText>
-                    <NFlex align="center" justify="space-between" :size="12" wrap>
-                        <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
-                        <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
-                    </NFlex>
-                    <NFlex align="center" :size="12" wrap>
-                        <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080"
-                            :step="60" style="width: 180px;">
-                            <template #suffix>{{ t('dataBackup.minutes') }}</template>
-                        </NInputNumber>
-                        <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
-                            style="width: 160px;">
-                            <template #suffix>{{ t('dataBackup.copies') }}</template>
-                        </NInputNumber>
-                        <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
-                            {{ t('dataBackup.saveAutomaticBackupSettings') }}
-                        </NButton>
-                        <NButton secondary @click="runAutoBackupNow"
-                            :loading="autoBackupStatus.status === 'backing-up'">
-                            {{ t('dataBackup.createNow') }}
-                        </NButton>
-                    </NFlex>
-                    <NText depth="3" style="font-size: 12px;">
-                        {{ t('dataBackup.lastAutomaticBackup', {
-                            time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
-                        }) }}
-                        <template v-if="autoBackupStatus.nextBackupAt">
-                            · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
-                        </template>
-                        <template v-if="autoBackupStatus.error">
-                            · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
-                        </template>
-                    </NText>
-                </NFlex>
-            </NCollapseItem>
-        </NCollapse>
     </NCard>
 </template>
 
@@ -377,6 +396,7 @@ import {
     NCollapseItem,
     NSwitch,
     NInputNumber,
+    NSelect,
     useMessage,
 } from "naive-ui";
 import {
@@ -400,8 +420,11 @@ import { PlatformDetector } from '@shared/platform';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
 import {
     automaticBackupService,
+    AUTOMATIC_BACKUP_INTERVAL_PRESETS,
     DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
     DEFAULT_AUTO_BACKUP_RETENTION,
+    MAX_AUTO_BACKUP_INTERVAL_MINUTES,
+    MIN_AUTO_BACKUP_INTERVAL_MINUTES,
 } from '@/lib/services/automatic-backup.service';
 import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
@@ -414,12 +437,32 @@ const emit = defineEmits<{ 'navigate-section': [section: string] }>();
 
 const activeBackupLocation = ref('local');
 const storageConfigs = ref<CloudStorageConfig[]>([]);
+const CUSTOM_AUTO_BACKUP_INTERVAL = 'custom' as const;
+type AutoBackupIntervalSelection = number | typeof CUSTOM_AUTO_BACKUP_INTERVAL;
 const autoBackupEnabled = ref(true);
 const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
+const autoBackupIntervalSelection = ref<AutoBackupIntervalSelection>(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
 const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION);
 const autoBackupLoading = ref(false);
 const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus());
 let unsubscribeBackupStatus: (() => void) | null = null;
+const autoBackupIntervalOptions = computed(() => [
+    ...AUTOMATIC_BACKUP_INTERVAL_PRESETS.map(minutes => ({
+        label: formatAutomaticBackupInterval(minutes),
+        value: minutes,
+    })),
+    { label: t('dataBackup.customInterval'), value: CUSTOM_AUTO_BACKUP_INTERVAL },
+]);
+
+const formatAutomaticBackupInterval = (minutes: number) => {
+    if (minutes < 60) return t('dataBackup.backupEveryMinutes', { count: minutes });
+    if (minutes < 1440) return t('dataBackup.backupEveryHours', { count: minutes / 60 });
+    if (minutes === 1440) return t('dataBackup.backupEveryDay');
+    return t('dataBackup.backupEveryDays', { count: minutes / 1440 });
+};
+
+const isAutomaticBackupIntervalPreset = (minutes: number) =>
+    (AUTOMATIC_BACKUP_INTERVAL_PRESETS as readonly number[]).includes(minutes);
 
 // 使用数据管理 composable
 const {
@@ -565,6 +608,14 @@ const loadAutomaticBackupSettings = async () => {
         automaticBackupService.getIntervalMinutes(),
         automaticBackupService.getRetention(),
     ]);
+    autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
+        ? autoBackupIntervalMinutes.value
+        : CUSTOM_AUTO_BACKUP_INTERVAL;
+};
+
+const handleAutoBackupIntervalSelection = (value: AutoBackupIntervalSelection) => {
+    autoBackupIntervalSelection.value = value;
+    if (typeof value === 'number') autoBackupIntervalMinutes.value = value;
 };
 
 const saveAutoBackupEnabled = async (enabled: boolean) => {
@@ -576,6 +627,9 @@ const saveAutoBackupSettings = async () => {
     autoBackupLoading.value = true;
     try {
         autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
+        autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
+            ? autoBackupIntervalMinutes.value
+            : CUSTOM_AUTO_BACKUP_INTERVAL;
         const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value);
         autoBackupRetention.value = retentionResult.retention;
         if (retentionResult.warnings.length > 0) {

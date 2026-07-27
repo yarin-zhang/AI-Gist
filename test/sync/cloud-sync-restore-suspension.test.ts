@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CloudSyncService } from '~/lib/services/cloud-sync.service'
-import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import { createEmptyCloudSyncManifest } from '@shared/cloud-sync-manifest'
 import { createCloudSyncSnapshot } from '@shared/cloud-sync-engine'
 
@@ -78,9 +77,16 @@ describe('CloudSyncService restore suspensions', () => {
       manifest = nextManifest
       return { success: true }
     })
-    vi.spyOn(CloudBackupAPI, 'createCloudBackup').mockResolvedValue({
-      success: true,
-      message: 'safety backup created'
+    const createLocalBackup = vi.fn().mockResolvedValue({
+      action: 'created',
+      backup: {
+        id: 'local-safety-backup',
+        name: 'local-safety-backup',
+        description: 'Local safety backup',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        size: 10
+      },
+      deletedCount: 0
     })
     const service = new CloudSyncService({
       storage,
@@ -93,14 +99,15 @@ describe('CloudSyncService restore suspensions', () => {
       database: {
         exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, data: emptyData }),
         replaceAllData
-      }
+      },
+      localBackupService: { create: createLocalBackup }
     })
     await service.suspendEnabledStoragesAfterRestore({ source: 'local-file' })
 
     const result = await service.publishRestoredDataToCloud(config.id)
 
     expect(result).toMatchObject({ success: true, action: 'uploaded', uploadedRemote: true })
-    expect(CloudBackupAPI.createCloudBackup).toHaveBeenCalledWith(config.id, expect.objectContaining({
+    expect(createLocalBackup).toHaveBeenCalledWith(expect.objectContaining({
       trigger: 'pre-restore-cloud-overwrite',
       data: remoteData
     }))

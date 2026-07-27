@@ -107,11 +107,13 @@ const refreshCloudBackupList = async () => {
 };
 
 const createCloudBackup = async () => {
+    if (loading.create) return;
     loading.create = true;
     try {
         const result = await CloudBackupAPI.createCloudBackup(props.config.id, {
             description: t('dataBackup.manualCloudBackupDescription', { time: new Date().toLocaleString() }),
             backupType: 'manual',
+            trigger: 'manual',
         });
         if (!result.success) return message.error(result.error || t('dataBackup.createCloudBackupFailed'));
         message.success(result.message || t('dataBackup.createCloudBackupSuccess'));

@@ -12,6 +12,7 @@ import type {
 import {
   applyCloudSyncTombstones,
   createCloudSyncSemanticChecksum,
+  createCloudSyncSemanticSignature,
   createCloudSyncSnapshot,
   getCloudSyncRecordKey,
   mergeCloudSyncData,
@@ -35,7 +36,6 @@ import {
 import type {
   CloudSyncRemoteSnapshotInfo
 } from '@shared/cloud-sync-snapshots';
-import { planCloudRetention } from '@shared/cloud-retention';
 import {
   reconcileCloudSyncDataContract,
   pruneCloudSyncTombstonedPromptChildren,
@@ -49,6 +49,7 @@ import { DatabaseServiceManager } from './database-manager.service';
 import { AppSettingsService } from './app-settings.service';
 import { mobileCloudBackupService } from './mobile-cloud-backup.service';
 import { webCloudBackupService } from './web-cloud-backup.service';
+import { localBackupService } from './local-backup.service';
 import type { DataChangeEventPayload, DataStoreName } from './data-change-events';
 import { onDataChange } from './data-change-events';
 import {
@@ -57,11 +58,6 @@ import {
   type CloudSyncV2RolloutState
 } from './cloud-sync-v2-coordinator';
 import type { CloudSyncV2ObjectStorageAdapter } from '@shared/cloud-sync-v2-repository';
-import {
-  AUTO_BACKUP_RETENTION_SETTING_KEY,
-  DEFAULT_AUTO_BACKUP_RETENTION,
-  normalizeAutomaticBackupRetention
-} from './cloud-retention-settings';
 
 const DEVICE_ID_STORAGE_KEY = 'ai_gist_cloud_sync_device_id';
 const LOCAL_STATE_STORAGE_PREFIX = 'ai_gist_cloud_sync_state';
@@ -80,7 +76,8 @@ const DEFAULT_REMOTE_POLL_INTERVAL_MS = DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES * 60
 const DEFAULT_AUTO_SYNC_RETRY_MS = DEFAULT_REMOTE_POLL_INTERVAL_MS;
 const DEFAULT_STARTUP_SYNC_DELAY_MS = 10000;
 const MAX_AUTO_SYNC_RETRY_MS = 60 * 60 * 1000;
-const MAX_REMOTE_RECHECK_ATTEMPTS = 3;
+const MAX_REMOTE_RECHECK_ATTEMPTS = 5;
+const REMOTE_RECHECK_RETRY_STEP_MS = 200;
 const READ_AFTER_WRITE_VERIFY_ATTEMPTS = 4;
 const READ_AFTER_WRITE_VERIFY_RETRY_MS = 120;
 const MAX_REMOTE_SNAPSHOT_SCAN = 20;
@@ -193,11 +190,6 @@ export interface CloudSyncCloudClient {
     storageId: string,
     snapshot: CloudSyncRemoteSnapshotInfo | string
   ): Promise<CloudSyncSnapshot>;
-  saveCloudSyncSnapshot?(storageId: string, snapshot: CloudSyncSnapshot): Promise<{ success: boolean; error?: string }>;
-  deleteCloudSyncSnapshot?(
-    storageId: string,
-    snapshot: CloudSyncRemoteSnapshotInfo | string
-  ): Promise<{ success: boolean; error?: string }>;
 }
 
 export interface CloudSyncDatabaseClient {
@@ -292,6 +284,7 @@ export interface CloudSyncServiceDeps {
   createDeviceId?: () => string;
   subscribeToDataChanges?: (listener: (change: DataChangeEventPayload) => void) => () => void;
   v2Coordinator?: CloudSyncV2Coordinator;
+  localBackupService?: Pick<typeof localBackupService, 'create'>;
 }
 
 type CloudSyncStatusListener = (status: CloudSyncStatus) => void;
@@ -307,6 +300,7 @@ export class CloudSyncService {
   private readonly createDeviceId: () => string;
   private readonly subscribeToDataChanges: (listener: (change: DataChangeEventPayload) => void) => () => void;
   private readonly v2Coordinator: CloudSyncV2Coordinator;
+  private readonly localBackupService: Pick<typeof localBackupService, 'create'>;
   private readonly runningSyncs = new Map<string, Promise<CloudSyncResult>>();
   private readonly syncGenerations = new Map<string, number>();
   private readonly activeScheduledRuns = new Set<Promise<void>>();
@@ -341,7 +335,6 @@ export class CloudSyncService {
   private pendingChangeVersion = 0;
   private lastLocalChangeAt: string | undefined;
   private restoreSuspensions = new Map<string, CloudSyncRestoreSuspension>();
-  private readonly retentionMaintainedStorages = new Set<string>();
 
   constructor(deps: CloudSyncServiceDeps = {}) {
     this.cloudClient = deps.cloudClient;
@@ -351,13 +344,10 @@ export class CloudSyncService {
     this.storage = deps.storage || getBrowserStorage();
     this.createDeviceId = deps.createDeviceId || generateUUID;
     this.subscribeToDataChanges = deps.subscribeToDataChanges || (listener => onDataChange(SYNC_STORE_NAMES, listener));
+    this.localBackupService = deps.localBackupService || localBackupService;
     this.v2Coordinator = deps.v2Coordinator || new CloudSyncV2Coordinator({
       database: this.database,
       storageFactory: storageId => this.getCloudSyncV2StorageAdapter(storageId),
-      getRetention: async () => normalizeAutomaticBackupRetention(await this.settings.getNumberValue(
-        AUTO_BACKUP_RETENTION_SETTING_KEY,
-        DEFAULT_AUTO_BACKUP_RETENTION
-      )),
       allowExperimentalShadow: ENABLE_EXPERIMENTAL_CLOUD_SYNC_V2_SHADOW
     });
     this.restorePendingChangeState();
@@ -409,7 +399,7 @@ export class CloudSyncService {
 
     const syncPromise = this.performSync(storageId, options, 0, generation, generateUUID())
       .then(async result => {
-        if (result.success && result.remoteRevision) {
+        if (result.success && result.uploadedRemote && result.remoteRevision) {
           try {
             const v2Result = await this.v2Coordinator.mirrorSuccessfulV1Sync({
               storageId,
@@ -446,19 +436,6 @@ export class CloudSyncService {
             console.warn('手动同步成功后检查待处理自动同步失败:', error);
           }
         }
-        if (
-          result.success &&
-          result.remoteRevision &&
-          (result.uploadedRemote || !this.retentionMaintainedStorages.has(storageId))
-        ) {
-          const maintenance = await this.pruneCloudSyncSnapshots(storageId, result.remoteRevision);
-          if (maintenance.success) {
-            this.retentionMaintainedStorages.add(storageId);
-          }
-          if (maintenance.warning) {
-            result.warnings = [...(result.warnings || []), maintenance.warning];
-          }
-        }
         if (this.runningSyncs.get(storageId) !== syncPromise) {
           if (this.autoSyncOptions) this.scheduleSync('retry', { delayMs: 0 });
           return result;
@@ -479,6 +456,17 @@ export class CloudSyncService {
           this.blockedStorageFailures.delete(storageId);
           this.deterministicFailureGuards.delete(storageId);
           this.clearRetryTimerForStorage(storageId);
+        } else if (
+          (options.reason || 'manual') === 'manual' &&
+          this.autoSyncOptions &&
+          canAutoRetryCloudSyncResult(result)
+        ) {
+          this.scheduleRetry(
+            'manual',
+            result.error || '手动同步遇到暂时性错误，等待自动重试',
+            [storageId],
+            manualPendingVersion
+          );
         }
         return result;
       })
@@ -715,17 +703,13 @@ export class CloudSyncService {
       let safetyBackupCreated = false;
 
       if (remoteSnapshot) {
-        const safetyBackup = await CloudBackupAPI.createCloudBackup(storageId, {
-          description: `恢复前云端安全备份 - ${new Date().toLocaleString()}`,
+        await this.localBackupService.create({
+          description: `覆盖云端前的本地安全备份 - ${new Date().toLocaleString()}`,
           data: remoteSnapshot.data,
           backupType: 'manual',
           trigger: 'pre-restore-cloud-overwrite',
-          deviceId,
-          dataChecksum: remoteSnapshot.dataChecksum
+          deviceId
         });
-        if (!safetyBackup.success) {
-          throw new Error(safetyBackup.error || safetyBackup.message || '创建恢复前云端安全备份失败');
-        }
         safetyBackupCreated = true;
       }
 
@@ -781,7 +765,7 @@ export class CloudSyncService {
         },
         warnings: mergeWarnings(
           mergeWarnings(
-            safetyBackupCreated ? ['已创建恢复前云端安全备份'] : [],
+            safetyBackupCreated ? ['已在本机创建覆盖云端前的安全备份'] : [],
             localChangedDuringPublish ? '发布期间检测到新的本机编辑，已保留并等待下一次同步' : undefined
           ),
           stateWarning
@@ -1384,6 +1368,7 @@ export class CloudSyncService {
       throw new Error('云端同步文件状态持续变化，应用会在下个同步周期自动重试');
     }
 
+    await delay((attempt + 1) * REMOTE_RECHECK_RETRY_STEP_MS);
     return await this.performSync(storageId, options, attempt + 1, generation);
   }
 
@@ -1438,9 +1423,12 @@ export class CloudSyncService {
     try {
       const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
       this.assertCurrentSyncGeneration(storageId, generation);
+      if (manifest.latestSnapshot) {
+        return { manifest };
+      }
       return {
         manifest: await this.repairManifestFromSnapshotFiles(storageId, manifest, deviceId, now, options, {
-          required: !manifest.latestSnapshot
+          required: true
         }, generation)
       };
     } catch (error) {
@@ -1692,7 +1680,7 @@ export class CloudSyncService {
         ...manifest,
         updatedAt: now,
         latestSnapshot: snapshot,
-        baseSnapshot: snapshot,
+        baseSnapshot: undefined,
         conflicts: sanitizeCloudSyncConflictsForMetadata(conflicts)
       },
       {
@@ -1713,8 +1701,6 @@ export class CloudSyncService {
   ): Promise<void> {
     const cloudClient = this.getCloudClient();
     this.assertCurrentSyncGeneration(storageId, generation);
-    await this.saveSnapshotFileIfSupported(storageId, manifest.latestSnapshot);
-    this.assertCurrentSyncGeneration(storageId, generation);
     const result = await cloudClient.saveCloudSyncManifest(storageId, manifest, {
       expectedRevision
     });
@@ -1734,8 +1720,6 @@ export class CloudSyncService {
     manifest: CloudSyncManifest,
     generation: number
   ): Promise<void> {
-    this.assertCurrentSyncGeneration(storageId, generation);
-    await this.saveSnapshotFileIfSupported(storageId, manifest.latestSnapshot);
     this.assertCurrentSyncGeneration(storageId, generation);
     const result = await this.getCloudClient().saveCloudSyncManifest(storageId, manifest);
     this.assertCurrentSyncGeneration(storageId, generation);
@@ -1818,68 +1802,6 @@ export class CloudSyncService {
     return false;
   }
 
-  private async saveSnapshotFileIfSupported(
-    storageId: string,
-    snapshot?: CloudSyncSnapshot
-  ): Promise<void> {
-    if (!snapshot) {
-      return;
-    }
-
-    const cloudClient = this.getCloudClient();
-    if (!cloudClient.saveCloudSyncSnapshot) {
-      return;
-    }
-
-    const result = await cloudClient.saveCloudSyncSnapshot(storageId, snapshot);
-    if (!result.success) {
-      throw new Error(result.error || '保存云同步快照失败');
-    }
-  }
-
-  private async pruneCloudSyncSnapshots(
-    storageId: string,
-    protectedRevision: string
-  ): Promise<{ success: boolean; warning?: string }> {
-    const cloudClient = this.getCloudClient();
-    if (!cloudClient.listCloudSyncSnapshots || !cloudClient.deleteCloudSyncSnapshot) {
-      return { success: true };
-    }
-
-    try {
-      const configuredRetention = await this.settings.getNumberValue(
-        AUTO_BACKUP_RETENTION_SETTING_KEY,
-        DEFAULT_AUTO_BACKUP_RETENTION
-      );
-      const retention = normalizeAutomaticBackupRetention(configuredRetention);
-      const snapshots = await cloudClient.listCloudSyncSnapshots(storageId);
-      const plan = planCloudRetention(
-        snapshots.map(snapshot => ({
-          ...snapshot,
-          key: snapshot.revision,
-          protected: snapshot.revision === protectedRevision
-        })),
-        retention
-      );
-
-      for (const snapshot of plan.deleted) {
-        const result = await cloudClient.deleteCloudSyncSnapshot(storageId, snapshot);
-        if (!result.success) {
-          throw new Error(result.error || `删除旧同步快照失败: ${snapshot.revision}`);
-        }
-      }
-
-      return { success: plan.deferred.length === 0 };
-    } catch (error) {
-      return {
-        success: false,
-        warning: `同步已成功，但旧恢复版本清理失败，将在后续同步重试：${
-          error instanceof Error ? error.message : String(error)
-        }`
-      };
-    }
-  }
-
   private async verifySavedManifest(
     storageId: string,
     manifest: CloudSyncManifest,
@@ -1908,16 +1830,6 @@ export class CloudSyncService {
     storageId: string,
     manifest: CloudSyncManifest
   ): Promise<void> {
-    const expectedSnapshot = manifest.latestSnapshot;
-    if (!expectedSnapshot) {
-      return;
-    }
-
-    const savedSnapshotFile = await this.readSnapshotFileIfSupported(storageId, expectedSnapshot.revision);
-    if (savedSnapshotFile) {
-      this.assertSavedSnapshotMatches(savedSnapshotFile, expectedSnapshot, '云同步快照文件');
-    }
-
     await this.verifySavedManifestContentOnce(storageId, manifest);
   }
 
@@ -2031,9 +1943,7 @@ export class CloudSyncService {
         saveCloudSyncManifest: (storageId, manifest, options) =>
           CloudBackupAPI.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => CloudBackupAPI.listCloudSyncSnapshots(storageId),
-        readCloudSyncSnapshot: (storageId, snapshot) => CloudBackupAPI.readCloudSyncSnapshot(storageId, snapshot),
-        saveCloudSyncSnapshot: (storageId, snapshot) => CloudBackupAPI.saveCloudSyncSnapshot(storageId, snapshot),
-        deleteCloudSyncSnapshot: (storageId, snapshot) => CloudBackupAPI.deleteCloudSyncSnapshot(storageId, snapshot)
+        readCloudSyncSnapshot: (storageId, snapshot) => CloudBackupAPI.readCloudSyncSnapshot(storageId, snapshot)
       };
     }
 
@@ -2043,9 +1953,7 @@ export class CloudSyncService {
         saveCloudSyncManifest: (storageId, manifest, options) =>
           webCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => webCloudBackupService.listCloudSyncSnapshots(storageId),
-        readCloudSyncSnapshot: (storageId, snapshot) => webCloudBackupService.readCloudSyncSnapshot(storageId, snapshot),
-        saveCloudSyncSnapshot: (storageId, snapshot) => webCloudBackupService.saveCloudSyncSnapshot(storageId, snapshot),
-        deleteCloudSyncSnapshot: (storageId, snapshot) => webCloudBackupService.deleteCloudSyncSnapshot(storageId, snapshot)
+        readCloudSyncSnapshot: (storageId, snapshot) => webCloudBackupService.readCloudSyncSnapshot(storageId, snapshot)
       };
     }
 
@@ -2054,9 +1962,7 @@ export class CloudSyncService {
       saveCloudSyncManifest: (storageId, manifest, options) =>
         mobileCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
       listCloudSyncSnapshots: storageId => mobileCloudBackupService.listCloudSyncSnapshots(storageId),
-      readCloudSyncSnapshot: (storageId, snapshot) => mobileCloudBackupService.readCloudSyncSnapshot(storageId, snapshot),
-      saveCloudSyncSnapshot: (storageId, snapshot) => mobileCloudBackupService.saveCloudSyncSnapshot(storageId, snapshot),
-      deleteCloudSyncSnapshot: (storageId, snapshot) => mobileCloudBackupService.deleteCloudSyncSnapshot(storageId, snapshot)
+      readCloudSyncSnapshot: (storageId, snapshot) => mobileCloudBackupService.readCloudSyncSnapshot(storageId, snapshot)
     };
   }
 
@@ -3326,7 +3232,11 @@ function createCloudSyncStructuredDiagnostic(
   } else if (error instanceof CloudSyncLocalChangedError) {
     code = 'SYNC_CANCELLED';
     retryClass = 'transient';
-  } else if (isCloudSyncRemoteChangedError(error) || isCloudSyncRevisionConflictMessage(message)) {
+  } else if (
+    isCloudSyncRemoteChangedError(error) ||
+    isCloudSyncRevisionConflictMessage(message) ||
+    isCloudSyncInstabilityError(message)
+  ) {
     code = 'REMOTE_CHANGED';
     retryClass = 'remote-changed';
   } else if (isCloudSyncAuthError(message)) {
@@ -3427,13 +3337,18 @@ function createEmptySummary(): CloudSyncMergeSummary {
 }
 
 function dataSetsEqual(left: CloudSyncDataSet, right: CloudSyncDataSet): boolean {
-  return createCloudSyncSemanticChecksum(left) === createCloudSyncSemanticChecksum(right);
+  const leftChecksum = createCloudSyncSemanticChecksum(left);
+  const rightChecksum = createCloudSyncSemanticChecksum(right);
+  return leftChecksum === rightChecksum &&
+    createCloudSyncSemanticSignature(left) === createCloudSyncSemanticSignature(right);
 }
 
 function canAutoRetryCloudSyncResult(result: CloudSyncResult): boolean {
   const retryClass = result.diagnostic?.retryClass;
   if (retryClass) {
-    return retryClass === 'transient' || retryClass === 'remote-changed';
+    return retryClass === 'transient' ||
+      retryClass === 'remote-changed' ||
+      isCloudSyncInstabilityError(result.error || '');
   }
   return isCloudSyncNetworkError(result.error || '') || isCloudSyncInstabilityError(result.error || '');
 }

@@ -26,4 +26,21 @@ describe('mobile sync and restore UI wiring', () => {
     expect(cloudPage).toContain('publishRestoredDataToCloud')
     expect(cloudPage).toContain('resumeRestoreWithMerge')
   })
+
+  it('keeps automatic backups local while allowing explicit manual cloud backups', () => {
+    const cloudPage = read('src/renderer/pages/mobile/MobileCloudBackupPage.vue')
+    const settingsPage = read('src/renderer/pages/mobile/MobileSettingsPage.vue')
+
+    expect(cloudPage).not.toContain('automaticBackupService')
+    expect(cloudPage).toContain('CloudBackupAPI.createCloudBackup(')
+    expect(cloudPage).toContain("t('cloudBackup.createCloudBackup')")
+    expect(cloudPage).toContain("backupType: 'manual'")
+    expect(cloudPage).toContain("trigger: 'manual'")
+    expect(settingsPage).toContain('automaticBackupService')
+    expect(settingsPage).toContain("t('dataBackup.automaticBackupDescription')")
+    expect(settingsPage).toContain('<ion-select-option v-for="option in autoBackupIntervalOptions"')
+    expect(settingsPage).toContain('CUSTOM_AUTO_BACKUP_INTERVAL')
+    expect(settingsPage).toContain("t('dataBackup.automaticBackupLifecycleDescription')")
+    expect(settingsPage).toContain('@click="runAutoBackupNow"')
+  })
 })

@@ -276,7 +276,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
     expect(manifest.latestSnapshot?.data.promptHistories).toEqual(expect.arrayContaining([
       expect.objectContaining({ uuid: 'icloud-history-mobile-update', imageBlobs: [UPDATED_IMAGE] })
     ]))
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(2)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(0)
 
     const manifestFile = JSON.parse(
       await fsp.readFile(getFakeICloudFilePath(storageId, getCloudSyncManifestPath()), 'utf-8')
@@ -286,7 +286,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
       .toBe(createCloudSyncDataChecksum(manifestFile.latestSnapshot.data))
   })
 
-  it('iCloud Drive 同步到一半只写入 snapshot 时重启能从快照恢复 manifest', async () => {
+  it('iCloud Drive manifest 写入中断时不会留下新 snapshot，重启后可重新发布当前状态', async () => {
     const storageId = 'icloud-half-written-snapshot-before-manifest'
     let failManifestWrite = true
     const interruptedClient = createICloudSyncClient(storageId, {
@@ -319,7 +319,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
     expect(failed.error).toContain('iCloud manifest pointer')
 
     const normalClient = createICloudSyncClient(storageId)
-    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(0)
     expect((await normalClient.getCloudSyncManifest(storageId)).latestSnapshot).toBeUndefined()
 
     const restartedDevice = createSyncService(
@@ -335,7 +335,8 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
     })
     expect(recovered, JSON.stringify(recovered, null, 2)).toMatchObject({
       success: true,
-      uploadedRemote: false,
+      action: 'uploaded',
+      uploadedRemote: true,
       appliedLocal: false
     })
     expect(recovered.error).toBeUndefined()
@@ -358,7 +359,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
         imageBlobs: [INITIAL_IMAGE]
       })
     ]))
-    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(0)
 
     const repeatedClick = await restartedDevice.syncNow(storageId, {
       deviceName: 'MacBook Interrupted Restarted',
@@ -366,7 +367,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
       reason: 'manual'
     })
     expect(repeatedClick).toMatchObject({ success: true, action: 'noop' })
-    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(1)
+    expect(await normalClient.listCloudSyncSnapshots(storageId)).toHaveLength(0)
   })
 
   it('iCloud Drive manifest 可读时不会把残留孤立 snapshot 当作最新数据', async () => {
@@ -499,7 +500,7 @@ describe('Cloud sync robustness E2E over iCloud Drive local provider', () => {
     ]))
     expect(finalManifest.latestSnapshot?.dataChecksum)
       .toBe(createCloudSyncDataChecksum(finalManifest.latestSnapshot!.data))
-    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(3)
+    expect(await client.listCloudSyncSnapshots(storageId)).toHaveLength(1)
   })
 })
 

@@ -465,7 +465,8 @@ function normalizeCloudSyncSnapshotForFile(snapshot) {
     revision: snapshot.revision,
     createdAt: snapshot.createdAt,
     data: snapshot.data,
-    dataChecksum: snapshot.dataChecksum || createCloudSyncDataChecksum(snapshot.data)
+    dataChecksum: snapshot.dataChecksum || createCloudSyncDataChecksum(snapshot.data),
+    contentChecksum: snapshot.contentChecksum
   };
 }
 
@@ -500,17 +501,22 @@ function validateCloudSyncSnapshot(snapshot) {
     }
   }
 
-  if (snapshot.dataChecksum === undefined) {
-    return { valid: true };
+  if (snapshot.dataChecksum !== undefined) {
+    if (typeof snapshot.dataChecksum !== 'string' || !snapshot.dataChecksum) {
+      return { valid: false, reason: 'snapshot dataChecksum is invalid' };
+    }
+
+    const actualChecksum = createCloudSyncDataChecksum(snapshot.data);
+    if (snapshot.dataChecksum !== actualChecksum) {
+      return { valid: false, reason: 'snapshot data checksum mismatch' };
+    }
   }
 
-  if (typeof snapshot.dataChecksum !== 'string' || !snapshot.dataChecksum) {
-    return { valid: false, reason: 'snapshot dataChecksum is invalid' };
-  }
-
-  const actualChecksum = createCloudSyncDataChecksum(snapshot.data);
-  if (snapshot.dataChecksum !== actualChecksum) {
-    return { valid: false, reason: 'snapshot data checksum mismatch' };
+  if (
+    snapshot.contentChecksum !== undefined &&
+    (typeof snapshot.contentChecksum !== 'string' || !snapshot.contentChecksum)
+  ) {
+    return { valid: false, reason: 'snapshot contentChecksum is invalid' };
   }
 
   return { valid: true };
@@ -757,11 +763,9 @@ async function getWebDAVSyncManifest({ config }) {
   const backupPath = normalizeRemotePath(CLOUD_BACKUP_DIR, CLOUD_SYNC_MANIFEST_BACKUP_FILE);
   try {
     const primaryState = await tryReadWebDAVSyncManifestFileWithMeta(client, manifestPath);
+    if (primaryState?.manifest) return primaryState.manifest;
     const backupState = await tryReadWebDAVSyncManifestFileWithMeta(client, backupPath);
-    return selectNewestWebDAVSyncManifest(
-      primaryState?.manifest,
-      backupState?.manifest
-    ) || createEmptyCloudSyncManifest();
+    return backupState?.manifest || createEmptyCloudSyncManifest();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('404') || message.includes('not found')) {
@@ -813,9 +817,10 @@ async function saveWebDAVSyncManifest({ config, manifest, options = {} }) {
   const content = JSON.stringify(normalizedManifest, null, 2);
 
   const primaryState = await tryReadWebDAVSyncManifestFileWithMeta(client, manifestPath);
-  const backupState = await tryReadWebDAVSyncManifestFileWithMeta(client, backupPath);
-  let currentManifest = selectNewestWebDAVSyncManifest(primaryState?.manifest, backupState?.manifest);
-  currentManifest = currentManifest || createEmptyCloudSyncManifest();
+  const backupState = primaryState?.manifest
+    ? null
+    : await tryReadWebDAVSyncManifestFileWithMeta(client, backupPath);
+  const currentManifest = primaryState?.manifest || backupState?.manifest || createEmptyCloudSyncManifest();
 
   assertExpectedCloudSyncRevision(currentManifest, options.expectedRevision);
 
@@ -1115,38 +1120,6 @@ async function tryReadWebDAVSyncManifestFileWithMeta(client, remotePath) {
 
 function getCloudSyncManifestRevision(manifest) {
   return manifest?.latestSnapshot?.revision || null;
-}
-
-function selectNewestWebDAVSyncManifest(primaryManifest, backupManifest) {
-  if (!primaryManifest) {
-    return backupManifest || null;
-  }
-
-  if (!backupManifest) {
-    return primaryManifest;
-  }
-
-  return getWebDAVSyncManifestTime(backupManifest) > getWebDAVSyncManifestTime(primaryManifest)
-    ? backupManifest
-    : primaryManifest;
-}
-
-function getWebDAVSyncManifestTime(manifest) {
-  const candidates = [
-    manifest.updatedAt,
-    manifest.latestSnapshot?.createdAt,
-    manifest.baseSnapshot?.createdAt
-  ];
-
-  let newestTime = 0;
-  for (const candidate of candidates) {
-    const time = new Date(candidate || '').getTime();
-    if (!Number.isNaN(time)) {
-      newestTime = Math.max(newestTime, time);
-    }
-  }
-
-  return newestTime;
 }
 
 function assertExpectedCloudSyncRevision(manifest, expectedRevision) {
