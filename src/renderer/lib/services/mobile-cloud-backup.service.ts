@@ -964,8 +964,8 @@ export class MobileCloudBackupService {
     const backupPath = getCloudSyncManifestBackupPath()
 
     if (options.expectedRevision === undefined) {
-      await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
       await this.writeWebDAVSyncManifestFile(config, primaryPath, manifest)
+      await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
       return
     }
 
@@ -1295,8 +1295,8 @@ export class MobileCloudBackupService {
     await this.ensureICloudDirectory(dirPath)
 
     if (options.expectedRevision === undefined) {
-      await this.writeICloudSyncManifestFile(dirPath, CLOUD_SYNC_MANIFEST_BACKUP_FILE, manifest)
       await this.writeICloudSyncManifestFile(dirPath, CLOUD_SYNC_MANIFEST_FILE, manifest)
+      await this.writeICloudSyncManifestFile(dirPath, CLOUD_SYNC_MANIFEST_BACKUP_FILE, manifest)
       return
     }
 

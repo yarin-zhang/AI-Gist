@@ -9,6 +9,7 @@ import {
 import { emitDataChange } from '~/lib/services/data-change-events'
 import {
   createCloudSyncDataChecksum,
+  createCloudSyncSemanticChecksum,
   createCloudSyncSnapshot
 } from '@shared/cloud-sync-engine'
 import {
@@ -275,21 +276,31 @@ describe('CloudSyncService', () => {
     })
 
     const first = await service.syncNow('cfg-1', { reason: 'interval' })
+    expect(first).toMatchObject({ success: true, action: 'uploaded' })
+    expect(cloudClient.saveCloudSyncSnapshot).not.toHaveBeenCalled()
+    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
+    expect(v2Coordinator.mirrorSuccessfulV1Sync).toHaveBeenCalledTimes(1)
+
+    cloudClient.saveCloudSyncSnapshot.mockClear()
+    cloudClient.saveCloudSyncManifest.mockClear()
+    cloudClient.listCloudSyncSnapshots.mockClear()
+    cloudClient.deleteCloudSyncSnapshot.mockClear()
+    v2Coordinator.mirrorSuccessfulV1Sync.mockClear()
+
     const unchangedResults = []
     for (let index = 0; index < 12; index += 1) {
       unchangedResults.push(await service.syncNow('cfg-1', { reason: 'interval' }))
     }
 
-    expect(first).toMatchObject({ success: true, action: 'uploaded' })
     expect(unchangedResults.every(result => result.success && result.action === 'noop')).toBe(true)
-    expect(cloudClient.saveCloudSyncSnapshot).toHaveBeenCalledTimes(1)
-    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalledTimes(1)
-    expect(cloudClient.listCloudSyncSnapshots).toHaveBeenCalledTimes(1)
+    expect(cloudClient.saveCloudSyncSnapshot).not.toHaveBeenCalled()
+    expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+    expect(cloudClient.listCloudSyncSnapshots).not.toHaveBeenCalled()
     expect(cloudClient.deleteCloudSyncSnapshot).not.toHaveBeenCalled()
-    expect(v2Coordinator.mirrorSuccessfulV1Sync).toHaveBeenCalledTimes(13)
+    expect(v2Coordinator.mirrorSuccessfulV1Sync).not.toHaveBeenCalled()
   })
 
-  it('a startup no-op immediately cleans accumulated sync snapshots while protecting the manifest head', async () => {
+  it('a startup no-op leaves legacy sync snapshots untouched', async () => {
     const currentSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'snapshot-0')
     const manifest = {
       ...createEmptyCloudSyncManifest('2026-06-01T00:00:00.000Z'),
@@ -323,12 +334,13 @@ describe('CloudSyncService', () => {
 
     expect(result).toMatchObject({ success: true, action: 'noop', uploadedRemote: false })
     expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
-    expect(cloudClient.deleteCloudSyncSnapshot).toHaveBeenCalledTimes(20)
-    expect(snapshots).toHaveLength(5)
+    expect(cloudClient.listCloudSyncSnapshots).not.toHaveBeenCalled()
+    expect(cloudClient.deleteCloudSyncSnapshot).not.toHaveBeenCalled()
+    expect(snapshots).toHaveLength(25)
     expect(snapshots.some(snapshot => snapshot.revision === currentSnapshot.revision)).toBe(true)
   })
 
-  it('snapshot retention deletion failure stays a warning and retries without re-uploading data', async () => {
+  it('does not perform legacy snapshot retention maintenance during no-op syncs', async () => {
     const currentSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'snapshot-current')
     const manifest = {
       ...createEmptyCloudSyncManifest('2026-06-01T00:00:00.000Z'),
@@ -366,9 +378,9 @@ describe('CloudSyncService', () => {
 
     expect(first).toMatchObject({ success: true, action: 'noop' })
     expect(second).toMatchObject({ success: true, action: 'noop' })
-    expect(first.warnings?.join(' ')).toContain('旧恢复版本清理失败')
-    expect(cloudClient.listCloudSyncSnapshots).toHaveBeenCalledTimes(2)
-    expect(cloudClient.deleteCloudSyncSnapshot).toHaveBeenCalledTimes(2)
+    expect(first.warnings).toBeUndefined()
+    expect(cloudClient.listCloudSyncSnapshots).not.toHaveBeenCalled()
+    expect(cloudClient.deleteCloudSyncSnapshot).not.toHaveBeenCalled()
     expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
   })
 
@@ -453,7 +465,7 @@ describe('CloudSyncService', () => {
     expect(database.replaceAllData).not.toHaveBeenCalled()
   })
 
-  it('writes the immutable snapshot before updating the manifest pointer', async () => {
+  it('publishes changed data only through the current manifest state', async () => {
     const storage = new MemoryStorage()
     let cloudManifest = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
     const savedSnapshots = new Map<string, any>()
@@ -500,8 +512,9 @@ describe('CloudSyncService', () => {
     const result = await service.syncNow('cfg-1')
 
     expect(result.success).toBe(true)
-    expect(callOrder).toEqual(['snapshot', 'manifest'])
-    expect(savedSnapshots.has(cloudManifest.latestSnapshot!.revision)).toBe(true)
+    expect(callOrder).toEqual(['manifest'])
+    expect(savedSnapshots.size).toBe(0)
+    expect(cloudManifest.baseSnapshot).toBeUndefined()
     expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(3)
   })
 
@@ -627,7 +640,7 @@ describe('CloudSyncService', () => {
     expect(result.success).toBe(true)
     expect(result.remoteRevision).toBe('rev-from-file')
     expect(cloudClient.listCloudSyncSnapshots).toHaveBeenCalledTimes(1)
-    expect(savedSnapshots[0].revision).toBe('rev-from-file')
+    expect(savedSnapshots).toHaveLength(0)
     expect(savedManifests[0].latestSnapshot.revision).toBe('rev-from-file')
     expect(database.replaceAllData).not.toHaveBeenCalled()
   })
@@ -704,15 +717,11 @@ describe('CloudSyncService', () => {
     )
     expect(savedManifests[0].latestSnapshot.revision).not.toBe('rev-new-file')
     expect(savedManifests[0].latestSnapshot.data.prompts[0].title).toBe('New file snapshot')
-    expect(cloudClient.saveCloudSyncSnapshot).toHaveBeenCalledWith('cfg-1', expect.objectContaining({
-      data: expect.objectContaining({
-        prompts: expect.arrayContaining([expect.objectContaining({ title: 'New file snapshot' })])
-      })
-    }))
+    expect(cloudClient.saveCloudSyncSnapshot).not.toHaveBeenCalled()
     expect(database.replaceAllData).not.toHaveBeenCalled()
   })
 
-  it('repairs a readable manifest inline snapshot from the matching immutable snapshot file', async () => {
+  it('does not inspect a matching legacy snapshot file when the manifest is readable', async () => {
     const remoteSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'rev-shared')
     const corruptedData = {
       ...baseData,
@@ -724,7 +733,8 @@ describe('CloudSyncService', () => {
     const corruptedSnapshot = {
       ...remoteSnapshot,
       data: corruptedData,
-      dataChecksum: createCloudSyncDataChecksum(corruptedData)
+      dataChecksum: createCloudSyncDataChecksum(corruptedData),
+      contentChecksum: createCloudSyncSemanticChecksum(corruptedData)
     }
     let cloudManifest = {
       ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
@@ -782,11 +792,10 @@ describe('CloudSyncService', () => {
     expect(result.success).toBe(true)
     expect(result.action).toBe('downloaded')
     expect(cloudClient.listCloudSyncSnapshots).not.toHaveBeenCalled()
-    expect(cloudClient.readCloudSyncSnapshot).toHaveBeenCalledWith('cfg-1', 'rev-shared')
-    expect(savedManifests[0].latestSnapshot.data.prompts[0].title).toBe('Base')
-    expect(savedManifests[0].latestSnapshot.dataChecksum).toBe(createCloudSyncDataChecksum(baseData))
+    expect(cloudClient.readCloudSyncSnapshot).not.toHaveBeenCalled()
+    expect(savedManifests).toHaveLength(0)
     expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
-      prompts: expect.arrayContaining([expect.objectContaining({ title: 'Base' })])
+      prompts: expect.arrayContaining([expect.objectContaining({ title: 'Corrupted inline manifest copy' })])
     }))
   })
 

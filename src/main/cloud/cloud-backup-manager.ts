@@ -960,8 +960,8 @@ export class CloudBackupManager {
 
     const content = Buffer.from(JSON.stringify(normalizedManifest, null, 2), 'utf-8');
     if (options.expectedRevision === undefined) {
-      await provider.writeFile(backupPath, content);
       await provider.writeFile(manifestPath, content);
+      await provider.writeFile(backupPath, content);
       return;
     }
 

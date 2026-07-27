@@ -8,10 +8,6 @@
                 </NText>
             </div>
             <NFlex :size="12">
-                <NButton type="primary" @click="createCloudBackup" :loading="loading.create">
-                    <template #icon><NIcon><Upload /></NIcon></template>
-                    {{ t('dataBackup.createCloudBackup') }}
-                </NButton>
                 <NButton @click="refreshCloudBackupList" :loading="loading.refresh">
                     <template #icon><NIcon><Refresh /></NIcon></template>
                     {{ t('dataBackup.refreshBackupList') }}
@@ -77,7 +73,7 @@ import {
     NButton, NCard, NEmpty, NFlex, NGrid, NGridItem, NIcon, NPagination,
     NPopconfirm, NTag, NText, useMessage,
 } from 'naive-ui';
-import { Recharging, Refresh, Trash, Upload } from '@vicons/tabler';
+import { Recharging, Refresh, Trash } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup';
 
@@ -87,7 +83,7 @@ const message = useMessage();
 const cloudBackups = ref<CloudBackupInfo[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(6);
-const loading = reactive({ refresh: false, create: false, restore: false });
+const loading = reactive({ refresh: false, restore: false });
 const totalPages = computed(() => Math.ceil(cloudBackups.value.length / pageSize.value));
 const paginatedBackups = computed(() => {
     const start = (currentPage.value - 1) * pageSize.value;
@@ -104,22 +100,6 @@ const refreshCloudBackupList = async () => {
         console.error('刷新云端备份列表失败:', error);
         message.error(t('dataBackup.loadCloudBackupsFailed'));
     } finally { loading.refresh = false; }
-};
-
-const createCloudBackup = async () => {
-    loading.create = true;
-    try {
-        const result = await CloudBackupAPI.createCloudBackup(props.config.id, {
-            description: t('dataBackup.manualCloudBackupDescription', { time: new Date().toLocaleString() }),
-            backupType: 'manual',
-        });
-        if (!result.success) return message.error(result.error || t('dataBackup.createCloudBackupFailed'));
-        message.success(result.message || t('dataBackup.createCloudBackupSuccess'));
-        await refreshCloudBackupList();
-    } catch (error) {
-        console.error('创建云端备份失败:', error);
-        message.error(error instanceof Error ? error.message : t('dataBackup.createCloudBackupFailed'));
-    } finally { loading.create = false; }
 };
 
 const restoreCloudBackup = async (backupId: string) => {

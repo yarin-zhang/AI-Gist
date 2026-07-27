@@ -169,7 +169,7 @@ export class CloudBackupAPI {
   }
 
   /**
-   * 创建云端备份
+   * @deprecated 新版本仅保留对旧云端备份的读取、恢复和手动删除；不要从产品流程调用此方法。
    */
   static async createCloudBackup(
     storageId: string,

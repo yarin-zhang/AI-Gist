@@ -43,7 +43,7 @@ describe('cloud sync manifest fallback', () => {
     })
   })
 
-  it('returns the backup manifest when both copies are valid and backup is newer', async () => {
+  it('treats the primary manifest as authoritative without reading a newer backup copy', async () => {
     const primaryManifest = {
       ...createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
       latestSnapshot: createCloudSyncSnapshot(baseData, 'device-a', 'rev-primary')
@@ -60,8 +60,24 @@ describe('cloud sync manifest fallback', () => {
       readBackup
     })
 
-    expect(manifest.latestSnapshot?.revision).toBe('rev-backup')
+    expect(manifest.latestSnapshot?.revision).toBe('rev-primary')
     expect(readPrimary).toHaveBeenCalledTimes(1)
+    expect(readBackup).not.toHaveBeenCalled()
+  })
+
+  it('uses the backup manifest only when the primary copy cannot be read', async () => {
+    const backupManifest = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: createCloudSyncSnapshot(baseData, 'device-b', 'rev-backup')
+    }
+    const readBackup = vi.fn().mockResolvedValue(backupManifest)
+
+    const manifest = await readCloudSyncManifestWithFallback({
+      readPrimary: vi.fn().mockRejectedValue(new Error('primary is corrupt')),
+      readBackup
+    })
+
+    expect(manifest.latestSnapshot?.revision).toBe('rev-backup')
     expect(readBackup).toHaveBeenCalledTimes(1)
   })
 

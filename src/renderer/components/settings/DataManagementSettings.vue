@@ -293,6 +293,48 @@
             <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
                 {{ success }}
             </NAlert>
+
+            <NCollapse>
+                <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
+                    <NFlex vertical :size="16" style="padding-top: 4px;">
+                        <NText depth="3" style="font-size: 12px;">
+                            {{ t('dataBackup.automaticBackupDescription') }}
+                        </NText>
+                        <NFlex align="center" justify="space-between" :size="12" wrap>
+                            <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
+                            <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
+                        </NFlex>
+                        <NFlex align="center" :size="12" wrap>
+                            <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080"
+                                :step="60" style="width: 180px;">
+                                <template #suffix>{{ t('dataBackup.minutes') }}</template>
+                            </NInputNumber>
+                            <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
+                                style="width: 160px;">
+                                <template #suffix>{{ t('dataBackup.copies') }}</template>
+                            </NInputNumber>
+                            <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
+                                {{ t('dataBackup.saveAutomaticBackupSettings') }}
+                            </NButton>
+                            <NButton secondary @click="runAutoBackupNow"
+                                :loading="autoBackupStatus.status === 'backing-up'">
+                                {{ t('dataBackup.createNow') }}
+                            </NButton>
+                        </NFlex>
+                        <NText depth="3" style="font-size: 12px;">
+                            {{ t('dataBackup.lastAutomaticBackup', {
+                                time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
+                            }) }}
+                            <template v-if="autoBackupStatus.nextBackupAt">
+                                · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
+                            </template>
+                            <template v-if="autoBackupStatus.error">
+                                · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+                            </template>
+                        </NText>
+                    </NFlex>
+                </NCollapseItem>
+            </NCollapse>
                 </NFlex>
             </NTabPane>
 
@@ -311,47 +353,6 @@
             </template>
         </NAlert>
 
-        <NCollapse v-else style="margin-top: var(--section-gap);">
-            <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
-                <NFlex vertical :size="16" style="padding-top: 4px;">
-                    <NText depth="3" style="font-size: 12px;">
-                        {{ t('dataBackup.automaticBackupDescription') }}
-                    </NText>
-                    <NFlex align="center" justify="space-between" :size="12" wrap>
-                        <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
-                        <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
-                    </NFlex>
-                    <NFlex align="center" :size="12" wrap>
-                        <NInputNumber v-model:value="autoBackupIntervalMinutes" :min="60" :max="10080"
-                            :step="60" style="width: 180px;">
-                            <template #suffix>{{ t('dataBackup.minutes') }}</template>
-                        </NInputNumber>
-                        <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
-                            style="width: 160px;">
-                            <template #suffix>{{ t('dataBackup.copies') }}</template>
-                        </NInputNumber>
-                        <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
-                            {{ t('dataBackup.saveAutomaticBackupSettings') }}
-                        </NButton>
-                        <NButton secondary @click="runAutoBackupNow"
-                            :loading="autoBackupStatus.status === 'backing-up'">
-                            {{ t('dataBackup.createNow') }}
-                        </NButton>
-                    </NFlex>
-                    <NText depth="3" style="font-size: 12px;">
-                        {{ t('dataBackup.lastAutomaticBackup', {
-                            time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
-                        }) }}
-                        <template v-if="autoBackupStatus.nextBackupAt">
-                            · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
-                        </template>
-                        <template v-if="autoBackupStatus.error">
-                            · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
-                        </template>
-                    </NText>
-                </NFlex>
-            </NCollapseItem>
-        </NCollapse>
     </NCard>
 </template>
 

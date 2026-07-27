@@ -5,6 +5,7 @@ import type {
 } from './cloud-sync-engine';
 import {
   createCloudSyncDataChecksum,
+  createCloudSyncSemanticChecksum,
   normalizeCloudSyncDataSet,
   validateCloudSyncSnapshot
 } from './cloud-sync-engine';
@@ -37,7 +38,7 @@ export interface CloudSyncManifest {
 
 export interface CloudSyncManifestRepairMetadata {
   reasons: string[];
-  repairedSnapshotFields: Array<'latestSnapshot' | 'baseSnapshot'>;
+  repairedSnapshotFields: ('latestSnapshot' | 'baseSnapshot')[];
 }
 
 export interface CloudSyncManifestValidationResult {
@@ -178,13 +179,7 @@ export async function readCloudSyncManifestWithFallback(
   const describeError = options.describeError || describeCloudSyncManifestError;
 
   try {
-    const primaryManifest = await options.readPrimary();
-    try {
-      const backupManifest = await options.readBackup();
-      return selectNewestManifest(primaryManifest, backupManifest);
-    } catch {
-      return primaryManifest;
-    }
+    return await options.readPrimary();
   } catch (primaryError) {
     try {
       return await options.readBackup();
@@ -253,32 +248,6 @@ export function createCloudSyncManifestRevisionConflictError(
   const expected = expectedRevision || '空';
   const current = currentRevision || '空';
   return new Error(`云同步 manifest 已被其他设备更新：期望 revision ${expected}，当前 revision ${current}`);
-}
-
-function selectNewestManifest(
-  primaryManifest: CloudSyncManifest,
-  backupManifest: CloudSyncManifest
-): CloudSyncManifest {
-  return getManifestTime(backupManifest) > getManifestTime(primaryManifest)
-    ? backupManifest
-    : primaryManifest;
-}
-
-function getManifestTime(manifest: CloudSyncManifest): number {
-  const candidates = [
-    manifest.updatedAt,
-    manifest.latestSnapshot?.createdAt,
-    manifest.baseSnapshot?.createdAt
-  ];
-
-  for (const candidate of candidates) {
-    const time = new Date(candidate || '').getTime();
-    if (!Number.isNaN(time)) {
-      return time;
-    }
-  }
-
-  return 0;
 }
 
 export function sanitizeCloudSyncConflictsForMetadata(input: unknown): CloudSyncConflict[] {
@@ -370,7 +339,7 @@ function repairOptionalSnapshotChecksum(
   valid: boolean;
   snapshot?: CloudSyncSnapshot;
   reasons: string[];
-  repairedFields: Array<'latestSnapshot' | 'baseSnapshot'>;
+  repairedFields: ('latestSnapshot' | 'baseSnapshot')[];
 } {
   if (value === undefined || value === null) {
     return { valid: true, reasons: [], repairedFields: [] };
@@ -386,7 +355,10 @@ function repairOptionalSnapshotChecksum(
     };
   }
 
-  if (validation.reason !== 'snapshot data checksum mismatch') {
+  if (
+    validation.reason !== 'snapshot data checksum mismatch' &&
+    validation.reason !== 'snapshot content checksum mismatch'
+  ) {
     return { valid: false, reasons: [], repairedFields: [] };
   }
 
@@ -414,7 +386,8 @@ function repairOptionalSnapshotChecksum(
       revision: snapshot.revision,
       createdAt: snapshot.createdAt,
       data: normalizedData,
-      dataChecksum: createCloudSyncDataChecksum(normalizedData)
+      dataChecksum: createCloudSyncDataChecksum(normalizedData),
+      contentChecksum: createCloudSyncSemanticChecksum(normalizedData)
     };
 
     if (!validateCloudSyncSnapshot(repairedSnapshot).valid) {

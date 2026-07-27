@@ -323,11 +323,11 @@
     "addSuccess": "Storage configuration added successfully",
     "androidNotSupported": "The Android platform does not currently support iCloud Drive, please use WebDAV.",
     "autoSync": "Auto Sync",
-    "backupDescription": "Manage cloud backup files, support create, restore and delete operations",
-    "backupDirectoryCreated": "The backup directory did not exist and has been created. Create the first backup to continue.",
-    "backupManagement": "Cloud Backup Management",
-    "cloudBackup": "Cloud Backup",
-    "cloudBackupList": "Cloud Backup List",
+    "backupDescription": "View, restore, or manually delete cloud backup files left by earlier versions",
+    "backupDirectoryCreated": "No legacy cloud backup directory exists in this location.",
+    "backupManagement": "Legacy Cloud Backups",
+    "cloudBackup": "Legacy Cloud Backups",
+    "cloudBackupList": "Legacy Cloud Backup List",
     "configName": "Configuration name",
     "configNamePlaceholder": "Please enter configuration name",
     "configuredStorage": "Configured Storage",
@@ -538,10 +538,12 @@
   },
   "dataBackup": {
     "automaticBackupCompleted": "Automatic backup check completed",
-    "automaticBackupDescription": "Create an independent full backup only when data changes. The retention count separately limits automatic backups and sync recovery versions; manual backups are never removed automatically.",
+    "automaticBackupDescription": "Automatic backups stay on this device and are created only when data changes. Retention removes only local automatic backups; manual backups are never removed automatically.",
     "automaticBackupDisabled": "Automatic backups disabled",
     "automaticBackupEnabled": "Automatic backups enabled",
     "automaticBackupFailed": "Failed: {error}",
+    "automaticBackupInterval": "Local backup interval (minutes)",
+    "automaticBackupRetention": "Copies kept on device",
     "automaticBackupSettings": "Automatic Backup Settings",
     "automaticBackupSettingsSaveFailed": "Failed to save automatic backup settings",
     "automaticBackupSettingsSaved": "Automatic backup settings saved",
@@ -550,8 +552,8 @@
     "automaticBackupRetentionApplied": "Retention policy applied; removed {count} old versions",
     "automaticBackupRetentionDeferred": "Removed {count} old versions; {deferred} newly written versions will be retried after the safety window",
     "automaticBackupRetentionWarning": "Policy saved, but some old versions could not be removed: {error}",
-    "cloudBackup": "Cloud Backup",
-    "cloudLocationDescription": "View and manage historical backup versions stored in this location.",
+    "cloudBackup": "Legacy Cloud Backups",
+    "cloudLocationDescription": "View, restore, or manually delete cloud backups left by earlier versions. New backups are not written here.",
     "configureCloudStorage": "Configure Data Sync",
     "confirmDeleteCloudBackup": "Delete this cloud backup?",
     "confirmRestore": "Restore",
@@ -570,8 +572,8 @@
     "manualCloudBackupDescription": "Manual cloud backup - {time}",
     "minutes": "min",
     "nextAutomaticBackup": "Next run: {time}",
-    "noCloudBackups": "No historical backups in this location",
-    "noCloudStorageDescription": "No cloud storage is configured. Configure data sync to view historical versions from each location here.",
+    "noCloudBackups": "No legacy cloud backups in this location",
+    "noCloudStorageDescription": "No cloud storage is configured. Existing legacy cloud backups remain available from their storage locations.",
     "none": "None",
     "refreshBackupList": "Refresh",
     "restore": "Restore",
@@ -1176,7 +1178,7 @@
         "title": "Data Sync"
       },
       "dataManagement": {
-        "description": "View historical backups stored locally and in each cloud location",
+        "description": "Create and manage local recovery history, with access to legacy cloud backups",
         "title": "Data Backup"
       },
       "language": {
@@ -1206,7 +1208,7 @@
         "title": "Data Sync"
       },
       "data-management": {
-        "description": "Create, restore, and manage local and cloud backups",
+        "description": "Create, restore, and manage local backups, with legacy cloud backup compatibility",
         "title": "Data Backup"
       },
       "laboratory": {

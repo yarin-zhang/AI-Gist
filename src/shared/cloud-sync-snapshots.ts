@@ -1,6 +1,7 @@
 import type { CloudSyncSnapshot } from './cloud-sync-engine';
 import {
   createCloudSyncDataChecksum,
+  createCloudSyncSemanticChecksum,
   normalizeCloudSyncDataSet,
   validateCloudSyncSnapshot
 } from './cloud-sync-engine';
@@ -92,7 +93,8 @@ function normalizeCloudSyncSnapshotForFile(snapshot: CloudSyncSnapshot): CloudSy
     revision: snapshot.revision,
     createdAt: snapshot.createdAt,
     data,
-    dataChecksum: createCloudSyncDataChecksum(data)
+    dataChecksum: createCloudSyncDataChecksum(data),
+    contentChecksum: createCloudSyncSemanticChecksum(data)
   };
 }
 
@@ -100,7 +102,14 @@ function repairCloudSyncSnapshotChecksum(
   value: unknown,
   reason: string | undefined
 ): CloudSyncSnapshot | null {
-  if (reason !== 'snapshot data checksum mismatch' || !value || typeof value !== 'object') {
+  if (
+    reason !== 'snapshot data checksum mismatch' &&
+    reason !== 'snapshot content checksum mismatch'
+  ) {
+    return null;
+  }
+
+  if (!value || typeof value !== 'object') {
     return null;
   }
 

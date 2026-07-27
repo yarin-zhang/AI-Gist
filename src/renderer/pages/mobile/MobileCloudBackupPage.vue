@@ -44,25 +44,6 @@
             {{ t('cloudBackup.saveSyncInterval') }}
           </ion-button>
         </div>
-        <ion-item>
-          <ion-label>
-            <h3>自动恢复快照</h3>
-            <p>仅在数据变化时创建完整备份；保留份数同时约束自动备份和同步恢复版本</p>
-          </ion-label>
-          <ion-toggle slot="end" :checked="autoBackupEnabled" @ionChange="saveAutoBackupEnabled"></ion-toggle>
-        </ion-item>
-        <ion-item>
-          <ion-label>快照间隔（分钟）</ion-label>
-          <ion-input slot="end" type="number" :value="autoBackupIntervalMinutes" @ionInput="handleAutoBackupIntervalInput"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label>保留份数</ion-label>
-          <ion-input slot="end" type="number" :value="autoBackupRetention" @ionInput="handleAutoBackupRetentionInput"></ion-input>
-        </ion-item>
-        <div class="sync-interval-actions">
-          <ion-button size="small" fill="outline" @click="saveAutoBackupSettings">保存快照策略</ion-button>
-          <ion-button size="small" fill="outline" @click="automaticBackupService.runNow('manual')">立即创建</ion-button>
-        </div>
       </ion-list>
 
       <ion-list v-if="restoreSuspensions.length > 0">
@@ -230,13 +211,9 @@
           </ion-toolbar>
         </ion-header>
         <ion-content>
-          <!-- 操作按钮 -->
+          <!-- 同步操作 -->
           <div class="action-buttons">
-            <ion-button expand="block" @click="createBackup" :disabled="loading.createBackup">
-              <ion-icon :icon="cloudUploadOutline" slot="start"></ion-icon>
-              {{ t('cloudBackup.createCloudBackup') }}
-            </ion-button>
-            <ion-button expand="block" fill="outline" @click="syncCloudData()" :disabled="loading.syncNow">
+            <ion-button expand="block" @click="syncCloudData()" :disabled="loading.syncNow">
               <ion-icon :icon="syncOutline" slot="start"></ion-icon>
               {{ t('cloudBackup.syncNow') }}
             </ion-button>
@@ -317,7 +294,6 @@ import {
   cloudOutline,
   cloudOfflineOutline,
   addOutline,
-  cloudUploadOutline,
   downloadOutline,
   trashOutline,
   documentOutline,
@@ -337,11 +313,6 @@ import {
   getCloudSyncResultMessage,
   getCloudSyncErrorDiagnosis
 } from '~/lib/services/cloud-sync.service'
-import {
-  automaticBackupService,
-  DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
-  DEFAULT_AUTO_BACKUP_RETENTION
-} from '~/lib/services/automatic-backup.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { CloudStorageConfig, CloudBackupInfo } from '@shared/types/cloud-backup'
 import type {
@@ -358,9 +329,6 @@ const storageConfigs = ref<CloudStorageConfig[]>([])
 const currentBackups = ref<CloudBackupInfo[]>([])
 const syncIntervalMinutes = ref(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES)
 const autoSyncEnabled = ref(true)
-const autoBackupEnabled = ref(true)
-const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
-const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const selectedConfig = ref<CloudStorageConfig | null>(null)
 const editingConfig = ref<CloudStorageConfig | null>(null)
 const restoreSuspensions = ref<CloudSyncRestoreSuspension[]>(cloudSyncService.getRestoreSuspensions())
@@ -380,7 +348,6 @@ const configForm = ref({
 })
 
 const loading = ref({
-  createBackup: false,
   restoreBackup: false,
   restoreDecision: false,
   syncNow: false,
@@ -407,40 +374,10 @@ const loadSyncInterval = async () => {
 
 const loadAutomationSettings = async () => {
   autoSyncEnabled.value = await cloudSyncService.getAutoSyncEnabled()
-  autoBackupEnabled.value = await automaticBackupService.getEnabled()
-  autoBackupIntervalMinutes.value = await automaticBackupService.getIntervalMinutes()
-  autoBackupRetention.value = await automaticBackupService.getRetention()
 }
 
 const saveAutoSyncEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
   autoSyncEnabled.value = await cloudSyncService.setAutoSyncEnabled(event.detail.checked)
-}
-
-const saveAutoBackupEnabled = async (event: CustomEvent<{ checked: boolean }>) => {
-  autoBackupEnabled.value = await automaticBackupService.setEnabled(event.detail.checked)
-}
-
-const handleAutoBackupIntervalInput = (event: CustomEvent<{ value?: string | number | null }>) => {
-  const value = Number(event.detail.value)
-  if (Number.isFinite(value)) autoBackupIntervalMinutes.value = value
-}
-
-const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | number | null }>) => {
-  const value = Number(event.detail.value)
-  if (Number.isFinite(value)) autoBackupRetention.value = value
-}
-
-const saveAutoBackupSettings = async () => {
-  autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
-  const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value)
-  autoBackupRetention.value = retentionResult.retention
-  if (retentionResult.warnings.length > 0) {
-    await showToast(`策略已保存，但部分旧版本清理失败：${retentionResult.warnings.join('；')}`, 'warning')
-  } else if (retentionResult.deferredCount > 0) {
-    await showToast(`已清理 ${retentionResult.deletedCount} 个旧版本；${retentionResult.deferredCount} 个刚写入的版本将在安全窗口后重试`)
-  } else {
-    await showToast(`保留策略已生效，已清理 ${retentionResult.deletedCount} 个旧版本`)
-  }
 }
 
 const saveSyncInterval = async () => {
@@ -656,46 +593,6 @@ const testConfigConnection = async () => {
 const closeConfigModal = () => {
   showAddConfigModal.value = false
   resetConfigForm()
-}
-
-// 创建备份
-const createBackup = async () => {
-  if (!selectedConfig.value) return
-
-  const loadingEl = await loadingController.create({
-    message: t('cloudBackup.creatingBackup')
-  })
-
-  loading.value.createBackup = true
-
-  try {
-    await loadingEl.present()
-
-    const timestamp = new Date().toLocaleString()
-    const result = await CloudBackupAPI.createCloudBackup(
-      selectedConfig.value.id,
-      {
-        description: `${t('cloudBackup.mobileBackup')} - ${timestamp}`,
-        backupType: 'manual',
-        trigger: 'manual'
-      }
-    )
-
-    if (result.success) {
-      showToast(t('cloudBackup.createSuccess'))
-      await loadBackupList(selectedConfig.value.id)
-    } else {
-      const friendlyError = getFriendlyBackupError(result.error)
-      showToast(friendlyError, 'danger')
-    }
-  } catch (error) {
-    console.error('创建备份失败:', error)
-    const friendlyError = getFriendlyBackupError(error instanceof Error ? error.message : String(error))
-    showToast(friendlyError, 'danger')
-  } finally {
-    await loadingEl.dismiss()
-    loading.value.createBackup = false
-  }
 }
 
 // 立即同步
@@ -990,27 +887,6 @@ const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
-}
-
-// 将技术错误转换为用户友好的备份错误提示
-const getFriendlyBackupError = (error?: string): string => {
-  if (!error) return '备份创建失败，请稍后重试'
-  if (error.includes('401') || error.includes('Unauthorized') || error.includes('403')) {
-    return '存储服务认证失败，请检查用户名和密码是否正确'
-  }
-  if (error.includes('404') || error.includes('Not Found')) {
-    return '备份目录不存在，请确认 WebDAV 服务器上的路径配置正确'
-  }
-  if (error.includes('ECONNREFUSED') || error.includes('Network') || error.includes('network') || error.includes('fetch')) {
-    return '无法连接到存储服务器，请检查网络连接和服务器地址'
-  }
-  if (error.includes('timeout') || error.includes('Timeout')) {
-    return '连接超时，请检查网络状态或稍后重试'
-  }
-  if (error.includes('数据库') || error.includes('database')) {
-    return '读取本地数据失败，请尝试重启应用后再备份'
-  }
-  return `备份失败：${error}`
 }
 
 // 将技术错误转换为用户友好的恢复错误提示

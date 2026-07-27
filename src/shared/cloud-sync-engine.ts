@@ -50,6 +50,7 @@ export interface CloudSyncSnapshot {
   createdAt: string;
   data: CloudSyncDataSet;
   dataChecksum?: string;
+  contentChecksum?: string;
 }
 
 export type CloudSyncConflictReason =
@@ -157,7 +158,8 @@ export function createCloudSyncSnapshot(
     revision,
     createdAt: new Date().toISOString(),
     data: snapshotData,
-    dataChecksum: createCloudSyncDataChecksum(snapshotData)
+    dataChecksum: createCloudSyncDataChecksum(snapshotData),
+    contentChecksum: createCloudSyncSemanticChecksum(snapshotData)
   };
 }
 
@@ -189,6 +191,14 @@ export function createCloudSyncDataChecksum(data: CloudSyncDataSet): string {
 }
 
 export function createCloudSyncSemanticChecksum(data: CloudSyncDataSet): string {
+  return createStableChecksum(createCloudSyncSemanticComparableData(data));
+}
+
+export function createCloudSyncSemanticSignature(data: CloudSyncDataSet): string {
+  return stableSerialize(createCloudSyncSemanticComparableData(data));
+}
+
+function createCloudSyncSemanticComparableData(data: CloudSyncDataSet): Record<string, any[]> {
   const normalizedData = normalizeCloudSyncDataSet(data);
   const relationContext = createRelationContext(normalizedData);
   const comparableData: Record<string, any[]> = {};
@@ -209,7 +219,7 @@ export function createCloudSyncSemanticChecksum(data: CloudSyncDataSet): string 
       .map(entry => entry.value);
   }
 
-  return createStableChecksum(comparableData);
+  return comparableData;
 }
 
 export function validateCloudSyncSnapshot(value: unknown): CloudSyncSnapshotValidationResult {
@@ -243,17 +253,26 @@ export function validateCloudSyncSnapshot(value: unknown): CloudSyncSnapshotVali
     return dataShapeValidation;
   }
 
-  if (snapshot.dataChecksum === undefined) {
-    return { valid: true };
+  if (snapshot.dataChecksum !== undefined) {
+    if (typeof snapshot.dataChecksum !== 'string' || !snapshot.dataChecksum) {
+      return { valid: false, reason: 'snapshot dataChecksum is invalid' };
+    }
+
+    const actualChecksum = createCloudSyncDataChecksum(snapshot.data);
+    if (snapshot.dataChecksum !== actualChecksum) {
+      return { valid: false, reason: 'snapshot data checksum mismatch' };
+    }
   }
 
-  if (typeof snapshot.dataChecksum !== 'string' || !snapshot.dataChecksum) {
-    return { valid: false, reason: 'snapshot dataChecksum is invalid' };
-  }
+  if (snapshot.contentChecksum !== undefined) {
+    if (typeof snapshot.contentChecksum !== 'string' || !snapshot.contentChecksum) {
+      return { valid: false, reason: 'snapshot contentChecksum is invalid' };
+    }
 
-  const actualChecksum = createCloudSyncDataChecksum(snapshot.data);
-  if (snapshot.dataChecksum !== actualChecksum) {
-    return { valid: false, reason: 'snapshot data checksum mismatch' };
+    const actualContentChecksum = createCloudSyncSemanticChecksum(snapshot.data);
+    if (snapshot.contentChecksum !== actualContentChecksum) {
+      return { valid: false, reason: 'snapshot content checksum mismatch' };
+    }
   }
 
   return { valid: true };

@@ -149,6 +149,10 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('display-directive="show:lazy"');
     expect(source).toContain('<CloudBackupLocationPane :config="config" />');
     expect(source).toContain("t('dataBackup.automaticBackupSettings')");
+
+    const cloudPane = readWorkspaceFile('src/renderer/components/settings/CloudBackupLocationPane.vue');
+    expect(cloudPane).not.toContain('createCloudBackup');
+    expect(cloudPane).not.toContain("t('dataBackup.createCloudBackup')");
   });
 
   it('uses the new visible section names in every supported locale', () => {

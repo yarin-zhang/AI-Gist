@@ -7,22 +7,12 @@ import { ref, reactive, toRef } from 'vue';
 import { DataManagementAPI } from '@renderer/lib/api/data-management.api';
 import { useDatabase } from './useDatabase';
 import { databaseService } from '@renderer/lib/db';
-import { PlatformDetector } from '@shared/platform';
 import {
-  createBackupPayload,
-  parseBackupPayload
-} from '@shared/backup-integrity';
+  localBackupService,
+  type LocalBackupInfo
+} from '@renderer/lib/services/local-backup.service';
 
-const WEB_BACKUPS_KEY = 'ai-gist:web:local-backups';
-
-export interface BackupInfo {
-  id: string;
-  name: string;
-  description: string;
-  createdAt: string;
-  size: number;
-  data?: any;
-}
+export type BackupInfo = LocalBackupInfo;
 
 export interface DataManagementState {
   backupList: BackupInfo[];
@@ -32,8 +22,7 @@ export interface DataManagementState {
 }
 
 export function useDataManagement() {
-  const { waitForDatabase, safeDbOperation } = useDatabase();
-  const capabilities = PlatformDetector.getCapabilities();
+  const { safeDbOperation } = useDatabase();
   
   // 状态管理
   const backupList = ref<BackupInfo[]>([]);
@@ -52,100 +41,12 @@ export function useDataManagement() {
     success.value = null;
   };
 
-  const getWebBackups = (): BackupInfo[] => {
-    try {
-      const raw = localStorage.getItem(WEB_BACKUPS_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw);
-    } catch (err) {
-      console.warn('读取 Web 备份快照失败:', err);
-      return [];
-    }
-  };
-
-  const saveWebBackups = (backups: BackupInfo[]) => {
-    localStorage.setItem(WEB_BACKUPS_KEY, JSON.stringify(backups));
-  };
-
-  const getJsonSize = (data: any): number => {
-    return new Blob([JSON.stringify(data)]).size;
-  };
-
-  const createBackupId = (): string => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  };
-
-  // 获取备份列表 - 从文件系统读取
+  // 获取本地备份列表
   const getBackupList = async (): Promise<BackupInfo[]> => {
     try {
       setLoading('refreshBackupList', true);
       clearMessages();
-      
-      console.log('开始获取备份列表...');
-
-      if (!capabilities.localBackupDirectory) {
-        const backups = getWebBackups()
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        backupList.value = [...backups];
-        return backups;
-      }
-      
-      // 获取备份目录路径
-      const userDataPath = await window.electronAPI.app.getPath('userData');
-      const backupDir = `${userDataPath}/backups`;
-      console.log('备份目录路径:', backupDir);
-      
-      // 确保备份目录存在
-      await window.electronAPI.fs.ensureDir(backupDir);
-      console.log('备份目录已确保存在');
-      
-      // 读取备份目录中的所有文件
-      const files = await window.electronAPI.fs.readdir(backupDir);
-      console.log('目录中的所有文件:', files);
-      
-      const backupFiles = files.filter(file => file.endsWith('.json'));
-      console.log('备份文件列表:', backupFiles);
-      
-      const backups: BackupInfo[] = [];
-      
-      for (const file of backupFiles) {
-        try {
-          const filePath = `${backupDir}/${file}`;
-          console.log('正在读取备份文件:', filePath);
-          
-          const content = await window.electronAPI.fs.readFile(filePath);
-          const backupData = JSON.parse(content);
-          const parsedBackup = parseBackupPayload(backupData);
-          const backupPayload = parsedBackup.payload;
-          
-          // 获取文件状态
-          const fileStats = await window.electronAPI.fs.stat(filePath);
-          
-          const backupInfo: BackupInfo = {
-            id: backupPayload.id,
-            name: backupPayload.name,
-            description: backupPayload.description || '自动备份',
-            createdAt: backupPayload.createdAt,
-            size: fileStats.size,
-            data: backupPayload
-          };
-          
-          console.log('成功读取备份:', backupInfo);
-          backups.push(backupInfo);
-        } catch (err) {
-          console.warn(`读取备份文件失败: ${file}`, err);
-        }
-      }
-      
-      // 按创建时间排序，最新的在前面
-      backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
-      console.log('最终备份列表:', backups);
-      // 强制触发响应式更新
+      const backups = await localBackupService.list();
       backupList.value = [...backups];
       return backups;
     } catch (err) {
@@ -157,94 +58,19 @@ export function useDataManagement() {
     }
   };
 
-  // 创建备份 - 调用 Electron 文件系统功能
+  // 创建本地备份；内容未变化时复用最新版本。
   const createBackup = async (description?: string): Promise<BackupInfo | null> => {
     try {
       setLoading('backup', true);
       clearMessages();
-      
-      console.log('开始创建备份...');
-      
-      // 1. 导出所有备份数据
-      const result = await safeDbOperation(() => databaseService.exportAllDataForBackup());
-      if (!result || !result.success || !result.data) {
-        throw new Error(result?.error || result?.message || '导出数据失败');
-      }
-      
-      console.log('数据导出成功，开始创建备份文件...');
-      
-      // 2. 创建备份信息
-      const backupId = createBackupId();
-      const timestamp = new Date().toISOString();
-      const backupName = `backup-${timestamp.split('T')[0]}-${backupId.substring(0, 8)}`;
-      const backupData = createBackupPayload({
-        id: backupId,
-        name: backupName,
-        description: description || '自动备份',
-        createdAt: timestamp,
-        data: result.data
+      const result = await localBackupService.create({
+        description: description || '手动本地备份',
+        backupType: 'manual',
+        trigger: 'manual'
       });
-
-      if (!capabilities.localBackupDirectory) {
-        const backupInfo: BackupInfo = {
-          id: backupId,
-          name: backupName,
-          description: description || '浏览器内备份',
-          createdAt: timestamp,
-          size: getJsonSize(backupData),
-          data: backupData,
-        };
-        const nextBackups = [backupInfo, ...getWebBackups()];
-        saveWebBackups(nextBackups);
-        backupList.value = nextBackups;
-        success.value = '备份快照创建成功';
-        return backupInfo;
-      }
-
-      // 3. 获取备份目录路径
-      const userDataPath = await window.electronAPI.app.getPath('userData');
-      const backupDir = `${userDataPath}/backups`;
-      console.log('备份目录路径:', backupDir);
-      
-      // 4. 确保备份目录存在
-      await window.electronAPI.fs.ensureDir(backupDir);
-      console.log('备份目录已确保存在');
-      
-      // 5. 保存备份文件
-      const backupFilePath = `${backupDir}/${backupName}.json`;
-      
-      console.log('正在写入备份文件:', backupFilePath);
-      const writeResult = await window.electronAPI.fs.writeFile(
-        backupFilePath, 
-        JSON.stringify(backupData, null, 2)
-      );
-      
-      if (!writeResult.success) {
-        throw new Error('备份文件写入失败');
-      }
-      
-      console.log('备份文件写入成功');
-      
-      // 6. 获取文件大小
-      const fileStats = await window.electronAPI.fs.stat(backupFilePath);
-      console.log('备份文件大小:', fileStats.size);
-      
-      const backupInfo: BackupInfo = {
-        id: backupId,
-        name: backupName,
-        description: description || '自动备份',
-        createdAt: timestamp,
-        size: fileStats.size,
-        data: backupData,
-      };
-
-      // 7. 刷新备份列表
-      console.log('刷新备份列表...');
       await getBackupList();
-
-      success.value = '备份创建成功';
-      console.log('备份创建完成');
-      return backupInfo;
+      success.value = result.action === 'unchanged' ? '数据未变化，已保留现有备份' : '备份创建成功';
+      return result.backup;
     } catch (err) {
       console.error('创建备份失败:', err);
       error.value = err instanceof Error ? err.message : '创建备份失败';
@@ -254,50 +80,14 @@ export function useDataManagement() {
     }
   };
 
-  // 恢复备份 - 从文件系统读取备份数据
+  // 恢复本地备份
   const restoreBackup = async (backupId: string): Promise<boolean> => {
     try {
       setLoading('restore', true);
       clearMessages();
-      
-      // 1. 查找备份
-      const backup = backupList.value.find(b => b.id === backupId);
-      if (!backup) {
-        throw new Error('备份不存在');
-      }
-
-      if (!capabilities.localBackupDirectory) {
-        if (!backup.data) {
-          throw new Error('备份数据无效');
-        }
-
-        const result = await safeDbOperation(() => databaseService.replaceAllData(backup.data));
-        if (result && result.success) {
-          success.value = '备份恢复成功';
-          return true;
-        }
-
-        throw new Error(result?.error || result?.message || '恢复失败');
-      }
-
-      // 2. 从文件系统读取备份数据
-      const userDataPath = await window.electronAPI.app.getPath('userData');
-      const backupDir = `${userDataPath}/backups`;
-      const backupFileName = `${backup.name}.json`;
-      const backupFilePath = `${backupDir}/${backupFileName}`;
-      
-      const backupContent = await window.electronAPI.fs.readFile(backupFilePath);
-      const backupData = JSON.parse(backupContent);
-      const parsedBackup = parseBackupPayload(backupData);
-
-      // 3. 恢复到数据库
-      const result = await safeDbOperation(() => databaseService.replaceAllData(parsedBackup.payload));
-      if (result && result.success) {
-        success.value = '备份恢复成功';
-        return true;
-      } else {
-        throw new Error(result?.error || result?.message || '恢复失败');
-      }
+      await localBackupService.restore(backupId);
+      success.value = '备份恢复成功';
+      return true;
     } catch (err) {
       error.value = err instanceof Error ? err.message : '恢复备份失败';
       return false;
@@ -306,42 +96,13 @@ export function useDataManagement() {
     }
   };
 
-  // 删除备份 - 从文件系统删除
+  // 删除本地备份
   const deleteBackup = async (backupId: string): Promise<boolean> => {
     try {
       setLoading('backup', true);
       clearMessages();
-      
-      // 查找要删除的备份
-      const backup = backupList.value.find(b => b.id === backupId);
-      if (!backup) {
-        throw new Error('备份不存在');
-      }
-
-      if (!capabilities.localBackupDirectory) {
-        const nextBackups = getWebBackups().filter(b => b.id !== backupId);
-        saveWebBackups(nextBackups);
-        backupList.value = nextBackups;
-        success.value = '备份删除成功';
-        return true;
-      }
-      
-      // 获取备份目录路径
-      const userDataPath = await window.electronAPI.app.getPath('userData');
-      const backupDir = `${userDataPath}/backups`;
-      const backupFileName = `${backup.name}.json`;
-      const backupFilePath = `${backupDir}/${backupFileName}`;
-      
-      // 删除文件
-      const deleteResult = await window.electronAPI.fs.unlink(backupFilePath);
-      
-      if (!deleteResult.success) {
-        throw new Error('删除备份文件失败');
-      }
-      
-      // 刷新备份列表
+      await localBackupService.delete(backupId);
       await getBackupList();
-      
       success.value = '备份删除成功';
       return true;
     } catch (err) {
@@ -355,22 +116,9 @@ export function useDataManagement() {
   // 打开备份目录
   const openBackupDirectory = async (): Promise<void> => {
     try {
-      if (!capabilities.localBackupDirectory) {
-        error.value = 'Web 端备份保存在浏览器本地存储中，没有可打开的系统目录';
-        return;
-      }
-
-      // 获取用户数据目录作为备份目录
-      const userDataPath = await window.electronAPI.app.getPath('userData');
-      const backupPath = `${userDataPath}/backups`;
-      
-      // 确保备份目录存在
-      await window.electronAPI.fs.ensureDir(backupPath);
-      
-      // 打开备份目录
-      await window.electronAPI.shell.openPath(backupPath);
+      await localBackupService.openDirectory();
     } catch (err) {
-      error.value = '无法打开备份目录';
+      error.value = err instanceof Error ? err.message : '无法打开备份目录';
     }
   };
 
