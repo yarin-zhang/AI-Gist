@@ -149,6 +149,10 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('display-directive="show:lazy"');
     expect(source).toContain('<CloudBackupLocationPane :config="config" />');
     expect(source).toContain("t('dataBackup.automaticBackupSettings')");
+    expect(source).toContain('<NSelect v-model:value="autoBackupIntervalSelection"');
+    expect(source).toContain('AUTOMATIC_BACKUP_INTERVAL_PRESETS');
+    expect(source).toContain("autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL");
+    expect(source).toContain("t('dataBackup.automaticBackupLifecycleDescription')");
 
     const cloudPane = readWorkspaceFile('src/renderer/components/settings/CloudBackupLocationPane.vue');
     expect(cloudPane).toContain('@click="createCloudBackup"');
@@ -156,6 +160,15 @@ describe('settings sync and backup information architecture', () => {
     expect(cloudPane).toContain("backupType: 'manual'");
     expect(cloudPane).toContain("trigger: 'manual'");
     expect(cloudPane).not.toContain('automaticBackupService');
+  });
+
+  it('renders retryable cloud errors as a scheduled warning while preserving error details', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    expect(source).toContain('const hasScheduledRetry = computed');
+    expect(source).toContain("if (hasScheduledRetry.value) return 'warning'");
+    expect(source).toContain("t('dataSync.statusRetryScheduled')");
+    expect(source).toContain('syncStatus.value.nextSyncAt');
+    expect(source).toContain('@click="showCurrentSyncError"');
   });
 
   it('uses the new visible section names in every supported locale', () => {

@@ -13,6 +13,8 @@ function createService(overrides: {
   createError?: Error
   deletedCount?: number
 } = {}) {
+  let dataChangeListener: ((change: any) => void) | undefined
+  const unsubscribeDataChanges = vi.fn()
   const settings = {
     getBooleanValue: vi.fn().mockResolvedValue(true),
     setBooleanValue: vi.fn().mockResolvedValue({}),
@@ -38,14 +40,36 @@ function createService(overrides: {
         }),
     pruneAutomatic: vi.fn().mockResolvedValue(overrides.deletedCount || 0)
   }
-  const service = new AutomaticBackupService({ settings, backupService })
-  return { service, settings, backupService, backup }
+  const service = new AutomaticBackupService({
+    settings,
+    backupService,
+    subscribeToDataChanges: listener => {
+      dataChangeListener = listener
+      return unsubscribeDataChanges
+    }
+  })
+  return {
+    service,
+    settings,
+    backupService,
+    backup,
+    emitDataChange: () => dataChangeListener?.({
+      storeName: 'prompts',
+      action: 'update',
+      id: 1,
+      timestamp: Date.now(),
+      sourceId: 'test'
+    }),
+    unsubscribeDataChanges
+  }
 }
 
 describe('automatic backup settings', () => {
-  it('normalizes local backup intervals to the supported one-hour to seven-day range', () => {
+  it('normalizes local backup intervals to the supported five-minute to seven-day range', () => {
     expect(normalizeAutomaticBackupInterval(Number.NaN)).toBe(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
-    expect(normalizeAutomaticBackupInterval(5)).toBe(60)
+    expect(normalizeAutomaticBackupInterval(1)).toBe(5)
+    expect(normalizeAutomaticBackupInterval(5)).toBe(5)
+    expect(normalizeAutomaticBackupInterval(10)).toBe(10)
     expect(normalizeAutomaticBackupInterval(360)).toBe(360)
     expect(normalizeAutomaticBackupInterval(20_000)).toBe(10_080)
   })
@@ -112,6 +136,50 @@ describe('automatic backup settings', () => {
     )
     expect(backupService.pruneAutomatic).toHaveBeenCalledWith(5)
     expect(result).toEqual({ retention: 5, deletedCount: 15, deferredCount: 0, warnings: [] })
+  })
+
+  it('flushes changed data to a local backup when the app enters the background', async () => {
+    const { service, backupService, emitDataChange } = createService()
+    await service.startFromSettings()
+    emitDataChange()
+
+    const result = await service.flushPendingBackup({ reason: 'background', timeoutMs: 1000 })
+
+    expect(result).toEqual({ success: true, skipped: false, timedOut: false, error: undefined })
+    expect(backupService.create).toHaveBeenCalledWith(expect.objectContaining({
+      backupType: 'automatic',
+      trigger: 'background'
+    }))
+    expect(service.hasPendingChanges()).toBe(false)
+    service.stop()
+  })
+
+  it('creates a follow-up lifecycle backup when data changes during the first write', async () => {
+    const { service, backupService, emitDataChange } = createService()
+    await service.startFromSettings()
+    emitDataChange()
+    backupService.create.mockImplementationOnce(async () => {
+      emitDataChange()
+      return {
+        action: 'created',
+        backup: {
+          id: 'during-write',
+          name: 'during-write',
+          description: 'during-write',
+          createdAt: '2026-07-11T02:00:00.000Z',
+          size: 10,
+          backupType: 'automatic'
+        },
+        deletedCount: 0
+      }
+    })
+
+    const result = await service.flushPendingBackup({ reason: 'shutdown', timeoutMs: 1000 })
+
+    expect(result.success).toBe(true)
+    expect(backupService.create).toHaveBeenCalledTimes(2)
+    expect(service.hasPendingChanges()).toBe(false)
+    service.stop()
   })
 
   it('uses semantic checksums that ignore regenerated local numeric ids', () => {

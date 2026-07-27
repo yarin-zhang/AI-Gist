@@ -1381,6 +1381,71 @@ describe('CloudSyncService', () => {
     )
   })
 
+  it('classifies continuously changing remote files as retryable remote changes', async () => {
+    vi.useFakeTimers()
+    const { service, cloudClient } = createService({
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Local edit', updatedAt: '2026-07-11T00:00:00.000Z' }]
+    })
+    let revision = 0
+    cloudClient.getCloudSyncManifest.mockImplementation(async () => {
+      revision += 1
+      const snapshot = createCloudSyncSnapshot({
+        ...baseData,
+        categories: [
+          ...baseData.categories,
+          { id: revision + 1, uuid: `remote-${revision}`, name: `Remote ${revision}`, updatedAt: '2026-07-11T00:00:00.000Z' }
+        ]
+      }, 'device-b', `remote-revision-${revision}`)
+      return {
+        ...createEmptyCloudSyncManifest('2026-07-11T00:00:00.000Z'),
+        latestSnapshot: snapshot,
+        baseSnapshot: snapshot
+      }
+    })
+
+    const pendingResult = service.syncNow('cfg-1', { reason: 'manual' })
+    await vi.runAllTimersAsync()
+    const result = await pendingResult
+
+    expect(result).toMatchObject({
+      success: false,
+      errorCode: 'REMOTE_CHANGED',
+      diagnostic: {
+        retryClass: 'remote-changed'
+      }
+    })
+    expect(result.error).toContain('云端同步文件状态持续变化')
+    expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(10)
+  })
+
+  it('schedules an automatic retry after a transient manual sync failure', async () => {
+    vi.useFakeTimers()
+    const { service, cloudClient } = createService(baseData, undefined, {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: () => vi.fn()
+    })
+    cloudClient.getCloudSyncManifest.mockRejectedValue(new Error('ECONNRESET'))
+    service.startAutoSync({ syncOnStart: false, pollIntervalMs: 0, retryMs: 500 })
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+
+    expect(result).toMatchObject({
+      success: false,
+      errorCode: 'REMOTE_NETWORK'
+    })
+    expect(service.getStatus()).toMatchObject({
+      status: 'error',
+      pending: true,
+      reason: 'manual',
+      lastResult: result
+    })
+    expect(service.getStatus().nextSyncAt).toBeTruthy()
+    service.stopAutoSync()
+  })
+
   it('continues uploading when the remote revision changes but remote data is unchanged', async () => {
     const localData = {
       ...baseData,

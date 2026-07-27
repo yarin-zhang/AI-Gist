@@ -76,7 +76,8 @@ const DEFAULT_REMOTE_POLL_INTERVAL_MS = DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES * 60
 const DEFAULT_AUTO_SYNC_RETRY_MS = DEFAULT_REMOTE_POLL_INTERVAL_MS;
 const DEFAULT_STARTUP_SYNC_DELAY_MS = 10000;
 const MAX_AUTO_SYNC_RETRY_MS = 60 * 60 * 1000;
-const MAX_REMOTE_RECHECK_ATTEMPTS = 3;
+const MAX_REMOTE_RECHECK_ATTEMPTS = 5;
+const REMOTE_RECHECK_RETRY_STEP_MS = 200;
 const READ_AFTER_WRITE_VERIFY_ATTEMPTS = 4;
 const READ_AFTER_WRITE_VERIFY_RETRY_MS = 120;
 const MAX_REMOTE_SNAPSHOT_SCAN = 20;
@@ -455,6 +456,17 @@ export class CloudSyncService {
           this.blockedStorageFailures.delete(storageId);
           this.deterministicFailureGuards.delete(storageId);
           this.clearRetryTimerForStorage(storageId);
+        } else if (
+          (options.reason || 'manual') === 'manual' &&
+          this.autoSyncOptions &&
+          canAutoRetryCloudSyncResult(result)
+        ) {
+          this.scheduleRetry(
+            'manual',
+            result.error || '手动同步遇到暂时性错误，等待自动重试',
+            [storageId],
+            manualPendingVersion
+          );
         }
         return result;
       })
@@ -1356,6 +1368,7 @@ export class CloudSyncService {
       throw new Error('云端同步文件状态持续变化，应用会在下个同步周期自动重试');
     }
 
+    await delay((attempt + 1) * REMOTE_RECHECK_RETRY_STEP_MS);
     return await this.performSync(storageId, options, attempt + 1, generation);
   }
 
@@ -3219,7 +3232,11 @@ function createCloudSyncStructuredDiagnostic(
   } else if (error instanceof CloudSyncLocalChangedError) {
     code = 'SYNC_CANCELLED';
     retryClass = 'transient';
-  } else if (isCloudSyncRemoteChangedError(error) || isCloudSyncRevisionConflictMessage(message)) {
+  } else if (
+    isCloudSyncRemoteChangedError(error) ||
+    isCloudSyncRevisionConflictMessage(message) ||
+    isCloudSyncInstabilityError(message)
+  ) {
     code = 'REMOTE_CHANGED';
     retryClass = 'remote-changed';
   } else if (isCloudSyncAuthError(message)) {
@@ -3329,7 +3346,9 @@ function dataSetsEqual(left: CloudSyncDataSet, right: CloudSyncDataSet): boolean
 function canAutoRetryCloudSyncResult(result: CloudSyncResult): boolean {
   const retryClass = result.diagnostic?.retryClass;
   if (retryClass) {
-    return retryClass === 'transient' || retryClass === 'remote-changed';
+    return retryClass === 'transient' ||
+      retryClass === 'remote-changed' ||
+      isCloudSyncInstabilityError(result.error || '');
   }
   return isCloudSyncNetworkError(result.error || '') || isCloudSyncInstabilityError(result.error || '');
 }

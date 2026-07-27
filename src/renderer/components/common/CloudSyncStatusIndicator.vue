@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 const visualState = computed(() => {
   if (status.value.status === 'syncing') return 'syncing';
+  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return 'scheduled';
   if (status.value.status === 'error') return 'error';
   if (status.value.status === 'scheduled' && status.value.pendingChanges) return 'scheduled';
   if (status.value.lastResult?.success || status.value.lastSyncAt) return 'success';
@@ -39,6 +40,7 @@ const statusIcon = computed(() => {
 
 const primaryText = computed(() => {
   if (status.value.status === 'syncing') return '正在同步';
+  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return '已安排同步重试';
   if (status.value.status === 'error') return '同步遇到问题';
   if (visualState.value === 'scheduled') return '等待下次同步';
   if (visualState.value === 'success') return '云同步正常';
@@ -46,6 +48,9 @@ const primaryText = computed(() => {
 });
 
 const detailText = computed(() => {
+  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) {
+    return getFriendlyCloudSyncError(status.value.error);
+  }
   if (status.value.status === 'error') {
     return getFriendlyCloudSyncError(status.value.error);
   }

@@ -105,7 +105,21 @@ export class LocalBackupService {
       deviceId: options.deviceId,
       dataChecksum
     });
-    const backup = await this.repository.write(payload);
+    const writtenBackup = await this.repository.write(payload);
+    let backup: LocalBackupInfo | undefined;
+    try {
+      backup = (await this.repository.list()).find(item => item.id === payload.id);
+      if (!backup || !await this.backupMatches(backup, data, dataChecksum)) {
+        throw new Error('本地备份写入后校验失败');
+      }
+    } catch (error) {
+      try {
+        await this.repository.delete(backup || writtenBackup);
+      } catch (cleanupError) {
+        console.warn('清理校验失败的本地备份失败:', cleanupError);
+      }
+      throw error instanceof Error ? error : new Error(String(error));
+    }
     const deletedCount = options.retention === undefined
       ? 0
       : await this.pruneAutomatic(options.retention, [backup, ...backups]);

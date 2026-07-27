@@ -740,10 +740,17 @@ const getStorageName = (storageId: string) =>
 
 const getSyncStatusLabel = () => {
   if (restoreSuspensions.value.length > 0) return t('cloudBackup.restoreDecisionDescription')
+  if (syncStatus.value.status === 'error' && syncStatus.value.pending && syncStatus.value.nextSyncAt) {
+    return t('cloudBackup.syncStatusValues.scheduled')
+  }
   return t(`cloudBackup.syncStatusValues.${syncStatus.value.status}`)
 }
 
-const getSyncStatusBadge = () => restoreSuspensions.value.length > 0 ? 'paused' : syncStatus.value.status
+const getSyncStatusBadge = () => {
+  if (restoreSuspensions.value.length > 0) return 'paused'
+  if (syncStatus.value.status === 'error' && syncStatus.value.pending && syncStatus.value.nextSyncAt) return 'retry'
+  return syncStatus.value.status
+}
 
 const getSyncStatusColor = () => {
   if (restoreSuspensions.value.length > 0 || ['error', 'paused'].includes(syncStatus.value.status)) return 'warning'

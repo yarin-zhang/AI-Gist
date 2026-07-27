@@ -174,4 +174,39 @@ describe('LocalBackupService', () => {
     expect(repository.delete).not.toHaveBeenCalled()
     expect(repository.backups.map(backup => backup.id)).toEqual(['existing'])
   })
+
+  it('does not prune existing backups until the new backup can be read back and verified', async () => {
+    const repository = new MemoryBackupRepository()
+    const originalWrite = repository.write.getMockImplementation()!
+    repository.write.mockImplementationOnce(async payload => {
+      const written = await originalWrite(payload)
+      repository.backups = repository.backups.filter(backup => backup.id !== payload.id)
+      return written
+    })
+    repository.backups.push({
+      id: 'existing',
+      name: 'existing',
+      description: 'Existing',
+      createdAt: '2026-07-11T00:00:00.000Z',
+      size: 10,
+      backupType: 'automatic',
+      payload: createBackupPayload({
+        id: 'existing',
+        name: 'existing',
+        createdAt: '2026-07-11T00:00:00.000Z',
+        data: emptyData,
+        backupType: 'automatic'
+      })
+    })
+    const { service } = createService(repository)
+
+    await expect(service.create({
+      data: { ...emptyData, prompts: [{ id: 1, uuid: 'new', title: 'New' }] },
+      backupType: 'automatic',
+      retention: 1
+    })).rejects.toThrow('本地备份写入后校验失败')
+
+    expect(repository.backups.map(backup => backup.id)).toEqual(['existing'])
+    expect(repository.delete).toHaveBeenCalledTimes(1)
+  })
 })

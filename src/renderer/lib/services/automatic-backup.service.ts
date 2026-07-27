@@ -9,6 +9,7 @@ import {
   DEFAULT_AUTO_BACKUP_RETENTION,
   normalizeAutomaticBackupRetention
 } from './cloud-retention-settings';
+import { onDataChange, type DataChangeEventPayload, type DataStoreName } from './data-change-events';
 
 export {
   AUTO_BACKUP_RETENTION_SETTING_KEY,
@@ -21,12 +22,24 @@ export {
 export const AUTO_BACKUP_ENABLED_SETTING_KEY = 'cloud.backup.auto.enabled';
 export const AUTO_BACKUP_INTERVAL_SETTING_KEY = 'cloud.backup.auto.intervalMinutes';
 export const DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES = 360;
-export const MIN_AUTO_BACKUP_INTERVAL_MINUTES = 60;
+export const MIN_AUTO_BACKUP_INTERVAL_MINUTES = 5;
 export const MAX_AUTO_BACKUP_INTERVAL_MINUTES = 10080;
+export const AUTOMATIC_BACKUP_INTERVAL_PRESETS = [5, 10, 15, 30, 60, 120, 360, 720, 1440, 10080] as const;
 
 const AUTO_BACKUP_STARTUP_DELAY_MS = 30_000;
+const BACKUP_STORE_NAMES: DataStoreName[] = [
+  'categories',
+  'prompts',
+  'promptVariables',
+  'promptHistories',
+  'ai_configs',
+  'quick_optimization_configs',
+  'ai_generation_history',
+  'settings',
+  'syncTombstones'
+];
 
-export type AutomaticBackupTrigger = 'startup' | 'interval' | 'manual';
+export type AutomaticBackupTrigger = 'startup' | 'interval' | 'manual' | 'blur' | 'background' | 'shutdown';
 export type AutomaticBackupLifecycleStatus = 'idle' | 'scheduled' | 'backing-up' | 'success' | 'error';
 
 export interface AutomaticBackupStatus {
@@ -48,6 +61,13 @@ export interface AutomaticBackupRetentionUpdateResult {
   warnings: string[];
 }
 
+export interface AutomaticBackupFlushResult {
+  success: boolean;
+  skipped: boolean;
+  timedOut: boolean;
+  error?: string;
+}
+
 type AutomaticBackupListener = (status: AutomaticBackupStatus) => void;
 
 export interface AutomaticBackupServiceDeps {
@@ -66,15 +86,24 @@ export interface AutomaticBackupServiceDeps {
     }>;
     pruneAutomatic(retention: number): Promise<number>;
   };
+  subscribeToDataChanges?: (listener: (change: DataChangeEventPayload) => void) => () => void;
+}
+
+interface AutomaticBackupRunResult {
+  success: boolean;
+  error?: string;
 }
 
 export class AutomaticBackupService {
   private static instance: AutomaticBackupService;
   private readonly settings: NonNullable<AutomaticBackupServiceDeps['settings']>;
   private readonly backupService: NonNullable<AutomaticBackupServiceDeps['backupService']>;
+  private readonly subscribeToDataChanges: NonNullable<AutomaticBackupServiceDeps['subscribeToDataChanges']>;
   private readonly listeners = new Set<AutomaticBackupListener>();
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private running: Promise<void> | null = null;
+  private running: Promise<AutomaticBackupRunResult> | null = null;
+  private unsubscribeDataChanges: (() => void) | null = null;
+  private pendingChangeVersion = 0;
   private intervalMinutes = DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES;
   private retention = DEFAULT_AUTO_BACKUP_RETENTION;
   private status: AutomaticBackupStatus = {
@@ -86,6 +115,8 @@ export class AutomaticBackupService {
   constructor(deps: AutomaticBackupServiceDeps = {}) {
     this.settings = deps.settings || AppSettingsService.getInstance();
     this.backupService = deps.backupService || localBackupService;
+    this.subscribeToDataChanges = deps.subscribeToDataChanges ||
+      (listener => onDataChange(BACKUP_STORE_NAMES, listener));
   }
 
   static getInstance(): AutomaticBackupService {
@@ -105,16 +136,29 @@ export class AutomaticBackupService {
     this.intervalMinutes = intervalMinutes;
     this.retention = retention;
     this.stopTimer();
+    this.unsubscribeDataChanges?.();
+    this.unsubscribeDataChanges = null;
     this.updateStatus({
       enabled,
       lastBackupAt: backups.find(backup => backup.backupType === 'automatic')?.createdAt
     });
-    if (enabled) this.schedule('startup', AUTO_BACKUP_STARTUP_DELAY_MS);
+    if (enabled) {
+      this.unsubscribeDataChanges = this.subscribeToDataChanges(() => {
+        this.pendingChangeVersion += 1;
+      });
+      this.schedule('startup', AUTO_BACKUP_STARTUP_DELAY_MS);
+    }
   }
 
   stop(): void {
     this.stopTimer();
+    this.unsubscribeDataChanges?.();
+    this.unsubscribeDataChanges = null;
     this.updateStatus({ status: 'idle', nextBackupAt: undefined });
+  }
+
+  hasPendingChanges(): boolean {
+    return this.pendingChangeVersion > 0;
   }
 
   getStatus(): AutomaticBackupStatus {
@@ -137,6 +181,8 @@ export class AutomaticBackupService {
       await this.startFromSettings();
     } else {
       this.stopTimer();
+      this.unsubscribeDataChanges?.();
+      this.unsubscribeDataChanges = null;
       this.updateStatus({ enabled: false, status: 'idle', nextBackupAt: undefined });
     }
     return enabled;
@@ -189,13 +235,52 @@ export class AutomaticBackupService {
   }
 
   async runNow(trigger: AutomaticBackupTrigger = 'manual'): Promise<void> {
-    if (this.running) return this.running;
+    if (this.running) {
+      await this.running;
+      return;
+    }
     this.stopTimer();
     this.running = this.performBackup(trigger).finally(() => {
       this.running = null;
       if (this.status.enabled) this.schedule('interval', this.intervalMinutes * 60_000);
     });
-    return this.running;
+    await this.running;
+  }
+
+  async flushPendingBackup(options: {
+    reason?: Extract<AutomaticBackupTrigger, 'blur' | 'background' | 'shutdown'>;
+    timeoutMs?: number;
+  } = {}): Promise<AutomaticBackupFlushResult> {
+    if (!this.status.enabled || !this.hasPendingChanges()) {
+      return { success: true, skipped: true, timedOut: false };
+    }
+
+    const reason = options.reason || 'shutdown';
+    const timeoutMs = Math.max(250, options.timeoutMs ?? 5000);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const task = this.performPendingBackupFlush(reason);
+
+    try {
+      const result = await Promise.race([
+        task.then(run => ({
+          success: run.success,
+          skipped: false,
+          timedOut: false,
+          error: run.error
+        })),
+        new Promise<AutomaticBackupFlushResult>(resolve => {
+          timeout = setTimeout(() => resolve({
+            success: false,
+            skipped: false,
+            timedOut: true,
+            error: `本地备份未能在 ${timeoutMs}ms 内完成`
+          }), timeoutMs);
+        })
+      ]);
+      return result;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   private schedule(trigger: AutomaticBackupTrigger, delayMs: number): void {
@@ -208,7 +293,29 @@ export class AutomaticBackupService {
     }, delayMs);
   }
 
-  private async performBackup(trigger: AutomaticBackupTrigger): Promise<void> {
+  private startBackup(trigger: AutomaticBackupTrigger): Promise<AutomaticBackupRunResult> {
+    this.stopTimer();
+    const task = this.performBackup(trigger).finally(() => {
+      if (this.running === task) this.running = null;
+      if (this.status.enabled) this.schedule('interval', this.intervalMinutes * 60_000);
+    });
+    this.running = task;
+    return task;
+  }
+
+  private async performPendingBackupFlush(
+    reason: Extract<AutomaticBackupTrigger, 'blur' | 'background' | 'shutdown'>
+  ): Promise<AutomaticBackupRunResult> {
+    if (this.running) await this.running;
+    while (this.hasPendingChanges()) {
+      const result = await (this.running || this.startBackup(reason));
+      if (!result.success) return result;
+    }
+    return { success: true };
+  }
+
+  private async performBackup(trigger: AutomaticBackupTrigger): Promise<AutomaticBackupRunResult> {
+    const pendingVersion = this.pendingChangeVersion;
     this.updateStatus({ status: 'backing-up', error: undefined, nextBackupAt: undefined });
     try {
       const result = await this.backupService.create({
@@ -225,11 +332,15 @@ export class AutomaticBackupService {
         deletedCount: result.deletedCount,
         deferredCount: 0
       });
+      if (this.pendingChangeVersion === pendingVersion) this.pendingChangeVersion = 0;
+      return { success: true };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.updateStatus({
         status: 'error',
-        error: error instanceof Error ? error.message : String(error)
+        error: message
       });
+      return { success: false, error: message };
     }
   }
 

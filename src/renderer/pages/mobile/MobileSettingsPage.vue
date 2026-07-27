@@ -61,6 +61,7 @@
           <ion-label>
             <h3>{{ t('dataBackup.automaticBackupSettings') }}</h3>
             <p>{{ t('dataBackup.automaticBackupDescription') }}</p>
+            <p>{{ t('dataBackup.automaticBackupLifecycleDescription') }}</p>
           </ion-label>
           <ion-toggle
             slot="end"
@@ -71,6 +72,20 @@
 
         <ion-item>
           <ion-label>{{ t('dataBackup.automaticBackupInterval') }}</ion-label>
+          <ion-select
+            slot="end"
+            interface="action-sheet"
+            :value="autoBackupIntervalSelection"
+            @ionChange="handleAutoBackupIntervalSelection"
+          >
+            <ion-select-option v-for="option in autoBackupIntervalOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <ion-item v-if="autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL">
+          <ion-label>{{ t('dataBackup.customIntervalMinutes') }}</ion-label>
           <ion-input
             class="backup-number-input"
             slot="end"
@@ -153,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
@@ -191,6 +206,7 @@ import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { createBackupPayload } from '@shared/backup-integrity'
 import {
   automaticBackupService,
+  AUTOMATIC_BACKUP_INTERVAL_PRESETS,
   DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
   DEFAULT_AUTO_BACKUP_RETENTION,
   MAX_AUTO_BACKUP_INTERVAL_MINUTES,
@@ -205,12 +221,30 @@ const { themeSource, setThemeSource } = useTheme()
 const currentLanguage = ref(currentLocale.value)
 const currentTheme = ref(themeSource.value || 'system')
 const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '')
+const CUSTOM_AUTO_BACKUP_INTERVAL = 'custom' as const
+type AutoBackupIntervalSelection = number | typeof CUSTOM_AUTO_BACKUP_INTERVAL
 const autoBackupEnabled = ref(true)
 const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
+const autoBackupIntervalSelection = ref<AutoBackupIntervalSelection>(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES)
 const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const autoBackupSaving = ref(false)
 const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus())
 let unsubscribeAutoBackupStatus: (() => void) | null = null
+const formatAutomaticBackupInterval = (minutes: number) => {
+  if (minutes < 60) return t('dataBackup.backupEveryMinutes', { count: minutes })
+  if (minutes < 1440) return t('dataBackup.backupEveryHours', { count: minutes / 60 })
+  if (minutes === 1440) return t('dataBackup.backupEveryDay')
+  return t('dataBackup.backupEveryDays', { count: minutes / 1440 })
+}
+const autoBackupIntervalOptions = computed(() => [
+  ...AUTOMATIC_BACKUP_INTERVAL_PRESETS.map(minutes => ({
+    label: formatAutomaticBackupInterval(minutes),
+    value: minutes
+  })),
+  { label: t('dataBackup.customInterval'), value: CUSTOM_AUTO_BACKUP_INTERVAL }
+])
+const isAutomaticBackupIntervalPreset = (minutes: number) =>
+  (AUTOMATIC_BACKUP_INTERVAL_PRESETS as readonly number[]).includes(minutes)
 
 const createBackupId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -246,6 +280,9 @@ const loadAutoBackupSettings = async () => {
   ])
   autoBackupEnabled.value = enabled
   autoBackupIntervalMinutes.value = intervalMinutes
+  autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(intervalMinutes)
+    ? intervalMinutes
+    : CUSTOM_AUTO_BACKUP_INTERVAL
   autoBackupRetention.value = retention
 }
 
@@ -261,6 +298,11 @@ const handleAutoBackupIntervalInput = (event: CustomEvent<{ value?: string | num
   if (Number.isFinite(value)) autoBackupIntervalMinutes.value = value
 }
 
+const handleAutoBackupIntervalSelection = (event: CustomEvent<{ value: AutoBackupIntervalSelection }>) => {
+  autoBackupIntervalSelection.value = event.detail.value
+  if (typeof event.detail.value === 'number') autoBackupIntervalMinutes.value = event.detail.value
+}
+
 const handleAutoBackupRetentionInput = (event: CustomEvent<{ value?: string | number | null }>) => {
   const value = Number(event.detail.value)
   if (Number.isFinite(value)) autoBackupRetention.value = value
@@ -270,6 +312,9 @@ const saveAutoBackupSettings = async () => {
   autoBackupSaving.value = true
   try {
     autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value)
+    autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
+      ? autoBackupIntervalMinutes.value
+      : CUSTOM_AUTO_BACKUP_INTERVAL
     const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value)
     autoBackupRetention.value = retentionResult.retention
     if (retentionResult.warnings.length > 0) {
