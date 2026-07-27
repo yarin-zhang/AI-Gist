@@ -91,6 +91,14 @@ describe('desktop design-system contract', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('does not use blocking browser dialogs in the desktop renderer', () => {
+    const blockingBrowserDialog = /\b(?:window\.)?(?:alert|confirm|prompt)\s*\(/;
+    const offenders = desktopFiles
+      .filter(path => blockingBrowserDialog.test(readFileSync(path, 'utf8')))
+      .map(path => relative(root, path));
+    expect(offenders).toEqual([]);
+  });
+
   it('removes the obsolete duplicate prompt detail implementation', () => {
     expect(existsSync(resolve(rendererRoot, 'components/prompt-management/PromptDetailModal.vue'))).toBe(false);
   });

@@ -150,7 +150,8 @@ import {
     NEmpty,
     NScrollbar,
     NSplit,
-    useMessage
+    useMessage,
+    useDialog
 } from 'naive-ui'
 import { Edit, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
@@ -173,6 +174,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const message = useMessage()
+const dialog = useDialog()
 const { t } = useI18n()
 
 // 使用统一的颜色配置
@@ -309,27 +311,31 @@ const handleCancelEdit = () => {
     editingCategory.value = null
 }
 
-const handleDelete = async (category: any) => {
+const handleDelete = (category: any) => {
     const promptCount = getCategoryPromptCount(category.id)
     if (promptCount > 0) {
         message.warning(t('promptManagement.categoryHasPrompts'))
         return
     }
 
-    if (!confirm(t('promptManagement.confirmDeleteCategory', { name: category.name }))) {
-        return
-    }
-
-    try {
-        await api.categories.delete.mutate(category.id)
-        message.success(t('promptManagement.categoryDeletedSuccess'))
-        // 重新加载统计信息
-        await loadStatistics()
-        emit('updated')
-    } catch (error) {
-        message.error(t('promptManagement.categoryDeletedFailed'))
-        console.error(error)
-    }
+    dialog.error({
+        title: t('common.confirm'),
+        content: t('promptManagement.confirmDeleteCategory', { name: category.name }),
+        positiveText: t('common.delete'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: async () => {
+            try {
+                await api.categories.delete.mutate(category.id)
+                message.success(t('promptManagement.categoryDeletedSuccess'))
+                // 重新加载统计信息
+                await loadStatistics()
+                emit('updated')
+            } catch (error) {
+                message.error(t('promptManagement.categoryDeletedFailed'))
+                console.error(error)
+            }
+        },
+    })
 }
 
 const handleClose = () => {
