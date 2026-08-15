@@ -26,7 +26,7 @@ export function installWebRuntimeBridge(): void {
         window.open(url, '_blank', 'noopener,noreferrer');
         return { success: true };
       },
-      onUpdateAvailable: () => () => {}
+      onUpdateAvailable: () => () => undefined
     },
     shell: {
       openPath: async () => ({ success: false, error: 'Web 端没有可打开的系统路径' }),

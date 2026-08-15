@@ -7,6 +7,11 @@ import vue from "eslint-plugin-vue";
 const vueParser = await import("vue-eslint-parser");
 
 export default await tseslint.config(
+  // Android 构建产物由 Capacitor/Gradle 生成，不参与源码检查
+  {
+    ignores: ["android/app/build/**"],
+  },
+
   // 通用 TypeScript 设置
   {
     files: ["**/*.{ts,tsx}"],

@@ -80,7 +80,7 @@ class ElectronFileSystemAdapter implements FileSystemAdapter {
  */
 class CapacitorFileSystemAdapter implements FileSystemAdapter {
   private Filesystem: any;
-  private dataDirectory: string = '';
+  private dataDirectory = '';
 
   constructor() {
     if (typeof window !== 'undefined' && (window as any).Capacitor) {
