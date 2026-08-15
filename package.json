@@ -9,6 +9,7 @@
         "dev:web": "vite --config vite.config.web.js",
         "build": "node scripts/build.js && electron-builder",
         "build:win": "node scripts/build.js && electron-builder --win",
+        "build:store:win": "node scripts/build.js && electron-builder --win appx --x64 --arm64 --publish never",
         "build:mac": "node scripts/build.js && PYTHON=python3 npm_config_python=python3 electron-builder --mac",
         "build:linux": "node scripts/build.js && electron-builder --linux",
         "build:web": "vite build --config vite.config.web.js",

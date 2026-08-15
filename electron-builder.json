@@ -57,6 +57,19 @@
         "icon": "src/assets/windows.ico",
         "artifactName": "AI-Gist-${version}-Windows-Setup.${ext}"
     },
+    "appx": {
+        "applicationId": "AIGist",
+        "identityName": "YarinZ.AIGist-PromptManager",
+        "publisher": "CN=B0E00209-75E9-44EE-B4B3-F71D2E3B4634",
+        "publisherDisplayName": "Yarin Z",
+        "displayName": "AI Gist",
+        "backgroundColor": "#1E293B",
+        "languages": [
+            "zh-CN",
+            "en-US"
+        ],
+        "artifactName": "AI-Gist-${version}-Windows-Store-${arch}.${ext}"
+    },
     "mac": {
         "target": "dmg",
         "icon": "src/assets/macos.icns",

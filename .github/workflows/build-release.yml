@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (例如: v0.1.1)'
+        description: '版本号（例如 v0.1.1）；填 store 时仅构建 Windows Store 包'
         required: false
         default: ''
 
@@ -16,7 +16,34 @@ permissions:
   contents: write
 
 jobs:
+  build-windows-store:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'store'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Build unsigned Microsoft Store packages
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: yarn build:store:win
+
+      - name: Upload Microsoft Store packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-store-packages
+          path: dist/AI-Gist-*-Windows-Store-*.appx
+          if-no-files-found: error
+
   create-release:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.version != 'store'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}

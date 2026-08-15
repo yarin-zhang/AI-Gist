@@ -37,6 +37,23 @@ describe('desktop packaging', () => {
     expect(entitlements).toContain('com.apple.security.cs.allow-unsigned-executable-memory');
   });
 
+  it('uses the Microsoft Store identity assigned by Partner Center', () => {
+    const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const workflow = readFileSync(resolve(root, '.github/workflows/build-release.yml'), 'utf8');
+
+    expect(packageJson.scripts['build:store:win']).toContain('--win appx --x64 --arm64');
+    expect(builderConfig.appx).toMatchObject({
+      applicationId: 'AIGist',
+      identityName: 'YarinZ.AIGist-PromptManager',
+      publisher: 'CN=B0E00209-75E9-44EE-B4B3-F71D2E3B4634',
+      publisherDisplayName: 'Yarin Z',
+      displayName: 'AI Gist'
+    });
+    expect(workflow).toContain("github.event.inputs.version == 'store'");
+    expect(workflow).toContain('dist/AI-Gist-*-Windows-Store-*.appx');
+  });
+
   it('keeps release builds working before signing credentials are provisioned', () => {
     const workflow = readFileSync(resolve(root, '.github/workflows/build-release.yml'), 'utf8');
 
