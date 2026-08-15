@@ -10,7 +10,7 @@
 
 ![主要截图](docs/images/image-main.png?v=202507031628)
 
-[🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases) | [🤖 Android APK](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [🍎 App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220)
+[🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases) | [🤖 Android APK](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [🍎 App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) | [🔏 Code signing policy](CODE_SIGNING_POLICY.md) | [🔒 隐私政策](PRIVACY.md)
 
 </div>
 
@@ -51,6 +51,8 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 
 桌面端安装包通过 GitHub Releases 发布；移动端目前提供 Android APK 安装包，iOS 版本已上架 App Store。
 
+Windows 正式安装包使用 [SignPath.io](https://signpath.io/) 提供的免费代码签名服务，证书由 [SignPath Foundation](https://signpath.org/) 提供；macOS 正式安装包在 Apple Developer 凭据可用时使用 Developer ID 签名并通过 Apple 公证。申请或迁移期间产生的旧版本可能仍未签名，具体状态以对应 Release 说明为准。详见 [Code signing policy](CODE_SIGNING_POLICY.md)。
+
 | 平台 | 下载链接 | 说明 |
 |------|----------|------|
 | ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Windows 安装程序 |
@@ -70,7 +72,7 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 ## 🚀 安装说明
 
 - **Windows：** 下载 `.exe` 文件后双击运行安装
-- **macOS：** 下载 `.dmg` 文件后打开，将应用拖拽到应用程序文件夹，在终端执行 `xattr -cr /Applications/AI\ Gist.app` 以解除“已损坏”报错后启动。
+- **macOS：** 下载 `.dmg` 文件后打开，将应用拖拽到应用程序文件夹。已签名并通过 Apple 公证的版本可直接启动；旧的未签名版本仍需在终端执行 `xattr -cr /Applications/AI\ Gist.app` 后启动。
 - **Linux：** 下载 `.AppImage` 文件后添加执行权限：`chmod +x ai-gist-linux.AppImage`
 - **Android：** 下载 `.apk` 文件后，根据系统提示允许安装来自浏览器或文件管理器的应用。
 - **iOS：** 在 [App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) 中搜索或打开链接安装。
