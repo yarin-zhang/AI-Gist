@@ -52,6 +52,25 @@ yarn version major
 
 这些文件将自动上传到对应版本的 GitHub Release 页面。
 
+## 桌面代码签名
+
+Windows 使用 SignPath Foundation 的免费开源代码签名服务。申请通过并在仓库中配置以下 Actions secrets 后，工作流会先上传未签名安装包供 SignPath 验证来源，等待签名批准，再把签名后的安装包上传到 Release：
+
+- `SIGNPATH_API_TOKEN`
+- `SIGNPATH_ORGANIZATION_ID`
+- `SIGNPATH_PROJECT_SLUG`
+- `SIGNPATH_SIGNING_POLICY_SLUG`
+
+macOS 使用 Apple Developer ID 签名并通过 Apple 公证。需要配置：
+
+- `MAC_CSC_LINK`：Developer ID Application `.p12` 文件的 Base64 内容
+- `MAC_CSC_KEY_PASSWORD`：`.p12` 导出密码
+- `APPLE_ID`：Apple Developer 账号
+- `APPLE_APP_SPECIFIC_PASSWORD`：Apple 账户的 App 专用密码
+- `APPLE_TEAM_ID`：10 位 Team ID
+
+凭据不完整时，工作流会发出 warning 并继续生成未签名兼容包，不会中断现有发布。签名配置、责任角色和构建来源见 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)。
+
 ## 工作流配置文件
 
 工作流配置位于 `.github/workflows/build-release.yml`。

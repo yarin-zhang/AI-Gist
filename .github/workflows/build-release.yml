@@ -12,6 +12,7 @@ on:
         default: ''
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -111,7 +112,40 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: npm install -g typescript
 
-      - name: Build and Publish (macOS)
+      - name: Check macOS signing configuration
+        id: mac-signing
+        shell: bash
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -n "$MAC_CSC_LINK" && -n "$MAC_CSC_KEY_PASSWORD" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::macOS signing credentials are incomplete; publishing an unsigned compatibility build."
+          fi
+
+      - name: Build, sign, notarize, and publish (macOS)
+        if: steps.mac-signing.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PYTHON: python3
+          npm_config_python: python3
+        run: |
+          node scripts/build.js
+          yarn electron-builder --mac --${{ matrix.arch }} --config.mac.notarize=true --publish always
+
+      - name: Build and publish unsigned compatibility package (macOS)
+        if: steps.mac-signing.outputs.available != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -146,12 +180,76 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: npm install -g typescript
 
-      - name: Build and Publish (Windows)
+      - name: Build unsigned Windows installer
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --win --publish always
+          yarn electron-builder --win --publish never
+
+      - name: Check SignPath configuration
+        id: signpath
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+        run: |
+          $available = @(
+            $env:SIGNPATH_API_TOKEN,
+            $env:SIGNPATH_ORGANIZATION_ID,
+            $env:SIGNPATH_PROJECT_SLUG,
+            $env:SIGNPATH_SIGNING_POLICY_SLUG
+          ) | Where-Object { [string]::IsNullOrWhiteSpace($_) }
+
+          if ($available.Count -eq 0) {
+            "available=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "available=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Warning "SignPath credentials are incomplete; publishing an unsigned compatibility build."
+          }
+
+      - name: Upload unsigned installer for origin verification
+        if: steps.signpath.outputs.available == 'true'
+        id: upload-unsigned-windows
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-windows-installer
+          path: dist/AI-Gist-*-Windows-Setup.exe
+          if-no-files-found: error
+
+      - name: Submit Windows installer to SignPath
+        if: steps.signpath.outputs.available == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-windows.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed
+
+      - name: Publish Windows installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
+          SIGNED: ${{ steps.signpath.outputs.available }}
+        run: |
+          if ($env:SIGNED -eq 'true') {
+            $installer = Get-ChildItem -Path dist/signed -Filter 'AI-Gist-*-Windows-Setup.exe' -Recurse | Select-Object -First 1
+          } else {
+            $installer = Get-ChildItem -Path dist -Filter 'AI-Gist-*-Windows-Setup.exe' | Select-Object -First 1
+          }
+
+          if (-not $installer) {
+            throw 'Windows installer was not found.'
+          }
+
+          gh release upload $env:RELEASE_VERSION $installer.FullName --repo $env:GITHUB_REPOSITORY --clobber
 
   build-linux:
     needs: create-release

@@ -60,7 +60,10 @@
     "mac": {
         "target": "dmg",
         "icon": "src/assets/macos.icns",
-        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}"
+        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}",
+        "hardenedRuntime": true,
+        "entitlements": "resources/entitlements.mac.plist",
+        "entitlementsInherit": "resources/entitlements.mac.plist"
     },
     "dmg": {
         "background": "src/assets/dmg-background.png",
