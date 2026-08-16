@@ -206,10 +206,6 @@ AI 快速调整
 
 </div>
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yarin-zhang/AI-Gist&type=Date)](https://www.star-history.com/#yarin-zhang/AI-Gist&Date)
-
 ## 许可证
 
 本项目采用 [AGPL 许可证](./LICENSE)，请在使用时遵守相关条款。
