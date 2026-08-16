@@ -8,7 +8,7 @@
 
 ✨ AI Gist 是一款隐私优先的 AI 提示词管理工具，致力于让个人收藏的 AI 提示词能够发挥最大价值。现已覆盖 Windows / macOS / Linux 桌面端，并提供 Android APK 与 iOS App Store 版本，支持变量替换、Jinja 模板、AI 生成与调优、历史版本记录、云端备份等核心功能。
 
-![主要截图](docs/images/image-main.png?v=202608162327)
+![主要截图](docs/images/image-main.png?v=202608170119)
 
 [🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases) | [🤖 Android APK](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [🍎 App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) | [🔏 Code signing policy](CODE_SIGNING_POLICY.md) | [🔒 隐私政策](PRIVACY.md)
 
