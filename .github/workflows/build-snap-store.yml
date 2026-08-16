@@ -1,0 +1,69 @@
+name: Build and Publish Snap Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: '构建后发布到 Snap Store'
+        required: true
+        type: boolean
+        default: false
+      channel:
+        description: 'Snap Store 发布通道'
+        required: true
+        type: choice
+        options:
+          - stable
+          - candidate
+          - beta
+          - edge
+        default: stable
+
+permissions:
+  contents: read
+
+jobs:
+  build-snap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Build Snap package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: yarn build:store:linux
+
+      - name: Locate Snap package
+        id: snap
+        shell: bash
+        run: |
+          SNAP_PATH=$(find dist -maxdepth 1 -type f -name 'AI-Gist-*-Linux-Snap-amd64.snap' -print -quit)
+          if [[ -z "$SNAP_PATH" ]]; then
+            echo '::error::Snap package was not produced.'
+            exit 1
+          fi
+          echo "path=$SNAP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Snap artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-snap-package
+          path: ${{ steps.snap.outputs.path }}
+          if-no-files-found: error
+
+      - name: Publish to Snap Store
+        if: ${{ inputs.publish }}
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snap.outputs.path }}
+          release: ${{ inputs.channel }}

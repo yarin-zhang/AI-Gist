@@ -44,6 +44,15 @@ AI Gist 首次登陆 Mac App Store。
 - 导入、导出与 WebDAV 备份恢复
 - 支持 Ollama、LM Studio 和自定义在线 AI 服务
 
+## Snap Store 2.0.3 版本说明
+
+AI Gist 首次登陆 Snap Store，提供适用于 amd64 Linux 桌面的严格沙箱版本。
+
+- 提示词变量与 Jinja 模板
+- 分类、标签、收藏、评分和历史记录
+- 导入、导出与 WebDAV 备份恢复
+- 支持 Ollama、LM Studio 和自定义在线 AI 服务
+
 ## 搜索关键词
 
 AI 提示词管理, 人工智能提示词, 提示词工具, 提示词模板, AI 提示词收集, AI 提示词优化, Jinja 模板

@@ -13,6 +13,7 @@
         "build:mac": "node scripts/build.js && PYTHON=python3 npm_config_python=python3 electron-builder --mac",
         "build:store:mac": "node scripts/build.js && PYTHON=python3 npm_config_python=python3 electron-builder --config electron-builder.mas.js --mac --universal --publish never",
         "build:linux": "node scripts/build.js && electron-builder --linux",
+        "build:store:linux": "node scripts/build.js && electron-builder --config electron-builder.snap.js --linux snap --x64 --publish never",
         "build:web": "vite build --config vite.config.web.js",
         "serve:web": "node scripts/web-server.js",
         "build:ci:mac": "node scripts/build.js && CSC_IDENTITY_AUTO_DISCOVERY=false yarn electron-builder --mac",
