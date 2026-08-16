@@ -202,6 +202,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 应用信息和更新
   app: {
+    isMacAppStore: process.mas === true,
     getVersion: () => ipcRenderer.invoke('app:get-version'),
     getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
     openDownloadPage: (url: string) => ipcRenderer.invoke('app:open-download-page', url),

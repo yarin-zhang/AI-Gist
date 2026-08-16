@@ -28,7 +28,13 @@
             <NFlex vertical :size="12">
                 <NFlex justify="space-between" align="center" :size="12" wrap>
                     <NText strong style="font-size: 16px;">{{ t('about.versionInfo') }}</NText>
-                    <NButton @click="handleCheckForUpdates" :loading="checking" secondary type="primary">
+                    <NButton
+                        v-if="capabilities.electronUpdates"
+                        @click="handleCheckForUpdates"
+                        :loading="checking"
+                        secondary
+                        type="primary"
+                    >
                         <template #icon>
                             <NIcon><Refresh /></NIcon>
                         </template>
@@ -159,8 +165,10 @@ import {
 import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
 import { useUpdate } from '~/composables/useUpdate';
 import { openExternalUrl } from '~/lib/platform/shell';
+import { PlatformDetector } from '@shared/platform';
 
 const { t } = useI18n();
+const capabilities = PlatformDetector.getCapabilities();
 
 // 应用图标
 const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href;

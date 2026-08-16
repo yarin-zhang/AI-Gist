@@ -173,6 +173,7 @@ export default interface ElectronApi {
 
   // 应用信息和更新
   app: {
+    isMacAppStore: boolean
     getVersion: () => Promise<string>
     getPath: (name: string) => Promise<string>
     checkUpdates: () => Promise<{ success: boolean; data?: any; error?: string }>

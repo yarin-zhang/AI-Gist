@@ -77,8 +77,17 @@ export class TestWebDAVServer {
     return new Promise((resolve, reject) => {
       this.server.close(err => {
         // 清理临时目录
-        try { fs.rmSync(this.rootDir, { recursive: true, force: true }) } catch {}
-        err ? reject(err) : resolve()
+        try {
+          fs.rmSync(this.rootDir, { recursive: true, force: true })
+        } catch {
+          // 临时目录清理失败不应覆盖服务器关闭结果
+        }
+
+        if (err) {
+          reject(err)
+        } else {
+          resolve()
+        }
       })
     })
   }

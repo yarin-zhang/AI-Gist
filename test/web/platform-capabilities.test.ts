@@ -108,6 +108,16 @@ describe('PlatformDetector web capability matrix', () => {
     expect(PlatformDetector.getCapabilities().globalShortcuts).toBe(true)
   })
 
+  it('disables external updates and direct iCloud access in Mac App Store builds', () => {
+    ;(window as any).electronAPI = { app: { isMacAppStore: true } }
+    ;(PlatformDetector as any)._platform = null
+
+    const capabilities = PlatformDetector.getCapabilities()
+    expect(capabilities.electronUpdates).toBe(false)
+    expect(capabilities.icloud).toBe(false)
+    expect(capabilities.webdavSync).toBe(true)
+  })
+
   it('keeps native mobile shells separate from Web', () => {
     ;(window as any).Capacitor = { getPlatform: () => 'ios' }
     ;(PlatformDetector as any)._platform = null

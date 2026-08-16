@@ -19,6 +19,7 @@ export function installWebRuntimeBridge(): void {
       reset: () => preferencesClient.reset()
     },
     app: {
+      isMacAppStore: false,
       getVersion: async () => __APP_VERSION__,
       getPath: async () => '',
       checkUpdates: async () => ({ success: false, error: 'Web 端不支持 Electron 更新检查' }),
@@ -26,7 +27,7 @@ export function installWebRuntimeBridge(): void {
         window.open(url, '_blank', 'noopener,noreferrer');
         return { success: true };
       },
-      onUpdateAvailable: () => () => {}
+      onUpdateAvailable: () => () => undefined
     },
     shell: {
       openPath: async () => ({ success: false, error: 'Web 端没有可打开的系统路径' }),

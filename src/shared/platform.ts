@@ -188,6 +188,9 @@ export class PlatformDetector {
     const platform = this.getPlatform();
 
     if (platform === 'electron') {
+      const isMacAppStore = typeof window !== 'undefined'
+        && window.electronAPI?.app?.isMacAppStore === true;
+
       return {
         desktopShell: true,
         mobileShell: false,
@@ -201,10 +204,10 @@ export class PlatformDetector {
         tray: true,
         startup: true,
         systemProxy: true,
-        electronUpdates: true,
+        electronUpdates: !isMacAppStore,
         cloudBackup: true,
         webdavSync: true,
-        icloud: true,
+        icloud: !isMacAppStore,
         aiGeneration: true,
         aiProxy: false,
         nativeAI: true,

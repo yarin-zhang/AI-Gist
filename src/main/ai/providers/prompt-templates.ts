@@ -24,7 +24,7 @@ export interface PromptTemplate {
  */
 export class PromptTemplateManager {
   private static instance: PromptTemplateManager;
-  private templates: Map<string, PromptTemplate> = new Map();
+  private templates = new Map<string, PromptTemplate>();
 
   private constructor() {
     this.initializeDefaultTemplates();
@@ -212,4 +212,4 @@ export function getPromptTemplateManager(): PromptTemplateManager {
 export function buildPrompts(request: any, config: any): { systemPrompt: string; userPrompt: string } {
   const manager = getPromptTemplateManager();
   return manager.selectTemplate(request, config);
-} 
+}

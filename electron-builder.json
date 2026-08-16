@@ -40,7 +40,11 @@
                 "*.icns"
             ]
         },
-        "package.json"
+        "package.json",
+        "!node_modules/@capacitor/android/**",
+        "!node_modules/@capacitor/ios/**",
+        "!node_modules/@capacitor/*/android/**",
+        "!node_modules/@capacitor/*/ios/**"
     ],
     "asarUnpack": [],
     "extraResources": [],
@@ -57,10 +61,36 @@
         "icon": "src/assets/windows.ico",
         "artifactName": "AI-Gist-${version}-Windows-Setup.${ext}"
     },
+    "appx": {
+        "applicationId": "AIGist",
+        "identityName": "YarinZ.AIGist-PromptManager",
+        "publisher": "CN=B0E00209-75E9-44EE-B4B3-F71D2E3B4634",
+        "publisherDisplayName": "Yarin Z",
+        "displayName": "AI Gist",
+        "backgroundColor": "#1E293B",
+        "languages": [
+            "zh-CN",
+            "en-US"
+        ],
+        "artifactName": "AI-Gist-${version}-Windows-Store-${arch}.${ext}"
+    },
     "mac": {
         "target": "dmg",
         "icon": "src/assets/macos.icns",
-        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}"
+        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}",
+        "hardenedRuntime": true,
+        "entitlements": "resources/entitlements.mac.plist",
+        "entitlementsInherit": "resources/entitlements.mac.plist"
+    },
+    "mas": {
+        "appId": "com.getaigist.app",
+        "target": "mas",
+        "icon": "src/assets/macos.icns",
+        "artifactName": "AI-Gist-${version}-Mac-App-Store-${arch}.${ext}",
+        "hardenedRuntime": true,
+        "mergeASARs": false,
+        "entitlements": "resources/entitlements.mas.plist",
+        "entitlementsInherit": "resources/entitlements.mas.inherit.plist"
     },
     "dmg": {
         "background": "src/assets/dmg-background.png",

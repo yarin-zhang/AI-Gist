@@ -282,7 +282,7 @@ export class NetworkProxyManager {
   /**
    * 获取当前代理配置信息
    */
-  static async getProxyInfo(url: string = 'https://www.google.com'): Promise<string> {
+  static async getProxyInfo(url = 'https://www.google.com'): Promise<string> {
     try {
       const proxyInfo = await session.defaultSession.resolveProxy(url);
       console.log(`获取代理信息 (${url}):`, proxyInfo);
