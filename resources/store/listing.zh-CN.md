@@ -6,7 +6,7 @@
 
 AI Gist
 
-Windows Partner Center 当前预留名称：AI Gist - Prompt Manager
+Windows Partner Center 当前仪表板名称：AI Gist
 
 ## 简短描述
 
