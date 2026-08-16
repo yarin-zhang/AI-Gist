@@ -49,18 +49,18 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/yarin-zhang/AI-Gist?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases/latest) [![GitHub all releases](https://img.shields.io/github/downloads/yarin-zhang/AI-Gist/total?style=flat)](https://github.com/yarin-zhang/AI-Gist/releases)
 
-桌面端安装包通过 GitHub Releases 发布；移动端目前提供 Android APK 安装包，iOS 版本已上架 App Store。
+桌面端安装包通过 GitHub Releases 发布，Linux 也可从 Snap Store 安装；移动端目前提供 Android APK 安装包，iOS 版本已上架 App Store。
 
 Windows 正式安装包使用 [SignPath.io](https://signpath.io/) 提供的免费代码签名服务，证书由 [SignPath Foundation](https://signpath.org/) 提供；macOS 正式安装包在 Apple Developer 凭据可用时使用 Developer ID 签名并通过 Apple 公证。申请或迁移期间产生的旧版本可能仍未签名，具体状态以对应 Release 说明为准。详见 [Code signing policy](CODE_SIGNING_POLICY.md)。
 
-| 平台 | 下载链接 | 说明 |
-|------|----------|------|
-| ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Windows 安装程序 |
-| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Apple Silicon)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Apple 芯片 |
-| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 适用于 Intel 芯片 |
-| ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 通用 Linux 应用 |
-| ![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=flat&logo=android&logoColor=white) | [Android APK](https://github.com/yarin-zhang/AI-Gist/releases/latest) | APK 形式安装包 |
-| ![iOS](https://img.shields.io/badge/iOS-App%20Store-000000?style=flat&logo=apple&logoColor=white) | [App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) | 已上架 App Store |
+| 平台 | 下载链接 | 应用市场 | 说明 |
+|------|----------|----------|------|
+| ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Microsoft Store（暂未公开） | Windows 安装程序 |
+| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Apple Silicon)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Mac App Store（审核中） | 适用于 Apple 芯片 |
+| ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | Mac App Store（审核中） | 适用于 Intel 芯片 |
+| ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [Snap Store](https://snapcraft.io/ai-gist) | 通用 Linux 应用 |
+| ![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=flat&logo=android&logoColor=white) | [Android APK](https://github.com/yarin-zhang/AI-Gist/releases/latest) | 暂未上架 | APK 形式安装包 |
+| ![iOS](https://img.shields.io/badge/iOS-App%20Store-000000?style=flat&logo=apple&logoColor=white) | [App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) | [App Store](https://apps.apple.com/cn/app/ai-gist/id6762559220) | 已上架 App Store |
 
 如果 Github 下载较慢，可以尝试通过百度网盘、SourceForge 进行下载。
 
