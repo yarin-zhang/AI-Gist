@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（例如 v0.1.1）；填 store 构建 Windows Store，填 mac-store 构建并上传 Mac App Store'
+        description: '版本号（例如 v0.1.1）；store 构建 Windows Store；mac-store 上传 Mac App Store；linux-store-build 仅构建 Snap；linux-store 发布 Snap stable'
         required: false
         default: ''
 
@@ -151,8 +151,54 @@ jobs:
         if: always()
         run: security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
 
+  build-linux-store:
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.version == 'linux-store-build' || github.event.inputs.version == 'linux-store')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Build Snap package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: yarn build:store:linux
+
+      - name: Locate Snap package
+        id: snap
+        shell: bash
+        run: |
+          SNAP_PATH=$(find dist -maxdepth 1 -type f -name 'AI-Gist-*-Linux-Snap-amd64.snap' -print -quit)
+          if [[ -z "$SNAP_PATH" ]]; then
+            echo '::error::Snap package was not produced.'
+            exit 1
+          fi
+          echo "path=$SNAP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Snap artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-snap-package
+          path: ${{ steps.snap.outputs.path }}
+          if-no-files-found: error
+
+      - name: Publish to Snap Store stable channel
+        if: github.event.inputs.version == 'linux-store'
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snap.outputs.path }}
+          release: stable
+
   create-release:
-    if: github.event_name != 'workflow_dispatch' || (github.event.inputs.version != 'store' && github.event.inputs.version != 'mac-store')
+    if: github.event_name != 'workflow_dispatch' || (github.event.inputs.version != 'store' && github.event.inputs.version != 'mac-store' && github.event.inputs.version != 'linux-store-build' && github.event.inputs.version != 'linux-store')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
