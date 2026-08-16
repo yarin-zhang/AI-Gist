@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（例如 v0.1.1）；填 store 时仅构建 Windows Store 包'
+        description: '版本号（例如 v0.1.1）；填 store 构建 Windows Store，填 mac-store 构建并上传 Mac App Store'
         required: false
         default: ''
 
@@ -42,8 +42,117 @@ jobs:
           path: dist/AI-Gist-*-Windows-Store-*.appx
           if-no-files-found: error
 
+  build-mac-store:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'mac-store'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Install Mac App Store signing certificates
+        env:
+          MAS_APP_CERT_P12_BASE64: ${{ secrets.MAS_APP_CERT_P12_BASE64 }}
+          MAS_APP_CERT_PASSWORD: ${{ secrets.MAS_APP_CERT_PASSWORD }}
+          MAS_INSTALLER_CERT_P12_BASE64: ${{ secrets.MAS_INSTALLER_CERT_P12_BASE64 }}
+          MAS_INSTALLER_CERT_PASSWORD: ${{ secrets.MAS_INSTALLER_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/mac-app-store-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          printf '%s' "$MAS_APP_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/mas-app.p12"
+          printf '%s' "$MAS_INSTALLER_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/mas-installer.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/mas-app.p12" -P "$MAS_APP_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/mas-installer.p12" -P "$MAS_INSTALLER_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Install Mac App Store provisioning profile
+        env:
+          MAS_PROVISIONING_PROFILE_BASE64: ${{ secrets.MAS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          MAS_PROVISIONING_PROFILE_PATH="$RUNNER_TEMP/AI_Gist_Mac_App_Store.provisionprofile"
+          printf '%s' "$MAS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$MAS_PROVISIONING_PROFILE_PATH"
+          security cms -D -i "$MAS_PROVISIONING_PROFILE_PATH" > "$RUNNER_TEMP/mas-profile.plist"
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$RUNNER_TEMP/mas-profile.plist")
+          if [[ "$PROFILE_APP_ID" != '9T93J5B7N6.com.getaigist.app' ]]; then
+            echo "::error::Unexpected Mac App Store provisioning profile: $PROFILE_APP_ID"
+            exit 1
+          fi
+          echo "MAS_PROVISIONING_PROFILE_PATH=$MAS_PROVISIONING_PROFILE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build signed Mac App Store package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: true
+          PYTHON: python3
+          npm_config_python: python3
+        run: |
+          node scripts/build.js
+          yarn electron-builder --config electron-builder.mas.js --mac --universal --publish never \
+            --config.mas.provisioningProfile="$MAS_PROVISIONING_PROFILE_PATH"
+
+          PKG_PATH=$(find dist -type f -name 'AI-Gist-*-Mac-App-Store-*.pkg' -print -quit)
+          if [[ -z "$PKG_PATH" ]]; then
+            echo '::error::Mac App Store package was not produced.'
+            exit 1
+          fi
+          pkgutil --check-signature "$PKG_PATH"
+          echo "MAS_PKG_PATH=$PKG_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload Mac App Store package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mac-app-store-package
+          path: dist/**/AI-Gist-*-Mac-App-Store-*.pkg
+          if-no-files-found: error
+
+      - name: Upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          if xcrun --find altool >/dev/null 2>&1; then
+            xcrun altool --validate-app --type macos --file "$MAS_PKG_PATH" \
+              --username "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD"
+            xcrun altool --upload-app --type macos --file "$MAS_PKG_PATH" \
+              --username "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD"
+          else
+            TRANSPORTER=$(xcrun --find iTMSTransporter)
+            "$TRANSPORTER" -m verify -assetFile "$MAS_PKG_PATH" \
+              -u "$APPLE_ID" -p "$APPLE_APP_SPECIFIC_PASSWORD" -v informational
+            "$TRANSPORTER" -m upload -assetFile "$MAS_PKG_PATH" \
+              -u "$APPLE_ID" -p "$APPLE_APP_SPECIFIC_PASSWORD" -v informational
+          fi
+
+      - name: Cleanup signing keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+
   create-release:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.version != 'store'
+    if: github.event_name != 'workflow_dispatch' || (github.event.inputs.version != 'store' && github.event.inputs.version != 'mac-store')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}

@@ -40,7 +40,11 @@
                 "*.icns"
             ]
         },
-        "package.json"
+        "package.json",
+        "!node_modules/@capacitor/android/**",
+        "!node_modules/@capacitor/ios/**",
+        "!node_modules/@capacitor/*/android/**",
+        "!node_modules/@capacitor/*/ios/**"
     ],
     "asarUnpack": [],
     "extraResources": [],
@@ -77,6 +81,16 @@
         "hardenedRuntime": true,
         "entitlements": "resources/entitlements.mac.plist",
         "entitlementsInherit": "resources/entitlements.mac.plist"
+    },
+    "mas": {
+        "appId": "com.getaigist.app",
+        "target": "mas",
+        "icon": "src/assets/macos.icns",
+        "artifactName": "AI-Gist-${version}-Mac-App-Store-${arch}.${ext}",
+        "hardenedRuntime": true,
+        "mergeASARs": false,
+        "entitlements": "resources/entitlements.mas.plist",
+        "entitlementsInherit": "resources/entitlements.mas.inherit.plist"
     },
     "dmg": {
         "background": "src/assets/dmg-background.png",

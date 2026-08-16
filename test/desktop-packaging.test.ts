@@ -21,6 +21,10 @@ describe('desktop packaging', () => {
       to: './renderer',
       filter: ['**/*']
     });
+    expect(builderConfig.files).toContain('!node_modules/@capacitor/android/**');
+    expect(builderConfig.files).toContain('!node_modules/@capacitor/ios/**');
+    expect(builderConfig.files).toContain('!node_modules/@capacitor/*/android/**');
+    expect(builderConfig.files).toContain('!node_modules/@capacitor/*/ios/**');
   });
 
   it('uses hardened runtime entitlements for notarized macOS releases', () => {
@@ -35,6 +39,34 @@ describe('desktop packaging', () => {
     });
     expect(entitlements).toContain('com.apple.security.cs.allow-jit');
     expect(entitlements).toContain('com.apple.security.cs.allow-unsigned-executable-memory');
+  });
+
+  it('uses the shared App Store bundle ID and sandbox entitlements for Mac App Store releases', () => {
+    const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const entitlements = readFileSync(resolve(root, builderConfig.mas.entitlements), 'utf8');
+    const inheritedEntitlements = readFileSync(resolve(root, builderConfig.mas.entitlementsInherit), 'utf8');
+
+    expect(packageJson.scripts['build:store:mac']).toContain('--config electron-builder.mas.js --mac --universal');
+    const masConfig = readFileSync(resolve(root, 'electron-builder.mas.js'), 'utf8');
+    expect(masConfig).toContain('identity: null');
+    expect(masConfig).toContain("identity: 'YANLIN ZHANG (9T93J5B7N6)'");
+    expect(builderConfig.mas).toMatchObject({
+      appId: 'com.getaigist.app',
+      target: 'mas',
+      hardenedRuntime: true,
+      mergeASARs: false,
+      entitlements: 'resources/entitlements.mas.plist',
+      entitlementsInherit: 'resources/entitlements.mas.inherit.plist'
+    });
+    expect(entitlements).toContain('com.apple.security.app-sandbox');
+    expect(entitlements).toContain('com.apple.security.files.user-selected.read-write');
+    expect(entitlements).toContain('com.apple.security.network.client');
+    expect(inheritedEntitlements).toContain('com.apple.security.inherit');
+    const workflow = readFileSync(resolve(root, '.github/workflows/build-release.yml'), 'utf8');
+    expect(workflow).toContain("github.event.inputs.version == 'mac-store'");
+    expect(workflow).toContain('dist/**/AI-Gist-*-Mac-App-Store-*.pkg');
+    expect(workflow).toContain('Upload to App Store Connect');
   });
 
   it('uses the Microsoft Store identity assigned by Partner Center', () => {

@@ -19,6 +19,7 @@ export function installWebRuntimeBridge(): void {
       reset: () => preferencesClient.reset()
     },
     app: {
+      isMacAppStore: false,
       getVersion: async () => __APP_VERSION__,
       getPath: async () => '',
       checkUpdates: async () => ({ success: false, error: 'Web 端不支持 Electron 更新检查' }),
