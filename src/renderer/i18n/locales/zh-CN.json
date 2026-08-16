@@ -1073,7 +1073,7 @@
     "copiedAndRecorded": "已复制提示词并记录本次使用",
     "selectModelFirst": "请先选择可用的 AI 模型",
     "emptyTitle": "选择一条提示词开始使用",
-    "emptyDescription": "从左侧提示词库选择内容，或新建一条提示词。日常使用和编辑能力会在这里清晰分开。",
+    "emptyDescription": "新建一条提示词",
     "sortBy": "排序方式",
     "sortUpdated": "最近更新",
     "sortUsage": "使用次数",

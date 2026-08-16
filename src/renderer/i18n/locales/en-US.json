@@ -1073,7 +1073,7 @@
     "copiedAndRecorded": "Prompt copied and usage recorded",
     "selectModelFirst": "Select an available AI model first",
     "emptyTitle": "Select a prompt to get started",
-    "emptyDescription": "Choose a prompt from the library or create a new one. Everyday use and editing stay clearly separated here.",
+    "emptyDescription": "Create a new prompt",
     "sortBy": "Sort by",
     "sortUpdated": "Recently updated",
     "sortUsage": "Usage count",

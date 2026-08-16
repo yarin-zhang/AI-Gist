@@ -1073,7 +1073,7 @@
     "copiedAndRecorded": "プロンプトをコピーし、使用を記録しました",
     "selectModelFirst": "利用可能な AI モデルを選択してください",
     "emptyTitle": "プロンプトを選択して開始",
-    "emptyDescription": "左側のライブラリからプロンプトを選択するか、新しく作成してください。日常利用と編集を明確に分けて表示します。",
+    "emptyDescription": "新しいプロンプトを作成",
     "sortBy": "並び順",
     "sortUpdated": "最近更新",
     "sortUsage": "使用回数",
