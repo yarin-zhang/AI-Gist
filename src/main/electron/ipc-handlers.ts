@@ -8,6 +8,7 @@ import { aiServiceManager } from '../ai/ai-service-manager';
 import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
 import { NetworkProxyManager } from './network-proxy';
+import { openShellPath } from './shell-operation-result';
 import type { PromptShortcutBinding, ShortcutCommandId, ShortcutExecutionRequest, UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
@@ -224,9 +225,9 @@ class IpcHandlers {
    */
   private setupShellHandlers() {
     // 打开路径
-    ipcMain.handle('shell:open-path', (_, path: string) => {
-      return shell.openPath(path);
-    });
+    ipcMain.handle('shell:open-path', (_, path: string) =>
+      openShellPath(path, target => shell.openPath(target))
+    );
 
     // 打开外部链接
     ipcMain.handle('shell:open-external', (_, url: string) => {
