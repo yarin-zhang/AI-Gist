@@ -13,7 +13,7 @@
 
 支持变量替换、Jinja 模板、AI 生成与调优、历史版本记录、云端备份等核心功能。
 
-![主要截图](docs/images/image-main.png?v=202608162327)
+![主要截图](docs/images/image-main.png?v=202608170119)
 
 [🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases)
 
