@@ -1,13 +1,10 @@
-name: Build iOS IPA (Mobile Branch)
+name: Build and Upload iOS App
 
 on:
-  push:
-    branches:
-      - mobile
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-ios:
@@ -21,158 +18,146 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'yarn'
+          cache: yarn
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: Build web assets
-        run: npx vite build --config vite.config.mobile.js
+        run: yarn vite build --config vite.config.mobile.js
 
       - name: Sync Capacitor
-        run: npx cap sync ios
+        run: yarn cap sync ios
 
       - name: Check signing configuration
-        id: signing
+        env:
+          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -n "${{ secrets.IOS_P12_BASE64 }}" ]; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
+          if [[ -z "$IOS_P12_BASE64" || -z "$IOS_P12_PASSWORD" || -z "$IOS_PROVISIONING_PROFILE_BASE64" || -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            echo "::error::iOS signing or App Store Connect credentials are incomplete."
+            exit 1
           fi
 
       - name: Install signing certificate
-        if: steps.signing.outputs.available == 'true'
         env:
           IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
           IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
         run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 20)
-          echo "$IOS_P12_BASE64" | base64 -d > $RUNNER_TEMP/certificate.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security import $RUNNER_TEMP/certificate.p12 -P "$IOS_P12_PASSWORD" \
-            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "$IOS_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -P "$IOS_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Install provisioning profile
-        if: steps.signing.outputs.available == 'true'
         env:
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
-          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
-          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d > $PP_PATH
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          UUID=$(security cms -D -i $PP_PATH | plutil -extract UUID raw -)
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
 
-      - name: Build Signed IPA
-        if: steps.signing.outputs.available == 'true'
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "PROVISIONING_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+
+      - name: Archive and export IPA
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d > \
-            ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+          VERSION=$(node -p "require('./package.json').version")
+          BUILD_NUMBER="${{ github.run_number }}"
+          ARCHIVE_PATH="$RUNNER_TEMP/AI-Gist.xcarchive"
+          EXPORT_PATH="$RUNNER_TEMP/export"
+          EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
 
           xcodebuild archive \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER=$PROVISIONING_PROFILE_UUID \
-            CODE_SIGN_IDENTITY="iPhone Distribution" \
-            DEVELOPMENT_TEAM=9T93J5B7N6
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_NAME" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
-          cat > $RUNNER_TEMP/ExportOptions.plist << EOF
+          cat > "$EXPORT_OPTIONS" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+            <key>destination</key>
+            <string>export</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
             <key>method</key>
             <string>app-store-connect</string>
-            <key>teamID</key>
-            <string>9T93J5B7N6</string>
-            <key>signingStyle</key>
-            <string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.aigist.app</key>
-              <string>${PROVISIONING_PROFILE_UUID}</string>
+              <key>com.getaigist.app</key>
+              <string>$PROVISIONING_PROFILE_NAME</string>
             </dict>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>uploadSymbols</key>
+            <true/>
           </dict>
           </plist>
           EOF
 
           xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/ipa \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8 \
-            -authenticationKeyID $APP_STORE_CONNECT_API_KEY_ID \
-            -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS" \
+            -exportPath "$EXPORT_PATH"
 
-      - name: Build Debug IPA (No Signing Config)
-        if: steps.signing.outputs.available != 'true'
-        run: |
-          xcodebuild archive \
-            -workspace ios/App/App.xcworkspace \
-            -scheme App \
-            -configuration Debug \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -exportOptionsPlist ios/App/ExportOptions-debug.plist \
-            -exportPath $RUNNER_TEMP/ipa \
-            || true
-          # Fallback: copy .app directly if export fails without signing
-          mkdir -p $RUNNER_TEMP/ipa
-          find $RUNNER_TEMP/App.xcarchive -name "*.app" -exec cp -r {} $RUNNER_TEMP/ipa/ \; 2>/dev/null || true
-
-      - name: Get version
-        id: get_version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          # 每次 run/attempt 唯一，避免同名 tag 被改写导致协作者 git pull --tags 报 would clobber
-          echo "tag=v${VERSION}-debug-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
-
-      - name: Collect artifacts
-        run: |
-          TAG="${{ steps.get_version.outputs.tag }}"
-          IPA=$(find $RUNNER_TEMP/ipa -name "*.ipa" | head -1)
-          if [ -n "$IPA" ]; then
-            cp "$IPA" "AI-Gist-${TAG}.ipa"
-          else
-            # No IPA (unsigned debug), zip the .app instead
-            APP=$(find $RUNNER_TEMP/ipa -name "*.app" | head -1)
-            zip -r "AI-Gist-${TAG}.ipa.zip" "$APP"
-            mv "AI-Gist-${TAG}.ipa.zip" "AI-Gist-${TAG}.ipa"
+          IPA_PATH=$(find "$EXPORT_PATH" -name '*.ipa' -print -quit)
+          if [[ -z "$IPA_PATH" ]]; then
+            echo "::error::No IPA was produced."
+            exit 1
           fi
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
-      - name: Cleanup keychain
-        if: always() && steps.signing.outputs.available == 'true'
-        run: security delete-keychain $KEYCHAIN_PATH 2>/dev/null || true
+      - name: Validate and upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          xcrun altool --validate-app --type ios --file "$IPA_PATH" \
+            --username "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD"
+          xcrun altool --upload-app --type ios --file "$IPA_PATH" \
+            --username "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD"
 
-      - name: Upload to debug release
-        uses: softprops/action-gh-release@v3
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ steps.get_version.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: "AI Gist ${{ steps.get_version.outputs.tag }}"
-          draft: true
-          prerelease: false
-          generate_release_notes: false
-          files: |
-            AI-Gist-${{ steps.get_version.outputs.tag }}.ipa
+          name: AI-Gist-iOS-${{ github.run_number }}
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+
+      - name: Cleanup signing keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
