@@ -9,7 +9,10 @@
         </ion-buttons>
         <ion-title>{{ isEdit ? t('promptManagement.edit') : t('promptManagement.createPrompt') }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="handleSave" :disabled="saving">
+          <ion-button @click="toggleFavorite" :aria-label="t('promptManagement.detailModal.favorite')">
+            <ion-icon :icon="formData.isFavorite ? heart : heartOutline"></ion-icon>
+          </ion-button>
+          <ion-button @click="handleSave" :disabled="saving" strong>
             {{ t('common.save') }}
           </ion-button>
         </ion-buttons>
@@ -17,88 +20,95 @@
     </ion-header>
 
     <ion-content :fullscreen="true">
-      <form @submit.prevent="handleSave">
-        <ion-list>
-          <!-- 内容 - 放在最前面 -->
-          <ion-item>
+      <form class="editor-flow" @submit.prevent="handleSave">
+        <!-- 核心内容：标题 -> 正文 -> 描述，一个连续的创作区域 -->
+        <section class="content-card">
+          <div class="field-block">
+            <ion-input
+              v-model="formData.title"
+              class="title-input"
+              :placeholder="t('promptManagement.titlePlaceholder')"
+            ></ion-input>
+          </div>
+
+          <div class="field-block">
             <ion-textarea
               v-model="formData.content"
-              :label="t('promptManagement.content')"
-              label-placement="stacked"
+              class="content-textarea"
               :placeholder="t('promptManagement.contentPlaceholder')"
-              :rows="8"
+              :rows="6"
               :auto-grow="true"
               required
             ></ion-textarea>
-          </ion-item>
+            <div class="field-meta-row">
+              <span class="field-hint">{{ t('promptManagement.variableSyntaxHint') }}</span>
+              <span class="char-count">{{ contentLength }} {{ t('promptManagement.characters') }}</span>
+            </div>
+          </div>
 
-          <!-- 收藏 -->
-          <ion-item>
-            <ion-label>{{ t('promptManagement.detailModal.favorite') }}</ion-label>
-            <ion-toggle v-model="formData.isFavorite" slot="end"></ion-toggle>
-          </ion-item>
+          <div class="field-block">
+            <span class="field-caption">{{ t('promptManagement.description') }}</span>
+            <ion-textarea
+              v-model="formData.description"
+              class="description-textarea"
+              :placeholder="t('promptManagement.descriptionPlaceholder')"
+              :rows="2"
+              :auto-grow="true"
+            ></ion-textarea>
+          </div>
+        </section>
 
-          <!-- 其他信息折叠区域 -->
-          <ion-item button @click="showMoreOptions = !showMoreOptions" lines="full">
-            <ion-label>{{ t('promptManagement.moreOptions') }}</ion-label>
-            <ion-icon :icon="showMoreOptions ? chevronUp : chevronDown" slot="end"></ion-icon>
-          </ion-item>
+        <!-- 元信息：分类 / 标签 / 图片，以内联 chip 呈现，无需跳转即可看到当前选择 -->
+        <section class="metadata-card">
+          <div class="metadata-group">
+            <span class="field-caption">{{ t('promptManagement.category') }}</span>
+            <div class="chip-scroll">
+              <button
+                type="button"
+                class="pill"
+                :class="{ active: !formData.categoryId }"
+                @click="selectCategory(null)"
+              >
+                {{ t('promptManagement.noCategory') }}
+              </button>
+              <button
+                v-for="category in categories"
+                :key="category.id"
+                type="button"
+                class="pill"
+                :class="{ active: formData.categoryId === category.id }"
+                :style="categoryChipStyle(category)"
+                @click="selectCategory(category.id)"
+              >
+                <span class="pill-dot" :style="{ background: category.color || 'var(--content-tertiary)' }"></span>
+                {{ category.name }}
+              </button>
+            </div>
+          </div>
 
-          <div v-show="showMoreOptions">
-            <!-- 标题 -->
-            <ion-item>
-              <ion-input
-                v-model="formData.title"
-                :label="t('promptManagement.title')"
-                label-placement="stacked"
-                :placeholder="t('promptManagement.titlePlaceholder')"
-              ></ion-input>
-            </ion-item>
+          <div class="metadata-group">
+            <span class="field-caption">{{ t('promptManagement.tags') }}</span>
+            <div class="chip-wrap">
+              <span
+                v-for="tag in formData.tags"
+                :key="tag"
+                class="pill pill-removable"
+                :style="tagChipStyle(tag)"
+                @click="removeTag(tag)"
+              >
+                {{ tag }}
+                <ion-icon :icon="closeCircle"></ion-icon>
+              </span>
+              <button type="button" class="pill pill-add" @click="showTagsModal = true">
+                <ion-icon :icon="add"></ion-icon>
+                {{ t('promptManagement.addTags') }}
+              </button>
+            </div>
+          </div>
 
-            <!-- 描述 -->
-            <ion-item>
-              <ion-textarea
-                v-model="formData.description"
-                :label="t('promptManagement.description')"
-                label-placement="stacked"
-                :placeholder="t('promptManagement.descriptionPlaceholder')"
-                :rows="3"
-                :auto-grow="true"
-              ></ion-textarea>
-            </ion-item>
-
-            <!-- 分类 -->
-            <ion-item button @click="showCategoryPicker = true">
-              <ion-label>{{ t('promptManagement.category') }}</ion-label>
-              <ion-note slot="end">
-                {{ selectedCategoryName || t('promptManagement.noCategory') }}
-              </ion-note>
-            </ion-item>
-
-            <!-- 标签 -->
-            <ion-item button @click="showTagsModal = true">
-              <ion-label>{{ t('promptManagement.tags') }}</ion-label>
-              <ion-note slot="end">
-                {{ formData.tags?.length || 0 }} {{ t('promptManagement.tags') }}
-              </ion-note>
-            </ion-item>
-
-            <!-- 图片 -->
-            <ion-item>
-              <ion-label>{{ t('promptManagement.images') }}</ion-label>
-              <ion-button slot="end" fill="outline" size="small" @click="triggerImagePicker">
-                {{ t('promptManagement.addImage') }}
-              </ion-button>
-            </ion-item>
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/*"
-              multiple
-              class="hidden-file-input"
-              @change="handleImageFilesSelected"
-            />
-            <div v-if="imagePreviewUrls.length > 0" class="image-preview-grid">
+          <div class="metadata-group">
+            <span class="field-caption">{{ t('promptManagement.images') }}</span>
+            <div class="image-grid">
               <div
                 v-for="(url, index) in imagePreviewUrls"
                 :key="index"
@@ -115,54 +125,29 @@
                   <ion-icon :icon="closeCircle" slot="icon-only"></ion-icon>
                 </ion-button>
               </div>
+              <button
+                type="button"
+                class="image-add-tile"
+                :aria-label="t('promptManagement.addImage')"
+                @click="triggerImagePicker"
+              >
+                <ion-icon :icon="add"></ion-icon>
+              </button>
             </div>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/*"
+              multiple
+              class="hidden-file-input"
+              @change="handleImageFilesSelected"
+            />
           </div>
-        </ion-list>
+        </section>
       </form>
     </ion-content>
 
-    <!-- 分类选择器 -->
-    <ion-modal :is-open="showCategoryPicker" @didDismiss="showCategoryPicker = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ t('promptManagement.selectCategory') }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="showCategoryPicker = false">
-              {{ t('common.close') }}
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content>
-        <ion-list>
-          <ion-item button @click="selectCategory(null)">
-            <ion-label>{{ t('promptManagement.noCategory') }}</ion-label>
-            <ion-icon
-              v-if="!formData.categoryId"
-              :icon="checkmark"
-              slot="end"
-              color="primary"
-            ></ion-icon>
-          </ion-item>
-          <ion-item
-            v-for="category in categories"
-            :key="category.id"
-            button
-            @click="selectCategory(category.id)"
-          >
-            <ion-label>{{ category.name }}</ion-label>
-            <ion-icon
-              v-if="formData.categoryId === category.id"
-              :icon="checkmark"
-              slot="end"
-              color="primary"
-            ></ion-icon>
-          </ion-item>
-        </ion-list>
-      </ion-content>
-    </ion-modal>
-
-    <!-- 标签选择器 -->
+    <!-- 标签选择器：搜索、新增与快速勾选热门标签 -->
     <ion-modal :is-open="showTagsModal" @didDismiss="showTagsModal = false">
       <ion-header>
         <ion-toolbar>
@@ -187,6 +172,7 @@
           <ion-chip
             v-for="tag in formData.tags"
             :key="tag"
+            :style="tagChipStyle(tag)"
             @click="removeTag(tag)"
           >
             <ion-label>{{ tag }}</ion-label>
@@ -241,32 +227,30 @@ import {
   IonButtons,
   IonButton,
   IonIcon,
-  IonList,
-  IonItem,
-  IonLabel,
   IonInput,
   IonTextarea,
-  IonToggle,
-  IonNote,
   IonModal,
   IonSearchbar,
   IonChip,
   IonCheckbox,
+  IonList,
+  IonItem,
+  IonLabel,
   IonListHeader,
   alertController,
   useBackButton
 } from '@ionic/vue'
 import {
   arrowBack,
-  checkmark,
   closeCircle,
   add,
-  chevronDown,
-  chevronUp
+  heart,
+  heartOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { getTagColor, getCategoryTagColor } from '~/lib/utils/tag-colors'
 import type { Prompt, Category } from '@shared/types'
 import { Camera, CameraSource, CameraResultType } from '@capacitor/camera'
 import { Capacitor } from '@capacitor/core'
@@ -284,10 +268,8 @@ const promptId = computed(() => {
 const saving = ref(false)
 const categories = ref<Category[]>([])
 const popularTags = ref<string[]>([])
-const showCategoryPicker = ref(false)
 const showTagsModal = ref(false)
 const tagSearchText = ref('')
-const showMoreOptions = ref(false)
 
 // 图片相关
 const imageBlobs = ref<Blob[]>([])
@@ -362,6 +344,35 @@ const formData = ref<Partial<Prompt>>({
   useCount: 0
 })
 
+const contentLength = computed(() => formData.value.content?.length || 0)
+
+// 收藏（与详情页头部的爱心图标交互保持一致，保存前仅更新本地状态）
+const toggleFavorite = () => {
+  formData.value.isFavorite = !formData.value.isFavorite
+}
+
+// 分类 chip 的选中态着色：沿用桌面端“分类自带颜色”的视觉语言
+const categoryChipStyle = (category: Category) => {
+  if (formData.value.categoryId !== category.id) return undefined
+  const { color, textColor } = getCategoryTagColor(category)
+  if (!color) return undefined
+  return {
+    backgroundColor: `${color}1f`,
+    borderColor: color,
+    color: textColor
+  }
+}
+
+// 标签 chip 沿用桌面端按标签名哈希取色的方案，保持跨端视觉一致
+const tagChipStyle = (tag: string) => {
+  const { color, textColor, borderColor } = getTagColor(tag)
+  return {
+    backgroundColor: color,
+    borderColor,
+    color: textColor
+  }
+}
+
 // 用于判断是否有真实改动（编辑模式下记录原始值）
 const originalSnapshot = ref<string>('')
 const originalImageSignature = ref('')
@@ -386,13 +397,6 @@ const hasRealChanges = (): boolean => {
   const currentSnapshot = JSON.stringify(rest)
   return currentSnapshot !== originalSnapshot.value || getImageSignature() !== originalImageSignature.value
 }
-
-// 选中的分类名称
-const selectedCategoryName = computed(() => {
-  if (!formData.value.categoryId) return ''
-  const category = categories.value.find(c => c.id === formData.value.categoryId)
-  return category?.name || ''
-})
 
 // 过滤后的热门标签
 const filteredPopularTags = computed(() => {
@@ -476,7 +480,6 @@ const loadData = async () => {
 // 选择分类
 const selectCategory = (categoryId: number | null) => {
   formData.value.categoryId = categoryId
-  showCategoryPicker.value = false
 }
 
 // 切换标签
@@ -602,29 +605,185 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.selected-tags {
-  padding: 16px;
+/*
+ * 单一连续流：核心创作内容（标题/正文/描述）与元信息（分类/标签/图片）
+ * 分为两张卡片，靠留白和卡片背景区分层级，但都在同一个可滚动区域内，
+ * 不再使用“更多选项”折叠区隐藏字段。
+ */
+.editor-flow {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  background: var(--ion-background-color);
-  border-bottom: 1px solid var(--ion-border-color);
+  flex-direction: column;
+  gap: var(--section-gap);
+  padding: var(--content-padding);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
 }
 
-ion-textarea {
-  --padding-top: 12px;
-  --padding-bottom: 12px;
+.content-card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--content-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.metadata-card {
+  background: var(--surface-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--content-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.field-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.field-caption {
+  font-size: var(--mobile-font-size-footnote);
+  font-weight: 600;
+  color: var(--content-secondary);
+}
+
+/* 标题：像笔记标题一样醒目、无边框、无浮动 label */
+.title-input {
+  --padding-start: 0;
+  --padding-end: 0;
+  --placeholder-color: var(--content-tertiary);
+  --placeholder-opacity: 1;
+  --color: var(--content-primary);
+  font-size: var(--mobile-font-size-heading);
+  font-weight: 600;
+}
+
+/* 正文：全篇最重要的输入区域，占据最大空间 */
+.content-textarea {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --placeholder-color: var(--content-tertiary);
+  --placeholder-opacity: 1;
+  --color: var(--content-primary);
+  font-size: var(--mobile-font-size-body);
+  line-height: var(--mobile-line-height-relaxed);
+  min-height: 132px;
+}
+
+.field-meta-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.field-hint {
+  font-size: var(--mobile-font-size-caption);
+  color: var(--content-tertiary);
+}
+
+.char-count {
+  flex: 0 0 auto;
+  font-size: var(--mobile-font-size-caption);
+  color: var(--content-tertiary);
+  white-space: nowrap;
+}
+
+.description-textarea {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --placeholder-color: var(--content-tertiary);
+  --placeholder-opacity: 1;
+  --color: var(--content-secondary);
+  font-size: var(--mobile-font-size-footnote);
+}
+
+.metadata-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.chip-scroll {
+  display: flex;
+  gap: var(--spacing-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.chip-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.chip-wrap {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 var(--spacing-md);
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-primary);
+  color: var(--content-secondary);
+  font-size: var(--mobile-font-size-footnote);
+  white-space: nowrap;
+}
+
+.pill.active {
+  border-color: var(--accent-primary);
+  background: var(--interactive-focus);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.pill-removable {
+  font-weight: 500;
+}
+
+.pill-removable ion-icon {
+  font-size: 14px;
+}
+
+.pill-add {
+  border-style: dashed;
+  color: var(--content-secondary);
+  background: transparent;
+}
+
+.pill-add ion-icon {
+  font-size: 14px;
 }
 
 .hidden-file-input {
   display: none;
 }
 
-.image-preview-grid {
+.image-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 16px 12px;
 }
 
 .image-preview-item {
@@ -649,5 +808,27 @@ ion-textarea {
   --padding-end: 0;
   width: 24px;
   height: 24px;
+}
+
+.image-add-tile {
+  width: calc(33.333% - 6px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-image, 8px);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-primary);
+  color: var(--content-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--mobile-icon-size-lg);
+}
+
+.selected-tags {
+  padding: 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--ion-background-color);
+  border-bottom: 1px solid var(--ion-border-color);
 }
 </style>
