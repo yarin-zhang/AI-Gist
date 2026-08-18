@@ -355,7 +355,6 @@ const toggleFavorite = () => {
 const categoryChipStyle = (category: Category) => {
   if (formData.value.categoryId !== category.id) return undefined
   const { color, textColor } = getCategoryTagColor(category)
-  if (!color) return undefined
   return {
     backgroundColor: `${color}1f`,
     borderColor: color,
