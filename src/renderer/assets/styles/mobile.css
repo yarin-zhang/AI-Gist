@@ -11,7 +11,7 @@ html.ai-gist-mobile {
   --ion-tab-bar-background: var(--surface-primary);
   --ion-item-background: var(--surface-primary);
   --ion-card-background: var(--surface-primary);
-  --ion-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --ion-font-family: var(--font-cjk-fallback), -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 }
 
 body.ai-gist-mobile {
