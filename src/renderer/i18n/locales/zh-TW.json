@@ -610,6 +610,9 @@
     "title": "語言設置"
   },
   "mainPage": {
+    "aiEntry": {
+      "label": "AI 生成"
+    },
     "menu": {
       "aiConfig": "AI 配置",
       "prompts": "AI 提示詞",

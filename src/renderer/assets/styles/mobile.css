@@ -1,17 +1,38 @@
 html.ai-gist-mobile {
   /*
-   * 底部标签栏高度 = 内容高度 + 安全区内边距。
-   * Ionic 的 ion-tab-bar 是 content-box，且自带 padding-bottom: var(--ion-safe-area-bottom)，
-   * 所以这里只能给「内容高度」，安全区通过 padding 单独补，否则会被重复计算导致标签栏过高。
-   * 安全区在原始值上收窄 10px（并保底 6px），让整条标签栏比 iOS 默认更紧凑。
+   * 底部标签栏高度 = 内容高度（安全区改由浮动导航容器的 padding-bottom 统一处理，
+   * 详见下方「浮动导航」分区），不再需要标签栏自身叠加安全区内边距。
    */
-  --mobile-tabbar-content-height: 46px;
-  --mobile-tabbar-safe-inset: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 6px);
+  --mobile-tabbar-content-height: 52px;
 
   --mobile-page-gutter: 16px;
   --mobile-touch-target: 44px;
   --mobile-surface-border: var(--border-default);
   --mobile-elevated-shadow: var(--shadow-popover);
+
+  /*
+   * 浮动导航：AI 入口条 + 标签栏，作为悬浮于内容之上的两片独立玻璃层，
+   * 而不是像素级贴底的实体栏。数值只在移动端本地使用，不进入设计系统 token，
+   * 颜色/阴影仍然全部复用 design-tokens 里的 surface / border / shadow 变量。
+   */
+  --mobile-nav-gutter: 14px;
+  --mobile-nav-bottom-offset: 8px;
+  --mobile-nav-item-gap: 8px;
+  --mobile-nav-radius: 999px;
+  --mobile-nav-shelf-height: 46px;
+  --mobile-nav-shelf-width-minimized: 46px;
+  --mobile-nav-tabbar-height-minimized: 44px;
+  --mobile-nav-tabbar-width-minimized: 220px;
+  --mobile-nav-surface: color-mix(in srgb, var(--surface-primary) 72%, transparent);
+  --mobile-nav-border: color-mix(in srgb, var(--border-default) 65%, transparent);
+  --mobile-nav-blur: 22px;
+  --mobile-nav-shadow: var(--shadow-overlay);
+  /* 轻微回弹的 spring 近似曲线，用于滚动收起/展开与入口条尺寸变化 */
+  --mobile-nav-transition: 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --mobile-nav-clearance: calc(
+    var(--mobile-nav-shelf-height) + var(--mobile-nav-item-gap) +
+    var(--mobile-tabbar-content-height) + var(--mobile-nav-bottom-offset) * 2
+  );
 
   /*
    * 移动端统一字号阶梯。所有移动端页面只允许使用这 6 档，禁止再写裸 px 字号，
@@ -33,11 +54,6 @@ html.ai-gist-mobile {
   --mobile-icon-size: 20px;
   --mobile-icon-size-lg: 24px;
   --mobile-empty-icon-size: 56px;
-
-  /* 悬浮按钮与内容底部留白 */
-  --mobile-fab-size: 56px;
-  --mobile-fab-offset: 16px;
-  --mobile-fab-clearance: calc(var(--mobile-fab-size) + var(--mobile-fab-offset) * 2);
 
   --ion-background-color: var(--surface-body);
   --ion-text-color: var(--content-primary);
@@ -246,23 +262,97 @@ html.ai-gist-mobile ion-segment-button ion-label {
 }
 
 /* ------------------------------------------------------------------ *
- * 底部标签栏
+ * 浮动导航：AI 入口条 + 底部标签栏
+ *
+ * 两者都是 <ion-tabs> 的 slot="bottom" 直接子元素（详见 MobileMainPage.vue），
+ * 因此都被移出正常文档流（position: fixed），不再占用 flex 布局中的独立高度，
+ * 而是作为悬浮在内容之上的两片独立玻璃层——这样内容可以在它们身后滚动、
+ * 透过背板的模糊/半透明背景显现，而不是被推挤到一段专属的空白条带上方。
  * ------------------------------------------------------------------ */
 
+html.ai-gist-mobile .mobile-floating-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  /* 默认贴右对齐：AI 入口条收起时贴右悬浮；标签栏用 align-self 常量居中，见下方 */
+  align-items: flex-end;
+  gap: var(--mobile-nav-item-gap);
+  padding: 0 var(--mobile-nav-gutter)
+    calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+  pointer-events: none;
+}
+
+html.ai-gist-mobile .mobile-ai-entry {
+  pointer-events: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--mobile-nav-shelf-height);
+  padding-inline: 20px;
+  border: 1px solid var(--mobile-nav-border);
+  border-radius: var(--mobile-nav-radius);
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--mobile-nav-surface));
+  backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  box-shadow: var(--mobile-nav-shadow);
+  color: var(--accent-primary);
+  font-size: var(--mobile-font-size-body);
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+  transition: width var(--mobile-nav-transition), padding var(--mobile-nav-transition),
+    gap var(--mobile-nav-transition);
+}
+
+html.ai-gist-mobile .mobile-ai-entry ion-icon {
+  font-size: var(--mobile-icon-size);
+  flex-shrink: 0;
+}
+
+html.ai-gist-mobile .mobile-ai-entry__label {
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 160px;
+  opacity: 1;
+  transition: opacity var(--mobile-nav-transition), max-width var(--mobile-nav-transition);
+}
+
 html.ai-gist-mobile ion-tab-bar {
-  --background: var(--surface-primary);
-  border-top-color: var(--border-default);
-  /* content-box：这里的 height 只是内容高度，安全区由 padding-bottom 单独补 */
+  pointer-events: auto;
+  /* 常量对齐：始终水平居中，不随收起/展开切换，只有 width 在两种状态间平滑过渡 */
+  align-self: center;
+  width: 100%;
+  --background: var(--mobile-nav-surface);
+  border: 1px solid var(--mobile-nav-border);
+  border-radius: var(--mobile-nav-radius);
+  /* content-box：这里的 height 只是内容高度，安全区已由外层 .mobile-floating-nav 统一处理 */
   height: var(--mobile-tabbar-content-height);
   min-height: 0;
-  padding-bottom: var(--mobile-tabbar-safe-inset);
+  padding: 0 4px;
+  backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  box-shadow: var(--mobile-nav-shadow);
+  transition: height var(--mobile-nav-transition), width var(--mobile-nav-transition);
 }
 
 html.ai-gist-mobile ion-tab-button {
   --padding-top: 2px;
   --padding-bottom: 2px;
+  --color-selected: var(--accent-primary);
   min-height: 0;
   height: 100%;
+  margin: 5px 2px;
+  border-radius: var(--mobile-nav-radius);
+  transition: background var(--mobile-nav-transition);
+}
+
+html.ai-gist-mobile ion-tab-button.tab-selected {
+  --background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 
 html.ai-gist-mobile ion-tab-button ion-icon {
@@ -275,30 +365,53 @@ html.ai-gist-mobile ion-tab-button ion-label {
   margin-top: 0;
   margin-bottom: 0;
   min-height: 0;
+  max-width: 60px;
+  max-height: 14px;
+  opacity: 1;
   font-size: var(--mobile-font-size-caption);
   font-weight: 500;
   line-height: 1.2;
-}
-
-/* ------------------------------------------------------------------ *
- * 悬浮操作按钮
- * ------------------------------------------------------------------ */
-
-html.ai-gist-mobile ion-fab[vertical="bottom"][horizontal="end"] {
-  right: var(--mobile-page-gutter);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-fab-offset));
+  transition: opacity var(--mobile-nav-transition), max-width var(--mobile-nav-transition),
+    max-height var(--mobile-nav-transition), margin var(--mobile-nav-transition);
 }
 
 /*
- * Tab 页面的内容区已经位于标签栏之上（ion-tabs 用 flex 把 router-outlet 排在标签栏前面），
- * 标签栏本身覆盖了安全区，所以这里不需要再叠加 env(safe-area-inset-bottom)。
+ * 滚动向下时收起：标签栏收缩为纯图标、居中的小型胶囊（align-self: center 是常量，
+ * 从未切换，收缩时会自动保持居中）；AI 入口条同样收缩为一个圆形图标按钮，
+ * 贴右悬浮（父容器 align-items: flex-end 同样是常量）。
+ * 两个状态之间只有 width / opacity 等连续属性在变化，因此过渡是平滑的。
  */
-html.ai-gist-mobile ion-tabs ion-fab[vertical="bottom"][horizontal="end"] {
-  bottom: var(--mobile-fab-offset);
+html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-bar {
+  width: var(--mobile-nav-tabbar-width-minimized);
+  height: var(--mobile-nav-tabbar-height-minimized);
 }
 
-html.ai-gist-mobile ion-fab-button {
-  --box-shadow: var(--mobile-elevated-shadow);
+html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-button ion-label {
+  opacity: 0;
+  max-width: 0;
+  max-height: 0;
+  margin: 0;
+}
+
+html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry {
+  width: var(--mobile-nav-shelf-width-minimized);
+  padding-inline: 0;
+  gap: 0;
+}
+
+html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry__label {
+  opacity: 0;
+  max-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ai-gist-mobile .mobile-ai-entry,
+  html.ai-gist-mobile .mobile-ai-entry__label,
+  html.ai-gist-mobile ion-tab-bar,
+  html.ai-gist-mobile ion-tab-button,
+  html.ai-gist-mobile ion-tab-button ion-label {
+    transition: none;
+  }
 }
 
 html.ai-gist-mobile ion-modal ion-content {

@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button @click="handleCancel">
-            <ion-icon :icon="arrowBack"></ion-icon>
+            <ion-icon :icon="presentedAsModal ? closeOutline : arrowBack"></ion-icon>
           </ion-button>
         </ion-buttons>
         <ion-title>{{ t('promptManagement.aiGenerate') }}</ion-title>
@@ -155,6 +155,7 @@ import {
 } from '@ionic/vue'
 import {
   arrowBack,
+  closeOutline,
   sparklesOutline,
   saveOutline,
   checkmark,
@@ -167,9 +168,24 @@ import type { AIConfig } from '@shared/types'
 import { AIGeneratorService } from '~/lib/services/mobile-ai-generator.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 
+// presentedAsModal：作为全局 AI 入口的模态表单展示时为 true。此时页面不在路由栈里，
+// 内部所有原本用于"路由式整页导航"的 router.back()/router.push() 都要改为 emit('close')，
+// 否则会误操作背后的 Tab 路由或残留在历史记录里。
+const props = defineProps<{ presentedAsModal?: boolean }>()
+const emit = defineEmits<{ close: [] }>()
+
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
+
+// 关闭当前生成器：模态展示时通知父级关闭 modal；路由整页展示时按原逻辑返回上一页
+const closeOrBack = () => {
+  if (props.presentedAsModal) {
+    emit('close')
+  } else {
+    router.back()
+  }
+}
 
 // 状态
 const configs = ref<AIConfig[]>([])
@@ -243,7 +259,20 @@ const loadConfigs = async () => {
 
 // 导航到AI配置页面
 const navigateToAIConfig = () => {
+  if (props.presentedAsModal) {
+    emit('close')
+  }
   router.push('/tabs/ai-config')
+}
+
+// 生成/保存成功后返回提示词列表：模态展示时只需关闭 modal（当前 Tab 的列表会通过
+// 数据变更事件自动刷新），路由整页展示时才需要真正跳转到列表页
+const finishAndReturnToPrompts = () => {
+  if (props.presentedAsModal) {
+    emit('close')
+  } else {
+    router.push('/tabs/prompts')
+  }
 }
 
 // 选择模型
@@ -311,9 +340,7 @@ const generatePrompt = async () => {
       await saveGeneratedPrompt(result)
       showToast(t('aiGenerator.generateAndSaveSuccess'), 'success')
       // 自动保存后返回列表
-      setTimeout(() => {
-        router.push('/tabs/prompts')
-      }, 1000)
+      setTimeout(finishAndReturnToPrompts, 1000)
     } else {
       showToast(t('aiGenerator.generateSuccess'), 'success')
     }
@@ -352,9 +379,7 @@ const savePrompt = async () => {
     showToast(t('aiGenerator.saveSuccess'), 'success')
 
     // 保存后返回提示词列表
-    setTimeout(() => {
-      router.push('/tabs/prompts')
-    }, 1000)
+    setTimeout(finishAndReturnToPrompts, 1000)
   } catch (error) {
     console.error('保存提示词失败:', error)
     showToast(t('aiGenerator.saveFailed') + ': ' + (error as Error).message, 'danger')
@@ -402,7 +427,7 @@ const handleCancel = async () => {
           role: 'destructive',
           handler: () => {
             resetForm()
-            router.back()
+            closeOrBack()
           }
         }
       ]
@@ -410,7 +435,7 @@ const handleCancel = async () => {
     await alert.present()
   } else {
     resetForm()
-    router.back()
+    closeOrBack()
   }
 }
 

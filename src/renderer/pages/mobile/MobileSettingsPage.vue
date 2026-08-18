@@ -6,7 +6,7 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true">
+    <ion-content :fullscreen="true" :scroll-events="true">
       <!-- 设置首页只做导航：每一项都进入独立的二级页面 -->
       <ion-list>
         <ion-list-header>
@@ -153,5 +153,10 @@ onUnmounted(() => unsubscribeSyncStatus?.())
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {
   margin-inline-end: 16px;
+}
+
+ion-content {
+  /* 让列表底部留出浮动导航（AI 入口条 + 标签栏）的空间，避免最后一项被遮挡 */
+  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-clearance));
 }
 </style>

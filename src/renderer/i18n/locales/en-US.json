@@ -610,6 +610,9 @@
     "title": "Language"
   },
   "mainPage": {
+    "aiEntry": {
+      "label": "Generate"
+    },
     "menu": {
       "aiConfig": "AI Config",
       "prompts": "AI Prompts",
