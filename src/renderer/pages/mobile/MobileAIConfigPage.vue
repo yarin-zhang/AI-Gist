@@ -2,15 +2,20 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ t('mainPage.menu.aiConfig') }}</ion-title>
+        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.aiConfig') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true">
+    <ion-content :fullscreen="true" :scroll-events="true" @ionScroll="onIonScroll">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+
+      <!-- 大标题：静止时展开，向下滚动时收起为工具栏小标题 -->
+      <div class="mobile-large-title-bar" :style="{ '--collapse-progress': headerProgress }">
+        <h1 class="mobile-large-title-text" aria-hidden="true">{{ t('mainPage.menu.aiConfig') }}</h1>
+      </div>
 
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-container">
@@ -19,8 +24,9 @@
 
       <!-- 空状态 -->
       <div v-else-if="configs.length === 0" class="empty-container">
-        <ion-icon :icon="sparklesOutline" class="empty-icon"></ion-icon>
+        <EmptyAIConfigIllustration />
         <p class="empty-text">{{ t('aiConfig.noConfigs') }}</p>
+        <p class="empty-description">{{ t('aiConfig.noConfigsDescription') }}</p>
         <ion-button @click="handleCreate">
           {{ t('aiConfig.addConfig') }}
         </ion-button>
@@ -57,46 +63,48 @@
         </ion-card>
 
         <!-- AI 配置列表 -->
-        <ion-list>
-          <ion-item-sliding v-for="config in configs" :key="config.id">
-            <ion-item button @click="handleView(config)">
-              <ion-label>
-                <h2>{{ config.name }}</h2>
-                <p class="config-description">
-                  {{ config.provider }} {{ config.model }}
-                </p>
-                <div class="config-meta">
-                  <ion-chip size="small" :color="config.isPreferred ? 'primary' : 'medium'">
-                    <ion-label>
-                      {{ config.isPreferred ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
-                    </ion-label>
-                  </ion-chip>
-                </div>
-              </ion-label>
-              <ion-toggle
-                slot="end"
-                :checked="config.enabled"
-                @ionChange="handleToggle(config, $event)"
-                @click.stop
-              ></ion-toggle>
-            </ion-item>
+        <div class="mobile-grouped-card">
+          <ion-list>
+            <ion-item-sliding v-for="config in configs" :key="config.id">
+              <ion-item button @click="handleView(config)">
+                <ion-label>
+                  <h2>{{ config.name }}</h2>
+                  <p class="config-description">
+                    {{ config.provider }} {{ config.model }}
+                  </p>
+                  <div class="config-meta">
+                    <ion-chip size="small" :color="config.isPreferred ? 'primary' : 'medium'">
+                      <ion-label>
+                        {{ config.isPreferred ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
+                      </ion-label>
+                    </ion-chip>
+                  </div>
+                </ion-label>
+                <ion-toggle
+                  slot="end"
+                  :checked="config.enabled"
+                  @ionChange="handleToggle(config, $event)"
+                  @click.stop
+                ></ion-toggle>
+              </ion-item>
 
-            <ion-item-options side="end">
-              <ion-item-option color="primary" @click="handleEdit(config)">
-                <ion-icon :icon="createOutline"></ion-icon>
-                {{ t('common.edit') }}
-              </ion-item-option>
-              <ion-item-option
-                v-if="!config.isPreferred"
-                color="danger"
-                @click="handleDelete(config)"
-              >
-                <ion-icon :icon="trashOutline"></ion-icon>
-                {{ t('common.delete') }}
-              </ion-item-option>
-            </ion-item-options>
-          </ion-item-sliding>
-        </ion-list>
+              <ion-item-options side="end">
+                <ion-item-option color="primary" @click="handleEdit(config)">
+                  <ion-icon :icon="createOutline"></ion-icon>
+                  {{ t('common.edit') }}
+                </ion-item-option>
+                <ion-item-option
+                  v-if="!config.isPreferred"
+                  color="danger"
+                  @click="handleDelete(config)"
+                >
+                  <ion-icon :icon="trashOutline"></ion-icon>
+                  {{ t('common.delete') }}
+                </ion-item-option>
+              </ion-item-options>
+            </ion-item-sliding>
+          </ion-list>
+        </div>
       </div>
     </ion-content>
 
@@ -141,7 +149,6 @@ import {
 } from '@ionic/vue'
 import {
   add,
-  sparklesOutline,
   createOutline,
   trashOutline,
   starOutline,
@@ -152,9 +159,12 @@ import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { AIConfig } from '@shared/types'
+import EmptyAIConfigIllustration from '~/components/mobile/illustrations/EmptyAIConfigIllustration.vue'
+import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
 
 const { t } = useI18n()
 const router = useRouter()
+const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
 
 // 状态
 const configs = ref<AIConfig[]>([])
@@ -383,14 +393,9 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.empty-icon {
-  color: var(--ion-color-medium);
-  margin-bottom: 16px;
-}
-
 .empty-text {
   color: var(--ion-color-medium);
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 }
 
 .config-description {

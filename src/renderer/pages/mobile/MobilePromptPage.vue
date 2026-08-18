@@ -2,7 +2,7 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ t('mainPage.menu.prompts') }}</ion-title>
+        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.prompts') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button v-if="hasAIConfig" @click="navigateToAIGenerator">
             <ion-icon :icon="sparklesOutline"></ion-icon>
@@ -24,11 +24,16 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-content ref="ionContentRef" :fullscreen="true">
+    <ion-content ref="ionContentRef" :fullscreen="true" :scroll-events="true" @ionScroll="onIonScroll">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+
+      <!-- 大标题：静止时展开，向下滚动时收起为工具栏小标题 -->
+      <div class="mobile-large-title-bar" :style="{ '--collapse-progress': headerProgress }">
+        <h1 class="mobile-large-title-text" aria-hidden="true">{{ t('mainPage.menu.prompts') }}</h1>
+      </div>
 
       <!-- 筛选标签 -->
       <div v-if="hasActiveFilters" class="filter-chips">
@@ -63,54 +68,67 @@
         <ion-spinner></ion-spinner>
       </div>
 
-      <!-- 空状态 -->
-      <div v-else-if="prompts.length === 0" class="empty-container">
-        <ion-icon :icon="documentTextOutline" class="empty-icon"></ion-icon>
+      <!-- 空状态：完全没有提示词（首次使用） -->
+      <div v-else-if="prompts.length === 0 && !isSearchOrFilterActive" class="empty-container">
+        <EmptyPromptsIllustration />
         <p class="empty-text">{{ t('promptManagement.noPrompts') }}</p>
+        <p class="empty-description">{{ t('promptManagement.noPromptsDescription') }}</p>
         <ion-button @click="handleCreate">
           {{ t('promptManagement.create') }}
         </ion-button>
       </div>
 
-      <!-- 提示词列表（列表视图） -->
-      <ion-list v-else-if="viewMode === 'list'">
-        <ion-item-sliding v-for="prompt in prompts" :key="prompt.id">
-          <ion-item button @click="handleView(prompt)">
-            <ion-label>
-              <h2>{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h2>
-              <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
-              <div class="prompt-meta">
-                <ion-chip v-if="prompt.categoryId" size="small" outline>
-                  <ion-label>{{ getCategoryName(prompt.categoryId) }}</ion-label>
-                </ion-chip>
-                <ion-chip v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag" size="small">
-                  <ion-label>{{ tag }}</ion-label>
-                </ion-chip>
-                <ion-chip v-if="getTagsArray(prompt.tags).length > 2" size="small">
-                  <ion-label>+{{ getTagsArray(prompt.tags).length - 2 }}</ion-label>
-                </ion-chip>
-              </div>
-            </ion-label>
-            <ion-icon
-              v-if="prompt.isFavorite"
-              :icon="heart"
-              slot="end"
-              color="danger"
-            ></ion-icon>
-          </ion-item>
+      <!-- 空状态：搜索/筛选后没有匹配结果，与「完全没有数据」区分开 -->
+      <div v-else-if="prompts.length === 0" class="empty-container">
+        <NoSearchResultsIllustration />
+        <p class="empty-text">{{ t('promptManagement.noSearchResults') }}</p>
+        <p class="empty-description">{{ t('promptManagement.noSearchResultsDescription') }}</p>
+        <ion-button fill="outline" @click="clearSearchAndFilters">
+          {{ t('promptManagement.clearSearchAndFilters') }}
+        </ion-button>
+      </div>
 
-          <ion-item-options side="end">
-            <ion-item-option color="primary" @click="handleEdit(prompt)">
-              <ion-icon :icon="createOutline"></ion-icon>
-              {{ t('common.edit') }}
-            </ion-item-option>
-            <ion-item-option color="danger" @click="handleDelete(prompt)">
-              <ion-icon :icon="trashOutline"></ion-icon>
-              {{ t('common.delete') }}
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
-      </ion-list>
+      <!-- 提示词列表（列表视图） -->
+      <div v-else-if="viewMode === 'list'" class="mobile-grouped-card">
+        <ion-list>
+          <ion-item-sliding v-for="prompt in prompts" :key="prompt.id">
+            <ion-item button @click="handleView(prompt)">
+              <ion-label>
+                <h2>{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h2>
+                <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
+                <div class="prompt-meta">
+                  <ion-chip v-if="prompt.categoryId" size="small" outline>
+                    <ion-label>{{ getCategoryName(prompt.categoryId) }}</ion-label>
+                  </ion-chip>
+                  <ion-chip v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag" size="small">
+                    <ion-label>{{ tag }}</ion-label>
+                  </ion-chip>
+                  <ion-chip v-if="getTagsArray(prompt.tags).length > 2" size="small">
+                    <ion-label>+{{ getTagsArray(prompt.tags).length - 2 }}</ion-label>
+                  </ion-chip>
+                </div>
+              </ion-label>
+              <ion-icon
+                v-if="prompt.isFavorite"
+                :icon="heart"
+                slot="end"
+                color="danger"
+              ></ion-icon>
+            </ion-item>
+
+            <ion-item-options side="end">
+              <ion-item-option color="primary" @click="handleEdit(prompt)">
+                <ion-icon :icon="createOutline"></ion-icon>
+                {{ t('common.edit') }}
+              </ion-item-option>
+              <ion-item-option color="danger" @click="handleDelete(prompt)">
+                <ion-icon :icon="trashOutline"></ion-icon>
+                {{ t('common.delete') }}
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        </ion-list>
+      </div>
 
       <!-- 瀑布流视图 -->
       <mobile-waterfall-view
@@ -261,7 +279,6 @@ import {
 import {
   add,
   heart,
-  documentTextOutline,
   funnelOutline,
   closeCircle,
   checkmark,
@@ -280,9 +297,13 @@ import type { Prompt, Category } from '@shared/types'
 import { useRouter } from 'vue-router'
 import { databaseService } from '~/lib/db'
 import MobileWaterfallView from '~/components/mobile/MobileWaterfallView.vue'
+import EmptyPromptsIllustration from '~/components/mobile/illustrations/EmptyPromptsIllustration.vue'
+import NoSearchResultsIllustration from '~/components/mobile/illustrations/NoSearchResultsIllustration.vue'
+import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
 
 const { t } = useI18n()
 const router = useRouter()
+const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
 
 // 滚动位置相关
 const ionContentRef = ref<any>(null)
@@ -329,6 +350,11 @@ const sortOptions = computed(() => [
 // 是否有激活的筛选
 const hasActiveFilters = computed(() => {
   return selectedCategory.value !== null || showFavoritesOnly.value || selectedTag.value !== null
+})
+
+// 是否处于搜索或筛选状态：用于区分「完全没有数据」与「搜索/筛选后没有匹配结果」两种空状态
+const isSearchOrFilterActive = computed(() => {
+  return hasActiveFilters.value || searchText.value.trim().length > 0
 })
 
 // 加载提示词列表
@@ -438,6 +464,19 @@ const handleCategoryFilter = (categoryId: number | null) => {
 // 清除分类筛选
 const clearCategory = () => {
   selectedCategory.value = null
+  loadPrompts()
+}
+
+// 清除搜索词和全部筛选条件（搜索/筛选后无匹配结果时的空状态操作）
+const clearSearchAndFilters = () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  searchText.value = ''
+  selectedCategory.value = null
+  selectedTag.value = null
+  showFavoritesOnly.value = false
   loadPrompts()
 }
 
@@ -675,14 +714,9 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.empty-icon {
-  color: var(--ion-color-medium);
-  margin-bottom: 16px;
-}
-
 .empty-text {
   color: var(--ion-color-medium);
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 }
 
 .prompt-description {

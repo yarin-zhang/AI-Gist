@@ -539,7 +539,7 @@ onIonViewWillEnter(() => {
 
 .section-content {
   background: var(--surface-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   overflow: hidden;
 }

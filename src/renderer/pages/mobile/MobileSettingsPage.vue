@@ -2,64 +2,72 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ t('mainPage.menu.settings') }}</ion-title>
+        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.settings') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true">
+    <ion-content :fullscreen="true" :scroll-events="true" @ionScroll="onIonScroll">
+      <!-- 大标题：静止时展开，向下滚动时收起为工具栏小标题 -->
+      <div class="mobile-large-title-bar" :style="{ '--collapse-progress': headerProgress }">
+        <h1 class="mobile-large-title-text" aria-hidden="true">{{ t('mainPage.menu.settings') }}</h1>
+      </div>
+
       <!-- 设置首页只做导航：每一项都进入独立的二级页面 -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.groups.data') }}</ion-label>
-        </ion-list-header>
+      <ion-list-header class="mobile-settings-group-header">
+        <ion-label>{{ t('mobileSettings.groups.data') }}</ion-label>
+      </ion-list-header>
+      <div class="mobile-grouped-card">
+        <ion-list>
+          <ion-item button detail @click="go('/mobile/settings/data-sync')">
+            <ion-icon :icon="syncOutline" slot="start"></ion-icon>
+            <ion-label class="ion-text-wrap">
+              <h3>{{ t('dataSync.title') }}</h3>
+              <p>{{ t('mobileSettings.entries.dataSyncDescription') }}</p>
+            </ion-label>
+            <ion-note slot="end">{{ syncSummary }}</ion-note>
+          </ion-item>
 
-        <ion-item button detail @click="go('/mobile/settings/data-sync')">
-          <ion-icon :icon="syncOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('dataSync.title') }}</h3>
-            <p>{{ t('mobileSettings.entries.dataSyncDescription') }}</p>
-          </ion-label>
-          <ion-note slot="end">{{ syncSummary }}</ion-note>
-        </ion-item>
+          <ion-item button detail @click="go('/mobile/settings/data-backup')">
+            <ion-icon :icon="archiveOutline" slot="start"></ion-icon>
+            <ion-label class="ion-text-wrap">
+              <h3>{{ t('dataBackup.title') }}</h3>
+              <p>{{ t('mobileSettings.entries.dataBackupDescription') }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
 
-        <ion-item button detail @click="go('/mobile/settings/data-backup')">
-          <ion-icon :icon="archiveOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('dataBackup.title') }}</h3>
-            <p>{{ t('mobileSettings.entries.dataBackupDescription') }}</p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
+      <ion-list-header class="mobile-settings-group-header">
+        <ion-label>{{ t('mobileSettings.groups.preferences') }}</ion-label>
+      </ion-list-header>
+      <div class="mobile-grouped-card">
+        <ion-list>
+          <ion-item button detail @click="go('/mobile/settings/general')">
+            <ion-icon :icon="optionsOutline" slot="start"></ion-icon>
+            <ion-label class="ion-text-wrap">
+              <h3>{{ t('settings.sections.general') }}</h3>
+              <p>{{ t('mobileSettings.entries.generalDescription') }}</p>
+            </ion-label>
+            <ion-note slot="end">{{ generalSummary }}</ion-note>
+          </ion-item>
+        </ion-list>
+      </div>
 
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.groups.preferences') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button detail @click="go('/mobile/settings/general')">
-          <ion-icon :icon="optionsOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('settings.sections.general') }}</h3>
-            <p>{{ t('mobileSettings.entries.generalDescription') }}</p>
-          </ion-label>
-          <ion-note slot="end">{{ generalSummary }}</ion-note>
-        </ion-item>
-      </ion-list>
-
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.groups.other') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button detail @click="go('/mobile/about')">
-          <ion-icon :icon="informationCircleOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('settings.menus.about.title') }}</h3>
-            <p>{{ t('mobileSettings.entries.aboutDescription') }}</p>
-          </ion-label>
-          <ion-note slot="end">{{ appVersion }}</ion-note>
-        </ion-item>
-      </ion-list>
+      <ion-list-header class="mobile-settings-group-header">
+        <ion-label>{{ t('mobileSettings.groups.other') }}</ion-label>
+      </ion-list-header>
+      <div class="mobile-grouped-card">
+        <ion-list>
+          <ion-item button detail @click="go('/mobile/about')">
+            <ion-icon :icon="informationCircleOutline" slot="start"></ion-icon>
+            <ion-label class="ion-text-wrap">
+              <h3>{{ t('settings.menus.about.title') }}</h3>
+              <p>{{ t('mobileSettings.entries.aboutDescription') }}</p>
+            </ion-label>
+            <ion-note slot="end">{{ appVersion }}</ion-note>
+          </ion-item>
+        </ion-list>
+      </div>
     </ion-content>
   </ion-page>
 </template>
@@ -89,12 +97,14 @@ import {
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useTheme } from '~/composables/useTheme'
+import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import { cloudSyncService, type CloudSyncStatus } from '~/lib/services/cloud-sync.service'
 
 const router = useRouter()
 const { t, locale, supportedLocales } = useI18n()
 const { themeSource } = useTheme()
+const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
 
 const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '')
 const storageCount = ref(0)
@@ -153,5 +163,17 @@ onUnmounted(() => unsubscribeSyncStatus?.())
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {
   margin-inline-end: 16px;
+}
+
+/*
+ * 分组标题现在放在圆角卡片外面（贴近原生 iOS 设置页的分组样式），
+ * 第一组紧跟大标题，顶部留白可以比后续分组略小。
+ */
+.mobile-settings-group-header {
+  margin-top: 4px;
+}
+
+.mobile-settings-group-header:first-of-type {
+  margin-top: 0;
 }
 </style>
