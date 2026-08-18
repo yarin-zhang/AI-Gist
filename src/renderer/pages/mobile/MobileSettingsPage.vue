@@ -562,13 +562,7 @@ onUnmounted(() => unsubscribeAutoBackupStatus?.())
 </script>
 
 <style scoped>
-ion-list-header {
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
+/* ion-list-header 的统一样式见 assets/styles/mobile.css */
 .backup-number-input {
   width: 88px;
   text-align: right;

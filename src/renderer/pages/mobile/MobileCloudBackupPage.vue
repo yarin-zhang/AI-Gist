@@ -1016,7 +1016,7 @@ onUnmounted(() => unsubscribeSyncStatus?.())
 
 .empty-state ion-icon {
   margin-bottom: 16px;
-  font-size: 64px;
+  font-size: var(--mobile-empty-icon-size);
 }
 
 .action-buttons {
@@ -1047,8 +1047,8 @@ onUnmounted(() => unsubscribeSyncStatus?.())
   padding: 10px;
   overflow: auto;
   color: var(--content-primary);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: var(--surface-secondary);

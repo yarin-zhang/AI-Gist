@@ -376,14 +376,12 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 80px;
   color: var(--ion-color-medium);
   margin-bottom: 16px;
 }
 
 .empty-text {
   color: var(--ion-color-medium);
-  font-size: 16px;
 }
 
 .prompt-header {
@@ -392,17 +390,17 @@ onUnmounted(() => {
 }
 
 .prompt-title {
-  font-size: 24px;
+  font-size: var(--mobile-font-size-heading);
   font-weight: 600;
   margin: 0 0 8px 0;
   color: var(--ion-text-color);
 }
 
 .prompt-description {
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
   color: var(--ion-color-medium);
   margin: 0;
-  line-height: 1.5;
+  line-height: var(--mobile-line-height-normal);
 }
 
 .prompt-meta-row {
@@ -418,7 +416,7 @@ onUnmounted(() => {
   gap: 10px;
   margin-top: 10px;
   color: var(--ion-color-medium);
-  font-size: 12px;
+  font-size: var(--mobile-font-size-footnote);
 }
 
 .tags-container {
@@ -437,7 +435,7 @@ onUnmounted(() => {
 }
 
 .section-header h2 {
-  font-size: 18px;
+  font-size: var(--mobile-font-size-title);
   font-weight: 600;
   margin: 0;
   color: var(--ion-text-color);
@@ -452,8 +450,8 @@ onUnmounted(() => {
 
 .prompt-content {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: var(--mobile-font-size-body);
+  line-height: var(--mobile-line-height-relaxed);
   white-space: pre-wrap;
   word-wrap: break-word;
   color: var(--ion-text-color);
