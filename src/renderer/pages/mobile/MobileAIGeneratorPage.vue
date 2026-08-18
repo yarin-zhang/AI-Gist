@@ -456,7 +456,6 @@ watch(() => route.path, (newPath) => {
 }
 
 .empty-icon {
-  font-size: 80px;
   color: var(--ion-color-medium);
   margin-bottom: 16px;
 }
@@ -464,14 +463,11 @@ watch(() => route.path, (newPath) => {
 .empty-text {
   color: var(--ion-color-dark);
   margin-bottom: 8px;
-  font-size: 18px;
-  font-weight: 600;
 }
 
 .empty-description {
   color: var(--ion-color-medium);
   margin-bottom: 24px;
-  font-size: 14px;
 }
 
 .generating-overlay {
@@ -489,7 +485,7 @@ watch(() => route.path, (newPath) => {
 .generating-overlay p {
   margin: 0;
   color: var(--ion-color-medium);
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
 }
 
 ion-textarea {

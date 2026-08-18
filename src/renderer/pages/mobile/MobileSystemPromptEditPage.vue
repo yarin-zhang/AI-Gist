@@ -182,15 +182,15 @@ ion-card {
 
 .info-text {
   color: var(--ion-color-medium);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
   margin: 0;
 }
 
 .system-prompt-textarea {
   font-family: monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-body);
+  line-height: var(--mobile-line-height-normal);
   min-height: 400px;
 }
 

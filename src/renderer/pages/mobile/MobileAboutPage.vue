@@ -238,19 +238,19 @@ onMounted(async () => {
 }
 
 .app-info h2 {
-  font-size: 22px;
+  font-size: var(--mobile-font-size-display);
   font-weight: 700;
   margin: 0 0 6px;
 }
 
 .app-desc {
-  font-size: 14px;
+  font-size: var(--mobile-font-size-body);
   color: var(--ion-color-medium);
   margin: 0 0 4px;
 }
 
 .app-features {
-  font-size: 12px;
+  font-size: var(--mobile-font-size-footnote);
   color: var(--ion-color-medium);
   margin: 0;
 }
@@ -262,7 +262,7 @@ onMounted(async () => {
 }
 
 .version-badge {
-  font-size: 11px;
+  font-size: var(--mobile-font-size-caption);
 }
 
 .update-notice {
@@ -285,8 +285,8 @@ onMounted(async () => {
   padding: 12px;
   background: var(--surface-secondary);
   border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-relaxed);
   white-space: pre-wrap;
   color: var(--content-primary);
 }

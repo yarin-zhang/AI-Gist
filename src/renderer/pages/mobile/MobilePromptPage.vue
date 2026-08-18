@@ -637,17 +637,26 @@ onUnmounted(() => {
   min-height: 44px;
   padding: 8px 16px;
   color: var(--ion-color-medium);
-  font-size: 13px;
+  font-size: var(--mobile-font-size-footnote);
   border-bottom: 1px solid var(--border-default);
 }
 
 .view-mode-segment {
-  width: 112px;
-  min-width: 112px;
+  flex: 0 0 auto;
+  width: 84px;
+  min-width: 84px;
 }
 
+/*
+ * 纯图标分段控件：解除 Ionic iOS 模式的 min-width / line-height 约束，
+ * 否则轨道被撑破（ion-segment 是 overflow: hidden 的 grid），图标会偏移。
+ * 通用部分见 assets/styles/mobile.css。
+ */
 .view-mode-segment ion-segment-button {
-  min-height: 32px;
+  --padding-start: 0;
+  --padding-end: 0;
+  min-width: 0;
+  min-height: 30px;
 }
 
 .loading-container {
@@ -667,7 +676,6 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 80px;
   color: var(--ion-color-medium);
   margin-bottom: 16px;
 }
@@ -675,12 +683,11 @@ onUnmounted(() => {
 .empty-text {
   color: var(--ion-color-medium);
   margin-bottom: 24px;
-  font-size: 16px;
 }
 
 .prompt-description {
   color: var(--ion-color-medium);
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -701,6 +708,7 @@ ion-chip {
 }
 
 ion-content {
-  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  /* 让列表底部留出悬浮按钮的空间；标签栏本身已经覆盖了安全区 */
+  --padding-bottom: var(--mobile-fab-clearance);
 }
 </style>
