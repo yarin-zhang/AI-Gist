@@ -93,17 +93,12 @@ const handleThemeChange = async (event: CustomEvent<{ value: 'system' | 'light' 
 </script>
 
 <style scoped>
-ion-list-header {
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
 
 .section-note {
   padding: 4px 0 8px;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
   white-space: normal;
 }
 </style>

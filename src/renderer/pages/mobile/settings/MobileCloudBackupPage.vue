@@ -239,12 +239,7 @@ onIonViewWillEnter(refresh)
 </script>
 
 <style scoped>
-ion-list-header {
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
 
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {
@@ -257,15 +252,15 @@ ion-item ion-icon[slot='start'] {
 
 .explainer p {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-relaxed);
   color: var(--ion-color-medium);
 }
 
 .section-note {
   padding: 4px 0 8px;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
   white-space: normal;
 }
 </style>

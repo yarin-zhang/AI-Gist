@@ -519,8 +519,6 @@ onIonViewWillEnter(() => {
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 600;
   color: var(--ion-text-color);
   margin-bottom: 12px;
   padding: 0 4px;
@@ -561,7 +559,7 @@ ion-item {
 .url-text {
   word-break: break-all;
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--mobile-font-size-footnote);
 }
 
 .masked-text {
@@ -582,8 +580,8 @@ ion-chip {
 .system-prompt-content {
   white-space: pre-wrap;
   font-family: monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
   color: var(--ion-text-color);
   padding: 16px;
   max-height: 200px;

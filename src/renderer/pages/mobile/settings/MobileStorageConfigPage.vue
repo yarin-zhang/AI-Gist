@@ -328,12 +328,7 @@ onIonViewWillEnter(loadConfig)
 </script>
 
 <style scoped>
-ion-list-header {
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
 
 .stacked-actions {
   display: flex;

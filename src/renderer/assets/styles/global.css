@@ -1,3 +1,101 @@
+/* 中日韩字形回退。
+
+   系统字体（-apple-system / system-ui）本身不含 CJK 字形。真机上 WebKit 会自动接续系统
+   字体族里的 PingFang / Hiragino，但 iOS 模拟器的运行时缺少这段接续关系，中文和日文界面
+   会整片渲染成豆腐块（□）。更麻烦的是：只要 -apple-system 排在首位，WebKit 就不再往后
+   查找同一 font-family 列表里的其它字体，所以单纯在列表末尾补一个 "PingFang SC" 无效。
+
+   因此这里用 unicode-range 把 CJK 码位单独绑到系统自带的中日字体上，并把它排在系统字体
+   之前：Latin 仍然走 -apple-system，只有 CJK 字符落到下面这些 face 上。真机、Windows、
+   Android 上 local() 要么命中同一个字体、要么整条 face 不可用并沿用原有回退，观感不变。
+
+   PingFang 在模拟器运行时里不含假名，Hiragino 不含简体专用字形，所以两者互为补充，
+   顺序按界面语言切换，避免用中文字形渲染日文。 */
+
+@font-face {
+  font-family: "AppCJK-SC";
+  font-weight: 400;
+  font-style: normal;
+  src: local("PingFangSC-Regular");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-SC";
+  font-weight: 500;
+  font-style: normal;
+  src: local("PingFangSC-Medium");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-SC";
+  font-weight: 600 900;
+  font-style: normal;
+  src: local("PingFangSC-Semibold");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-TC";
+  font-weight: 400;
+  font-style: normal;
+  src: local("PingFangTC-Regular");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-TC";
+  font-weight: 500;
+  font-style: normal;
+  src: local("PingFangTC-Medium");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-TC";
+  font-weight: 600 900;
+  font-style: normal;
+  src: local("PingFangTC-Semibold");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-JP";
+  font-weight: 400;
+  font-style: normal;
+  src: local("HiraginoSans-W3");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-JP";
+  font-weight: 500;
+  font-style: normal;
+  src: local("HiraginoSans-W5");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+@font-face {
+  font-family: "AppCJK-JP";
+  font-weight: 600 900;
+  font-style: normal;
+  src: local("HiraginoSans-W6");
+  unicode-range: U+2E80-303F, U+3040-30FF, U+3100-312F, U+31C0-31EF, U+3200-32FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2A6DF;
+}
+
+:root {
+  --font-cjk-fallback: "AppCJK-SC", "AppCJK-JP";
+}
+
+html:lang(zh-Hant) {
+  --font-cjk-fallback: "AppCJK-TC", "AppCJK-JP";
+}
+
+html:lang(ja) {
+  --font-cjk-fallback: "AppCJK-JP", "AppCJK-SC";
+}
+
 /* 根元素样式 - 确保在拖拽时不显示白色背景 */
 html {
   height: 100%;
@@ -18,7 +116,7 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-cjk-fallback), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: var(--font-size-base, 14px);
   -webkit-user-select: none;
   -moz-user-select: none;

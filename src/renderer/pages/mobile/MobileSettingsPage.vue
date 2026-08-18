@@ -148,12 +148,7 @@ onUnmounted(() => unsubscribeSyncStatus?.())
 </script>
 
 <style scoped>
-ion-list-header {
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
 
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {

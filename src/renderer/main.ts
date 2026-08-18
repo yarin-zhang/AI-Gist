@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import i18n from './i18n'
 import { initDatabase, databaseService, cloudSyncService, automaticBackupService } from './lib/services'
-import type { SupportedLocale } from '@shared/types/preferences'
+import { applyDocumentLocale, resolveInitialLocale } from './i18n/locale-detection'
 import { PlatformDetector } from '@shared/platform'
 import './tailwind.css'
 import './assets/scss/index.scss'
@@ -23,34 +23,10 @@ setupMobileDebug()
 
 // 初始化语言设置
 function initLocale() {
-  const savedLocale = localStorage.getItem('locale')
-  if (savedLocale && ['zh-CN', 'zh-TW', 'en-US', 'ja-JP'].includes(savedLocale)) {
-    i18n.global.locale.value = savedLocale as SupportedLocale
-    console.log(`应用语言设置: ${savedLocale}`)
-  } else {
-    // 如果没有保存的语言设置，使用系统语言或默认语言
-    const systemLocale = navigator.language
-    if (systemLocale.startsWith('zh')) {
-      // 根据系统语言判断是简体还是繁体
-      if (systemLocale.includes('TW') || systemLocale.includes('HK')) {
-        i18n.global.locale.value = 'zh-TW'
-        localStorage.setItem('locale', 'zh-TW')
-        console.log('检测到繁体中文系统，设置语言为: zh-TW')
-      } else {
-        i18n.global.locale.value = 'zh-CN'
-        localStorage.setItem('locale', 'zh-CN')
-        console.log('检测到简体中文系统，设置语言为: zh-CN')
-      }
-    } else if (systemLocale.startsWith('ja')) {
-      i18n.global.locale.value = 'ja-JP'
-      localStorage.setItem('locale', 'ja-JP')
-      console.log('检测到日语系统，设置语言为: ja-JP')
-    } else {
-      i18n.global.locale.value = 'en-US'
-      localStorage.setItem('locale', 'en-US')
-      console.log('设置默认语言为: en-US')
-    }
-  }
+  const locale = resolveInitialLocale()
+  i18n.global.locale.value = locale
+  applyDocumentLocale(locale)
+  console.log(`应用语言设置: ${locale}`)
 }
 
 // 预设初始主题类，避免闪烁
