@@ -378,6 +378,12 @@
     "syncInterval": "检查间隔",
     "syncIntervalDescription": "当前每 {minutes} 分钟检查一次云端变化",
     "syncNow": "立即同步",
+    "syncResult": {
+      "uploaded": "同步完成，已上传本机数据",
+      "downloaded": "同步完成，已更新本机数据",
+      "merged": "同步完成，已合并本机和云端数据",
+      "upToDate": "同步完成，数据已是最新"
+    },
     "syncing": "正在同步",
     "testConnection": "测试连接",
     "title": "云端备份",
@@ -610,6 +616,63 @@
       "settings": "设置"
     },
     "title": "AI Gist"
+  },
+  "mobileSettings": {
+    "groups": {
+      "data": "数据",
+      "preferences": "偏好",
+      "other": "其他"
+    },
+    "entries": {
+      "dataSyncDescription": "多设备之间自动保持数据一致",
+      "dataBackupDescription": "创建并恢复本机和云端的备份版本",
+      "generalDescription": "语言与主题",
+      "aboutDescription": "版本信息与反馈"
+    },
+    "sync": {
+      "explainerTitle": "数据同步是什么",
+      "explainerBody": "同步会在本机与云端之间双向合并数据，让所有设备保持一致。它不保留历史版本；需要历史版本请使用「数据备份」。",
+      "storageSectionDescription": "数据同步和云端备份都会使用这里配置的存储。",
+      "addStorage": "添加 WebDAV 存储",
+      "editStorage": "编辑存储",
+      "newStorage": "新建存储",
+      "syncThisStorage": "立即同步此存储",
+      "autoSyncSection": "自动同步",
+      "restoreDecisionAction": "处理恢复后的云端数据",
+      "deleteStorage": "删除此存储",
+      "notConfigured": "未配置"
+    },
+    "backup": {
+      "explainerTitle": "本地备份和云端备份的区别",
+      "explainerBody": "本地备份保存在本机，可随时回到过去的版本；云端备份由你手动上传到云端存储，换机时可恢复。两者都不会与其他设备自动合并。",
+      "localTitle": "本地备份",
+      "localDescription": "保存在本机，自动或手动创建",
+      "cloudSectionTitle": "云端备份位置",
+      "cloudDescription": "手动上传到「{name}」",
+      "fileSectionTitle": "备份文件",
+      "exportDescription": "导出为可分享的备份文件",
+      "importDescription": "从备份文件恢复全部数据",
+      "noStorageHint": "尚未配置云端存储，配置后可按需手动创建云端备份。",
+      "goToDataSync": "前往数据同步",
+      "automaticSectionTitle": "自动备份",
+      "versionsSectionTitle": "备份版本",
+      "createManualBackup": "立即创建备份",
+      "manualBackupDescription": "手动本地备份 - {time}",
+      "typeAutomatic": "自动",
+      "typeManual": "手动",
+      "localStorageNote": "本地备份保存在应用的私有存储中，卸载应用会一并删除；重要数据请同时创建云端备份。",
+      "restoreLocalWarning": "恢复会用该备份完全覆盖当前数据，并暂停云端同步等待你确认。",
+      "createSuccess": "备份创建成功",
+      "createUnchanged": "数据没有变化，已保留现有备份",
+      "createFailed": "创建备份失败",
+      "restoreSuccess": "备份恢复成功",
+      "restoreFailed": "恢复备份失败",
+      "deleteSuccess": "备份删除成功",
+      "deleteFailed": "删除备份失败",
+      "loadFailed": "加载备份列表失败",
+      "count": "{count} 个版本",
+      "retentionCount": "保留 {count} 份"
+    }
   },
   "networkProxy": {
     "connectionFailed": "连接失败",

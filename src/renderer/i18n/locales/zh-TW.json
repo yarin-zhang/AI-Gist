@@ -378,6 +378,12 @@
     "syncInterval": "檢查間隔",
     "syncIntervalDescription": "目前每 {minutes} 分鐘檢查一次雲端變化",
     "syncNow": "立即同步",
+    "syncResult": {
+      "uploaded": "同步完成，已上傳本機資料",
+      "downloaded": "同步完成，已更新本機資料",
+      "merged": "同步完成，已合併本機和雲端資料",
+      "upToDate": "同步完成，資料已是最新"
+    },
     "syncing": "正在同步",
     "testConnection": "測試連接",
     "title": "雲端備份",
@@ -610,6 +616,63 @@
       "settings": "設定"
     },
     "title": "AI Gist"
+  },
+  "mobileSettings": {
+    "groups": {
+      "data": "資料",
+      "preferences": "偏好",
+      "other": "其他"
+    },
+    "entries": {
+      "dataSyncDescription": "多裝置之間自動保持資料一致",
+      "dataBackupDescription": "建立並還原本機和雲端的備份版本",
+      "generalDescription": "語言與主題",
+      "aboutDescription": "版本資訊與意見回饋"
+    },
+    "sync": {
+      "explainerTitle": "資料同步是什麼",
+      "explainerBody": "同步會在本機與雲端之間雙向合併資料，讓所有裝置保持一致。它不會保留歷史版本；需要歷史版本請使用「資料備份」。",
+      "storageSectionDescription": "資料同步和雲端備份都會使用這裡設定的儲存空間。",
+      "addStorage": "新增 WebDAV 儲存",
+      "editStorage": "編輯儲存設定",
+      "newStorage": "新增儲存設定",
+      "syncThisStorage": "立即同步此儲存",
+      "autoSyncSection": "自動同步",
+      "restoreDecisionAction": "處理還原後的雲端資料",
+      "deleteStorage": "刪除此儲存設定",
+      "notConfigured": "未設定"
+    },
+    "backup": {
+      "explainerTitle": "本機備份和雲端備份的差別",
+      "explainerBody": "本機備份儲存在這台裝置，可隨時回到過去的版本；雲端備份由你手動上傳到雲端儲存，換機時可還原。兩者都不會與其他裝置自動合併。",
+      "localTitle": "本機備份",
+      "localDescription": "儲存在本機，自動或手動建立",
+      "cloudSectionTitle": "雲端備份位置",
+      "cloudDescription": "手動上傳到「{name}」",
+      "fileSectionTitle": "備份檔案",
+      "exportDescription": "匯出為可分享的備份檔案",
+      "importDescription": "從備份檔案還原全部資料",
+      "noStorageHint": "尚未設定雲端儲存，設定後即可依需求手動建立雲端備份。",
+      "goToDataSync": "前往資料同步",
+      "automaticSectionTitle": "自動備份",
+      "versionsSectionTitle": "備份版本",
+      "createManualBackup": "立即建立備份",
+      "manualBackupDescription": "手動本機備份 - {time}",
+      "typeAutomatic": "自動",
+      "typeManual": "手動",
+      "localStorageNote": "本機備份儲存在應用程式的私有空間，解除安裝時會一併刪除；重要資料請同時建立雲端備份。",
+      "restoreLocalWarning": "還原會用該備份完全覆蓋目前資料，並暫停雲端同步等待你確認。",
+      "createSuccess": "備份建立成功",
+      "createUnchanged": "資料沒有變化，已保留現有備份",
+      "createFailed": "建立備份失敗",
+      "restoreSuccess": "備份還原成功",
+      "restoreFailed": "還原備份失敗",
+      "deleteSuccess": "備份刪除成功",
+      "deleteFailed": "刪除備份失敗",
+      "loadFailed": "載入備份清單失敗",
+      "count": "{count} 個版本",
+      "retentionCount": "保留 {count} 份"
+    }
   },
   "networkProxy": {
     "connectionFailed": "連接失敗",

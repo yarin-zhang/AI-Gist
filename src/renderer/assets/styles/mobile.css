@@ -89,3 +89,8 @@ html.ai-gist-mobile ion-loading,
 html.ai-gist-mobile ion-picker {
   --background: var(--surface-primary);
 }
+
+/* 弹窗文案使用纯文本（未开启 Ionic innerHTMLTemplatesEnabled），保留其中的换行 */
+html.ai-gist-mobile ion-alert.mobile-alert-preserve-lines .alert-message {
+  white-space: pre-line;
+}

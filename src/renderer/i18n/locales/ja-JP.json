@@ -378,6 +378,12 @@
     "syncInterval": "確認間隔",
     "syncIntervalDescription": "現在は {minutes} 分ごとにクラウドの変更を確認します",
     "syncNow": "今すぐ同期",
+    "syncResult": {
+      "uploaded": "同期が完了しました（本体のデータをアップロードしました）",
+      "downloaded": "同期が完了しました（本体のデータを更新しました）",
+      "merged": "同期が完了しました（本体とクラウドのデータをマージしました）",
+      "upToDate": "同期が完了しました（すでに最新です）"
+    },
     "syncing": "同期中",
     "testConnection": "接続テスト",
     "title": "クラウドバックアップ",
@@ -610,6 +616,63 @@
       "settings": "設定"
     },
     "title": "AI Gist"
+  },
+  "mobileSettings": {
+    "groups": {
+      "data": "データ",
+      "preferences": "環境設定",
+      "other": "その他"
+    },
+    "entries": {
+      "dataSyncDescription": "複数のデバイス間でデータを自動的に一致させます",
+      "dataBackupDescription": "本体とクラウドのバックアップを作成・復元します",
+      "generalDescription": "言語とテーマ",
+      "aboutDescription": "バージョン情報とフィードバック"
+    },
+    "sync": {
+      "explainerTitle": "データ同期とは",
+      "explainerBody": "同期は本体とクラウドのデータを双方向にマージし、すべてのデバイスを同じ状態に保ちます。過去のバージョンは残らないため、履歴が必要な場合は「データバックアップ」を使用してください。",
+      "storageSectionDescription": "データ同期とクラウドバックアップは、ここで設定したストレージを共有します。",
+      "addStorage": "WebDAV ストレージを追加",
+      "editStorage": "ストレージを編集",
+      "newStorage": "ストレージを新規作成",
+      "syncThisStorage": "このストレージを今すぐ同期",
+      "autoSyncSection": "自動同期",
+      "restoreDecisionAction": "復元後のクラウドデータを処理",
+      "deleteStorage": "このストレージを削除",
+      "notConfigured": "未設定"
+    },
+    "backup": {
+      "explainerTitle": "ローカルバックアップとクラウドバックアップの違い",
+      "explainerBody": "ローカルバックアップは本体に保存され、いつでも以前のバージョンに戻せます。クラウドバックアップは手動でクラウドストレージにアップロードし、機種変更時に復元できます。どちらも他のデバイスと自動的にマージされることはありません。",
+      "localTitle": "ローカルバックアップ",
+      "localDescription": "本体に保存され、自動または手動で作成されます",
+      "cloudSectionTitle": "クラウドバックアップの保存先",
+      "cloudDescription": "「{name}」へ手動でアップロード",
+      "fileSectionTitle": "バックアップファイル",
+      "exportDescription": "共有できるバックアップファイルとして書き出します",
+      "importDescription": "バックアップファイルからすべてのデータを復元します",
+      "noStorageHint": "クラウドストレージが未設定です。設定すると必要に応じて手動でクラウドバックアップを作成できます。",
+      "goToDataSync": "データ同期へ移動",
+      "automaticSectionTitle": "自動バックアップ",
+      "versionsSectionTitle": "バックアップのバージョン",
+      "createManualBackup": "今すぐバックアップを作成",
+      "manualBackupDescription": "手動ローカルバックアップ - {time}",
+      "typeAutomatic": "自動",
+      "typeManual": "手動",
+      "localStorageNote": "ローカルバックアップはアプリの専用領域に保存され、アプリを削除すると一緒に消えます。重要なデータはクラウドバックアップも作成してください。",
+      "restoreLocalWarning": "復元すると現在のデータはこのバックアップで完全に上書きされ、確認するまでクラウド同期は一時停止します。",
+      "createSuccess": "バックアップを作成しました",
+      "createUnchanged": "データに変更がないため、既存のバックアップを保持しました",
+      "createFailed": "バックアップの作成に失敗しました",
+      "restoreSuccess": "バックアップを復元しました",
+      "restoreFailed": "バックアップの復元に失敗しました",
+      "deleteSuccess": "バックアップを削除しました",
+      "deleteFailed": "バックアップの削除に失敗しました",
+      "loadFailed": "バックアップ一覧の読み込みに失敗しました",
+      "count": "{count} 件のバージョン",
+      "retentionCount": "{count} 件を保持"
+    }
   },
   "networkProxy": {
     "connectionFailed": "接続失敗",
@@ -1176,7 +1239,7 @@
     "menus": {
       "about": {
         "description": "アプリのバージョン情報を表示し、アップデートを確認する",
-        "title": "について"
+        "title": "アプリについて"
       },
       "appearance": {
         "description": "アプリのテーマを構成する",
