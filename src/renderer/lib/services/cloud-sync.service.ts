@@ -44,6 +44,7 @@ import {
   type CloudSyncRelationRepair
 } from '@shared/cloud-sync-contract';
 import { generateUUID } from '../utils/uuid';
+import i18n from '../../i18n';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
 import { DatabaseServiceManager } from './database-manager.service';
 import { AppSettingsService } from './app-settings.service';
@@ -2812,11 +2813,31 @@ function mergeWarnings(existing: string[] | undefined, additional?: string): str
   return warnings.length > 0 ? warnings : undefined;
 }
 
+/**
+ * 同步结果提示会直接出现在桌面端和移动端的界面上，必须跟随当前语言。
+ * i18n 尚未初始化时（例如纯 Node 单测）回退到中文原文，避免抛错。
+ */
+function translateSyncMessage(key: string): string {
+  try {
+    const translated = (i18n.global.t as (key: string) => string)(key);
+    return translated === key ? SYNC_MESSAGE_FALLBACKS[key] || key : translated;
+  } catch {
+    return SYNC_MESSAGE_FALLBACKS[key] || key;
+  }
+}
+
+const SYNC_MESSAGE_FALLBACKS: Record<string, string> = {
+  'dataSync.syncResult.uploaded': '同步完成，已上传本机数据',
+  'dataSync.syncResult.downloaded': '同步完成，已更新本机数据',
+  'dataSync.syncResult.merged': '同步完成，已合并本机和云端数据',
+  'dataSync.syncResult.upToDate': '同步完成，数据已是最新'
+};
+
 export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): string {
-  if (action === 'uploaded') return '同步完成，已上传本机数据';
-  if (action === 'downloaded') return '同步完成，已更新本机数据';
-  if (action === 'merged') return '同步完成，已合并本机和云端数据';
-  return '同步完成，数据已是最新';
+  const key = action === 'uploaded' || action === 'downloaded' || action === 'merged'
+    ? action
+    : 'upToDate';
+  return translateSyncMessage(`dataSync.syncResult.${key}`);
 }
 
 export function getCloudSyncErrorDiagnosis(

@@ -220,7 +220,18 @@ export class CloudBackupAPI {
     const client = getCloudBackupClient();
     if (client) {
       const downloaded = await client.restoreCloudBackup(storageId, backupId) as any;
-      if (!PlatformDetector.isMobile() || !downloaded.success) {
+      if (!downloaded.success) {
+        return downloaded;
+      }
+      if (!PlatformDetector.isMobile()) {
+        // Web 端的实现自己就把数据写回了本地库，但没有暂停云同步。
+        // 不补上这一步，自动同步会在用户决定「覆盖云端」还是「重新合并」之前
+        // 就把刚恢复的数据合并掉，恢复等于白做。
+        const { cloudSyncService } = await import('../services/cloud-sync.service');
+        await cloudSyncService.suspendEnabledStoragesAfterRestore({
+          source: 'cloud-backup',
+          backupId
+        });
         return downloaded;
       }
       if (!downloaded.data) {

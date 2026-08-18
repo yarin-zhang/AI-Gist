@@ -400,10 +400,10 @@
   "common": {
     "actions": "operate",
     "add": "Add to",
-    "back": "return",
+    "back": "Back",
     "cancel": "Cancel",
     "close": "Close",
-    "confirm": "confirm",
+    "confirm": "Confirm",
     "copy": "Copy",
     "create": "Create",
     "clear": "Clear",
@@ -529,6 +529,12 @@
     "syncIntervalSaveFailed": "Failed to save the cloud check interval",
     "syncIntervalSaved": "Cloud check interval set to {minutes} minutes",
     "syncNow": "Sync Now",
+    "syncResult": {
+      "uploaded": "Sync complete — local data was uploaded",
+      "downloaded": "Sync complete — local data was updated",
+      "merged": "Sync complete — local and cloud data were merged",
+      "upToDate": "Sync complete — everything is already up to date"
+    },
     "testConnection": "Test Connection",
     "updateSuccess": "Storage configuration updated",
     "username": "Username",
@@ -610,6 +616,63 @@
       "settings": "Settings"
     },
     "title": "AI Gist"
+  },
+  "mobileSettings": {
+    "groups": {
+      "data": "Data",
+      "preferences": "Preferences",
+      "other": "Other"
+    },
+    "entries": {
+      "dataSyncDescription": "Keep every device up to date automatically",
+      "dataBackupDescription": "Create and restore backup versions on this device and in the cloud",
+      "generalDescription": "Language and theme",
+      "aboutDescription": "Version information and feedback"
+    },
+    "sync": {
+      "explainerTitle": "What data sync does",
+      "explainerBody": "Sync merges data both ways between this device and the cloud so every device matches. It does not keep past versions — use Data Backup for that.",
+      "storageSectionDescription": "Both data sync and cloud backups use the storage configured here.",
+      "addStorage": "Add WebDAV storage",
+      "editStorage": "Edit storage",
+      "newStorage": "New storage",
+      "syncThisStorage": "Sync this storage now",
+      "autoSyncSection": "Automatic sync",
+      "restoreDecisionAction": "Resolve cloud data after restore",
+      "deleteStorage": "Delete this storage",
+      "notConfigured": "Not configured"
+    },
+    "backup": {
+      "explainerTitle": "Local backups vs. cloud backups",
+      "explainerBody": "Local backups stay on this device so you can roll back to an earlier version. Cloud backups are uploaded by you on demand and can be restored on a new device. Neither one merges with other devices automatically.",
+      "localTitle": "Local backups",
+      "localDescription": "Stored on this device, created automatically or manually",
+      "cloudSectionTitle": "Cloud backup locations",
+      "cloudDescription": "Uploaded manually to “{name}”",
+      "fileSectionTitle": "Backup files",
+      "exportDescription": "Export a backup file you can share or keep",
+      "importDescription": "Restore all data from a backup file",
+      "noStorageHint": "No cloud storage configured yet. Add one to create cloud backups on demand.",
+      "goToDataSync": "Go to Data Sync",
+      "automaticSectionTitle": "Automatic backup",
+      "versionsSectionTitle": "Backup versions",
+      "createManualBackup": "Create backup now",
+      "manualBackupDescription": "Manual local backup - {time}",
+      "typeAutomatic": "Automatic",
+      "typeManual": "Manual",
+      "localStorageNote": "Local backups live in the app's private storage and are deleted when the app is uninstalled. Keep a cloud backup of anything important.",
+      "restoreLocalWarning": "Restoring overwrites all current data with this backup and pauses cloud sync until you confirm what to do.",
+      "createSuccess": "Backup created",
+      "createUnchanged": "Data has not changed, the existing backup was kept",
+      "createFailed": "Failed to create backup",
+      "restoreSuccess": "Backup restored",
+      "restoreFailed": "Failed to restore backup",
+      "deleteSuccess": "Backup deleted",
+      "deleteFailed": "Failed to delete backup",
+      "loadFailed": "Failed to load the backup list",
+      "count": "{count} version | {count} versions",
+      "retentionCount": "Keep {count} copies"
+    }
   },
   "networkProxy": {
     "connectionFailed": "Connection Failed",
@@ -1176,7 +1239,7 @@
     "menus": {
       "about": {
         "description": "View app version information and check for updates",
-        "title": "about"
+        "title": "About"
       },
       "appearance": {
         "description": "Configure your app’s theme",
@@ -1202,7 +1265,7 @@
     "sectionDescriptions": {
       "about": {
         "description": "View application version information and check for updates",
-        "title": "about"
+        "title": "About"
       },
       "appearance": {
         "description": "Configure the theme mode of the application",
