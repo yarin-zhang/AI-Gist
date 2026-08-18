@@ -220,26 +220,26 @@ onUnmounted(() => {
 }
 
 .card-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--mobile-font-size-body);
+  font-weight: 600;
   color: var(--content-primary);
   margin: 0 0 4px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.4;
+  line-height: var(--mobile-line-height-normal);
 }
 
 .card-desc {
-  font-size: 12px;
+  font-size: var(--mobile-font-size-footnote);
   color: var(--content-secondary);
   margin: 0 0 6px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.3;
+  line-height: var(--mobile-line-height-normal);
 }
 
 .card-tags {
@@ -250,7 +250,7 @@ onUnmounted(() => {
 }
 
 .card-tag {
-  font-size: 10px;
+  font-size: var(--mobile-font-size-caption);
   padding: 2px 6px;
   border-radius: 10px;
   background: var(--surface-secondary);
@@ -266,7 +266,7 @@ onUnmounted(() => {
 }
 
 .card-category {
-  font-size: 11px;
+  font-size: var(--mobile-font-size-caption);
   color: var(--ion-color-primary, #3880ff);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -275,7 +275,7 @@ onUnmounted(() => {
 }
 
 .card-favorite {
-  font-size: 14px;
+  font-size: var(--mobile-icon-size-sm);
   color: var(--ion-color-danger, #eb445a);
   flex-shrink: 0;
 }

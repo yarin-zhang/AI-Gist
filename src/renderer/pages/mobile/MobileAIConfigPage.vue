@@ -384,7 +384,6 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 80px;
   color: var(--ion-color-medium);
   margin-bottom: 16px;
 }
@@ -392,12 +391,11 @@ onUnmounted(() => {
 .empty-text {
   color: var(--ion-color-medium);
   margin-bottom: 24px;
-  font-size: 16px;
 }
 
 .config-description {
   color: var(--ion-color-medium);
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
   margin-top: 4px;
 }
 
@@ -432,7 +430,8 @@ ion-card {
 }
 
 ion-content {
-  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  /* 让列表底部留出悬浮按钮的空间；标签栏本身已经覆盖了安全区 */
+  --padding-bottom: var(--mobile-fab-clearance);
 }
 
 .preferred-alert {
@@ -450,12 +449,12 @@ ion-content {
 }
 
 .preferred-info ion-icon {
-  font-size: 24px;
+  font-size: var(--mobile-icon-size-lg);
 }
 
 .preferred-info p {
   margin: 4px 0 0 0;
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
   opacity: 0.9;
 }
 
@@ -466,13 +465,13 @@ ion-content {
 }
 
 .warning-alert ion-icon {
-  font-size: 24px;
+  font-size: var(--mobile-icon-size-lg);
   flex-shrink: 0;
 }
 
 .warning-alert p {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
 }
 </style>

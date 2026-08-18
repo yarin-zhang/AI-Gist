@@ -584,8 +584,6 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 600;
   color: var(--ion-text-color);
   margin-bottom: 12px;
   padding: 0 4px;
@@ -617,9 +615,9 @@ ion-item {
 
 .service-description {
   color: var(--ion-color-medium);
-  font-size: 14px;
+  font-size: var(--mobile-font-size-footnote);
   margin: 0 0 8px 0;
-  line-height: 1.5;
+  line-height: var(--mobile-line-height-normal);
 }
 
 .service-links {
@@ -669,7 +667,7 @@ ion-item {
 }
 
 .test-result-detail {
-  font-size: 13px;
+  font-size: var(--mobile-font-size-footnote);
   opacity: 0.8;
   word-break: break-word;
 }
