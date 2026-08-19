@@ -85,19 +85,14 @@
                                     </div>
                                 </template>
                                 <template v-else>
-                                    <NTooltip>
-                                        <template #trigger>
-                                            <NButton size="small" quaternary circle class="category-drag-handle"
-                                                :draggable="orderedCategories.length > 1 && !reordering && editingCategory === null && !isCreating"
-                                                :aria-label="t('promptManagement.categoryDragHandle', { name: category.name })"
-                                                :disabled="orderedCategories.length < 2 || reordering || editingCategory !== null || isCreating"
-                                                @dragstart="handleCategoryDragStart($event, category)"
-                                                @dragend="handleCategoryDragEnd">
-                                                <template #icon><NIcon size="16"><GripVertical /></NIcon></template>
-                                            </NButton>
-                                        </template>
-                                        {{ t('promptManagement.categoryDragHint') }}
-                                    </NTooltip>
+                                    <NButton size="small" quaternary circle class="category-drag-handle"
+                                        :draggable="orderedCategories.length > 1 && !reordering && editingCategory === null && !isCreating"
+                                        :aria-label="t('promptManagement.categoryDragHandle', { name: category.name })"
+                                        :disabled="orderedCategories.length < 2 || reordering || editingCategory !== null || isCreating"
+                                        @dragstart="handleCategoryDragStart($event, category)"
+                                        @dragend="handleCategoryDragEnd">
+                                        <template #icon><NIcon size="16"><GripVertical /></NIcon></template>
+                                    </NButton>
 
                                     <span class="category-color-dot"
                                         :style="{ backgroundColor: category.color || 'var(--accent-success)' }" />

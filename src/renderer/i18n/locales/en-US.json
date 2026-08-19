@@ -745,7 +745,6 @@
     "categoryFilterTitle": "Category Filter",
     "categoryHasPrompts": "This category still has prompts and cannot be deleted",
     "categoryDragHandle": "Drag category {name} to reorder",
-    "categoryDragHint": "Drag to reorder",
     "categoryManageDesc": "Reorder, create, edit, or delete your prompt categories",
     "categoryManageEmpty": "No categories yet. Click \"Create Category\" to add one.",
     "categoryManageTitle": "Category Management",
@@ -1160,9 +1159,7 @@
     "workspaceView": "Workspace",
     "gridView": "Cards",
     "tableView": "Table",
-    "folderView": "Folders",
-    "collapseSidebar": "Collapse prompt library",
-    "expandSidebar": "Expand prompt library"
+    "folderView": "Folders"
   },
   "promptEditor": {
     "viewMode": "Editor view", "visual": "Variable blocks", "source": "Source",

@@ -745,7 +745,6 @@
     "categoryFilterTitle": "分类筛选",
     "categoryHasPrompts": "该分类下还有提示词，无法删除",
     "categoryDragHandle": "拖拽分类“{name}”调整顺序",
-    "categoryDragHint": "拖拽排序",
     "categoryManageDesc": "管理您的提示词分类，调整顺序并创建、编辑或删除分类",
     "categoryManageEmpty": "暂无分类，点击“新建分类”创建",
     "categoryManageTitle": "分类管理",
@@ -1160,9 +1159,7 @@
     "workspaceView": "工作台",
     "gridView": "卡片",
     "tableView": "表格",
-    "folderView": "文件夹",
-    "collapseSidebar": "收起提示词库",
-    "expandSidebar": "展开提示词库"
+    "folderView": "文件夹"
   },
   "promptEditor": {
     "viewMode": "编辑视图", "visual": "变量块", "source": "源码",
