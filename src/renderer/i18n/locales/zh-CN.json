@@ -1123,7 +1123,6 @@
     "variablePlaceholder": "占位符",
     "variablePlaceholderText": "输入提示文本",
     "variableRequired": "必填",
-    "variableSyntaxHint": "支持 {'{{'}变量名{'}}'} 语法定义变量",
     "variableTip": "在左侧输入内容时使用 {'{{'}变量名{'}}'} 格式，会自动识别变量",
     "variableType": "类型",
     "version": "版本",
