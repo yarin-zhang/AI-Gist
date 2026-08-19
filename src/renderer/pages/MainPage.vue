@@ -42,20 +42,16 @@ const promptManagementPageRef = ref()
 const menuOptions: MenuOption[] = [
     {
         label: t('mainPage.menu.prompts'),
-        // NMenu 在收起态会用 title（而非 label）渲染图标的悬浮提示，缺失会导致空白 tooltip
-        title: t('mainPage.menu.prompts'),
         key: 'prompts',
         icon: () => h(NIcon, null, { default: () => h(PromptNavigationIcon) })
     },
     {
         label: t('mainPage.menu.aiConfig'),
-        title: t('mainPage.menu.aiConfig'),
         key: 'ai-config',
         icon: () => h(NIcon, null, { default: () => h(AIConfigNavigationIcon) })
     },
     {
         label: t('mainPage.menu.settings'),
-        title: t('mainPage.menu.settings'),
         key: 'settings',
         icon: () => h(NIcon, null, { default: () => h(SettingsNavigationIcon) })
     }
