@@ -606,7 +606,6 @@
     "retrying": "重試中..."
   },
   "language": {
-    "description": "選擇應用的顯示語言",
     "selectLanguage": "選擇語言",
     "title": "語言設置"
   },
@@ -1250,7 +1249,6 @@
         "title": "關於"
       },
       "appearance": {
-        "description": "配置應用的主題模式",
         "title": "外觀設定"
       },
       "cloudBackup": {

@@ -606,7 +606,6 @@
     "retrying": "重试中..."
   },
   "language": {
-    "description": "选择应用的显示语言",
     "selectLanguage": "选择语言",
     "title": "语言设置"
   },
@@ -1254,8 +1253,7 @@
         "description": "查看应用版本信息和检查更新"
       },
       "appearance": {
-        "title": "外观设置",
-        "description": "配置应用的主题模式"
+        "title": "外观设置"
       },
       "language": {
         "title": "语言设置",

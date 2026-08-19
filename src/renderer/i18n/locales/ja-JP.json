@@ -606,7 +606,6 @@
     "retrying": "再試行中..."
   },
   "language": {
-    "description": "アプリケーションの表示言語を選択",
     "selectLanguage": "言語を選択",
     "title": "言語設定"
   },
@@ -1250,7 +1249,6 @@
         "title": "アプリについて"
       },
       "appearance": {
-        "description": "アプリのテーマを構成する",
         "title": "外観設定"
       },
       "cloudBackup": {

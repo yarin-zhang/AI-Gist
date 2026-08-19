@@ -606,7 +606,6 @@
     "retrying": "Retrying..."
   },
   "language": {
-    "description": "Choose the display language for the application",
     "selectLanguage": "Select Language",
     "title": "Language"
   },
@@ -1250,7 +1249,6 @@
         "title": "About"
       },
       "appearance": {
-        "description": "Configure your app’s theme",
         "title": "Appearance settings"
       },
       "cloudBackup": {
