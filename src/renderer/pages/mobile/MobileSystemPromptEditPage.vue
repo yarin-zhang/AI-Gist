@@ -17,28 +17,24 @@
     <ion-content :fullscreen="true">
       <div class="editor-container">
         <!-- 提示信息 -->
-        <ion-card>
-          <ion-card-content>
-            <p class="info-text">{{ t('aiConfig.systemPromptTip') }}</p>
-          </ion-card-content>
-        </ion-card>
+        <div class="section-content info-card">
+          <p class="info-text">{{ t('aiConfig.systemPromptTip') }}</p>
+        </div>
 
         <!-- 编辑器 -->
-        <ion-card>
-          <ion-card-content>
-            <ion-textarea
-              v-model="systemPrompt"
-              :placeholder="t('aiConfig.systemPromptPlaceholder')"
-              :auto-grow="true"
-              :rows="15"
-              class="system-prompt-textarea"
-            ></ion-textarea>
-          </ion-card-content>
-        </ion-card>
+        <div class="section-content editor-card">
+          <ion-textarea
+            v-model="systemPrompt"
+            :placeholder="t('aiConfig.systemPromptPlaceholder')"
+            :auto-grow="true"
+            :rows="15"
+            class="system-prompt-textarea"
+          ></ion-textarea>
+        </div>
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
-          <ion-button expand="block" fill="outline" @click="handleReset">
+          <ion-button expand="block" fill="outline" color="medium" @click="handleReset">
             <ion-icon slot="start" :icon="refreshOutline"></ion-icon>
             {{ t('aiConfig.resetToDefault') }}
           </ion-button>
@@ -60,8 +56,6 @@ import {
   IonButtons,
   IonButton,
   IonBackButton,
-  IonCard,
-  IonCardContent,
   IonTextarea,
   IonIcon,
   alertController
@@ -172,12 +166,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/*
+ * 说明卡片 / 编辑器容器复用 MobileAIConfigDetailPage.vue、MobileAIConfigEditPage.vue
+ * 里已经在用的“分组内容块”样式（secondary 背景 + 边框 + 大圆角），
+ * 而不是裸的 ion-card，以便和同一功能下的其它移动端页面保持一致的卡片语言。
+ */
 .editor-container {
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  padding: var(--content-padding);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
 }
 
-ion-card {
-  margin-bottom: 16px;
+.section-content {
+  background: var(--surface-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+}
+
+.info-card {
+  padding: var(--content-padding);
 }
 
 .info-text {
@@ -187,11 +197,25 @@ ion-card {
   margin: 0;
 }
 
+.editor-card {
+  padding: var(--content-padding);
+}
+
+/* 去掉 ion-textarea 自身的内边距/背景，让它与 .editor-card 融为一体，
+   同时保留清晰可辨的编辑区域边界（由外层卡片的背景+边框提供）。 */
 .system-prompt-textarea {
+  --background: transparent;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --placeholder-color: var(--content-tertiary);
+  --placeholder-opacity: 1;
+  --color: var(--content-primary);
   font-family: monospace;
   font-size: var(--mobile-font-size-body);
   line-height: var(--mobile-line-height-normal);
-  min-height: 400px;
+  min-height: 360px;
 }
 
 .action-buttons {
