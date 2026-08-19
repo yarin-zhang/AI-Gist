@@ -517,7 +517,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
 @media (max-width: 1120px) {
     .prompt-command-bar { grid-template-columns: auto 1fr auto; gap: 12px; }
     .page-subtitle, .view-switcher-item span, .page-actions .action-label { display: none; }
-    .view-switcher { justify-content: center; }
+    .view-switcher { justify-content: center; justify-self: center; }
     .view-switcher-item { width: 32px; justify-content: center; padding: 0; }
     .page-actions :deep(.n-button) { width: 32px; padding: 0; }
     .page-actions :deep(.n-button__icon) { margin: 0; }
