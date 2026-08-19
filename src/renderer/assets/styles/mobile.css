@@ -14,9 +14,13 @@ html.ai-gist-mobile {
    * 浮动导航：AI 入口条 + 标签栏，作为悬浮于内容之上的两片独立玻璃层，
    * 而不是像素级贴底的实体栏。数值只在移动端本地使用，不进入设计系统 token，
    * 颜色/阴影仍然全部复用 design-tokens 里的 surface / border / shadow 变量。
+   *
+   * gutter/bottom-offset 刻意调小：偏大的数值会在屏幕圆角处露出一块明显的三角形
+   * 空隙（issue #6 截图中箭头指向的位置），贴边越紧这块空隙越不明显；仍然保留
+   * 胶囊形浮动层与屏幕边缘之间必要的呼吸间距，不做贴死到边的整栏重设计。
    */
-  --mobile-nav-gutter: 14px;
-  --mobile-nav-bottom-offset: 8px;
+  --mobile-nav-gutter: 8px;
+  --mobile-nav-bottom-offset: 6px;
   --mobile-nav-item-gap: 8px;
   --mobile-nav-radius: 999px;
   --mobile-nav-shelf-height: 46px;
@@ -418,6 +422,17 @@ html.ai-gist-mobile ion-tab-bar {
 }
 
 html.ai-gist-mobile ion-tab-button {
+  /*
+   * ion-tab-button 的 shadow DOM 内部是 `background: var(--background)`，若不在这里
+   * 显式声明，该自定义属性会从父级 ion-tab-bar（--background: var(--mobile-nav-surface)）
+   * 一路继承下来，导致每个未选中的按钮都各自再画一层和玻璃背板一模一样的圆角色块——
+   * 这正是 issue #6 里「不同 Tab 之间还有底色」的成因（按钮之间露出层叠的色块边缘，
+   * 看起来像一串独立小药丸而不是一整条无缝的玻璃背板）。显式重置为 transparent，
+   * 让未选中状态完全露出 ion-tab-bar 自身的背板，只有选中态才保留高亮色块。
+   */
+  --background: transparent;
+  --background-focused: transparent;
+  --background-focused-opacity: 0;
   --padding-top: 2px;
   --padding-bottom: 2px;
   --color-selected: var(--accent-primary);
@@ -430,6 +445,7 @@ html.ai-gist-mobile ion-tab-button {
 
 html.ai-gist-mobile ion-tab-button.tab-selected {
   --background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  --background-focused: color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 
 html.ai-gist-mobile ion-tab-button ion-icon {
