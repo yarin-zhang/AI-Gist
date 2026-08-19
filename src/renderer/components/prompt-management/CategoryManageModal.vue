@@ -2,9 +2,8 @@
     <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
         <!-- 顶部固定区域 -->
         <template #header>
-            <NText :style="{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }">{{ t('promptManagement.categoryManageTitle') }}
-            </NText>
-            <NText depth="3">{{ t('promptManagement.categoryManageDesc') }}</NText>
+            <NText strong class="modal-title">{{ t('promptManagement.categoryManageTitle') }}</NText>
+            <NText depth="3" class="modal-subtitle">{{ t('promptManagement.categoryManageDesc') }}</NText>
         </template>
 
         <!-- 中间可操作区域：统一的单页分类列表管理 -->
@@ -25,17 +24,14 @@
                     <div class="category-manage-list">
                         <!-- 新建分类：内联行，置顶方便快速录入 -->
                         <div v-if="isCreating" class="category-row category-row-editing">
-                            <NPopover trigger="click" placement="bottom-start" :show-arrow="false">
-                                <template #trigger>
-                                    <button type="button" class="category-color-swatch"
+                            <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
+                                :swatches="COLOR_SWATCHES">
+                                <template #trigger="{ onClick, ref: setTriggerRef }">
+                                    <button type="button" class="category-color-swatch" :ref="setTriggerRef"
                                         :style="{ backgroundColor: newCategory.color }"
-                                        :aria-label="t('promptManagement.color')" />
+                                        :aria-label="t('promptManagement.color')" @click="onClick" />
                                 </template>
-                                <div class="category-color-picker-panel">
-                                    <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
-                                        :swatches="COLOR_SWATCHES" />
-                                </div>
-                            </NPopover>
+                            </NColorPicker>
                             <NInput v-model:value="newCategory.name" size="small" class="category-row-name-input"
                                 :placeholder="t('promptManagement.categoryNamePlaceholder')" autofocus
                                 @keyup.enter="handleCreate" />
@@ -60,17 +56,14 @@
                             <div class="category-row"
                                 :class="{ 'category-row-editing': editingCategory?.id === category.id }">
                                 <template v-if="editingCategory?.id === category.id">
-                                    <NPopover trigger="click" placement="bottom-start" :show-arrow="false">
-                                        <template #trigger>
-                                            <button type="button" class="category-color-swatch"
+                                    <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
+                                        :swatches="COLOR_SWATCHES">
+                                        <template #trigger="{ onClick, ref: setTriggerRef }">
+                                            <button type="button" class="category-color-swatch" :ref="setTriggerRef"
                                                 :style="{ backgroundColor: editingCategory!.color }"
-                                                :aria-label="t('promptManagement.color')" />
+                                                :aria-label="t('promptManagement.color')" @click="onClick" />
                                         </template>
-                                        <div class="category-color-picker-panel">
-                                            <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
-                                                :swatches="COLOR_SWATCHES" />
-                                        </div>
-                                    </NPopover>
+                                    </NColorPicker>
                                     <NInput v-model:value="editingCategory!.name" size="small"
                                         class="category-row-name-input" :placeholder="t('promptManagement.categoryName')"
                                         @keyup.enter="handleSaveEdit" />
@@ -166,7 +159,6 @@ import {
     NColorPicker,
     NEmpty,
     NScrollbar,
-    NPopover,
     NTooltip,
     useMessage,
     useDialog
@@ -478,6 +470,24 @@ watch(() => props.categories, async (newCategories) => {
     flex-direction: column;
     gap: var(--section-gap);
     min-height: 0;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.modal-title {
+    display: block;
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-normal);
+}
+
+.modal-subtitle {
+    display: block;
+    margin-top: 3px;
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .category-manage-toolbar {
@@ -566,10 +576,6 @@ watch(() => props.categories, async (newCategories) => {
     border-radius: var(--radius-control);
     padding: 0;
     cursor: pointer;
-}
-
-.category-color-picker-panel {
-    width: 220px;
 }
 
 .category-row-info {
