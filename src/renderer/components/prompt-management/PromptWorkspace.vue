@@ -28,10 +28,12 @@
                             :aria-label="t('promptManagement.description')" @input="resizeDescriptionInput"
                             @keydown.enter.exact.prevent="commitDescription($event)"
                             @keydown.esc.prevent="cancelEditDescription($event)" @blur="commitDescription()" />
-                        <NText v-else-if="prompt?.description" depth="3"
-                            class="workspace-description workspace-field-editable" tabindex="0" role="button"
-                            :title="t('promptWorkspace.clickToEdit')" @click="startEditDescription"
-                            @keydown.enter.prevent="startEditDescription" @keydown.space.prevent="startEditDescription">
+                        <NText v-else-if="prompt?.description" depth="3" class="workspace-description"
+                            :class="{ 'workspace-field-editable': canInlineEdit }"
+                            :tabindex="canInlineEdit ? 0 : undefined" :role="canInlineEdit ? 'button' : undefined"
+                            :title="canInlineEdit ? t('promptWorkspace.clickToEdit') : undefined"
+                            @click="startEditDescription" @keydown.enter.prevent="startEditDescription"
+                            @keydown.space.prevent="startEditDescription">
                             {{ prompt.description }}
                         </NText>
                         <NText v-else-if="canInlineEdit" depth="3"
@@ -114,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NText, NTooltip, useMessage } from 'naive-ui'
 import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Trash, X } from '@vicons/tabler'
@@ -153,10 +155,17 @@ const editRef = ref<any>()
 const hasUnsavedChanges = computed(() => Boolean(editRef.value?.hasUnsavedChanges))
 
 // 标题 / 描述原地编辑：点击文本直接进入编辑态，失焦或回车保存，Esc 取消
+//
+// 进入编辑态时把目标 prompt id 与原始值捕获到独立的 ref 中，commitTitle/commitDescription
+// 一律使用这个捕获值而不是实时读取 props.prompt，避免编辑期间 props.prompt 被父组件替换
+// （例如跨窗口广播触发的 reconcileSelection 静默切换了选中项）时把文本误写到另一个 prompt 上。
+// 一旦检测到 prompt 身份在编辑过程中发生变化，watch 会强制放弃当前编辑，不做任何保存。
 const editingTitle = ref(false)
 const editingDescription = ref(false)
 const titleDraft = ref('')
 const descriptionDraft = ref('')
+const editingTitleTarget = ref<{ id: number; original: string } | null>(null)
+const editingDescriptionTarget = ref<{ id: number; original: string } | null>(null)
 const savingField = ref<'title' | 'description' | null>(null)
 const titleInputRef = ref<HTMLInputElement>()
 const descriptionInputRef = ref<HTMLTextAreaElement>()
@@ -164,8 +173,11 @@ const descriptionInputRef = ref<HTMLTextAreaElement>()
 const canInlineEdit = computed(() => Boolean(props.prompt?.id))
 
 const startEditTitle = () => {
-    if (!canInlineEdit.value || editingTitle.value) return
-    titleDraft.value = props.prompt?.title || ''
+    const id = props.prompt?.id
+    if (!id || editingTitle.value) return
+    const original = props.prompt?.title || ''
+    editingTitleTarget.value = { id, original }
+    titleDraft.value = original
     editingTitle.value = true
     nextTick(() => titleInputRef.value?.focus())
 }
@@ -173,18 +185,20 @@ const startEditTitle = () => {
 const cancelEditTitle = (event?: KeyboardEvent) => {
     if (event?.isComposing) return
     editingTitle.value = false
+    editingTitleTarget.value = null
 }
 
 const commitTitle = async (event?: KeyboardEvent) => {
     if (event?.isComposing) return
     if (!editingTitle.value) return
     const next = titleDraft.value.trim()
+    const target = editingTitleTarget.value
     editingTitle.value = false
-    const id = props.prompt?.id
-    if (!id || !next || next === props.prompt?.title) return
+    editingTitleTarget.value = null
+    if (!target || !next || next === target.original) return
     savingField.value = 'title'
     try {
-        const updated = await api.prompts.update.mutate({ id, data: { title: next } })
+        const updated = await api.prompts.update.mutate({ id: target.id, data: { title: next } })
         emit('updated', updated)
     } catch (error) {
         console.error(error)
@@ -195,8 +209,11 @@ const commitTitle = async (event?: KeyboardEvent) => {
 }
 
 const startEditDescription = () => {
-    if (!canInlineEdit.value || editingDescription.value) return
-    descriptionDraft.value = props.prompt?.description || ''
+    const id = props.prompt?.id
+    if (!id || editingDescription.value) return
+    const original = props.prompt?.description || ''
+    editingDescriptionTarget.value = { id, original }
+    descriptionDraft.value = original
     editingDescription.value = true
     nextTick(() => {
         resizeDescriptionInput()
@@ -207,20 +224,21 @@ const startEditDescription = () => {
 const cancelEditDescription = (event?: KeyboardEvent) => {
     if (event?.isComposing) return
     editingDescription.value = false
+    editingDescriptionTarget.value = null
 }
 
 const commitDescription = async (event?: KeyboardEvent) => {
     if (event?.isComposing) return
     if (!editingDescription.value) return
     const next = descriptionDraft.value.trim()
+    const target = editingDescriptionTarget.value
     editingDescription.value = false
-    const id = props.prompt?.id
-    if (!id) return
-    const current = props.prompt?.description || ''
-    if (next === current) return
+    editingDescriptionTarget.value = null
+    if (!target) return
+    if (next === target.original) return
     savingField.value = 'description'
     try {
-        const updated = await api.prompts.update.mutate({ id, data: { description: next || undefined } })
+        const updated = await api.prompts.update.mutate({ id: target.id, data: { description: next || undefined } })
         emit('updated', updated)
     } catch (error) {
         console.error(error)
@@ -229,6 +247,19 @@ const commitDescription = async (event?: KeyboardEvent) => {
         savingField.value = null
     }
 }
+
+// prompt 身份在编辑过程中发生变化（例如跨窗口数据变更触发了选中项静默切换）时，
+// 强制放弃当前编辑态，绝不把草稿保存到新的 prompt 上。
+watch(() => props.prompt?.id, (newId) => {
+    if (editingTitle.value && newId !== editingTitleTarget.value?.id) {
+        editingTitle.value = false
+        editingTitleTarget.value = null
+    }
+    if (editingDescription.value && newId !== editingDescriptionTarget.value?.id) {
+        editingDescription.value = false
+        editingDescriptionTarget.value = null
+    }
+})
 
 const resizeDescriptionInput = () => {
     const el = descriptionInputRef.value
