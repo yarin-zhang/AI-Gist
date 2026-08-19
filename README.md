@@ -119,6 +119,20 @@ yarn dev:win
 
 渲染页面修改会由 Vite 即时热更新；Electron 主进程和 preload 修改后会自动重新编译并重启客户端。首次运行会缓存一份 Windows Electron 开发运行时，之后不需要重新打包。
 
+如果只需要在浏览器中预览 Web 端，可运行：
+
+```bash
+yarn dev:web
+```
+
+如果需要开发 iOS / Android 移动端，先构建并同步到 Capacitor，再用 Xcode / Android Studio 打开原生项目：
+
+```bash
+yarn build:mobile   # 构建渲染层并同步到 Capacitor
+yarn cap:ios        # 用 Xcode 打开 iOS 项目（需 macOS + Xcode）
+yarn cap:android    # 用 Android Studio 打开 Android 项目（需 Android Studio）
+```
+
 ### 其他常用命令
 
 ```bash
@@ -139,6 +153,7 @@ yarn build:linux    # 构建 Linux 安装包
 
 - [项目架构指南](./docs/project-architecture.md)
 - [Web 本地部署与多端差异说明](./docs/web-deployment-and-platform-differences.md)
+- [移动端开发指南](./docs/mobile-development.md)
 - [GitHub Actions 自动构建与发布](./docs/github-actions.md)
 
 ## 贡献
