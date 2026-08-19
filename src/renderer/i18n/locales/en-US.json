@@ -1148,6 +1148,7 @@
     "emptyTitle": "Select a prompt to get started",
     "emptyDescription": "Create a new prompt",
     "sortBy": "Sort by",
+    "sortCreated": "Recently created",
     "sortUpdated": "Recently updated",
     "sortUsage": "Usage count",
     "sortTitle": "Title",

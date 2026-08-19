@@ -275,4 +275,16 @@ describe('prompt management detail regressions', () => {
     expect(settingsPage).toMatch(/\.settings-content-inner :deep\(\.n-divider:not\(\.n-divider--vertical\)\)\s*\{[^}]*margin:\s*0/s)
     expect(settingsPage).not.toContain('.settings-content :deep(.n-divider')
   })
+
+  it('defaults the sidebar prompt list to creation-time order and reserves updated-time sort for "recent" (issue #15)', () => {
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+
+    expect(sidebar).toContain("import { sortPromptsForLibrary, type PromptLibrarySortBy } from '@/lib/utils/prompt-library-sort'")
+    expect(sidebar).toContain("const sortBy = ref<PromptLibrarySortBy>('created')")
+    expect(sidebar).toContain("{ label: t('promptWorkspace.sortCreated'), key: 'created' }")
+    expect(sidebar).toContain('result = sortPromptsForLibrary(result, sortBy.value)')
+    // The "recent" (最近使用) view keeps sorting by updatedAt regardless of the
+    // default sort field — it is the documented exception in issue #15.
+    expect(sidebar).toContain("result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())")
+  })
 })

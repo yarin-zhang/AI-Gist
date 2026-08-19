@@ -1148,6 +1148,7 @@
     "emptyTitle": "选择一条提示词开始使用",
     "emptyDescription": "新建一条提示词",
     "sortBy": "排序方式",
+    "sortCreated": "创建时间",
     "sortUpdated": "最近更新",
     "sortUsage": "使用次数",
     "sortTitle": "标题",
