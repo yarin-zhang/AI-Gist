@@ -190,7 +190,7 @@
         <NModal v-model:show="syncErrorDialogVisible" preset="card"
             style="width: min(680px, calc(100vw - 32px));" :title="t('dataSync.syncErrorDetails')">
             <NFlex v-if="syncErrorDiagnosis" vertical :size="16">
-                <NAlert type="error" :title="syncErrorDiagnosis.title">
+                <NAlert :type="syncErrorDiagnosis.canAutoRetry ? 'warning' : 'error'" :title="syncErrorDiagnosis.title">
                     {{ syncErrorDiagnosis.message }}
                 </NAlert>
                 <NFlex vertical :size="8">
@@ -299,9 +299,22 @@ const storageDescriptionText = computed(() => capabilities.icloud
 const hasScheduledRetry = computed(() =>
     syncStatus.value.status === 'error' && syncStatus.value.pending && !!syncStatus.value.nextSyncAt
 );
+// 同步失败时不要把原始技术错误（可能带内部 ID、堆栈片段）直接展示给用户，
+// 统一通过诊断函数转成可读文案，并借助 canAutoRetry 区分"会自动恢复的临时
+// 状况"（警告色）和"需要用户处理的错误"（错误色）。
+const syncStatusDiagnosis = computed(() => getCloudSyncErrorDiagnosis(
+    syncStatus.value.lastResult || syncStatus.value.error,
+    {
+        storageId: syncStatus.value.storageId,
+        reason: syncStatus.value.reason,
+        status: syncStatus.value.status,
+        failureCount: syncStatus.value.failureCount,
+        timestamp: syncStatus.value.updatedAt,
+    }
+));
 const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() => {
     if (hasScheduledRetry.value) return 'warning';
-    if (syncStatus.value.status === 'error') return 'error';
+    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.canAutoRetry ? 'warning' : 'error';
     if (!autoSyncEnabled.value) return 'warning';
     if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'info';
     if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return 'success';
@@ -309,7 +322,7 @@ const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() =>
 });
 const statusTitle = computed(() => {
     if (hasScheduledRetry.value) return t('dataSync.statusRetryScheduled');
-    if (syncStatus.value.status === 'error') return t('dataSync.statusError');
+    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.title;
     if (!autoSyncEnabled.value) return t('dataSync.statusPaused');
     if (syncStatus.value.status === 'syncing') return t('dataSync.statusSyncing');
     if (syncStatus.value.pendingChanges) return t('dataSync.statusPending');
@@ -319,11 +332,11 @@ const statusTitle = computed(() => {
 const statusDescription = computed(() => {
     if (hasScheduledRetry.value) {
         return t('dataSync.statusRetryScheduledDescription', {
-            error: syncStatus.value.error || t('dataSync.statusErrorDescription'),
+            error: syncStatusDiagnosis.value.message,
             time: formatDate(syncStatus.value.nextSyncAt!),
         });
     }
-    if (syncStatus.value.status === 'error') return syncStatus.value.error || t('dataSync.statusErrorDescription');
+    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.message;
     if (!autoSyncEnabled.value) return t('dataSync.statusPausedDescription');
     if (storageConfigs.value.length === 0) return t('dataSync.statusNotConfiguredDescription');
     if (syncStatus.value.status === 'syncing') return t('dataSync.statusSyncingDescription');
