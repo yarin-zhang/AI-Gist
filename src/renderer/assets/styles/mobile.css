@@ -399,6 +399,49 @@ html.ai-gist-mobile .mobile-ai-entry__label {
   transition: opacity var(--mobile-nav-transition), max-width var(--mobile-nav-transition);
 }
 
+/*
+ * 提示词 Tab 专属：长条 + 圆形两按钮布局（Gitea issue #7）。
+ * 长条主按钮直接复用 .mobile-ai-entry 本身——展开态/收起态的宽度、内边距、
+ * 过渡规则完全不用重写，这里只把它的宽度从「100%」改成「让出圆形按钮的位置」；
+ * 圆形按钮尺寸固定，展开、收起两种状态下都是同一个纯图标圆按钮，不需要单独
+ * 的收起过渡。justify-content: flex-end 保证收起后两个圆形贴右悬浮，与原来
+ * 单按钮收起时贴右的位置保持一致。
+ */
+html.ai-gist-mobile .mobile-prompt-actions {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--mobile-nav-item-gap);
+}
+
+html.ai-gist-mobile .mobile-prompt-actions .mobile-ai-entry {
+  width: calc(100% - var(--mobile-nav-shelf-width-minimized) - var(--mobile-nav-item-gap));
+}
+
+html.ai-gist-mobile .mobile-prompt-actions__secondary {
+  pointer-events: auto;
+  flex: 0 0 var(--mobile-nav-shelf-width-minimized);
+  width: var(--mobile-nav-shelf-width-minimized);
+  height: var(--mobile-nav-shelf-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mobile-nav-border);
+  border-radius: var(--mobile-nav-radius);
+  background: var(--mobile-nav-surface);
+  backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
+  box-shadow: var(--mobile-nav-shadow);
+  color: var(--content-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.ai-gist-mobile .mobile-prompt-actions__secondary ion-icon {
+  font-size: var(--mobile-icon-size);
+  flex-shrink: 0;
+}
+
 html.ai-gist-mobile ion-tab-bar {
   pointer-events: auto;
   /* 常量对齐：始终水平居中，不随收起/展开切换，只有 width 在两种状态间平滑过渡 */
@@ -457,6 +500,11 @@ html.ai-gist-mobile ion-tab-button ion-label {
  * 从未切换，收缩时会自动保持居中）；AI 入口条同样收缩为一个圆形图标按钮，
  * 贴右悬浮（父容器 align-items: flex-end 同样是常量）。
  * 两个状态之间只有 width / opacity 等连续属性在变化，因此过渡是平滑的。
+ *
+ * 下面这两条 `.mobile-floating-nav--minimized .mobile-ai-entry(__label)` 选择器是
+ * 后代选择器，不要求直接子元素，因此提示词 Tab 两按钮布局里嵌套了一层
+ * `.mobile-prompt-actions` 的长条主按钮同样会命中——收起后它会和圆形次按钮一起
+ * 变成两个贴右悬浮的小圆点，不需要再为这个布局单独写一份收起规则。
  */
 html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-bar {
   width: var(--mobile-nav-tabbar-width-minimized);

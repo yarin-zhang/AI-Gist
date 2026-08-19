@@ -726,6 +726,7 @@
     "adjustmentInstruction": "Adjustment instruction:",
     "advancedFilter": "Advanced Filter",
     "aiGenerate": "AI Generate",
+    "aiGeneratePrompt": "AI Generate Prompt",
     "aiModelPlaceholder": "Select AI model for optimization",
     "allCategories": "All Categories",
     "basicInfo": "Basic Information",
