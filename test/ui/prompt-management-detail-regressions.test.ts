@@ -239,11 +239,11 @@ describe('prompt management detail regressions', () => {
 
     // Collapsing must free the space back to the prompt list pane instead of leaving
     // a blank gap, and the resize handle must be disabled while collapsed.
-    expect(sidebar).toContain(':disabled="isCategoryListCollapsed"')
+    expect(sidebar).toContain(':disabled="categoryPaneCollapsedForLayout"')
     expect(sidebar).toContain(":pane1-style=\"promptPaneStyle\"")
     expect(sidebar).toContain(":pane2-style=\"categoryPaneStyle\"")
-    expect(sidebar).toContain("isCategoryListCollapsed.value ? { flex: '1 1 auto' } : undefined")
-    expect(sidebar).toContain("isCategoryListCollapsed.value ? { flex: '0 0 auto' } : undefined")
+    expect(sidebar).toContain("categoryPaneCollapsedForLayout.value ? { flex: '1 1 auto' } : undefined")
+    expect(sidebar).toContain("categoryPaneCollapsedForLayout.value ? { flex: '0 0 auto' } : undefined")
 
     // Collapsed state must be persisted and restored across app launches.
     expect(sidebar).toContain("ref(localStorage.getItem('prompt_library_category_collapsed') === 'true')")
@@ -256,6 +256,36 @@ describe('prompt management detail regressions', () => {
     const toggleMarkup = sidebar.slice(toggleStart, sidebar.indexOf('</button>', toggleStart))
     expect(toggleMarkup).not.toContain('aria-label')
     expect(toggleMarkup).toContain('aria-expanded')
+  })
+
+  it('defers the category pane content-fit switch by a tick so collapsing does not reverse-jump', () => {
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+
+    // This is a string-level guard, not a runtime layout test: jsdom does not implement
+    // real CSS layout (offsetHeight/getBoundingClientRect are stubs), so this repo's
+    // test setup cannot reproduce or assert against the actual reflow bug below — that
+    // was verified with a frame/microtask-level sampler against a live browser instead
+    // (see the PR/commit description). This test only pins the structural fix in place
+    // so a future edit doesn't silently re-couple the two signals.
+    //
+    // Bug this guards against: NCollapseTransition's leave hook measures the category
+    // pane's *current* rendered height synchronously, in the same reactive flush that
+    // flips `isCategoryListCollapsed`. Two things in that same flush would otherwise
+    // inflate that measurement past what was actually on screen: (1) the pane's
+    // flex-basis switching from its ratio-constrained height to content-fit
+    // (`flex: 0 0 auto`), which lets it balloon to the list's full unclamped content
+    // height, and (2) NSplit's resize handle disabling, which unmounts its 9px trigger
+    // element and hands that space to the still-unstyled pane. Either one alone already
+    // produces a one-frame reverse jump on collapse (category pane briefly grows,
+    // prompt pane briefly shrinks) before the real shrink animation starts. Deferring
+    // both signals by one tick (via categoryPaneCollapsedForLayout) lets the leave hook
+    // measure the correct, already-visible height first. Expanding has no such hazard,
+    // so it stays synchronous.
+    expect(sidebar).toContain('const categoryPaneCollapsedForLayout = ref(isCategoryListCollapsed.value)')
+    expect(sidebar).toMatch(/watch\(isCategoryListCollapsed,\s*\(collapsed\)\s*=>\s*\{\s*if\s*\(collapsed\)\s*\{\s*nextTick\(\(\)\s*=>\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*true\s*\}\)\s*\}\s*else\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*false\s*\}\s*\}\)/)
+    expect(sidebar).toContain("import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'")
+    expect(sidebar).toContain(':disabled="categoryPaneCollapsedForLayout"')
+    expect(sidebar).not.toContain(':disabled="isCategoryListCollapsed"')
   })
 
   it('allows the active category filter to be clicked again to clear it', () => {

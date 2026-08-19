@@ -20,7 +20,7 @@
         <NSplit ref="librarySplitRef" v-model:size="librarySplitSize" direction="vertical"
             :min="MIN_PROMPT_PANE_RATIO" :max="librarySplitMax"
             :resize-trigger-size="LIBRARY_RESIZE_TRIGGER_SIZE" class="library-split"
-            :disabled="isCategoryListCollapsed" :pane1-style="promptPaneStyle" :pane2-style="categoryPaneStyle">
+            :disabled="categoryPaneCollapsedForLayout" :pane1-style="promptPaneStyle" :pane2-style="categoryPaneStyle">
                 <template #1>
                     <section class="prompt-section">
                         <div class="result-heading">
@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NCollapseTransition, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
 import {
@@ -173,8 +173,13 @@ const librarySplitSize = ref(Number.isFinite(storedSplitSize) && storedSplitSize
 const librarySplitRef = ref<{ $el?: HTMLElement } | null>(null)
 const librarySplitMax = ref('9999px')
 const isCategoryListCollapsed = ref(localStorage.getItem('prompt_library_category_collapsed') === 'true')
-const promptPaneStyle = computed(() => (isCategoryListCollapsed.value ? { flex: '1 1 auto' } : undefined))
-const categoryPaneStyle = computed(() => (isCategoryListCollapsed.value ? { flex: '0 0 auto' } : undefined))
+// Mirrors isCategoryListCollapsed, but switching to the collapsed (content-fit) pane
+// sizing — and disabling NSplit's resize handle, which unmounts its 9px trigger
+// element and would otherwise let the still-undersized category pane silently absorb
+// that freed space a tick early — is delayed by one tick. See the watcher below.
+const categoryPaneCollapsedForLayout = ref(isCategoryListCollapsed.value)
+const promptPaneStyle = computed(() => (categoryPaneCollapsedForLayout.value ? { flex: '1 1 auto' } : undefined))
+const categoryPaneStyle = computed(() => (categoryPaneCollapsedForLayout.value ? { flex: '0 0 auto' } : undefined))
 const MIN_PROMPT_PANE_RATIO = 0.45
 const MIN_CATEGORY_PANE_HEIGHT = 82
 const LIBRARY_RESIZE_TRIGGER_SIZE = 9
@@ -321,6 +326,27 @@ const handleSearchShortcut = (event: KeyboardEvent) => {
 
 watch(librarySplitSize, size => localStorage.setItem('prompt_library_split_size', String(size)))
 watch(isCategoryListCollapsed, collapsed => localStorage.setItem('prompt_library_category_collapsed', String(collapsed)))
+// Collapsing switches the category pane from its ratio-constrained height to
+// content-fit (flex: 0 0 auto) sizing (and disables NSplit's resize handle, which
+// unmounts its 9px trigger element) so the pane shrinks down to just the heading
+// instead of leaving a blank gap. NCollapseTransition's leave hook measures the
+// pane's *current* rendered height synchronously, in the same patch that flips
+// `show`. If the pane's flex-basis switched to content-fit — or the trigger element
+// unmounted, freeing its 9px back into the still-undersized pane — in that same
+// patch, the measurement would read a bigger height than what was actually on
+// screen, producing a one-frame reverse jump (the category pane briefly growing,
+// the prompt pane briefly shrinking) before the real shrink animation starts.
+// Deferring both by one tick lets the leave hook measure the correct, already-
+// visible height first. Expanding has no such hazard: the ratio-constrained height
+// is already a definite size the moment NCollapseTransition mounts and measures,
+// so it can switch back immediately.
+watch(isCategoryListCollapsed, (collapsed) => {
+    if (collapsed) {
+        nextTick(() => { categoryPaneCollapsedForLayout.value = true })
+    } else {
+        categoryPaneCollapsedForLayout.value = false
+    }
+})
 
 onMounted(() => {
     window.addEventListener('keydown', handleSearchShortcut)
