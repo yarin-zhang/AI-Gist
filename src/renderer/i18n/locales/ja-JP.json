@@ -606,7 +606,6 @@
     "retrying": "再試行中..."
   },
   "language": {
-    "description": "アプリケーションの表示言語を選択",
     "selectLanguage": "言語を選択",
     "title": "言語設定"
   },
@@ -634,8 +633,7 @@
       "aboutDescription": "バージョン情報とフィードバック"
     },
     "sync": {
-      "explainerTitle": "データ同期とは",
-      "explainerBody": "同期は本体とクラウドのデータを双方向にマージし、すべてのデバイスを同じ状態に保ちます。過去のバージョンは残らないため、履歴が必要な場合は「データバックアップ」を使用してください。",
+      "historyHint": "同期は過去のバージョンを保持しません。以前のデータが必要な場合は「データバックアップ」をご利用ください。",
       "storageSectionDescription": "データ同期とクラウドバックアップは、ここで設定したストレージを共有します。",
       "addStorage": "WebDAV ストレージを追加",
       "editStorage": "ストレージを編集",
@@ -647,8 +645,6 @@
       "notConfigured": "未設定"
     },
     "backup": {
-      "explainerTitle": "ローカルバックアップとクラウドバックアップの違い",
-      "explainerBody": "ローカルバックアップは本体に保存され、いつでも以前のバージョンに戻せます。クラウドバックアップは手動でクラウドストレージにアップロードし、機種変更時に復元できます。どちらも他のデバイスと自動的にマージされることはありません。",
       "localTitle": "ローカルバックアップ",
       "localDescription": "本体に保存され、自動または手動で作成されます",
       "cloudSectionTitle": "クラウドバックアップの保存先",
@@ -656,6 +652,7 @@
       "fileSectionTitle": "バックアップファイル",
       "exportDescription": "共有できるバックアップファイルとして書き出します",
       "importDescription": "バックアップファイルからすべてのデータを復元します",
+      "fileWarning": "バックアップファイルには API キーが含まれる場合があります。取り扱いにご注意ください。",
       "noStorageHint": "クラウドストレージが未設定です。設定すると必要に応じて手動でクラウドバックアップを作成できます。",
       "goToDataSync": "データ同期へ移動",
       "automaticSectionTitle": "自動バックアップ",
@@ -1255,7 +1252,6 @@
         "title": "アプリについて"
       },
       "appearance": {
-        "description": "アプリのテーマを構成する",
         "title": "外観設定"
       },
       "cloudBackup": {

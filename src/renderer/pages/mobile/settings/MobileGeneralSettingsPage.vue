@@ -27,10 +27,6 @@
             </ion-select-option>
           </ion-select>
         </ion-item>
-
-        <ion-item lines="none">
-          <ion-note class="section-note">{{ t('language.description') }}</ion-note>
-        </ion-item>
       </ion-list>
 
       <ion-list>
@@ -50,10 +46,6 @@
             <ion-select-option value="system">{{ t('appearance.auto') }}</ion-select-option>
           </ion-select>
         </ion-item>
-
-        <ion-item lines="none">
-          <ion-note class="section-note">{{ t('settings.menus.appearance.description') }}</ion-note>
-        </ion-item>
       </ion-list>
     </ion-content>
   </ion-page>
@@ -72,7 +64,6 @@ import {
   IonListHeader,
   IonItem,
   IonLabel,
-  IonNote,
   IonSelect,
   IonSelectOption
 } from '@ionic/vue'
@@ -94,11 +85,4 @@ const handleThemeChange = async (event: CustomEvent<{ value: 'system' | 'light' 
 
 <style scoped>
 /* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
-
-.section-note {
-  padding: 4px 0 8px;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  white-space: normal;
-}
 </style>

@@ -10,12 +10,6 @@
     </ion-header>
 
     <ion-content :fullscreen="true">
-      <!-- 先解释「同步」和「备份」的区别，避免用户误以为同步会保留历史版本 -->
-      <div class="explainer">
-        <h2>{{ t('mobileSettings.sync.explainerTitle') }}</h2>
-        <p>{{ t('mobileSettings.sync.explainerBody') }}</p>
-      </div>
-
       <ion-list>
         <ion-list-header>
           <ion-label>{{ t('cloudBackup.syncStatus') }}</ion-label>
@@ -131,8 +125,9 @@
           </ion-select>
         </ion-item>
 
+        <!-- 同步不保留历史版本这件事容易被误解，挪到页面底部作为收尾提示 -->
         <ion-item lines="none">
-          <ion-note class="section-note">{{ t('dataSync.autoSyncDescription') }}</ion-note>
+          <ion-note class="section-note">{{ t('mobileSettings.sync.historyHint') }}</ion-note>
         </ion-item>
       </ion-list>
     </ion-content>
@@ -344,24 +339,6 @@ onUnmounted(() => unsubscribeSyncStatus?.())
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {
   margin-inline-end: 16px;
-}
-
-.explainer {
-  padding: 16px 16px 4px;
-}
-
-.explainer h2 {
-  margin: 0 0 6px;
-  font-size: var(--mobile-font-size-body);
-  font-weight: 600;
-  color: var(--content-primary);
-}
-
-.explainer p {
-  margin: 0;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-relaxed);
-  color: var(--ion-color-medium);
 }
 
 .section-note {

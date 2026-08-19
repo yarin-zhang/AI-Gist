@@ -606,7 +606,6 @@
     "retrying": "重試中..."
   },
   "language": {
-    "description": "選擇應用的顯示語言",
     "selectLanguage": "選擇語言",
     "title": "語言設置"
   },
@@ -634,8 +633,7 @@
       "aboutDescription": "版本資訊與意見回饋"
     },
     "sync": {
-      "explainerTitle": "資料同步是什麼",
-      "explainerBody": "同步會在本機與雲端之間雙向合併資料，讓所有裝置保持一致。它不會保留歷史版本；需要歷史版本請使用「資料備份」。",
+      "historyHint": "同步不會保留歷史版本，如需找回舊資料，請使用「資料備份」。",
       "storageSectionDescription": "資料同步和雲端備份都會使用這裡設定的儲存空間。",
       "addStorage": "新增 WebDAV 儲存",
       "editStorage": "編輯儲存設定",
@@ -647,8 +645,6 @@
       "notConfigured": "未設定"
     },
     "backup": {
-      "explainerTitle": "本機備份和雲端備份的差別",
-      "explainerBody": "本機備份儲存在這台裝置，可隨時回到過去的版本；雲端備份由你手動上傳到雲端儲存，換機時可還原。兩者都不會與其他裝置自動合併。",
       "localTitle": "本機備份",
       "localDescription": "儲存在本機，自動或手動建立",
       "cloudSectionTitle": "雲端備份位置",
@@ -656,6 +652,7 @@
       "fileSectionTitle": "備份檔案",
       "exportDescription": "匯出為可分享的備份檔案",
       "importDescription": "從備份檔案還原全部資料",
+      "fileWarning": "備份檔案可能包含 API 金鑰，請妥善保管。",
       "noStorageHint": "尚未設定雲端儲存，設定後即可依需求手動建立雲端備份。",
       "goToDataSync": "前往資料同步",
       "automaticSectionTitle": "自動備份",
@@ -1255,7 +1252,6 @@
         "title": "關於"
       },
       "appearance": {
-        "description": "配置應用的主題模式",
         "title": "外觀設定"
       },
       "cloudBackup": {
