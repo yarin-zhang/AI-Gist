@@ -21,24 +21,27 @@
           </div>
         </template>
         <template #toolbar-extra>
-          <NTooltip>
-            <template #trigger>
-              <NButton size="small" quaternary :disabled="!content.trim()" @click="openPreview">
-                <template #icon><NIcon size="16"><Eye /></NIcon></template>
-                <span class="toolbar-label">{{ t('promptManagement.preview') }}</span>
-              </NButton>
-            </template>
-            {{ t('promptManagement.jinjaTemplatePreview') }}
-          </NTooltip>
-          <NTooltip>
-            <template #trigger>
-              <NButton size="small" quaternary @click="showSyntaxHelp = true">
-                <template #icon><NIcon size="16"><Help /></NIcon></template>
-                <span class="toolbar-label">{{ t('promptManagement.jinjaSyntaxHelp') }}</span>
-              </NButton>
-            </template>
-            {{ t('promptManagement.jinjaSupportTooltip') }}
-          </NTooltip>
+          <div class="jinja-assist-actions">
+            <NTooltip>
+              <template #trigger>
+                <NButton size="small" quaternary :disabled="!content.trim()" @click="openPreview">
+                  <template #icon><NIcon size="16"><Eye /></NIcon></template>
+                  <span class="toolbar-label">{{ t('promptManagement.preview') }}</span>
+                </NButton>
+              </template>
+              {{ t('promptManagement.jinjaTemplatePreview') }}
+            </NTooltip>
+            <NTooltip>
+              <template #trigger>
+                <NButton size="small" quaternary @click="showSyntaxHelp = true">
+                  <template #icon><NIcon size="16"><Help /></NIcon></template>
+                  <span class="toolbar-label">{{ t('promptManagement.jinjaSyntaxHelp') }}</span>
+                </NButton>
+              </template>
+              {{ t('promptManagement.jinjaSupportTooltip') }}
+            </NTooltip>
+          </div>
+          <span class="jinja-toolbar-divider" aria-hidden="true" />
         </template>
       </StructuredPromptEditor>
 
@@ -362,6 +365,8 @@ defineExpose({
 .template-status > :deep(.n-icon) { flex: 0 0 auto; color: var(--accent-success); }
 .template-status.invalid > :deep(.n-icon) { color: var(--accent-error); }
 .template-status-detail { display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.jinja-assist-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+.jinja-toolbar-divider { flex: 0 0 auto; width: 1px; height: 18px; margin-inline: 2px; background: var(--border-default); }
 .jinja-editor-workspace.compact { grid-template-columns: minmax(0, 1fr); }
 .preview-canvas { height: calc(100vh - 96px); min-height: 320px; }
 .syntax-card { border: 1px solid var(--border-default); background: var(--surface-primary); }
@@ -371,7 +376,8 @@ defineExpose({
 .syntax-example:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
 .syntax-example code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
 .syntax-example :deep(.n-icon) { flex: 0 0 auto; color: var(--content-secondary); }
-@media (max-width: 720px) {
+@container structured-editor (max-width: 720px) {
   .template-status-detail, .toolbar-label { display: none; }
+  .jinja-toolbar-divider { margin-inline: 4px; }
 }
 </style>
