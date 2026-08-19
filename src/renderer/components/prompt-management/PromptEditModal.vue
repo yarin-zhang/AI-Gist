@@ -1197,8 +1197,12 @@ const optimizePrompt = async (configId: number) => {
             customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
             enabled: Boolean(selectedConfig.enabled),
             systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
-            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
-            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+            // selectedConfig 来自 AIConfig，其 createdAt/updatedAt 在类型上是 Date，
+            // 但配置一旦经过备份恢复或云同步写入 IndexedDB（JSON 序列化边界），
+            // 实际值会变成 ISO 字符串而非 Date 实例，故此处需按实际类型分别处理，
+            // 不能假设一定是 Date（否则 .toISOString 会抛错，见 issue #37）
+            createdAt: selectedConfig.createdAt instanceof Date ? selectedConfig.createdAt.toISOString() : (selectedConfig.createdAt || new Date().toISOString()),
+            updatedAt: selectedConfig.updatedAt instanceof Date ? selectedConfig.updatedAt.toISOString() : (selectedConfig.updatedAt || new Date().toISOString())
         };
 
         // 构建请求参数
@@ -1309,8 +1313,10 @@ ${t('promptManagement.outputImprovedPrompt')}`;
             customModel: selectedConfig.customModel ? String(selectedConfig.customModel) : '',
             enabled: Boolean(selectedConfig.enabled),
             systemPrompt: selectedConfig.systemPrompt ? String(selectedConfig.systemPrompt) : '',
-            createdAt: selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : new Date().toISOString(),
-            updatedAt: selectedConfig.updatedAt ? selectedConfig.updatedAt.toISOString() : new Date().toISOString()
+            // 同 optimizePrompt：createdAt/updatedAt 可能是 Date 实例，也可能是备份恢复/
+            // 云同步写入后的 ISO 字符串，需按实际类型分别处理（见 issue #37 根因说明）
+            createdAt: selectedConfig.createdAt instanceof Date ? selectedConfig.createdAt.toISOString() : (selectedConfig.createdAt || new Date().toISOString()),
+            updatedAt: selectedConfig.updatedAt instanceof Date ? selectedConfig.updatedAt.toISOString() : (selectedConfig.updatedAt || new Date().toISOString())
         };
 
         // 构建请求参数
