@@ -61,8 +61,10 @@ html.ai-gist-mobile {
    * 大标题滚动收起（Tab 根页面共用，逻辑见 composables/useCollapsingHeader.ts）。
    * expanded 是展开时大标题区块的高度，collapse-range 只是 CSS 里的注释说明——
    * 实际的滚动阈值常量在组合式函数里，这里的变量只描述视觉高度。
+   * 高度需要与 .mobile-large-title-bar 的 padding 保持同步：顶部内边距每变化
+   * 多少，这里就要跟着加/减多少，否则展开态会被 overflow: hidden 裁掉。
    */
-  --mobile-largetitle-height: 40px;
+  --mobile-largetitle-height: 46px;
 
   --ion-background-color: var(--surface-body);
   --ion-text-color: var(--content-primary);
@@ -275,7 +277,14 @@ html.ai-gist-mobile .section-title {
 html.ai-gist-mobile .mobile-large-title-bar {
   --collapse-progress: 0;
   overflow: hidden;
-  padding: 2px var(--mobile-page-gutter) 10px;
+  /*
+   * 顶部内边距原本只有 2px，紧贴在工具栏（搜索框/操作按钮）下方，三个 Tab 根页面
+   * （提示词 / AI 配置 / 设置）的大标题看起来都贴得太近（issue #5）。这里改用
+   * spacing token 留出呼吸空间；工具栏自身的顶部安全区已经由 Ionic 的
+   * `ion-header ion-toolbar:first-of-type { padding-top: var(--ion-safe-area-top) }`
+   * 默认处理，无需在这里重复适配 env(safe-area-inset-top)。
+   */
+  padding: var(--spacing-sm) var(--mobile-page-gutter) 10px;
   max-height: calc((1 - var(--collapse-progress)) * var(--mobile-largetitle-height));
   opacity: calc(1 - var(--collapse-progress));
 }
