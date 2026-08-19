@@ -27,7 +27,7 @@
         <p class="empty-text">{{ t('promptManagement.promptNotFound') }}</p>
       </div>
 
-      <div v-else>
+      <div v-else class="prompt-detail-body">
         <!-- 标题和描述 -->
         <div class="prompt-header">
           <h1 class="prompt-title">{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h1>
@@ -71,14 +71,20 @@
             />
           </div>
         </div>
+      </div>
 
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <ion-button expand="block" @click="copyContent">
-            <ion-icon slot="start" :icon="copyOutline"></ion-icon>
-            {{ t('promptManagement.detailModal.copyContent') }}
-          </ion-button>
-        </div>
+      <!--
+        操作按钮：使用 Ionic ion-content 官方的 slot="fixed" 机制（项目里
+        ion-refresher 在其他页面也依赖同一机制），把按钮从可滚动内容流中
+        摘出来，悬浮在 ion-content 可视区域的底部——也就是「窗口底部」，
+        而不是「页面内容的末尾」。对应 Gitea issue #63：用户此前需要滑动到
+        内容最后才能看到「复制提示词」按钮。
+      -->
+      <div v-if="prompt" class="action-buttons" slot="fixed">
+        <ion-button expand="block" @click="copyContent">
+          <ion-icon slot="start" :icon="copyOutline"></ion-icon>
+          {{ t('promptManagement.detailModal.copyContent') }}
+        </ion-button>
       </div>
     </ion-content>
 
@@ -384,6 +390,15 @@ onUnmounted(() => {
   color: var(--ion-color-medium);
 }
 
+.prompt-detail-body {
+  /*
+   * 底部操作栏改为 slot="fixed" 悬浮后不再占用文档流高度，这里补回等量的
+   * 底部内边距，保证滚动到内容真正末尾时最后一行文字不会被悬浮按钮遮挡。
+   * 数值 = 操作栏自身高度（按钮 + 上下内边距，约 72px）+ 少量呼吸间距。
+   */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+}
+
 .prompt-header {
   padding: 20px 16px;
   background: var(--ion-background-color);
@@ -457,11 +472,24 @@ onUnmounted(() => {
   color: var(--ion-text-color);
 }
 
+/*
+ * 悬浮在 ion-content 可视区域底部的操作栏（slot="fixed"）。
+ * Ionic 会把 [slot=fixed] 的元素设为 position: absolute，相对 ion-content
+ * 自身（充满 header 下方到窗口底部的可视区域）定位，因此 bottom: 0 精确
+ * 贴在「窗口底部」，与滚动内容、内容长短完全无关。
+ */
 .action-buttons {
-  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: var(--ion-background-color);
+  border-top: 1px solid var(--border-default);
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
 }
 
 ion-chip {
