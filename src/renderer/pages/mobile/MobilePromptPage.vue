@@ -2,8 +2,34 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.prompts') }}</ion-title>
-        <ion-buttons slot="end">
+        <!-- 默认状态：左上角的搜索图标，点击后原地展开为搜索框 -->
+        <ion-buttons v-if="!isSearchActive" slot="start">
+          <ion-button :aria-label="t('promptManagement.searchPrompt')" @click="openSearch">
+            <ion-icon :icon="searchOutline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+
+        <ion-title v-if="!isSearchActive" :style="{ opacity: headerProgress }">{{ t('mainPage.menu.prompts') }}</ion-title>
+
+        <!--
+          展开态：直接用 ion-searchbar 自带的 show-cancel-button="always" 提供收起入口，
+          不必自己监听 blur / 手写取消按钮；animated 启用 Ionic 内置的图标与取消按钮过渡动画。
+          注意 closeSearch 里仍要显式清空 searchText——ion-searchbar 内部清空输入的动作
+          有一个短延时，我们一收起就把它卸载，延时来不及触发，细节见 closeSearch 的注释。
+        -->
+        <ion-searchbar
+          v-else
+          ref="searchbarRef"
+          v-model="searchText"
+          :placeholder="t('promptManagement.searchPrompt')"
+          show-cancel-button="always"
+          animated
+          @ionInput="handleSearch"
+          @ionClear="handleSearch"
+          @ionCancel="closeSearch"
+        ></ion-searchbar>
+
+        <ion-buttons v-if="!isSearchActive" slot="end">
           <ion-button v-if="hasAIConfig" @click="navigateToAIGenerator">
             <ion-icon :icon="sparklesOutline"></ion-icon>
           </ion-button>
@@ -14,16 +40,6 @@
             <ion-icon :icon="add"></ion-icon>
           </ion-button>
         </ion-buttons>
-      </ion-toolbar>
-
-      <!-- 搜索栏 -->
-      <ion-toolbar>
-        <ion-searchbar
-          v-model="searchText"
-          :placeholder="t('promptManagement.searchPrompt')"
-          @ionInput="handleSearch"
-          @ionClear="handleSearch"
-        ></ion-searchbar>
       </ion-toolbar>
     </ion-header>
 
@@ -237,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onActivated, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onActivated, onUnmounted, nextTick } from 'vue'
 import {
   IonPage,
   IonHeader,
@@ -280,7 +296,8 @@ import {
   trashOutline,
   sparklesOutline,
   listOutline,
-  gridOutline
+  gridOutline,
+  searchOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigStatus } from '~/composables/useAIConfigStatus'
@@ -316,6 +333,9 @@ const prompts = ref<Prompt[]>([])
 const categories = ref<Category[]>([])
 const loading = ref(true)
 const searchText = ref('')
+// 搜索栏展开状态：默认收起为左上角图标，点击后原地展开为 ion-searchbar
+const isSearchActive = ref(false)
+const searchbarRef = ref<any>(null)
 const selectedCategory = ref<number | null>(null)
 const selectedTag = ref<string | null>(null)
 const showFavoritesOnly = ref(false)
@@ -423,6 +443,32 @@ const getFirstLineOfContent = (content: string | undefined) => {
   if (!content) return t('promptManagement.detailModal.noDescription')
   const firstLine = content.split('\n')[0].trim()
   return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine
+}
+
+// 展开搜索框：先切到展开态渲染出 ion-searchbar，再等它挂载后调用官方的 setFocus()
+// 自动聚焦，避免手写 CSS 展开动画——过渡效果交给 ion-searchbar 自身的 animated 属性。
+const openSearch = async () => {
+  isSearchActive.value = true
+  await nextTick()
+  await searchbarRef.value?.$el?.setFocus?.()
+}
+
+// 收起搜索框：由 ion-searchbar 内置的取消按钮（show-cancel-button="always"）触发。
+// 取消按钮本身会清空输入，但它的清空逻辑内部有一个 64ms 的 setTimeout（见 @ionic/core
+// 的 onClearInput 实现），而这里一收起就用 v-if 把 ion-searchbar 卸载，
+// disconnectedCallback 会提前清掉那个 setTimeout，导致清空动作根本来不及执行——
+// 结果是搜索词和筛选结果都会原样留在收起前的状态。因此这里仍需和
+// clearSearchAndFilters 一样，显式清空 searchText 并重新加载一次列表。
+const closeSearch = () => {
+  isSearchActive.value = false
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  if (searchText.value) {
+    searchText.value = ''
+    loadPrompts()
+  }
 }
 
 // 搜索处理
