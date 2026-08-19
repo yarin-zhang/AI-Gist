@@ -1,5 +1,6 @@
 <template>
   <span class="prompt-variable-field" :class="[`type-${normalizedType}`, { inline, error, compact }]"
+    :style="fieldStyle"
     :data-variable-field="variable.name" :data-first-occurrence="firstOccurrence ? 'true' : 'false'">
     <span v-if="!inline || normalizedType === 'textarea'" class="field-label">
       <span>{{ variable.name }}</span>
@@ -71,15 +72,58 @@ const inputProps = computed(() => ({
   'aria-label': props.variable.name,
   tabindex: props.firstOccurrence ? 0 : -1,
 }))
+
+// Inline text fields size themselves to their content instead of a fixed/viewport-relative width.
+// Full-width glyphs (CJK, fullwidth punctuation, etc.) render close to twice as wide as the `ch`
+// unit's reference digit, so they count as two width units to keep the box wide enough to show
+// the whole value without clipping it.
+const isWideChar = (codePoint: number) => (
+  (codePoint >= 0x1100 && codePoint <= 0x115f)
+  || (codePoint >= 0x2e80 && codePoint <= 0xa4cf)
+  || (codePoint >= 0xac00 && codePoint <= 0xd7a3)
+  || (codePoint >= 0xf900 && codePoint <= 0xfaff)
+  || (codePoint >= 0xfe30 && codePoint <= 0xfe4f)
+  || (codePoint >= 0xff00 && codePoint <= 0xff60)
+  || (codePoint >= 0xffe0 && codePoint <= 0xffe6)
+  || (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+)
+const measureWidthUnits = (text: string) => {
+  let units = 0
+  for (const char of text) units += isWideChar(char.codePointAt(0) ?? 0) ? 2 : 1
+  return units
+}
+
+const FIELD_MARGIN_CH = 10 // ~5 characters of breathing room on each side of the content
+const FIELD_MIN_CH = 10
+const FIELD_MAX_CH = 56 // caps growth so a long default/value can't stretch the line awkwardly
+// Base the width on the variable's default value when present, falling back to the placeholder
+// (which itself falls back to the variable name), then grow it if the user types past that.
+const baseReferenceText = computed(() => props.variable.defaultValue || placeholder.value || props.variable.name || '')
+const inlineFieldWidthCh = computed(() => {
+  const contentUnits = Math.max(measureWidthUnits(baseReferenceText.value), measureWidthUnits(stringValue.value))
+  return Math.min(Math.max(contentUnits + FIELD_MARGIN_CH, FIELD_MIN_CH), FIELD_MAX_CH)
+})
+const fieldStyle = computed(() => (
+  props.inline && normalizedType.value === 'text'
+    ? { '--field-ch': String(inlineFieldWidthCh.value) }
+    : undefined
+))
 </script>
 
 <style scoped>
 .prompt-variable-field { position: relative; display: flex; flex-direction: column; gap: 5px; min-width: 0; vertical-align: baseline; }
-.prompt-variable-field.inline { display: inline-flex; min-width: 112px; max-width: min(320px, 100%); margin: 2px 4px; vertical-align: middle; }
+.prompt-variable-field.inline { display: inline-flex; max-width: 100%; margin: 2px 4px; vertical-align: middle; }
 .prompt-variable-field.inline.type-number { width: 128px; }
 .prompt-variable-field.inline.type-select { min-width: 150px; width: auto; }
 .prompt-variable-field.inline.type-boolean { min-width: 0; }
-.prompt-variable-field.type-text.inline :deep(.n-input) { width: clamp(120px, 20vw, 280px); }
+/* Width tracks content: --field-ch is set from the variable's default value/placeholder length
+   (falling back to the variable name), widened live as the user types past it, and capped so a
+   long value can't stretch the surrounding line awkwardly. */
+.prompt-variable-field.type-text.inline { width: auto; max-width: 100%; }
+/* The upper clamp bound uses vw rather than % because this field's own width is auto (shrink to
+   fit), so a plain percentage here has no well-defined containing block to resolve against and
+   would silently fall back to the browser's default input width. */
+.prompt-variable-field.type-text.inline :deep(.n-input) { width: clamp(64px, calc(var(--field-ch, 22) * 1ch), 92vw); }
 .prompt-variable-field.type-textarea { width: 100%; margin: 10px 0; padding: var(--compact-padding); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .field-label { display: flex; align-items: center; gap: 4px; color: var(--content-secondary); font-size: 13px; font-weight: var(--font-weight-medium); }
 .required-mark { color: var(--accent-error); }
@@ -89,6 +133,7 @@ const inputProps = computed(() => ({
 .field-error { color: var(--accent-error); font-size: 12px; line-height: 1.3; }
 .prompt-variable-field.inline .field-error { position: absolute; top: calc(100% + 2px); left: 0; z-index: 1; padding: 2px 5px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-primary); box-shadow: var(--shadow-popover); white-space: nowrap; }
 .prompt-variable-field.compact.inline { min-width: 100px; }
+.prompt-variable-field.compact.inline.type-text { min-width: 0; }
 .prompt-variable-field :deep(.n-input) {
   --n-color: var(--surface-primary) !important;
   --n-color-focus: var(--surface-primary) !important;
