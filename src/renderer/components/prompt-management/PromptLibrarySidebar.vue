@@ -388,7 +388,8 @@ onBeforeUnmount(() => {
     appearance: none; width: 100%; border: 0; color: var(--content-primary); background: transparent;
     cursor: pointer; text-align: left; border-radius: var(--radius-panel);
 }
-.library-nav-item, .category-item { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 6px 9px; font-size: var(--font-size-base); }
+.library-nav-item { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 6px 9px; font-size: var(--font-size-base); }
+.category-item { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px; margin-bottom: 3px; font-size: var(--font-size-base); }
 .library-nav-item:hover, .category-item:hover, .prompt-list-item:hover { background: var(--interactive-hover); }
 .library-nav-item.active, .category-item.active { background: var(--surface-tertiary); color: var(--content-primary); font-weight: var(--font-weight-medium); }
 .nav-count { margin-left: auto; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
