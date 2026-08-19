@@ -58,17 +58,23 @@
 
           <template v-else>
             <div class="preset-actions">
-              <NTooltip v-for="config in quickOptimizationConfigs" :key="config.id"
-                :disabled="!config.description">
-                <template #trigger>
-                  <NButton size="small" secondary :loading="optimizing === config.name"
-                    :disabled="!content.trim() || optimizing !== null || !config.id"
-                    @click="runOptimization(config.id)">
-                    {{ config.name }}
-                  </NButton>
-                </template>
-                {{ config.description }}
-              </NTooltip>
+              <template v-for="config in quickOptimizationConfigs" :key="config.id">
+                <NTooltip v-if="config.description?.trim()">
+                  <template #trigger>
+                    <NButton size="small" secondary :loading="optimizing === config.name"
+                      :disabled="!content.trim() || optimizing !== null || !config.id"
+                      @click="runOptimization(config.id)">
+                      {{ config.name }}
+                    </NButton>
+                  </template>
+                  {{ config.description.trim() }}
+                </NTooltip>
+                <NButton v-else size="small" secondary :loading="optimizing === config.name"
+                  :disabled="!content.trim() || optimizing !== null || !config.id"
+                  @click="runOptimization(config.id)">
+                  {{ config.name }}
+                </NButton>
+              </template>
               <NText v-if="quickOptimizationConfigs.length === 0" depth="3" class="empty-actions">
                 {{ t('promptEditor.quickOptimizationEmpty') }}
               </NText>

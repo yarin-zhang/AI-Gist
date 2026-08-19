@@ -31,3 +31,6 @@ coverage/
 
 # 参考
 docs/reference/
+
+# 多 worktree 协作方案的临时工作区
+.worktree/
