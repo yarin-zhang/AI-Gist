@@ -3,4 +3,5 @@
  */
 
 export { generateUUID } from './uuid';
-export * from './ai.service'; 
+export * from './ai.service';
+export { formatDateTime } from './date';

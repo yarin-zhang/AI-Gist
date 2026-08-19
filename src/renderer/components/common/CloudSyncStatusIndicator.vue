@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { AlertTriangle, CircleCheck, Clock, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
@@ -7,7 +8,9 @@ import {
   getCloudSyncResultMessage
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
+import { formatDateTime } from '~/lib/utils/date';
 
+const { t } = useI18n();
 const status = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const tooltipVisible = ref(false);
 const detailPanelVisible = ref(false);
@@ -57,12 +60,12 @@ const statusIcon = computed(() => {
 });
 
 const primaryText = computed(() => {
-  if (status.value.status === 'syncing') return '正在同步';
-  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return '已安排同步重试';
+  if (status.value.status === 'syncing') return t('dataSync.statusSyncing');
+  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return t('dataSync.statusRetryScheduled');
   if (status.value.status === 'error') return errorDiagnosis.value.title;
-  if (visualState.value === 'scheduled') return '等待下次同步';
-  if (visualState.value === 'success') return '云同步正常';
-  return '云同步待机';
+  if (visualState.value === 'scheduled') return t('dataSync.indicatorWaitingNextSync');
+  if (visualState.value === 'success') return t('dataSync.indicatorSyncNormal');
+  return t('dataSync.indicatorIdle');
 });
 
 const detailText = computed(() => {
@@ -75,33 +78,33 @@ const detailText = computed(() => {
   }
 
   if (visualState.value === 'success') {
-    return '本机与云端数据已同步';
+    return t('dataSync.indicatorSyncedDetail');
   }
 
   if (visualState.value === 'scheduled') {
-    return '应用会在同步周期到达后检查云端变化';
+    return t('dataSync.indicatorScheduledDetail');
   }
 
   if (status.value.status === 'syncing') {
-    return '正在检查并合并本机与云端数据';
+    return t('dataSync.statusSyncingDescription');
   }
 
-  return '启用云存储后会自动显示同步状态';
+  return t('dataSync.indicatorIdleDetail');
 });
 
 const nextSyncText = computed(() => {
   if (!status.value.nextSyncAt) return '';
-  return `下次检查 ${formatDateTime(status.value.nextSyncAt)}`;
+  return t('dataSync.indicatorNextCheckAt', { time: formatDateTime(status.value.nextSyncAt) });
 });
 
 const lastSyncText = computed(() => {
   if (!status.value.lastSyncAt) return '';
-  return `最近同步 ${formatDateTime(status.value.lastSyncAt)}`;
+  return t('dataSync.lastSyncAt', { time: formatDateTime(status.value.lastSyncAt) });
 });
 
 const ariaLabel = computed(() => {
-    const action = hasErrorDetail.value ? '点击查看错误详情' : '点击打开数据同步设置';
-  return `${primaryText.value}，${detailText.value}。${action}`;
+  const action = hasErrorDetail.value ? t('dataSync.indicatorAriaViewError') : t('dataSync.indicatorAriaOpenSettings');
+  return [primaryText.value, detailText.value, action].filter(Boolean).join('. ');
 });
 
 const showTooltip = () => {
@@ -166,19 +169,6 @@ const setCopyState = (nextState: 'idle' | 'copied' | 'failed') => {
   }
 };
 
-const formatDateTime = (dateString: string): string => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) {
-    return dateString;
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
-};
-
 onMounted(() => {
   unsubscribe = cloudSyncService.onStatusChange(nextStatus => {
     status.value = nextStatus;
@@ -225,7 +215,7 @@ onUnmounted(() => {
     >
       <strong>{{ primaryText }}</strong>
       <span>{{ detailText }}</span>
-      <span v-if="hasErrorDetail">点击查看完整错误详情</span>
+      <span v-if="hasErrorDetail">{{ t('dataSync.indicatorViewFullError') }}</span>
       <span v-if="nextSyncText">{{ nextSyncText }}</span>
       <span v-else-if="lastSyncText">{{ lastSyncText }}</span>
     </div>
@@ -235,7 +225,7 @@ onUnmounted(() => {
       class="cloud-sync-detail-panel"
       role="dialog"
       aria-modal="false"
-      aria-label="云同步错误详情"
+      :aria-label="t('dataSync.syncErrorDetails')"
       @click.stop
     >
       <div class="cloud-sync-detail-header">
@@ -243,7 +233,7 @@ onUnmounted(() => {
           <strong>{{ errorDiagnosis.title }}</strong>
           <span>{{ errorDiagnosis.message }}</span>
         </div>
-        <button class="cloud-sync-panel-icon-button" type="button" aria-label="关闭" @click="closeDetailPanel">
+        <button class="cloud-sync-panel-icon-button" type="button" :aria-label="t('common.close')" @click="closeDetailPanel">
           <X />
         </button>
       </div>
@@ -257,9 +247,9 @@ onUnmounted(() => {
       <div class="cloud-sync-detail-actions">
         <button class="cloud-sync-panel-button" type="button" @click="copyErrorDetails">
           <Copy />
-          <span v-if="copyState === 'copied'">已复制</span>
-          <span v-else-if="copyState === 'failed'">复制失败</span>
-          <span v-else>复制详情</span>
+          <span v-if="copyState === 'copied'">{{ t('dataSync.indicatorCopyCopied') }}</span>
+          <span v-else-if="copyState === 'failed'">{{ t('dataSync.indicatorCopyFailed') }}</span>
+          <span v-else>{{ t('dataSync.indicatorCopyDetails') }}</span>
         </button>
         <button
           class="cloud-sync-panel-button"
@@ -268,11 +258,11 @@ onUnmounted(() => {
           @click="retrySyncNow"
         >
           <Refresh />
-          <span>重试</span>
+          <span>{{ t('common.retry') }}</span>
         </button>
         <button class="cloud-sync-panel-button" type="button" @click="openSettings">
           <Settings />
-          <span>设置</span>
+          <span>{{ t('settings.title') }}</span>
         </button>
       </div>
     </div>
