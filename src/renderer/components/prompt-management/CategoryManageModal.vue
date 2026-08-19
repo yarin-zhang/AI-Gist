@@ -31,8 +31,10 @@
                                         :style="{ backgroundColor: newCategory.color }"
                                         :aria-label="t('promptManagement.color')" />
                                 </template>
-                                <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
-                                    :swatches="COLOR_SWATCHES" style="width: 220px;" />
+                                <div class="category-color-picker-panel">
+                                    <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
+                                        :swatches="COLOR_SWATCHES" />
+                                </div>
                             </NPopover>
                             <NInput v-model:value="newCategory.name" size="small" class="category-row-name-input"
                                 :placeholder="t('promptManagement.categoryNamePlaceholder')" autofocus
@@ -64,8 +66,10 @@
                                                 :style="{ backgroundColor: editingCategory!.color }"
                                                 :aria-label="t('promptManagement.color')" />
                                         </template>
-                                        <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
-                                            :swatches="COLOR_SWATCHES" style="width: 220px;" />
+                                        <div class="category-color-picker-panel">
+                                            <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
+                                                :swatches="COLOR_SWATCHES" />
+                                        </div>
                                     </NPopover>
                                     <NInput v-model:value="editingCategory!.name" size="small"
                                         class="category-row-name-input" :placeholder="t('promptManagement.categoryName')"
@@ -567,6 +571,10 @@ watch(() => props.categories, async (newCategories) => {
     border-radius: var(--radius-control);
     padding: 0;
     cursor: pointer;
+}
+
+.category-color-picker-panel {
+    width: 220px;
 }
 
 .category-row-info {
