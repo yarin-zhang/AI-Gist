@@ -1,17 +1,20 @@
 <template>
   <div class="structured-editor">
     <div class="structured-editor-toolbar ui-toolbar">
-      <div class="editor-view-switch" role="group" :aria-label="t('promptEditor.viewMode')">
-        <NButton v-if="!sourceOnly" size="small" :type="visualMode ? 'primary' : 'default'"
-          :secondary="visualMode" :quaternary="!visualMode" @click="setVisualMode(true)">
-          <template #icon><NIcon size="16"><LayoutCards /></NIcon></template>
-          <span class="view-mode-label">{{ t('promptEditor.visual') }}</span>
-        </NButton>
-        <NButton size="small" :type="!visualMode ? 'primary' : 'default'"
-          :secondary="!visualMode" :quaternary="visualMode" @click="setVisualMode(false)">
-          <template #icon><NIcon size="16"><Code /></NIcon></template>
-          <span class="view-mode-label">{{ t('promptEditor.source') }}</span>
-        </NButton>
+      <div class="editor-view-switch" :role="sourceOnly ? undefined : 'group'"
+        :aria-label="sourceOnly ? undefined : t('promptEditor.viewMode')">
+        <template v-if="!sourceOnly">
+          <NButton size="small" :type="visualMode ? 'primary' : 'default'"
+            :secondary="visualMode" :quaternary="!visualMode" @click="setVisualMode(true)">
+            <template #icon><NIcon size="16"><LayoutCards /></NIcon></template>
+            <span class="view-mode-label">{{ t('promptEditor.visual') }}</span>
+          </NButton>
+          <NButton size="small" :type="!visualMode ? 'primary' : 'default'"
+            :secondary="!visualMode" :quaternary="visualMode" @click="setVisualMode(false)">
+            <template #icon><NIcon size="16"><Code /></NIcon></template>
+            <span class="view-mode-label">{{ t('promptEditor.source') }}</span>
+          </NButton>
+        </template>
         <slot name="toolbar-prefix" />
       </div>
 
@@ -320,7 +323,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.structured-editor { box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
+.structured-editor { container: structured-editor / inline-size; box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
 .structured-editor-toolbar { min-height: 46px; padding: 6px var(--compact-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); border: 0; border-bottom: 1px solid var(--border-default); border-radius: 0; }
 .editor-view-switch, .editor-toolbar-actions { min-width: 0; display: flex; align-items: center; gap: 4px; }
 .editor-view-switch { flex: 0 1 auto; }
@@ -341,15 +344,15 @@ defineExpose({
 .structured-editor-host :deep(.prompt-variable-source.selected) { background: var(--interactive-active); font-weight: var(--font-weight-medium); }
 .structured-editor-host :deep(.prompt-variable-diagnostic) { text-decoration: underline wavy var(--accent-warning); text-underline-offset: 3px; }
 .editor-diagnostic { min-height: 32px; padding: 6px var(--compact-padding); display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border-default); color: var(--accent-warning); background: var(--surface-secondary); font-size: 12px; }
-@media (max-width: 680px) {
+@container structured-editor (max-width: 680px) {
   .variable-count { display: none; }
   .structured-editor-toolbar { padding-inline: 8px; gap: 4px; }
   .editor-view-switch :deep(.n-button__content), .editor-toolbar-actions :deep(.n-button__content) { font-size: 12px; }
 }
-@media (max-width: 620px) {
+@container structured-editor (max-width: 620px) {
   .toolbar-button-label { display: none; }
 }
-@media (max-width: 500px) {
+@container structured-editor (max-width: 500px) {
   .view-mode-label { display: none; }
 }
 </style>
