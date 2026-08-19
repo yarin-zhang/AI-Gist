@@ -222,6 +222,36 @@ describe('prompt management detail regressions', () => {
     expect(sidebar).not.toContain(':max="0.82"')
   })
 
+  it('lets the sidebar category panel collapse without a no-op v-show on NScrollbar', () => {
+    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
+
+    // NScrollbar's rendered root (without a `container` prop) is another component
+    // (VResizeObserver), not a plain element, so `v-show` placed directly on it never
+    // toggles `display` and the category list stays visible. It must sit on a real div.
+    expect(sidebar).toContain('<div v-show="!isCategoryListCollapsed" class="category-list-wrapper">')
+    expect(sidebar).not.toMatch(/<NScrollbar[^>]*v-show/)
+
+    // Collapsing must free the space back to the prompt list pane instead of leaving
+    // a blank gap, and the resize handle must be disabled while collapsed.
+    expect(sidebar).toContain(':disabled="isCategoryListCollapsed"')
+    expect(sidebar).toContain(":pane1-style=\"promptPaneStyle\"")
+    expect(sidebar).toContain(":pane2-style=\"categoryPaneStyle\"")
+    expect(sidebar).toContain("isCategoryListCollapsed.value ? { flex: '1 1 auto' } : undefined")
+    expect(sidebar).toContain("isCategoryListCollapsed.value ? { flex: '0 0 auto' } : undefined")
+
+    // Collapsed state must be persisted and restored across app launches.
+    expect(sidebar).toContain("ref(localStorage.getItem('prompt_library_category_collapsed') === 'true')")
+    expect(sidebar).toContain("watch(isCategoryListCollapsed, collapsed => localStorage.setItem('prompt_library_category_collapsed', String(collapsed)))")
+    expect(sidebar).toContain('const toggleCategoryList = () => {')
+
+    // The toggle already has visible text ("Categories"), so an aria-label would
+    // override its accessible name with just the expand/collapse verb.
+    const toggleStart = sidebar.indexOf('class="category-heading-toggle"')
+    const toggleMarkup = sidebar.slice(toggleStart, sidebar.indexOf('</button>', toggleStart))
+    expect(toggleMarkup).not.toContain('aria-label')
+    expect(toggleMarkup).toContain('aria-expanded')
+  })
+
   it('allows the active category filter to be clicked again to clear it', () => {
     const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
 
