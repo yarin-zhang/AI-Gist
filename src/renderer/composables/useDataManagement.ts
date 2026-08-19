@@ -64,7 +64,7 @@ export function useDataManagement() {
       setLoading('backup', true);
       clearMessages();
       const result = await localBackupService.create({
-        description: description || '手动本地备份',
+        description,
         backupType: 'manual',
         trigger: 'manual'
       });

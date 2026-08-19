@@ -79,6 +79,7 @@ import {
 } from 'naive-ui';
 import { Recharging, Refresh, Trash, Upload } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
+import { formatDateTime } from '@/lib/utils/date';
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup';
 
 const props = defineProps<{ config: CloudStorageConfig }>();
@@ -111,7 +112,7 @@ const createCloudBackup = async () => {
     loading.create = true;
     try {
         const result = await CloudBackupAPI.createCloudBackup(props.config.id, {
-            description: t('dataBackup.manualCloudBackupDescription', { time: new Date().toLocaleString() }),
+            description: t('dataBackup.manualCloudBackupDescription', { time: formatDateTime(new Date()) }),
             backupType: 'manual',
             trigger: 'manual',
         });
@@ -149,7 +150,7 @@ const deleteCloudBackup = async (backupId: string) => {
     }
 };
 
-const formatDate = (value: string) => new Date(value).toLocaleString();
+const formatDate = (value: string) => formatDateTime(value);
 const formatSize = (size: number) => {
     if (!size || Number.isNaN(size) || size <= 0) return '0 B';
     if (size < 1024) return `${size} B`;

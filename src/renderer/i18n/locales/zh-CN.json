@@ -433,6 +433,8 @@
     "aiConfigCount": "{count} 个",
     "aiConfiguration": "AI 配置",
     "backupManagement": "数据备份",
+    "backupTypeAutomatic": "自动本地备份",
+    "backupTypeManual": "手动本地备份",
     "backupVersionList": "备份版本列表",
     "categoryManagement": "分类管理",
     "categoryCount": "{count} 个",

@@ -428,6 +428,7 @@ import {
 } from '@/lib/services/automatic-backup.service';
 import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
+import { formatDateTime } from '@/lib/utils/date';
 import CloudBackupLocationPane from './CloudBackupLocationPane.vue';
 
 const { t } = useI18n();
@@ -499,6 +500,16 @@ const currentPage = ref(1);
 const pageSize = ref(6);
 const totalItems = computed(() => backupList.value.length);
 const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value));
+// 备份版本标题必须跟随当前界面语言展示，不能直接使用创建时写死存进备份文件的
+// description 文本（那段文本的语言取决于创建备份那一刻的界面语言，与当前语言
+// 切换无关）。这里始终按 backupType 现算标题文案，日期统一复用 formatDateTime。
+const formatBackupVersionLabel = (backup: { backupType?: string; createdAt: string }) => {
+  const typeLabel = backup.backupType === 'automatic'
+    ? t('dataManagement.backupTypeAutomatic')
+    : t('dataManagement.backupTypeManual');
+  return `${typeLabel} - ${formatDateTime(backup.createdAt)}`;
+};
+
 const paginatedBackups = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
   const end = start + pageSize.value;
@@ -506,9 +517,9 @@ const paginatedBackups = computed(() => {
   const formattedBackups = backupList.value.map((backup: any) => ({
     id: backup.id,
     name: backup.name,
-    createdAt: new Date(backup.createdAt).toLocaleString('zh-CN'),
+    createdAt: formatDateTime(backup.createdAt),
     size: `${(backup.size / 1024).toFixed(2)} KB`,
-    version: backup.description || 'v1.0'
+    version: formatBackupVersionLabel(backup)
   }));
   return formattedBackups.slice(start, end);
 });
@@ -662,7 +673,7 @@ const runAutoBackupNow = async () => {
     else message.success(t('dataBackup.automaticBackupCreatedAndRotated', { count: status.deletedCount || 0 }));
 };
 
-const formatBackupDate = (value: string) => new Date(value).toLocaleString();
+const formatBackupDate = (value: string) => formatDateTime(value);
 
 // 监听备份列表变化
 watch(() => backupList.value.length, (newLength, oldLength) => {
