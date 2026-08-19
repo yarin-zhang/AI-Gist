@@ -46,8 +46,40 @@
           </div>
         </div>
 
-        <!-- 提示词内容 -->
-        <div class="content-section">
+        <!--
+          提示词内容：只有当提示词含有 {{变量名}} 挖空变量时才切换为"填写变量 +
+          实时预览"这套交互（对应 Gitea issue #87），普通纯文本提示词保持原样
+          展示 content，不受影响。
+        -->
+        <template v-if="variables.length">
+          <div class="content-section">
+            <div class="section-header">
+              <h2>{{ t('promptWorkspace.fillVariables') }}</h2>
+              <span class="fill-progress">{{ t('promptFill.progress', { filled: filledCount, total: variables.length }) }}</span>
+            </div>
+            <div class="mobile-grouped-card">
+              <PromptVariableFillForm
+                ref="fillFormRef"
+                :variables="variables"
+                v-model="draft"
+                :render-error="rendered.error"
+              />
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="section-header">
+              <h2>{{ t('promptWorkspace.finalPrompt') }}</h2>
+            </div>
+            <p v-if="rendered.error" class="render-error">
+              {{ t('promptWorkspace.renderFailed') }}：{{ rendered.error }}
+            </p>
+            <div class="prompt-content-wrapper">
+              <div class="prompt-content">{{ rendered.content }}</div>
+            </div>
+          </div>
+        </template>
+        <div v-else class="content-section">
           <div class="section-header">
             <h2>{{ t('promptManagement.detailModal.promptContent') }}</h2>
           </div>
@@ -133,6 +165,13 @@ import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { recordPromptUsage } from '~/lib/utils/prompt-usage'
+import {
+  getActivePromptVariables,
+  createPromptDraft,
+  isEmptyPromptValue,
+  renderPrompt,
+} from '~/lib/utils/prompt-template'
+import PromptVariableFillForm from '~/components/mobile/PromptVariableFillForm.vue'
 import type { Prompt, Category } from '@shared/types'
 
 const { t } = useI18n()
@@ -146,6 +185,18 @@ const loading = ref(true)
 const imageUrls = ref<string[]>([])
 const previewUrl = ref<string | null>(null)
 let initialLoadPromise: Promise<void> | null = null
+// 上一次加载成功的提示词身份（id/uuid），用来判断 loadPrompt() 这次拿到的是否
+// 还是同一个提示词——见下方 loadPrompt() 内的用法和注释。
+let loadedPromptKey: string | null = null
+
+// 挖空变量：解析规则、默认值兜底、必填校验全部直接复用桌面端同一份
+// ~/lib/utils/prompt-template（desktop 端通过 @ 别名引用的也是这个文件，
+// 两个别名在 vite 配置里都指向 src/renderer），保证两端解析结果一致。
+const fillFormRef = ref<InstanceType<typeof PromptVariableFillForm>>()
+const draft = ref<Record<string, any>>({})
+const variables = computed(() => (prompt.value ? getActivePromptVariables(prompt.value) : []))
+const rendered = computed(() => (prompt.value ? renderPrompt(prompt.value, draft.value, variables.value) : { content: '' }))
+const filledCount = computed(() => variables.value.filter(variable => !isEmptyPromptValue(draft.value[variable.name])).length)
 
 const openImagePreview = (url: string) => {
   previewUrl.value = url
@@ -167,6 +218,19 @@ const updateImageUrls = () => {
 }
 
 // 加载提示词详情
+//
+// onIonViewWillEnter（见下方）会在这个页面每次重新变为激活状态时都调用一次
+// loadPrompt()，最典型的场景是：用户从这个详情页点进"编辑"看一眼，再返回。
+// 这不是一次身份变化的导航——仍然是同一个提示词——如果每次都无条件把
+// draft.value 重置为空默认值，会静默清空用户尚未提交的填写进度（对应 Gitea
+// #87 复查发现的数据丢失 bug）。
+//
+// 参照桌面端 PromptUseWorkspace.vue 的既有模式：那边用
+// `watch(() => \`${props.prompt.id || ''}:${props.prompt.uuid}\`, ...)` 只在
+// 提示词身份真正改变时才调用 initializeDraft() 重置草稿。这里没有 watch 可用
+// （prompt 是这个页面自己异步 fetch 来的，不是响应式 prop），所以改为手动记录
+// 上一次加载成功的身份 key，本次加载完成后比较：身份不同才重置 draft 和校验
+// 状态；身份相同（同一个提示词）就保留 draft.value 原样，不覆盖。
 const loadPrompt = async () => {
   loading.value = true
   try {
@@ -175,6 +239,12 @@ const loadPrompt = async () => {
       throw new Error('Invalid prompt ID')
     }
     prompt.value = await api.prompts.getById.query(promptId)
+    const promptKey = prompt.value ? `${prompt.value.id ?? ''}:${prompt.value.uuid ?? ''}` : null
+    if (promptKey !== loadedPromptKey) {
+      draft.value = createPromptDraft(variables.value, {})
+      fillFormRef.value?.resetValidation()
+      loadedPromptKey = promptKey
+    }
     updateImageUrls()
   } catch (error) {
     console.error('加载提示词失败:', error)
@@ -243,15 +313,33 @@ const toggleFavorite = async () => {
 }
 
 // 复制内容
+//
+// 有挖空变量时，复制的是替换过变量的最终文本（rendered.content），而不是原始
+// 模板；必填变量没填完（或 Jinja 模板渲染失败）时中止复制——这与桌面端
+// PromptUseWorkspace.copyPrompt() 的既有约定一致：先调用
+// fillCanvasRef.validateAndFocus()，校验不通过就不复制，只定位到第一个问题字段。
+// 没有变量的普通提示词完全保持原有行为（原样复制 content）。
 const copyContent = async () => {
   if (!prompt.value?.content) return
 
+  const hasVariables = variables.value.length > 0
+  if (hasVariables) {
+    const valid = await fillFormRef.value?.validateAndFocus()
+    if (!valid || rendered.value.error) {
+      showToast(t(rendered.value.error ? 'promptWorkspace.renderFailed' : 'promptWorkspace.completeRequired'), 'warning')
+      return
+    }
+  }
+
+  const finalContent = hasVariables ? rendered.value.content : prompt.value.content
+
   try {
-    await navigator.clipboard.writeText(prompt.value.content)
+    await navigator.clipboard.writeText(finalContent)
     try {
       const updated = await recordPromptUsage({
         promptId: prompt.value.id!,
-        content: prompt.value.content,
+        content: finalContent,
+        variables: hasVariables ? { ...draft.value } : undefined,
         incrementUseCount: id => api.prompts.incrementUseCount.mutate(id),
       })
       prompt.value.useCount = updated.useCount
@@ -447,6 +535,10 @@ onUnmounted(() => {
 
 .section-header {
   margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
 }
 
 .section-header h2 {
@@ -454,6 +546,29 @@ onUnmounted(() => {
   font-weight: 600;
   margin: 0;
   color: var(--ion-text-color);
+}
+
+.fill-progress {
+  flex: 0 0 auto;
+  color: var(--content-tertiary);
+  font-size: var(--mobile-font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 变量填写区域沿用设置页已有的"分组卡片列表"约定（见 mobile.css 的
+ * .mobile-grouped-card），把贴边的 ion-list 收进与下方"最终提示词"预览框
+ * 一致的圆角卡片里，避免一条条平铺。
+ */
+.mobile-grouped-card {
+  margin: 0;
+}
+
+.render-error {
+  margin: 0 0 10px;
+  color: var(--accent-error);
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
 }
 
 .prompt-content-wrapper {
