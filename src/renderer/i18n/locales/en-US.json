@@ -438,6 +438,7 @@
     "backupTypeAutomatic": "Automatic local backup",
     "backupTypeManual": "Manual local backup",
     "backupVersionList": "Backup Version List",
+    "backupFileNameTooltip": "File name: {name}",
     "categoryManagement": "Category Management",
     "categoryCount": "{count}",
     "checkDatabaseHealth": "Check the database",
@@ -445,6 +446,7 @@
     "clearDatabaseWarning": "⚠️ Dangerous Operation Warning",
     "clearDatabaseWarningItems": "Create a backup of the current data, delete all existing data, and reset the database to the initial state. This operation cannot be undone",
     "clearDatabaseWarningText": "Clearing the database will:",
+    "collapseBackupList": "Collapse",
     "confirmClearDatabase": "Are you sure you want to clear the entire database?",
     "confirmDeleteBackup": "Are you sure you want to delete this backup?",
     "containsSensitiveInfo": "Contains sensitive information",
@@ -475,7 +477,8 @@
     "securityWarning": "Security Warning",
     "securityWarningText": "You have selected to export AI configuration, the exported data will contain sensitive information such as API keys. Please keep export files safe to avoid leakage.",
     "selectDataTypeToExport": "Select data type to export:",
-    "selectiveDataExport": "Selective Data Export"
+    "selectiveDataExport": "Selective Data Export",
+    "showMoreBackups": "Show all ({count} more)"
   },
   "dataSync": {
     "addStorageConfig": "Add Storage",

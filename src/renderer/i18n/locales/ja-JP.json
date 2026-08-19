@@ -444,6 +444,7 @@
     "backupTypeAutomatic": "自動ローカルバックアップ",
     "backupTypeManual": "手動ローカルバックアップ",
     "backupVersionList": "バックアップバージョンリスト",
+    "backupFileNameTooltip": "ファイル名：{name}",
     "categoryManagement": "分類管理",
     "categoryCount": "{count} 件",
     "checkDatabaseHealth": "データベースを確認",
@@ -451,6 +452,7 @@
     "clearDatabaseWarning": "⚠️危険な操作警告",
     "clearDatabaseWarningItems": "現在のデータのバックアップを自動的に作成し、すべての既存データを削除し、データベースを初期状態にリセットします。この操作は取り消せません",
     "clearDatabaseWarningText": "データベースのクリアにより：",
+    "collapseBackupList": "折りたたむ",
     "confirmClearDatabase": "データベース全体をクリアしますか？",
     "confirmDeleteBackup": "このバックアップを削除しますか？",
     "containsSensitiveInfo": "機密情報が含まれています",
@@ -481,7 +483,8 @@
     "securityWarning": "セキュリティ注意",
     "securityWarningText": "AI設定をエクスポートする場合、エクスポートデータにはAPIキーなどの機密情報が含まれます。エクスポートファイルを適切に保管し、漏洩を避けてください。",
     "selectDataTypeToExport": "エクスポートするデータタイプを選択：",
-    "selectiveDataExport": "選択的データエクスポート"
+    "selectiveDataExport": "選択的データエクスポート",
+    "showMoreBackups": "すべて表示（残り {count} 件）"
   },
   "dataSync": {
     "addStorageConfig": "ストレージを追加",

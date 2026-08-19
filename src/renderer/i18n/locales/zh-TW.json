@@ -444,6 +444,7 @@
     "backupTypeAutomatic": "自動本機備份",
     "backupTypeManual": "手動本機備份",
     "backupVersionList": "備份版本列表",
+    "backupFileNameTooltip": "檔案名稱：{name}",
     "categoryManagement": "分類管理",
     "categoryCount": "{count} 個",
     "checkDatabaseHealth": "檢查數據庫",
@@ -451,6 +452,7 @@
     "clearDatabaseWarning": "⚠️ 危險操作警告",
     "clearDatabaseWarningItems": "自動創建當前數據的備份，刪除所有現有數據，重置數據庫到初始狀態。此操作不可撤銷",
     "clearDatabaseWarningText": "清空數據庫將會：",
+    "collapseBackupList": "收起",
     "confirmClearDatabase": "確定要清空整個數據庫嗎？",
     "confirmDeleteBackup": "確定要刪除這個備份嗎？",
     "containsSensitiveInfo": "包含敏感信息",
@@ -481,7 +483,8 @@
     "securityWarning": "安全提示",
     "securityWarningText": "您選擇了導出 AI 配置，導出的數據將包含 API 密鑰等敏感信息。\n請妥善保管導出文件，避免洩露。",
     "selectDataTypeToExport": "選擇要導出的數據類型：",
-    "selectiveDataExport": "選擇性數據導出"
+    "selectiveDataExport": "選擇性數據導出",
+    "showMoreBackups": "展開全部（還有 {count} 項）"
   },
   "dataSync": {
     "addStorageConfig": "新增儲存設定",

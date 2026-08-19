@@ -41,71 +41,71 @@
                     <div v-if="backupList.length > 0">
                         <NFlex vertical :size="12">
                             <NText strong>{{ t('dataManagement.backupVersionList') }}</NText>
-                            <NGrid cols="6" item-responsive :x-gap="12" :y-gap="12">
-                                <NGridItem v-for="backup in paginatedBackups" :key="backup.id"
-                                    span="6 600:5 900:4 1200:3 1500:2 1800:1">
-                                    <NCard size="small" :title="backup.version">
-                                        <NFlex vertical :size="4">
-                                            <NFlex align="center" :size="8">
-                                                <NText strong>{{ backup.name }}</NText>
-                                            </NFlex>
-                                        </NFlex>
-                                        <template #header-extra>
-                                            <NFlex vertical :size="4">
-                                                <NFlex align="center" :size="8">
-                                                    <NTag type="info" size="small">{{ backup.createdAt }}</NTag>
-                                                </NFlex>
-                                            </NFlex>
-                                        </template>
 
-                                        <template #action>
-                                            <NFlex justify="space-between" align="center" style="width: 100%;">
-                                                <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
-                                                    :negative-text="t('common.cancel')"
-                                                    :positive-text="t('dataBackup.confirmRestore')" placement="top"
-                                                    :show-icon="false">
-                                                    <template #trigger>
-                                                        <NButton type="primary" size="small"
-                                                            :loading="loading.restore"
-                                                            :disabled="loading.restore">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Recharging />
-                                                                </NIcon>
-                                                            </template>
-                                                            {{ t('dataManagement.restore') }}
-                                                        </NButton>
-                                                    </template>
-                                                    <div style="max-width: 300px;">
-                                                        <p>{{ t('dataManagement.restoreWarning') }}</p>
-                                                    </div>
-                                                </NPopconfirm>
-                                                <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
-                                                    :negative-text="t('common.cancel')"
-                                                    :positive-text="t('common.confirm')">
-                                                    <template #trigger>
-                                                        <NButton type="error" secondary size="small">
-                                                            <template #icon>
-                                                                <NIcon>
-                                                                    <Trash />
-                                                                </NIcon>
-                                                            </template>
-                                                            {{ t('dataManagement.delete') }}
-                                                        </NButton>
-                                                    </template>
-                                                    {{ t('dataManagement.confirmDeleteBackup') }}
-                                                </NPopconfirm>
-                                            </NFlex>
-                                        </template>
-                                    </NCard>
-                                </NGridItem>
-                            </NGrid>
+                            <div class="backup-list" :class="{ 'backup-list--scrollable': showAllBackups }">
+                                <div v-for="backup in visibleBackups" :key="backup.id" class="backup-row">
+                                    <div class="backup-row-info">
+                                        <div class="backup-row-title">{{ backup.version }}</div>
+                                        <NTooltip trigger="hover" placement="bottom-start">
+                                            <template #trigger>
+                                                <NText depth="3" class="backup-row-meta">{{ backup.createdAt }}</NText>
+                                            </template>
+                                            {{ t('dataManagement.backupFileNameTooltip', { name: backup.name }) }}
+                                        </NTooltip>
+                                    </div>
 
-                            <!-- 分页组件 -->
-                            <div v-if="totalPages > 1" class="pagination-container">
-                                <NPagination v-model:page="currentPage" v-model:page-size="pageSize"
-                                    :item-count="totalItems" show-size-picker show-quick-jumper
-                                    :page-sizes="[6, 12, 18]" />
+                                    <div class="backup-row-actions">
+                                        <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
+                                            :negative-text="t('common.cancel')"
+                                            :positive-text="t('dataBackup.confirmRestore')" placement="top"
+                                            :show-icon="false">
+                                            <template #trigger>
+                                                <NButton type="primary" tertiary size="tiny"
+                                                    :loading="loading.restore"
+                                                    :disabled="loading.restore">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Recharging />
+                                                        </NIcon>
+                                                    </template>
+                                                    {{ t('dataManagement.restore') }}
+                                                </NButton>
+                                            </template>
+                                            <div style="max-width: 300px;">
+                                                <p>{{ t('dataManagement.restoreWarning') }}</p>
+                                            </div>
+                                        </NPopconfirm>
+                                        <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
+                                            :negative-text="t('common.cancel')"
+                                            :positive-text="t('common.confirm')">
+                                            <template #trigger>
+                                                <NButton type="error" quaternary size="tiny">
+                                                    <template #icon>
+                                                        <NIcon>
+                                                            <Trash />
+                                                        </NIcon>
+                                                    </template>
+                                                    {{ t('dataManagement.delete') }}
+                                                </NButton>
+                                            </template>
+                                            {{ t('dataManagement.confirmDeleteBackup') }}
+                                        </NPopconfirm>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="backupList.length > BACKUP_PREVIEW_COUNT" class="backup-list-toggle">
+                                <NButton text size="small" @click="showAllBackups = !showAllBackups">
+                                    <template #icon>
+                                        <NIcon>
+                                            <ChevronUp v-if="showAllBackups" />
+                                            <ChevronDown v-else />
+                                        </NIcon>
+                                    </template>
+                                    {{ showAllBackups
+                                        ? t('dataManagement.collapseBackupList')
+                                        : t('dataManagement.showMoreBackups', { count: hiddenBackupCount }) }}
+                                </NButton>
                             </div>
                         </NFlex>
                     </div>
@@ -385,11 +385,9 @@ import {
     NDivider,
     NPopconfirm,
     NTag,
-    NPagination,
+    NTooltip,
     NCheckbox,
     NRadio,
-    NGrid,
-    NGridItem,
     NTabs,
     NTabPane,
     NCollapse,
@@ -412,6 +410,8 @@ import {
     DatabaseOff,
     Archive,
     Folder,
+    ChevronDown,
+    ChevronUp,
 } from "@vicons/tabler";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from 'vue-i18n';
@@ -495,34 +495,30 @@ const dataStats = ref({
     settings: 0
 });
 
-// 分页
-const currentPage = ref(1);
-const pageSize = ref(6);
-const totalItems = computed(() => backupList.value.length);
-const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value));
 // 备份版本标题必须跟随当前界面语言展示，不能直接使用创建时写死存进备份文件的
 // description 文本（那段文本的语言取决于创建备份那一刻的界面语言，与当前语言
-// 切换无关）。这里始终按 backupType 现算标题文案，日期统一复用 formatDateTime。
-const formatBackupVersionLabel = (backup: { backupType?: string; createdAt: string }) => {
-  const typeLabel = backup.backupType === 'automatic'
+// 切换无关）。这里始终按 backupType 现算标题文案；日期只在副标题行展示一次
+// （通过 formatDateTime），避免标题和副标题重复显示同一个日期。
+const formatBackupTypeLabel = (backup: { backupType?: string }) => {
+  return backup.backupType === 'automatic'
     ? t('dataManagement.backupTypeAutomatic')
     : t('dataManagement.backupTypeManual');
-  return `${typeLabel} - ${formatDateTime(backup.createdAt)}`;
 };
 
-const paginatedBackups = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  // 转换备份数据格式以匹配组件期望的格式
-  const formattedBackups = backupList.value.map((backup: any) => ({
+// 备份版本列表：默认只展示最近的几条，其余收进「查看更多」
+const BACKUP_PREVIEW_COUNT = 3;
+const showAllBackups = ref(false);
+const formattedBackups = computed(() => backupList.value.map((backup: any) => ({
     id: backup.id,
     name: backup.name,
     createdAt: formatDateTime(backup.createdAt),
     size: `${(backup.size / 1024).toFixed(2)} KB`,
-    version: formatBackupVersionLabel(backup)
-  }));
-  return formattedBackups.slice(start, end);
-});
+    version: formatBackupTypeLabel(backup)
+})));
+const visibleBackups = computed(() => showAllBackups.value
+    ? formattedBackups.value
+    : formattedBackups.value.slice(0, BACKUP_PREVIEW_COUNT));
+const hiddenBackupCount = computed(() => Math.max(backupList.value.length - BACKUP_PREVIEW_COUNT, 0));
 
 // 选择性导出选项
 const exportOptions = ref({
@@ -679,7 +675,6 @@ const formatBackupDate = (value: string) => formatDateTime(value);
 watch(() => backupList.value.length, (newLength, oldLength) => {
     console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
 });
-watch(pageSize, () => { currentPage.value = 1; });
 
 // 初始化
 onMounted(async () => {
@@ -708,11 +703,61 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.pagination-container {
+.backup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.backup-list--scrollable {
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.backup-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius-panel);
+    transition: background-color .12s ease;
+}
+
+.backup-row:hover {
+    background: var(--interactive-hover);
+}
+
+.backup-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.backup-row-title {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.backup-row-meta {
+    font-size: 12px;
+    width: fit-content;
+    cursor: default;
+}
+
+.backup-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.backup-list-toggle {
     display: flex;
     justify-content: center;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-default);
 }
 </style>
