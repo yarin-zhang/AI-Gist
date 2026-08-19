@@ -5,14 +5,43 @@
                 <div class="workspace-primary-row">
                     <div class="workspace-identity">
                         <div class="workspace-title-row">
-                            <NText strong class="workspace-title">
+                            <input v-if="editingTitle" ref="titleInputRef" v-model="titleDraft" type="text"
+                                class="workspace-title-input" maxlength="200" :disabled="savingField === 'title'"
+                                :placeholder="t('promptManagement.titlePlaceholder')"
+                                :aria-label="t('promptManagement.title')"
+                                @keydown.enter.prevent="commitTitle($event)"
+                                @keydown.esc.prevent="cancelEditTitle($event)" @blur="commitTitle()" />
+                            <NText v-else strong class="workspace-title"
+                                :class="{ 'workspace-field-editable': canInlineEdit }"
+                                :tabindex="canInlineEdit ? 0 : undefined" :role="canInlineEdit ? 'button' : undefined"
+                                :title="canInlineEdit ? t('promptWorkspace.clickToEdit') : undefined"
+                                @click="startEditTitle" @keydown.enter.prevent="startEditTitle"
+                                @keydown.space.prevent="startEditTitle">
                                 {{ prompt?.title || t('promptWorkspace.newPrompt') }}
                             </NText>
                             <span v-if="hasUnsavedChanges" class="unsaved-dot"
                                 :title="t('promptWorkspace.unsavedChanges')" />
                         </div>
-                        <NText v-if="prompt?.description" depth="3" class="workspace-description">
+                        <textarea v-if="editingDescription" ref="descriptionInputRef" v-model="descriptionDraft"
+                            class="workspace-description-input" rows="1" :disabled="savingField === 'description'"
+                            :placeholder="t('promptManagement.descriptionPlaceholder')"
+                            :aria-label="t('promptManagement.description')" @input="resizeDescriptionInput"
+                            @keydown.enter.exact.prevent="commitDescription($event)"
+                            @keydown.esc.prevent="cancelEditDescription($event)" @blur="commitDescription()" />
+                        <NText v-else-if="prompt?.description" depth="3" class="workspace-description"
+                            :class="{ 'workspace-field-editable': canInlineEdit }"
+                            :tabindex="canInlineEdit ? 0 : undefined" :role="canInlineEdit ? 'button' : undefined"
+                            :title="canInlineEdit ? t('promptWorkspace.clickToEdit') : undefined"
+                            @click="startEditDescription" @keydown.enter.prevent="startEditDescription"
+                            @keydown.space.prevent="startEditDescription">
                             {{ prompt.description }}
+                        </NText>
+                        <NText v-else-if="canInlineEdit" depth="3"
+                            class="workspace-description workspace-description-placeholder workspace-field-editable"
+                            tabindex="0" role="button" :title="t('promptWorkspace.clickToEdit')"
+                            @click="startEditDescription" @keydown.enter.prevent="startEditDescription"
+                            @keydown.space.prevent="startEditDescription">
+                            {{ t('promptWorkspace.addDescription') }}
                         </NText>
                     </div>
 
@@ -87,11 +116,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NText, NTooltip } from 'naive-ui'
+import { NButton, NIcon, NText, NTooltip, useMessage } from 'naive-ui'
 import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Trash, X } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
+import { api } from '@/lib/api'
 import PromptUseWorkspace from './PromptUseWorkspace.vue'
 import PromptEditModal from './PromptEditModal.vue'
 
@@ -119,9 +149,125 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const message = useMessage()
 const editRef = ref<any>()
 
 const hasUnsavedChanges = computed(() => Boolean(editRef.value?.hasUnsavedChanges))
+
+// 标题 / 描述原地编辑：点击文本直接进入编辑态，失焦或回车保存，Esc 取消
+//
+// 进入编辑态时把目标 prompt id 与原始值捕获到独立的 ref 中，commitTitle/commitDescription
+// 一律使用这个捕获值而不是实时读取 props.prompt，避免编辑期间 props.prompt 被父组件替换
+// （例如跨窗口广播触发的 reconcileSelection 静默切换了选中项）时把文本误写到另一个 prompt 上。
+// 一旦检测到 prompt 身份在编辑过程中发生变化，watch 会强制放弃当前编辑，不做任何保存。
+const editingTitle = ref(false)
+const editingDescription = ref(false)
+const titleDraft = ref('')
+const descriptionDraft = ref('')
+const editingTitleTarget = ref<{ id: number; original: string } | null>(null)
+const editingDescriptionTarget = ref<{ id: number; original: string } | null>(null)
+const savingField = ref<'title' | 'description' | null>(null)
+const titleInputRef = ref<HTMLInputElement>()
+const descriptionInputRef = ref<HTMLTextAreaElement>()
+
+const canInlineEdit = computed(() => Boolean(props.prompt?.id))
+
+const startEditTitle = () => {
+    const id = props.prompt?.id
+    if (!id || editingTitle.value) return
+    const original = props.prompt?.title || ''
+    editingTitleTarget.value = { id, original }
+    titleDraft.value = original
+    editingTitle.value = true
+    nextTick(() => titleInputRef.value?.focus())
+}
+
+const cancelEditTitle = (event?: KeyboardEvent) => {
+    if (event?.isComposing) return
+    editingTitle.value = false
+    editingTitleTarget.value = null
+}
+
+const commitTitle = async (event?: KeyboardEvent) => {
+    if (event?.isComposing) return
+    if (!editingTitle.value) return
+    const next = titleDraft.value.trim()
+    const target = editingTitleTarget.value
+    editingTitle.value = false
+    editingTitleTarget.value = null
+    if (!target || !next || next === target.original) return
+    savingField.value = 'title'
+    try {
+        const updated = await api.prompts.update.mutate({ id: target.id, data: { title: next } })
+        emit('updated', updated)
+    } catch (error) {
+        console.error(error)
+        message.error(t('promptManagement.updateFailed'))
+    } finally {
+        savingField.value = null
+    }
+}
+
+const startEditDescription = () => {
+    const id = props.prompt?.id
+    if (!id || editingDescription.value) return
+    const original = props.prompt?.description || ''
+    editingDescriptionTarget.value = { id, original }
+    descriptionDraft.value = original
+    editingDescription.value = true
+    nextTick(() => {
+        resizeDescriptionInput()
+        descriptionInputRef.value?.focus()
+    })
+}
+
+const cancelEditDescription = (event?: KeyboardEvent) => {
+    if (event?.isComposing) return
+    editingDescription.value = false
+    editingDescriptionTarget.value = null
+}
+
+const commitDescription = async (event?: KeyboardEvent) => {
+    if (event?.isComposing) return
+    if (!editingDescription.value) return
+    const next = descriptionDraft.value.trim()
+    const target = editingDescriptionTarget.value
+    editingDescription.value = false
+    editingDescriptionTarget.value = null
+    if (!target) return
+    if (next === target.original) return
+    savingField.value = 'description'
+    try {
+        const updated = await api.prompts.update.mutate({ id: target.id, data: { description: next || undefined } })
+        emit('updated', updated)
+    } catch (error) {
+        console.error(error)
+        message.error(t('promptManagement.updateFailed'))
+    } finally {
+        savingField.value = null
+    }
+}
+
+// prompt 身份在编辑过程中发生变化（例如跨窗口数据变更触发了选中项静默切换）时，
+// 强制放弃当前编辑态，绝不把草稿保存到新的 prompt 上。
+watch(() => props.prompt?.id, (newId) => {
+    if (editingTitle.value && newId !== editingTitleTarget.value?.id) {
+        editingTitle.value = false
+        editingTitleTarget.value = null
+    }
+    if (editingDescription.value && newId !== editingDescriptionTarget.value?.id) {
+        editingDescription.value = false
+        editingDescriptionTarget.value = null
+    }
+})
+
+const resizeDescriptionInput = () => {
+    const el = descriptionInputRef.value
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+}
+
 const handleEditVisibility = (show: boolean) => {
     if (!show && props.mode === 'edit') {
         if (props.prompt?.id) emit('request-mode', 'use')
@@ -146,6 +292,15 @@ defineExpose({
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .workspace-title { max-width: min(620px, 52vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
 .workspace-description { display: block; max-width: 660px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.workspace-field-editable { cursor: text; border-radius: var(--radius-control); padding: 1px 6px; margin: -1px -6px; }
+.workspace-field-editable:hover { background: var(--interactive-hover); }
+.workspace-field-editable:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
+.workspace-title-input { max-width: min(620px, 52vw); width: 100%; font: inherit; font-weight: 600; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; color: var(--content-primary); background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); padding: 1px 6px; margin: -1px -6px; outline: none; }
+.workspace-title-input:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; border-color: var(--border-strong); }
+.workspace-title-input:disabled { opacity: .6; }
+.workspace-description-input { display: block; width: 100%; max-width: 660px; margin-top: 2px; font: inherit; font-size: 13px; line-height: 1.5; color: var(--content-secondary); background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); padding: 3px 6px; resize: none; outline: none; overflow-y: auto; }
+.workspace-description-input:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; border-color: var(--border-strong); }
+.workspace-description-input:disabled { opacity: .6; }
 .workspace-controls { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
 .workspace-control-divider { width: 1px; height: 18px; margin: 0 5px; background: var(--border-default); }
 .workspace-mode-bar { height: 38px; padding: 0 var(--page-padding); display: flex; align-items: flex-end; justify-content: space-between; border-top: 1px solid var(--border-subtle); background: var(--surface-secondary); }

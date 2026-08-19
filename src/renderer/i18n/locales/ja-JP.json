@@ -1117,6 +1117,8 @@
     "blankPrompt": "空のプロンプトを作成",
     "manualCreate": "手動で作成",
     "newPrompt": "新しいプロンプト",
+    "clickToEdit": "クリックして編集",
+    "addDescription": "説明を追加",
     "use": "使用",
     "editing": "編集中",
     "unsavedChanges": "未保存の変更があります",

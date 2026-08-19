@@ -1117,6 +1117,8 @@
     "blankPrompt": "New blank prompt",
     "manualCreate": "Create manually",
     "newPrompt": "New prompt",
+    "clickToEdit": "Click to edit",
+    "addDescription": "Add a description",
     "use": "Use",
     "editing": "Editing",
     "unsavedChanges": "Unsaved changes",
