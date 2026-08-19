@@ -69,13 +69,11 @@
                             <span v-if="selectedTag && searchText.trim()">{{ t('promptManagement.searchingForTag', {
                                 tag: selectedTag }) }} + {{ t('promptManagement.searchingFor', {
                                 text: searchText.trim() }) }}</span>
-                            <span v-if="selectedCategory"> {{ t('promptManagement.categoryFilter', {
+                            <span v-if="selectedCategory">{{ t('promptManagement.categoryFilter', {
                                 name: getCategoryName(selectedCategory) }) }}</span>
                             <span v-if="showFavoritesOnly">{{ t('promptManagement.favoritesOnly') }}</span>
-                            <span v-if="!initialLoading" style="margin-left: 8px; color: var(--n-color-primary);">
-                                ({{ t('promptManagement.foundResults', { count: totalCount }) }}{{ hasNextPage || prompts.length
-                                    < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '' }})
-                            </span>
+                            <span v-if="!initialLoading" class="result-count-text">{{ '(' + t('promptManagement.foundResults', { count: totalCount }) + (hasNextPage || prompts.length
+                                    < totalCount ? `，${t('promptManagement.showingResults', { count: prompts.length })}` : '') + ')' }}</span>
                         </NFlex>
                         <NButton text size="small" @click="clearAllFilters">
                             {{ t('common.clear') }}
@@ -1752,6 +1750,7 @@ defineExpose({
 .prompt-search-input { flex: 1 1 320px; min-width: 240px; }
 .prompt-sort-select { width: 164px; }
 .active-filter-summary { padding: 7px 10px; border-top: 1px solid var(--border-default); color: var(--content-secondary); font-size: 12px; }
+.active-filter-summary .result-count-text { color: var(--n-color-primary); }
 .advanced-filter-panel { max-height: min(30vh, 260px); margin-top: 4px; padding: 10px 6px 2px 2px; overflow-y: auto; border-top: 1px solid var(--border-default); }
 .batch-action-bar { margin-top: 12px; }
 .batch-action-bar :deep(.n-card) { box-shadow: none; }
