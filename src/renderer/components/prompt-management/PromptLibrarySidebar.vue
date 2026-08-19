@@ -378,7 +378,7 @@ onBeforeUnmount(() => {
     border-right: 0;
 }
 
-.library-header { padding: 12px 12px 10px; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.library-header { padding: 12px 12px 10px; }
 .library-navigation { padding: 8px 8px 4px; }
 .library-split { flex: 1; min-height: 0; }
 .prompt-section, .category-section { height: 100%; min-height: 0; display: flex; flex-direction: column; }
