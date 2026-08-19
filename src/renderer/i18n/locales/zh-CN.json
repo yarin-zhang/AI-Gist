@@ -444,6 +444,7 @@
     "backupTypeAutomatic": "自动本地备份",
     "backupTypeManual": "手动本地备份",
     "backupVersionList": "备份版本列表",
+    "backupFileNameTooltip": "文件名：{name}",
     "categoryManagement": "分类管理",
     "categoryCount": "{count} 个",
     "checkDatabaseHealth": "检查数据库",
@@ -451,6 +452,7 @@
     "clearDatabaseWarning": "⚠️ 危险操作警告",
     "clearDatabaseWarningItems": "自动创建当前数据的备份，删除所有现有数据，重置数据库到初始状态。此操作不可撤销",
     "clearDatabaseWarningText": "清空数据库将会：",
+    "collapseBackupList": "收起",
     "confirmClearDatabase": "确定要清空整个数据库吗？",
     "confirmDeleteBackup": "确定要删除这个备份吗？",
     "containsSensitiveInfo": "包含敏感信息",
@@ -481,7 +483,8 @@
     "securityWarning": "安全提示",
     "securityWarningText": "您选择了导出 AI 配置，导出的数据将包含 API 密钥等敏感信息。请妥善保管导出文件，避免泄露。",
     "selectDataTypeToExport": "选择要导出的数据类型：",
-    "selectiveDataExport": "选择性数据导出"
+    "selectiveDataExport": "选择性数据导出",
+    "showMoreBackups": "展开全部（还有 {count} 项）"
   },
   "dataSync": {
     "addStorageConfig": "添加存储配置",
