@@ -1098,6 +1098,67 @@ describe('CloudSyncService', () => {
     expect(diagnosis.copyText).toContain('重试类型: transient')
   })
 
+  it('classifies a sync-generation-superseded failure as an auto-retrying notice instead of a hard error', async () => {
+    const { service, cloudClient } = createService(baseData)
+    cloudClient.getCloudSyncManifest.mockRejectedValue(new Error('同步任务已被更新的生命周期同步取代'))
+
+    const result = await service.syncNow('cfg-1', { reason: 'manual' })
+    const diagnosis = getCloudSyncErrorDiagnosis(result, { storageId: 'cfg-1', reason: 'manual' })
+
+    expect(result).toMatchObject({
+      success: false,
+      errorCode: 'SYNC_CANCELLED',
+      diagnostic: {
+        retryClass: 'transient'
+      }
+    })
+    expect(diagnosis.canAutoRetry).toBe(true)
+    expect(diagnosis.canUserFix).toBe(false)
+    expect(diagnosis.title).not.toBe('同步遇到问题')
+    expect(diagnosis.message).not.toContain('请复制错误详情反馈')
+    expect(diagnosis.copyText).toContain('错误代码: SYNC_CANCELLED')
+  })
+
+  it('recognizes a raw sync-generation-superseded message even without a structured diagnostic', () => {
+    const diagnosis = getCloudSyncErrorDiagnosis(
+      '923713d1-b76a-4f12-baf5-885ac7d0422d：同步任务已被更新的生命周期同步取代'
+    )
+
+    expect(diagnosis.canAutoRetry).toBe(true)
+    expect(diagnosis.canUserFix).toBe(false)
+    expect(diagnosis.title).not.toBe('同步遇到问题')
+  })
+
+  it('falls back to a calm auto-retry notice for structured diagnostics classified transient/remote-changed but unmatched by any specific rule', () => {
+    const unclassifiedTransientResult = {
+      success: false,
+      appliedLocal: false,
+      uploadedRemote: false,
+      conflicts: [],
+      summary: { added: 0, updated: 0, deleted: 0, kept: 0, conflicts: 0 },
+      error: 'some future condition not covered by any text-based rule',
+      errorCode: 'UNKNOWN_SYNC_ERROR',
+      diagnostic: {
+        operationId: 'op-future',
+        code: 'UNKNOWN_SYNC_ERROR',
+        phase: 'merge',
+        retryClass: 'remote-changed',
+        message: 'some future condition not covered by any text-based rule',
+        storageId: 'cfg-1',
+        fingerprint: 'fp-future'
+      }
+    } as const
+
+    const diagnosis = getCloudSyncErrorDiagnosis(unclassifiedTransientResult, {
+      storageId: 'cfg-1',
+      reason: 'manual'
+    })
+
+    expect(diagnosis.title).toBe('同步遇到临时状况')
+    expect(diagnosis.canAutoRetry).toBe(true)
+    expect(diagnosis.canUserFix).toBe(false)
+  })
+
   it('fails sync when a saved manifest reads back the same revision with different data', async () => {
     const emptyManifest = createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z')
     const { service, cloudClient, storage } = createService(baseData, emptyManifest)

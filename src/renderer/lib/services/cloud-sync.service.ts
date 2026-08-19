@@ -2895,6 +2895,14 @@ export function getCloudSyncErrorDiagnosis(
       '确认是否需要保留云端恢复后的新增数据',
       '完成选择后再继续同步'
     ];
+  } else if (structuredDiagnostic?.code === 'SYNC_CANCELLED' || isCloudSyncCancelledMessage(rawError)) {
+    title = '同步已被新的操作接管';
+    message = '有新的同步请求覆盖了这一次操作，这是正常的调度行为，应用会自动继续，无需手动处理。';
+    canAutoRetry = true;
+    suggestedActions = [
+      '无需处理，等待应用自动完成后续同步',
+      '如长时间未显示"云同步正常"，可手动点击立即同步'
+    ];
   } else if (isCloudSyncInstabilityError(rawError)) {
     title = '云端同步状态暂时不一致';
     message = '应用会保留本机数据并自动重试；如果持续出现，请查看详情复制诊断信息。';
@@ -2939,6 +2947,17 @@ export function getCloudSyncErrorDiagnosis(
       '重启应用后重新同步',
       '确认本机磁盘空间充足',
       '复制错误详情并反馈'
+    ];
+  } else if (structuredDiagnostic?.retryClass === 'transient' || structuredDiagnostic?.retryClass === 'remote-changed') {
+    // 兜底：结构化诊断已判定为可自动恢复的临时状况，但文案未命中以上任何具体分类。
+    // 仍然应当以"警告并自动重试"的口吻呈现，而不是让用户误以为需要自己处理。
+    title = '同步遇到临时状况';
+    message = '这通常是网络波动或云端数据短暂变化导致的，应用会自动重试，暂时无需处理。';
+    canAutoRetry = true;
+    suggestedActions = [
+      '等待应用自动重试',
+      '如果持续较长时间未恢复，可手动点击立即同步',
+      '仍未恢复时，请复制错误详情反馈'
     ];
   }
 
@@ -3057,6 +3076,15 @@ function isCloudSyncPathError(error: string): boolean {
     error.includes('目录不存在') ||
     error.includes('路径不存在')
   );
+}
+
+/**
+ * 同一个同步存储配置上，新的同步请求会取代仍在进行中的旧请求（世代号机制），
+ * 这是正常的调度行为而非真正的失败：旧请求的调用方会看到这条消息，但新请求
+ * 会接手继续完成同步。展示给用户时必须和真正需要处理的错误区分开。
+ */
+function isCloudSyncCancelledMessage(error: string): boolean {
+  return /生命周期同步取代|同步任务已被更新/.test(error);
 }
 
 function isCloudSyncDatabaseError(error: string): boolean {
@@ -3275,7 +3303,7 @@ function createCloudSyncStructuredDiagnostic(
   } else if (isCloudSyncManifestCorruptionError(error)) {
     code = 'REMOTE_CORRUPT';
     retryClass = 'user-action';
-  } else if (/生命周期同步取代|同步任务已被更新/.test(message)) {
+  } else if (isCloudSyncCancelledMessage(message)) {
     code = 'SYNC_CANCELLED';
     retryClass = 'transient';
   } else if (context.phase === 'export') {

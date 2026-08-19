@@ -4,8 +4,7 @@ import { AlertTriangle, CircleCheck, Clock, CloudOff, Copy, Refresh, Settings, X
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
-  getCloudSyncResultMessage,
-  getFriendlyCloudSyncError
+  getCloudSyncResultMessage
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
 
@@ -20,9 +19,27 @@ const emit = defineEmits<{
   activate: [];
 }>();
 
+const rawErrorText = computed(() => status.value.error || status.value.lastResult?.error || '');
+
+const hasErrorDetail = computed(() => status.value.status === 'error' && !!rawErrorText.value);
+
+const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(rawErrorText.value, {
+  storageId: status.value.storageId,
+  reason: status.value.reason,
+  status: status.value.status,
+  failureCount: status.value.failureCount,
+  timestamp: status.value.updatedAt
+}));
+
+// 网络波动、同步任务被更新的世代取代等"可以自动恢复"的状况，不应该用刺眼的
+// 错误红色呈现——它们会自动重试，用户通常无需介入。只有诊断判定为不可自动
+// 重试的情况，才是真正需要用户查看并处理的错误。
+const isAttentionWorthy = computed(() => hasErrorDetail.value && errorDiagnosis.value.canAutoRetry);
+
 const visualState = computed(() => {
   if (status.value.status === 'syncing') return 'syncing';
   if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return 'scheduled';
+  if (status.value.status === 'error' && isAttentionWorthy.value) return 'attention';
   if (status.value.status === 'error') return 'error';
   if (status.value.status === 'scheduled' && status.value.pendingChanges) return 'scheduled';
   if (status.value.lastResult?.success || status.value.lastSyncAt) return 'success';
@@ -33,6 +50,7 @@ const visualState = computed(() => {
 const statusIcon = computed(() => {
   if (visualState.value === 'syncing') return Refresh;
   if (visualState.value === 'scheduled') return Clock;
+  if (visualState.value === 'attention') return Clock;
   if (visualState.value === 'error') return AlertTriangle;
   if (visualState.value === 'success') return CircleCheck;
   return CloudOff;
@@ -41,18 +59,15 @@ const statusIcon = computed(() => {
 const primaryText = computed(() => {
   if (status.value.status === 'syncing') return '正在同步';
   if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return '已安排同步重试';
-  if (status.value.status === 'error') return '同步遇到问题';
+  if (status.value.status === 'error') return errorDiagnosis.value.title;
   if (visualState.value === 'scheduled') return '等待下次同步';
   if (visualState.value === 'success') return '云同步正常';
   return '云同步待机';
 });
 
 const detailText = computed(() => {
-  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) {
-    return getFriendlyCloudSyncError(status.value.error);
-  }
   if (status.value.status === 'error') {
-    return getFriendlyCloudSyncError(status.value.error);
+    return errorDiagnosis.value.message;
   }
 
   if (visualState.value === 'success' && status.value.lastResult?.success) {
@@ -73,18 +88,6 @@ const detailText = computed(() => {
 
   return '启用云存储后会自动显示同步状态';
 });
-
-const rawErrorText = computed(() => status.value.error || status.value.lastResult?.error || '');
-
-const hasErrorDetail = computed(() => status.value.status === 'error' && !!rawErrorText.value);
-
-const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(rawErrorText.value, {
-  storageId: status.value.storageId,
-  reason: status.value.reason,
-  status: status.value.status,
-  failureCount: status.value.failureCount,
-  timestamp: status.value.updatedAt
-}));
 
 const nextSyncText = computed(() => {
   if (!status.value.nextSyncAt) return '';

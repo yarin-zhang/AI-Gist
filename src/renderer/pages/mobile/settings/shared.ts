@@ -85,7 +85,9 @@ export const presentSyncErrorDetails = async (
     timestamp: new Date().toISOString()
   })
 
-  await showToast(diagnosis.message, 'danger')
+  // 会自动重试的临时状况（网络波动、同步任务被更新的世代取代等）用警告色提示，
+  // 避免让用户误以为遇到了需要自己处理的严重错误。
+  await showToast(diagnosis.message, diagnosis.canAutoRetry ? 'warning' : 'danger')
 
   const buttons: Parameters<typeof alertController.create>[0]['buttons'] = [
     {
