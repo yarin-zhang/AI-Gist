@@ -3,6 +3,11 @@
     <ion-header>
       <ion-toolbar>
         <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.aiConfig') }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="handleCreate">
+            <ion-icon :icon="add"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -107,13 +112,6 @@
         </div>
       </div>
     </ion-content>
-
-    <!-- 浮动操作按钮 -->
-    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button @click="handleCreate">
-        <ion-icon :icon="add"></ion-icon>
-      </ion-fab-button>
-    </ion-fab>
   </ion-page>
 </template>
 
@@ -132,8 +130,7 @@ import {
   IonChip,
   IonIcon,
   IonButton,
-  IonFab,
-  IonFabButton,
+  IonButtons,
   IonRefresher,
   IonRefresherContent,
   IonSpinner,
@@ -435,8 +432,8 @@ ion-card {
 }
 
 ion-content {
-  /* 让列表底部留出悬浮按钮的空间；标签栏本身已经覆盖了安全区 */
-  --padding-bottom: var(--mobile-fab-clearance);
+  /* 让列表底部留出浮动导航（AI 入口条 + 标签栏）的空间，避免最后一项被遮挡 */
+  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-clearance));
 }
 
 .preferred-alert {

@@ -611,6 +611,9 @@
     "title": "言語設定"
   },
   "mainPage": {
+    "aiEntry": {
+      "label": "AI生成"
+    },
     "menu": {
       "aiConfig": "AI設定",
       "prompts": "AIプロンプト",
