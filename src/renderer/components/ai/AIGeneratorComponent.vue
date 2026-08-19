@@ -852,7 +852,6 @@ onMounted(async () => {
 .result-content { flex: 1 1 0; height: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .result-status { flex: 0 0 auto; }
 .result-textarea { flex: 1 1 0; height: 0; min-height: 0; }
-.result-textarea :deep(.n-input-wrapper) { background: var(--surface-secondary); }
 .history-scroll { flex: 1 1 0; height: 0; min-height: 0; }
 :deep(.history-scroll .n-scrollbar-content) { min-height: 100%; display: flex; flex-direction: column; }
 .history-list { background: transparent; }
