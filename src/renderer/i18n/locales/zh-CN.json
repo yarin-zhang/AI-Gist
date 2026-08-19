@@ -295,8 +295,7 @@
     "saveSuccess": "提示词已保存",
     "selectModel": "选择模型",
     "stop": "停止",
-    "stopped": "已停止生成",
-    "title": "AI 提示词生成器"
+    "stopped": "已停止生成"
   },
   "appearance": {
     "auto": "跟随系统",
@@ -626,9 +625,6 @@
     "title": "语言设置"
   },
   "mainPage": {
-    "aiEntry": {
-      "label": "AI 生成"
-    },
     "menu": {
       "aiConfig": "AI 配置",
       "prompts": "AI 提示词",

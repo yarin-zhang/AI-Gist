@@ -8,12 +8,14 @@
         玻璃层（见 assets/styles/mobile.css 的 .mobile-floating-nav 分区），而不是
         贴死在屏幕底部的实体栏。标签栏本身在向下滚动时会收起为纯图标的小型胶囊。
 
-        提示词 Tab 上的入口条是「新建提示词」+「AI 生成提示词」的长条+圆形两按钮
-        （见 Gitea issue #7），谁占长条主位由是否已配置 AI 决定，逻辑见
-        lib/mobile/floating-prompt-actions.ts；其余 2 个 Tab 保持原来「AI 生成」
-        单按钮不变，因为「新建提示词」在那两个页面语境下没有意义。两种布局共用
-        同一套滚动收起动画：长条按钮始终是 .mobile-ai-entry，收起时的宽度/内边距
-        过渡规则完全复用，未新增任何滚动状态。
+        入口条只在「AI 提示词」Tab 上出现，是「新建提示词」+「AI 生成提示词」的
+        长条+圆形两按钮（见 Gitea issue #7），谁占长条主位由是否已配置 AI 决定，
+        逻辑见 lib/mobile/floating-prompt-actions.ts。「AI 配置」「设置」这两个
+        Tab 不再重复渲染独立的「AI 生成」按钮（Gitea issue #59）：这两个页面
+        语境下点它既不能新建提示词，也没有直达价值，且 isPromptsTab 已经覆盖了
+        全部 3 个 Tab 的判断，v-if 之外无需 v-else 兜底。入口条与标签栏共用同一套
+        滚动收起动画：容器整体是 bottom: 0 的定位盒子，标签栏始终是最后一个子项，
+        入口条是否渲染只影响它上方留白，不会让标签栏跟着挪位置或跳动。
       -->
       <div
         slot="bottom"
@@ -39,17 +41,6 @@
             <ion-icon :icon="promptActionMeta[promptFloatingActions.secondary].icon"></ion-icon>
           </button>
         </div>
-
-        <button
-          v-else
-          type="button"
-          class="mobile-ai-entry"
-          :aria-label="t('aiGenerator.title')"
-          @click="openAIGenerator"
-        >
-          <ion-icon :icon="sparkles"></ion-icon>
-          <span class="mobile-ai-entry__label">{{ t('mainPage.aiEntry.label') }}</span>
-        </button>
 
         <ion-tab-bar id="mobile-tab-bar">
           <ion-tab-button tab="prompts" href="/tabs/prompts">
@@ -116,7 +107,8 @@ const openAIGenerator = () => {
 
 // ------------------------------------------------------------------
 // 提示词操作区：两态两按钮布局（Gitea issue #7）
-// 只在提示词 Tab 上生效，其余 Tab 保持原来的单一 AI 入口按钮。
+// 只在提示词 Tab 上生效；「AI 配置」「设置」两个 Tab 不渲染任何浮动入口按钮
+// （Gitea issue #59）。
 // ------------------------------------------------------------------
 const isPromptsTab = computed(() => route.path === '/tabs/prompts')
 
