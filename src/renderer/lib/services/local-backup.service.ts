@@ -14,6 +14,7 @@ import { normalizeForChecksum, stableSerialize } from '@shared/data-checksum';
 import { PlatformDetector } from '@shared/platform';
 import type { ExportResult } from '@shared/types/data-management';
 import { DatabaseServiceManager } from './database-manager.service';
+import i18n from '../../i18n';
 
 const WEB_BACKUPS_KEY = 'ai-gist:web:local-backups';
 const WEB_BACKUP_DB_NAME = 'ai-gist-local-backups';
@@ -61,6 +62,27 @@ export interface LocalBackupServiceDeps {
   createId?: () => string;
 }
 
+const LOCAL_BACKUP_DESCRIPTION_FALLBACKS: Record<BackupType, string> = {
+  automatic: '自动本地备份',
+  manual: '手动本地备份'
+};
+
+/**
+ * 备份版本列表标题必须跟随当前界面语言显示，不能在创建备份时把某一种语言的文案
+ * 写死存进备份文件（否则切换语言后，已创建的备份标题不会跟着变）。这里只生成
+ * 一个与语言无关的默认描述；备份创建时间由界面用 formatDateTime 单独格式化展示。
+ * i18n 尚未初始化时（例如纯 Node 单测）回退到中文原文，避免抛错。
+ */
+export function getDefaultLocalBackupDescription(backupType: BackupType = 'manual'): string {
+  const key = backupType === 'automatic' ? 'dataManagement.backupTypeAutomatic' : 'dataManagement.backupTypeManual';
+  try {
+    const translated = (i18n.global.t as (key: string) => string)(key);
+    return translated === key ? LOCAL_BACKUP_DESCRIPTION_FALLBACKS[backupType] : translated;
+  } catch {
+    return LOCAL_BACKUP_DESCRIPTION_FALLBACKS[backupType];
+  }
+}
+
 export class LocalBackupService {
   private readonly database: NonNullable<LocalBackupServiceDeps['database']>;
   private readonly repository: LocalBackupRepository;
@@ -97,7 +119,7 @@ export class LocalBackupService {
     const payload = createBackupPayload({
       id,
       name,
-      description: options.description || (options.backupType === 'automatic' ? '自动本地备份' : '手动本地备份'),
+      description: options.description || getDefaultLocalBackupDescription(options.backupType || 'manual'),
       createdAt,
       data,
       backupType: options.backupType || 'manual',
@@ -414,7 +436,7 @@ function toLocalBackupInfo(input: unknown, size: number): LocalBackupInfo {
   return {
     id: payload.id,
     name: payload.name,
-    description: payload.description || '本地备份',
+    description: payload.description || getDefaultLocalBackupDescription(payload.backupType),
     createdAt: payload.createdAt,
     size,
     backupType: payload.backupType,

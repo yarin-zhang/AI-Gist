@@ -87,8 +87,9 @@ describe('automatic backup settings', () => {
     await service.runNow('interval')
 
     expect(backupService.create).toHaveBeenCalledTimes(1)
+    // 不再在这里把某种语言的描述文案写死存进备份文件：备份列表标题由界面按
+    // backupType 现算并跟随当前界面语言，创建时只需要传 backupType 供界面识别。
     expect(backupService.create).toHaveBeenCalledWith({
-      description: expect.stringContaining('自动本地备份'),
       backupType: 'automatic',
       trigger: 'interval',
       retention: DEFAULT_AUTO_BACKUP_RETENTION

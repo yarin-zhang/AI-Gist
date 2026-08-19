@@ -319,7 +319,6 @@ export class AutomaticBackupService {
     this.updateStatus({ status: 'backing-up', error: undefined, nextBackupAt: undefined });
     try {
       const result = await this.backupService.create({
-        description: `自动本地备份 - ${new Date().toLocaleString()}`,
         backupType: 'automatic',
         trigger,
         retention: this.retention

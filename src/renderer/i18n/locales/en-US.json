@@ -427,6 +427,8 @@
     "aiConfigCount": "{count}",
     "aiConfiguration": "AI Configuration",
     "backupManagement": "Data Backup",
+    "backupTypeAutomatic": "Automatic local backup",
+    "backupTypeManual": "Manual local backup",
     "backupVersionList": "Backup Version List",
     "categoryManagement": "Category Management",
     "categoryCount": "{count}",
