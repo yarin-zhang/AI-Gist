@@ -46,6 +46,22 @@
           </div>
         </div>
 
+        <!-- 图片 -->
+        <div v-if="imageUrls.length > 0" class="content-section">
+          <div class="section-header">
+            <h2>{{ t('promptManagement.images') }}</h2>
+          </div>
+          <div class="images-grid">
+            <img
+              v-for="(url, index) in imageUrls"
+              :key="index"
+              :src="url"
+              class="prompt-image"
+              @click="openImagePreview(url)"
+            />
+          </div>
+        </div>
+
         <!--
           提示词内容：只有当提示词含有 {{变量名}} 挖空变量时才切换为"填写变量 +
           实时预览"这套交互（对应 Gitea issue #87），普通纯文本提示词保持原样
@@ -85,22 +101,6 @@
           </div>
           <div class="prompt-content-wrapper">
             <div class="prompt-content">{{ prompt.content }}</div>
-          </div>
-        </div>
-
-        <!-- 图片 -->
-        <div v-if="imageUrls.length > 0" class="content-section">
-          <div class="section-header">
-            <h2>{{ t('promptManagement.images') }}</h2>
-          </div>
-          <div class="images-grid">
-            <img
-              v-for="(url, index) in imageUrls"
-              :key="index"
-              :src="url"
-              class="prompt-image"
-              @click="openImagePreview(url)"
-            />
           </div>
         </div>
       </div>
