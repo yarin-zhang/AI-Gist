@@ -213,6 +213,5 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
     align-items: center;
     justify-content: center;
     background: var(--surface-sidebar);
-    border-top: 1px solid var(--border-default);
 }
 </style>
