@@ -70,6 +70,12 @@
         ></ion-input>
       </ion-item>
 
+      <!-- 变量的辅助说明文字（对应桌面端 PromptVariableField 用 tooltip 展示的
+           variable.description）：移动端没有 hover，改用字段下方的小字副标题。
+           有错误提示时优先显示错误，避免同一字段下堆两行小字。 -->
+      <p v-if="variable.description && !showError(variable.name)" class="variable-hint">
+        {{ variable.description }}
+      </p>
       <p v-if="showError(variable.name)" class="variable-error" role="alert">
         {{ t('promptWorkspace.requiredValue') }}
       </p>
@@ -91,6 +97,12 @@ import {
 const props = defineProps<{
   variables: EditablePromptVariable[]
   modelValue: Record<string, any>
+  // 桌面端 copyPrompt() 校验入口 fillCanvasRef.validateAndFocus() 的契约是
+  // “必填变量都已填写 且 模板渲染没有出错”才算通过（PromptFillCanvas.vue
+  // 140-145 行：`if (!missing.value.length && !rendered.value.error) return true`）。
+  // 这个 prop 把渲染错误从父组件（详情页）传进来，让本组件的 validateAndFocus()
+  // 独立满足同样的契约，不依赖调用方在外部再补一次 rendered.error 检查。
+  renderError?: string
 }>()
 
 const emit = defineEmits<{
@@ -155,7 +167,7 @@ const setItemRef = (name: string, el: any) => {
 // 存在必填但未填写的变量时，标记为已触碰（露出错误提示）、滚动并聚焦到第一个
 // 未填写的字段，并返回 false 让调用方（详情页的复制按钮）中止复制。
 const validateAndFocus = async (): Promise<boolean> => {
-  if (!missing.value.length) return true
+  if (!missing.value.length && !props.renderError) return true
   touched.value = new Set([...touched.value, ...missing.value])
   await nextTick()
   const target = itemElements.get(missing.value[0])
@@ -197,5 +209,12 @@ defineExpose({ validateAndFocus, resetValidation })
   color: var(--accent-error);
   font-size: var(--mobile-font-size-caption);
   background: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
+}
+
+.variable-hint {
+  margin: 0;
+  padding: 0 var(--content-padding) var(--spacing-sm);
+  color: var(--content-tertiary);
+  font-size: var(--mobile-font-size-caption);
 }
 </style>

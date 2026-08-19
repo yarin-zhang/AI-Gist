@@ -131,4 +131,74 @@ describe('mobile prompt variable fill — 页面接线（wiring）检查', () =>
     const source = read(DETAIL_PAGE)
     expect(source).toMatch(/<div v-else class="content-section">[\s\S]*?\{\{ prompt\.content \}\}/)
   })
+
+  it('validateAndFocus() 把渲染错误传给填写表单，让表单自己也能满足"必填齐全且渲染无误"的契约', () => {
+    const source = read(DETAIL_PAGE)
+    expect(source).toContain(':render-error="rendered.error"')
+    const formSource = read(FILL_FORM)
+    expect(formSource).toMatch(/renderError\?:\s*string/)
+    expect(formSource).toMatch(/if \(!missing\.value\.length && !props\.renderError\) return true/)
+  })
+})
+
+// 第二轮修复：review 发现并复现的真实数据丢失 bug——onIonViewWillEnter 会在这个
+// 页面每次重新变为激活状态时都调用 loadPrompt()（例如从"编辑"页返回），第一轮
+// 实现里 draft.value = createPromptDraft(...) 是无条件执行的，导致用户已经填完
+// 的草稿被静默清空。修复参照桌面端 PromptUseWorkspace.vue 的既有模式：只在
+// 提示词身份（id/uuid）真正改变时才重置草稿。
+describe('mobile prompt variable fill — 详情页重新进入不应清空已填草稿（issue #87 二轮修复）', () => {
+  it('loadPrompt() 里 draft 的重置被"身份是否变化"的 if 包裹，不再是无条件执行的一行代码', () => {
+    const source = read(DETAIL_PAGE)
+    // 记忆"上一次加载的是哪个提示词"必须声明在 loadPrompt 之外（模块级变量），
+    // 否则每次调用都会是全新的初始值，起不到跨调用记忆的作用。
+    expect(source).toMatch(/let loadedPromptKey: string \| null = null/)
+    // 重置 draft 与重置校验状态必须被同一个身份比较 if 包裹，且只有分支内才
+    // 更新 loadedPromptKey——这样"相同身份"路径下三者都不会执行，草稿原样保留。
+    expect(source).toMatch(
+      /const promptKey = prompt\.value[\s\S]{0,80}\n\s*if \(promptKey !== loadedPromptKey\) \{\s*\n\s*draft\.value = createPromptDraft\(variables\.value, \{\}\)\s*\n\s*fillFormRef\.value\?\.resetValidation\(\)\s*\n\s*loadedPromptKey = promptKey\s*\n\s*\}/
+    )
+    // 锁定"拿到 prompt 后立刻无条件重置 draft"这个旧的 bug 模式不会再出现。
+    expect(source).not.toMatch(
+      /prompt\.value = await api\.prompts\.getById\.query\(promptId\)\s*\n\s*draft\.value = createPromptDraft/
+    )
+  })
+
+  it('模拟真实复现步骤：同一提示词往返导航（详情→编辑→详情）保留草稿，切换到不同提示词才重置为默认值', () => {
+    // 这里直接复用生产代码同一份 createPromptDraft/getActivePromptVariables，
+    // 按 loadPrompt() 里锁定的同一套身份比较规则模拟"加载"，验证该算法本身在
+    // review 描述的两个场景下都行为正确：
+    //   1) 同一个提示词 id/uuid 重新加载（从编辑页返回）——草稿保留
+    //   2) 换成另一个不同的提示词——草稿正确重置为新提示词的默认值
+    let loadedPromptKey: string | null = null
+    let draft: Record<string, any> = {}
+    const load = (p: PromptWithRelations) => {
+      const key = `${p.id ?? ''}:${p.uuid ?? ''}`
+      if (key !== loadedPromptKey) {
+        draft = createPromptDraft(getActivePromptVariables(p), {})
+        loadedPromptKey = key
+      }
+    }
+
+    const prompt = travelPrompt()
+
+    // 步骤 1：首次进入详情页，填完全部 5 个变量到 "5/5 filled"
+    load(prompt)
+    draft = { ...draft, 目的地: '京都', 天数: '5', 月份: '11月', 预算: '8000元', 偏好: '古寺与美食' }
+    expect(getMissingPromptVariables(getActivePromptVariables(prompt), draft)).toEqual([])
+
+    // 步骤 2：导航到 /prompt/edit/2 再返回 /prompt/detail/2——同一个提示词，
+    // onIonViewWillEnter 重新触发 loadPrompt()，草稿必须原样保留（不能退回 "1/5"）
+    load(prompt)
+    expect(draft).toEqual({ 目的地: '京都', 天数: '5', 月份: '11月', 预算: '8000元', 偏好: '古寺与美食' })
+
+    // 步骤 3：真正切换到另一个不同的提示词——草稿要正确重置为新提示词的默认值，
+    // 不能因为这次修复而"永远不重置"
+    const otherPrompt = travelPrompt({
+      id: 2,
+      uuid: 'prompt-other',
+      content: '给{{受众}}写一封{{语气}}的邮件。',
+    })
+    load(otherPrompt)
+    expect(draft).toEqual({ 受众: '', 语气: '' })
+  })
 })

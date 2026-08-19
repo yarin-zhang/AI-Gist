@@ -58,7 +58,12 @@
               <span class="fill-progress">{{ t('promptFill.progress', { filled: filledCount, total: variables.length }) }}</span>
             </div>
             <div class="mobile-grouped-card">
-              <PromptVariableFillForm ref="fillFormRef" :variables="variables" v-model="draft" />
+              <PromptVariableFillForm
+                ref="fillFormRef"
+                :variables="variables"
+                v-model="draft"
+                :render-error="rendered.error"
+              />
             </div>
           </div>
 
@@ -180,6 +185,9 @@ const loading = ref(true)
 const imageUrls = ref<string[]>([])
 const previewUrl = ref<string | null>(null)
 let initialLoadPromise: Promise<void> | null = null
+// 上一次加载成功的提示词身份（id/uuid），用来判断 loadPrompt() 这次拿到的是否
+// 还是同一个提示词——见下方 loadPrompt() 内的用法和注释。
+let loadedPromptKey: string | null = null
 
 // 挖空变量：解析规则、默认值兜底、必填校验全部直接复用桌面端同一份
 // ~/lib/utils/prompt-template（desktop 端通过 @ 别名引用的也是这个文件，
@@ -210,6 +218,19 @@ const updateImageUrls = () => {
 }
 
 // 加载提示词详情
+//
+// onIonViewWillEnter（见下方）会在这个页面每次重新变为激活状态时都调用一次
+// loadPrompt()，最典型的场景是：用户从这个详情页点进"编辑"看一眼，再返回。
+// 这不是一次身份变化的导航——仍然是同一个提示词——如果每次都无条件把
+// draft.value 重置为空默认值，会静默清空用户尚未提交的填写进度（对应 Gitea
+// #87 复查发现的数据丢失 bug）。
+//
+// 参照桌面端 PromptUseWorkspace.vue 的既有模式：那边用
+// `watch(() => \`${props.prompt.id || ''}:${props.prompt.uuid}\`, ...)` 只在
+// 提示词身份真正改变时才调用 initializeDraft() 重置草稿。这里没有 watch 可用
+// （prompt 是这个页面自己异步 fetch 来的，不是响应式 prop），所以改为手动记录
+// 上一次加载成功的身份 key，本次加载完成后比较：身份不同才重置 draft 和校验
+// 状态；身份相同（同一个提示词）就保留 draft.value 原样，不覆盖。
 const loadPrompt = async () => {
   loading.value = true
   try {
@@ -218,8 +239,12 @@ const loadPrompt = async () => {
       throw new Error('Invalid prompt ID')
     }
     prompt.value = await api.prompts.getById.query(promptId)
-    draft.value = createPromptDraft(variables.value, {})
-    fillFormRef.value?.resetValidation()
+    const promptKey = prompt.value ? `${prompt.value.id ?? ''}:${prompt.value.uuid ?? ''}` : null
+    if (promptKey !== loadedPromptKey) {
+      draft.value = createPromptDraft(variables.value, {})
+      fillFormRef.value?.resetValidation()
+      loadedPromptKey = promptKey
+    }
     updateImageUrls()
   } catch (error) {
     console.error('加载提示词失败:', error)
