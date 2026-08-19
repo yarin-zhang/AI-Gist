@@ -2,7 +2,8 @@
     "appId": "com.yarinz.aigist",
     "productName": "AI Gist",
     "directories": {
-        "output": "dist"
+        "output": "dist",
+        "buildResources": "resources"
     },
     "publish": {
         "provider": "github",
