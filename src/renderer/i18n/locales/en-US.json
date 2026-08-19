@@ -295,8 +295,7 @@
     "saveSuccess": "Prompt word has been saved",
     "selectModel": "Select Model",
     "stop": "Stop",
-    "stopped": "Generation stopped",
-    "title": "AI Prompt Generator"
+    "stopped": "Generation stopped"
   },
   "appearance": {
     "auto": "Follow System",
@@ -626,9 +625,6 @@
     "title": "Language"
   },
   "mainPage": {
-    "aiEntry": {
-      "label": "Generate"
-    },
     "menu": {
       "aiConfig": "AI Config",
       "prompts": "AI Prompts",

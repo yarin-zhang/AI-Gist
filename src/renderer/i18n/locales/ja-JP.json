@@ -295,8 +295,7 @@
     "saveSuccess": "プロンプトワードが保存されました",
     "selectModel": "モデルを選択",
     "stop": "停止",
-    "stopped": "生成停止",
-    "title": "AIプロンプトジェネレーター"
+    "stopped": "生成停止"
   },
   "appearance": {
     "auto": "システムに従う",
@@ -626,9 +625,6 @@
     "title": "言語設定"
   },
   "mainPage": {
-    "aiEntry": {
-      "label": "AI生成"
-    },
     "menu": {
       "aiConfig": "AI設定",
       "prompts": "AIプロンプト",
