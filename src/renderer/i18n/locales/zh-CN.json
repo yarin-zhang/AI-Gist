@@ -749,6 +749,7 @@
     "categoryDragHandle": "拖拽分类“{name}”调整顺序",
     "categoryDragHint": "拖拽排序",
     "categoryManageDesc": "管理您的提示词分类，调整顺序并创建、编辑或删除分类",
+    "categoryManageEmpty": "暂无分类，点击“新建分类”创建",
     "categoryManageTitle": "分类管理",
     "categoryName": "分类名称",
     "categoryNamePlaceholder": "请输入分类名称",

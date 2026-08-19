@@ -749,6 +749,7 @@
     "categoryDragHandle": "拖曳分類「{name}」調整順序",
     "categoryDragHint": "拖曳排序",
     "categoryManageDesc": "管理您的提示詞分類，調整順序並創建、編輯或刪除分類",
+    "categoryManageEmpty": "尚無分類，點擊「新建分類」建立",
     "categoryManageTitle": "分類管理",
     "categoryName": "分類名稱",
     "categoryNamePlaceholder": "請輸入分類名稱",
