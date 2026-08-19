@@ -288,7 +288,7 @@ defineExpose({
 .prompt-workspace { flex: 1; min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; background: var(--surface-body); }
 .workspace-header { flex: 0 0 auto; border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
 .workspace-primary-row { min-height: 60px; padding: 9px var(--page-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
-.workspace-identity { min-width: 0; }
+.workspace-identity { flex: 1 1 auto; min-width: 0; }
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .workspace-title { max-width: min(620px, 52vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
 .workspace-description { display: block; max-width: 660px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
