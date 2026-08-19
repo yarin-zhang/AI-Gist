@@ -200,6 +200,7 @@
             v-for="tag in filteredPopularTags"
             :key="tag"
             button
+            :detail="false"
             @click="toggleTag(tag)"
           >
             <ion-label>{{ tag }}</ion-label>
