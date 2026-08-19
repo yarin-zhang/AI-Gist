@@ -278,6 +278,8 @@
     "generatedPromptTag": "AI生成",
     "generatedPromptTitle": "AI生成: {topic}",
     "generating": "正在生成中...",
+    "generatingWithCount": "正在生成... 已生成 {count} 字元",
+    "generatingWithRate": "正在生成... 已生成 {count} 字元 ({rate} 字元/秒)",
     "generationHistory": "生成歷史",
     "history": "歷史記錄",
     "noConfigAvailable": "暫無可用的 AI 配置",

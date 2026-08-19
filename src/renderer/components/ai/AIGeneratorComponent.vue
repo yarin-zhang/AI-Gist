@@ -79,9 +79,6 @@
                                 </NText>
                             </div>
                             <NFlex align="center" size="small">
-                                <NTag v-if="generating && !showHistory" size="small" type="info">
-                                    {{ getGenerationStatusText() }}
-                                </NTag>
                                 <NButton v-if="showHistory" size="small" secondary @click="loadHistory">
                                     <template #icon><NIcon size="16"><Refresh /></NIcon></template>
                                     {{ t('common.refresh') }}
@@ -153,6 +150,9 @@
                     </template>
 
                     <div v-else class="result-content">
+                        <AIGenerationStatus v-if="generating" class="result-status" :char-count="streamStats.charCount"
+                            :is-streaming="streamStats.isStreaming" :is-active="streamStats.isGenerationActive"
+                            :growth-rate="streamStats.contentGrowthRate" />
                         <NInput v-model:value="generatedResult" type="textarea" readonly show-count
                             :placeholder="t('aiGenerator.resultPlaceholder')"
                             class="workspace-textarea result-textarea" />
@@ -174,7 +174,6 @@ import {
     NInput,
     NButton,
     NIcon,
-    NTag,
     NThing,
     NEmpty,
     NText,
@@ -190,6 +189,7 @@ import {
 import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import AIModelSelector from '~/components/common/AIModelSelector.vue'
+import AIGenerationStatus from './AIGenerationStatus.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 import { useDatabase } from '~/composables/useDatabase'
@@ -815,25 +815,6 @@ const serializeConfig = (config: AIConfig) => {
     return serialized;
 }
 
-// 获取生成状态文本
-const getGenerationStatusText = () => {
-    if (!generating.value) {
-        return ''
-    }
-    
-    if (streamStats.isStreaming && streamStats.charCount > 0) {
-        if (streamStats.isGenerationActive && streamStats.contentGrowthRate > 0) {
-            // 显示生成速率
-            return `正在生成... 已生成 ${streamStats.charCount} 字符 (${streamStats.contentGrowthRate.toFixed(1)} 字符/秒)`
-        } else if (streamStats.charCount > 0) {
-            // 显示已生成字符数
-            return `正在生成... 已生成 ${streamStats.charCount} 字符`
-        }
-    }
-    
-    return '正在生成...'
-}
-
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()
@@ -865,11 +846,27 @@ onMounted(async () => {
 .workspace-textarea :deep(.n-input__textarea),
 .workspace-textarea :deep(.n-input__textarea-el) { height: 100%; min-height: 0; }
 .workspace-textarea :deep(.n-input__textarea-el) { resize: none; }
+/* "要求"与"生成结果"文本域视觉对齐手动新建模式的 StructuredPromptEditor
+   （背景 surface-primary、边框 border-default），做法参照
+   PromptVariableField.vue 的组件级 :deep(.n-input) 覆盖，而不是改全局
+   Input 主题——避免影响本组件之外其它 13 处使用 NInput 的地方（Gitea #49）。
+   注意：.workspace-textarea 这个 class 是直接绑在 NInput 组件根节点上的
+   （NInput 根节点自身就带有 .n-input class），并非其祖先元素，所以这里不
+   能用 :deep() 后代选择器（会因为找不到"父 workspace-textarea 之下的
+   .n-input 后代"而永远不命中），直接覆盖 .workspace-textarea 即可。 */
+.workspace-textarea {
+  --n-color: var(--surface-primary) !important;
+  --n-color-focus: var(--surface-primary) !important;
+  --n-border: 1px solid var(--border-default) !important;
+  --n-border-hover: 1px solid var(--border-strong) !important;
+  --n-border-focus: 1px solid var(--accent-primary) !important;
+}
 .generator-control-panel { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--compact-padding); margin-top: var(--section-gap); padding-top: var(--section-gap); border-top: 1px solid var(--border-default); }
 .generator-model-selector { width: 100%; min-width: 0; }
 .generator-action-row { display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
-.result-content { flex: 1 1 0; height: 0; min-height: 0; }
-.result-textarea :deep(.n-input-wrapper) { background: var(--surface-secondary); }
+.result-content { flex: 1 1 0; height: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.result-status { flex: 0 0 auto; }
+.result-textarea { flex: 1 1 0; height: 0; min-height: 0; }
 .history-scroll { flex: 1 1 0; height: 0; min-height: 0; }
 :deep(.history-scroll .n-scrollbar-content) { min-height: 100%; display: flex; flex-direction: column; }
 .history-list { background: transparent; }
