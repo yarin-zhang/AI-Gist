@@ -1118,6 +1118,8 @@
     "blankPrompt": "新增空白提示詞",
     "manualCreate": "手動新建",
     "newPrompt": "新提示詞",
+    "clickToEdit": "點擊可編輯",
+    "addDescription": "新增描述",
     "use": "使用",
     "editing": "正在編輯",
     "unsavedChanges": "有未儲存的變更",
