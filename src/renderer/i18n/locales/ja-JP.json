@@ -745,7 +745,6 @@
     "categoryFilterTitle": "カテゴリフィルター",
     "categoryHasPrompts": "このカテゴリにはまだプロンプトがあるため、削除できません",
     "categoryDragHandle": "カテゴリ「{name}」をドラッグして並べ替え",
-    "categoryDragHint": "ドラッグして並べ替え",
     "categoryManageDesc": "プロンプトカテゴリの順序変更、作成、編集、削除を管理",
     "categoryManageEmpty": "カテゴリがありません。「カテゴリを作成」をクリックして作成してください",
     "categoryManageTitle": "カテゴリ管理",
@@ -1160,9 +1159,7 @@
     "workspaceView": "ワークスペース",
     "gridView": "カード",
     "tableView": "テーブル",
-    "folderView": "フォルダー",
-    "collapseSidebar": "ライブラリを折りたたむ",
-    "expandSidebar": "ライブラリを展開する"
+    "folderView": "フォルダー"
   },
   "promptEditor": {
     "viewMode": "編集ビュー", "visual": "変数ブロック", "source": "ソース",

@@ -11,8 +11,7 @@ import {
     NIcon,
     NFlex,
     NText,
-    NButton,
-    NTooltip
+    NButton
 } from 'naive-ui'
 import {
     ChevronLeft,
@@ -124,16 +123,11 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                             :collapsed="collapseRef" :collapsed-width="56" :collapsed-icon-size="20"
                             class="main-sider-menu" />
                         <div class="main-sider-toggle">
-                            <NTooltip placement="right">
-                                <template #trigger>
-                                    <NButton quaternary circle size="small" @click="collapseRef = !collapseRef">
-                                        <template #icon>
-                                            <NIcon size="16"><ChevronRight v-if="collapseRef" /><ChevronLeft v-else /></NIcon>
-                                        </template>
-                                    </NButton>
+                            <NButton quaternary circle size="small" @click="collapseRef = !collapseRef">
+                                <template #icon>
+                                    <NIcon size="16"><ChevronRight v-if="collapseRef" /><ChevronLeft v-else /></NIcon>
                                 </template>
-                                {{ collapseRef ? t('promptWorkspace.expandSidebar') : t('promptWorkspace.collapseSidebar') }}
-                            </NTooltip>
+                            </NButton>
                         </div>
                     </div>
                 </NLayoutSider>
