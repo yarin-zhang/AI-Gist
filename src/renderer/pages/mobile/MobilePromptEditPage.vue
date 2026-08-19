@@ -41,7 +41,6 @@
               required
             ></ion-textarea>
             <div class="field-meta-row">
-              <span class="field-hint">{{ t('promptManagement.variableSyntaxHint') }}</span>
               <span class="char-count">{{ contentLength }} {{ t('promptManagement.characters') }}</span>
             </div>
           </div>
@@ -676,13 +675,8 @@ onUnmounted(() => {
 .field-meta-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--spacing-sm);
-}
-
-.field-hint {
-  font-size: var(--mobile-font-size-caption);
-  color: var(--content-tertiary);
 }
 
 .char-count {
