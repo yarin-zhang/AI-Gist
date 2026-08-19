@@ -726,6 +726,7 @@
     "adjustmentInstruction": "调整指令：",
     "advancedFilter": "高级筛选",
     "aiGenerate": "AI 生成",
+    "aiGeneratePrompt": "AI 生成提示词",
     "aiModelPlaceholder": "请选择 AI 模型",
     "allCategories": "全部分类",
     "basicInfo": "基本信息",

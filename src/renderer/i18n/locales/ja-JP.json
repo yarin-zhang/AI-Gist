@@ -726,6 +726,7 @@
     "adjustmentInstruction": "調整指示：",
     "advancedFilter": "高度なフィルター",
     "aiGenerate": "AI生成",
+    "aiGeneratePrompt": "AIでプロンプトを生成",
     "aiModelPlaceholder": "AIモデルを選択",
     "allCategories": "全カテゴリ",
     "basicInfo": "基本情報",

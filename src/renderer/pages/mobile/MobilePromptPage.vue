@@ -283,13 +283,13 @@ import {
   gridOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
+import { useAIConfigStatus } from '~/composables/useAIConfigStatus'
 import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import { getTagsArray } from '~/lib/utils/tag-colors'
 import type { Prompt, Category } from '@shared/types'
 import { useRouter } from 'vue-router'
-import { databaseService } from '~/lib/db'
 import MobileWaterfallView from '~/components/mobile/MobileWaterfallView.vue'
 import EmptyPromptsIllustration from '~/components/mobile/illustrations/EmptyPromptsIllustration.vue'
 import NoSearchResultsIllustration from '~/components/mobile/illustrations/NoSearchResultsIllustration.vue'
@@ -325,7 +325,9 @@ const currentPage = ref(1)
 const pageSize = 20
 const hasNextPage = ref(false)
 const totalCount = ref(0)
-const hasAIConfig = ref(false)
+// 是否存在已启用的 AI 配置：跨组件共享状态，另见底部浮动导航的两态按钮布局
+// （src/renderer/pages/MobileMainPage.vue），两处依赖同一份数据，不再各自查库。
+const { hasAIConfig, refreshAIConfigStatus } = useAIConfigStatus()
 const viewMode = ref<'list' | 'waterfall'>(
   (localStorage.getItem('mobilePromptViewMode') as 'list' | 'waterfall') || 'list'
 )
@@ -499,17 +501,6 @@ const handleCreate = () => {
   router.push('/prompt/create')
 }
 
-// 检查是否有AI配置
-const checkAIConfig = async () => {
-  try {
-    const configs = await databaseService.aiConfig.getEnabledAIConfigs()
-    hasAIConfig.value = configs.length > 0
-  } catch (error) {
-    console.error('检查AI配置失败:', error)
-    hasAIConfig.value = false
-  }
-}
-
 // 导航到AI生成器
 const navigateToAIGenerator = () => {
   router.push('/ai-generator')
@@ -560,7 +551,7 @@ const reloadRealtimeData = async (showLoading = false) => {
   await Promise.all([
     loadCategories(),
     loadPrompts(false, { showLoading }),
-    checkAIConfig()
+    refreshAIConfigStatus()
   ])
 }
 
@@ -600,7 +591,7 @@ const unsubscribeDataChanges = onDataChange(['prompts', 'categories', 'ai_config
 onMounted(async () => {
   await loadCategories()
   await loadPrompts()
-  await checkAIConfig()
+  await refreshAIConfigStatus()
 })
 
 // 离开页面时保存滚动位置
@@ -621,7 +612,7 @@ onIonViewWillEnter(() => {
   if (shouldReload) {
     runRealtimeRefresh(isMutation || prompts.value.length === 0)
   } else {
-    checkAIConfig()
+    refreshAIConfigStatus()
   }
 })
 
@@ -638,7 +629,7 @@ onActivated(() => {
   if (pendingRealtimeRefresh) {
     runRealtimeRefresh(false)
   } else {
-    checkAIConfig()
+    refreshAIConfigStatus()
   }
 })
 
