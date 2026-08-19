@@ -22,30 +22,14 @@
           <div class="form-content">
             <ion-list lines="none">
 
-          <!-- 服务类型 -->
-          <ion-item lines="none">
-            <ion-select
-              v-model="formData.type"
-              :label="t('aiConfig.serviceType')"
-              :placeholder="t('aiConfig.pleaseSelectType')"
-              @ionChange="onTypeChange"
-            >
-              <ion-select-option disabled>{{ t('aiConfig.localServices') }}</ion-select-option>
-              <ion-select-option value="ollama">Ollama</ion-select-option>
-              <ion-select-option value="lmstudio">LM Studio</ion-select-option>
-              <ion-select-option disabled>{{ t('aiConfig.onlineServices') }}</ion-select-option>
-              <ion-select-option value="openai">OpenAI</ion-select-option>
-              <ion-select-option value="anthropic">Anthropic Claude</ion-select-option>
-              <ion-select-option value="google">Google Gemini AI</ion-select-option>
-              <ion-select-option value="azure">Azure OpenAI</ion-select-option>
-              <ion-select-option value="mistral">Mistral AI</ion-select-option>
-              <ion-select-option value="openrouter">OpenRouter</ion-select-option>
-              <ion-select-option value="deepseek">DeepSeek</ion-select-option>
-              <ion-select-option value="tencent">腾讯云</ion-select-option>
-              <ion-select-option value="aliyun">阿里云</ion-select-option>
-              <ion-select-option value="zhipu">智谱 AI</ion-select-option>
-              <ion-select-option value="siliconflow">硅基流动</ion-select-option>
-            </ion-select>
+          <!-- 服务类型：改为卡片式弹层选择，分组顺序为「在线服务」在前、「本地服务」在后
+               （移动端连接本地模型不方便，不适合作为默认优先项，详见 issue #58） -->
+          <ion-item button detail lines="none" @click="showTypeModal = true">
+            <ion-label>{{ t('aiConfig.serviceType') }}</ion-label>
+            <div class="type-trigger-value" slot="end">
+              <span class="type-badge">{{ selectedProviderChoice.initial }}</span>
+              <span class="type-trigger-name">{{ selectedProviderChoice.label }}</span>
+            </div>
           </ion-item>
 
           <!-- 配置名称 - 选择服务类型后显示 -->
@@ -190,6 +174,51 @@
         </div>
       </div>
     </ion-content>
+
+    <!-- 服务类型选择弹层：卡片式列表，分组顺序为「在线服务」→「本地服务」 -->
+    <ion-modal :is-open="showTypeModal" @didDismiss="showTypeModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('aiConfig.serviceType') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showTypeModal = false">
+              {{ t('common.close') }}
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="type-modal-content">
+        <template v-for="group in typeGroups" :key="group.key">
+          <ion-list-header class="type-group-header">
+            <ion-icon :icon="group.icon"></ion-icon>
+            <ion-label>{{ group.label }}</ion-label>
+          </ion-list-header>
+          <div class="mobile-grouped-card">
+            <ion-list lines="full">
+              <ion-item
+                v-for="provider in group.providers"
+                :key="provider.type"
+                button
+                :detail="false"
+                @click="selectType(provider.type)"
+              >
+                <span class="type-badge" slot="start">{{ provider.initial }}</span>
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ provider.label }}</h3>
+                  <p>{{ provider.description }}</p>
+                </ion-label>
+                <ion-icon
+                  v-if="formData.type === provider.type"
+                  :icon="checkmarkCircle"
+                  slot="end"
+                  color="primary"
+                ></ion-icon>
+              </ion-item>
+            </ion-list>
+          </div>
+        </template>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -206,11 +235,13 @@ import {
   IonButton,
   IonBackButton,
   IonList,
+  IonListHeader,
   IonItem,
   IonLabel,
   IonInput,
   IonSelect,
   IonSelectOption,
+  IonModal,
   IonChip,
   IonIcon,
   IonSpinner,
@@ -220,13 +251,15 @@ import {
   add,
   close,
   checkmarkCircle,
-  closeCircle
+  closeCircle,
+  cloudOutline,
+  hardwareChipOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigForm } from '~/composables/useAIConfigForm'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import type { AIConfig } from '@shared/types'
+import type { AIConfig, AIProviderType } from '@shared/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -261,9 +294,9 @@ const shouldShowModelConfig = computed(() => {
   return !!testResult.value?.success || isEditMode.value || formData.models.length > 0 || !!formData.customModel
 })
 
-// 计算属性：服务商信息
-const getServiceInfo = computed(() => {
-  const info: Record<string, { name: string; description: string }> = {
+// 服务商信息（名称 + 描述）。按类型取值，供当前选中态展示和选择弹层的卡片列表共用
+const getServiceInfoByType = (type: AIProviderType) => {
+  const info: Record<AIProviderType, { name: string; description: string }> = {
     openai: {
       name: 'OpenAI',
       description: t('aiConfig.serviceDescriptions.openai')
@@ -317,8 +350,76 @@ const getServiceInfo = computed(() => {
       description: t('aiConfig.serviceDescriptions.lmstudio')
     }
   }
-  return info[formData.type] || { name: '', description: '' }
-})
+  return info[type] || { name: '', description: '' }
+}
+
+// 计算属性：当前选中服务商信息
+const getServiceInfo = computed(() => getServiceInfoByType(formData.type))
+
+// 服务类型选择弹层
+// 移动端目前没有桌面端的「自定义服务」分组（OpenAI 兼容服务 / Claude 兼容服务）——
+// 原生 ion-select 里从来只有「本地服务」「在线服务」两组，不存在对应的选项或数据，
+// 因此这不是本次 issue 范围内该新增的功能，这里只调整已有两组的相对顺序：
+// 在线服务在前、本地服务在后（手机连接本地模型不方便，不适合作为默认优先项）。
+const showTypeModal = ref(false)
+
+const localTypeOrder: AIProviderType[] = ['ollama', 'lmstudio']
+const onlineTypeOrder: AIProviderType[] = [
+  'openai', 'anthropic', 'google', 'azure', 'mistral',
+  'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow'
+]
+
+// 卡片头像用的短缩写，仅作视觉标识，不引入新的配色体系
+const providerInitials: Record<AIProviderType, string> = {
+  ollama: 'Ol',
+  lmstudio: 'LM',
+  openai: 'Op',
+  anthropic: 'An',
+  google: 'Go',
+  azure: 'Az',
+  mistral: 'Mi',
+  openrouter: 'Or',
+  deepseek: 'De',
+  tencent: '腾',
+  aliyun: '阿',
+  zhipu: '智',
+  siliconflow: '硅'
+}
+
+const buildProviderChoice = (type: AIProviderType) => {
+  const info = getServiceInfoByType(type)
+  return {
+    type,
+    label: info.name,
+    description: info.description,
+    initial: providerInitials[type]
+  }
+}
+
+const typeGroups = computed(() => [
+  {
+    key: 'online',
+    label: t('aiConfig.onlineServices'),
+    icon: cloudOutline,
+    providers: onlineTypeOrder.map(buildProviderChoice)
+  },
+  {
+    key: 'local',
+    label: t('aiConfig.localServices'),
+    icon: hardwareChipOutline,
+    providers: localTypeOrder.map(buildProviderChoice)
+  }
+])
+
+const selectedProviderChoice = computed(() => buildProviderChoice(formData.type))
+
+const selectType = (type: AIProviderType) => {
+  if (formData.type !== type) {
+    formData.type = type
+    onTypeChange()
+  }
+  showTypeModal.value = false
+}
 
 // 加载配置数据（编辑模式）
 const loadConfig = async () => {
@@ -686,5 +787,62 @@ ion-item {
 
 ion-chip {
   margin: 0;
+}
+
+/* 服务类型触发行：右侧展示当前选中的服务商头像 + 名称，点击后打开卡片式选择弹层 */
+.type-trigger-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 60%;
+}
+
+.type-trigger-name {
+  color: var(--content-secondary);
+  font-size: var(--mobile-font-size-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 服务商头像：统一用缩写替代逐个品牌图标，避免引入新的配色/图标体系 */
+.type-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+  font-size: var(--mobile-font-size-caption);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.type-modal-content {
+  --padding-start: var(--mobile-page-gutter);
+  --padding-end: var(--mobile-page-gutter);
+  --padding-top: 12px;
+  --padding-bottom: 20px;
+}
+
+/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言 */
+.type-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 4px 8px;
+  color: var(--content-secondary);
+  font-size: var(--mobile-font-size-footnote);
+}
+
+.type-group-header:first-of-type {
+  margin-top: 4px;
+}
+
+.type-group-header ion-icon {
+  font-size: 16px;
 }
 </style>
