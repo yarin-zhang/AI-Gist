@@ -102,7 +102,6 @@
                         <div class="category-heading">
                             <button type="button" class="category-heading-toggle"
                                 :aria-expanded="!isCategoryListCollapsed"
-                                :aria-label="isCategoryListCollapsed ? t('promptManagement.expand') : t('promptManagement.collapse')"
                                 @click="toggleCategoryList">
                                 <NIcon size="16" class="category-heading-chevron"
                                     :class="{ 'is-collapsed': isCategoryListCollapsed }">
@@ -115,15 +114,17 @@
                                 <template #icon><NIcon size="16"><Settings /></NIcon></template>
                             </NButton>
                         </div>
-                        <NScrollbar v-show="!isCategoryListCollapsed" class="category-list">
-                            <button v-for="category in categories" :key="category.id" type="button"
-                                class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
-                                @click="selectNavigation(`category:${category.id}`)">
-                                <span class="category-dot" :style="{ backgroundColor: category.color || 'var(--content-tertiary)' }" />
-                                <span class="category-name">{{ category.name }}</span>
-                                <span class="nav-count">{{ categoryCounts.get(category.id) || 0 }}</span>
-                            </button>
-                        </NScrollbar>
+                        <div v-show="!isCategoryListCollapsed" class="category-list-wrapper">
+                            <NScrollbar class="category-list">
+                                <button v-for="category in categories" :key="category.id" type="button"
+                                    class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
+                                    @click="selectNavigation(`category:${category.id}`)">
+                                    <span class="category-dot" :style="{ backgroundColor: category.color || 'var(--content-tertiary)' }" />
+                                    <span class="category-name">{{ category.name }}</span>
+                                    <span class="nav-count">{{ categoryCounts.get(category.id) || 0 }}</span>
+                                </button>
+                            </NScrollbar>
+                        </div>
                     </section>
                 </template>
         </NSplit>
@@ -355,6 +356,7 @@ onBeforeUnmount(() => {
 .library-navigation { padding: 8px 8px 4px; }
 .library-split { flex: 1; min-height: 0; }
 .prompt-section, .category-section { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.category-list-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .category-list { flex: 1; min-height: 0; padding: 0 8px 8px; }
 .library-nav-item, .category-item, .prompt-list-item {
     appearance: none; width: 100%; border: 0; color: var(--content-primary); background: transparent;
