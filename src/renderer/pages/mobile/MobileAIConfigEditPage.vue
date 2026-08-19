@@ -22,30 +22,15 @@
           <div class="form-content">
             <ion-list lines="none">
 
-          <!-- 服务类型 -->
-          <ion-item lines="none">
-            <ion-select
-              v-model="formData.type"
-              :label="t('aiConfig.serviceType')"
-              :placeholder="t('aiConfig.pleaseSelectType')"
-              @ionChange="onTypeChange"
-            >
-              <ion-select-option disabled>{{ t('aiConfig.localServices') }}</ion-select-option>
-              <ion-select-option value="ollama">Ollama</ion-select-option>
-              <ion-select-option value="lmstudio">LM Studio</ion-select-option>
-              <ion-select-option disabled>{{ t('aiConfig.onlineServices') }}</ion-select-option>
-              <ion-select-option value="openai">OpenAI</ion-select-option>
-              <ion-select-option value="anthropic">Anthropic Claude</ion-select-option>
-              <ion-select-option value="google">Google Gemini AI</ion-select-option>
-              <ion-select-option value="azure">Azure OpenAI</ion-select-option>
-              <ion-select-option value="mistral">Mistral AI</ion-select-option>
-              <ion-select-option value="openrouter">OpenRouter</ion-select-option>
-              <ion-select-option value="deepseek">DeepSeek</ion-select-option>
-              <ion-select-option value="tencent">腾讯云</ion-select-option>
-              <ion-select-option value="aliyun">阿里云</ion-select-option>
-              <ion-select-option value="zhipu">智谱 AI</ion-select-option>
-              <ion-select-option value="siliconflow">硅基流动</ion-select-option>
-            </ion-select>
+          <!-- 服务类型：卡片式弹层选择，分组顺序为「自定义服务」→「在线服务」→「本地服务」
+               （严格按 issue #58 原文的三条顺序需求：自定义优先，在线次之，本地最后——
+               手机连接本地模型不方便，不适合作为默认优先项） -->
+          <ion-item button detail lines="none" @click="showTypeModal = true">
+            <ion-label>{{ t('aiConfig.serviceType') }}</ion-label>
+            <div class="type-trigger-value" slot="end">
+              <span class="type-badge">{{ selectedProviderChoice.initial }}</span>
+              <span class="type-trigger-name">{{ selectedProviderChoice.label }}</span>
+            </div>
           </ion-item>
 
           <!-- 配置名称 - 选择服务类型后显示 -->
@@ -190,6 +175,51 @@
         </div>
       </div>
     </ion-content>
+
+    <!-- 服务类型选择弹层：卡片式列表，分组顺序为「自定义服务」→「在线服务」→「本地服务」 -->
+    <ion-modal :is-open="showTypeModal" @didDismiss="showTypeModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('aiConfig.serviceType') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showTypeModal = false">
+              {{ t('common.close') }}
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="type-modal-content">
+        <template v-for="group in typeGroups" :key="group.key">
+          <ion-list-header class="type-group-header">
+            <ion-icon :icon="group.icon"></ion-icon>
+            <ion-label>{{ group.label }}</ion-label>
+          </ion-list-header>
+          <div class="mobile-grouped-card">
+            <ion-list lines="full">
+              <ion-item
+                v-for="provider in group.providers"
+                :key="provider.id"
+                button
+                :detail="false"
+                @click="selectType(provider)"
+              >
+                <span class="type-badge" slot="start">{{ provider.initial }}</span>
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ provider.label }}</h3>
+                  <p>{{ provider.description }}</p>
+                </ion-label>
+                <ion-icon
+                  v-if="selectedChoiceId === provider.id"
+                  :icon="checkmarkCircle"
+                  slot="end"
+                  color="primary"
+                ></ion-icon>
+              </ion-item>
+            </ion-list>
+          </div>
+        </template>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -206,11 +236,13 @@ import {
   IonButton,
   IonBackButton,
   IonList,
+  IonListHeader,
   IonItem,
   IonLabel,
   IonInput,
   IonSelect,
   IonSelectOption,
+  IonModal,
   IonChip,
   IonIcon,
   IonSpinner,
@@ -220,28 +252,34 @@ import {
   add,
   close,
   checkmarkCircle,
-  closeCircle
+  closeCircle,
+  cloudOutline,
+  hardwareChipOutline,
+  extensionPuzzleOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigForm } from '~/composables/useAIConfigForm'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import type { AIConfig } from '@shared/types'
+import { getDefaultBaseURL } from '@shared/ai-provider-metadata'
+import type { AIConfig, AIProviderType } from '@shared/types'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-// 使用 composable
+// 使用 composable。needsBaseURL / getBaseURLInfo / getApiKeyInfo 在组合式函数里只按
+// AIProviderType 判断，无法识别本页新增的「自定义服务」卡片（type 仍是 openai/anthropic，
+// 但需要不同的字段展示逻辑），因此这里取原始值并在下方结合 isCustomSelected 派生出
+// 同名的、感知自定义状态的版本，其余用法不变。
 const {
   formData,
-  needsBaseURL,
+  needsBaseURL: baseNeedsBaseURL,
   needsApiKey,
-  canTestConnection,
   handleTypeChange,
   getApiKeyLabel,
-  getBaseURLInfo,
-  getApiKeyInfo,
+  getBaseURLInfo: baseGetBaseURLInfo,
+  getApiKeyInfo: baseGetApiKeyInfo,
   resetForm
 } = useAIConfigForm()
 
@@ -261,9 +299,9 @@ const shouldShowModelConfig = computed(() => {
   return !!testResult.value?.success || isEditMode.value || formData.models.length > 0 || !!formData.customModel
 })
 
-// 计算属性：服务商信息
-const getServiceInfo = computed(() => {
-  const info: Record<string, { name: string; description: string }> = {
+// 服务商信息（名称 + 描述）。按类型取值，供当前选中态展示和选择弹层的卡片列表共用
+const getServiceInfoByType = (type: AIProviderType) => {
+  const info: Record<AIProviderType, { name: string; description: string }> = {
     openai: {
       name: 'OpenAI',
       description: t('aiConfig.serviceDescriptions.openai')
@@ -317,8 +355,174 @@ const getServiceInfo = computed(() => {
       description: t('aiConfig.serviceDescriptions.lmstudio')
     }
   }
-  return info[formData.type] || { name: '', description: '' }
-})
+  return info[type] || { name: '', description: '' }
+}
+
+// 计算属性：当前选中服务商信息。自定义服务的名称/描述来自选中的卡片本身（复用兼容服务的
+// 文案），而不是按 type（openai/anthropic）取通用服务商介绍。
+const getServiceInfo = computed(() => isCustomSelected.value
+  ? { name: selectedProviderChoice.value.label, description: selectedProviderChoice.value.description }
+  : getServiceInfoByType(formData.type))
+
+// 服务类型选择弹层：三个分组，顺序严格按 issue #58 原文——
+// 1. 自定义服务（最前）：OpenAI 兼容服务 / Claude 兼容服务，参照桌面端 AIConfigPage.vue
+//    的 compatibilityProviderChoices 实现——type 仍是 openai/anthropic，仅加 custom
+//    标记、baseURL 留空，不引入新的 AIProviderType 或数据模型改动。
+// 2. 在线服务（第二）
+// 3. 本地服务（最后）：手机连接本地模型不方便，不适合作为默认优先项。
+// 注意：这个顺序是 issue 原文的三条需求本身要求的顺序，与桌面端当前实现顺序
+// （本地→在线→自定义）不同——「和桌面端保持一致」指的是复用桌面端已有的自定义服务
+// 功能，不是照抄桌面端现状的分组顺序。
+const showTypeModal = ref(false)
+
+const localTypeOrder: AIProviderType[] = ['ollama', 'lmstudio']
+const onlineTypeOrder: AIProviderType[] = [
+  'openai', 'anthropic', 'google', 'azure', 'mistral',
+  'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow'
+]
+
+// 卡片头像用的短缩写，仅作视觉标识，不引入新的配色体系
+const providerInitials: Record<AIProviderType, string> = {
+  ollama: 'Ol',
+  lmstudio: 'LM',
+  openai: 'Op',
+  anthropic: 'An',
+  google: 'Go',
+  azure: 'Az',
+  mistral: 'Mi',
+  openrouter: 'Or',
+  deepseek: 'De',
+  tencent: '腾',
+  aliyun: '阿',
+  zhipu: '智',
+  siliconflow: '硅'
+}
+
+interface ProviderCardChoice {
+  id: string
+  type: AIProviderType
+  label: string
+  description: string
+  initial: string
+  custom?: boolean
+  placeholder?: string
+}
+
+const buildProviderChoice = (type: AIProviderType): ProviderCardChoice => {
+  const info = getServiceInfoByType(type)
+  return {
+    id: `official:${type}`,
+    type,
+    label: info.name,
+    description: info.description,
+    initial: providerInitials[type]
+  }
+}
+
+// 自定义服务分组：复用桌面端 AIConfigPage.vue 的 custom:openai / custom:claude 概念
+// （type 仍是 'openai' / 'anthropic'，只是加 custom 标记 + 空 baseURL），共用同一套
+// i18n 文案（aiConfig.workspace.customOpenAI* / customClaude*），不新增翻译 key。
+const compatibilityChoices = computed<ProviderCardChoice[]>(() => [
+  {
+    id: 'custom:openai',
+    type: 'openai',
+    label: t('aiConfig.workspace.customOpenAI'),
+    description: t('aiConfig.workspace.customOpenAIDesc'),
+    initial: providerInitials.openai,
+    custom: true,
+    placeholder: 'https://your-provider.example/v1'
+  },
+  {
+    id: 'custom:claude',
+    type: 'anthropic',
+    label: t('aiConfig.workspace.customClaude'),
+    description: t('aiConfig.workspace.customClaudeDesc'),
+    initial: providerInitials.anthropic,
+    custom: true,
+    placeholder: 'https://your-provider.example'
+  }
+])
+
+const typeGroups = computed(() => [
+  {
+    key: 'custom',
+    label: t('aiConfig.workspace.customServices'),
+    icon: extensionPuzzleOutline,
+    providers: compatibilityChoices.value
+  },
+  {
+    key: 'online',
+    label: t('aiConfig.onlineServices'),
+    icon: cloudOutline,
+    providers: onlineTypeOrder.map(buildProviderChoice)
+  },
+  {
+    key: 'local',
+    label: t('aiConfig.localServices'),
+    icon: hardwareChipOutline,
+    providers: localTypeOrder.map(buildProviderChoice)
+  }
+])
+
+// 当前选中的卡片 id（official:xxx / custom:openai / custom:claude）。
+// 因为自定义服务和官方服务可能共用同一个 AIProviderType（如 custom:openai 与
+// official:openai 都是 type:'openai'），仅凭 formData.type 无法区分选中的是哪张卡片，
+// 需要单独的 id 状态。
+const selectedChoiceId = ref('official:openai')
+const allProviderChoices = computed(() => typeGroups.value.flatMap(group => group.providers))
+const selectedProviderChoice = computed(() =>
+  allProviderChoices.value.find(choice => choice.id === selectedChoiceId.value)
+  || buildProviderChoice(formData.type)
+)
+const isCustomSelected = computed(() => Boolean(selectedProviderChoice.value.custom))
+
+// needsBaseURL / canTestConnection / getBaseURLInfo / getApiKeyInfo：在组合式函数原始值
+// 基础上叠加「自定义服务」的差异化展示逻辑（参照桌面端 isCustomProviderChoice 的处理）：
+// - 自定义 Claude 兼容服务的 type 是 anthropic，但和普通 Anthropic 不同，必须填 Base URL；
+// - Base URL 标签/占位符改为「兼容服务地址」+ 具体协议示例，不使用官方默认地址自动填充；
+// - 自定义服务没有已知的获取 Key / 文档链接，不展示这两个按钮。
+const needsBaseURL = computed(() => isCustomSelected.value || baseNeedsBaseURL.value)
+const canTestConnection = computed(() => (
+  (!needsApiKey.value || Boolean(formData.apiKey.trim()))
+  && (!needsBaseURL.value || Boolean(formData.baseURL.trim()))
+))
+const getBaseURLInfo = computed(() => isCustomSelected.value
+  ? {
+      label: t('aiConfig.workspace.customServiceEndpoint'),
+      placeholder: selectedProviderChoice.value.placeholder || t('aiConfig.useOfficialEndpoint')
+    }
+  : baseGetBaseURLInfo.value)
+const getApiKeyInfo = computed(() => isCustomSelected.value
+  ? { apiKeyUrl: '', docUrl: '' }
+  : baseGetApiKeyInfo.value)
+
+const selectType = (choice: ProviderCardChoice) => {
+  const isSame = selectedChoiceId.value === choice.id
+  selectedChoiceId.value = choice.id
+  if (!isSame) {
+    formData.type = choice.type
+    onTypeChange()
+    if (choice.custom) {
+      // 自定义服务：Base URL 必须留空让用户自己填，不能沿用 handleTypeChange 按
+      // type 自动填充的官方默认地址；配置名称同样只在新建模式下才自动带入卡片标题。
+      formData.baseURL = ''
+      if (!isEditMode.value) {
+        formData.name = choice.label
+      }
+    }
+  }
+  showTypeModal.value = false
+}
+
+// 判断已保存的配置是否为「自定义服务」：与桌面端 AIConfigPage.vue 的 isCustomConfig
+// 判断逻辑一致——openai 类型但 baseURL 不是官方默认地址，或 anthropic 类型但填了
+// baseURL（官方 Anthropic 不需要 baseURL），即视为自定义。
+const normalizeURL = (value?: string) => (value || '').trim().replace(/\/+$/, '')
+const isCustomConfig = (config: AIConfig) => (
+  config.type === 'openai' && normalizeURL(config.baseURL) !== normalizeURL(getDefaultBaseURL('openai'))
+) || (
+  config.type === 'anthropic' && Boolean(normalizeURL(config.baseURL))
+)
 
 // 加载配置数据（编辑模式）
 const loadConfig = async () => {
@@ -336,6 +540,9 @@ const loadConfig = async () => {
       formData.models = config.models
       formData.defaultModel = config.defaultModel || ''
       formData.customModel = config.customModel || ''
+      selectedChoiceId.value = isCustomConfig(config)
+        ? (config.type === 'anthropic' ? 'custom:claude' : 'custom:openai')
+        : `official:${config.type}`
     }
   } catch (error) {
     console.error('加载配置失败:', error)
@@ -686,5 +893,62 @@ ion-item {
 
 ion-chip {
   margin: 0;
+}
+
+/* 服务类型触发行：右侧展示当前选中的服务商头像 + 名称，点击后打开卡片式选择弹层 */
+.type-trigger-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 60%;
+}
+
+.type-trigger-name {
+  color: var(--content-secondary);
+  font-size: var(--mobile-font-size-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 服务商头像：统一用缩写替代逐个品牌图标，避免引入新的配色/图标体系 */
+.type-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+  font-size: var(--mobile-font-size-caption);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.type-modal-content {
+  --padding-start: var(--mobile-page-gutter);
+  --padding-end: var(--mobile-page-gutter);
+  --padding-top: 12px;
+  --padding-bottom: 20px;
+}
+
+/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言 */
+.type-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 4px 8px;
+  color: var(--content-secondary);
+  font-size: var(--mobile-font-size-footnote);
+}
+
+.type-group-header:first-of-type {
+  margin-top: 4px;
+}
+
+.type-group-header ion-icon {
+  font-size: 16px;
 }
 </style>
