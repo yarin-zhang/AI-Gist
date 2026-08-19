@@ -5,7 +5,7 @@
                 <NFlex vertical :size="4">
                     <NText>{{ statusDescription }}</NText>
                     <NText v-if="syncStatus.lastSyncAt" depth="3" style="font-size: 12px;">
-                        {{ t('dataSync.lastSyncAt', { time: formatDate(syncStatus.lastSyncAt) }) }}
+                        {{ t('dataSync.lastSyncAt', { time: formatDateTime(syncStatus.lastSyncAt) }) }}
                     </NText>
                     <NText v-if="syncStatus.pendingChanges" depth="3" style="font-size: 12px;">
                         {{ t('dataSync.pendingChanges') }}
@@ -38,6 +38,14 @@
                     <NGridItem v-for="config in storageConfigs" :key="config.id"
                         span="6 700:6 1100:3 1600:2">
                         <NCard size="small" :title="config.name">
+                            <template #header-extra>
+                                <NDropdown :options="storageActionOptions" :size="'small'"
+                                    @select="key => handleStorageAction(key, config)">
+                                    <NButton size="small" quaternary circle :aria-label="t('dataSync.storageActions')">
+                                        <template #icon><NIcon size="16"><DotsVertical /></NIcon></template>
+                                    </NButton>
+                                </NDropdown>
+                            </template>
                             <NFlex vertical :size="8">
                                 <NFlex align="center" :size="8">
                                     <NTag :type="config.type === 'webdav' ? 'info' : 'success'" size="small">
@@ -64,23 +72,13 @@
                                             <template #icon><NIcon><Wifi /></NIcon></template>
                                             {{ t('dataSync.testConnection') }}
                                         </NButton>
-                                        <NButton size="small" secondary @click="syncCloudData(config.id)"
-                                            :loading="loading.syncNow && syncingStorageId === config.id"
-                                            :disabled="!config.enabled">
-                                            <template #icon><NIcon><Refresh /></NIcon></template>
-                                            {{ t('dataSync.syncNow') }}
-                                        </NButton>
                                     </NFlex>
-                                    <NPopconfirm @positive-click="deleteConfig(config.id)"
-                                        :negative-text="t('common.cancel')" :positive-text="t('common.confirm')">
-                                        <template #trigger>
-                                            <NButton type="error" secondary size="small">
-                                                <template #icon><NIcon><Trash /></NIcon></template>
-                                                {{ t('common.delete') }}
-                                            </NButton>
-                                        </template>
-                                        {{ t('dataSync.confirmDeleteConfig') }}
-                                    </NPopconfirm>
+                                    <NButton type="primary" size="small" @click="syncCloudData(config.id)"
+                                        :loading="loading.syncNow && syncingStorageId === config.id"
+                                        :disabled="!config.enabled">
+                                        <template #icon><NIcon><Refresh /></NIcon></template>
+                                        {{ t('dataSync.syncNow') }}
+                                    </NButton>
                                 </NFlex>
                             </template>
                         </NCard>
@@ -219,15 +217,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { FormInst, FormRules } from 'naive-ui';
 import {
-    NAlert, NButton, NCard, NCollapse, NCollapseItem, NEmpty, NFlex, NForm, NFormItem,
-    NGrid, NGridItem, NIcon, NInput, NInputNumber, NModal, NPopconfirm, NRadio,
-    NRadioGroup, NSwitch, NTag, NText, useMessage,
+    NAlert, NButton, NCard, NCollapse, NCollapseItem, NDropdown, NEmpty, NFlex, NForm, NFormItem,
+    NGrid, NGridItem, NIcon, NInput, NInputNumber, NModal, NRadio,
+    NRadioGroup, NSwitch, NTag, NText, useDialog, useMessage,
 } from 'naive-ui';
-import { Copy, Edit, Plus, Refresh, Trash, Wifi } from '@vicons/tabler';
+import { Copy, DotsVertical, Edit, Plus, Refresh, Trash, Wifi } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
 import {
     cloudSyncService,
@@ -244,9 +242,13 @@ import {
     createCloudStorageConfigForConnectionTest,
     normalizeCloudStorageConfigForConnectionTest,
 } from '@/lib/utils/cloud-storage-config';
+import { formatDateTime } from '@/lib/utils/date';
+import type { DataSyncStatusKind } from '@/lib/utils/data-sync-status';
+import { resolveDataSyncAlertType, resolveDataSyncStatusKind } from '@/lib/utils/data-sync-status';
 
 const { t } = useI18n();
 const message = useMessage();
+const dialog = useDialog();
 const capabilities = PlatformDetector.getCapabilities();
 
 const storageConfigs = ref<CloudStorageConfig[]>([]);
@@ -312,28 +314,42 @@ const syncStatusDiagnosis = computed(() => getCloudSyncErrorDiagnosis(
         timestamp: syncStatus.value.updatedAt,
     }
 ));
-const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() => {
-    if (hasScheduledRetry.value) return 'warning';
-    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.canAutoRetry ? 'warning' : 'error';
-    if (!autoSyncEnabled.value) return 'warning';
-    if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'info';
-    if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return 'success';
-    return 'info';
-});
+// 标题文案和横幅颜色必须来自同一套判断（resolveDataSyncStatusKind），不能像之前
+// 那样各自维护一份 if/else 分支——那种写法曾经导致 pendingChanges 的检查只在
+// statusAlertType 里被限定为"仅当 status === 'scheduled' 时才生效"，而
+// statusTitle 是无条件检查，两者在 status === 'success' 且仍有未同步的本地变更
+// 时会互相矛盾（标题说"等待同步"，颜色却是成功绿色）。详见 data-sync-status.ts
+// 顶部注释。
+const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind({
+    hasScheduledRetry: hasScheduledRetry.value,
+    isError: syncStatus.value.status === 'error',
+    canAutoRetryError: syncStatusDiagnosis.value.canAutoRetry,
+    autoSyncEnabled: autoSyncEnabled.value,
+    isSyncing: syncStatus.value.status === 'syncing',
+    pendingChanges: !!syncStatus.value.pendingChanges,
+    hasSucceededBefore: !!(syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success),
+    hasStorageConfigs: storageConfigs.value.length > 0,
+}));
+const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(
+    () => resolveDataSyncAlertType(dataSyncStatusKind.value, syncStatusDiagnosis.value.canAutoRetry)
+);
 const statusTitle = computed(() => {
-    if (hasScheduledRetry.value) return t('dataSync.statusRetryScheduled');
-    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.title;
-    if (!autoSyncEnabled.value) return t('dataSync.statusPaused');
-    if (syncStatus.value.status === 'syncing') return t('dataSync.statusSyncing');
-    if (syncStatus.value.pendingChanges) return t('dataSync.statusPending');
-    if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return t('dataSync.statusCurrent');
-    return storageConfigs.value.length ? t('dataSync.statusReady') : t('dataSync.statusNotConfigured');
+    switch (dataSyncStatusKind.value) {
+        case 'retryScheduled': return t('dataSync.statusRetryScheduled');
+        case 'error': return syncStatusDiagnosis.value.title;
+        case 'paused': return t('dataSync.statusPaused');
+        case 'syncing': return t('dataSync.statusSyncing');
+        case 'pending': return t('dataSync.statusPending');
+        case 'current': return t('dataSync.statusCurrent');
+        case 'ready': return t('dataSync.statusReady');
+        case 'notConfigured': return t('dataSync.statusNotConfigured');
+    }
 });
 const statusDescription = computed(() => {
     if (hasScheduledRetry.value) {
         return t('dataSync.statusRetryScheduledDescription', {
             error: syncStatusDiagnosis.value.message,
-            time: formatDate(syncStatus.value.nextSyncAt!),
+            time: formatDateTime(syncStatus.value.nextSyncAt!),
         });
     }
     if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.message;
@@ -458,6 +474,26 @@ const deleteConfig = async (id: string) => {
     }
 };
 
+// 删除是存储卡片里唯一的破坏性操作，移进"…"二级菜单是为了避免用户误触；
+// 二次确认沿用之前 NPopconfirm 的文案，只是换成从下拉菜单触发的 dialog 确认。
+const storageActionOptions = computed(() => [
+    {
+        label: t('common.delete'),
+        key: 'delete',
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Trash) }),
+    },
+]);
+const handleStorageAction = (key: string, config: CloudStorageConfig) => {
+    if (key !== 'delete') return;
+    dialog.error({
+        title: t('common.confirm'),
+        content: t('dataSync.confirmDeleteConfig'),
+        positiveText: t('common.delete'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: () => deleteConfig(config.id),
+    });
+};
+
 const syncCloudData = async (storageId: string, forceRetry = false) => {
     loading.value.syncNow = true;
     syncingStorageId.value = storageId;
@@ -540,7 +576,6 @@ const loadStorageConfigs = async () => {
 };
 const getConfigDescription = (config: CloudStorageConfig) => config.type === 'webdav'
     ? (config as any).url : `iCloud Drive - ${(config as any).path || 'AI-Gist-Backup'}`;
-const formatDate = (value: string) => new Date(value).toLocaleString();
 
 onMounted(async () => {
     unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => { syncStatus.value = status; });

@@ -116,14 +116,42 @@ describe('settings sync and backup information architecture', () => {
 
   it('keeps storage card and form actions in the required order', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
-    const cardActionStart = source.indexOf('<template #action>');
-    const cardActions = source.slice(cardActionStart, source.indexOf('</NCard>', cardActionStart));
+    const cardStart = source.indexOf('<NCard size="small" :title="config.name">');
+    const cardEnd = source.indexOf('</NCard>', cardStart);
+    const card = source.slice(cardStart, cardEnd);
+
+    // Delete is a destructive, rarely-used action: it moves into the card's "…" menu
+    // (header-extra) instead of sitting next to the frequently-used buttons, so a stray
+    // click can't trigger it. Edit and Test Connection stay grouped on the left of the
+    // action row, while Sync Now — the most frequently used action — is promoted to a
+    // prominent primary button on the right.
+    const headerExtraStart = card.indexOf('<template #header-extra>');
+    const actionStart = card.indexOf('<template #action>');
+    expect(headerExtraStart).toBeGreaterThan(-1);
+    expect(actionStart).toBeGreaterThan(headerExtraStart);
+
+    const headerExtra = card.slice(headerExtraStart, actionStart);
+    expect(headerExtra).toContain('<NDropdown');
+    expect(headerExtra).toContain(':options="storageActionOptions"');
+    expect(headerExtra).toContain('@select="key => handleStorageAction(key, config)"');
+    expect(headerExtra).toContain('<DotsVertical');
+    expect(headerExtra).toContain(":aria-label=\"t('dataSync.storageActions')\"");
+
+    const cardActions = card.slice(actionStart);
     expectInOrder(cardActions, [
       '@click="editConfig(config)"',
       '@click="testSavedConnection(config)"',
       '@click="syncCloudData(config.id)"',
-      '@positive-click="deleteConfig(config.id)"',
     ]);
+    expect(cardActions).not.toContain('@positive-click="deleteConfig(config.id)"');
+    expect(cardActions).toMatch(/<NButton type="primary" size="small" @click="syncCloudData\(config\.id\)"/);
+
+    // The confirmation dialog that used to live in the inline NPopconfirm is preserved,
+    // just triggered from the dropdown selection instead of a directly visible button.
+    expect(source).toContain('const handleStorageAction = (key: string, config: CloudStorageConfig) => {');
+    expect(source).toContain("if (key !== 'delete') return;");
+    expect(source).toMatch(/dialog\.error\(\{[\s\S]*?content:\s*t\('dataSync\.confirmDeleteConfig'\)/);
+    expect(source).toContain('onPositiveClick: () => deleteConfig(config.id),');
 
     const modalFooter = source.slice(source.indexOf('<NFlex justify="space-between" align="center">', source.indexOf('<NModal')));
     expectInOrder(modalFooter, [
@@ -165,10 +193,71 @@ describe('settings sync and backup information architecture', () => {
   it('renders retryable cloud errors as a scheduled warning while preserving error details', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
     expect(source).toContain('const hasScheduledRetry = computed');
-    expect(source).toContain("if (hasScheduledRetry.value) return 'warning'");
     expect(source).toContain("t('dataSync.statusRetryScheduled')");
     expect(source).toContain('syncStatus.value.nextSyncAt');
     expect(source).toContain('@click="showCurrentSyncError"');
+    // The 'warning' color for a scheduled retry is asserted against the real
+    // resolveDataSyncAlertType() logic in test/data-sync-status.test.ts, not by
+    // grepping this file -- see that suite for the behavioral coverage.
+  });
+
+  it('derives the status title and banner color from the same shared resolver instead of two separate branch chains', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+
+    // The item-4 review finding was that statusTitle and statusAlertType used to be two
+    // independently maintained if/else chains that could (and did) disagree about
+    // whether pendingChanges matters. Pin the wiring so both are forced through the
+    // same resolveDataSyncStatusKind() result and neither one re-inlines its own
+    // pendingChanges/status branching.
+    expect(source).toContain(
+      "import { resolveDataSyncAlertType, resolveDataSyncStatusKind } from '@/lib/utils/data-sync-status';",
+    );
+    expect(source).toContain('const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind({');
+    // pendingChanges must be passed through unconditionally -- not gated behind a
+    // `syncStatus.value.status === 'scheduled' &&` check, which is exactly the
+    // asymmetry that caused the reported bug.
+    expect(source).toMatch(/pendingChanges:\s*!!syncStatus\.value\.pendingChanges,/);
+    expect(source).not.toMatch(/status\s*===\s*'scheduled'\s*&&\s*syncStatus\.value\.pendingChanges/);
+
+    const statusAlertTypeStart = source.indexOf('const statusAlertType = computed');
+    const statusAlertTypeEnd = source.indexOf(');', statusAlertTypeStart);
+    expect(source.slice(statusAlertTypeStart, statusAlertTypeEnd)).toContain(
+      'resolveDataSyncAlertType(dataSyncStatusKind.value, syncStatusDiagnosis.value.canAutoRetry)',
+    );
+
+    const statusTitleStart = source.indexOf('const statusTitle = computed');
+    const statusTitleEnd = source.indexOf('});', statusTitleStart);
+    const statusTitleBody = source.slice(statusTitleStart, statusTitleEnd);
+    expect(statusTitleBody).toContain('switch (dataSyncStatusKind.value)');
+    // statusTitle must not keep its own copy of the pendingChanges/status decision tree.
+    expect(statusTitleBody).not.toContain('syncStatus.value.pendingChanges');
+  });
+
+  it('formats sync timestamps as yyyy-MM-dd HH:mm:ss using the shared date util', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    expect(source).toContain("import { formatDateTime } from '@/lib/utils/date';");
+    expect(source).toContain("t('dataSync.lastSyncAt', { time: formatDateTime(syncStatus.lastSyncAt) })");
+    expect(source).toContain('time: formatDateTime(syncStatus.value.nextSyncAt!)');
+    expect(source).not.toContain('toLocaleString()');
+
+    const util = readWorkspaceFile('src/renderer/lib/utils/date.ts');
+    expect(util).toMatch(/`\$\{year\}-\$\{month\}-\$\{day\} \$\{hours\}:\$\{minutes\}:\$\{seconds\}`/);
+
+    const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
+    expect(indicator).toContain("import { formatDateTime } from '~/lib/utils/date';");
+    expect(indicator).not.toContain('Intl.DateTimeFormat');
+  });
+
+  it('routes the cloud sync status indicator strings through i18n', () => {
+    const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
+    expect(indicator).toContain("import { useI18n } from 'vue-i18n';");
+    expect(indicator).toContain("const { t } = useI18n();");
+    expect(indicator).toContain("t('dataSync.indicatorSyncNormal')");
+    expect(indicator).toContain("t('dataSync.indicatorIdle')");
+    expect(indicator).toContain("t('dataSync.indicatorWaitingNextSync')");
+    // No bare Chinese/Japanese literal strings should remain in the script logic that
+    // previously hardcoded the tooltip and aria-label text regardless of app language.
+    expect(indicator).not.toMatch(/return '[^']*[一-鿿][^']*'/);
   });
 
   it('uses the new visible section names in every supported locale', () => {
