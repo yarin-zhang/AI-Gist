@@ -383,7 +383,12 @@ onBeforeUnmount(() => {
 .library-split { flex: 1; min-height: 0; }
 .prompt-section, .category-section { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .category-list-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.category-list { flex: 1; min-height: 0; padding: 0 8px 8px; }
+/* NScrollbar renders its own root without the parent's scoped data-v attribute, so this
+   padding must be applied through :deep() or it silently resolves to 0 and the category
+   list ends up flush with the sidebar edge instead of matching .library-navigation's inset.
+   box-sizing: border-box keeps the stretched flex width from overflowing by the padding
+   amount, since NScrollbar's root defaults to content-box. */
+.category-section :deep(.category-list) { flex: 1; min-height: 0; box-sizing: border-box; padding: 0 8px 8px; }
 .library-nav-item, .category-item, .prompt-list-item {
     appearance: none; width: 100%; border: 0; color: var(--content-primary); background: transparent;
     cursor: pointer; text-align: left; border-radius: var(--radius-panel);
@@ -401,7 +406,10 @@ onBeforeUnmount(() => {
 .category-heading-chevron.is-collapsed { transform: rotate(-90deg); }
 .category-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prompt-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
+/* Same NScrollbar scoping issue as .category-list above: :deep() and box-sizing: border-box
+   are both required, and the horizontal value is raised to 8px to match .library-navigation
+   so prompt cards align with the filter buttons above them. */
+.prompt-section :deep(.prompt-results) { flex: 1; min-height: 0; box-sizing: border-box; padding: 0 8px 10px; }
 .prompt-list-item { position: relative; min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 7px 9px 7px 10px; margin-bottom: 2px; border-radius: var(--radius-panel); }
 .prompt-list-item.active { color: var(--content-primary); background: var(--surface-tertiary); }
 .selection-check { width: 18px; height: 18px; margin: 1px 9px 0 0; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-control); }
