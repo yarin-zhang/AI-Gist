@@ -749,6 +749,7 @@
     "categoryDragHandle": "Drag category {name} to reorder",
     "categoryDragHint": "Drag to reorder",
     "categoryManageDesc": "Reorder, create, edit, or delete your prompt categories",
+    "categoryManageEmpty": "No categories yet. Click \"Create Category\" to add one.",
     "categoryManageTitle": "Category Management",
     "categoryName": "Category Name",
     "categoryNamePlaceholder": "Enter category name",
