@@ -79,9 +79,6 @@
                                 </NText>
                             </div>
                             <NFlex align="center" size="small">
-                                <NTag v-if="generating && !showHistory" size="small" type="info">
-                                    {{ getGenerationStatusText() }}
-                                </NTag>
                                 <NButton v-if="showHistory" size="small" secondary @click="loadHistory">
                                     <template #icon><NIcon size="16"><Refresh /></NIcon></template>
                                     {{ t('common.refresh') }}
@@ -153,6 +150,9 @@
                     </template>
 
                     <div v-else class="result-content">
+                        <AIGenerationStatus v-if="generating" class="result-status" :char-count="streamStats.charCount"
+                            :is-streaming="streamStats.isStreaming" :is-active="streamStats.isGenerationActive"
+                            :growth-rate="streamStats.contentGrowthRate" />
                         <NInput v-model:value="generatedResult" type="textarea" readonly show-count
                             :placeholder="t('aiGenerator.resultPlaceholder')"
                             class="workspace-textarea result-textarea" />
@@ -174,7 +174,6 @@ import {
     NInput,
     NButton,
     NIcon,
-    NTag,
     NThing,
     NEmpty,
     NText,
@@ -190,6 +189,7 @@ import {
 import { History, Refresh, Check, AlertCircle, X, Robot, Plus, Bolt, Star } from '@vicons/tabler'
 import { api } from '~/lib/api'
 import AIModelSelector from '~/components/common/AIModelSelector.vue'
+import AIGenerationStatus from './AIGenerationStatus.vue'
 import type { AIConfig, AIGenerationHistory } from '~/lib/db'
 import { databaseService } from '~/lib/db'
 import { useDatabase } from '~/composables/useDatabase'
@@ -815,25 +815,6 @@ const serializeConfig = (config: AIConfig) => {
     return serialized;
 }
 
-// 获取生成状态文本
-const getGenerationStatusText = () => {
-    if (!generating.value) {
-        return ''
-    }
-    
-    if (streamStats.isStreaming && streamStats.charCount > 0) {
-        if (streamStats.isGenerationActive && streamStats.contentGrowthRate > 0) {
-            // 显示生成速率
-            return `正在生成... 已生成 ${streamStats.charCount} 字符 (${streamStats.contentGrowthRate.toFixed(1)} 字符/秒)`
-        } else if (streamStats.charCount > 0) {
-            // 显示已生成字符数
-            return `正在生成... 已生成 ${streamStats.charCount} 字符`
-        }
-    }
-    
-    return '正在生成...'
-}
-
 // 组件挂载时加载数据
 onMounted(async () => {
     await waitForDatabase()
@@ -868,7 +849,9 @@ onMounted(async () => {
 .generator-control-panel { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--compact-padding); margin-top: var(--section-gap); padding-top: var(--section-gap); border-top: 1px solid var(--border-default); }
 .generator-model-selector { width: 100%; min-width: 0; }
 .generator-action-row { display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
-.result-content { flex: 1 1 0; height: 0; min-height: 0; }
+.result-content { flex: 1 1 0; height: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.result-status { flex: 0 0 auto; }
+.result-textarea { flex: 1 1 0; height: 0; min-height: 0; }
 .result-textarea :deep(.n-input-wrapper) { background: var(--surface-secondary); }
 .history-scroll { flex: 1 1 0; height: 0; min-height: 0; }
 :deep(.history-scroll .n-scrollbar-content) { min-height: 100%; display: flex; flex-direction: column; }

@@ -278,6 +278,8 @@
     "generatedPromptTag": "AI generated",
     "generatedPromptTitle": "AI generated: {topic}",
     "generating": "Generating...",
+    "generatingWithCount": "Generating... {count} characters so far",
+    "generatingWithRate": "Generating... {count} characters so far ({rate} chars/sec)",
     "generationHistory": "Generation History",
     "history": "History",
     "noConfigAvailable": "No available AI configurations",
