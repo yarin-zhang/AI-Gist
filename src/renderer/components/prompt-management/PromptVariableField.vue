@@ -80,8 +80,7 @@ const inputProps = computed(() => ({
 .prompt-variable-field.inline.type-select { min-width: 150px; width: auto; }
 .prompt-variable-field.inline.type-boolean { min-width: 0; }
 .prompt-variable-field.type-text.inline :deep(.n-input) { width: clamp(120px, 20vw, 280px); }
-.prompt-variable-field.type-textarea { width: 100%; margin: 10px 0; padding: var(--compact-padding); border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
-.prompt-variable-field.error.type-textarea { border-color: var(--accent-error); }
+.prompt-variable-field.type-textarea { width: 100%; margin: 10px 0; padding: var(--compact-padding); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .field-label { display: flex; align-items: center; gap: 4px; color: var(--content-secondary); font-size: 13px; font-weight: var(--font-weight-medium); }
 .required-mark { color: var(--accent-error); }
 .field-help { color: var(--content-tertiary); cursor: help; }
