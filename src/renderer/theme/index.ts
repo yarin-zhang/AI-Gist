@@ -136,21 +136,7 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       fontSizeMedium: tokens.typography.fontSizes.base,
       fontSizeLarge: tokens.typography.fontSizes.base,
       lineHeight: tokens.typography.lineHeights.normal,
-      lineHeightTextarea: tokens.typography.lineHeights.normal,
-      // 输入框底色统一使用面板表面色，避免 naive-ui 默认的半透明叠加色
-      // 在深色主题下显得比周围面板更亮，造成"各自为战"的视觉割裂
-      color: surface.primary,
-      colorFocus: surface.primary,
-      colorDisabled: surface.secondary,
-      textColor: content.primary,
-      placeholderColor: content.tertiary,
-      border: `1px solid ${border.default}`,
-      borderHover: `1px solid ${border.strong}`,
-      borderFocus: `1px solid ${accent.primary}`,
-      borderDisabled: `1px solid ${border.subtle}`,
-      boxShadowFocus: `0 0 0 2px ${interactive.focus}`,
-      borderRadius: tokens.component.controlRadius,
-      caretColor: accent.primary
+      lineHeightTextarea: tokens.typography.lineHeights.normal
     },
     Select: {
       fontSizeTiny: tokens.typography.fontSizes.xs,

@@ -846,6 +846,21 @@ onMounted(async () => {
 .workspace-textarea :deep(.n-input__textarea),
 .workspace-textarea :deep(.n-input__textarea-el) { height: 100%; min-height: 0; }
 .workspace-textarea :deep(.n-input__textarea-el) { resize: none; }
+/* "要求"与"生成结果"文本域视觉对齐手动新建模式的 StructuredPromptEditor
+   （背景 surface-primary、边框 border-default），做法参照
+   PromptVariableField.vue 的组件级 :deep(.n-input) 覆盖，而不是改全局
+   Input 主题——避免影响本组件之外其它 13 处使用 NInput 的地方（Gitea #49）。
+   注意：.workspace-textarea 这个 class 是直接绑在 NInput 组件根节点上的
+   （NInput 根节点自身就带有 .n-input class），并非其祖先元素，所以这里不
+   能用 :deep() 后代选择器（会因为找不到"父 workspace-textarea 之下的
+   .n-input 后代"而永远不命中），直接覆盖 .workspace-textarea 即可。 */
+.workspace-textarea {
+  --n-color: var(--surface-primary) !important;
+  --n-color-focus: var(--surface-primary) !important;
+  --n-border: 1px solid var(--border-default) !important;
+  --n-border-hover: 1px solid var(--border-strong) !important;
+  --n-border-focus: 1px solid var(--accent-primary) !important;
+}
 .generator-control-panel { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--compact-padding); margin-top: var(--section-gap); padding-top: var(--section-gap); border-top: 1px solid var(--border-default); }
 .generator-model-selector { width: 100%; min-width: 0; }
 .generator-action-row { display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
