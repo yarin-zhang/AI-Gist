@@ -38,6 +38,28 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
   return await Promise.race([fetchPromise, timeoutPromise])
 }
 
+/**
+ * 判断异常是否为“网络层失败”（fetch 本身没有发出/收到响应）。
+ *
+ * 浏览器对 fetch() 网络层失败（DNS 失败、连接被拒绝/重置、CORS 拦截、
+ * ATS 拦截、离线等）统一抛出 TypeError，但各引擎的 message 文案完全不同：
+ *   - Chrome/Edge (Chromium)      -> "Failed to fetch"
+ *   - Firefox                     -> "NetworkError when attempting to fetch resource."
+ *   - Safari / WebKit（iOS WKWebView 用的正是这套引擎）
+ *                                  -> "Type error"（较老版本）或 "Load failed"（新版本）
+ *
+ * 之前的代码只匹配了 Chrome/Firefox 的文案，导致移动端（iOS 使用 WKWebView）
+ * 发生网络层失败时，WebKit 抛出的原始 "TypeError: Type error" 未被识别，
+ * 从而把这个对用户毫无意义的浏览器内部错误文案直接展示了出来——这正是
+ * 「测试连接」在 iOS 上显示 "Type Error" 的根本原因。
+ *
+ * 这里改为按错误的类型（TypeError）而不是具体文案来判断，可以覆盖所有
+ * 引擎的网络层失败文案，而不需要逐一穷举每个浏览器的措辞。
+ */
+function isNetworkLayerError(error: unknown): boolean {
+  return error instanceof TypeError
+}
+
 async function readErrorMessage(response: Response): Promise<string> {
   let errorMessage = `HTTP ${response.status}`
   try {
@@ -546,7 +568,7 @@ async function testOpenAICompatible(
     if (error instanceof Error) {
       if (error.message === '请求超时') {
         errorMessage = '请求超时，请检查网络连接'
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+      } else if (isNetworkLayerError(error) || error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         errorMessage = '无法连接到服务器，请检查 Base URL 和网络连接'
       } else {
         errorMessage = error.message
@@ -610,7 +632,7 @@ async function testAnthropic(apiKey?: string): Promise<AIConfigTestResult> {
     if (error instanceof Error) {
       if (error.message === '请求超时') {
         errorMessage = '请求超时'
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+      } else if (isNetworkLayerError(error) || error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         errorMessage = '无法连接到 Anthropic 服务器'
       } else {
         errorMessage = error.message
@@ -683,7 +705,7 @@ async function testGoogle(apiKey?: string): Promise<AIConfigTestResult> {
     if (error instanceof Error) {
       if (error.message === '请求超时') {
         errorMessage = '请求超时'
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+      } else if (isNetworkLayerError(error) || error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         errorMessage = '无法连接到 Google 服务器'
       } else {
         errorMessage = error.message
@@ -786,7 +808,7 @@ async function testLocalService(baseURL: string, providerType: 'ollama' | 'lmstu
     if (error instanceof Error) {
       if (error.message === '请求超时') {
         errorMessage = '请求超时，请确保本地服务已启动'
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+      } else if (isNetworkLayerError(error) || error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         errorMessage = '无法连接到本地服务，请检查 Base URL'
       } else {
         errorMessage = error.message

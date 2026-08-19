@@ -151,4 +151,45 @@ describe('mobile AI provider 2026 refresh', () => {
     expect(result.modelSource).toBe('unavailable')
     expect(result.models).toEqual([])
   })
+
+  // 回归测试：Gitea issue #62
+  // 移动端（iOS，使用 WKWebView/Safari 引擎）下，fetch() 网络层失败
+  // （CORS 拦截、DNS 失败、ATS 拦截等）抛出的是 TypeError，但各引擎的
+  // message 文案不同：Chrome 是 "Failed to fetch"，Firefox 是
+  // "NetworkError when attempting to fetch resource."，而 Safari/WebKit
+  // 是 "Type error"（或新版本的 "Load failed"）。
+  // 之前的代码只识别了 Chrome/Firefox 的文案，导致 WebKit 抛出的原始
+  // "TypeError: Type error" 被当作未知错误直接展示给用户，
+  // 这正是「测试连接」在移动端点击后显示 "Type error" 的根本原因。
+  // 如果回退到旧实现（只匹配 'Failed to fetch' / 'Network' 子串），
+  // 这个测试会失败——因为 error 会变成裸的 "Type error"。
+  it('translates a WebKit-style network TypeError into a friendly message instead of leaking "Type error"', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockRejectedValueOnce(new TypeError('Type error'))
+
+    const result = await testAIConfig({
+      type: 'deepseek',
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'sk-fake-invalid-key'
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).not.toBe('Type error')
+    expect(result.error).toBe('无法连接到服务器，请检查 Base URL 和网络连接')
+  })
+
+  it('translates the newer Safari "Load failed" network TypeError the same way', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockRejectedValueOnce(new TypeError('Load failed'))
+
+    const result = await testAIConfig({
+      type: 'deepseek',
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'sk-fake-invalid-key'
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).not.toBe('Load failed')
+    expect(result.error).toBe('无法连接到服务器，请检查 Base URL 和网络连接')
+  })
 })
