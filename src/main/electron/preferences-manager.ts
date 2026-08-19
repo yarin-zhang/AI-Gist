@@ -98,6 +98,10 @@ class PreferencesManager {
     networkProxy: {
       mode: 'system'
     },
+    // 本地 CLI 桥接配置
+    cliBridge: {
+      enabled: false,
+    },
   };
 
   // ==================== 构造函数 ====================
@@ -194,6 +198,9 @@ class PreferencesManager {
       networkProxy: {
         mode: loadedPrefs.networkProxy?.mode ?? this.defaultPreferences.networkProxy!.mode,
         manualConfig: loadedPrefs.networkProxy?.manualConfig,
+      },
+      cliBridge: {
+        enabled: loadedPrefs.cliBridge?.enabled ?? this.defaultPreferences.cliBridge!.enabled,
       },
     };
   }

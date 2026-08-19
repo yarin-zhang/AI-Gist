@@ -64,13 +64,15 @@ describe('settings sync and backup information architecture', () => {
       "label: t('settings.sections.close')",
       "label: t('settings.sections.shortcuts')",
       "label: t('settings.sections.networkProxy')",
+      "label: t('settings.sections.cliBridge')",
     ]);
     expect(source).toContain("children: pick('general')");
-    expect(source).toContain("children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy')");
+    expect(source).toContain("children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy', 'cli-bridge')");
     expect(source).toContain('visible: capabilities.startup');
     expect(source).toContain('visible: capabilities.tray');
     expect(source).toContain('visible: capabilities.globalShortcuts');
     expect(source).toContain('visible: capabilities.systemProxy');
+    expect(source).toContain('visible: capabilities.cliBridge');
   });
 
   it('gives the settings navigation and content independent scroll areas', () => {

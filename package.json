@@ -3,6 +3,9 @@
     "version": "2.0.3",
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
+    "bin": {
+        "ai-gist": "./bin/ai-gist.js"
+    },
     "scripts": {
         "dev": "node scripts/dev-server.js",
         "dev:win": "node scripts/dev-server.js --windows",
@@ -96,6 +99,7 @@
         "@langchain/openai": "^0.5.12",
         "@vicons/tabler": "^0.13.0",
         "archiver": "^7.0.1",
+        "commander": "^15.0.0",
         "ionicons": "^7.0.0",
         "langchain": "^0.3.27",
         "naive-ui": "^2.41.0",

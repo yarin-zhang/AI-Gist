@@ -9,6 +9,7 @@ import { updateManager } from './update-manager';
 import { dataManagementService, fsService } from '../data';
 import { NetworkProxyManager } from './network-proxy';
 import { openShellPath } from './shell-operation-result';
+import { cliBridgeManager } from './cli-bridge-manager';
 import type { PromptShortcutBinding, ShortcutCommandId, ShortcutExecutionRequest, UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
@@ -29,6 +30,7 @@ class IpcHandlers {
     this.setupShellHandlers();
     this.setupDataHandlers();
     this.setupProxyHandlers();
+    this.setupCliBridgeHandlers();
   }
 
   /**
@@ -443,6 +445,15 @@ class IpcHandlers {
   }
 
   /**
+   * 设置本地 CLI 桥接处理器
+   * 实际的服务器启停与请求转发逻辑都在 cliBridgeManager 里，这里只暴露给设置页用的状态查询/开关接口
+   */
+  private setupCliBridgeHandlers() {
+    ipcMain.handle('cli-bridge:get-status', () => cliBridgeManager.getStatus());
+    ipcMain.handle('cli-bridge:set-enabled', (_, enabled: boolean) => cliBridgeManager.setEnabled(enabled));
+  }
+
+  /**
    * 清理所有处理器
    */
   cleanup() {
@@ -527,7 +538,11 @@ class IpcHandlers {
     ipcMain.removeHandler('shortcuts:navigate-main');
     ipcMain.removeHandler('shortcuts:request-paste-permission');
     ipcMain.removeAllListeners('shortcuts:launcher-ready');
-    
+
+    // 清理本地 CLI 桥接处理器
+    ipcMain.removeHandler('cli-bridge:get-status');
+    ipcMain.removeHandler('cli-bridge:set-enabled');
+
     // 清理 AI 服务管理器的活跃生成请求
     aiServiceManager.stopAllGenerations();
   }

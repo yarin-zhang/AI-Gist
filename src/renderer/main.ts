@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import i18n from './i18n'
-import { initDatabase, databaseService, cloudSyncService, automaticBackupService } from './lib/services'
+import { initDatabase, databaseService, cloudSyncService, automaticBackupService, initializeCliBridgeExecutor } from './lib/services'
 import { applyDocumentLocale, resolveInitialLocale } from './i18n/locale-detection'
 import { PlatformDetector } from '@shared/platform'
 import './tailwind.css'
@@ -178,6 +178,10 @@ async function startApp() {
         startupDelayMs: PlatformDetector.isMobile() ? 0 : undefined
       });
       await automaticBackupService.startFromSettings();
+
+      if (PlatformDetector.isElectron()) {
+        initializeCliBridgeExecutor();
+      }
 
       if (PlatformDetector.isElectron() && window.electronAPI.lifecycle) {
         window.electronAPI.lifecycle.onFlushRequested(({ timeoutMs }) => {

@@ -304,6 +304,15 @@
     "light": "淺色主題",
     "theme": "主題模式"
   },
+  "cliBridge": {
+    "enable": "啟用本機 CLI 存取",
+    "enableTip": "開啟後，本機命令列工具（例如 Claude Code 等程式編寫 Agent）可以透過一個僅限本機存取、需要權杖驗證的介面讀寫提示詞與分類資料。",
+    "statusRunning": "運作中 · 連接埠 {port}",
+    "statusStopped": "未運作",
+    "tryItHint": "在終端機中執行以下指令驗證連線：",
+    "startFailed": "本機 CLI 橋接啟動失敗，請確認是否有其他程式占用了本機連接埠",
+    "toggleFailed": "切換本機 CLI 橋接狀態失敗"
+  },
   "closeBehavior": {
     "ask": "每次詢問",
     "askOnClose": "關閉時彈出選擇對話框",
@@ -1317,6 +1326,10 @@
         "description": "選擇連線方式並測試代理連線",
         "title": "網絡代理設置"
       },
+      "cli-bridge": {
+        "description": "允許本機命令列工具（如程式編寫 Agent）讀寫提示詞與分類資料",
+        "title": "本機 CLI 橋接"
+      },
       "shortcuts": {
         "description": "設定全域快捷鍵和快速複製",
         "title": "快捷鍵設置"
@@ -1336,6 +1349,7 @@
       "language": "語言",
       "laboratory": "實驗室",
       "networkProxy": "網絡代理",
+      "cliBridge": "本機 CLI",
       "shortcuts": "快捷鍵",
       "startup": "啟動"
     },

@@ -153,6 +153,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 快捷键管理
   shortcuts: shortcutsAPI,
+  // 本地 CLI 桥接
+  cliBridge: {
+    getStatus: () => ipcRenderer.invoke('cli-bridge:get-status'),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('cli-bridge:set-enabled', enabled),
+    onInvokeRequest: (callback: (request: { id: string; action: string; params?: any }) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, request: any) => callback(request);
+      ipcRenderer.on('cli-bridge:invoke-request', listener);
+      return () => ipcRenderer.removeListener('cli-bridge:invoke-request', listener);
+    },
+    sendInvokeResponse: (response: { id: string; ok: boolean; result?: any; error?: { message: string; code?: string } }) => {
+      ipcRenderer.send('cli-bridge:invoke-response', response);
+    },
+  },
   // 数据管理
   data: {
     selectImportFile: (format: string) => ipcRenderer.invoke('data:select-import-file', { format }),
