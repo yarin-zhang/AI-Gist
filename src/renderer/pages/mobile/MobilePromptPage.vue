@@ -180,6 +180,34 @@
             <ion-icon v-if="viewMode === 'waterfall'" :icon="checkmark" slot="end" color="primary"></ion-icon>
           </ion-item>
 
+          <!-- 收藏筛选：长期存在的筛选项，置于分类筛选之前 -->
+          <ion-list-header>
+            <ion-label>{{ t('promptManagement.favorites') }}</ion-label>
+          </ion-list-header>
+          <ion-item>
+            <ion-label>{{ t('promptManagement.favoritesOnly') }}</ion-label>
+            <ion-toggle v-model="showFavoritesOnly" slot="end"></ion-toggle>
+          </ion-item>
+
+          <!-- 排序：长期存在的筛选项，置于分类筛选之前 -->
+          <ion-list-header>
+            <ion-label>{{ t('promptManagement.sortBy') }}</ion-label>
+          </ion-list-header>
+          <ion-item
+            v-for="option in sortOptions"
+            :key="option.value"
+            button
+            @click="handleSortChange(option.value)"
+          >
+            <ion-label>{{ option.label }}</ion-label>
+            <ion-icon
+              v-if="sortType === option.value"
+              :icon="checkmark"
+              slot="end"
+              color="primary"
+            ></ion-icon>
+          </ion-item>
+
           <!-- 分类筛选 -->
           <ion-list-header>
             <ion-label>{{ t('promptManagement.categoryFilterTitle') }}</ion-label>
@@ -197,34 +225,6 @@
             <ion-label>{{ category.name }}</ion-label>
             <ion-icon
               v-if="selectedCategory === category.id"
-              :icon="checkmark"
-              slot="end"
-              color="primary"
-            ></ion-icon>
-          </ion-item>
-
-          <!-- 收藏筛选 -->
-          <ion-list-header>
-            <ion-label>{{ t('promptManagement.favorites') }}</ion-label>
-          </ion-list-header>
-          <ion-item>
-            <ion-label>{{ t('promptManagement.favoritesOnly') }}</ion-label>
-            <ion-toggle v-model="showFavoritesOnly"></ion-toggle>
-          </ion-item>
-
-          <!-- 排序 -->
-          <ion-list-header>
-            <ion-label>{{ t('promptManagement.sortBy') }}</ion-label>
-          </ion-list-header>
-          <ion-item
-            v-for="option in sortOptions"
-            :key="option.value"
-            button
-            @click="handleSortChange(option.value)"
-          >
-            <ion-label>{{ option.label }}</ion-label>
-            <ion-icon
-              v-if="sortType === option.value"
               :icon="checkmark"
               slot="end"
               color="primary"
