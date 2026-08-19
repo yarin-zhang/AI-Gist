@@ -94,6 +94,7 @@ import {
   getPromptFloatingActions,
   type PromptFloatingActionKind
 } from '~/lib/mobile/floating-prompt-actions'
+import { shouldResetFloatingNav } from '~/lib/mobile/floating-nav-reset'
 import MobileAIGeneratorPage from './mobile/MobileAIGeneratorPage.vue'
 
 const { t } = useI18n()
@@ -178,10 +179,27 @@ onUnmounted(() => {
   unsubscribeAIConfigChanges()
 })
 
-// 切换 Tab 时重置滚动基准并展开导航，避免带着上一个 Tab 的收起状态进入新页面
+// 切换 Tab 时重置滚动基准并展开导航，避免带着上一个 Tab 的收起状态进入新页面。
+//
+// 必须只在「三个 Tab 之间互相切换」时才重置，不能在离开/返回 /tabs/* 之外的
+// 二级页面（提示词详情、设置子页面等）时触发：MobileMainPage 导航到这类
+// 二级页面时并不会被销毁，Ionic 的 ion-router-outlet 只是把它保留在页面栈
+// 底层、盖上新页面，而这个 watch 挂在全局 route 对象上，离开 /tabs/* 时
+// 同样会触发。旧写法不分青红皂白一律重置，会导致：提示词列表下滑到收起态
+// -> 点进详情页（此时组件仍在后台挂载，isNavMinimized 被这里误重置为
+// false，只是暂时被详情页盖住看不见）-> 返回列表页时浮动导航条先展开成
+// 较宽状态，要等用户再滑动一下触发一次新的真实 ionScroll，才会被
+// handleIonScroll 重新收起——列表实际滚动位置全程没变，只是这里的响应式
+// 状态被提前清空了（对应 Gitea issue #88）。判断逻辑抽成纯函数
+// shouldResetFloatingNav（见 lib/mobile/floating-nav-reset.ts），只有
+// 新旧路径确实都落在 Tab 根路径下才重置；离开/返回二级页面时保留原有的
+// 收起状态。
 watch(
   () => route.path,
-  () => {
+  (newPath, oldPath) => {
+    if (!shouldResetFloatingNav(oldPath, newPath)) {
+      return
+    }
     lastScrollTop = 0
     isNavMinimized.value = false
   }
