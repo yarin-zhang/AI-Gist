@@ -19,7 +19,8 @@
 
         <NSplit ref="librarySplitRef" v-model:size="librarySplitSize" direction="vertical"
             :min="MIN_PROMPT_PANE_RATIO" :max="librarySplitMax"
-            :resize-trigger-size="LIBRARY_RESIZE_TRIGGER_SIZE" class="library-split">
+            :resize-trigger-size="LIBRARY_RESIZE_TRIGGER_SIZE" class="library-split"
+            :disabled="isCategoryListCollapsed" :pane1-style="promptPaneStyle" :pane2-style="categoryPaneStyle">
                 <template #1>
                     <section class="prompt-section">
                         <div class="result-heading">
@@ -99,13 +100,22 @@
                 <template #2>
                     <section class="category-section">
                         <div class="category-heading">
-                            <NText depth="3">{{ t('promptWorkspace.categories') }}</NText>
+                            <button type="button" class="category-heading-toggle"
+                                :aria-expanded="!isCategoryListCollapsed"
+                                :aria-label="isCategoryListCollapsed ? t('promptManagement.expand') : t('promptManagement.collapse')"
+                                @click="toggleCategoryList">
+                                <NIcon size="16" class="category-heading-chevron"
+                                    :class="{ 'is-collapsed': isCategoryListCollapsed }">
+                                    <ChevronDown />
+                                </NIcon>
+                                <NText depth="3">{{ t('promptWorkspace.categories') }}</NText>
+                            </button>
                             <NButton quaternary circle size="tiny" :aria-label="t('promptManagement.categories')"
                                 @click="$emit('manage-categories')">
                                 <template #icon><NIcon size="16"><Settings /></NIcon></template>
                             </NButton>
                         </div>
-                        <NScrollbar class="category-list">
+                        <NScrollbar v-show="!isCategoryListCollapsed" class="category-list">
                             <button v-for="category in categories" :key="category.id" type="button"
                                 class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
                                 @click="selectNavigation(`category:${category.id}`)">
@@ -125,7 +135,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
 import {
-    ArrowsSort, Check, Clock, ListDetails, Search, Settings, Star
+    ArrowsSort, Check, ChevronDown, Clock, ListDetails, Search, Settings, Star
 } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import { useTagColors } from '@/composables/useTagColors'
@@ -160,6 +170,9 @@ const storedSplitSize = Number(localStorage.getItem('prompt_library_split_size')
 const librarySplitSize = ref(Number.isFinite(storedSplitSize) && storedSplitSize > 0 ? storedSplitSize : 0.7)
 const librarySplitRef = ref<{ $el?: HTMLElement } | null>(null)
 const librarySplitMax = ref('9999px')
+const isCategoryListCollapsed = ref(localStorage.getItem('prompt_library_category_collapsed') === 'true')
+const promptPaneStyle = computed(() => (isCategoryListCollapsed.value ? { flex: '1 1 auto' } : undefined))
+const categoryPaneStyle = computed(() => (isCategoryListCollapsed.value ? { flex: '0 0 auto' } : undefined))
 const MIN_PROMPT_PANE_RATIO = 0.45
 const MIN_CATEGORY_PANE_HEIGHT = 82
 const LIBRARY_RESIZE_TRIGGER_SIZE = 9
@@ -294,6 +307,10 @@ const clearFilters = () => {
     searchText.value = ''
 }
 
+const toggleCategoryList = () => {
+    isCategoryListCollapsed.value = !isCategoryListCollapsed.value
+}
+
 const handleSearchShortcut = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
@@ -302,6 +319,7 @@ const handleSearchShortcut = (event: KeyboardEvent) => {
 }
 
 watch(librarySplitSize, size => localStorage.setItem('prompt_library_split_size', String(size)))
+watch(isCategoryListCollapsed, collapsed => localStorage.setItem('prompt_library_category_collapsed', String(collapsed)))
 
 onMounted(() => {
     window.addEventListener('keydown', handleSearchShortcut)
@@ -347,6 +365,11 @@ onBeforeUnmount(() => {
 .library-nav-item.active, .category-item.active { background: var(--surface-tertiary); color: var(--content-primary); font-weight: var(--font-weight-medium); }
 .nav-count { margin-left: auto; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .category-heading, .result-heading { min-height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 5px; font-size: 12px; letter-spacing: .02em; }
+.category-heading-toggle { appearance: none; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; margin: -4px 0; padding: 4px 6px 4px 4px; border: 0; border-radius: var(--radius-control); color: inherit; background: transparent; cursor: pointer; font: inherit; text-align: left; }
+.category-heading-toggle:hover { background: var(--interactive-hover); }
+.category-heading-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.category-heading-chevron { flex: 0 0 auto; color: var(--content-tertiary); transition: transform .16s ease; }
+.category-heading-chevron.is-collapsed { transform: rotate(-90deg); }
 .category-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
