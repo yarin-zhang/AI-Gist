@@ -634,8 +634,7 @@
       "aboutDescription": "Version information and feedback"
     },
     "sync": {
-      "explainerTitle": "What data sync does",
-      "explainerBody": "Sync merges data both ways between this device and the cloud so every device matches. It does not keep past versions — use Data Backup for that.",
+      "historyHint": "Sync doesn't keep past versions. Use Data Backup if you need to recover older data.",
       "storageSectionDescription": "Both data sync and cloud backups use the storage configured here.",
       "addStorage": "Add WebDAV storage",
       "editStorage": "Edit storage",
@@ -647,8 +646,6 @@
       "notConfigured": "Not configured"
     },
     "backup": {
-      "explainerTitle": "Local backups vs. cloud backups",
-      "explainerBody": "Local backups stay on this device so you can roll back to an earlier version. Cloud backups are uploaded by you on demand and can be restored on a new device. Neither one merges with other devices automatically.",
       "localTitle": "Local backups",
       "localDescription": "Stored on this device, created automatically or manually",
       "cloudSectionTitle": "Cloud backup locations",
@@ -656,6 +653,7 @@
       "fileSectionTitle": "Backup files",
       "exportDescription": "Export a backup file you can share or keep",
       "importDescription": "Restore all data from a backup file",
+      "fileWarning": "Backup files may contain API keys — keep them safe.",
       "noStorageHint": "No cloud storage configured yet. Add one to create cloud backups on demand.",
       "goToDataSync": "Go to Data Sync",
       "automaticSectionTitle": "Automatic backup",

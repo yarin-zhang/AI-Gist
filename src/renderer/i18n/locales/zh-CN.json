@@ -634,8 +634,7 @@
       "aboutDescription": "版本信息与反馈"
     },
     "sync": {
-      "explainerTitle": "数据同步是什么",
-      "explainerBody": "同步会在本机与云端之间双向合并数据，让所有设备保持一致。它不保留历史版本；需要历史版本请使用「数据备份」。",
+      "historyHint": "同步不保留历史版本，如需找回旧数据，请使用「数据备份」。",
       "storageSectionDescription": "数据同步和云端备份都会使用这里配置的存储。",
       "addStorage": "添加 WebDAV 存储",
       "editStorage": "编辑存储",
@@ -647,8 +646,6 @@
       "notConfigured": "未配置"
     },
     "backup": {
-      "explainerTitle": "本地备份和云端备份的区别",
-      "explainerBody": "本地备份保存在本机，可随时回到过去的版本；云端备份由你手动上传到云端存储，换机时可恢复。两者都不会与其他设备自动合并。",
       "localTitle": "本地备份",
       "localDescription": "保存在本机，自动或手动创建",
       "cloudSectionTitle": "云端备份位置",
@@ -656,6 +653,7 @@
       "fileSectionTitle": "备份文件",
       "exportDescription": "导出为可分享的备份文件",
       "importDescription": "从备份文件恢复全部数据",
+      "fileWarning": "备份文件可能包含 API 密钥，请妥善保管。",
       "noStorageHint": "尚未配置云端存储，配置后可按需手动创建云端备份。",
       "goToDataSync": "前往数据同步",
       "automaticSectionTitle": "自动备份",

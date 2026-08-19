@@ -10,12 +10,6 @@
     </ion-header>
 
     <ion-content :fullscreen="true">
-      <!-- 备份和同步是两回事，这里把两种备份的差别说清楚 -->
-      <div class="explainer">
-        <h2>{{ t('mobileSettings.backup.explainerTitle') }}</h2>
-        <p>{{ t('mobileSettings.backup.explainerBody') }}</p>
-      </div>
-
       <ion-list>
         <ion-list-header>
           <ion-label>{{ t('dataBackup.local') }}</ion-label>
@@ -82,8 +76,9 @@
           </ion-label>
         </ion-item>
 
+        <!-- 备份文件里的 API 密钥风险是真正需要提醒的部分，其余说明留给各条目自己的描述 -->
         <ion-item lines="none">
-          <ion-note class="section-note">{{ t('dataManagement.fullBackupDescription') }}</ion-note>
+          <ion-note class="section-note">{{ t('mobileSettings.backup.fileWarning') }}</ion-note>
         </ion-item>
       </ion-list>
     </ion-content>
@@ -290,24 +285,6 @@ onIonViewWillEnter(loadSummary)
 /* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
 ion-item ion-icon[slot='start'] {
   margin-inline-end: 16px;
-}
-
-.explainer {
-  padding: 16px 16px 4px;
-}
-
-.explainer h2 {
-  margin: 0 0 6px;
-  font-size: var(--mobile-font-size-body);
-  font-weight: 600;
-  color: var(--content-primary);
-}
-
-.explainer p {
-  margin: 0;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-relaxed);
-  color: var(--ion-color-medium);
 }
 
 .section-note {
