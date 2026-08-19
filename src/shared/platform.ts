@@ -20,6 +20,7 @@ export interface PlatformCapabilities {
   tray: boolean;
   startup: boolean;
   systemProxy: boolean;
+  cliBridge: boolean;
   electronUpdates: boolean;
   cloudBackup: boolean;
   webdavSync: boolean;
@@ -204,6 +205,7 @@ export class PlatformDetector {
         tray: true,
         startup: true,
         systemProxy: true,
+        cliBridge: true,
         electronUpdates: !isMacAppStore,
         cloudBackup: true,
         webdavSync: true,
@@ -229,6 +231,7 @@ export class PlatformDetector {
         tray: false,
         startup: false,
         systemProxy: false,
+        cliBridge: false,
         electronUpdates: false,
         cloudBackup: true,
         webdavSync: true,
@@ -255,6 +258,7 @@ export class PlatformDetector {
       tray: false,
       startup: false,
       systemProxy: false,
+      cliBridge: false,
       electronUpdates: false,
       cloudBackup: true,
       webdavSync: true,

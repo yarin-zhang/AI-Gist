@@ -303,6 +303,15 @@
     "light": "Light Theme",
     "theme": "Theme Mode"
   },
+  "cliBridge": {
+    "enable": "Enable local CLI access",
+    "enableTip": "When enabled, local command-line tools (such as coding agents like Claude Code) can read and write prompt and category data through a token-authenticated, loopback-only interface.",
+    "statusRunning": "Running · port {port}",
+    "statusStopped": "Not running",
+    "tryItHint": "Verify the connection by running this in a terminal:",
+    "startFailed": "Failed to start the local CLI bridge. Check whether another process is using the port.",
+    "toggleFailed": "Failed to toggle the local CLI bridge"
+  },
   "closeBehavior": {
     "ask": "Ask each time",
     "askOnClose": "Show selection dialog when closing",
@@ -1315,6 +1324,10 @@
         "description": "Choose how the app connects and test the proxy",
         "title": "Network Proxy Settings"
       },
+      "cli-bridge": {
+        "description": "Allow local command-line tools (such as coding agents) to read and write prompt and category data",
+        "title": "Local CLI Bridge"
+      },
       "shortcuts": {
         "description": "Configure global shortcuts and quick copy actions",
         "title": "Shortcut Settings"
@@ -1334,6 +1347,7 @@
       "language": "Language",
       "laboratory": "Laboratory",
       "networkProxy": "Network Proxy",
+      "cliBridge": "Local CLI",
       "shortcuts": "Shortcuts",
       "startup": "Startup"
     },

@@ -2844,6 +2844,7 @@ __metadata:
     archiver: "npm:^7.0.1"
     chalk: "npm:^4.1.2"
     chokidar: "npm:^4.0.3"
+    commander: "npm:^15.0.0"
     electron: "npm:^32.1.2"
     electron-builder: "npm:^25.1.6"
     eslint: "npm:^9.29.0"
@@ -3863,6 +3864,13 @@ __metadata:
   version: 12.1.0
   resolution: "commander@npm:12.1.0"
   checksum: 10c0/6e1996680c083b3b897bfc1cfe1c58dfbcd9842fd43e1aaf8a795fbc237f65efcc860a3ef457b318e73f29a4f4a28f6403c3d653d021d960e4632dd45bde54a9
+  languageName: node
+  linkType: hard
+
+"commander@npm:^15.0.0":
+  version: 15.0.0
+  resolution: "commander@npm:15.0.0"
+  checksum: 10c0/539229c171914ea1ccd45ee5f10d924289a12a684ea3a7a44147abe54003c35ed6de9ae4ad198d88c29fdf403dca0428451a388234e6dc01b6faa978fb207206
   languageName: node
   linkType: hard
 

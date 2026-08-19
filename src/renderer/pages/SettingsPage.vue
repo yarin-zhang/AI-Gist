@@ -83,11 +83,14 @@
                         <!-- 网络代理设置 -->
                         <NetworkProxySettings v-if="capabilities.systemProxy && activeSettingKey === 'network-proxy'"
                             :model-value="settings.networkProxy"
-                            @update:model-value="(val) => { 
-                                console.log('SettingsPage: networkProxy updated:', val); 
-                                settings.networkProxy = val; 
-                                updateSetting(); 
+                            @update:model-value="(val) => {
+                                console.log('SettingsPage: networkProxy updated:', val);
+                                settings.networkProxy = val;
+                                updateSetting();
                             }" />
+
+                        <!-- 本地 CLI 桥接设置 -->
+                        <CliBridgeSettings v-if="capabilities.cliBridge && activeSettingKey === 'cli-bridge'" />
 
                         <!-- 关于 -->
                         <AboutSettings v-if="activeSettingKey === 'about'" />
@@ -127,6 +130,7 @@ import {
     Cloud,
     Keyboard,
     Wifi,
+    Terminal2,
 } from "@vicons/tabler";
 import { SettingsNavigationIcon } from '@/theme/navigation-icons'
 import LaboratoryPanel from "@/components/example/LaboratoryPanel.vue";
@@ -138,6 +142,7 @@ import DataSyncSettings from "@/components/settings/DataSyncSettings.vue";
 import AboutSettings from "@/components/settings/AboutSettings.vue";
 import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
+import CliBridgeSettings from "@/components/settings/CliBridgeSettings.vue";
 import LanguageSettings from "@/components/settings/LanguageSettings.vue";
 import { PlatformDetector } from "@shared/platform";
 import { preferencesClient } from "@/lib/platform/preferences";
@@ -265,6 +270,12 @@ const settingItems = computed(() => {
             visible: capabilities.systemProxy,
         },
         {
+            label: t('settings.sections.cliBridge'),
+            key: "cli-bridge",
+            icon: () => h(NIcon, { size: 16 }, { default: () => h(Terminal2) }),
+            visible: capabilities.cliBridge,
+        },
+        {
             label: t('settings.sections.about'),
             key: "about",
             icon: () => h(NIcon, { size: 16 }, { default: () => h(InfoCircle) }),
@@ -301,7 +312,7 @@ const menuOptions = computed(() => {
             type: 'group' as const,
             label: t('settings.groups.system'),
             key: 'settings-group-system',
-            children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy'),
+            children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy', 'cli-bridge'),
         },
         {
             type: 'group' as const,
@@ -334,6 +345,7 @@ const currentSectionInfo = computed(() => {
         'data-management',
         'shortcuts',
         'network-proxy',
+        'cli-bridge',
     ]);
 
     return {

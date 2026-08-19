@@ -131,6 +131,11 @@ export interface UserPreferences {
       noProxy?: string;
     };
   };
+  // 新增：本地 CLI 桥接配置
+  cliBridge?: {
+    /** 是否允许本地 CLI（回环 HTTP + token 鉴权）访问本机数据 */
+    enabled: boolean;
+  };
 }
 
 /**

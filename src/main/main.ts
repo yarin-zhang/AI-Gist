@@ -1,13 +1,14 @@
 import { app, BrowserWindow, session, Menu, ipcMain, powerMonitor } from 'electron';
 import { randomUUID } from 'crypto';
-import { 
-  windowManager, 
-  trayManager, 
+import {
+  windowManager,
+  trayManager,
   ipcHandlers,
   themeManager,
   preferencesManager,
   singleInstanceManager,
   NetworkProxyManager,
+  cliBridgeManager,
 } from './electron';
 import { ShortcutManager } from './electron/shortcut-manager';
 import { 
@@ -58,7 +59,10 @@ function beginGracefulQuit(timeoutMs: number, source: string): void {
   console.log(`${source}，刷新待同步数据...`);
   isQuitting = true;
   windowManager.setQuitting(true);
-  void requestRendererSyncFlush(timeoutMs).finally(() => {
+  void Promise.all([
+    requestRendererSyncFlush(timeoutMs),
+    cliBridgeManager.stop(),
+  ]).finally(() => {
     quitFlushCompleted = true;
     quitFlushInProgress = false;
     app.quit();
@@ -115,6 +119,10 @@ app.whenReady().then(async () => {
   // 创建主窗口
   const mainWindow = windowManager.createMainWindow();
   attachSystemSessionEndHandler(mainWindow);
+
+  // 本地 CLI 桥接：若用户已在设置中开启，则随应用启动
+  cliBridgeManager.setMainWindow(mainWindow);
+  void cliBridgeManager.start();
   (powerMonitor as any).on('shutdown', (event: Electron.Event) => {
     // Electron 32 的类型声明缺少事件参数，但 Linux/macOS 运行时支持阻止关机以便限时清理。
     event.preventDefault();
@@ -166,6 +174,7 @@ app.whenReady().then(async () => {
       attachSystemSessionEndHandler(newWindow);
       trayManager.setMainWindow(newWindow);
       themeManager.setMainWindow(newWindow);
+      cliBridgeManager.setMainWindow(newWindow);
     }
   });
 

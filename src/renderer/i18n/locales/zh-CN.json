@@ -303,6 +303,15 @@
     "light": "浅色主题",
     "theme": "主题模式"
   },
+  "cliBridge": {
+    "enable": "启用本地 CLI 访问",
+    "enableTip": "开启后，本地命令行工具（例如 Claude Code 等编码 Agent）可以通过一个仅限本机访问、需要令牌验证的接口读写提示词与分类数据。",
+    "statusRunning": "运行中 · 端口 {port}",
+    "statusStopped": "未运行",
+    "tryItHint": "在终端中运行以下命令验证连接：",
+    "startFailed": "本地 CLI 桥接启动失败，请检查是否有其他程序占用了本机端口",
+    "toggleFailed": "切换本地 CLI 桥接状态失败"
+  },
   "closeBehavior": {
     "ask": "每次询问",
     "askOnClose": "关闭时弹出选择对话框",
@@ -1315,6 +1324,10 @@
         "description": "选择联网方式并测试代理连接",
         "title": "网络代理设置"
       },
+      "cli-bridge": {
+        "description": "允许本地命令行工具（如编码 Agent）读写提示词与分类数据",
+        "title": "本地 CLI 桥接"
+      },
       "shortcuts": {
         "description": "设置全局快捷键和快捷复制",
         "title": "快捷键设置"
@@ -1334,6 +1347,7 @@
       "language": "语言",
       "laboratory": "实验室",
       "networkProxy": "网络代理",
+      "cliBridge": "本地 CLI",
       "shortcuts": "快捷键",
       "startup": "启动"
     },
