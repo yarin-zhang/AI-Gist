@@ -114,7 +114,7 @@
                                 <template #icon><NIcon size="16"><Settings /></NIcon></template>
                             </NButton>
                         </div>
-                        <div v-show="!isCategoryListCollapsed" class="category-list-wrapper">
+                        <NCollapseTransition :show="!isCategoryListCollapsed" class="category-list-wrapper">
                             <NScrollbar class="category-list">
                                 <button v-for="category in categories" :key="category.id" type="button"
                                     class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
@@ -124,7 +124,7 @@
                                     <span class="nav-count">{{ categoryCounts.get(category.id) || 0 }}</span>
                                 </button>
                             </NScrollbar>
-                        </div>
+                        </NCollapseTransition>
                     </section>
                 </template>
         </NSplit>
@@ -134,7 +134,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
+import { NButton, NCollapseTransition, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
 import {
     ArrowsSort, Check, ChevronDown, Clock, ListDetails, Search, Settings, Star
 } from '@vicons/tabler'

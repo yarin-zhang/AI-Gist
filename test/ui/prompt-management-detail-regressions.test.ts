@@ -228,8 +228,14 @@ describe('prompt management detail regressions', () => {
     // NScrollbar's rendered root (without a `container` prop) is another component
     // (VResizeObserver), not a plain element, so `v-show` placed directly on it never
     // toggles `display` and the category list stays visible. It must sit on a real div.
-    expect(sidebar).toContain('<div v-show="!isCategoryListCollapsed" class="category-list-wrapper">')
+    // NCollapseTransition renders its own wrapping div and fully unmounts its slot
+    // content while collapsed, so it sidesteps the same pitfall while animating like
+    // the Quick Optimize panel (issue #33: the two collapse affordances must feel the
+    // same, not just behave the same).
+    expect(sidebar).toContain('<NCollapseTransition :show="!isCategoryListCollapsed" class="category-list-wrapper">')
     expect(sidebar).not.toMatch(/<NScrollbar[^>]*v-show/)
+    expect(sidebar).not.toMatch(/<div[^>]*v-show="!isCategoryListCollapsed"/)
+    expect(sidebar).toContain("import { NButton, NCollapseTransition, NDropdown")
 
     // Collapsing must free the space back to the prompt list pane instead of leaving
     // a blank gap, and the resize handle must be disabled while collapsed.
