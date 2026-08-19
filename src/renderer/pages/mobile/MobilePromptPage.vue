@@ -660,9 +660,9 @@ onUnmounted(() => {
   gap: 12px;
   min-height: 44px;
   padding: 8px 16px;
+  margin-bottom: 12px;
   color: var(--ion-color-medium);
   font-size: var(--mobile-font-size-footnote);
-  border-bottom: 1px solid var(--border-default);
 }
 
 .view-mode-segment {
