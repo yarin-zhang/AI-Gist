@@ -1148,6 +1148,7 @@
     "emptyTitle": "選擇一條提示詞開始使用",
     "emptyDescription": "新增一條提示詞",
     "sortBy": "排序方式",
+    "sortCreated": "創建時間",
     "sortUpdated": "最近更新",
     "sortUsage": "使用次數",
     "sortTitle": "標題",

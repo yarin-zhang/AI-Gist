@@ -1148,6 +1148,7 @@
     "emptyTitle": "プロンプトを選択して開始",
     "emptyDescription": "新しいプロンプトを作成",
     "sortBy": "並び順",
+    "sortCreated": "作成日時",
     "sortUpdated": "最近更新",
     "sortUsage": "使用回数",
     "sortTitle": "タイトル",

@@ -129,6 +129,7 @@ import {
 } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import { useTagColors } from '@/composables/useTagColors'
+import { sortPromptsForLibrary, type PromptLibrarySortBy } from '@/lib/utils/prompt-library-sort'
 
 interface Props {
     prompts: PromptWithRelations[]
@@ -152,7 +153,7 @@ const { t } = useI18n()
 const { getTagColor, getTagsArray } = useTagColors()
 const searchText = ref('')
 const activeFilter = ref('all')
-const sortBy = ref<'updated' | 'usage' | 'title'>('updated')
+const sortBy = ref<PromptLibrarySortBy>('created')
 const selectionMode = ref(false)
 const selectedIds = ref<number[]>([])
 const thumbnailUrlCache = new Map<Blob, string>()
@@ -210,9 +211,7 @@ const filteredPrompts = computed(() => {
     }
 
     if (activeFilter.value !== 'recent') {
-        if (sortBy.value === 'usage') result.sort((a, b) => (b.useCount || 0) - (a.useCount || 0))
-        else if (sortBy.value === 'title') result.sort((a, b) => a.title.localeCompare(b.title))
-        else result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        result = sortPromptsForLibrary(result, sortBy.value)
     }
 
     const query = searchText.value.trim().toLocaleLowerCase()
@@ -235,6 +234,7 @@ const resultHeading = computed(() => {
 })
 
 const sortOptions = computed(() => [
+    { label: t('promptWorkspace.sortCreated'), key: 'created' },
     { label: t('promptWorkspace.sortUpdated'), key: 'updated' },
     { label: t('promptWorkspace.sortUsage'), key: 'usage' },
     { label: t('promptWorkspace.sortTitle'), key: 'title' },
