@@ -5,7 +5,7 @@
                 <NFlex vertical :size="4">
                     <NText>{{ statusDescription }}</NText>
                     <NText v-if="syncStatus.lastSyncAt" depth="3" style="font-size: 12px;">
-                        {{ t('dataSync.lastSyncAt', { time: formatDate(syncStatus.lastSyncAt) }) }}
+                        {{ t('dataSync.lastSyncAt', { time: formatDateTime(syncStatus.lastSyncAt) }) }}
                     </NText>
                     <NText v-if="syncStatus.pendingChanges" depth="3" style="font-size: 12px;">
                         {{ t('dataSync.pendingChanges') }}
@@ -38,6 +38,14 @@
                     <NGridItem v-for="config in storageConfigs" :key="config.id"
                         span="6 700:6 1100:3 1600:2">
                         <NCard size="small" :title="config.name">
+                            <template #header-extra>
+                                <NDropdown :options="storageActionOptions" :size="'small'"
+                                    @select="key => handleStorageAction(key, config)">
+                                    <NButton size="small" quaternary circle :aria-label="t('dataSync.storageActions')">
+                                        <template #icon><NIcon size="16"><DotsVertical /></NIcon></template>
+                                    </NButton>
+                                </NDropdown>
+                            </template>
                             <NFlex vertical :size="8">
                                 <NFlex align="center" :size="8">
                                     <NTag :type="config.type === 'webdav' ? 'info' : 'success'" size="small">
@@ -64,23 +72,13 @@
                                             <template #icon><NIcon><Wifi /></NIcon></template>
                                             {{ t('dataSync.testConnection') }}
                                         </NButton>
-                                        <NButton size="small" secondary @click="syncCloudData(config.id)"
-                                            :loading="loading.syncNow && syncingStorageId === config.id"
-                                            :disabled="!config.enabled">
-                                            <template #icon><NIcon><Refresh /></NIcon></template>
-                                            {{ t('dataSync.syncNow') }}
-                                        </NButton>
                                     </NFlex>
-                                    <NPopconfirm @positive-click="deleteConfig(config.id)"
-                                        :negative-text="t('common.cancel')" :positive-text="t('common.confirm')">
-                                        <template #trigger>
-                                            <NButton type="error" secondary size="small">
-                                                <template #icon><NIcon><Trash /></NIcon></template>
-                                                {{ t('common.delete') }}
-                                            </NButton>
-                                        </template>
-                                        {{ t('dataSync.confirmDeleteConfig') }}
-                                    </NPopconfirm>
+                                    <NButton type="primary" size="small" @click="syncCloudData(config.id)"
+                                        :loading="loading.syncNow && syncingStorageId === config.id"
+                                        :disabled="!config.enabled">
+                                        <template #icon><NIcon><Refresh /></NIcon></template>
+                                        {{ t('dataSync.syncNow') }}
+                                    </NButton>
                                 </NFlex>
                             </template>
                         </NCard>
@@ -219,15 +217,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { FormInst, FormRules } from 'naive-ui';
 import {
-    NAlert, NButton, NCard, NCollapse, NCollapseItem, NEmpty, NFlex, NForm, NFormItem,
-    NGrid, NGridItem, NIcon, NInput, NInputNumber, NModal, NPopconfirm, NRadio,
-    NRadioGroup, NSwitch, NTag, NText, useMessage,
+    NAlert, NButton, NCard, NCollapse, NCollapseItem, NDropdown, NEmpty, NFlex, NForm, NFormItem,
+    NGrid, NGridItem, NIcon, NInput, NInputNumber, NModal, NRadio,
+    NRadioGroup, NSwitch, NTag, NText, useDialog, useMessage,
 } from 'naive-ui';
-import { Copy, Edit, Plus, Refresh, Trash, Wifi } from '@vicons/tabler';
+import { Copy, DotsVertical, Edit, Plus, Refresh, Trash, Wifi } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
 import {
     cloudSyncService,
@@ -244,9 +242,11 @@ import {
     createCloudStorageConfigForConnectionTest,
     normalizeCloudStorageConfigForConnectionTest,
 } from '@/lib/utils/cloud-storage-config';
+import { formatDateTime } from '@/lib/utils/date';
 
 const { t } = useI18n();
 const message = useMessage();
+const dialog = useDialog();
 const capabilities = PlatformDetector.getCapabilities();
 
 const storageConfigs = ref<CloudStorageConfig[]>([]);
@@ -312,11 +312,18 @@ const syncStatusDiagnosis = computed(() => getCloudSyncErrorDiagnosis(
         timestamp: syncStatus.value.updatedAt,
     }
 ));
+// 颜色语义要跟 statusTitle 的分支顺序保持一致：status === 'scheduled' 既可能是
+// "刚有本地变更、正等待防抖后的同步"（还没完成，蓝色 info），也可能只是"距离上次
+// 成功同步已经有一段时间、正在等待下一次例行检查"（已经是最新状态，应为绿色
+// success）。之前这里把两种 scheduled 一律显示成 info，导致标题已经是
+// "Data is up to date" 时横幅却仍是蓝色。这里按 statusTitle 同样的优先级改为：
+// 有本地变更等待同步时才是 info，其余情况只要存在成功的同步记录就用 success。
 const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() => {
     if (hasScheduledRetry.value) return 'warning';
     if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.canAutoRetry ? 'warning' : 'error';
     if (!autoSyncEnabled.value) return 'warning';
-    if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'info';
+    if (syncStatus.value.status === 'syncing') return 'info';
+    if (syncStatus.value.status === 'scheduled' && syncStatus.value.pendingChanges) return 'info';
     if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return 'success';
     return 'info';
 });
@@ -333,7 +340,7 @@ const statusDescription = computed(() => {
     if (hasScheduledRetry.value) {
         return t('dataSync.statusRetryScheduledDescription', {
             error: syncStatusDiagnosis.value.message,
-            time: formatDate(syncStatus.value.nextSyncAt!),
+            time: formatDateTime(syncStatus.value.nextSyncAt!),
         });
     }
     if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.message;
@@ -458,6 +465,26 @@ const deleteConfig = async (id: string) => {
     }
 };
 
+// 删除是存储卡片里唯一的破坏性操作，移进"…"二级菜单是为了避免用户误触；
+// 二次确认沿用之前 NPopconfirm 的文案，只是换成从下拉菜单触发的 dialog 确认。
+const storageActionOptions = computed(() => [
+    {
+        label: t('common.delete'),
+        key: 'delete',
+        icon: () => h(NIcon, { size: 16 }, { default: () => h(Trash) }),
+    },
+]);
+const handleStorageAction = (key: string, config: CloudStorageConfig) => {
+    if (key !== 'delete') return;
+    dialog.error({
+        title: t('common.confirm'),
+        content: t('dataSync.confirmDeleteConfig'),
+        positiveText: t('common.delete'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: () => deleteConfig(config.id),
+    });
+};
+
 const syncCloudData = async (storageId: string, forceRetry = false) => {
     loading.value.syncNow = true;
     syncingStorageId.value = storageId;
@@ -540,7 +567,6 @@ const loadStorageConfigs = async () => {
 };
 const getConfigDescription = (config: CloudStorageConfig) => config.type === 'webdav'
     ? (config as any).url : `iCloud Drive - ${(config as any).path || 'AI-Gist-Backup'}`;
-const formatDate = (value: string) => new Date(value).toLocaleString();
 
 onMounted(async () => {
     unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => { syncStatus.value = status; });
