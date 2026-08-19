@@ -94,11 +94,13 @@ const inputProps = computed(() => ({
   --n-color: var(--surface-primary) !important;
   --n-color-focus: var(--surface-primary) !important;
   --n-color-disabled: var(--surface-secondary) !important;
+  --n-border: 1px solid var(--border-default) !important;
 }
 .prompt-variable-field :deep(.n-base-selection) {
   --n-color: var(--surface-primary) !important;
   --n-color-active: var(--surface-primary) !important;
   --n-color-disabled: var(--surface-secondary) !important;
+  --n-border: 1px solid var(--border-default) !important;
 }
 .prompt-variable-field.type-textarea :deep(.n-input) {
   --n-color: var(--surface-secondary) !important;
