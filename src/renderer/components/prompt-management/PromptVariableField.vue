@@ -1,34 +1,43 @@
 <template>
-  <span class="prompt-variable-field" :class="[`type-${normalizedType}`, { inline, error, compact }]"
-    :style="fieldStyle"
-    :data-variable-field="variable.name" :data-first-occurrence="firstOccurrence ? 'true' : 'false'">
-    <span v-if="!inline || normalizedType === 'textarea'" class="field-label">
-      <span>{{ variable.name }}</span>
-      <span v-if="variable.required" class="required-mark" aria-hidden="true">*</span>
-      <NTooltip v-if="variable.description">
-        <template #trigger><NIcon size="14" class="field-help"><InfoCircle /></NIcon></template>
-        {{ variable.description }}
-      </NTooltip>
-    </span>
+  <NTooltip trigger="hover" placement="bottom" :disabled="!(inline && error)" content-style="max-width: 220px">
+    <template #trigger>
+      <span class="prompt-variable-field" :class="[`type-${normalizedType}`, { inline, error, compact }]"
+        :style="fieldStyle"
+        :data-variable-field="variable.name" :data-first-occurrence="firstOccurrence ? 'true' : 'false'">
+        <span v-if="!inline || normalizedType === 'textarea'" class="field-label">
+          <span>{{ variable.name }}</span>
+          <span v-if="variable.required" class="required-mark" aria-hidden="true">*</span>
+          <NTooltip v-if="variable.description">
+            <template #trigger><NIcon size="14" class="field-help"><InfoCircle /></NIcon></template>
+            {{ variable.description }}
+          </NTooltip>
+        </span>
 
-    <NSelect v-if="normalizedType === 'select'" size="small" :value="modelValue" :options="options" clearable
-      :placeholder="placeholder" :status="error ? 'error' : undefined" :consistent-menu-width="false"
-      :input-props="inputProps" @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
-    <NInputNumber v-else-if="normalizedType === 'number'" size="small" :value="numberValue" clearable
-      :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="inputProps"
-      @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
-    <span v-else-if="normalizedType === 'boolean'" class="boolean-field">
-      <NSwitch size="small" :value="Boolean(modelValue)" :input-props="inputProps"
-        @update:value="$emit('update:modelValue', $event)" />
-      <span v-if="inline" class="boolean-label">{{ variable.name }}</span>
-    </span>
-    <NInput v-else size="small" :value="stringValue" :type="normalizedType === 'textarea' ? 'textarea' : 'text'"
-      :autosize="normalizedType === 'textarea' ? { minRows: compact ? 2 : 3, maxRows: 7 } : undefined"
-      :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="inputProps"
-      @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
+        <NSelect v-if="normalizedType === 'select'" size="small" :value="modelValue" :options="options" clearable
+          :placeholder="placeholder" :status="error ? 'error' : undefined" :consistent-menu-width="false"
+          :input-props="inputProps" @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
+        <NInputNumber v-else-if="normalizedType === 'number'" size="small" :value="numberValue" clearable
+          :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="inputProps"
+          @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
+        <span v-else-if="normalizedType === 'boolean'" class="boolean-field">
+          <NSwitch size="small" :value="Boolean(modelValue)" :input-props="inputProps"
+            @update:value="$emit('update:modelValue', $event)" />
+          <span v-if="inline" class="boolean-label">{{ variable.name }}</span>
+        </span>
+        <NInput v-else size="small" :value="stringValue" :type="normalizedType === 'textarea' ? 'textarea' : 'text'"
+          :autosize="normalizedType === 'textarea' ? { minRows: compact ? 2 : 3, maxRows: 7 } : undefined"
+          :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="inputProps"
+          @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
 
-    <span v-if="error" class="field-error" role="alert">{{ t('promptWorkspace.requiredValue') }}</span>
-  </span>
+        <!-- Non-inline (grid) fields have their own row, so the message can sit in normal flow.
+             Inline fields sit inside running text: a visible message would cover whatever follows,
+             so it becomes an on-hover tooltip (trigger above) and stays available to screen readers here. -->
+        <span v-if="error && !inline" class="field-error" role="alert">{{ t('promptWorkspace.requiredValue') }}</span>
+        <span v-else-if="error && inline" class="sr-only" role="alert">{{ t('promptWorkspace.requiredValue') }}</span>
+      </span>
+    </template>
+    {{ t('promptWorkspace.requiredValue') }}
+  </NTooltip>
 </template>
 
 <script setup lang="ts">
@@ -131,7 +140,10 @@ const fieldStyle = computed(() => (
 .boolean-field { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; }
 .boolean-label { color: var(--content-secondary); font-size: 13px; }
 .field-error { color: var(--accent-error); font-size: 12px; line-height: 1.3; }
-.prompt-variable-field.inline .field-error { position: absolute; top: calc(100% + 2px); left: 0; z-index: 1; padding: 2px 5px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-primary); box-shadow: var(--shadow-popover); white-space: nowrap; }
+/* Kept off-screen (not display:none) so screen readers still announce the alert; the input's own
+   error-status border is the persistent visual cue, and the wrapping NTooltip surfaces the same
+   text on hover without covering the text that follows in the sentence. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .prompt-variable-field.compact.inline { min-width: 100px; }
 .prompt-variable-field.compact.inline.type-text { min-width: 0; }
 .prompt-variable-field :deep(.n-input) {
