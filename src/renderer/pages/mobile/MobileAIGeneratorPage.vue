@@ -257,12 +257,14 @@ const loadConfigs = async () => {
   }
 }
 
-// 导航到AI配置页面
+// 导航到"添加 AI 配置"表单：直接复用 AI 配置 Tab 自身"新增"按钮的跳转方式
+// （router.push('/ai-config/create')，见 MobileAIConfigPage.vue 的 handleCreate），
+// 不再先跳到 AI 配置 Tab 列表页再让用户多点一次"新增"（Gitea issue #61）。
 const navigateToAIConfig = () => {
   if (props.presentedAsModal) {
     emit('close')
   }
-  router.push('/tabs/ai-config')
+  router.push('/ai-config/create')
 }
 
 // 生成/保存成功后返回提示词列表：模态展示时只需关闭 modal（当前 Tab 的列表会通过
