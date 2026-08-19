@@ -15,14 +15,37 @@ html.ai-gist-mobile {
    * 而不是像素级贴底的实体栏。数值只在移动端本地使用，不进入设计系统 token，
    * 颜色/阴影仍然全部复用 design-tokens 里的 surface / border / shadow 变量。
    *
-   * gutter/bottom-offset 刻意调小：偏大的数值会在屏幕圆角处露出一块明显的三角形
-   * 空隙（issue #6 截图中箭头指向的位置），贴边越紧这块空隙越不明显；仍然保留
-   * 胶囊形浮动层与屏幕边缘之间必要的呼吸间距，不做贴死到边的整栏重设计。
+   * gutter 复用页面统一的 --mobile-page-gutter（16px），而不是刻意收紧到接近 0：
+   * issue #6 第一次修复曾经把它收紧成 8px/6px、试图用「贴边」掩盖屏幕圆角处的
+   * 空隙，被明确指出修反了方向——iOS 26 默认的悬浮标签栏本来就应该在左右两侧
+   * 留出呼吸间距（连同上方悬浮的「新建提示词」入口条一起，两者共用同一个
+   * .mobile-floating-nav 的 padding，天然对齐，不需要分别调）。
+   *
+   * 真正的根因不是 gutter 太大，而是选中态的高亮色块只是一颗独立内缩的小药丸：
+   * 它自己的小圆角和胶囊容器自身的大圆角是两条不同半径的弧线，中间会夹出一块
+   * 白色/玻璃色的月牙形缺口。修复方式见下方 ion-tab-button.tab-selected:first-
+   * child/:last-child——只在首/尾 Tab 被选中时让它撑满整高、贴到容器内壁，
+   * 与外层胶囊同心，把月牙缺口填平；gutter 本身不需要为此收紧。
    */
-  --mobile-nav-gutter: 8px;
-  --mobile-nav-bottom-offset: 6px;
+  --mobile-nav-gutter: var(--mobile-page-gutter);
+  --mobile-nav-bottom-offset: 10px;
   --mobile-nav-item-gap: 8px;
   --mobile-nav-radius: 999px;
+  /* 标签栏内边距与按钮外边距：单独抽出来是为了让下面「首尾 Tab 选中态贴边」
+     的负 margin 计算有名字可引用，避免两处各写一遍 4px/2px 的魔法数字。 */
+  --mobile-nav-tabbar-padding-inline: 4px;
+  --mobile-nav-tabbutton-margin-block: 5px;
+  --mobile-nav-tabbutton-margin-inline: 2px;
+  /*
+   * 首尾 Tab 选中态的负 margin 只需要抵消 ion-tab-bar 自己的 padding：margin 是
+   * 相对「容器内容区起点」（padding 结束的地方）计算的，把 margin-left 设成
+   * -padding 就能让按钮的外侧边缘正好退回到内容区起点——也就是紧贴 1px 内边框
+   * 的内侧，视觉上蓝色刚好铺到边框跟前，边框本身仍然完整可见、不被盖住。
+   * 不能再叠加按钮自身的 margin-inline（2px）：那是按钮相对内容区起点的正向
+   * 偏移量，不是需要额外抵消的量，叠加进去会导致向外多推 2px，让色块盖住甚至
+   * 越过外层 1px 边框，早期实现踩过这个坑，用实际渲染坐标验证过才发现。
+   */
+  --mobile-nav-tab-edge-bleed: var(--mobile-nav-tabbar-padding-inline);
   --mobile-nav-shelf-height: 46px;
   --mobile-nav-shelf-width-minimized: 46px;
   --mobile-nav-tabbar-height-minimized: 44px;
@@ -459,14 +482,22 @@ html.ai-gist-mobile ion-tab-bar {
   pointer-events: auto;
   /* 常量对齐：始终水平居中，不随收起/展开切换，只有 width 在两种状态间平滑过渡 */
   align-self: center;
-  width: 100%;
+  /*
+   * 这里是 content-box（见下方 height 注释），`width: 100%` 只计算内容宽度，
+   * 自身的 padding + 1px border 会在这之外各再多占 padding+1px。实测下来若真写
+   * 100%，胶囊会比 .mobile-floating-nav 留出的内容区宽 2*(padding+1px)，向两侧
+   * 各溢出这么多——这正是「新建提示词」入口条（没有 padding/border，天然贴合
+   * 内容区）和下面标签栏两侧边距对不齐的根因。用 calc 减掉这部分，让标签栏的
+   * 可视外框正好卡在 .mobile-floating-nav 的内容区边缘，两者边距严格一致。
+   */
+  width: calc(100% - (var(--mobile-nav-tabbar-padding-inline) * 2) - 2px);
   --background: var(--mobile-nav-surface);
   border: 1px solid var(--mobile-nav-border);
   border-radius: var(--mobile-nav-radius);
   /* content-box：这里的 height 只是内容高度，安全区已由外层 .mobile-floating-nav 统一处理 */
   height: var(--mobile-tabbar-content-height);
   min-height: 0;
-  padding: 0 4px;
+  padding: 0 var(--mobile-nav-tabbar-padding-inline);
   backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
   box-shadow: var(--mobile-nav-shadow);
@@ -490,14 +521,43 @@ html.ai-gist-mobile ion-tab-button {
   --color-selected: var(--accent-primary);
   min-height: 0;
   height: 100%;
-  margin: 5px 2px;
+  margin: var(--mobile-nav-tabbutton-margin-block) var(--mobile-nav-tabbutton-margin-inline);
   border-radius: var(--mobile-nav-radius);
-  transition: background var(--mobile-nav-transition);
+  transition: background var(--mobile-nav-transition), margin var(--mobile-nav-transition);
 }
 
 html.ai-gist-mobile ion-tab-button.tab-selected {
   --background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
   --background-focused: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+
+/*
+ * issue #6 二次反馈：首/尾 Tab 被选中时，蓝色高亮不能只是容器里独立内缩的一颗
+ * 小药丸——它自己的圆角和外层胶囊容器的圆角是两条不同半径、不同圆心的弧线，
+ * 中间会夹出一块白色/玻璃色的月牙形缺口（正是反馈截图里红色箭头指向的位置）。
+ *
+ * 修复：只在「当前选中的按钮同时是第一个/最后一个子元素」时，取消该按钮的
+ * 上下外边距（让它撑满 ion-tab-bar 的整个内容高度）并用负 margin 抵消掉
+ * 容器自身的 padding（即 --mobile-nav-tab-edge-bleed，具体推导见上面 token
+ * 定义处的注释），让它的外侧边缘一路退到胶囊内壁——紧贴 1px 边框内侧，边框
+ * 本身仍完整可见。撑满整高之后，同一个 --mobile-nav-radius 会自动算出和
+ * 外层胶囊同心的半圆端头，两条弧线重合，月牙缺口就被填平了。只处理外侧
+ * （first-child 只推左边、last-child 只推右边），朝向中间 Tab 的那一侧
+ * 外边距不变，不会把整颗按钮变成异常凸出的大药丸。
+ *
+ * 中间 Tab（AI 配置）被选中时不命中 :first-child/:last-child，沿用上面
+ * 原本内缩的小药丸高亮，不受影响——切换到中间 Tab 应该立刻恢复正常形状。
+ */
+html.ai-gist-mobile ion-tab-button.tab-selected:first-child {
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-left: calc(-1 * var(--mobile-nav-tab-edge-bleed));
+}
+
+html.ai-gist-mobile ion-tab-button.tab-selected:last-child {
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-right: calc(-1 * var(--mobile-nav-tab-edge-bleed));
 }
 
 html.ai-gist-mobile ion-tab-button ion-icon {
