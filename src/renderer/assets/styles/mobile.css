@@ -501,10 +501,19 @@ html.ai-gist-mobile ion-tab-button ion-label {
  * 贴右悬浮（父容器 align-items: flex-end 同样是常量）。
  * 两个状态之间只有 width / opacity 等连续属性在变化，因此过渡是平滑的。
  *
- * 下面这两条 `.mobile-floating-nav--minimized .mobile-ai-entry(__label)` 选择器是
- * 后代选择器，不要求直接子元素，因此提示词 Tab 两按钮布局里嵌套了一层
- * `.mobile-prompt-actions` 的长条主按钮同样会命中——收起后它会和圆形次按钮一起
- * 变成两个贴右悬浮的小圆点，不需要再为这个布局单独写一份收起规则。
+ * 下面 `.mobile-floating-nav--minimized .mobile-ai-entry(__label)` 是后代选择器，
+ * 不要求直接子元素，因此提示词 Tab 两按钮布局里嵌套了一层 `.mobile-prompt-actions`
+ * 的长条主按钮同样会命中——收起后它会和圆形次按钮一起变成两个贴右悬浮的小圆点，
+ * 不需要再为这个布局单独写一份收起规则。
+ *
+ * 但嵌套场景下光靠后代选择器不够：`.mobile-floating-nav--minimized .mobile-ai-entry`
+ * 和上面展开态的 `.mobile-prompt-actions .mobile-ai-entry`（第 418 行）specificity
+ * 完全相等（都是 3 个 class + 1 个 type），收起态目前能生效纯粹依赖它在源码里
+ * 排在后面——一旦有人调整这两块规则的先后顺序，收起动画会静默失效且不会被
+ * lint/test 捕获。所以额外补一条更具体的 `.mobile-floating-nav--minimized
+ * .mobile-prompt-actions .mobile-ai-entry`（4 个 class），让嵌套场景下的收起态
+ * 选择器 specificity 严格高于展开态规则，不再依赖书写顺序；独立单按钮场景
+ * （其余两个 Tab）继续走原来的后代选择器。
  */
 html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-bar {
   width: var(--mobile-nav-tabbar-width-minimized);
@@ -518,6 +527,7 @@ html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-button ion-label {
   margin: 0;
 }
 
+html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-prompt-actions .mobile-ai-entry,
 html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry {
   width: var(--mobile-nav-shelf-width-minimized);
   padding-inline: 0;

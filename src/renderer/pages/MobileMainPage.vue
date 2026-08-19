@@ -23,7 +23,7 @@
         <div v-if="isPromptsTab" class="mobile-prompt-actions">
           <button
             type="button"
-            class="mobile-ai-entry mobile-prompt-actions__primary"
+            class="mobile-ai-entry"
             :aria-label="promptActionMeta[promptFloatingActions.primary].label"
             @click="promptActionMeta[promptFloatingActions.primary].handler"
           >
