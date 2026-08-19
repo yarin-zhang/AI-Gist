@@ -1162,6 +1162,7 @@
     "aiResponse": "AI response",
     "aiSummarize": "Generate title and description with AI",
     "aiSummarizeEmptyContent": "Add prompt content before generating a title and description",
+    "aiSummarizing": "Generating title and description...",
     "aiSummarizeFailed": "Failed to generate title and description",
     "readyToCopy": "Prompt is ready",
     "completeRequired": "Complete the required variables first",

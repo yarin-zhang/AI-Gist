@@ -39,21 +39,35 @@ export function buildAISummaryPrompt(content: string): string {
 }
 
 /**
- * 从任意文本中提取第一个花括号配对完整的 JSON 对象子串（支持嵌套花括号）。
+ * 从任意文本中扫描每一个 `{` 作为候选起点，对每个起点做花括号深度匹配
+ * （支持嵌套花括号），返回所有能配对出完整花括号范围的候选子串，按起点
+ * 在原文中的先后顺序排列。
+ *
+ * 之所以不是只取“第一个 `{`”：本工具的核心场景是变量化/Jinja 提示词，AI
+ * 回复里经常会在真正的 JSON 对象之前提到 `{{variableName}}` 这类装饰性、
+ * 不配对或语义上并非 JSON 的花括号。如果只信任第一个 `{`，深度匹配会在这些
+ * 花括号上就地配对出一段无效子串，导致后面真正合法的 JSON 对象永远不会被
+ * 尝试。调用方需要逐个候选尝试 JSON.parse，直到找到第一个真正合法且可用的
+ * 候选为止。
  */
-function extractFirstJsonObject(text: string): string | null {
-  const start = text.indexOf('{')
-  if (start === -1) return null
+function extractJsonObjectCandidates(text: string): string[] {
+  const candidates: string[] = []
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue
 
-  let depth = 0
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '{') depth++
-    else if (text[i] === '}') {
-      depth--
-      if (depth === 0) return text.slice(start, i + 1)
+    let depth = 0
+    for (let i = start; i < text.length; i++) {
+      if (text[i] === '{') depth++
+      else if (text[i] === '}') {
+        depth--
+        if (depth === 0) {
+          candidates.push(text.slice(start, i + 1))
+          break
+        }
+      }
     }
   }
-  return null
+  return candidates
 }
 
 function truncate(value: string, maxLength: number): string {
@@ -79,8 +93,11 @@ export function parseAISummaryResponse(raw: string): AISummaryResult {
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
   const candidate = fenceMatch ? fenceMatch[1].trim() : text
 
-  const jsonSlice = extractFirstJsonObject(candidate)
-  if (jsonSlice) {
+  // 依次尝试每一个候选花括号范围：深度匹配可能因为文本里更早出现的、和真正
+  // JSON 无关的花括号（例如 `{{variable}}`）而配对到错误的 `}`，导致
+  // JSON.parse 失败或解析出一个没有可用 title 的对象——这两种情况都应该
+  // 跳过，继续尝试下一个候选起点，而不是直接放弃转向纯文本兜底。
+  for (const jsonSlice of extractJsonObjectCandidates(candidate)) {
     try {
       const parsed = JSON.parse(jsonSlice)
       const title = typeof parsed?.title === 'string' ? parsed.title.trim() : ''
@@ -92,7 +109,7 @@ export function parseAISummaryResponse(raw: string): AISummaryResult {
         }
       }
     } catch {
-      // JSON 解析失败，继续尝试下面的兜底逻辑
+      // 这个候选范围不是合法 JSON，继续尝试下一个候选起点
     }
   }
 

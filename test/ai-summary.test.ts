@@ -30,6 +30,22 @@ describe('parseAISummaryResponse', () => {
     })
   })
 
+  it('skips unmatched decorative braces that appear before the real JSON object', () => {
+    const raw = 'noise {{{not real}}} then real: {"title": "Real Title", "description": "..."}'
+    expect(parseAISummaryResponse(raw)).toEqual({
+      title: 'Real Title',
+      description: '...',
+    })
+  })
+
+  it('skips a Jinja-style {{variable}} mention that appears before the real JSON object', () => {
+    const raw = 'Sure! For a template using {{name}} style variables, here is the summary: {"title": "Placeholder Helper", "description": "..."}'
+    expect(parseAISummaryResponse(raw)).toEqual({
+      title: 'Placeholder Helper',
+      description: '...',
+    })
+  })
+
   it('truncates overly long fields instead of writing runaway text into the form', () => {
     const longTitle = 'A'.repeat(120)
     const raw = JSON.stringify({ title: longTitle, description: 'ok' })

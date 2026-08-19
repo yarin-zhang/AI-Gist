@@ -1162,6 +1162,7 @@
     "aiResponse": "AI 回應",
     "aiSummarize": "AI 生成標題和描述",
     "aiSummarizeEmptyContent": "請先填寫提示詞內容，再生成標題和描述",
+    "aiSummarizing": "正在生成標題和描述…",
     "aiSummarizeFailed": "生成標題和描述失敗",
     "readyToCopy": "提示詞已準備好",
     "completeRequired": "請先完成必填變數",

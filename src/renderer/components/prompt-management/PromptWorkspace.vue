@@ -54,7 +54,7 @@
                                     <template #icon><NIcon size="16"><Stars /></NIcon></template>
                                 </NButton>
                             </template>
-                            {{ canSummarizeWithAI ? t('promptWorkspace.aiSummarize') : t('promptWorkspace.aiSummarizeEmptyContent') }}
+                            {{ aiSummarizeTooltip }}
                         </NTooltip>
                         <NButton v-if="prompt?.id" circle quaternary size="small"
                             :type="prompt.isFavorite ? 'warning' : 'default'"
@@ -186,7 +186,15 @@ const canInlineEdit = computed(() => Boolean(props.prompt?.id))
 // AI 一键生成标题 / 描述：读取已保存的正文内容，调用已配置的首选 AI 模型
 // 总结出简短的标题和描述并直接回填、保存。正文为空时按钮禁用，避免对空内容总结。
 const summarizing = ref(false)
-const canSummarizeWithAI = computed(() => Boolean(props.prompt?.content?.trim()) && !summarizing.value)
+const hasSummarizableContent = computed(() => Boolean(props.prompt?.content?.trim()))
+const canSummarizeWithAI = computed(() => hasSummarizableContent.value && !summarizing.value)
+// 按钮 tooltip：三种状态各用独立文案，避免“生成中被禁用”这一状态误用“内容为空”
+// 的提示文案（内容其实并不为空，只是正在生成中）
+const aiSummarizeTooltip = computed(() => {
+    if (summarizing.value) return t('promptWorkspace.aiSummarizing')
+    if (!hasSummarizableContent.value) return t('promptWorkspace.aiSummarizeEmptyContent')
+    return t('promptWorkspace.aiSummarize')
+})
 
 const toISOString = (value: any) => {
     const date = value ? new Date(value) : new Date()
@@ -221,6 +229,11 @@ const summarizeWithAI = async () => {
             || preferredConfig.customModel
             || (Array.isArray(preferredConfig.models) ? preferredConfig.models[0] : '')
             || ''
+
+        if (!model) {
+            message.error(t('promptManagement.selectModel'))
+            return
+        }
 
         const request = {
             configId: String(preferredConfig.configId || ''),
