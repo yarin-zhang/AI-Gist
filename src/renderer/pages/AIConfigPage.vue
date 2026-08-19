@@ -1170,7 +1170,13 @@ defineExpose({ openAddConfigModal })
 .filter-item.active { font-weight: var(--font-weight-medium); }
 .filter-count { margin-left: auto; color: var(--content-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .library-heading { padding: 7px 14px 5px; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-xs); }
-.config-results { flex: 1; min-height: 0; padding: 0 7px 10px; }
+/* NScrollbar renders its own root without the parent's scoped data-v attribute, so this
+   padding must be applied through :deep() or it silently resolves to 0 and config cards
+   end up flush with the sidebar edge instead of matching .library-filters's inset. The
+   horizontal value is raised to 8px to match .library-filters exactly, and box-sizing:
+   border-box keeps the stretched flex width from overflowing by the padding amount, since
+   NScrollbar's root defaults to content-box. */
+.config-library :deep(.config-results) { flex: 1; min-height: 0; box-sizing: border-box; padding: 0 8px 10px; }
 .config-list-item { width: 100%; min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 8px 9px; margin-bottom: 2px; border: 0; border-radius: var(--radius-panel); background: transparent; text-align: left; }
 .provider-icon { width: 34px; height: 34px; }
 .config-list-copy { flex: 1; min-width: 0; }
