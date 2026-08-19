@@ -19,7 +19,7 @@
     <ion-content :fullscreen="true">
       <!-- 没有AI配置时显示的空状态 -->
       <div v-if="configs.length === 0 && !loading" class="empty-container">
-        <ion-icon :icon="sparklesOutline" class="empty-icon"></ion-icon>
+        <EmptyAIConfigIllustration />
         <p class="empty-text">{{ t('aiGenerator.noConfigAvailable') }}</p>
         <p class="empty-description">{{ t('aiGenerator.addConfigFirst') }}</p>
         <ion-button @click="navigateToAIConfig">
@@ -156,7 +156,6 @@ import {
 import {
   arrowBack,
   closeOutline,
-  sparklesOutline,
   saveOutline,
   checkmark,
   star
@@ -167,6 +166,7 @@ import { databaseService } from '~/lib/db'
 import type { AIConfig } from '@shared/types'
 import { AIGeneratorService } from '~/lib/services/mobile-ai-generator.service'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import EmptyAIConfigIllustration from '~/components/mobile/illustrations/EmptyAIConfigIllustration.vue'
 
 // presentedAsModal：作为全局 AI 入口的模态表单展示时为 true。此时页面不在路由栈里，
 // 内部所有原本用于"路由式整页导航"的 router.back()/router.push() 都要改为 emit('close')，
@@ -480,19 +480,9 @@ watch(() => route.path, (newPath) => {
   height: 100%;
 }
 
-.empty-icon {
-  color: var(--ion-color-medium);
-  margin-bottom: 16px;
-}
-
 .empty-text {
   color: var(--ion-color-dark);
-  margin-bottom: 8px;
-}
-
-.empty-description {
-  color: var(--ion-color-medium);
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 }
 
 .generating-overlay {

@@ -54,6 +54,15 @@ html.ai-gist-mobile {
   --mobile-icon-size: 20px;
   --mobile-icon-size-lg: 24px;
   --mobile-empty-icon-size: 56px;
+  /* 空状态插图（线稿 + 强调色），比纯图标大一档，用于承载更完整的场景插画 */
+  --mobile-illustration-size: 132px;
+
+  /*
+   * 大标题滚动收起（Tab 根页面共用，逻辑见 composables/useCollapsingHeader.ts）。
+   * expanded 是展开时大标题区块的高度，collapse-range 只是 CSS 里的注释说明——
+   * 实际的滚动阈值常量在组合式函数里，这里的变量只描述视觉高度。
+   */
+  --mobile-largetitle-height: 40px;
 
   --ion-background-color: var(--surface-body);
   --ion-text-color: var(--content-primary);
@@ -95,6 +104,8 @@ html.ai-gist-mobile ion-list {
 html.ai-gist-mobile ion-card {
   --background: var(--surface-primary);
   border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
 }
 
 /* ------------------------------------------------------------------ *
@@ -227,14 +238,80 @@ html.ai-gist-mobile .empty-state > p {
 }
 
 html.ai-gist-mobile .empty-description {
+  max-width: 260px;
+  margin: 0 0 var(--spacing-2xl);
+  color: var(--content-secondary);
   font-size: var(--mobile-font-size-footnote);
   line-height: var(--mobile-line-height-normal);
+}
+
+/*
+ * 空状态插画：线稿 + 单一强调色，与 ion-icon 的描边风格保持同一视觉重量。
+ * 具体图形见 components/mobile/illustrations/*.vue，这里只统一尺寸与间距。
+ */
+html.ai-gist-mobile .mobile-empty-illustration {
+  width: var(--mobile-illustration-size);
+  height: auto;
+  margin-bottom: var(--spacing-lg);
 }
 
 /* 页面内的区块标题（非 ion-* 组件） */
 html.ai-gist-mobile .section-title {
   font-size: var(--mobile-font-size-title);
   font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ *
+ * 折叠大标题（3 个 Tab 根页面共用）
+ *
+ * 大标题区块是 <ion-content> 内的普通文档流元素，随内容一起滚动；收起进度
+ * 由页面通过 :style="{ '--collapse-progress': progress }" 写入，progress 来自
+ * composables/useCollapsingHeader.ts，与 <ion-content> 自身派发的 ionScroll 一一对应，
+ * 因此不需要额外的 CSS transition 就已经跟手——滚多少收多少，回到顶部时也会
+ * 跟着滚动位置立即展开。工具栏里的小标题透明度同样直接绑定 progress，两者保持
+ * 同步的交叉淡入淡出。
+ * ------------------------------------------------------------------ */
+
+html.ai-gist-mobile .mobile-large-title-bar {
+  --collapse-progress: 0;
+  overflow: hidden;
+  padding: 2px var(--mobile-page-gutter) 10px;
+  max-height: calc((1 - var(--collapse-progress)) * var(--mobile-largetitle-height));
+  opacity: calc(1 - var(--collapse-progress));
+}
+
+html.ai-gist-mobile .mobile-large-title-text {
+  margin: 0;
+  font-size: var(--mobile-font-size-display);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--content-primary);
+  transform-origin: left center;
+  transform: scale(calc(1 - var(--collapse-progress) * 0.16));
+  white-space: nowrap;
+}
+
+/*
+ * 工具栏小标题：透明度与大标题的收起进度一一对应，由页面内联绑定
+ * :style="{ opacity: progress }"，此处只负责默认可见性之外没有额外规则——
+ * 真正的无障碍标题始终是这个 ion-title（大标题区块本身标了 aria-hidden），
+ * 因此这里不需要 visibility/aria 处理。
+ */
+
+/* ------------------------------------------------------------------ *
+ * 分组卡片列表：把原本贴边的 ion-list 收进圆角卡片，减少「一条条平铺」的感觉。
+ * ------------------------------------------------------------------ */
+
+html.ai-gist-mobile .mobile-grouped-card {
+  margin: 0 var(--mobile-page-gutter) var(--spacing-lg);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+html.ai-gist-mobile .mobile-grouped-card ion-list {
+  border-radius: 0;
 }
 
 /* ------------------------------------------------------------------ *

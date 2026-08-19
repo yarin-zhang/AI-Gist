@@ -443,7 +443,7 @@ onUnmounted(() => {
 
 .prompt-content-wrapper {
   background: var(--surface-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   border: 1px solid var(--border-default);
 }
