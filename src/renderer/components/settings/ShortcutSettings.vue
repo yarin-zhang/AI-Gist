@@ -17,8 +17,13 @@
           <NTag size="small" :type="statusType(command.status?.state)">
             {{ statusLabel(command.status?.state) }}
           </NTag>
-          <NButton secondary class="accelerator-button" @click="startCommandCapture(command.id)">
-            {{ command.binding.accelerator ? displayAccelerator(command.binding.accelerator) : t('shortcuts.notSet') }}
+          <NButton
+            quaternary
+            class="accelerator-button"
+            :title="command.binding.accelerator ? displayAccelerator(command.binding.accelerator) : t('shortcuts.notSet')"
+            @click="startCommandCapture(command.id)"
+          >
+            <ShortcutKeyCombo :accelerator="command.binding.accelerator" :empty-label="t('shortcuts.notSet')" />
           </NButton>
           <NSwitch :value="command.binding.enabled" @update:value="enabled => toggleCommand(command.id, enabled)" />
         </section>
@@ -53,8 +58,13 @@
           <NTag size="small" :type="statusType(bindingStatus(binding.id)?.state)">
             {{ statusLabel(bindingStatus(binding.id)?.state) }}
           </NTag>
-          <NButton secondary class="accelerator-button" @click="editBinding(binding)">
-            {{ displayAccelerator(binding.accelerator) }}
+          <NButton
+            quaternary
+            class="accelerator-button"
+            :title="displayAccelerator(binding.accelerator)"
+            @click="editBinding(binding)"
+          >
+            <ShortcutKeyCombo :accelerator="binding.accelerator" :empty-label="t('shortcuts.notSet')" />
           </NButton>
           <NSwitch :value="binding.enabled" @update:value="enabled => toggleBinding(binding, enabled)" />
           <NButton text type="error" @click="removeBinding(binding.id)"><NIcon><Trash /></NIcon></NButton>
@@ -108,6 +118,7 @@ import type {
 } from '@shared/types';
 import { apiClientManager } from '@/lib/api';
 import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue';
+import ShortcutKeyCombo from '@/components/shortcuts/ShortcutKeyCombo.vue';
 
 const { t } = useI18n();
 const message = useMessage();
@@ -328,7 +339,7 @@ onBeforeUnmount(() => {
 .binding-row { grid-template-columns: minmax(180px, 1fr) auto 190px auto auto; }
 .shortcut-copy { min-width: 0; }
 .description { display: block; margin-top: 4px; font-size: 12px; }
-.accelerator-button { justify-content: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.accelerator-button { justify-content: center; }
 .capture-card { width: min(420px, calc(100vw - 32px)); }
 .captured-key { font-size: 20px; color: var(--n-color-target); }
 @media (max-width: 800px) {
