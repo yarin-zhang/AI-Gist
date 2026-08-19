@@ -193,30 +193,44 @@ describe('settings sync and backup information architecture', () => {
   it('renders retryable cloud errors as a scheduled warning while preserving error details', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
     expect(source).toContain('const hasScheduledRetry = computed');
-    expect(source).toContain("if (hasScheduledRetry.value) return 'warning'");
     expect(source).toContain("t('dataSync.statusRetryScheduled')");
     expect(source).toContain('syncStatus.value.nextSyncAt');
     expect(source).toContain('@click="showCurrentSyncError"');
+    // The 'warning' color for a scheduled retry is asserted against the real
+    // resolveDataSyncAlertType() logic in test/data-sync-status.test.ts, not by
+    // grepping this file -- see that suite for the behavioral coverage.
   });
 
-  it('shows the up-to-date banner as success once only a routine sync check is scheduled', () => {
+  it('derives the status title and banner color from the same shared resolver instead of two separate branch chains', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
-    const alertTypeStart = source.indexOf('const statusAlertType = computed');
-    const alertTypeEnd = source.indexOf('\n});', alertTypeStart);
-    const alertType = source.slice(alertTypeStart, alertTypeEnd);
 
-    // A bare "scheduled" status (routine auto-sync check, no pending local edits) used to
-    // fall into the same bucket as "syncing" and render as info/blue even when the title
-    // already said "Data is up to date". Only a scheduled check with unsynced local
-    // changes should stay info; once there is a prior successful sync, the banner must
-    // resolve to success -- matching the sibling CloudSyncStatusIndicator's visualState.
-    expect(alertType).not.toMatch(/status\s*===\s*'syncing'\s*\|\|\s*syncStatus\.value\.status\s*===\s*'scheduled'\)\s*return 'info'/);
-    const syncingCheck = alertType.indexOf("syncStatus.value.status === 'syncing') return 'info'");
-    const pendingScheduledCheck = alertType.indexOf("syncStatus.value.status === 'scheduled' && syncStatus.value.pendingChanges) return 'info'");
-    const successCheck = alertType.indexOf("lastSyncAt || syncStatus.value.lastResult?.success) return 'success'");
-    expect(syncingCheck).toBeGreaterThan(-1);
-    expect(pendingScheduledCheck).toBeGreaterThan(syncingCheck);
-    expect(successCheck).toBeGreaterThan(pendingScheduledCheck);
+    // The item-4 review finding was that statusTitle and statusAlertType used to be two
+    // independently maintained if/else chains that could (and did) disagree about
+    // whether pendingChanges matters. Pin the wiring so both are forced through the
+    // same resolveDataSyncStatusKind() result and neither one re-inlines its own
+    // pendingChanges/status branching.
+    expect(source).toContain(
+      "import { resolveDataSyncAlertType, resolveDataSyncStatusKind } from '@/lib/utils/data-sync-status';",
+    );
+    expect(source).toContain('const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind({');
+    // pendingChanges must be passed through unconditionally -- not gated behind a
+    // `syncStatus.value.status === 'scheduled' &&` check, which is exactly the
+    // asymmetry that caused the reported bug.
+    expect(source).toMatch(/pendingChanges:\s*!!syncStatus\.value\.pendingChanges,/);
+    expect(source).not.toMatch(/status\s*===\s*'scheduled'\s*&&\s*syncStatus\.value\.pendingChanges/);
+
+    const statusAlertTypeStart = source.indexOf('const statusAlertType = computed');
+    const statusAlertTypeEnd = source.indexOf(');', statusAlertTypeStart);
+    expect(source.slice(statusAlertTypeStart, statusAlertTypeEnd)).toContain(
+      'resolveDataSyncAlertType(dataSyncStatusKind.value, syncStatusDiagnosis.value.canAutoRetry)',
+    );
+
+    const statusTitleStart = source.indexOf('const statusTitle = computed');
+    const statusTitleEnd = source.indexOf('});', statusTitleStart);
+    const statusTitleBody = source.slice(statusTitleStart, statusTitleEnd);
+    expect(statusTitleBody).toContain('switch (dataSyncStatusKind.value)');
+    // statusTitle must not keep its own copy of the pendingChanges/status decision tree.
+    expect(statusTitleBody).not.toContain('syncStatus.value.pendingChanges');
   });
 
   it('formats sync timestamps as yyyy-MM-dd HH:mm:ss using the shared date util', () => {

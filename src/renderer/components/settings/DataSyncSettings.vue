@@ -243,6 +243,8 @@ import {
     normalizeCloudStorageConfigForConnectionTest,
 } from '@/lib/utils/cloud-storage-config';
 import { formatDateTime } from '@/lib/utils/date';
+import type { DataSyncStatusKind } from '@/lib/utils/data-sync-status';
+import { resolveDataSyncAlertType, resolveDataSyncStatusKind } from '@/lib/utils/data-sync-status';
 
 const { t } = useI18n();
 const message = useMessage();
@@ -312,29 +314,36 @@ const syncStatusDiagnosis = computed(() => getCloudSyncErrorDiagnosis(
         timestamp: syncStatus.value.updatedAt,
     }
 ));
-// 颜色语义要跟 statusTitle 的分支顺序保持一致：status === 'scheduled' 既可能是
-// "刚有本地变更、正等待防抖后的同步"（还没完成，蓝色 info），也可能只是"距离上次
-// 成功同步已经有一段时间、正在等待下一次例行检查"（已经是最新状态，应为绿色
-// success）。之前这里把两种 scheduled 一律显示成 info，导致标题已经是
-// "Data is up to date" 时横幅却仍是蓝色。这里按 statusTitle 同样的优先级改为：
-// 有本地变更等待同步时才是 info，其余情况只要存在成功的同步记录就用 success。
-const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(() => {
-    if (hasScheduledRetry.value) return 'warning';
-    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.canAutoRetry ? 'warning' : 'error';
-    if (!autoSyncEnabled.value) return 'warning';
-    if (syncStatus.value.status === 'syncing') return 'info';
-    if (syncStatus.value.status === 'scheduled' && syncStatus.value.pendingChanges) return 'info';
-    if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return 'success';
-    return 'info';
-});
+// 标题文案和横幅颜色必须来自同一套判断（resolveDataSyncStatusKind），不能像之前
+// 那样各自维护一份 if/else 分支——那种写法曾经导致 pendingChanges 的检查只在
+// statusAlertType 里被限定为"仅当 status === 'scheduled' 时才生效"，而
+// statusTitle 是无条件检查，两者在 status === 'success' 且仍有未同步的本地变更
+// 时会互相矛盾（标题说"等待同步"，颜色却是成功绿色）。详见 data-sync-status.ts
+// 顶部注释。
+const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind({
+    hasScheduledRetry: hasScheduledRetry.value,
+    isError: syncStatus.value.status === 'error',
+    canAutoRetryError: syncStatusDiagnosis.value.canAutoRetry,
+    autoSyncEnabled: autoSyncEnabled.value,
+    isSyncing: syncStatus.value.status === 'syncing',
+    pendingChanges: !!syncStatus.value.pendingChanges,
+    hasSucceededBefore: !!(syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success),
+    hasStorageConfigs: storageConfigs.value.length > 0,
+}));
+const statusAlertType = computed<'success' | 'info' | 'warning' | 'error'>(
+    () => resolveDataSyncAlertType(dataSyncStatusKind.value, syncStatusDiagnosis.value.canAutoRetry)
+);
 const statusTitle = computed(() => {
-    if (hasScheduledRetry.value) return t('dataSync.statusRetryScheduled');
-    if (syncStatus.value.status === 'error') return syncStatusDiagnosis.value.title;
-    if (!autoSyncEnabled.value) return t('dataSync.statusPaused');
-    if (syncStatus.value.status === 'syncing') return t('dataSync.statusSyncing');
-    if (syncStatus.value.pendingChanges) return t('dataSync.statusPending');
-    if (syncStatus.value.lastSyncAt || syncStatus.value.lastResult?.success) return t('dataSync.statusCurrent');
-    return storageConfigs.value.length ? t('dataSync.statusReady') : t('dataSync.statusNotConfigured');
+    switch (dataSyncStatusKind.value) {
+        case 'retryScheduled': return t('dataSync.statusRetryScheduled');
+        case 'error': return syncStatusDiagnosis.value.title;
+        case 'paused': return t('dataSync.statusPaused');
+        case 'syncing': return t('dataSync.statusSyncing');
+        case 'pending': return t('dataSync.statusPending');
+        case 'current': return t('dataSync.statusCurrent');
+        case 'ready': return t('dataSync.statusReady');
+        case 'notConfigured': return t('dataSync.statusNotConfigured');
+    }
 });
 const statusDescription = computed(() => {
     if (hasScheduledRetry.value) {
