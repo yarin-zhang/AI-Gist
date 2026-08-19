@@ -46,6 +46,16 @@
                     </div>
 
                     <div class="workspace-controls">
+                        <NTooltip v-if="prompt?.id">
+                            <template #trigger>
+                                <NButton circle quaternary size="small" :loading="summarizing"
+                                    :disabled="!canSummarizeWithAI"
+                                    :aria-label="t('promptWorkspace.aiSummarize')" @click="summarizeWithAI">
+                                    <template #icon><NIcon size="16"><Stars /></NIcon></template>
+                                </NButton>
+                            </template>
+                            {{ canSummarizeWithAI ? t('promptWorkspace.aiSummarize') : t('promptWorkspace.aiSummarizeEmptyContent') }}
+                        </NTooltip>
                         <NButton v-if="prompt?.id" circle quaternary size="small"
                             :type="prompt.isFavorite ? 'warning' : 'default'"
                             :aria-label="t('promptManagement.favorites')" @click="$emit('toggle-favorite')">
@@ -119,9 +129,10 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NText, NTooltip, useMessage } from 'naive-ui'
-import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Trash, X } from '@vicons/tabler'
+import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Stars, Trash, X } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import { api } from '@/lib/api'
+import { buildAISummaryPrompt, parseAISummaryResponse } from '@/lib/utils/ai-summary'
 import PromptUseWorkspace from './PromptUseWorkspace.vue'
 import PromptEditModal from './PromptEditModal.vue'
 
@@ -171,6 +182,68 @@ const titleInputRef = ref<HTMLInputElement>()
 const descriptionInputRef = ref<HTMLTextAreaElement>()
 
 const canInlineEdit = computed(() => Boolean(props.prompt?.id))
+
+// AI 一键生成标题 / 描述：读取已保存的正文内容，调用已配置的首选 AI 模型
+// 总结出简短的标题和描述并直接回填、保存。正文为空时按钮禁用，避免对空内容总结。
+const summarizing = ref(false)
+const canSummarizeWithAI = computed(() => Boolean(props.prompt?.content?.trim()) && !summarizing.value)
+
+const toISOString = (value: any) => {
+    const date = value ? new Date(value) : new Date()
+    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+}
+
+const serializeAIConfig = (config: any) => ({
+    ...config,
+    models: Array.isArray(config.models) ? config.models.map(String) : [],
+    createdAt: toISOString(config.createdAt),
+    updatedAt: toISOString(config.updatedAt),
+})
+
+const summarizeWithAI = async () => {
+    const target = props.prompt
+    const content = (target?.content || '').trim()
+    if (!target?.id || !content || summarizing.value) return
+
+    // 生成结果即将覆盖标题/描述，先放弃正在进行中的手动编辑，避免草稿残留遮住新值
+    if (editingTitle.value) cancelEditTitle()
+    if (editingDescription.value) cancelEditDescription()
+
+    summarizing.value = true
+    try {
+        const preferredConfig = await api.aiConfigs.getPreferred.query()
+        if (!preferredConfig) {
+            message.warning(t('promptManagement.noAIConfigAvailable'))
+            return
+        }
+
+        const model = preferredConfig.defaultModel
+            || preferredConfig.customModel
+            || (Array.isArray(preferredConfig.models) ? preferredConfig.models[0] : '')
+            || ''
+
+        const request = {
+            configId: String(preferredConfig.configId || ''),
+            topic: content,
+            customPrompt: buildAISummaryPrompt(content),
+            model: String(model),
+        }
+
+        const result = await (window as any).electronAPI?.ai?.generatePrompt(request, serializeAIConfig(preferredConfig))
+        const summary = parseAISummaryResponse(result?.generatedPrompt || '')
+
+        const updated = await api.prompts.update.mutate({
+            id: target.id,
+            data: { title: summary.title, description: summary.description || undefined },
+        })
+        emit('updated', updated)
+    } catch (error) {
+        console.error(error)
+        message.error(`${t('promptWorkspace.aiSummarizeFailed')}: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+        summarizing.value = false
+    }
+}
 
 const startEditTitle = () => {
     const id = props.prompt?.id
