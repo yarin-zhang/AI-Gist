@@ -311,6 +311,9 @@
     "statusRunning": "運作中 · 連接埠 {port}",
     "statusStopped": "未運作",
     "tryItHint": "在終端機中執行以下指令驗證連線：",
+    "copyCommand": "複製指令",
+    "copySuccess": "指令已複製到剪貼簿",
+    "copyFailed": "複製失敗，請手動選取文字複製",
     "startFailed": "本機 CLI 橋接啟動失敗，請確認是否有其他程式占用了本機連接埠",
     "toggleFailed": "切換本機 CLI 橋接狀態失敗"
   },

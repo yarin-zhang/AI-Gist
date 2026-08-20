@@ -167,6 +167,9 @@
 	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 	font-size: 0.875em;
 	border: 1px solid var(--border-subtle);
+	-webkit-user-select: text;
+	-moz-user-select: text;
+	user-select: text;
 }
 
 /*
