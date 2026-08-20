@@ -307,10 +307,11 @@
   },
   "cliBridge": {
     "enable": "启用本地 CLI 访问",
-    "enableTip": "开启后，本地命令行工具（例如 Claude Code 等编码 Agent）可以通过一个仅限本机访问、需要令牌验证的接口读写提示词与分类数据。",
+    "enableTip": "开启后，Claude Code 等 AI Agent 也能查询和管理 AI Gist 中的提示词数据。",
     "statusRunning": "运行中 · 端口 {port}",
     "statusStopped": "未运行",
-    "tryItHint": "在终端中运行以下命令验证连接：",
+    "tryItHintAgent": "试试跟 AI 说：「用 AI Gist 的 CLI 工具，看看里面有哪些提示词？」",
+    "tryItHint": "或者在终端中运行以下命令验证连接：",
     "copyCommand": "复制命令",
     "copySuccess": "命令已复制到剪贴板",
     "copyFailed": "复制失败，请手动选中文本复制",

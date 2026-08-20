@@ -307,10 +307,11 @@
   },
   "cliBridge": {
     "enable": "Enable local CLI access",
-    "enableTip": "When enabled, local command-line tools (such as coding agents like Claude Code) can read and write prompt and category data through a token-authenticated, loopback-only interface.",
+    "enableTip": "Once enabled, AI agents like Claude Code can also look up and manage your AI Gist prompts.",
     "statusRunning": "Running · port {port}",
     "statusStopped": "Not running",
-    "tryItHint": "Verify the connection by running this in a terminal:",
+    "tryItHintAgent": "Try asking your AI: \"Use AI Gist's CLI to show me what prompts I have.\"",
+    "tryItHint": "Or verify the connection yourself by running this in a terminal:",
     "copyCommand": "Copy command",
     "copySuccess": "Command copied to clipboard",
     "copyFailed": "Copy failed, please select the text manually",
