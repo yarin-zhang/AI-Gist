@@ -19,11 +19,18 @@
                 </NFlex>
 
                 <template v-if="status.running">
-                    <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHintAgent') }}</NText>
+                    <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHintAgentLabel') }}</NText>
+                    <NFlex align="center" :size="8" class="cli-command-row">
+                        <code class="code-inline cli-command-code">{{ t('cliBridge.tryItHintAgentExample') }}</code>
+                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyText(t('cliBridge.tryItHintAgentExample'))">
+                            <template #icon><NIcon size="14"><Copy /></NIcon></template>
+                        </NButton>
+                    </NFlex>
+
                     <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHint') }}</NText>
                     <NFlex align="center" :size="8" class="cli-command-row">
                         <code class="code-inline cli-command-code">{{ STATUS_COMMAND }}</code>
-                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyStatusCommand">
+                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyText(STATUS_COMMAND)">
                             <template #icon><NIcon size="14"><Copy /></NIcon></template>
                         </NButton>
                     </NFlex>
@@ -80,12 +87,12 @@ const handleToggle = async (value: boolean) => {
     }
 };
 
-const copyStatusCommand = async () => {
+const copyText = async (text: string) => {
     try {
-        await navigator.clipboard.writeText(STATUS_COMMAND);
+        await navigator.clipboard.writeText(text);
         message.success(t('cliBridge.copySuccess'));
     } catch (error) {
-        console.error('复制命令失败:', error);
+        console.error('复制失败:', error);
         message.error(t('cliBridge.copyFailed'));
     }
 };
