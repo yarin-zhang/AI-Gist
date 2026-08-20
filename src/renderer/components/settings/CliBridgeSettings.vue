@@ -20,7 +20,12 @@
 
                 <template v-if="status.running">
                     <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHint') }}</NText>
-                    <code class="code-inline">node bin/ai-gist.js status</code>
+                    <NFlex align="center" :size="8" class="cli-command-row">
+                        <code class="code-inline cli-command-code">{{ STATUS_COMMAND }}</code>
+                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyStatusCommand">
+                            <template #icon><NIcon size="14"><Copy /></NIcon></template>
+                        </NButton>
+                    </NFlex>
                 </template>
             </NFlex>
         </NFlex>
@@ -29,12 +34,15 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { NCard, NDivider, NFlex, NSwitch, NTag, NText, useMessage } from 'naive-ui';
+import { NButton, NCard, NDivider, NFlex, NIcon, NSwitch, NTag, NText, useMessage } from 'naive-ui';
 import { useI18n } from 'vue-i18n';
+import { Copy } from '@vicons/tabler';
 import type { CliBridgeStatus } from '@shared/types';
 
 const { t } = useI18n();
 const message = useMessage();
+
+const STATUS_COMMAND = 'node bin/ai-gist.js status';
 
 const enabled = ref(false);
 const loading = ref(false);
@@ -71,6 +79,16 @@ const handleToggle = async (value: boolean) => {
     }
 };
 
+const copyStatusCommand = async () => {
+    try {
+        await navigator.clipboard.writeText(STATUS_COMMAND);
+        message.success(t('cliBridge.copySuccess'));
+    } catch (error) {
+        console.error('复制命令失败:', error);
+        message.error(t('cliBridge.copyFailed'));
+    }
+};
+
 onMounted(refreshStatus);
 </script>
 
@@ -79,5 +97,13 @@ onMounted(refreshStatus);
     display: block;
     margin-top: 4px;
     font-size: 12px;
+}
+
+.cli-command-row {
+    max-width: 100%;
+}
+
+.cli-command-code {
+    overflow-wrap: anywhere;
 }
 </style>
