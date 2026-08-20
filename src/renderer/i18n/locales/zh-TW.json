@@ -307,10 +307,11 @@
   },
   "cliBridge": {
     "enable": "啟用本機 CLI 存取",
-    "enableTip": "開啟後，本機命令列工具（例如 Claude Code 等程式編寫 Agent）可以透過一個僅限本機存取、需要權杖驗證的介面讀寫提示詞與分類資料。",
+    "enableTip": "開啟後，Claude Code 等 AI Agent 也能查詢和管理 AI Gist 中的提示詞資料。",
     "statusRunning": "運作中 · 連接埠 {port}",
     "statusStopped": "未運作",
-    "tryItHint": "在終端機中執行以下指令驗證連線：",
+    "tryItHintAgent": "試試跟 AI 說：「用 AI Gist 的 CLI 工具，看看裡面有哪些提示詞？」",
+    "tryItHint": "或者在終端機中執行以下指令驗證連線：",
     "copyCommand": "複製指令",
     "copySuccess": "指令已複製到剪貼簿",
     "copyFailed": "複製失敗，請手動選取文字複製",

@@ -19,6 +19,7 @@
                 </NFlex>
 
                 <template v-if="status.running">
+                    <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHintAgent') }}</NText>
                     <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHint') }}</NText>
                     <NFlex align="center" :size="8" class="cli-command-row">
                         <code class="code-inline cli-command-code">{{ STATUS_COMMAND }}</code>
