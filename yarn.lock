@@ -2871,6 +2871,8 @@ __metadata:
     vue-router: "npm:^4.0.0"
     webdav: "npm:^5.5.0"
     zod: "npm:^3.25.40"
+  bin:
+    ai-gist: ./bin/ai-gist.js
   languageName: unknown
   linkType: soft
 
