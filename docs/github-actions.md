@@ -45,31 +45,44 @@ yarn version major
 
 工作流将生成以下构建产物：
 
-- Windows: `AI-Gist-Setup-{version}.exe`
-- macOS (Intel): `AI-Gist-{version}-mac-x64.dmg`
-- macOS (Apple Silicon): `AI-Gist-{version}-mac-arm64.dmg`
-- Linux: `ai-gist-{version}-linux.snap`
+- Windows: `AI-Gist-{version}-Windows-Setup.exe`
+- macOS (Intel): `AI-Gist-{version}-macOS-x64.dmg`
+- macOS (Apple Silicon): `AI-Gist-{version}-macOS-arm64.dmg`
+- Linux: `AI-Gist-{version}-linux.AppImage`
+- Android: `AI-Gist-v{version}-android.apk`
 
-这些文件将自动上传到对应版本的 GitHub Release 页面。
+这些文件将自动上传到对应版本的 GitHub Release 页面。签名凭据不完整时产出的 Windows / macOS 兼容包会带 `-unsigned` 后缀（例如 `AI-Gist-{version}-Windows-Setup-unsigned.exe`），避免与已签名产物混淆或互相覆盖。
 
 ## 桌面代码签名
 
-Windows 使用 SignPath Foundation 的免费开源代码签名服务。申请通过并在仓库中配置以下 Actions secrets 后，工作流会先上传未签名安装包供 SignPath 验证来源，等待签名批准，再把签名后的安装包上传到 Release：
+每个平台 job 的签名状态（signed / unsigned、缺少哪些 Secrets）会写入 GitHub Actions 的 Job Summary，凭据缺失时同时输出 warning，不会静默跳过。
 
-- `SIGNPATH_API_TOKEN`
-- `SIGNPATH_ORGANIZATION_ID`
-- `SIGNPATH_PROJECT_SLUG`
-- `SIGNPATH_SIGNING_POLICY_SLUG`
+### Windows（SignPath）
 
-macOS 使用 Apple Developer ID 签名并通过 Apple 公证。需要配置：
+Windows 使用 SignPath Foundation 的免费开源代码签名服务。申请通过并在仓库中配置以下 Actions secrets 后，工作流会先上传未签名安装包供 SignPath 验证来源，等待签名批准，再对签名结果做 Authenticode 校验（`Get-AuthenticodeSignature`，校验失败即中断发布），最后把签名后的安装包上传到 Release：
 
-- `MAC_CSC_LINK`：Developer ID Application `.p12` 文件的 Base64 内容
+- `SIGNPATH_API_TOKEN`：SignPath 用户设置中生成的 API Token
+- `SIGNPATH_ORGANIZATION_ID`：SignPath 组织 ID
+- `SIGNPATH_PROJECT_SLUG`：SignPath 项目 slug
+- `SIGNPATH_SIGNING_POLICY_SLUG`：签名策略 slug（一般为 `release-signing`）
+
+申请流程：在 [signpath.org](https://signpath.org/apply) 提交开源项目申请（需要仓库公开、含 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)、账号开启 MFA），通过后在 SignPath 控制台创建项目并把上述四个值配置到 GitHub 仓库的 Actions secrets。四个 secrets 任一缺失时，工作流发布带 `-unsigned` 后缀的未签名兼容包。
+
+### macOS（Developer ID + 公证）
+
+macOS 使用 Apple Developer ID 签名并通过 Apple 公证，构建后会在 CI 内执行 `codesign --verify`、`xcrun stapler validate` 与 `spctl --assess` 三重校验。需要配置：
+
+- `MAC_CSC_LINK`：Developer ID Application `.p12` 文件的 Base64 内容（在 [Apple Developer 证书页面](https://developer.apple.com/account/resources/certificates/list) 创建 **Developer ID Application** 类型证书，注意不是 Mac App Store 用的 Apple Distribution）
 - `MAC_CSC_KEY_PASSWORD`：`.p12` 导出密码
 - `APPLE_ID`：Apple Developer 账号
-- `APPLE_APP_SPECIFIC_PASSWORD`：Apple 账户的 App 专用密码
+- `APPLE_APP_SPECIFIC_PASSWORD`：Apple 账户的 [App 专用密码](https://appleid.apple.com/account/manage)
 - `APPLE_TEAM_ID`：10 位 Team ID
 
-凭据不完整时，工作流会发出 warning 并继续生成未签名兼容包，不会中断现有发布。签名配置、责任角色和构建来源见 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)。
+凭据不完整时，工作流会发出 warning 并继续生成带 `-unsigned` 后缀的兼容包，不会中断现有发布。兼容包会通过 `scripts/adhoc-sign-mac.js` 做 ad-hoc 签名（否则 asar 打包破坏签名封条后，Apple Silicon 会直接拒绝运行该二进制），用户仍需 `xattr -cr` 移除 quarantine 属性后才能打开。签名配置、责任角色和构建来源见 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)。
+
+### Linux
+
+AppImage 无需代码签名。用户下载后需要 `chmod +x` 赋予执行权限；Ubuntu 22.04+ 运行 AppImage 需要 `libfuse2`。相关指引已写入 Release 说明模板。
 
 ## 工作流配置文件
 

@@ -269,6 +269,26 @@ jobs:
           draft: true
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## 📦 安装说明（遇到「损坏 / 无法验证开发者 / SmartScreen」提示请看这里）
+
+            **Windows**：下载 `AI-Gist-*-Windows-Setup.exe`。若出现 Microsoft Defender SmartScreen 蓝色提示，点击「更多信息」→「仍要运行」即可继续安装。文件名带 `-unsigned` 后缀的安装包为未签名兼容构建，出现该提示属预期行为。
+
+            **macOS**：请按芯片下载（Apple Silicon → `arm64`，Intel → `x64`）。正式版均已使用 Apple Developer ID 签名并通过 Apple 公证，可直接安装。若使用文件名带 `-unsigned` 后缀的兼容包时提示「已损坏，无法打开」，请先将应用拖入「应用程序」文件夹，再在终端执行：
+
+            ```bash
+            xattr -cr "/Applications/AI Gist.app"
+            ```
+
+            **Linux (AppImage)**：下载后先赋予执行权限再运行：
+
+            ```bash
+            chmod +x AI-Gist-*-linux.AppImage
+            ```
+
+            Ubuntu 22.04 及以上版本如提示缺少 FUSE，请先安装 libfuse2：`sudo apt install libfuse2`
+
+            ---
 
   build-mac:
     needs: create-release
@@ -308,11 +328,28 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [[ -n "$MAC_CSC_LINK" && -n "$MAC_CSC_KEY_PASSWORD" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+          MISSING=()
+          [[ -z "$MAC_CSC_LINK" ]] && MISSING+=(MAC_CSC_LINK)
+          [[ -z "$MAC_CSC_KEY_PASSWORD" ]] && MISSING+=(MAC_CSC_KEY_PASSWORD)
+          [[ -z "$APPLE_ID" ]] && MISSING+=(APPLE_ID)
+          [[ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]] && MISSING+=(APPLE_APP_SPECIFIC_PASSWORD)
+          [[ -z "$APPLE_TEAM_ID" ]] && MISSING+=(APPLE_TEAM_ID)
+
+          if [[ ${#MISSING[@]} -eq 0 ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### macOS (${{ matrix.arch }}) 签名状态：✅ 将执行 Developer ID 签名 + Apple 公证"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::macOS signing credentials are incomplete; publishing an unsigned compatibility build."
+            echo "::warning::macOS signing credentials are incomplete (missing: ${MISSING[*]}); publishing an unsigned compatibility build."
+            {
+              echo "### macOS (${{ matrix.arch }}) 签名状态：⚠️ 未签名兼容构建"
+              echo ""
+              echo "缺少 Secrets：\`${MISSING[*]}\`"
+              echo ""
+              echo "产物将以 \`-unsigned\` 后缀发布（仅 ad-hoc 签名，未公证），用户需执行 \`xattr -cr\` 才能打开。"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Build, sign, notarize, and publish (macOS)
@@ -330,6 +367,20 @@ jobs:
           node scripts/build.js
           yarn electron-builder --mac --${{ matrix.arch }} --config.mac.notarize=true --publish always
 
+      - name: Verify macOS signature and notarization
+        if: steps.mac-signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          APP_PATH=$(find dist -maxdepth 2 -type d -name '*.app' -print -quit)
+          if [[ -z "$APP_PATH" ]]; then
+            echo '::error::Built .app was not found for signature verification.'
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          spctl --assess --type execute --verbose=2 "$APP_PATH"
+          echo "- ✅ \`$APP_PATH\` 通过 codesign 校验、公证票据（staple）校验与 Gatekeeper 评估" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build and publish unsigned compatibility package (macOS)
         if: steps.mac-signing.outputs.available != 'true'
         env:
@@ -339,7 +390,9 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          yarn electron-builder --mac --${{ matrix.arch }} --publish always
+          yarn electron-builder --mac --${{ matrix.arch }} --publish always \
+            --config.afterSign=scripts/adhoc-sign-mac.js \
+            --config.mac.artifactName='AI-Gist-${version}-macOS-${arch}-unsigned.${ext}'
 
   build-windows:
     needs: create-release
@@ -382,18 +435,23 @@ jobs:
           SIGNPATH_PROJECT_SLUG: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
         run: |
-          $available = @(
-            $env:SIGNPATH_API_TOKEN,
-            $env:SIGNPATH_ORGANIZATION_ID,
-            $env:SIGNPATH_PROJECT_SLUG,
-            $env:SIGNPATH_SIGNING_POLICY_SLUG
-          ) | Where-Object { [string]::IsNullOrWhiteSpace($_) }
+          $missing = @()
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN)) { $missing += 'SIGNPATH_API_TOKEN' }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_ORGANIZATION_ID)) { $missing += 'SIGNPATH_ORGANIZATION_ID' }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_PROJECT_SLUG)) { $missing += 'SIGNPATH_PROJECT_SLUG' }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_SIGNING_POLICY_SLUG)) { $missing += 'SIGNPATH_SIGNING_POLICY_SLUG' }
 
-          if ($available.Count -eq 0) {
+          if ($missing.Count -eq 0) {
             "available=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "### Windows 签名状态：✅ 将提交 SignPath 签名请求" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           } else {
             "available=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Warning "SignPath credentials are incomplete; publishing an unsigned compatibility build."
+            Write-Warning ("SignPath credentials are incomplete (missing: {0}); publishing an unsigned compatibility build." -f ($missing -join ', '))
+            "### Windows 签名状态：⚠️ 未签名兼容构建" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            ("缺少 Secrets：``{0}``" -f ($missing -join ', ')) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            "安装包将以 ``-unsigned`` 后缀发布，安装时会触发 SmartScreen 提示（更多信息 → 仍要运行）。" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           }
 
       - name: Upload unsigned installer for origin verification
@@ -427,12 +485,23 @@ jobs:
         run: |
           if ($env:SIGNED -eq 'true') {
             $installer = Get-ChildItem -Path dist/signed -Filter 'AI-Gist-*-Windows-Setup.exe' -Recurse | Select-Object -First 1
+            if (-not $installer) {
+              throw 'Signed Windows installer was not found.'
+            }
+
+            $sig = Get-AuthenticodeSignature -FilePath $installer.FullName
+            if ($sig.Status -ne 'Valid') {
+              throw "Signed installer failed Authenticode verification: $($sig.Status) $($sig.StatusMessage)"
+            }
+            ("- ✅ Authenticode 校验通过，签名者：``{0}``" -f $sig.SignerCertificate.Subject) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           } else {
             $installer = Get-ChildItem -Path dist -Filter 'AI-Gist-*-Windows-Setup.exe' | Select-Object -First 1
-          }
+            if (-not $installer) {
+              throw 'Windows installer was not found.'
+            }
 
-          if (-not $installer) {
-            throw 'Windows installer was not found.'
+            $unsignedName = $installer.Name -replace '\.exe$', '-unsigned.exe'
+            $installer = Rename-Item -Path $installer.FullName -NewName $unsignedName -PassThru
           }
 
           gh release upload $env:RELEASE_VERSION $installer.FullName --repo $env:GITHUB_REPOSITORY --clobber
