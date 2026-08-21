@@ -111,8 +111,12 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
+          # CFBundleVersion 必须比上一次上传 App Store Connect 的 build 号更高，
+          # 否则上传报 -19241。用 run_number 保证单调递增；营销版本号（CFBundleShortVersionString）
+          # 仍取 package.json 的 version，商店里显示为 "2.1.0 (123)" 的形式。
           yarn electron-builder --config electron-builder.mas.js --mac --universal --publish never \
-            --config.mas.provisioningProfile="$MAS_PROVISIONING_PROFILE_PATH"
+            --config.mas.provisioningProfile="$MAS_PROVISIONING_PROFILE_PATH" \
+            --config.buildVersion="${{ github.run_number }}"
 
           PKG_PATH=$(find dist -type f -name 'AI-Gist-*-Mac-App-Store-*.pkg' -print -quit)
           if [[ -z "$PKG_PATH" ]]; then
