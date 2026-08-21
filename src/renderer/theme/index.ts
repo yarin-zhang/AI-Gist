@@ -89,6 +89,13 @@ export function getThemeOverrides(themeName: 'light' | 'dark'): GlobalThemeOverr
       borderColor: border.default,
       hoverColor: interactive.hover,
       dividerColor: border.subtle,
+
+      // 弹出层阴影：boxShadow2 是 naive-ui 弹出层家族（Popover / Dropdown /
+      // Select 菜单 / Popselect / AutoComplete / DatePicker / TimePicker /
+      // Cascader 等面板）的统一阴影来源。在这里统一替换为设计令牌，
+      // 阴影直接落在参与过渡动画的面板元素上，与面板同步淡入淡出，
+      // 避免在外层定位容器上补阴影导致的“阴影滞后”（#112）。
+      boxShadow2: tokens.elevation.popover,
       
       // 尺寸
       lineHeight: tokens.typography.lineHeights.normal,

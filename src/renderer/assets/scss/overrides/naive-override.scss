@@ -135,11 +135,15 @@
 	font-weight: var(--font-weight-semibold);
 }
 
-// 弹出层最大宽度
+// 弹出层最大宽度。
+// 注意：这里只能限制宽度，不能加 box-shadow / border-radius。
+// .v-binder-follower-content 是 vueuc 的定位包裹层，位于 Vue Transition 之外，
+// 不参与面板的 fade-in-scale-up 过渡：加在它上面的阴影会在展开瞬间全量出现、
+// 收起时残留，并与面板自身的阴影叠加，造成“阴影滞后一拍”的观感（#112）。
+// 弹出面板的阴影统一由主题层 common.boxShadow2（见 theme/index.ts）落在
+// 参与过渡动画的面板元素上，与面板同步淡入淡出。
 .v-binder-follower-content {
 	max-width: calc(100vw - (var(--spacing-xl) * 2));
-	border-radius: var(--radius-panel);
-	box-shadow: var(--shadow-popover);
 }
 
 // 数据表格
