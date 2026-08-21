@@ -60,16 +60,17 @@ class SingleInstanceManager {
     if (!gotTheLock) {
       // 如果没有获得锁，说明已经有实例在运行
       console.log(CONSTANTS.LOG_MESSAGES.APP_RUNNING);
-      
-      if (!isDevelopment) {
-        // 生产环境下显示提示对话框
-        this.showSystemErrorDialog();
-      } else {
+
+      if (isDevelopment) {
         console.log(CONSTANTS.LOG_MESSAGES.DEV_DUPLICATE);
       }
-      
-      // 强制退出
-      process.exit(0);
+
+      // 静默优雅退出。已运行实例会收到 second-instance 事件，
+      // 由它负责弹出提示并聚焦现有窗口（见 handleSecondInstance）。
+      // 这里不能用 process.exit()：此时 Chromium 尚未初始化完成，
+      // 硬退出会触发 SIGTRAP，让 macOS 记录崩溃报告并弹出
+      // "AI Gist quit unexpectedly" 对话框。
+      app.quit();
     } else {
       console.log(CONSTANTS.LOG_MESSAGES.LOCK_ACQUIRED);
       // 监听第二个实例启动事件
