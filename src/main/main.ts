@@ -1,5 +1,4 @@
-import { app, BrowserWindow, session, Menu, ipcMain, powerMonitor } from 'electron';
-import { randomUUID } from 'crypto';
+import { app, BrowserWindow, session, Menu, powerMonitor } from 'electron';
 import {
   windowManager,
   trayManager,
@@ -10,8 +9,9 @@ import {
   NetworkProxyManager,
   cliBridgeManager,
 } from './electron';
+import { quitFlushCoordinator } from './electron/quit-flush-coordinator';
 import { ShortcutManager } from './electron/shortcut-manager';
-import { 
+import {
   dataManagementService
 } from './data';
 import { CloudBackupManager } from './cloud/cloud-backup-manager';
@@ -19,30 +19,7 @@ import { CloudBackupManager } from './cloud/cloud-backup-manager';
 // 全局变量定义
 let isQuitting = false; // 标记应用是否正在退出
 let cloudBackupManager: CloudBackupManager;
-let quitFlushCompleted = false;
-let quitFlushInProgress = false;
 let resourcesCleaned = false;
-
-async function requestRendererSyncFlush(timeoutMs = 5000): Promise<void> {
-  const mainWindow = windowManager.getMainWindow();
-  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
-
-  const id = randomUUID();
-  await new Promise<void>(resolve => {
-    const timer = setTimeout(() => {
-      ipcMain.removeListener('cloud-sync:flush-response', onResponse);
-      resolve();
-    }, timeoutMs + 250);
-    const onResponse = (_event: Electron.IpcMainEvent, response: { id?: string }) => {
-      if (response?.id !== id) return;
-      clearTimeout(timer);
-      ipcMain.removeListener('cloud-sync:flush-response', onResponse);
-      resolve();
-    };
-    ipcMain.on('cloud-sync:flush-response', onResponse);
-    mainWindow.webContents.send('cloud-sync:flush-request', { id, reason: 'shutdown', timeoutMs });
-  });
-}
 
 function cleanupResources(): void {
   if (resourcesCleaned) return;
@@ -53,26 +30,25 @@ function cleanupResources(): void {
   ShortcutManager.getInstance().destroy();
 }
 
+/**
+ * 触发一次"优雅退出"：不管是从哪条路径调用（窗口关闭选择彻底退出、托盘退出、
+ * 系统关机、非 macOS 无托盘时的 window-all-closed），都统一交给
+ * quitFlushCoordinator 处理——它会并行刷新渲染进程数据、停止本地 CLI 桥接
+ * （并清理 ~/.ai-gist/cli-bridge.json），完成后才真正调用 app.quit()。
+ * 这样"应用真的要退出时必须停止 CLI 桥接"这条契约只需要维护在一个地方，
+ * 不需要每条退出路径各自记得去调用 cliBridgeManager.stop()。
+ */
 function beginGracefulQuit(timeoutMs: number, source: string): void {
-  if (quitFlushCompleted || quitFlushInProgress) return;
-  quitFlushInProgress = true;
-  console.log(`${source}，刷新待同步数据...`);
   isQuitting = true;
   windowManager.setQuitting(true);
-  void Promise.all([
-    requestRendererSyncFlush(timeoutMs),
-    cliBridgeManager.stop(),
-  ]).finally(() => {
-    quitFlushCompleted = true;
-    quitFlushInProgress = false;
-    app.quit();
-  });
+  quitFlushCoordinator.begin(timeoutMs, source, () => app.quit());
 }
 
 function attachSystemSessionEndHandler(window: BrowserWindow): void {
   window.on('session-end', () => {
-    // Electron 32 的 Windows session-end 不可阻塞，只能做最后一次尽力刷新。
-    void requestRendererSyncFlush(3000);
+    // Electron 32 的 Windows session-end 不可阻塞，只能做最后一次尽力刷新
+    // （不涉及 CLI 桥接：会话结束不代表应用一定会退出）。
+    void quitFlushCoordinator.requestRendererSyncFlush(3000);
   });
 }
 
@@ -200,7 +176,7 @@ app.on('window-all-closed', function () {
 
 // 应用即将退出时的处理
 app.on('before-quit', (event) => {
-  if (quitFlushCompleted) {
+  if (quitFlushCoordinator.isFlushCompleted()) {
     cleanupResources();
     return;
   }
