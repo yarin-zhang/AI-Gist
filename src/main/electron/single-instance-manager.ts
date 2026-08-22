@@ -25,6 +25,7 @@ const CONSTANTS = {
     DEV_DUPLICATE: '开发环境：检测到重复实例',
     LOCK_ACQUIRED: '获得单实例锁定，继续启动应用',
     SECOND_INSTANCE: '检测到第二个实例尝试启动，显示现有窗口',
+    CLI_AUTO_LAUNCH_PROBE: '检测到本地 CLI 的自动拉起探测，应用已在运行，静默忽略（不弹窗、不抢占窗口焦点）',
     COMMAND_LINE: '命令行参数:',
     WORKING_DIR: '工作目录:',
     WINDOW_STATUS: '主窗口状态:',
@@ -32,6 +33,20 @@ const CONSTANTS = {
     WINDOW_NOT_EXISTS: '不存在'
   }
 } as const;
+
+/**
+ * bin/lib/bridge-client.js 的 tryAutoLaunchOnMac() 在通过 `open -a "AI Gist" --args ...`
+ * 拉起/唤醒应用时会带上这个命令行标记。如果应用其实已经在运行（例如常驻托盘），
+ * `open -a` 会短暂拉起一个新的 Electron 进程，这个新进程会在 requestSingleInstanceLock()
+ * 时输给已经在运行的实例，并把自己的命令行参数通过 'second-instance' 事件转交过来——
+ * 也就是这里的 handleSecondInstance()。带着这个标记说明这次触发只是 CLI 想确认应用是否
+ * 在跑的一次探测性拉起，而不是用户手动又打开了一次应用，因此不应该弹出"已在运行"的
+ * 对话框（这个对话框和 CLI 本身要执行的操作毫无关系，只会让用户困惑，这正是
+ * Gitea issue #149 里"再次打开时就会报错"的根因之一）。必须和
+ * bin/lib/bridge-client.js 里的 AUTO_LAUNCH_MARKER 保持完全一致（两边运行时环境不同，
+ * 无法共享同一个 import，只能约定字面量一致）。
+ */
+const CLI_AUTO_LAUNCH_MARKER = '--ai-gist-cli-autolaunch';
 
 /**
  * 单实例管理器
@@ -88,7 +103,16 @@ class SingleInstanceManager {
     console.log(CONSTANTS.LOG_MESSAGES.SECOND_INSTANCE);
     console.log(CONSTANTS.LOG_MESSAGES.COMMAND_LINE, commandLine);
     console.log(CONSTANTS.LOG_MESSAGES.WORKING_DIR, workingDirectory);
-    
+
+    // 本地 CLI 的自动拉起探测：应用已经在运行（否则根本不会走到 second-instance），
+    // 用户此时只是在跑一条 CLI 命令，不是想再打开一个应用窗口。直接静默返回，
+    // 既不弹出"已在运行"对话框，也不强制显示/聚焦主窗口（例如用户特意把窗口
+    // 常驻在托盘里，CLI 命令不应该把它弹出来）。
+    if (commandLine.includes(CLI_AUTO_LAUNCH_MARKER)) {
+      console.log(CONSTANTS.LOG_MESSAGES.CLI_AUTO_LAUNCH_PROBE);
+      return;
+    }
+
     // 显示提示对话框
     const mainWindow = windowManager.getMainWindow();
     console.log(CONSTANTS.LOG_MESSAGES.WINDOW_STATUS, mainWindow ? CONSTANTS.LOG_MESSAGES.WINDOW_EXISTS : CONSTANTS.LOG_MESSAGES.WINDOW_NOT_EXISTS);
