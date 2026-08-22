@@ -269,19 +269,19 @@ class CapacitorLocalBackupRepository implements LocalBackupRepository {
     } catch {
       return [];
     }
-    const backups: LocalBackupInfo[] = [];
-    for (const entry of entries) {
+    const backups = (await Promise.all(entries.map(async entry => {
       const name = typeof entry === 'string' ? entry : entry.name || '';
-      if (!name.endsWith('.json')) continue;
+      if (!name.endsWith('.json')) return null;
       try {
         const path = `${LOCAL_BACKUP_DIRECTORY}/${name}`;
         const result = await Filesystem.readFile({ path, directory: Directory.Data, encoding: Encoding.UTF8 });
         const content = typeof result.data === 'string' ? result.data : await result.data.text();
-        backups.push(toLocalBackupInfo(JSON.parse(content), new Blob([content]).size));
+        return toLocalBackupInfo(JSON.parse(content), new Blob([content]).size);
       } catch (error) {
         console.warn(`读取移动端本地备份失败: ${name}`, error);
+        return null;
       }
-    }
+    }))).filter((backup): backup is LocalBackupInfo => backup !== null);
     return sortLocalBackups(backups);
   }
 
