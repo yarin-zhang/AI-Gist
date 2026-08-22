@@ -77,18 +77,20 @@
               <div class="service-links">
                 <ion-button
                   v-if="getApiKeyInfo.apiKeyUrl"
-                  fill="clear"
+                  fill="outline"
                   size="small"
                   @click="openUrl(getApiKeyInfo.apiKeyUrl)"
                 >
+                  <ion-icon :icon="keyOutline" slot="start"></ion-icon>
                   {{ t('aiConfig.getApiKey') }}
                 </ion-button>
                 <ion-button
                   v-if="getApiKeyInfo.docUrl"
-                  fill="clear"
+                  fill="outline"
                   size="small"
                   @click="openUrl(getApiKeyInfo.docUrl)"
                 >
+                  <ion-icon :icon="documentTextOutline" slot="start"></ion-icon>
                   {{ t('aiConfig.viewDocumentation') }}
                 </ion-button>
               </div>
@@ -260,6 +262,8 @@ import {
   close,
   checkmarkCircle,
   closeCircle,
+  keyOutline,
+  documentTextOutline,
   cloudOutline,
   hardwareChipOutline,
   extensionPuzzleOutline
@@ -882,9 +886,26 @@ ion-item {
 }
 
 .service-links {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-default);
+}
+
+.service-links ion-button {
+  --border-color: var(--border-default);
+  --border-radius: var(--radius-control);
+  --color: var(--accent-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+  min-height: 36px;
+  font-size: var(--mobile-font-size-footnote);
+}
+
+.service-links ion-icon {
+  font-size: 16px;
 }
 
 .action-buttons {
