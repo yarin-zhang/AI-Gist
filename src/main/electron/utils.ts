@@ -103,14 +103,16 @@ export function getAppIconPath(): string {
 }
 
 /**
- * 获取 macOS 托盘图标路径（无底色，随系统深浅色主题切换）
- * 文件名对应的是同目录下 tray-light@2x.png / tray-dark@2x.png 的 1x 版本，
- * Electron 会按约定自动挑选同目录下的 @2x 版本用于高分屏渲染
- * @param isDarkMode 当前系统是否为深色外观
+ * 获取 macOS 托盘图标路径（模板图像，无底色）
+ * 配合 nativeImage.setTemplateImage(true) 使用：由系统按菜单栏当前的
+ * 实际渲染颜色自动上色，与其他菜单栏图标保持一致的浅色/深色/高亮表现，
+ * 而不是根据 nativeTheme 手动猜测再切换两套图片。
+ * 文件名对应同目录下 tray-template@2x.png 的 1x 版本，Electron 会按约定
+ * 自动挑选同目录下的 @2x 版本用于高分屏渲染
  * @returns 图标文件路径，如果未找到则返回空字符串
  */
-export function getMacTrayIconPath(isDarkMode: boolean): string {
-  const fileName = isDarkMode ? 'tray-dark.png' : 'tray-light.png';
+export function getMacTrayIconPath(): string {
+  const fileName = 'tray-template.png';
   const iconPath = findIconFile([fileName]);
 
   if (!iconPath) {

@@ -1,5 +1,5 @@
 // 标准库导入
-import { Tray, Menu, nativeImage, BrowserWindow, app, nativeTheme } from 'electron';
+import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
 
 // 本地模块导入
 import { getAppIconPath, getMacTrayIconPath } from './utils';
@@ -33,7 +33,6 @@ class TrayManager {
   private mainWindow: BrowserWindow | null = null;
   private onQuitCallback?: () => void;
   private showWindowCallback?: () => void;
-  private themeChangeListener: (() => void) | null = null;
 
   // ==================== 窗口管理方法 ====================
   
@@ -77,9 +76,6 @@ class TrayManager {
       this.tray = new Tray(icon);
       this.setupTrayMenu();
       this.setupTrayEvents();
-      if (process.platform === 'darwin') {
-        this.setupTrayThemeSync();
-      }
 
       console.log(CONSTANTS.LOG_MESSAGES.TRAY_CREATED);
       return true;
@@ -93,10 +89,6 @@ class TrayManager {
    * 销毁托盘
    */
   destroy(): void {
-    if (this.themeChangeListener) {
-      nativeTheme.removeListener('updated', this.themeChangeListener);
-      this.themeChangeListener = null;
-    }
     if (this.tray) {
       this.tray.destroy();
       this.tray = null;
@@ -146,11 +138,14 @@ class TrayManager {
   }
 
   /**
-   * 创建 macOS 托盘图标（无底色，随系统深浅色主题切换）
+   * 创建 macOS 托盘图标（模板图像）
+   * 标记为 template image 后，图标的浅色/深色/高亮表现完全交给系统
+   * 根据菜单栏实际渲染颜色处理，和其他菜单栏图标行为一致，无需自己
+   * 监听主题变化再手动换图
    * @returns 图标实例或 null
    */
   private createMacTrayIcon(): Electron.NativeImage | null {
-    const iconPath = getMacTrayIconPath(nativeTheme.shouldUseDarkColors);
+    const iconPath = getMacTrayIconPath();
     if (!iconPath) {
       console.warn(CONSTANTS.LOG_MESSAGES.ICON_NOT_FOUND);
       return null;
@@ -164,20 +159,8 @@ class TrayManager {
       return null;
     }
 
+    icon.setTemplateImage(true);
     return icon;
-  }
-
-  /**
-   * 监听系统深浅色主题变化，实时更新托盘图标
-   */
-  private setupTrayThemeSync(): void {
-    this.themeChangeListener = () => {
-      const icon = this.createMacTrayIcon();
-      if (icon) {
-        this.tray?.setImage(icon);
-      }
-    };
-    nativeTheme.on('updated', this.themeChangeListener);
   }
 
   /**
