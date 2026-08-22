@@ -115,6 +115,7 @@
     "onlineServices": "オンラインサービス",
     "openaiCompatible": "OpenAI互換",
     "openaiExample": "例：https://api.openai.com/v1",
+    "openaiBaseURLHint": "OpenAI API の URL には /v1 サフィックスが必要です。",
     "optimizePrompt": "プロンプトを最適化",
     "pleaseEnterAPIKey": "APIキーを入力してください",
     "pleaseEnterBaseURL": "ベースURLを入力してください",

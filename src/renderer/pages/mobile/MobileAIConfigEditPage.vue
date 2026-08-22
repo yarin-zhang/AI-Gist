@@ -53,6 +53,13 @@
             ></ion-input>
           </ion-item>
 
+          <p
+            v-if="formData.type === 'openai' && !isCustomSelected"
+            class="base-url-hint"
+          >
+            {{ t('aiConfig.openaiBaseURLHint') }}
+          </p>
+
           <!-- API Key -->
           <ion-item v-if="formData.type && needsApiKey" lines="none">
             <ion-input
@@ -818,6 +825,13 @@ ion-item {
 .service-info {
   width: 100%;
   padding: 12px 0;
+}
+
+.base-url-hint {
+  color: var(--ion-color-medium);
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
+  margin: 0 16px 8px;
 }
 
 .service-description {
