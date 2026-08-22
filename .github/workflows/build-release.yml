@@ -111,13 +111,14 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          # CFBundleVersion 必须比同一营销版本号下上一次上传 App Store Connect
-          # 的 build 号更高，否则上传报 -19241。构建号取 package.json 的
-          # buildRevision（见 scripts/version.js），每个版本号从 1 开始数，不用
-          # run_number——那样每跑一次流水线就跳一大截。营销版本号
+          # Mac 的 CFBundleVersion 必须比这个 app **历史上**上传过的最大值更高，
+          # 跟营销版本号无关（iOS 才是按版本串比较），否则上传报 90061/-19241。
+          # 所以这里用 --mac-build（把版本号编成 2010101 这样的长整数，见
+          # scripts/version.js），不能用 --build 的 buildRevision——它每个版本
+          # 号从 1 重新数，会低于历史遗留的 run_number 水位。营销版本号
           # （CFBundleShortVersionString）就是 package.json 的 version，商店里
-          # 显示为 "2.1.1 (1)" 的形式。
-          BUILD_NUMBER=$(node scripts/version.js --build)
+          # 显示为 "2.1.1 (2010101)" 的形式，用户看到的只有 2.1.1。
+          BUILD_NUMBER=$(node scripts/version.js --mac-build)
           yarn electron-builder --config config/electron-builder.mas.js --mac --universal --publish never \
             --config.mas.provisioningProfile="$MAS_PROVISIONING_PROFILE_PATH" \
             --config.buildVersion="$BUILD_NUMBER"
