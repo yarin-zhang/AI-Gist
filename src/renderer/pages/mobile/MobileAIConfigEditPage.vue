@@ -881,8 +881,13 @@ ion-item {
 
 /* label-placement="stacked" 的输入框：标签独占一行、输入框独占下一行，
    需要比默认内联布局更高的行高，否则标签和输入框会显得过于拥挤（issue #145）。
-   只选择 stacked 的输入框，不影响下方模型配置区仍保持内联标签的「自定义模型」输入框。 */
-ion-item ion-input[label-placement="stacked"] {
+   只选择 stacked 的输入框，不影响下方模型配置区仍保持内联标签的「自定义模型」输入框。
+   注意：不能用属性选择器 [label-placement="stacked"]——Vue 给 Ionic 自定义元素传这个
+   prop 时走的是 DOM 属性赋值（el.labelPlacement = 'stacked'），不会反映成 HTML 属性，
+   所以 hasAttribute('label-placement') 是 false，属性选择器永远不会命中。改用 Ionic
+   渲染后真实挂在元素上的 class（input-label-placement-stacked），已用
+   getComputedStyle 实测确认命中。 */
+ion-item ion-input.input-label-placement-stacked {
   --padding-top: 10px;
   --padding-bottom: 10px;
 }
