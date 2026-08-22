@@ -72,6 +72,9 @@
           <ion-list>
             <ion-item-sliding v-for="config in configs" :key="config.id">
               <ion-item button @click="handleView(config)">
+                <span class="provider-icon" slot="start" aria-hidden="true">
+                  <component :is="getProviderIcon(config)" />
+                </span>
                 <ion-label>
                   <h2>{{ config.name }}</h2>
                   <p class="config-description">
@@ -116,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
@@ -151,17 +154,45 @@ import {
   starOutline,
   warningOutline
 } from 'ionicons/icons'
+import {
+  Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
+  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
+} from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import type { AIConfig } from '@shared/types'
+import type { AIConfig, AIProviderType } from '@shared/types'
 import EmptyAIConfigIllustration from '~/components/mobile/illustrations/EmptyAIConfigIllustration.vue'
 import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
 
 const { t } = useI18n()
 const router = useRouter()
 const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
+
+const providerIcons: Record<AIProviderType, Component> = {
+  openai: Atom,
+  ollama: BrandOpenSource,
+  anthropic: LetterA,
+  google: BrandGoogle,
+  azure: BrandWindows,
+  lmstudio: DeviceDesktop,
+  deepseek: LetterD,
+  mistral: LetterM,
+  siliconflow: Circles,
+  tencent: LetterT,
+  aliyun: Cloud,
+  zhipu: LetterZ,
+  openrouter: Route
+}
+
+const normalizeURL = (value?: string) => (value || '').trim().replace(/\/+$/, '')
+const getProviderIcon = (config: AIConfig) => {
+  const isCustom = (config.type === 'openai'
+    && normalizeURL(config.baseURL) !== 'https://api.openai.com/v1')
+    || (config.type === 'anthropic' && Boolean(normalizeURL(config.baseURL)))
+  return isCustom ? Api : providerIcons[config.type] || Atom
+}
 
 // 状态
 const configs = ref<AIConfig[]>([])
@@ -399,6 +430,24 @@ onUnmounted(() => {
   color: var(--ion-color-medium);
   font-size: var(--mobile-font-size-footnote);
   margin-top: 4px;
+}
+
+.provider-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  background: var(--surface-secondary);
+  color: var(--content-secondary);
+}
+
+.provider-icon :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 
 .config-meta {
