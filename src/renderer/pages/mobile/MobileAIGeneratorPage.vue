@@ -217,26 +217,26 @@ const selectedModelName = computed(() => {
 
 // 获取配置的所有模型
 const getConfigModels = (config: AIConfig) => {
-  const models: string[] = []
+  const models = new Set<string>()
 
   // 默认模型是配置实际使用的首选项，放在列表首位，避免远端模型列表的
   // 顺序覆盖用户在配置页明确选择的 defaultModel。
   if (config.defaultModel) {
-    models.push(config.defaultModel)
+    models.add(config.defaultModel)
   }
 
   // 添加所有可用模型
   if (config.models && config.models.length > 0) {
-    models.push(...config.models.filter(model => !models.includes(model)))
+    config.models.forEach(model => models.add(model))
   }
 
   // 如果有自定义模型，也添加进去
-  if (config.customModel && !models.includes(config.customModel)) {
-    models.push(config.customModel)
+  if (config.customModel) {
+    models.add(config.customModel)
   }
 
   // 没有可用模型时返回空列表，由调用方显示空状态。
-  return models
+  return [...models]
 }
 
 // 加载 AI 配置

@@ -169,15 +169,13 @@ function selectPreferredModel(enabledConfigs: AIConfig[]): {
 }
 
 function getConfigModels(config: AIConfig): string[] {
-  const models: string[] = []
-  if (config.defaultModel) models.push(config.defaultModel)
+  const models = new Set<string>()
+  if (config.defaultModel) models.add(config.defaultModel)
   for (const model of config.models || []) {
-    if (!models.includes(model)) models.push(model)
+    models.add(model)
   }
-  if (config.customModel && !models.includes(config.customModel)) {
-    models.push(config.customModel)
-  }
-  return models
+  if (config.customModel) models.add(config.customModel)
+  return [...models]
 }
 
 describe('selectPreferredModel', () => {
@@ -224,6 +222,15 @@ describe('selectPreferredModel', () => {
       'second-remote-model'
     ])
     expect(selectPreferredModel([config]).selectedModelKey).toBe('cfg1:selected-model')
+  })
+
+  it('[回归] defaultModel、models 和 customModel 组合后保持唯一', () => {
+    const config = makeConfig({
+      defaultModel: 'selected-model',
+      models: ['selected-model', 'remote-model', 'remote-model'],
+      customModel: 'remote-model'
+    })
+    expect(getConfigModels(config)).toEqual(['selected-model', 'remote-model'])
   })
 
   it('[回归] 选出的 configId 始终存在于 configs 列表中', () => {
