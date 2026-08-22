@@ -53,7 +53,7 @@ function copyAssets() {
         }
         
         // 复制图标文件
-        const iconFiles = ['windows.ico', 'macos.icns', 'linux.png', 'icon.png', 'tray.png', 'tray@2x.png', 'tray-light.png', 'tray-light@2x.png', 'tray-dark.png', 'tray-dark@2x.png'];
+        const iconFiles = ['windows.ico', 'macos.icns', 'linux.png', 'icon.png', 'tray.png', 'tray@2x.png', 'tray-template.png', 'tray-template@2x.png'];
         iconFiles.forEach(file => {
             const srcPath = Path.join(assetsPath, file);
             const destPath = Path.join(buildAssetsPath, file);
