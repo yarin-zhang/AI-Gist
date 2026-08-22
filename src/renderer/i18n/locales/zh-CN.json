@@ -115,6 +115,7 @@
     "onlineServices": "在线服务",
     "openaiCompatible": "OpenAI 兼容",
     "openaiExample": "例如: https://api.openai.com/v1",
+    "openaiBaseURLHint": "OpenAI API 地址需要包含 /v1 后缀。",
     "optimizePrompt": "优化提示词",
     "pleaseEnterAPIKey": "请输入 API Key",
     "pleaseEnterBaseURL": "请输入 Base URL",

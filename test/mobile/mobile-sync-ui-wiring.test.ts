@@ -50,6 +50,13 @@ describe('mobile sync and restore UI wiring', () => {
     expect(localBackup).toContain('localBackupService.create(')
   })
 
+  it('ignores stale local backup list responses after a newer refresh', () => {
+    const source = read(LOCAL_BACKUP)
+    expect(source).toContain('let latestBackupLoad = 0')
+    expect(source).toContain('const requestId = ++latestBackupLoad')
+    expect(source).toContain('if (requestId === latestBackupLoad) backups.value = nextBackups')
+  })
+
   it('keeps the settings home a pure navigation list', () => {
     const home = read(SETTINGS_HOME)
 

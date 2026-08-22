@@ -21,6 +21,7 @@ import './assets/styles/mobile.css'
 
 import { IonicVue } from '@ionic/vue'
 import type { App } from 'vue'
+import { PlatformDetector } from '@shared/platform'
 
 /**
  * 初始化 Ionic
@@ -28,5 +29,9 @@ import type { App } from 'vue'
 export function setupIonic(app: App) {
   document.documentElement.classList.add('ai-gist-mobile')
   document.body.classList.add('ai-gist-mobile')
-  app.use(IonicVue)
+
+  // Web 移动版没有原生平台信息，Ionic 默认会回退到 Material Design。
+  // 只为 Web 移动壳固定 iOS 模式；原生 Android/iOS 继续使用平台默认行为。
+  const ionicConfig = PlatformDetector.isWeb() ? { mode: 'ios' as const } : undefined
+  app.use(IonicVue, ionicConfig)
 }

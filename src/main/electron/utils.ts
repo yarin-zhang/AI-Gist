@@ -14,6 +14,8 @@ const PLATFORM_ICONS = {
     'icon.png'
   ],
   darwin: [
+    // 不能列 macos.icns：nativeImage.createFromPath 无法解码 .icns，
+    // 会导致托盘创建失败（macOS 的 Dock 图标由 app bundle 提供，不依赖这里）
     'tray@2x.png',
     'icon@2x.png',
     'tray.png',

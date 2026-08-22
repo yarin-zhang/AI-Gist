@@ -115,6 +115,7 @@
     "onlineServices": "Online Services",
     "openaiCompatible": "OpenAI Compatible",
     "openaiExample": "For example: https://api.openai.com/v1",
+    "openaiBaseURLHint": "The OpenAI API URL must include the /v1 suffix.",
     "optimizePrompt": "Optimize Prompt",
     "pleaseEnterAPIKey": "Please enter API Key",
     "pleaseEnterBaseURL": "Please enter the Base URL",

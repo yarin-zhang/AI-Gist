@@ -45,7 +45,16 @@
         "!node_modules/@capacitor/android/**",
         "!node_modules/@capacitor/ios/**",
         "!node_modules/@capacitor/*/android/**",
-        "!node_modules/@capacitor/*/ios/**"
+        "!node_modules/@capacitor/*/ios/**",
+        "!node_modules/**/*.map",
+        "!node_modules/**/*.d.ts",
+        "!node_modules/**/*.d.mts",
+        "!node_modules/**/*.d.cts",
+        "!node_modules/**/*.tsbuildinfo",
+        "!node_modules/**/*.md",
+        "!node_modules/js-tiktoken/dist/index.js",
+        "!node_modules/js-tiktoken/dist/index.cjs",
+        "!node_modules/js-tiktoken/dist/ranks/**"
     ],
     "asarUnpack": [],
     "extraResources": [],

@@ -168,6 +168,16 @@ function selectPreferredModel(enabledConfigs: AIConfig[]): {
   return { selectedModelKey: '', selectedConfigName: '' }
 }
 
+function getConfigModels(config: AIConfig): string[] {
+  const models = new Set<string>()
+  if (config.defaultModel) models.add(config.defaultModel)
+  for (const model of config.models || []) {
+    models.add(model)
+  }
+  if (config.customModel) models.add(config.customModel)
+  return [...models]
+}
+
 describe('selectPreferredModel', () => {
   it('无配置时返回空 key', () => {
     expect(selectPreferredModel([]).selectedModelKey).toBe('')
@@ -198,6 +208,29 @@ describe('selectPreferredModel', () => {
   it('配置无 defaultModel 时不设置 key', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: undefined })
     expect(selectPreferredModel([config]).selectedModelKey).toBe('')
+  })
+
+  it('[回归] defaultModel 优先于远端模型列表顺序', () => {
+    const config = makeConfig({
+      configId: 'cfg1',
+      defaultModel: 'selected-model',
+      models: ['first-remote-model', 'selected-model', 'second-remote-model']
+    })
+    expect(getConfigModels(config)).toEqual([
+      'selected-model',
+      'first-remote-model',
+      'second-remote-model'
+    ])
+    expect(selectPreferredModel([config]).selectedModelKey).toBe('cfg1:selected-model')
+  })
+
+  it('[回归] defaultModel、models 和 customModel 组合后保持唯一', () => {
+    const config = makeConfig({
+      defaultModel: 'selected-model',
+      models: ['selected-model', 'remote-model', 'remote-model'],
+      customModel: 'remote-model'
+    })
+    expect(getConfigModels(config)).toEqual(['selected-model', 'remote-model'])
   })
 
   it('[回归] 选出的 configId 始终存在于 configs 列表中', () => {

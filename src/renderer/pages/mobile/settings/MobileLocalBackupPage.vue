@@ -174,6 +174,7 @@ const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION)
 const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus())
 const busy = reactive({ refresh: false, create: false })
 let unsubscribeStatus: (() => void) | null = null
+let latestBackupLoad = 0
 
 const RETENTION_PRESETS = [5, 10, 20, 30, 50, 100]
 
@@ -207,14 +208,20 @@ const loadSettings = async () => {
 }
 
 const loadBackups = async () => {
+  const requestId = ++latestBackupLoad
   busy.refresh = true
   try {
-    backups.value = await localBackupService.list()
+    const nextBackups = await localBackupService.list()
+    // 页面重新进入或创建备份后可能同时触发多次读取。只接受最后一次
+    // 请求的结果，避免较早的慢请求把刚创建的记录覆盖掉。
+    if (requestId === latestBackupLoad) backups.value = nextBackups
   } catch (error) {
     console.error('加载本地备份列表失败:', error)
-    await showToast(t('mobileSettings.backup.loadFailed'), 'danger')
+    if (requestId === latestBackupLoad) {
+      await showToast(t('mobileSettings.backup.loadFailed'), 'danger')
+    }
   } finally {
-    busy.refresh = false
+    if (requestId === latestBackupLoad) busy.refresh = false
   }
 }
 

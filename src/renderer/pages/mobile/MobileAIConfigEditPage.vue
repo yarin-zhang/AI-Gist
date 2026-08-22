@@ -28,7 +28,7 @@
           <ion-item button detail lines="none" @click="showTypeModal = true">
             <ion-label>{{ t('aiConfig.serviceType') }}</ion-label>
             <div class="type-trigger-value" slot="end">
-              <span class="type-badge">{{ selectedProviderChoice.initial }}</span>
+              <span class="provider-icon" aria-hidden="true"><component :is="selectedProviderChoice.icon" /></span>
               <span class="type-trigger-name">{{ selectedProviderChoice.label }}</span>
             </div>
           </ion-item>
@@ -53,6 +53,13 @@
             ></ion-input>
           </ion-item>
 
+          <p
+            v-if="formData.type === 'openai' && !isCustomSelected"
+            class="base-url-hint"
+          >
+            {{ t('aiConfig.openaiBaseURLHint') }}
+          </p>
+
           <!-- API Key -->
           <ion-item v-if="formData.type && needsApiKey" lines="none">
             <ion-input
@@ -70,18 +77,20 @@
               <div class="service-links">
                 <ion-button
                   v-if="getApiKeyInfo.apiKeyUrl"
-                  fill="clear"
+                  fill="outline"
                   size="small"
                   @click="openUrl(getApiKeyInfo.apiKeyUrl)"
                 >
+                  <ion-icon :icon="keyOutline" slot="start"></ion-icon>
                   {{ t('aiConfig.getApiKey') }}
                 </ion-button>
                 <ion-button
                   v-if="getApiKeyInfo.docUrl"
-                  fill="clear"
+                  fill="outline"
                   size="small"
                   @click="openUrl(getApiKeyInfo.docUrl)"
                 >
+                  <ion-icon :icon="documentTextOutline" slot="start"></ion-icon>
                   {{ t('aiConfig.viewDocumentation') }}
                 </ion-button>
               </div>
@@ -203,7 +212,7 @@
                 :detail="false"
                 @click="selectType(provider)"
               >
-                <span class="type-badge" slot="start">{{ provider.initial }}</span>
+                <span class="provider-icon" slot="start" aria-hidden="true"><component :is="provider.icon" /></span>
                 <ion-label class="ion-text-wrap">
                   <h3>{{ provider.label }}</h3>
                   <p>{{ provider.description }}</p>
@@ -224,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
@@ -253,10 +262,16 @@ import {
   close,
   checkmarkCircle,
   closeCircle,
+  keyOutline,
+  documentTextOutline,
   cloudOutline,
   hardwareChipOutline,
   extensionPuzzleOutline
 } from 'ionicons/icons'
+import {
+  Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
+  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
+} from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigForm } from '~/composables/useAIConfigForm'
 import { api } from '~/lib/api'
@@ -398,12 +413,31 @@ const providerInitials: Record<AIProviderType, string> = {
   siliconflow: '硅'
 }
 
+// Reuse the established provider marks from the desktop provider picker. These
+// are vector icons, so they stay crisp inside the circular mobile affordance.
+const providerIcons: Record<AIProviderType, Component> = {
+  openai: Atom,
+  ollama: BrandOpenSource,
+  anthropic: LetterA,
+  google: BrandGoogle,
+  azure: BrandWindows,
+  lmstudio: DeviceDesktop,
+  deepseek: LetterD,
+  mistral: LetterM,
+  siliconflow: Circles,
+  tencent: LetterT,
+  aliyun: Cloud,
+  zhipu: LetterZ,
+  openrouter: Route
+}
+
 interface ProviderCardChoice {
   id: string
   type: AIProviderType
   label: string
   description: string
   initial: string
+  icon: Component
   custom?: boolean
   placeholder?: string
 }
@@ -415,7 +449,8 @@ const buildProviderChoice = (type: AIProviderType): ProviderCardChoice => {
     type,
     label: info.name,
     description: info.description,
-    initial: providerInitials[type]
+    initial: providerInitials[type],
+    icon: providerIcons[type]
   }
 }
 
@@ -429,6 +464,7 @@ const compatibilityChoices = computed<ProviderCardChoice[]>(() => [
     label: t('aiConfig.workspace.customOpenAI'),
     description: t('aiConfig.workspace.customOpenAIDesc'),
     initial: providerInitials.openai,
+    icon: Api,
     custom: true,
     placeholder: 'https://your-provider.example/v1'
   },
@@ -438,6 +474,7 @@ const compatibilityChoices = computed<ProviderCardChoice[]>(() => [
     label: t('aiConfig.workspace.customClaude'),
     description: t('aiConfig.workspace.customClaudeDesc'),
     initial: providerInitials.anthropic,
+    icon: LetterA,
     custom: true,
     placeholder: 'https://your-provider.example'
   }
@@ -468,7 +505,7 @@ const typeGroups = computed(() => [
 // 因为自定义服务和官方服务可能共用同一个 AIProviderType（如 custom:openai 与
 // official:openai 都是 type:'openai'），仅凭 formData.type 无法区分选中的是哪张卡片，
 // 需要单独的 id 状态。
-const selectedChoiceId = ref('official:openai')
+const selectedChoiceId = ref('custom:openai')
 const allProviderChoices = computed(() => typeGroups.value.flatMap(group => group.providers))
 const selectedProviderChoice = computed(() =>
   allProviderChoices.value.find(choice => choice.id === selectedChoiceId.value)
@@ -775,8 +812,22 @@ const showToast = async (message: string, color: string = 'success') => {
 }
 
 // 初始化
+const initializeNewConfig = () => {
+  if (isEditMode.value) return
+
+  // The default card is the OpenAI-compatible service. Keep the form data in
+  // sync with that card so the first render can be tested or saved directly.
+  resetForm()
+  const defaultChoice = compatibilityChoices.value[0]
+  selectedChoiceId.value = defaultChoice.id
+  formData.type = defaultChoice.type
+  formData.name = defaultChoice.label
+  formData.baseURL = ''
+}
+
 onMounted(() => {
   loadConfig()
+  initializeNewConfig()
 })
 </script>
 
@@ -820,6 +871,13 @@ ion-item {
   padding: 12px 0;
 }
 
+.base-url-hint {
+  color: var(--ion-color-medium);
+  font-size: var(--mobile-font-size-footnote);
+  line-height: var(--mobile-line-height-normal);
+  margin: 0 16px 8px;
+}
+
 .service-description {
   color: var(--ion-color-medium);
   font-size: var(--mobile-font-size-footnote);
@@ -828,9 +886,26 @@ ion-item {
 }
 
 .service-links {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-default);
+}
+
+.service-links ion-button {
+  --border-color: var(--border-default);
+  --border-radius: var(--radius-control);
+  --color: var(--accent-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+  min-height: 36px;
+  font-size: var(--mobile-font-size-footnote);
+}
+
+.service-links ion-icon {
+  font-size: 16px;
 }
 
 .action-buttons {
@@ -911,8 +986,8 @@ ion-chip {
   text-overflow: ellipsis;
 }
 
-/* 服务商头像：统一用缩写替代逐个品牌图标，避免引入新的配色/图标体系 */
-.type-badge {
+/* 服务商头像：复用桌面端矢量标识，统一放入圆形边框避免图标错位 */
+.provider-icon {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -920,11 +995,14 @@ ion-chip {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  color: var(--accent-primary);
-  font-size: var(--mobile-font-size-caption);
-  font-weight: 600;
-  line-height: 1;
+  border: 1px solid var(--border-default);
+  background: var(--surface-secondary);
+  color: var(--content-secondary);
+}
+
+.provider-icon :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 
 .type-modal-content {

@@ -23,21 +23,20 @@ html.ai-gist-mobile {
    *
    * 真正的根因不是 gutter 太大，而是选中态的高亮色块只是一颗独立内缩的小药丸：
    * 它自己的小圆角和胶囊容器自身的大圆角是两条不同半径的弧线，中间会夹出一块
-   * 白色/玻璃色的月牙形缺口。修复方式见下方 ion-tab-button.tab-selected:first-
-   * child/:last-child——只在首/尾 Tab 被选中时让它撑满整高、贴到容器内壁，
-   * 与外层胶囊同心，把月牙缺口填平；gutter 本身不需要为此收紧。
+   * 白色/玻璃色的月牙形缺口。修复方式见下方 ion-tab-button 的
+   * :first-child/:last-child 规则——首/尾槽位静态外扩到容器内壁，与外层胶囊
+   * 同心，把月牙缺口填平；gutter 本身不需要为此收紧。
    */
   --mobile-nav-gutter: var(--mobile-page-gutter);
   --mobile-nav-bottom-offset: 10px;
   --mobile-nav-item-gap: 8px;
   --mobile-nav-radius: 999px;
-  /* 标签栏内边距与按钮外边距：单独抽出来是为了让下面「首尾 Tab 选中态贴边」
-     的负 margin 计算有名字可引用，避免两处各写一遍 4px/2px 的魔法数字。 */
+  /* 标签栏内边距与按钮外边距：单独抽出来是为了让下面「首尾槽位贴边」的负
+     margin 计算有名字可引用，避免两处各写一遍 4px/2px 的魔法数字。 */
   --mobile-nav-tabbar-padding-inline: 4px;
-  --mobile-nav-tabbutton-margin-block: 5px;
   --mobile-nav-tabbutton-margin-inline: 2px;
   /*
-   * 首尾 Tab 选中态的负 margin 只需要抵消 ion-tab-bar 自己的 padding：margin 是
+   * 首尾 Tab 的负 margin 只需要抵消 ion-tab-bar 自己的 padding：margin 是
    * 相对「容器内容区起点」（padding 结束的地方）计算的，把 margin-left 设成
    * -padding 就能让按钮的外侧边缘正好退回到内容区起点——也就是紧贴 1px 内边框
    * 的内侧，视觉上蓝色刚好铺到边框跟前，边框本身仍然完整可见、不被盖住。
@@ -46,6 +45,14 @@ html.ai-gist-mobile {
    * 越过外层 1px 边框，早期实现踩过这个坑，用实际渲染坐标验证过才发现。
    */
   --mobile-nav-tab-edge-bleed: var(--mobile-nav-tabbar-padding-inline);
+  /*
+   * Tab 文字宽度上限：只是给收起动画一个可过渡的 max-width 终点值，取值本身
+   * 要明显大于最长的多语言 label（en-US "AI Prompts"、ja-JP "AIプロンプト"），
+   * 不能真的夹到文字——issue #6 第三轮反馈里 "AI Prompts" 被截断，就是早先
+   * 60px 的上限在 11px 字号下不够宽导致的。每个槽位实际有 ~120px 宽，128px
+   * 的上限既永远不会截断现有 label，又保证收起动画的时长观感不变。
+   */
+  --mobile-nav-tablabel-max-width: 128px;
   --mobile-nav-shelf-height: 46px;
   --mobile-nav-shelf-width-minimized: 46px;
   --mobile-nav-tabbar-height-minimized: 44px;
@@ -521,43 +528,39 @@ html.ai-gist-mobile ion-tab-button {
   --color-selected: var(--accent-primary);
   min-height: 0;
   height: 100%;
-  margin: var(--mobile-nav-tabbutton-margin-block) var(--mobile-nav-tabbutton-margin-inline);
+  /*
+   * issue #6 三次反馈：槽位几何必须是静态的，不允许随「谁被选中」而变化。
+   * 第二轮的实现只在 .tab-selected 命中首/尾时才做贴边（负 margin + 清上下
+   * 外边距），于是三个按钮的 flex 槽位会在切换选中项的瞬间整体重排——选中
+   * 中间 Tab 时首尾恢复内缩、整条高亮范围看起来收窄，选回右侧时右缘又向外
+   * 延伸。对齐 iOS 分段控件/iOS 26 悬浮标签栏的做法是：三个槽位（可点击区域
+   * 与底色范围）恒定不变，任何时刻只有高亮在固定槽位之间移动。
+   *
+   * 因此把「撑满整高 + 首尾贴边」全部改成静态布局：
+   * - 所有按钮上下外边距恒为 0，始终撑满 ion-tab-bar 的内容高度；未选中时
+   *   背景透明，看不出差别，选中时高亮自动填满所在槽位的全高。
+   * - 首/尾按钮的外侧负 margin（贴合胶囊内壁，推导见 --mobile-nav-tab-edge-
+   *   bleed 的注释）同样恒定生效，与选中态无关。
+   * 这样三种选中态下每个按钮的边界坐标完全一致，高亮胶囊的形状只由「它落在
+   * 哪个槽位」决定：首尾是与外层胶囊同心的半圆端头，中间是等宽的圆角矩形。
+   * margin 不再参与选中态切换，transition 里也随之只保留 background。
+   */
+  margin: 0 var(--mobile-nav-tabbutton-margin-inline);
   border-radius: var(--mobile-nav-radius);
-  transition: background var(--mobile-nav-transition), margin var(--mobile-nav-transition);
+  transition: background var(--mobile-nav-transition);
+}
+
+html.ai-gist-mobile ion-tab-button:first-child {
+  margin-left: calc(-1 * var(--mobile-nav-tab-edge-bleed));
+}
+
+html.ai-gist-mobile ion-tab-button:last-child {
+  margin-right: calc(-1 * var(--mobile-nav-tab-edge-bleed));
 }
 
 html.ai-gist-mobile ion-tab-button.tab-selected {
   --background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
   --background-focused: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-}
-
-/*
- * issue #6 二次反馈：首/尾 Tab 被选中时，蓝色高亮不能只是容器里独立内缩的一颗
- * 小药丸——它自己的圆角和外层胶囊容器的圆角是两条不同半径、不同圆心的弧线，
- * 中间会夹出一块白色/玻璃色的月牙形缺口（正是反馈截图里红色箭头指向的位置）。
- *
- * 修复：只在「当前选中的按钮同时是第一个/最后一个子元素」时，取消该按钮的
- * 上下外边距（让它撑满 ion-tab-bar 的整个内容高度）并用负 margin 抵消掉
- * 容器自身的 padding（即 --mobile-nav-tab-edge-bleed，具体推导见上面 token
- * 定义处的注释），让它的外侧边缘一路退到胶囊内壁——紧贴 1px 边框内侧，边框
- * 本身仍完整可见。撑满整高之后，同一个 --mobile-nav-radius 会自动算出和
- * 外层胶囊同心的半圆端头，两条弧线重合，月牙缺口就被填平了。只处理外侧
- * （first-child 只推左边、last-child 只推右边），朝向中间 Tab 的那一侧
- * 外边距不变，不会把整颗按钮变成异常凸出的大药丸。
- *
- * 中间 Tab（AI 配置）被选中时不命中 :first-child/:last-child，沿用上面
- * 原本内缩的小药丸高亮，不受影响——切换到中间 Tab 应该立刻恢复正常形状。
- */
-html.ai-gist-mobile ion-tab-button.tab-selected:first-child {
-  margin-top: 0;
-  margin-bottom: 0;
-  margin-left: calc(-1 * var(--mobile-nav-tab-edge-bleed));
-}
-
-html.ai-gist-mobile ion-tab-button.tab-selected:last-child {
-  margin-top: 0;
-  margin-bottom: 0;
-  margin-right: calc(-1 * var(--mobile-nav-tab-edge-bleed));
 }
 
 html.ai-gist-mobile ion-tab-button ion-icon {
@@ -570,8 +573,17 @@ html.ai-gist-mobile ion-tab-button ion-label {
   margin-top: 0;
   margin-bottom: 0;
   min-height: 0;
-  max-width: 60px;
+  /*
+   * max-width 只是收起动画的过渡终点，取值必须大于最长的多语言 label
+   * （见 --mobile-nav-tablabel-max-width 的注释），否则文字会被夹住截断
+   * （issue #6 第三轮反馈：en-US 的 "AI Prompts" 显示不完整）。
+   * nowrap + hidden 是兜底：未来若出现比槽位还宽的极端 label，宁可裁剪
+   * 也不能换行把标签栏撑变形。
+   */
+  max-width: var(--mobile-nav-tablabel-max-width);
   max-height: 14px;
+  overflow: hidden;
+  white-space: nowrap;
   opacity: 1;
   font-size: var(--mobile-font-size-caption);
   font-weight: 500;

@@ -56,7 +56,7 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 
 | 平台 | 安装包 | 应用市场 | 说明 |
 |------|----------|----------|------|
-| ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) |  | Windows 安装程序 |
+| ![Windows](https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white) | [Windows Setup](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [Microsoft Store](https://apps.microsoft.com/detail/9n6vb23vsk8k?hl=zh-CN&gl=US) | Windows 安装程序 |
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Apple Silicon)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [App Store](https://apps.apple.com/us/app/ai-gist/id6762559220) | 适用于 Apple 芯片 Mac |
 | ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) | [macOS (Intel)](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [App Store](https://apps.apple.com/us/app/ai-gist/id6762559220) | 适用于 Intel 芯片 Mac |
 | ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) | [Linux AppImage](https://github.com/yarin-zhang/AI-Gist/releases/latest) | [Snap Store](https://snapcraft.io/ai-gist) | 通用 Linux 应用 |
