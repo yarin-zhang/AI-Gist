@@ -32,6 +32,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # Android 的 versionCode/versionName 写在 build.gradle 里，靠
+      # scripts/sync-version.js 与 package.json 保持一致，这里防止忘记同步。
+      - name: Verify native version numbers
+        run: yarn version:check
+
       - name: Build web assets
         run: npx vite build --config config/vite.config.mobile.js
 

@@ -82,8 +82,11 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          BUILD_NUMBER="${{ github.run_number }}"
+          # 版本号和构建号都来自 package.json（见 scripts/version.js）：构建号
+          # 就是 buildRevision，每个版本号从 1 开始数。不用 run_number——那样
+          # 每跑一次流水线构建号就跳一大截。
+          VERSION=$(node scripts/version.js --version)
+          BUILD_NUMBER=$(node scripts/version.js --build)
           ARCHIVE_PATH="$RUNNER_TEMP/AI-Gist.xcarchive"
           EXPORT_PATH="$RUNNER_TEMP/export"
           EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"

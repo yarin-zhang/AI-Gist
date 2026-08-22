@@ -1,6 +1,7 @@
 {
     "name": "ai-gist",
-    "version": "2.1.0",
+    "version": "2.1.1",
+    "buildRevision": 1,
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
     "bin": "./bin/ai-gist.js",
@@ -32,7 +33,9 @@
         "test:run": "vitest run --config config/vitest.config.ts",
         "test:ui": "vitest --ui --config config/vitest.config.ts",
         "test:coverage": "vitest run --coverage --config config/vitest.config.ts",
-        "version": "git add -A",
+        "version:sync": "node scripts/sync-version.js",
+        "version:check": "node scripts/sync-version.js --check",
+        "version": "node scripts/sync-version.js && git add -A",
         "postversion": "git push && git push --tags"
     },
     "repository": "https://github.com/yarin-zhang/ai-gist",
