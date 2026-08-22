@@ -1,16 +1,19 @@
 // @ts-nocheck
 const Path = require('path');
 const vuePlugin = require('@vitejs/plugin-vue')
-const { version } = require('./package.json');
+const { version } = require('../package.json');
 
 const { defineConfig } = require('vite');
+
+// 本文件位于 config/，所有路径都以仓库根目录为基准
+const Root = Path.join(__dirname, '..');
 
 function aiGistWebBackendPlugin() {
     let apiHandler = null;
 
     const getApiHandler = () => {
         if (!apiHandler) {
-            const { createWebRequestHandler } = require('./scripts/web-server.js');
+            const { createWebRequestHandler } = require('../scripts/web-server.js');
             apiHandler = createWebRequestHandler({ serveStaticFiles: false });
         }
         return apiHandler;
@@ -35,14 +38,14 @@ function aiGistWebBackendPlugin() {
 }
 
 const config = defineConfig({
-    root: Path.join(__dirname, 'src', 'renderer'),
+    root: Path.join(Root, 'src', 'renderer'),
     publicDir: 'public',
     server: {
         port: 8080,
     },
     open: false,
     build: {
-        outDir: Path.join(__dirname, 'build', 'web'),
+        outDir: Path.join(Root, 'build', 'web'),
         emptyOutDir: true,
     },
     plugins: [vuePlugin(), aiGistWebBackendPlugin()],
@@ -53,12 +56,12 @@ const config = defineConfig({
     },
     resolve: {
         alias: {
-            '@renderer': Path.resolve(__dirname, 'src/renderer'),
-            '@shared': Path.resolve(__dirname, 'src/shared'),
-            '@main': Path.resolve(__dirname, 'src/main'),
-            '@root': Path.resolve(__dirname, 'src'),
-            '@': Path.resolve(__dirname, 'src/renderer'),
-            '~': Path.resolve(__dirname, 'src/renderer'),
+            '@renderer': Path.resolve(Root, 'src/renderer'),
+            '@shared': Path.resolve(Root, 'src/shared'),
+            '@main': Path.resolve(Root, 'src/main'),
+            '@root': Path.resolve(Root, 'src'),
+            '@': Path.resolve(Root, 'src/renderer'),
+            '~': Path.resolve(Root, 'src/renderer'),
         }
     }
 });

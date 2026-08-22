@@ -1,4 +1,5 @@
-// eslint.config.js
+// config/eslint.config.mjs
+import path from "node:path";
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import vue from "eslint-plugin-vue";
@@ -6,7 +7,15 @@ import vue from "eslint-plugin-vue";
 // 用于解析 .vue 文件的 parser
 const vueParser = await import("vue-eslint-parser");
 
+// 本文件位于 config/，但所有 files/ignores 与 tsconfig 路径都以仓库根目录为基准。
+// basePath 让 ESLint 用仓库根目录解析这些相对 glob，而不是 config/。
+const repoRoot = path.resolve(import.meta.dirname, "..");
+
 export default await tseslint.config(
+  {
+    basePath: repoRoot,
+  },
+
   // Android 构建产物由 Capacitor/Gradle 生成，不参与源码检查
   {
     ignores: ["android/app/build/**"],
@@ -31,6 +40,7 @@ export default await tseslint.config(
     files: ["src/renderer/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
+        tsconfigRootDir: repoRoot,
         project: "./src/renderer/tsconfig.json",
       },
     },
@@ -41,6 +51,7 @@ export default await tseslint.config(
     files: ["src/main/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
+        tsconfigRootDir: repoRoot,
         project: "./src/main/tsconfig.json",
       },
     },

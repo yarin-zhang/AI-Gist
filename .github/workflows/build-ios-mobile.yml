@@ -24,7 +24,7 @@ jobs:
         run: yarn install --immutable
 
       - name: Build web assets
-        run: yarn vite build --config vite.config.mobile.js
+        run: yarn vite build --config config/vite.config.mobile.js
 
       - name: Sync Capacitor
         run: yarn cap sync ios

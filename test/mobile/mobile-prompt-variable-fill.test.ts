@@ -7,7 +7,7 @@
  * 兜底、必填校验规则都来自 `src/renderer/lib/utils/prompt-template.ts`。
  *
  * 移动端新增的 `MobilePromptDetailPage.vue` + `PromptVariableFillForm.vue`
- * 直接从同一个文件 import 这些函数（vite.config.mobile.js 里 `@`/`~` 两个别名
+ * 直接从同一个文件 import 这些函数（config/vite.config.mobile.js 里 `@`/`~` 两个别名
  * 都指向 src/renderer，这不是"重新实现一份等价逻辑"，而是字面上同一份源码），
  * 因此不可能出现两端对同一个提示词解析出不同变量列表的情况。
  *

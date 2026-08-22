@@ -7,7 +7,7 @@ const root = process.cwd();
 describe('desktop packaging', () => {
   it('copies renderer resources required by the compiled main process into the packaged app', () => {
     const buildScript = readFileSync(resolve(root, 'scripts/build.js'), 'utf8');
-    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'config/electron-builder.json'), 'utf8'));
     const rendererFilesEntry = builderConfig.files.find((entry: unknown) => (
       typeof entry === 'object'
       && entry !== null
@@ -28,7 +28,7 @@ describe('desktop packaging', () => {
   });
 
   it('uses hardened runtime entitlements for notarized macOS releases', () => {
-    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'config/electron-builder.json'), 'utf8'));
     const entitlementsPath = resolve(root, builderConfig.mac.entitlements);
     const entitlements = readFileSync(entitlementsPath, 'utf8');
 
@@ -43,18 +43,21 @@ describe('desktop packaging', () => {
 
   it('uses the shared App Store bundle ID and sandbox entitlements for Mac App Store releases', () => {
     const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'config/electron-builder.json'), 'utf8'));
     const entitlements = readFileSync(resolve(root, builderConfig.mas.entitlements), 'utf8');
     const inheritedEntitlements = readFileSync(resolve(root, builderConfig.mas.entitlementsInherit), 'utf8');
 
-    expect(packageJson.scripts['build:store:mac']).toContain('--config electron-builder.mas.js --mac --universal');
-    const masConfig = readFileSync(resolve(root, 'electron-builder.mas.js'), 'utf8');
+    expect(packageJson.scripts['build:store:mac']).toContain('--config config/electron-builder.mas.js --mac --universal');
+    const masConfig = readFileSync(resolve(root, 'config/electron-builder.mas.js'), 'utf8');
     expect(masConfig).toContain('identity: null');
     expect(masConfig).toContain("identity: 'YANLIN ZHANG (9T93J5B7N6)'");
     expect(builderConfig.mas).toMatchObject({
       appId: 'com.getaigist.app',
       target: 'mas',
-      hardenedRuntime: true,
+      // MAS 构建必须关闭 hardened runtime：Electron 的 V8 需要 JIT 内存，
+      // 开启后上架版本会启动即崩溃（见 config/electron-builder.mas.js 的注释）。
+      // App Store 要求的是 App Sandbox，不是 hardened runtime。
+      hardenedRuntime: false,
       mergeASARs: false,
       entitlements: 'resources/entitlements.mas.plist',
       entitlementsInherit: 'resources/entitlements.mas.inherit.plist'
@@ -71,7 +74,7 @@ describe('desktop packaging', () => {
 
   it('uses the Microsoft Store identity assigned by Partner Center', () => {
     const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-    const builderConfig = JSON.parse(readFileSync(resolve(root, 'electron-builder.json'), 'utf8'));
+    const builderConfig = JSON.parse(readFileSync(resolve(root, 'config/electron-builder.json'), 'utf8'));
     const workflow = readFileSync(resolve(root, '.github/workflows/build-release.yml'), 'utf8');
 
     expect(packageJson.scripts['build:store:win']).toContain('--win appx --x64 --arm64');

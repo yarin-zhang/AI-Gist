@@ -2857,7 +2857,6 @@ __metadata:
     naive-ui: "npm:^2.41.0"
     nunjucks: "npm:^3.2.4"
     sass: "npm:^1.89.2"
-    tailwindcss: "npm:^4.1.11"
     tsc-alias: "npm:^1.8.16"
     typescript: "npm:^5.8.3"
     typescript-eslint: "npm:^8.35.0"
@@ -9528,13 +9527,6 @@ __metadata:
   version: 3.2.4
   resolution: "symbol-tree@npm:3.2.4"
   checksum: 10c0/dfbe201ae09ac6053d163578778c53aa860a784147ecf95705de0cd23f42c851e1be7889241495e95c37cabb058edb1052f141387bef68f705afc8f9dd358509
-  languageName: node
-  linkType: hard
-
-"tailwindcss@npm:^4.1.11":
-  version: 4.2.1
-  resolution: "tailwindcss@npm:4.2.1"
-  checksum: 10c0/482d734b582e9da509042ff59c1d7564d99e39e238c50ae907c20fa56177a8a00c3902f6971329971bd6a1c5357026ac76a849b8f2c69c94f0f59be99530ba54
   languageName: node
   linkType: hard
 

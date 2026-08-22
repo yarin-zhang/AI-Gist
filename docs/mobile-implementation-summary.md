@@ -27,7 +27,7 @@
   - Electron 使用 localStorage，Capacitor 使用 Preferences
 
 ### 4. 构建配置
-- ✅ 创建移动端专用 Vite 配置 (`vite.config.mobile.js`)
+- ✅ 创建移动端专用 Vite 配置 (`config/vite.config.mobile.js`)
 - ✅ 创建移动端构建脚本 (`scripts/build-mobile.js`)
 - ✅ 添加 package.json 脚本：
   - `yarn build:mobile` - 构建移动端应用
@@ -59,7 +59,7 @@ AI-Gist/
 ├── docs/
 │   └── mobile-development.md      # 新增：移动端开发文档
 ├── capacitor.config.ts            # 新增：Capacitor 配置
-├── vite.config.mobile.js          # 新增：移动端 Vite 配置
+├── config/vite.config.mobile.js   # 新增：移动端 Vite 配置
 ├── ios/                           # 新增：iOS 原生项目（已忽略）
 └── android/                       # 新增：Android 原生项目（已忽略）
 ```

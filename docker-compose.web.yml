@@ -2,7 +2,7 @@ services:
   ai-gist-web:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: docker/Dockerfile.web
     ports:
       - "8080:8080"
     environment:
