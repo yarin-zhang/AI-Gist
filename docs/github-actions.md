@@ -27,6 +27,12 @@ yarn version major
    - 提交更改
    - 推送代码和标签到仓库远端
 
+   随后运行一次版本同步，把新版本号和推导出的构建号写进 Android / iOS 原生工程（详见 [versioning.md](versioning.md)）：
+
+   ```bash
+   yarn version:sync
+   ```
+
 3. 一旦形如 `v1.2.3` 的标签被推送，Actions 工作流将自动触发并执行以下操作：
    - 为该版本创建一个新的 Draft Release
    - 构建 Windows、macOS (x64 和 ARM64) 和 Linux 版本的安装包
