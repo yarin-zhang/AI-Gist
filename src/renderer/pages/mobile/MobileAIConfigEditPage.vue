@@ -1012,7 +1012,13 @@ ion-chip {
   --padding-bottom: 20px;
 }
 
-/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言 */
+/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言。
+   问题（issue #144）：ion-list-header 在 ios 模式下，内部投影的 ion-label 自带
+   非对称的 margin-top/margin-bottom（用于原生「大标题」样式，预期标题很高、
+   文字贴底），即使这里覆盖了宿主的 display/align-items，label 自身的 margin
+   已经把它的 flex 外边距盒撑满了整个头部高度，align-items:center 也无法把
+   图标和文字的视觉中心对齐——图标居中，文字却被自带的 margin 顶到偏下的位置。
+   修复：直接清零 ion-label 的 margin，图标和文字才会以同一个基准垂直居中。 */
 .type-group-header {
   display: flex;
   align-items: center;
@@ -1028,5 +1034,10 @@ ion-chip {
 
 .type-group-header ion-icon {
   font-size: 16px;
+}
+
+.type-group-header ion-label {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 </style>
