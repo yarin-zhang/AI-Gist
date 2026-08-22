@@ -2,12 +2,12 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（例如 v0.1.1）；store 构建 Windows Store；mac-store 上传 Mac App Store；linux-store-build 仅构建 Snap；linux-store 发布 Snap stable'
+        description: '版本号（例如 v0.1.1；留空使用 package.json）；store 构建 Windows Store；mac-store 上传 Mac App Store；linux-store-build 仅构建 Snap；linux-store 发布 Snap stable'
         required: false
         default: ''
 
@@ -209,6 +209,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -220,10 +222,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          TAG_VERSION: ${{ github.ref_name }}
         run: |
           PACKAGE_VERSION="v$(node -p "require('./package.json').version")"
 
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_VERSION" ]]; then
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            VERSION="$TAG_VERSION"
+          elif [[ -n "$INPUT_VERSION" ]]; then
             VERSION="$INPUT_VERSION"
           else
             VERSION="$PACKAGE_VERSION"
@@ -245,22 +250,32 @@ jobs:
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create Git Tag
+      - name: Verify manual release tag exists
+        if: github.event_name == 'workflow_dispatch'
         env:
           RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
-            echo "Tag $RELEASE_VERSION already exists, skipping tag creation"
-          else
-            git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION"
-            git push origin "$RELEASE_VERSION"
-            echo "Created and pushed tag $RELEASE_VERSION"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag $RELEASE_VERSION does not exist. Push the version tag first, then run this workflow."
+            exit 1
           fi
 
-      - name: Create Draft GitHub Release
+          # Annotated tags expose the target commit through the peeled ^{} ref;
+          # lightweight tags expose the commit directly on refs/tags/<version>.
+          REMOTE_TAG_SHA=$(git ls-remote origin "refs/tags/$RELEASE_VERSION^{}" | awk 'NR == 1 { print $1 }')
+          if [[ -z "$REMOTE_TAG_SHA" ]]; then
+            REMOTE_TAG_SHA=$(git ls-remote origin "refs/tags/$RELEASE_VERSION" | awk 'NR == 1 { print $1 }')
+          fi
+          CHECKOUT_SHA=$(git rev-parse HEAD)
+
+          if [[ "$REMOTE_TAG_SHA" != "$CHECKOUT_SHA" ]]; then
+            echo "::error::Tag $RELEASE_VERSION points to $REMOTE_TAG_SHA, but this workflow checked out $CHECKOUT_SHA. Dispatch the workflow from the tagged commit."
+            exit 1
+          fi
+
+          echo "Using existing tag $RELEASE_VERSION at $CHECKOUT_SHA; no tag will be created or pushed."
+
+      - name: Create Draft Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
