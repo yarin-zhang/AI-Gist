@@ -89,7 +89,6 @@
         "naive-ui": "^2.41.0",
         "nunjucks": "^3.2.4",
         "sass": "^1.89.2",
-        "tailwindcss": "^4.1.11",
         "tsc-alias": "^1.8.16",
         "typescript": "^5.8.3",
         "typescript-eslint": "^8.35.0",

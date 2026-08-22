@@ -145,12 +145,12 @@ describe('desktop design-system contract', () => {
   it('does not retain deprecated decorative surface helpers', () => {
     const common = readFileSync(resolve(rendererRoot, 'assets/scss/common.scss'), 'utf8');
     const animations = readFileSync(resolve(rendererRoot, 'assets/scss/common-animations.scss'), 'utf8');
-    const tailwind = readFileSync(resolve(rendererRoot, 'tailwind.css'), 'utf8');
     expect(common).not.toContain('.glass-effect');
     expect(common).not.toContain('.text-gradient');
     expect(animations).not.toContain('.hover-lift');
     expect(animations).not.toContain('.pulse-glow');
-    expect(tailwind).not.toMatch(/card-modern[\s\S]*shadow-/);
+    // 原先还会检查 tailwind.css 里的 .card-modern；该文件已随 Tailwind 一并移除，
+    // 那批 @apply 辅助类不复存在，断言无对象可查。
   });
 
   it('uses a focus-trap-compatible root for every raw Naive UI modal', () => {
