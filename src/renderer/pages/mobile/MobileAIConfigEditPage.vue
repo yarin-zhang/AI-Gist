@@ -33,10 +33,13 @@
             </div>
           </ion-item>
 
-          <!-- 配置名称 - 选择服务类型后显示 -->
+          <!-- 配置名称 - 选择服务类型后显示。label-placement="stacked" 让标签独占一行、
+               输入框独占下方一行，避免和「兼容服务地址」一样标签与输入框同行挤占宽度
+               （issue #145：过长的 placeholder/value 会被截断看不全）。 -->
           <ion-item v-if="formData.type" lines="none">
             <ion-input
               v-model="formData.name"
+              label-placement="stacked"
               :label="t('aiConfig.configName')"
               :placeholder="t('aiConfig.pleaseEnterConfigName')"
               required
@@ -47,6 +50,7 @@
           <ion-item v-if="formData.type && needsBaseURL" lines="none">
             <ion-input
               v-model="formData.baseURL"
+              label-placement="stacked"
               :label="getBaseURLInfo.label"
               :placeholder="getBaseURLInfo.placeholder"
               type="url"
@@ -64,6 +68,7 @@
           <ion-item v-if="formData.type && needsApiKey" lines="none">
             <ion-input
               v-model="formData.apiKey"
+              label-placement="stacked"
               :label="getApiKeyLabel"
               placeholder="API Key"
               type="password"
@@ -864,6 +869,14 @@ ion-item {
   --padding-start: 16px;
   --padding-end: 16px;
   --inner-padding-end: 0;
+}
+
+/* label-placement="stacked" 的输入框：标签独占一行、输入框独占下一行，
+   需要比默认内联布局更高的行高，否则标签和输入框会显得过于拥挤（issue #145）。
+   只选择 stacked 的输入框，不影响下方模型配置区仍保持内联标签的「自定义模型」输入框。 */
+ion-item ion-input[label-placement="stacked"] {
+  --padding-top: 10px;
+  --padding-bottom: 10px;
 }
 
 .service-info {
