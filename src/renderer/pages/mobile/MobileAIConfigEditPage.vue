@@ -801,7 +801,23 @@ const showToast = async (message: string, color: string = 'success') => {
 }
 
 // 初始化
+const initializeNewConfig = () => {
+  if (isEditMode.value) return
+
+  // The default card is the OpenAI-compatible service. Keep the form data in
+  // sync with that card so the first render can be tested or saved directly.
+  resetForm()
+  const defaultChoice = compatibilityChoices.value[0]
+  selectedChoiceId.value = defaultChoice.id
+  formData.type = defaultChoice.type
+  formData.name = defaultChoice.label
+  formData.baseURL = ''
+}
+
 onMounted(() => {
+  loadConfig()
+  initializeNewConfig()
+})
   loadConfig()
 })
 </script>
