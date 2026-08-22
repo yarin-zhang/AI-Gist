@@ -32,6 +32,14 @@ describe('release workflow trigger contract', () => {
     expect(tagCheckIndex).toBeLessThan(releaseIndex)
   })
 
+  it('binds a manual release to the commit referenced by its remote tag', () => {
+    expect(workflow).toContain('refs/tags/$RELEASE_VERSION^{}')
+    expect(workflow).toContain('CHECKOUT_SHA=$(git rev-parse HEAD)')
+    expect(workflow).toContain('[[ "$REMOTE_TAG_SHA" != "$CHECKOUT_SHA" ]]')
+    expect(workflow).toContain('Tag $RELEASE_VERSION points to $REMOTE_TAG_SHA')
+    expect(workflow).toContain('Dispatch the workflow from the tagged commit.')
+  })
+
   it('does not let store-only dispatches enter the release job', () => {
     expect(workflow).toContain("github.event.inputs.version != 'store'")
     expect(workflow).toContain("github.event.inputs.version != 'mac-store'")

@@ -259,7 +259,21 @@ jobs:
             echo "::error::Tag $RELEASE_VERSION does not exist. Push the version tag first, then run this workflow."
             exit 1
           fi
-          echo "Using existing tag $RELEASE_VERSION; no tag will be created or pushed."
+
+          # Annotated tags expose the target commit through the peeled ^{} ref;
+          # lightweight tags expose the commit directly on refs/tags/<version>.
+          REMOTE_TAG_SHA=$(git ls-remote origin "refs/tags/$RELEASE_VERSION^{}" | awk 'NR == 1 { print $1 }')
+          if [[ -z "$REMOTE_TAG_SHA" ]]; then
+            REMOTE_TAG_SHA=$(git ls-remote origin "refs/tags/$RELEASE_VERSION" | awk 'NR == 1 { print $1 }')
+          fi
+          CHECKOUT_SHA=$(git rev-parse HEAD)
+
+          if [[ "$REMOTE_TAG_SHA" != "$CHECKOUT_SHA" ]]; then
+            echo "::error::Tag $RELEASE_VERSION points to $REMOTE_TAG_SHA, but this workflow checked out $CHECKOUT_SHA. Dispatch the workflow from the tagged commit."
+            exit 1
+          fi
+
+          echo "Using existing tag $RELEASE_VERSION at $CHECKOUT_SHA; no tag will be created or pushed."
 
       - name: Create Draft Release
         uses: softprops/action-gh-release@v3

@@ -41,7 +41,7 @@ yarn version major
 3. 在左侧列表中选择 "Build and Release" 工作流
 4. 点击 "Run workflow" 按钮
 5. 输入版本号（例如：v0.1.1）
-6. 点击 "Run workflow" 开始构建流程。正式发布的手动运行必须输入一个已经存在的版本标签（版本号留空时使用 `package.json` 的版本并检查对应标签）；工作流不会创建或推送标签。输入 `store`、`mac-store`、`linux-store-build` 或 `linux-store` 时进入对应商店流程，这些构建不要求版本标签。
+6. 点击 "Run workflow" 开始构建流程。正式发布的手动运行必须输入一个已经存在的版本标签（版本号留空时使用 `package.json` 的版本并检查对应标签），并从该标签指向的 commit 发起；工作流会核对远端标签 SHA 与当前 checkout SHA，不一致时中止，也不会创建或推送标签。输入 `store`、`mac-store`、`linux-store-build` 或 `linux-store` 时进入对应商店流程，这些构建不要求版本标签。
 
 ## 构建产物
 
