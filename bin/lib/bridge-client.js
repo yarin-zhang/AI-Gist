@@ -22,6 +22,12 @@ const AUTO_LAUNCH_TIMEOUT_MS = 15000;
 const AUTO_LAUNCH_POLL_INTERVAL_MS = 500;
 const REQUEST_TIMEOUT_MS = 15000;
 
+// 传给 `open --args` 的命令行标记，用来告诉主进程"这是 CLI 自动拉起的探测启动，
+// 不是用户手动再点了一次应用图标"。必须和
+// src/main/electron/single-instance-manager.ts 里的 CLI_AUTO_LAUNCH_MARKER
+// 保持完全一致（两边运行时环境不同，无法共享同一个 import，只能约定字面量一致）。
+const AUTO_LAUNCH_MARKER = '--ai-gist-cli-autolaunch';
+
 class CliBridgeError extends Error {
   constructor(message, code) {
     super(message);
@@ -105,9 +111,32 @@ function httpInvoke(runtimeInfo, action, params) {
 
 function tryAutoLaunchOnMac() {
   try {
-    spawn('open', ['-a', 'AI Gist'], { stdio: 'ignore', detached: true }).unref();
+    // --args 之后的内容会作为命令行参数传给被启动/唤醒的 AI Gist 进程。如果 AI Gist
+    // 其实已经在跑（例如常驻在托盘），`open -a` 不会创建一个真正独立运行的新实例，
+    // 而是会短暂拉起一个新的 Electron 进程，该进程在 requestSingleInstanceLock() 时
+    // 输给已经在运行的实例，随即把自己的命令行参数通过 'second-instance' 事件转交
+    // 给主实例后退出。带上这个标记，主进程就能识别出这只是 CLI 的探测性拉起，
+    // 从而不弹出"AI-Gist 已在运行"的对话框（那个对话框和这次 CLI 调用本身毫无关系，
+    // 只会让用户困惑）。见 single-instance-manager.ts 的 CLI_AUTO_LAUNCH_MARKER。
+    spawn('open', ['-a', 'AI Gist', '--args', AUTO_LAUNCH_MARKER], { stdio: 'ignore', detached: true }).unref();
   } catch {
     // 尽力而为：静默失败，后面的轮询超时会给出统一的错误提示
+  }
+}
+
+/**
+ * 删除过期的运行时连接信息文件（如果存在）。
+ *
+ * 用于"文件存在但连接被拒绝"的场景：上一次 AI Gist 没有正常退出（崩溃/被强杀/断电），
+ * 留下的 port/token 已经没有任何进程在监听。如果不删除它，后续的 waitForRuntimeInfo()
+ * 轮询会立刻读到这份旧文件、误以为一个新实例已经就位，从而完全跳过等待，
+ * 拿着同一份失效信息再失败一次。删除后轮询才会真正等到新实例启动、覆盖写入新文件。
+ */
+function removeStaleRuntimeInfo() {
+  try {
+    fs.unlinkSync(RUNTIME_FILE);
+  } catch {
+    // 忽略：文件可能已经被新启动的实例覆盖，或本来就不存在
   }
 }
 
@@ -149,11 +178,15 @@ async function invoke(action, params, options = {}) {
   let runtimeInfo = readRuntimeInfo();
   let attemptedAutoLaunch = false;
 
-  if (!runtimeInfo && autoLaunchEnabled) {
+  const autoLaunchAndWait = async () => {
     attemptedAutoLaunch = true;
     process.stderr.write('AI Gist 未运行，正在尝试启动… (Launching AI Gist…)\n');
     tryAutoLaunchOnMac();
-    runtimeInfo = await waitForRuntimeInfo(AUTO_LAUNCH_TIMEOUT_MS);
+    return waitForRuntimeInfo(AUTO_LAUNCH_TIMEOUT_MS);
+  };
+
+  if (!runtimeInfo && autoLaunchEnabled) {
+    runtimeInfo = await autoLaunchAndWait();
   }
 
   if (!runtimeInfo) {
@@ -163,15 +196,32 @@ async function invoke(action, params, options = {}) {
   try {
     return await httpInvoke(runtimeInfo, action, params);
   } catch (error) {
-    if (error instanceof CliBridgeError && error.code === 'CONNECTION_REFUSED') {
+    const isStaleConnection = error instanceof CliBridgeError && error.code === 'CONNECTION_REFUSED';
+    if (!isStaleConnection) {
+      throw error;
+    }
+
+    // 运行时文件存在，但实际连接被拒绝：说明上一次 AI Gist 没有正常退出（崩溃、
+    // 被强制杀死、断电等），留下的是一份过期的端口/token 信息，此时真实情况其实
+    // 和"应用没在运行"完全一样。之前的实现会在这里直接报错、要求用户手动重开，
+    // 这正是 issue #149 里"之前的 CLI 没关掉，再次打开时就会报错"的根因之一：
+    // 明明可以像"应用从未启动过"一样自动拉起，却因为找到了一份（失效的）运行时
+    // 文件而放弃了自动拉起。这里改成：清掉过期文件，按同样的自动拉起流程重试一次。
+    if (!autoLaunchEnabled || attemptedAutoLaunch) {
       throw new CliBridgeError(
         'AI Gist 似乎已经退出（发现了过期的连接信息）。请重新打开 AI Gist 后重试。\n' +
           '(AI Gist appears to have quit — stale connection info was found. Please reopen AI Gist and try again.)',
         'APP_NOT_RUNNING'
       );
     }
-    throw error;
+
+    removeStaleRuntimeInfo();
+    const freshInfo = await autoLaunchAndWait();
+    if (!freshInfo) {
+      throw new CliBridgeError(buildNotRunningMessage(true), 'APP_NOT_RUNNING');
+    }
+    return await httpInvoke(freshInfo, action, params);
   }
 }
 
-module.exports = { invoke, CliBridgeError, RUNTIME_FILE };
+module.exports = { invoke, CliBridgeError, RUNTIME_FILE, AUTO_LAUNCH_MARKER };

@@ -691,6 +691,28 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/*
+ * 搜索框展开态顶部间距（issue #146）：
+ * ion-toolbar 一旦检测到内部有 ion-searchbar，会自动加上内置的
+ * `toolbar-searchbar` class，该类会把 .toolbar-container 的
+ * padding-top/padding-bottom 清零，并让插槽内容 align-self: start——
+ * 这是 Ionic 为「搜索框独占一个 toolbar，紧贴在标题栏正下方」的常见用法
+ * 设计的（比如 MobilePromptEditPage.vue 里的标签选择弹层，标题和搜索框
+ * 各占一个 toolbar），此时清零并不显眼，因为上方还有标题栏的分割线。
+ * 但这里的搜索框是原地替换掉第一个、也是唯一一个 toolbar 里的 ion-title，
+ * 这个 toolbar 同时还承担着 Ionic 默认的安全区适配
+ * （`ion-header ion-toolbar:first-of-type { padding-top: var(--ion-safe-area-top) }`）。
+ * 清零后的搜索框会直接贴住安全区下边缘——在没有安全区的设备上则是直接贴住
+ * 屏幕物理顶边，跟收起态大标题的呼吸空间（.mobile-large-title-bar 同样用了
+ * --spacing-sm 作为顶部留白）不一致，视觉上过于拥挤。
+ * 这里补回的 padding-top 加在 ion-searchbar 自身而不是 toolbar 上，
+ * 是叠加在安全区之上的固定呼吸空间，不会替代安全区适配：有安全区的设备上
+ * 两者相加，没有安全区的设备上只有这一份，不会出现间距过大的问题。
+ */
+ion-toolbar:first-of-type ion-searchbar {
+  padding-top: var(--spacing-sm);
+}
+
 .filter-chips {
   padding: 8px 16px;
   display: flex;

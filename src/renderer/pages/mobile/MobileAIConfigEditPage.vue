@@ -33,10 +33,13 @@
             </div>
           </ion-item>
 
-          <!-- 配置名称 - 选择服务类型后显示 -->
+          <!-- 配置名称 - 选择服务类型后显示。label-placement="stacked" 让标签独占一行、
+               输入框独占下方一行，避免和「兼容服务地址」一样标签与输入框同行挤占宽度
+               （issue #145：过长的 placeholder/value 会被截断看不全）。 -->
           <ion-item v-if="formData.type" lines="none">
             <ion-input
               v-model="formData.name"
+              label-placement="stacked"
               :label="t('aiConfig.configName')"
               :placeholder="t('aiConfig.pleaseEnterConfigName')"
               required
@@ -47,6 +50,7 @@
           <ion-item v-if="formData.type && needsBaseURL" lines="none">
             <ion-input
               v-model="formData.baseURL"
+              label-placement="stacked"
               :label="getBaseURLInfo.label"
               :placeholder="getBaseURLInfo.placeholder"
               type="url"
@@ -64,16 +68,21 @@
           <ion-item v-if="formData.type && needsApiKey" lines="none">
             <ion-input
               v-model="formData.apiKey"
+              label-placement="stacked"
               :label="getApiKeyLabel"
               placeholder="API Key"
               type="password"
             ></ion-input>
           </ion-item>
 
-          <!-- 服务信息 -->
+          <!-- 服务信息：前面加一个小的信息图标，与上方表单字段区分开，避免视觉上混在一起
+               （issue #145）。 -->
           <ion-item v-if="formData.type && getServiceInfo.description" lines="none">
             <div class="service-info">
-              <p class="service-description">{{ getServiceInfo.description }}</p>
+              <p class="service-description">
+                <ion-icon :icon="informationCircleOutline" class="service-description-icon" aria-hidden="true"></ion-icon>
+                <span>{{ getServiceInfo.description }}</span>
+              </p>
               <div class="service-links">
                 <ion-button
                   v-if="getApiKeyInfo.apiKeyUrl"
@@ -97,18 +106,20 @@
             </div>
           </ion-item>
 
-          <!-- 测试连接按钮 -->
-          <ion-item v-if="formData.type" lines="none">
-            <div class="action-buttons">
-              <ion-button
-                expand="block"
-                @click="handleTestConnection"
-                :disabled="testingConnection || !canTestConnection"
-              >
-                <ion-spinner v-if="testingConnection" slot="start"></ion-spinner>
-                {{ t('aiConfig.testConnection') }}
-              </ion-button>
-            </div>
+          <!-- 测试连接：改用 iOS 列表行按钮（图标 + 主色文字），与备份页
+               「创建备份」等主操作行使用同一套约定，而不是撑满宽度的纯色块状按钮
+               （issue #145）。 -->
+          <ion-item
+            v-if="formData.type"
+            button
+            :detail="false"
+            lines="none"
+            :disabled="testingConnection || !canTestConnection"
+            @click="handleTestConnection"
+          >
+            <ion-icon :icon="flashOutline" slot="start" color="primary"></ion-icon>
+            <ion-label color="primary">{{ t('aiConfig.testConnection') }}</ion-label>
+            <ion-spinner v-if="testingConnection" slot="end" name="crescent"></ion-spinner>
           </ion-item>
 
           <!-- 测试结果 -->
@@ -266,7 +277,9 @@ import {
   documentTextOutline,
   cloudOutline,
   hardwareChipOutline,
-  extensionPuzzleOutline
+  extensionPuzzleOutline,
+  flashOutline,
+  informationCircleOutline
 } from 'ionicons/icons'
 import {
   Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
@@ -866,6 +879,19 @@ ion-item {
   --inner-padding-end: 0;
 }
 
+/* label-placement="stacked" 的输入框：标签独占一行、输入框独占下一行，
+   需要比默认内联布局更高的行高，否则标签和输入框会显得过于拥挤（issue #145）。
+   只选择 stacked 的输入框，不影响下方模型配置区仍保持内联标签的「自定义模型」输入框。
+   注意：不能用属性选择器 [label-placement="stacked"]——Vue 给 Ionic 自定义元素传这个
+   prop 时走的是 DOM 属性赋值（el.labelPlacement = 'stacked'），不会反映成 HTML 属性，
+   所以 hasAttribute('label-placement') 是 false，属性选择器永远不会命中。改用 Ionic
+   渲染后真实挂在元素上的 class（input-label-placement-stacked），已用
+   getComputedStyle 实测确认命中。 */
+ion-item ion-input.input-label-placement-stacked {
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+}
+
 .service-info {
   width: 100%;
   padding: 12px 0;
@@ -879,10 +905,21 @@ ion-item {
 }
 
 .service-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   color: var(--ion-color-medium);
   font-size: var(--mobile-font-size-footnote);
   margin: 0 0 8px 0;
   line-height: var(--mobile-line-height-normal);
+}
+
+/* 信息图标：和上方提示文字第一行对齐，避免和上面的表单字段视觉混淆（issue #145）。 */
+.service-description-icon {
+  flex: none;
+  font-size: 16px;
+  margin-top: 2px;
+  color: var(--content-tertiary, var(--ion-color-medium));
 }
 
 .service-links {
@@ -906,18 +943,6 @@ ion-item {
 
 .service-links ion-icon {
   font-size: 16px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-  padding: 8px 0;
-}
-
-.action-buttons ion-button {
-  flex: 1;
-  margin: 0;
 }
 
 .test-result {
@@ -1012,7 +1037,13 @@ ion-chip {
   --padding-bottom: 20px;
 }
 
-/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言 */
+/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言。
+   问题（issue #144）：ion-list-header 在 ios 模式下，内部投影的 ion-label 自带
+   非对称的 margin-top/margin-bottom（用于原生「大标题」样式，预期标题很高、
+   文字贴底），即使这里覆盖了宿主的 display/align-items，label 自身的 margin
+   已经把它的 flex 外边距盒撑满了整个头部高度，align-items:center 也无法把
+   图标和文字的视觉中心对齐——图标居中，文字却被自带的 margin 顶到偏下的位置。
+   修复：直接清零 ion-label 的 margin，图标和文字才会以同一个基准垂直居中。 */
 .type-group-header {
   display: flex;
   align-items: center;
@@ -1028,5 +1059,10 @@ ion-chip {
 
 .type-group-header ion-icon {
   font-size: 16px;
+}
+
+.type-group-header ion-label {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 </style>
