@@ -818,8 +818,6 @@ onMounted(() => {
   loadConfig()
   initializeNewConfig()
 })
-  loadConfig()
-})
 </script>
 
 <style scoped>
