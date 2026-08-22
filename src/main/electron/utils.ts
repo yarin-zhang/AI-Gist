@@ -94,10 +94,28 @@ function logIconSearchFailure(preferredIcons: readonly string[]): void {
 export function getAppIconPath(): string {
   const preferredIcons = getPreferredIcons();
   const iconPath = findIconFile(preferredIcons);
-  
+
   if (!iconPath) {
     logIconSearchFailure(preferredIcons);
   }
-  
+
+  return iconPath;
+}
+
+/**
+ * 获取 macOS 托盘图标路径（无底色，随系统深浅色主题切换）
+ * 文件名对应的是同目录下 tray-light@2x.png / tray-dark@2x.png 的 1x 版本，
+ * Electron 会按约定自动挑选同目录下的 @2x 版本用于高分屏渲染
+ * @param isDarkMode 当前系统是否为深色外观
+ * @returns 图标文件路径，如果未找到则返回空字符串
+ */
+export function getMacTrayIconPath(isDarkMode: boolean): string {
+  const fileName = isDarkMode ? 'tray-dark.png' : 'tray-light.png';
+  const iconPath = findIconFile([fileName]);
+
+  if (!iconPath) {
+    logIconSearchFailure([fileName]);
+  }
+
   return iconPath;
 }

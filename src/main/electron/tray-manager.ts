@@ -1,8 +1,9 @@
 // 标准库导入
-import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
+import { Tray, Menu, nativeImage, BrowserWindow, app, nativeTheme } from 'electron';
 
 // 本地模块导入
-import { getAppIconPath } from './utils';
+import { getAppIconPath, getMacTrayIconPath } from './utils';
+import { ShortcutManager } from './shortcut-manager';
 
 /**
  * 常量定义
@@ -32,6 +33,7 @@ class TrayManager {
   private mainWindow: BrowserWindow | null = null;
   private onQuitCallback?: () => void;
   private showWindowCallback?: () => void;
+  private themeChangeListener: (() => void) | null = null;
 
   // ==================== 窗口管理方法 ====================
   
@@ -75,6 +77,9 @@ class TrayManager {
       this.tray = new Tray(icon);
       this.setupTrayMenu();
       this.setupTrayEvents();
+      if (process.platform === 'darwin') {
+        this.setupTrayThemeSync();
+      }
 
       console.log(CONSTANTS.LOG_MESSAGES.TRAY_CREATED);
       return true;
@@ -88,6 +93,10 @@ class TrayManager {
    * 销毁托盘
    */
   destroy(): void {
+    if (this.themeChangeListener) {
+      nativeTheme.removeListener('updated', this.themeChangeListener);
+      this.themeChangeListener = null;
+    }
     if (this.tray) {
       this.tray.destroy();
       this.tray = null;
@@ -109,6 +118,10 @@ class TrayManager {
    * @returns 图标实例或 null
    */
   private createTrayIcon(): Electron.NativeImage | null {
+    if (process.platform === 'darwin') {
+      return this.createMacTrayIcon();
+    }
+
     const iconPath = getAppIconPath();
     if (!iconPath) {
       console.warn(CONSTANTS.LOG_MESSAGES.ICON_NOT_FOUND);
@@ -118,12 +131,12 @@ class TrayManager {
     console.log(CONSTANTS.LOG_MESSAGES.ICON_PATH_LOG, iconPath);
 
     let icon = nativeImage.createFromPath(iconPath);
-    
+
     // Windows 平台特殊处理
     if (process.platform === 'win32' && !icon.isEmpty()) {
       icon = icon.resize({ width: 16, height: 16 });
     }
-    
+
     if (icon.isEmpty()) {
       console.warn(CONSTANTS.LOG_MESSAGES.ICON_INVALID);
       return null;
@@ -133,10 +146,49 @@ class TrayManager {
   }
 
   /**
+   * 创建 macOS 托盘图标（无底色，随系统深浅色主题切换）
+   * @returns 图标实例或 null
+   */
+  private createMacTrayIcon(): Electron.NativeImage | null {
+    const iconPath = getMacTrayIconPath(nativeTheme.shouldUseDarkColors);
+    if (!iconPath) {
+      console.warn(CONSTANTS.LOG_MESSAGES.ICON_NOT_FOUND);
+      return null;
+    }
+
+    console.log(CONSTANTS.LOG_MESSAGES.ICON_PATH_LOG, iconPath);
+
+    const icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) {
+      console.warn(CONSTANTS.LOG_MESSAGES.ICON_INVALID);
+      return null;
+    }
+
+    return icon;
+  }
+
+  /**
+   * 监听系统深浅色主题变化，实时更新托盘图标
+   */
+  private setupTrayThemeSync(): void {
+    this.themeChangeListener = () => {
+      const icon = this.createMacTrayIcon();
+      if (icon) {
+        this.tray?.setImage(icon);
+      }
+    };
+    nativeTheme.on('updated', this.themeChangeListener);
+  }
+
+  /**
    * 设置托盘菜单
+   * macOS 上点击图标直接打开搜索框，不需要右键菜单
    */
   private setupTrayMenu(): void {
     if (!this.tray) return;
+
+    this.tray.setToolTip(CONSTANTS.TOOLTIP_TEXT);
+    if (process.platform === 'darwin') return;
 
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -150,19 +202,24 @@ class TrayManager {
       }
     ]);
 
-    this.tray.setToolTip(CONSTANTS.TOOLTIP_TEXT);
     this.tray.setContextMenu(contextMenu);
   }
 
   /**
    * 设置托盘事件
+   * macOS 上单击直接打开搜索框；其他平台单击/双击显示主窗口
    */
   private setupTrayEvents(): void {
     if (!this.tray) return;
 
+    if (process.platform === 'darwin') {
+      this.tray.on('click', () => void ShortcutManager.getInstance().openLauncher({ kind: 'launcher' }));
+      return;
+    }
+
     // 双击事件
     this.tray.on('double-click', () => this.showMainWindow());
-    
+
     // 单击事件（根据平台设置）
     if (this.shouldHandleClickEvent()) {
       this.tray.on('click', () => this.showMainWindow());
@@ -174,7 +231,7 @@ class TrayManager {
    * @returns 是否处理单击事件
    */
   private shouldHandleClickEvent(): boolean {
-    return process.platform === 'darwin' || process.platform === 'win32';
+    return process.platform === 'win32';
   }
 
   /**
