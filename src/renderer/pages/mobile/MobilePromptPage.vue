@@ -113,7 +113,7 @@
           <ion-item-sliding v-for="prompt in prompts" :key="prompt.id">
             <ion-item button @click="handleView(prompt)">
               <ion-label>
-                <h2>{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h2>
+                <h2 class="prompt-title">{{ prompt.title || getFirstLineOfContent(prompt.content) }}</h2>
                 <p v-if="prompt.description" class="prompt-description">{{ prompt.description }}</p>
                 <div class="prompt-meta">
                   <ion-chip v-if="prompt.categoryId" size="small" outline>
@@ -759,6 +759,14 @@ onUnmounted(() => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+.prompt-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-meta {
