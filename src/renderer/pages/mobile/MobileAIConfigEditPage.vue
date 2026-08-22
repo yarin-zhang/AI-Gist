@@ -75,10 +75,14 @@
             ></ion-input>
           </ion-item>
 
-          <!-- 服务信息 -->
+          <!-- 服务信息：前面加一个小的信息图标，与上方表单字段区分开，避免视觉上混在一起
+               （issue #145）。 -->
           <ion-item v-if="formData.type && getServiceInfo.description" lines="none">
             <div class="service-info">
-              <p class="service-description">{{ getServiceInfo.description }}</p>
+              <p class="service-description">
+                <ion-icon :icon="informationCircleOutline" class="service-description-icon" aria-hidden="true"></ion-icon>
+                <span>{{ getServiceInfo.description }}</span>
+              </p>
               <div class="service-links">
                 <ion-button
                   v-if="getApiKeyInfo.apiKeyUrl"
@@ -102,18 +106,20 @@
             </div>
           </ion-item>
 
-          <!-- 测试连接按钮 -->
-          <ion-item v-if="formData.type" lines="none">
-            <div class="action-buttons">
-              <ion-button
-                expand="block"
-                @click="handleTestConnection"
-                :disabled="testingConnection || !canTestConnection"
-              >
-                <ion-spinner v-if="testingConnection" slot="start"></ion-spinner>
-                {{ t('aiConfig.testConnection') }}
-              </ion-button>
-            </div>
+          <!-- 测试连接：改用 iOS 列表行按钮（图标 + 主色文字），与备份页
+               「创建备份」等主操作行使用同一套约定，而不是撑满宽度的纯色块状按钮
+               （issue #145）。 -->
+          <ion-item
+            v-if="formData.type"
+            button
+            :detail="false"
+            lines="none"
+            :disabled="testingConnection || !canTestConnection"
+            @click="handleTestConnection"
+          >
+            <ion-icon :icon="flashOutline" slot="start" color="primary"></ion-icon>
+            <ion-label color="primary">{{ t('aiConfig.testConnection') }}</ion-label>
+            <ion-spinner v-if="testingConnection" slot="end" name="crescent"></ion-spinner>
           </ion-item>
 
           <!-- 测试结果 -->
@@ -271,7 +277,9 @@ import {
   documentTextOutline,
   cloudOutline,
   hardwareChipOutline,
-  extensionPuzzleOutline
+  extensionPuzzleOutline,
+  flashOutline,
+  informationCircleOutline
 } from 'ionicons/icons'
 import {
   Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
@@ -892,10 +900,21 @@ ion-item ion-input[label-placement="stacked"] {
 }
 
 .service-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   color: var(--ion-color-medium);
   font-size: var(--mobile-font-size-footnote);
   margin: 0 0 8px 0;
   line-height: var(--mobile-line-height-normal);
+}
+
+/* 信息图标：和上方提示文字第一行对齐，避免和上面的表单字段视觉混淆（issue #145）。 */
+.service-description-icon {
+  flex: none;
+  font-size: 16px;
+  margin-top: 2px;
+  color: var(--content-tertiary, var(--ion-color-medium));
 }
 
 .service-links {
@@ -919,18 +938,6 @@ ion-item ion-input[label-placement="stacked"] {
 
 .service-links ion-icon {
   font-size: 16px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-  padding: 8px 0;
-}
-
-.action-buttons ion-button {
-  flex: 1;
-  margin: 0;
 }
 
 .test-result {
