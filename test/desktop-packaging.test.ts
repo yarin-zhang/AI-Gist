@@ -54,7 +54,7 @@ describe('desktop packaging', () => {
     expect(builderConfig.mas).toMatchObject({
       appId: 'com.getaigist.app',
       target: 'mas',
-      hardenedRuntime: true,
+      hardenedRuntime: false,
       mergeASARs: false,
       entitlements: 'resources/entitlements.mas.plist',
       entitlementsInherit: 'resources/entitlements.mas.inherit.plist'
