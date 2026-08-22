@@ -114,7 +114,7 @@ jobs:
           # CFBundleVersion 必须比上一次上传 App Store Connect 的 build 号更高，
           # 否则上传报 -19241。用 run_number 保证单调递增；营销版本号（CFBundleShortVersionString）
           # 仍取 package.json 的 version，商店里显示为 "2.1.0 (123)" 的形式。
-          yarn electron-builder --config electron-builder.mas.js --mac --universal --publish never \
+          yarn electron-builder --config config/electron-builder.mas.js --mac --universal --publish never \
             --config.mas.provisioningProfile="$MAS_PROVISIONING_PROFILE_PATH" \
             --config.buildVersion="${{ github.run_number }}"
 
@@ -380,7 +380,7 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          yarn electron-builder --mac --${{ matrix.arch }} --config.mac.notarize=true --publish always
+          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --config.mac.notarize=true --publish always
 
       - name: Verify macOS signature and notarization
         if: steps.mac-signing.outputs.available == 'true'
@@ -405,7 +405,7 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          yarn electron-builder --mac --${{ matrix.arch }} --publish always \
+          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --publish always \
             --config.afterSign=scripts/adhoc-sign-mac.js \
             --config.mac.artifactName='AI-Gist-${version}-macOS-${arch}-unsigned.${ext}'
 
@@ -439,7 +439,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --win --publish never
+          yarn electron-builder --config config/electron-builder.json --win --publish never
 
       - name: Check SignPath configuration
         id: signpath
@@ -551,7 +551,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --linux --publish always
+          yarn electron-builder --config config/electron-builder.json --linux --publish always
 
   build-android:
     needs: create-release

@@ -7,7 +7,7 @@ console.log('🚀 开始构建移动端应用...\n');
 // 1. 构建渲染进程（使用移动端配置）
 console.log('📦 步骤 1/3: 构建渲染进程...');
 try {
-  execSync('vite build --config vite.config.mobile.js', {
+  execSync('vite build --config config/vite.config.mobile.js', {
     stdio: 'inherit',
     cwd: path.join(__dirname, '..')
   });

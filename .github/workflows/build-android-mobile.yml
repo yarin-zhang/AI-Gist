@@ -33,7 +33,7 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build web assets
-        run: npx vite build --config vite.config.mobile.js
+        run: npx vite build --config config/vite.config.mobile.js
 
       - name: Configure Android SDK path
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties

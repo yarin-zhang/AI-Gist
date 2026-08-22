@@ -19,7 +19,7 @@ Web 部署由两个部分组成：
 - 前端静态资源：`yarn build:web` 生成到 `build/web`。
 - Web 后端：`scripts/web-server.js`，负责静态资源托管、WebDAV 代理和 AI 代理。
 
-Docker 镜像使用 `Dockerfile.web` 构建：
+Docker 镜像使用 `docker/Dockerfile.web` 构建：
 
 1. `deps` 阶段安装依赖。
 2. `build` 阶段执行 `yarn build:web`。
@@ -90,7 +90,7 @@ docker compose -f docker-compose.web.yml down
 也可以手动构建并运行镜像：
 
 ```bash
-docker build -f Dockerfile.web -t ai-gist-web:local .
+docker build -f docker/Dockerfile.web -t ai-gist-web:local .
 docker run --rm -p 8080:8080 --name ai-gist-web ai-gist-web:local
 ```
 
@@ -341,7 +341,7 @@ iCloud Drive 依赖桌面或 iOS 原生能力。Web Docker 端运行在浏览器
 yarn build:web
 node --check scripts/web-server.js
 docker compose -f docker-compose.web.yml config
-docker build -f Dockerfile.web -t ai-gist-web:local .
+docker build -f docker/Dockerfile.web -t ai-gist-web:local .
 docker run --rm -p 18080:8080 --name ai-gist-web-test ai-gist-web:local
 ```
 
@@ -365,7 +365,7 @@ docker stop ai-gist-web-test
 ```bash
 yarn test:run
 node scripts/build.js
-yarn vite build --config vite.config.mobile.js
+yarn vite build --config config/vite.config.mobile.js
 ```
 
 ## 十二、维护原则
@@ -374,4 +374,4 @@ yarn vite build --config vite.config.mobile.js
 - Electron-only 能力不要在 Web UI 中裸露；应隐藏、降级或提供 Web 替代实现。
 - Web 后端只补齐浏览器缺失的系统/网络能力，不承担账号、多租户或长期服务端数据存储。
 - 跨端同步以 WebDAV/iCloud 等用户自有云存储为边界，默认保持本地优先。
-- 文档中的部署命令应和 `Dockerfile.web`、`docker-compose.web.yml`、`package.json` 中的脚本保持同步。
+- 文档中的部署命令应和 `docker/Dockerfile.web`、`docker-compose.web.yml`、`package.json` 中的脚本保持同步。

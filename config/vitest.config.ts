@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
+// 本文件位于 config/，所有路径都以仓库根目录为基准
+const repoRoot = resolve(__dirname, '..')
+
 export default defineConfig({
   test: {
     // 测试环境配置
@@ -35,7 +38,7 @@ export default defineConfig({
         'scripts/',
         '**/*.d.ts',
         '**/*.config.{js,ts}',
-        '**/vite.config.js'
+        'config/'
       ]
     },
     
@@ -43,7 +46,7 @@ export default defineConfig({
     testTimeout: 10000,
     
     // 设置测试根目录
-    root: process.cwd(),
+    root: repoRoot,
     
     // Mock 设置
     mockReset: true,
@@ -63,12 +66,12 @@ export default defineConfig({
   
   resolve: {
     alias: {
-      '@renderer': resolve(__dirname, 'src/renderer'),
-      '@main': resolve(__dirname, 'src/main'),
-      '@shared': resolve(__dirname, 'src/shared'),
-      '@test': resolve(__dirname, 'test'),
-      '@': resolve(__dirname, 'src/renderer'),
-      '~': resolve(__dirname, 'src/renderer')
+      '@renderer': resolve(repoRoot, 'src/renderer'),
+      '@main': resolve(repoRoot, 'src/main'),
+      '@shared': resolve(repoRoot, 'src/shared'),
+      '@test': resolve(repoRoot, 'test'),
+      '@': resolve(repoRoot, 'src/renderer'),
+      '~': resolve(repoRoot, 'src/renderer')
     }
   },
   

@@ -10,7 +10,7 @@
 
   这个组件是同一套交互在移动端的等价实现：变量的解析、默认值兜底、必填校验
   规则全部直接复用 `~/lib/utils/prompt-template`（与桌面端引用的是同一份源码，
-  见 vite.config.mobile.js 的 `@`/`~` 别名都指向 src/renderer），因此不会出现
+  见 config/vite.config.mobile.js 的 `@`/`~` 别名都指向 src/renderer），因此不会出现
   两端对同一个提示词解析出不同变量列表的情况；这里只重新实现了触屏交互部分：
   用纵向的 ion-item + ion-input/ion-textarea/ion-select/ion-toggle 列表代替桌面端
   的两列/行内编辑布局，更符合移动端惯例。

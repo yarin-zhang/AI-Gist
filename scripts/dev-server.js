@@ -143,7 +143,7 @@ function terminateElectron() {
  */
 async function startRenderer() {
     viteServer = await Vite.createServer({
-        configFile: Path.join(__dirname, '..', 'vite.config.js'),
+        configFile: Path.join(__dirname, '..', 'config', 'vite.config.js'),
         mode: 'development',
         server: isWindowsPreview ? { host: '0.0.0.0' } : undefined,
     });
