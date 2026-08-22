@@ -250,23 +250,18 @@ jobs:
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create Git Tag
+      - name: Verify manual release tag exists
         if: github.event_name == 'workflow_dispatch'
         env:
           RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
-            echo "Tag $RELEASE_VERSION already exists, skipping tag creation"
-          else
-            git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION"
-            git push origin "$RELEASE_VERSION"
-            echo "Created and pushed tag $RELEASE_VERSION"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag $RELEASE_VERSION does not exist. Push the version tag first, then run this workflow."
+            exit 1
           fi
+          echo "Using existing tag $RELEASE_VERSION; no tag will be created or pushed."
 
-      - name: Create Draft GitHub Release
+      - name: Create Draft Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

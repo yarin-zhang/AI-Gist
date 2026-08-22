@@ -1,6 +1,6 @@
 # Actions 自动构建与发布指南
 
-本项目使用兼容 GitHub Actions 格式的 Actions Runner 自动构建和发布 AI Gist 应用程序。
+本项目使用兼容 Actions 格式的 Runner 自动构建和发布 AI Gist 应用程序。
 
 ## 自动发布流程
 
@@ -41,7 +41,7 @@ yarn version major
 3. 在左侧列表中选择 "Build and Release" 工作流
 4. 点击 "Run workflow" 按钮
 5. 输入版本号（例如：v0.1.1）
-6. 点击 "Run workflow" 开始构建流程。版本号留空时使用 `package.json` 的版本；输入 `store`、`mac-store`、`linux-store-build` 或 `linux-store` 时进入对应商店流程。
+6. 点击 "Run workflow" 开始构建流程。正式发布的手动运行必须输入一个已经存在的版本标签（版本号留空时使用 `package.json` 的版本并检查对应标签）；工作流不会创建或推送标签。输入 `store`、`mac-store`、`linux-store-build` 或 `linux-store` 时进入对应商店流程，这些构建不要求版本标签。
 
 ## 构建产物
 
@@ -57,7 +57,7 @@ yarn version major
 
 ## 桌面代码签名
 
-每个平台 job 的签名状态（signed / unsigned、缺少哪些 Secrets）会写入 GitHub Actions 的 Job Summary，凭据缺失时同时输出 warning，不会静默跳过。
+每个平台 job 的签名状态（signed / unsigned、缺少哪些 Secrets）会写入 Actions 的 Job Summary，凭据缺失时同时输出 warning，不会静默跳过。
 
 ### Windows（SignPath）
 
@@ -68,7 +68,7 @@ Windows 使用 SignPath Foundation 的免费开源代码签名服务。申请通
 - `SIGNPATH_PROJECT_SLUG`：SignPath 项目 slug
 - `SIGNPATH_SIGNING_POLICY_SLUG`：签名策略 slug（一般为 `release-signing`）
 
-申请流程：在 [signpath.org](https://signpath.org/apply) 提交开源项目申请（需要仓库公开、含 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)、账号开启 MFA），通过后在 SignPath 控制台创建项目并把上述四个值配置到 GitHub 仓库的 Actions secrets。四个 secrets 任一缺失时，工作流发布带 `-unsigned` 后缀的未签名兼容包。
+申请流程：在 [signpath.org](https://signpath.org/apply) 提交开源项目申请（需要仓库公开、含 [`CODE_SIGNING_POLICY.md`](../CODE_SIGNING_POLICY.md)、账号开启 MFA），通过后在 SignPath 控制台创建项目并把上述四个值配置到仓库的 Actions secrets。四个 secrets 任一缺失时，工作流发布带 `-unsigned` 后缀的未签名兼容包。
 
 ### macOS（Developer ID + 公证）
 

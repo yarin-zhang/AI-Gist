@@ -19,7 +19,23 @@ describe('release workflow trigger contract', () => {
     expect(workflow).toContain('VERSION="$TAG_VERSION"')
   })
 
-  it('does not create a second tag from a tag-triggered run', () => {
-    expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'")
+  it('keeps manual release runs read-only with respect to tags', () => {
+    const versionIndex = workflow.indexOf('- name: Get version')
+    const tagCheckIndex = workflow.indexOf('- name: Verify manual release tag exists')
+    const releaseIndex = workflow.indexOf('- name: Create Draft Release')
+
+    expect(workflow).toContain('Verify manual release tag exists')
+    expect(workflow).toContain('git ls-remote --exit-code --tags origin')
+    expect(workflow).toContain('no tag will be created or pushed')
+    expect(workflow).not.toMatch(/^\s+git (?:tag|push)\b/m)
+    expect(versionIndex).toBeLessThan(tagCheckIndex)
+    expect(tagCheckIndex).toBeLessThan(releaseIndex)
+  })
+
+  it('does not let store-only dispatches enter the release job', () => {
+    expect(workflow).toContain("github.event.inputs.version != 'store'")
+    expect(workflow).toContain("github.event.inputs.version != 'mac-store'")
+    expect(workflow).toContain("github.event.inputs.version != 'linux-store'")
+    expect(workflow).toContain("github.event.inputs.version != 'linux-store-build'")
   })
 })
