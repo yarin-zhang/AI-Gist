@@ -97,6 +97,9 @@
         "target": "mas",
         "icon": "src/assets/macos.icns",
         "artifactName": "AI-Gist-${version}-Mac-App-Store-${arch}.${ext}",
+        "extendInfo": {
+            "ITSAppUsesNonExemptEncryption": false
+        },
         "hardenedRuntime": false,
         "mergeASARs": false,
         "entitlements": "resources/entitlements.mas.plist",
