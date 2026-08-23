@@ -15,7 +15,7 @@
 
 ![主要截图](docs/images/image-main.png?v=202608170119)
 
-[🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases)
+[🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases) | [🇬🇧 English README](docs/README.en.md)
 
 </div>
 
