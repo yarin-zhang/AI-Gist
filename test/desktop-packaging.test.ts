@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
+const require = createRequire(import.meta.url);
 
 interface IcoEntry {
   width: number;
@@ -171,11 +173,15 @@ describe('desktop packaging', () => {
     const builderConfig = JSON.parse(readFileSync(resolve(root, 'config/electron-builder.json'), 'utf8'));
     const entitlements = readFileSync(resolve(root, builderConfig.mas.entitlements), 'utf8');
     const inheritedEntitlements = readFileSync(resolve(root, builderConfig.mas.entitlementsInherit), 'utf8');
+    const resolvedMasConfig = require(resolve(root, 'config/electron-builder.mas.js')) as {
+      mas?: { extendInfo?: { ITSAppUsesNonExemptEncryption?: boolean } };
+    };
 
     expect(packageJson.scripts['build:store:mac']).toContain('--config config/electron-builder.mas.js --mac --universal');
     const masConfig = readFileSync(resolve(root, 'config/electron-builder.mas.js'), 'utf8');
     expect(masConfig).toContain('identity: null');
     expect(masConfig).toContain("identity: 'YANLIN ZHANG (9T93J5B7N6)'");
+    expect(masConfig).toContain('...baseConfig.mas');
     expect(builderConfig.mas).toMatchObject({
       appId: 'com.getaigist.app',
       target: 'mas',
@@ -184,8 +190,17 @@ describe('desktop packaging', () => {
       // App Store 要求的是 App Sandbox，不是 hardened runtime。
       hardenedRuntime: false,
       mergeASARs: false,
+      extendInfo: {
+        // App Store Connect 可从 MAS 目标生成的 Info.plist 自动读取出口合规豁免。
+        ITSAppUsesNonExemptEncryption: false
+      },
       entitlements: 'resources/entitlements.mas.plist',
       entitlementsInherit: 'resources/entitlements.mas.inherit.plist'
+    });
+    // 普通 macOS 包沿用 mac 目标，不应带入 MAS 专属的出口合规声明。
+    expect(builderConfig.mac).not.toHaveProperty('extendInfo.ITSAppUsesNonExemptEncryption');
+    expect(resolvedMasConfig.mas?.extendInfo).toMatchObject({
+      ITSAppUsesNonExemptEncryption: false
     });
     expect(entitlements).toContain('com.apple.security.app-sandbox');
     expect(entitlements).toContain('com.apple.security.files.user-selected.read-write');
