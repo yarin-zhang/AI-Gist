@@ -211,6 +211,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      release_created: ${{ steps.existing_release.outputs.exists == 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -280,7 +281,28 @@ jobs:
 
           echo "Using existing tag $RELEASE_VERSION at $CHECKOUT_SHA; no tag will be created or pushed."
 
+      # A rerun may find a draft or published Release for this tag. Preserve
+      # its hand-edited notes and existing assets; downstream jobs may only
+      # add installers that are still missing. The version is always exposed
+      # so a failed first run can be resumed from the same tag.
+      - name: Check for an existing release
+        id: existing_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "::notice::Release $RELEASE_VERSION already exists; existing notes and assets are preserved; missing installers may be uploaded."
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      # The release body is intentionally omitted: GitHub's generated notes
+      # are the single source of truth for what changed. Installation and
+      # troubleshooting instructions belong in documentation.
       - name: Create Draft Release
+        if: steps.existing_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -289,29 +311,10 @@ jobs:
           draft: true
           prerelease: false
           generate_release_notes: true
-          body: |
-            ## 📦 安装说明（遇到「损坏 / 无法验证开发者 / SmartScreen」提示请看这里）
-
-            **Windows**：下载 `AI-Gist-*-Windows-Setup.exe`。若出现 Microsoft Defender SmartScreen 蓝色提示，点击「更多信息」→「仍要运行」即可继续安装。文件名带 `-unsigned` 后缀的安装包为未签名兼容构建，出现该提示属预期行为。
-
-            **macOS**：请按芯片下载（Apple Silicon → `arm64`，Intel → `x64`）。正式版均已使用 Apple Developer ID 签名并通过 Apple 公证，可直接安装。若使用文件名带 `-unsigned` 后缀的兼容包时提示「已损坏，无法打开」，请先将应用拖入「应用程序」文件夹，再在终端执行：
-
-            ```bash
-            xattr -cr "/Applications/AI Gist.app"
-            ```
-
-            **Linux (AppImage)**：下载后先赋予执行权限再运行：
-
-            ```bash
-            chmod +x AI-Gist-*-linux.AppImage
-            ```
-
-            Ubuntu 22.04 及以上版本如提示缺少 FUSE，请先安装 libfuse2：`sudo apt install libfuse2`
-
-            ---
 
   build-mac:
     needs: create-release
+    if: needs.create-release.result == 'success'
     runs-on: macos-latest
     strategy:
       matrix:
@@ -372,7 +375,7 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Build, sign, notarize, and publish (macOS)
+      - name: Build, sign, and notarize (macOS)
         if: steps.mac-signing.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -385,7 +388,7 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --config.mac.notarize=true --publish always
+          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --config.mac.notarize=true --publish never
 
       - name: Verify macOS signature and notarization
         if: steps.mac-signing.outputs.available == 'true'
@@ -401,7 +404,7 @@ jobs:
           spctl --assess --type execute --verbose=2 "$APP_PATH"
           echo "- ✅ \`$APP_PATH\` 通过 codesign 校验、公证票据（staple）校验与 Gatekeeper 评估" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build and publish unsigned compatibility package (macOS)
+      - name: Build unsigned compatibility package (macOS)
         if: steps.mac-signing.outputs.available != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -410,12 +413,37 @@ jobs:
           npm_config_python: python3
         run: |
           node scripts/build.js
-          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --publish always \
+          yarn electron-builder --config config/electron-builder.json --mac --${{ matrix.arch }} --publish never \
             --config.afterSign=scripts/adhoc-sign-mac.js \
             --config.mac.artifactName='AI-Gist-${version}-macOS-${arch}-unsigned.${ext}'
 
+      - name: Upload macOS installer if missing
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
+        run: |
+          shopt -s nullglob
+          ARTIFACTS=(dist/AI-Gist-*.dmg)
+          if (( ${#ARTIFACTS[@]} == 0 )); then
+            echo '::error::No macOS installer was produced.'
+            exit 1
+          fi
+
+          EXISTING_ASSETS=$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name')
+          for artifact in "${ARTIFACTS[@]}"; do
+            asset=$(basename "$artifact")
+            if grep -Fqx "$asset" <<< "$EXISTING_ASSETS"; then
+              echo "Skipping existing Release asset $asset"
+            else
+              gh release upload "$RELEASE_VERSION" "$artifact" --repo "$GITHUB_REPOSITORY"
+              EXISTING_ASSETS+=$'\n'"$asset"
+            fi
+          done
+
   build-windows:
     needs: create-release
+    if: needs.create-release.result == 'success'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -524,10 +552,16 @@ jobs:
             $installer = Rename-Item -Path $installer.FullName -NewName $unsignedName -PassThru
           }
 
-          gh release upload $env:RELEASE_VERSION $installer.FullName --repo $env:GITHUB_REPOSITORY --clobber
+          $existingAssets = @(gh release view $env:RELEASE_VERSION --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+          if ($existingAssets -contains $installer.Name) {
+            Write-Host "Skipping existing Release asset $($installer.Name)"
+          } else {
+            gh release upload $env:RELEASE_VERSION $installer.FullName --repo $env:GITHUB_REPOSITORY
+          }
 
   build-linux:
     needs: create-release
+    if: needs.create-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -551,15 +585,40 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: npm install -g typescript
 
-      - name: Build and Publish (Linux)
+      - name: Build Linux installer
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           node scripts/build.js
-          yarn electron-builder --config config/electron-builder.json --linux --publish always
+          yarn electron-builder --config config/electron-builder.json --linux --publish never
+
+      - name: Upload Linux installer if missing
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
+        run: |
+          shopt -s nullglob
+          ARTIFACTS=(dist/AI-Gist-*-linux.AppImage)
+          if (( ${#ARTIFACTS[@]} == 0 )); then
+            echo '::error::No Linux AppImage was produced.'
+            exit 1
+          fi
+
+          EXISTING_ASSETS=$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name')
+          for artifact in "${ARTIFACTS[@]}"; do
+            asset=$(basename "$artifact")
+            if grep -Fqx "$asset" <<< "$EXISTING_ASSETS"; then
+              echo "Skipping existing Release asset $asset"
+            else
+              gh release upload "$RELEASE_VERSION" "$artifact" --repo "$GITHUB_REPOSITORY"
+              EXISTING_ASSETS+=$'\n'"$asset"
+            fi
+          done
 
   build-android:
     needs: create-release
+    if: needs.create-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -633,6 +692,53 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.create-release.outputs.version }}"
-          gh release upload "$VERSION" AI-Gist-*.apk \
-            --repo ${{ github.repository }} \
-            --clobber
+          APK_PATH="AI-Gist-${VERSION}-android.apk"
+          EXISTING_ASSETS=$(gh release view "$VERSION" --repo "${{ github.repository }}" \
+            --json assets --jq '.assets[].name')
+          if grep -Fqx "$APK_PATH" <<< "$EXISTING_ASSETS"; then
+            echo "Skipping existing Release asset $APK_PATH"
+          else
+            gh release upload "$VERSION" "$APK_PATH" \
+              --repo ${{ github.repository }}
+          fi
+
+  # electron-builder uploads latest*.yml and *.blockmap for auto-updaters.
+  # This app checks the Releases API and sends users to the release page, so
+  # those metadata files have no consumer and should not clutter downloads.
+  prune-release-assets:
+    needs: [create-release, build-mac, build-windows, build-linux, build-android]
+    # always() lets cleanup run after a partial platform failure. Existing
+    # Releases are resumed without deleting any metadata from their assets.
+    if: always() && needs.create-release.result == 'success' && needs.create-release.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove electron-updater metadata from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
+        run: |
+          ASSETS=$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name')
+
+          PRUNED=0
+          while IFS= read -r asset; do
+            [[ -z "$asset" ]] && continue
+            case "$asset" in
+              latest*.yml|*.blockmap)
+                echo "Removing $asset"
+                gh release delete-asset "$RELEASE_VERSION" "$asset" \
+                  --repo "$GITHUB_REPOSITORY" --yes
+                PRUNED=$((PRUNED + 1))
+                ;;
+            esac
+          done <<< "$ASSETS"
+
+          if [[ "$PRUNED" -eq 0 ]]; then
+            echo '- Release 资产已是干净状态，无需清理' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- 已从 Release 移除 $PRUNED 个 electron-updater 元数据文件（latest*.yml / *.blockmap）" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo '### Release 资产' >> "$GITHUB_STEP_SUMMARY"
+          gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[] | "- \(.name)（\(.size) 字节）"' >> "$GITHUB_STEP_SUMMARY"
