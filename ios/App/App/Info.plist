@@ -12,6 +12,7 @@
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
 		<string>ja</string>
+		<string>it</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>AI Gist</string>

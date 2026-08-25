@@ -13,7 +13,7 @@ describe('mobile OpenAI configuration guidance', () => {
   })
 
   it('defines the hint in every supported locale', () => {
-    for (const locale of ['zh-CN', 'zh-TW', 'en-US', 'ja-JP']) {
+    for (const locale of ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT']) {
       const messages = JSON.parse(read(`src/renderer/i18n/locales/${locale}.json`))
       expect(messages.aiConfig.openaiBaseURLHint).toBeTruthy()
       expect(messages.aiConfig.openaiBaseURLHint).toContain('/v1')

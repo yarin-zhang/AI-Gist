@@ -5,7 +5,7 @@
 /**
  * 支持的语言类型
  */
-export type SupportedLocale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP';
+export type SupportedLocale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP' | 'it-IT';
 
 export type ShortcutAction = 'copy' | 'paste';
 

@@ -12,7 +12,9 @@ import {
     dateZhCN,
     dateZhTW,
     dateEnUS,
-    dateJaJP
+    dateJaJP,
+    itIT,
+    dateItIT
 } from 'naive-ui'
 import { IonApp, IonRouterOutlet } from '@ionic/vue'
 import { useTheme } from '~/composables/useTheme'
@@ -47,6 +49,8 @@ const naiveLocale = computed(() => {
             return zhTW
         case 'ja-JP':
             return jaJP
+        case 'it-IT':
+            return itIT
         default:
             return enUS
     }
@@ -60,6 +64,8 @@ const naiveDateLocale = computed(() => {
             return dateZhTW
         case 'ja-JP':
             return dateJaJP
+        case 'it-IT':
+            return dateItIT
         default:
             return dateEnUS
     }

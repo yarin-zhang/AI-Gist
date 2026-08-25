@@ -80,7 +80,8 @@
         "backgroundColor": "#1E293B",
         "languages": [
             "zh-CN",
-            "en-US"
+            "en-US",
+            "it-IT"
         ],
         "artifactName": "AI-Gist-${version}-Windows-Store-${arch}.${ext}"
     },
