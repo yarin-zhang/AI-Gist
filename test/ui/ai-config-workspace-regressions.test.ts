@@ -108,7 +108,7 @@ describe('AI configuration workspace regressions', () => {
   })
 
   it('ships the new workspace copy in every supported locale', () => {
-    for (const locale of ['zh-CN', 'zh-TW', 'en-US', 'ja-JP']) {
+    for (const locale of ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT']) {
       const messages = JSON.parse(readRendererFile(`i18n/locales/${locale}.json`))
       expect(messages.aiConfig.workspace.searchPlaceholder).toBeTruthy()
       expect(messages.aiConfig.workspace.defaultSystemPrompt).toBeTruthy()

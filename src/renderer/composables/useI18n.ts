@@ -11,7 +11,8 @@ export function useI18n() {
     { code: 'zh-CN' as const, name: '简体中文' },
     { code: 'zh-TW' as const, name: '繁體中文' },
     { code: 'en-US' as const, name: 'English' },
-    { code: 'ja-JP' as const, name: '日本語' }
+    { code: 'ja-JP' as const, name: '日本語' },
+    { code: 'it-IT' as const, name: 'Italiano' }
   ]
 
   // 切换语言（用户显式选择，写入本地存储）

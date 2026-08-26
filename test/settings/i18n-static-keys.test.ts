@@ -3,7 +3,7 @@ import { extname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const rendererRoot = resolve(process.cwd(), 'src/renderer');
-const localeNames = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP'] as const;
+const localeNames = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT'] as const;
 const sourceExtensions = new Set(['.vue', '.ts', '.tsx', '.js']);
 
 const collectSourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true })

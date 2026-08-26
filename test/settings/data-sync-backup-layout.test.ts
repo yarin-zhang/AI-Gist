@@ -268,6 +268,7 @@ describe('settings sync and backup information architecture', () => {
       'zh-TW': ['資料同步', '資料備份', '一般設定'],
       'en-US': ['Data Sync', 'Data Backup', 'General Settings'],
       'ja-JP': ['データ同期', 'データバックアップ', '一般設定'],
+      'it-IT': ['Sincronizzazione dati', 'Backup dei dati', 'Impostazioni generali'],
     } as const;
 
     for (const [locale, [syncName, backupName, generalName]] of Object.entries(expected)) {

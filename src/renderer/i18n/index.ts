@@ -3,6 +3,7 @@ import zhCN from './locales/zh-CN.json'
 import zhTW from './locales/zh-TW.json'
 import enUS from './locales/en-US.json'
 import jaJP from './locales/ja-JP.json'
+import itIT from './locales/it-IT.json'
 
 const i18n = createI18n({
   legacy: false, // 使用 Composition API 模式
@@ -13,7 +14,8 @@ const i18n = createI18n({
     'zh-TW': zhTW,
     'en-US': enUS,
     'ja-JP': jaJP,
+    'it-IT': itIT,
   }
 })
 
-export default i18n 
+export default i18n

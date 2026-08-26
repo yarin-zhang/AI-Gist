@@ -36,6 +36,8 @@ describe('detectPreferredLocale', () => {
     ['ja-JP', 'ja-JP'],
     ['en', 'en-US'],
     ['en-GB', 'en-US'],
+    ['it', 'it-IT'],
+    ['it-IT', 'it-IT'],
   ])('把 %s 识别为 %s', (tag, expected) => {
     setNavigatorLanguages([tag])
     expect(detectPreferredLocale()).toBe(expected)
@@ -94,6 +96,7 @@ describe('applyDocumentLocale', () => {
     ['zh-TW', 'zh-Hant'],
     ['ja-JP', 'ja'],
     ['en-US', 'en'],
+    ['it-IT', 'it'],
   ] as const)('把 %s 写成 <html lang="%s">，供 :lang() 选择 CJK 字体', (locale, lang) => {
     applyDocumentLocale(locale)
     expect(document.documentElement.lang).toBe(lang)

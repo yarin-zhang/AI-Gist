@@ -1,6 +1,6 @@
 import type { SupportedLocale } from '@shared/types/preferences'
 
-export const SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP'] as const
+export const SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT'] as const
 
 export const LOCALE_STORAGE_KEY = 'locale'
 /** 标记 locale 是用户显式选择的，而不是自动探测的结果 */
@@ -29,6 +29,7 @@ function matchLocale(tag: string): SupportedLocale | null {
   }
   if (language === 'ja') return 'ja-JP'
   if (language === 'en') return 'en-US'
+  if (language === 'it') return 'it-IT'
   return null
 }
 
@@ -74,7 +75,8 @@ const HTML_LANG_BY_LOCALE: Record<SupportedLocale, string> = {
   'zh-CN': 'zh-Hans',
   'zh-TW': 'zh-Hant',
   'en-US': 'en',
-  'ja-JP': 'ja'
+  'ja-JP': 'ja',
+  'it-IT': 'it'
 }
 
 /** 同步 <html lang>，用于 :lang() 选择 CJK 回退字体，同时改善断行与无障碍朗读 */
