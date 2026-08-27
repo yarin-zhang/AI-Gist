@@ -172,7 +172,10 @@ import EmptyAIConfigIllustration from '~/components/mobile/illustrations/EmptyAI
 // 内部所有原本用于"路由式整页导航"的 router.back()/router.push() 都要改为 emit('close')，
 // 否则会误操作背后的 Tab 路由或残留在历史记录里。
 const props = defineProps<{ presentedAsModal?: boolean }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  close: []
+  navigateToAIConfig: []
+}>()
 
 const { t } = useI18n()
 const router = useRouter()
@@ -267,7 +270,8 @@ const loadConfigs = async () => {
 // 不再先跳到 AI 配置 Tab 列表页再让用户多点一次"新增"（Gitea issue #61）。
 const navigateToAIConfig = () => {
   if (props.presentedAsModal) {
-    emit('close')
+    emit('navigateToAIConfig')
+    return
   }
   router.push('/ai-config/create')
 }

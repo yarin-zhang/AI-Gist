@@ -68,13 +68,17 @@
       :initial-breakpoint="1"
       @didDismiss="showAIGenerator = false"
     >
-      <MobileAIGeneratorPage presented-as-modal @close="showAIGenerator = false" />
+      <MobileAIGeneratorPage
+        presented-as-modal
+        @close="showAIGenerator = false"
+        @navigate-to-ai-config="navigateToAIConfigFromModal"
+      />
     </ion-modal>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import {
   IonPage,
   IonTabs,
@@ -104,6 +108,14 @@ const router = useRouter()
 const showAIGenerator = ref(false)
 const openAIGenerator = () => {
   showAIGenerator.value = true
+}
+
+// 先让模态完成关闭动画，再进入 AI 配置页，避免 close 事件和路由跳转并行造成
+// 残留历史页或重复返回。
+const navigateToAIConfigFromModal = async () => {
+  showAIGenerator.value = false
+  await nextTick()
+  await router.push('/ai-config/create')
 }
 
 // ------------------------------------------------------------------
