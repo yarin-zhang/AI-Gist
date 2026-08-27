@@ -402,6 +402,8 @@
     "syncInterval": "確認間隔",
     "syncIntervalDescription": "現在は {minutes} 分ごとにクラウドの変更を確認します",
     "syncNow": "今すぐ同期",
+    "enableToSync": "同期するにはこの設定を有効にしてください",
+    "enableSuccess": "ストレージ設定を有効にしました",
     "syncResult": {
       "downloaded": "同期が完了しました（本体のデータを更新しました）",
       "merged": "同期が完了しました（本体とクラウドのデータをマージしました）",

@@ -402,6 +402,8 @@
     "syncInterval": "检查间隔",
     "syncIntervalDescription": "当前每 {minutes} 分钟检查一次云端变化",
     "syncNow": "立即同步",
+    "enableToSync": "启用后可同步；当前配置已禁用",
+    "enableSuccess": "存储配置已启用",
     "syncResult": {
       "downloaded": "同步完成，已更新本机数据",
       "merged": "同步完成，已合并本机和云端数据",

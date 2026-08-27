@@ -58,6 +58,9 @@
                                 <NText depth="3" style="font-size: 12px; word-break: break-all;">
                                     {{ getConfigDescription(config) }}
                                 </NText>
+                                <NText v-if="!config.enabled" type="warning" style="font-size: 12px;">
+                                    {{ t('dataSync.enableToSync') }}
+                                </NText>
                             </NFlex>
 
                             <template #action>
@@ -73,11 +76,17 @@
                                             {{ t('dataSync.testConnection') }}
                                         </NButton>
                                     </NFlex>
-                                    <NButton type="primary" size="small" @click="syncCloudData(config.id)"
+                                    <NButton v-if="config.enabled" type="primary" size="small" @click="syncCloudData(config.id)"
                                         :loading="loading.syncNow && syncingStorageId === config.id"
-                                        :disabled="!config.enabled">
+                                        :aria-label="t('dataSync.syncNow')">
                                         <template #icon><NIcon><Refresh /></NIcon></template>
                                         {{ t('dataSync.syncNow') }}
+                                    </NButton>
+                                    <NButton v-else type="warning" size="small" @click="enableStorage(config)"
+                                        :loading="enablingStorageId === config.id"
+                                        :title="t('dataSync.enableToSync')"
+                                        :aria-label="t('dataSync.enableToSync')">
+                                        {{ t('dataSync.enableConfig') }}
                                     </NButton>
                                 </NFlex>
                             </template>
@@ -264,6 +273,7 @@ const syncErrorDialogVisible = ref(false);
 const syncErrorStorageId = ref('');
 const syncErrorDiagnosis = ref<ReturnType<typeof getCloudSyncErrorDiagnosis> | null>(null);
 const loading = ref({ saveConfig: false, testDraft: false, syncNow: false, saveSyncInterval: false });
+const enablingStorageId = ref('');
 let unsubscribeSyncStatus: (() => void) | null = null;
 
 const configForm = ref({
@@ -460,6 +470,23 @@ const saveConfig = async () => {
         console.error('保存存储配置失败:', error);
         message.error(t('dataSync.saveFailed'));
     } finally { loading.value.saveConfig = false; }
+};
+
+const enableStorage = async (config: CloudStorageConfig) => {
+    enablingStorageId.value = config.id;
+    try {
+        const result = await CloudBackupAPI.updateStorageConfig(config.id, { enabled: true });
+        if (!result.success) {
+            message.error(result.error || t('dataSync.saveFailed'));
+            return;
+        }
+        await loadStorageConfigs();
+        cloudSyncService.scheduleSync('config-enabled', { storageId: config.id, delayMs: 0 });
+        message.success(t('dataSync.enableSuccess'));
+    } catch (error) {
+        console.error('启用存储配置失败:', error);
+        message.error(t('dataSync.saveFailed'));
+    } finally { enablingStorageId.value = ''; }
 };
 
 const deleteConfig = async (id: string) => {

@@ -402,6 +402,8 @@
     "syncInterval": "Intervallo di sincronizzazione",
     "syncIntervalDescription": "Attualmente controlla le modifiche al cloud ogni {minutes} minuti",
     "syncNow": "Sincronizza ora",
+    "enableToSync": "Abilita questa configurazione per sincronizzare",
+    "enableSuccess": "Configurazione di archiviazione abilitata",
     "syncResult": {
       "downloaded": "Sincronizzazione completata, i dati locali sono stati aggiornati",
       "merged": "Sincronizzazione completata, i dati locali e cloud sono stati uniti",

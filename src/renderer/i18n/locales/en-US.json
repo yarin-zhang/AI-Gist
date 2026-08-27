@@ -402,6 +402,8 @@
     "syncInterval": "Check interval",
     "syncIntervalDescription": "Currently checks for cloud changes every {minutes} minutes",
     "syncNow": "Sync now",
+    "enableToSync": "Enable this configuration to sync",
+    "enableSuccess": "Storage configuration enabled",
     "syncResult": {
       "downloaded": "Synchronization completed, local data has been updated",
       "merged": "Synchronization completed, local and cloud data have been merged",

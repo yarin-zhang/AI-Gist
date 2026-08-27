@@ -402,6 +402,8 @@
     "syncInterval": "檢查間隔",
     "syncIntervalDescription": "目前每 {minutes} 分鐘檢查一次雲端變化",
     "syncNow": "立即同步",
+    "enableToSync": "啟用後可同步；目前設定已停用",
+    "enableSuccess": "儲存設定已啟用",
     "syncResult": {
       "downloaded": "同步完成，已更新本機資料",
       "merged": "同步完成，已合併本機和雲端資料",
