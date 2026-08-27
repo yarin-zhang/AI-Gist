@@ -7,10 +7,12 @@
         </ion-buttons>
         <ion-title>{{ t('promptManagement.detailModal.detail') }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="toggleFavorite">
+          <ion-button @click="toggleFavorite" :aria-label="t('promptManagement.detailModal.favorite')"
+            :title="t('promptManagement.detailModal.favorite')">
             <ion-icon :icon="prompt?.isFavorite ? heart : heartOutline"></ion-icon>
           </ion-button>
-          <ion-button @click="showActionMenu">
+          <ion-button @click="showActionMenu" :aria-label="t('promptManagement.moreOptions')"
+            :title="t('promptManagement.moreOptions')">
             <ion-icon :icon="ellipsisVertical"></ion-icon>
           </ion-button>
         </ion-buttons>
