@@ -66,7 +66,7 @@
       :is-open="showAIGenerator"
       :breakpoints="[0, 1]"
       :initial-breakpoint="1"
-      @didDismiss="showAIGenerator = false"
+      @didDismiss="handleAIGeneratorDidDismiss"
     >
       <MobileAIGeneratorPage
         presented-as-modal
@@ -106,15 +106,26 @@ const route = useRoute()
 const router = useRouter()
 
 const showAIGenerator = ref(false)
+let resolveAIGeneratorDismiss: (() => void) | null = null
 const openAIGenerator = () => {
   showAIGenerator.value = true
 }
 
-// 先让模态完成关闭动画，再进入 AI 配置页，避免 close 事件和路由跳转并行造成
-// 残留历史页或重复返回。
+const handleAIGeneratorDidDismiss = () => {
+  showAIGenerator.value = false
+  resolveAIGeneratorDismiss?.()
+  resolveAIGeneratorDismiss = null
+}
+
+// 先等待模态完成关闭动画，再进入 AI 配置页，避免 close 事件和路由跳转并行造成
+// 残留历史页或重复返回。Ionic 的 didDismiss 才代表遮罩和页面栈真正清理完成。
 const navigateToAIConfigFromModal = async () => {
+  const dismissed = new Promise<void>(resolve => {
+    resolveAIGeneratorDismiss = resolve
+  })
   showAIGenerator.value = false
   await nextTick()
+  await dismissed
   await router.push('/ai-config/create')
 }
 
