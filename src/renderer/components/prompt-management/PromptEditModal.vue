@@ -465,7 +465,7 @@
                 <div>
                     <NFlex size="small">
                         <NButton @click="closePreviewModal">{{ t('common.close') }}</NButton>
-                        <NButton type="primary" @click="rollbackToHistory(previewHistory!); closePreviewModal();">
+                        <NButton type="primary" @click="rollbackToHistory(previewHistory!, closePreviewModal)">
                             {{ t('promptManagement.rollbackToVersion') }}
                         </NButton>
                     </NFlex>
@@ -1396,7 +1396,7 @@ const closePreviewModal = () => {
 };
 
 // 回滚到历史版本
-const rollbackToHistory = (history: PromptHistory) => {
+const applyHistoryRollback = (history: PromptHistory) => {
     try {
         // 设置初始化标志，防止递归更新
         isInitializing.value = true;
@@ -1438,6 +1438,18 @@ const rollbackToHistory = (history: PromptHistory) => {
     }
 };
 
+const rollbackToHistory = (history: PromptHistory, onConfirmed?: () => void) => {
+    dialog.warning({
+        title: t('common.confirm'),
+        content: t('promptManagement.rollbackConfirmation'),
+        positiveText: t('common.confirm'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: () => {
+            applyHistoryRollback(history);
+            onConfirmed?.();
+        },
+    });
+};
 // 获取分类名称
 const getCategoryName = (categoryId: any) => {
     if (!categoryId) return t('promptManagement.noCategory');
