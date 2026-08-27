@@ -257,30 +257,40 @@
                                 </template>
                                 {{ t('dataManagement.repairDatabase') }}
                             </NButton>
-                            <NPopconfirm @positive-click="handleClearDatabase" :negative-text="t('common.cancel')"
-                                :positive-text="t('dataManagement.clearDatabase')" placement="top">
-                                <template #trigger>
-                                    <NButton type="error" :loading="loading.clearDatabase">
-                                        <template #icon>
-                                            <NIcon>
-                                                <DatabaseOff />
-                                            </NIcon>
-                                        </template>
-                                        {{ t('dataManagement.clearDatabase') }}
-                                    </NButton>
-                                </template>
-                                <div style="max-width: 350px;">
-                                    <p><strong>{{ t('dataManagement.clearDatabaseWarning') }}</strong></p>
-                                    <p>{{ t('dataManagement.clearDatabaseWarningText') }}</p>
-                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                        <li v-for="item in t('dataManagement.clearDatabaseWarningItems')" :key="item">{{
-                                            item }}
-                                        </li>
-                                    </ul>
-                                    <p><strong>{{ t('dataManagement.confirmClearDatabase') }}</strong></p>
-                                </div>
-                            </NPopconfirm>
                         </NFlex>
+                        <NCollapse>
+                            <NCollapseItem :title="t('dataManagement.advancedDangerZone')" name="clear-database">
+                                <NAlert type="error" show-icon>
+                                    <template #header>{{ t('dataManagement.clearDatabaseWarning') }}</template>
+                                    <p>{{ t('dataManagement.clearDatabaseWarningText') }}</p>
+                                    <ul class="clear-database-impact">
+                                        <li>{{ t('dataManagement.clearDatabaseImpactLocal') }}</li>
+                                        <li>{{ t('dataManagement.clearDatabaseImpactCloud') }}</li>
+                                        <li>{{ t('dataManagement.clearDatabaseImpactSync') }}</li>
+                                    </ul>
+                                </NAlert>
+                                <NPopconfirm @positive-click="handleClearDatabase" @negative-click="clearConfirmWord = ''"
+                                    :negative-text="t('common.cancel')" :positive-text="t('dataManagement.clearDatabase')"
+                                    :positive-button-props="{ disabled: clearConfirmWord !== clearDatabaseConfirmationWord }"
+                                    placement="top">
+                                    <template #trigger>
+                                        <NButton type="error" :loading="loading.clearDatabase">
+                                            <template #icon>
+                                                <NIcon><DatabaseOff /></NIcon>
+                                            </template>
+                                            {{ t('dataManagement.clearDatabase') }}
+                                        </NButton>
+                                    </template>
+                                    <div style="max-width: 350px;">
+                                        <p><strong>{{ t('dataManagement.confirmClearDatabase') }}</strong></p>
+                                        <p>{{ t('dataManagement.clearDatabaseConfirmationHint', { word: clearDatabaseConfirmationWord }) }}</p>
+                                        <NInput v-model:value="clearConfirmWord"
+                                            :placeholder="t('dataManagement.clearDatabaseConfirmationPlaceholder', { word: clearDatabaseConfirmationWord })"
+                                            autocomplete="off" />
+                                    </div>
+                                </NPopconfirm>
+                            </NCollapseItem>
+                        </NCollapse>
                     </NFlex>
                 </NFlex>
             </div>
@@ -394,6 +404,7 @@ import {
     NCollapseItem,
     NSwitch,
     NInputNumber,
+    NInput,
     NSelect,
     useMessage,
 } from "naive-ui";
@@ -437,6 +448,8 @@ const capabilities = PlatformDetector.getCapabilities();
 const emit = defineEmits<{ 'navigate-section': [section: string] }>();
 
 const activeBackupLocation = ref('local');
+const clearDatabaseConfirmationWord = 'CLEAR';
+const clearConfirmWord = ref('');
 const storageConfigs = ref<CloudStorageConfig[]>([]);
 const CUSTOM_AUTO_BACKUP_INTERVAL = 'custom' as const;
 type AutoBackupIntervalSelection = number | typeof CUSTOM_AUTO_BACKUP_INTERVAL;
@@ -593,7 +606,9 @@ const handleRepairDatabase = async () => {
 };
 
 const handleClearDatabase = async () => {
+    if (clearConfirmWord.value !== clearDatabaseConfirmationWord) return;
     await clearDatabase();
+    clearConfirmWord.value = '';
 };
 
 const loadStorageConfigs = async () => {
