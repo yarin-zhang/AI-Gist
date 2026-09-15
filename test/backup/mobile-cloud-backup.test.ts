@@ -760,7 +760,7 @@ describe('MobileCloudBackupService', () => {
         dataType: 'file',
         data: btoa(String.fromCharCode(...bytes))
       })
-      expect(put.headers['If-Match']).toBe('"v1"')
+      expect(put.headers['If-Match']).toBe('v1')
     })
 
     it('拒绝路径穿越及 sync-v2 命名空间之外的访问', async () => {
