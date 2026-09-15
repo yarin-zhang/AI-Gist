@@ -449,6 +449,8 @@ let folderLoadRequestId = 0
 let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let realtimeRefreshPending = false
 let realtimeRefreshPromise: Promise<void> | null = null
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+const SEARCH_DEBOUNCE_MS = 250
 
 // 排序相关状态
 const sortType = ref<'timeDesc' | 'timeAsc' | 'useCount' | 'favorite'>('timeDesc') // 默认按时间倒序排序
@@ -1203,15 +1205,19 @@ const loadCategories = async (includeStatistics = true) => {
 
 // 事件处理
 const handleSearch = () => {
-    // 重置页码
-    currentPage.value = 1
-    if (viewMode.value === 'table') {
-        loadPromptsForTable()
-    } else if (viewMode.value === 'tree') {
-        loadFolderData()
-    } else {
-        loadPrompts(true) // 重置加载
-    }
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => {
+        searchTimer = null
+        // 重置页码
+        currentPage.value = 1
+        if (viewMode.value === 'table') {
+            loadPromptsForTable()
+        } else if (viewMode.value === 'tree') {
+            loadFolderData()
+        } else {
+            loadPrompts(true) // 重置加载
+        }
+    }, SEARCH_DEBOUNCE_MS)
 }
 
 // 监听排序方式变化
@@ -1691,6 +1697,7 @@ const hasValidImage = (prompt: PromptWithRelations) => {
 // 组件卸载时清理URL缓存
 onBeforeUnmount(() => {
     unsubscribeDataChanges()
+    if (searchTimer) clearTimeout(searchTimer)
     if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
     // 清理所有创建的Blob URL
     imageUrlCache.forEach(url => {
