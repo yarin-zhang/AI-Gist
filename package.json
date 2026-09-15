@@ -112,5 +112,8 @@
         "uuid": "^11.1.0",
         "webdav": "^5.5.0"
     },
-    "packageManager": "yarn@4.9.2"
+    "packageManager": "yarn@4.9.2",
+    "resolutions": {
+        "app-builder-lib@npm:25.1.8": "patch:app-builder-lib@npm%3A25.1.8#~/.yarn/patches/app-builder-lib-npm-25.1.8-4ade675052.patch"
+    }
 }
