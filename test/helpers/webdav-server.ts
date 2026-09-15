@@ -15,6 +15,7 @@ export interface WebDAVServerOptions {
   username?: string
   password?: string
   rootDir?: string
+  etagFormat?: 'quoted' | 'unquoted'
 }
 
 // ---- XML 工具 ----
@@ -54,12 +55,14 @@ export class TestWebDAVServer {
   readonly rootDir: string
   private username: string
   private password: string
+  private etagFormat: 'quoted' | 'unquoted'
   readonly port: number
 
   constructor(opts: WebDAVServerOptions = {}) {
     this.port     = opts.port     ?? 18765
     this.username = opts.username ?? 'testuser'
     this.password = opts.password ?? 'testpass'
+    this.etagFormat = opts.etagFormat ?? 'quoted'
     this.rootDir  = opts.rootDir  ?? fs.mkdtempSync(path.join(os.tmpdir(), 'ai-gist-webdav-'))
     this.server   = this.createServer()
   }
@@ -93,7 +96,9 @@ export class TestWebDAVServer {
   }
 
   get baseUrl(): string {
-    return `http://127.0.0.1:${this.port}`
+    const address = this.server.address()
+    const port = address && typeof address !== 'string' ? address.port : this.port
+    return `http://127.0.0.1:${port}`
   }
 
   // ---- HTTP 服务器 ----
@@ -171,7 +176,7 @@ export class TestWebDAVServer {
       isDir: stat.isDirectory(),
       size:  stat.size,
       mtime: stat.mtime,
-      etag:  createEtag(stat),
+      etag:  createEtag(stat, this.etagFormat),
     })
 
     // depth=1 时列出子项
@@ -186,7 +191,7 @@ export class TestWebDAVServer {
           isDir: childStat.isDirectory(),
           size:  childStat.size,
           mtime: childStat.mtime,
-          etag:  createEtag(childStat),
+          etag:  createEtag(childStat, this.etagFormat),
         })
       }
     }
@@ -208,7 +213,7 @@ export class TestWebDAVServer {
     const data = await fsp.readFile(fsPath)
     res.writeHead(200, {
       'Content-Length': String(data.length),
-      'ETag': createEtag(stat),
+      'ETag': createEtag(stat, this.etagFormat),
     })
     res.end(data)
   }
@@ -222,7 +227,7 @@ export class TestWebDAVServer {
 
     const ifMatch = req.headers['if-match']
     if (typeof ifMatch === 'string') {
-      if (!existingStat || createEtag(existingStat) !== ifMatch) {
+      if (!existingStat || createEtag(existingStat, this.etagFormat) !== ifMatch) {
         res.writeHead(412); res.end(); return
       }
     }
@@ -232,7 +237,7 @@ export class TestWebDAVServer {
     await fsp.writeFile(fsPath, body)
     const nextStat = await fsp.stat(fsPath)
     res.writeHead(existingStat ? 204 : 201, {
-      'ETag': createEtag(nextStat),
+      'ETag': createEtag(nextStat, this.etagFormat),
     }); res.end()
   }
 
@@ -264,8 +269,9 @@ export class TestWebDAVServer {
 
 // ---- 工具函数 ----
 
-function createEtag(stat: fs.Stats): string {
-  return `"${stat.size}-${Math.floor(stat.mtimeMs)}"`
+function createEtag(stat: fs.Stats, format: 'quoted' | 'unquoted'): string {
+  const token = `${stat.size}-${Math.floor(stat.mtimeMs)}`
+  return format === 'quoted' ? `"${token}"` : token
 }
 
 function readBody(req: http.IncomingMessage): Promise<Buffer> {

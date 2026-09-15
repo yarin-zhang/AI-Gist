@@ -3002,6 +3002,49 @@ __metadata:
   languageName: node
   linkType: hard
 
+"app-builder-lib@patch:app-builder-lib@npm%3A25.1.8#~/.yarn/patches/app-builder-lib-npm-25.1.8-4ade675052.patch":
+  version: 25.1.8
+  resolution: "app-builder-lib@patch:app-builder-lib@npm%3A25.1.8#~/.yarn/patches/app-builder-lib-npm-25.1.8-4ade675052.patch::version=25.1.8&hash=442db1"
+  dependencies:
+    "@develar/schema-utils": "npm:~2.6.5"
+    "@electron/notarize": "npm:2.5.0"
+    "@electron/osx-sign": "npm:1.3.1"
+    "@electron/rebuild": "npm:3.6.1"
+    "@electron/universal": "npm:2.0.1"
+    "@malept/flatpak-bundler": "npm:^0.4.0"
+    "@types/fs-extra": "npm:9.0.13"
+    async-exit-hook: "npm:^2.0.1"
+    bluebird-lst: "npm:^1.0.9"
+    builder-util: "npm:25.1.7"
+    builder-util-runtime: "npm:9.2.10"
+    chromium-pickle-js: "npm:^0.2.0"
+    config-file-ts: "npm:0.2.8-rc1"
+    debug: "npm:^4.3.4"
+    dotenv: "npm:^16.4.5"
+    dotenv-expand: "npm:^11.0.6"
+    ejs: "npm:^3.1.8"
+    electron-publish: "npm:25.1.7"
+    form-data: "npm:^4.0.0"
+    fs-extra: "npm:^10.1.0"
+    hosted-git-info: "npm:^4.1.0"
+    is-ci: "npm:^3.0.0"
+    isbinaryfile: "npm:^5.0.0"
+    js-yaml: "npm:^4.1.0"
+    json5: "npm:^2.2.3"
+    lazy-val: "npm:^1.0.5"
+    minimatch: "npm:^10.0.0"
+    resedit: "npm:^1.7.0"
+    sanitize-filename: "npm:^1.6.3"
+    semver: "npm:^7.3.8"
+    tar: "npm:^6.1.12"
+    temp-file: "npm:^3.4.0"
+  peerDependencies:
+    dmg-builder: 25.1.8
+    electron-builder-squirrel-windows: 25.1.8
+  checksum: 10c0/20bdcda08212533f363c03d0c9b42ca3bda30fa7ec545db5c7f00ba78aaba794fd5eabc77f66b5351585b06e5e7ec04c48e4d1434da2316169118f2cfef87ed6
+  languageName: node
+  linkType: hard
+
 "aproba@npm:^1.0.3 || ^2.0.0":
   version: 2.1.0
   resolution: "aproba@npm:2.1.0"

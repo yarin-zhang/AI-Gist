@@ -71,7 +71,7 @@ import { WebCloudBackupService } from '~/lib/services/web-cloud-backup.service'
 import { DatabaseServiceManager } from '~/lib/services/database-manager.service'
 import { WebDAVProvider } from '../../src/main/cloud/webdav-provider'
 import { CloudSyncService } from '~/lib/services/cloud-sync.service'
-import { CapacitorHttp } from '@capacitor/core'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import {
   assertValidCloudSyncManifest,
@@ -582,6 +582,9 @@ function setupWebDavRequestProxy() {
     username?: string
     password?: string
     body?: string
+    bodyBase64?: string
+    headers?: Record<string, string>
+    responseType?: string
     contentType?: string
   }) => {
     const { default: http } = await import('http')
@@ -593,13 +596,15 @@ function setupWebDavRequestProxy() {
         ? 'Basic ' + Buffer.from(`${opts.username}:${opts.password ?? ''}`).toString('base64')
         : undefined
 
-      const headers: Record<string, string> = {}
+      const headers: Record<string, string> = { ...opts.headers }
       if (auth) headers['Authorization'] = auth
       if (opts.contentType) headers['Content-Type'] = opts.contentType
 
       let bodyBuf: Buffer | undefined
-      if (opts.body !== undefined) {
-        bodyBuf = Buffer.from(opts.body, 'utf-8')
+      if (opts.body !== undefined || opts.bodyBase64 !== undefined) {
+        bodyBuf = opts.bodyBase64 !== undefined
+          ? Buffer.from(opts.bodyBase64, 'base64')
+          : Buffer.from(opts.body!, 'utf-8')
         headers['Content-Length'] = String(bodyBuf.length)
       }
 
@@ -614,7 +619,8 @@ function setupWebDavRequestProxy() {
         res.on('data', (c: Buffer) => chunks.push(c))
         res.on('end', () => resolve({
           status: res.statusCode ?? 0,
-          body: Buffer.concat(chunks).toString('utf-8'),
+          body: Buffer.concat(chunks).toString(opts.responseType === 'base64' ? 'base64' : 'utf-8'),
+          headers: res.headers,
         }))
       })
 
@@ -640,7 +646,7 @@ function setupHttpProxy() {  mockHttp.request.mockImplementation(async (opts: an
       let bodyBuf: Buffer | undefined
       if (opts.data !== undefined) {
         const raw = typeof opts.data === 'string' ? opts.data : JSON.stringify(opts.data)
-        bodyBuf = Buffer.from(raw, 'utf-8')
+        bodyBuf = Buffer.from(raw, opts.dataType === 'file' ? 'base64' : 'utf-8')
         headers['Content-Length'] = String(bodyBuf.length)
       }
 
@@ -663,7 +669,8 @@ function setupHttpProxy() {  mockHttp.request.mockImplementation(async (opts: an
           } catch {
             // Keep plain text responses as-is.
           }
-          resolve({ status: res.statusCode ?? 0, data })
+          if (opts.responseType === 'arraybuffer') data = Buffer.concat(chunks).toString('base64')
+          resolve({ status: res.statusCode ?? 0, data, headers: res.headers })
         })
       })
 
@@ -767,6 +774,72 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
   // ----------------------------------------------------------------
 
   describe('WebDAVProvider（桌面端）', () => {
+    it.each((['quoted', 'unquoted'] as const).flatMap(etagFormat =>
+      ['ios', 'android'].map(platform => ({ etagFormat, platform })),
+    ))(
+      '保留 $etagFormat ETag，桌面与 $platform 连续互写并拒绝过期更新',
+      async ({ etagFormat, platform }) => {
+        vi.spyOn(Capacitor, 'getPlatform').mockReturnValue(platform)
+        const conditionalServer = new TestWebDAVServer({ port: 0, etagFormat })
+        await conditionalServer.start()
+        try {
+          const config = {
+            id: 'etag-roundtrip', name: 'ETag roundtrip', type: 'webdav' as const,
+            enabled: true, url: conditionalServer.baseUrl,
+            username: USERNAME, password: PASSWORD,
+            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          }
+          const desktop = new WebDAVProvider(config)
+          const otherDevice = new WebDAVProvider(config)
+          const filePath = '/AI-Gist-Backup/sync-v2/conditional.json'
+          await desktop.initializeDirectories()
+          await desktop.createDirectory('/AI-Gist-Backup/sync-v2')
+          const first = await desktop.writeFile(filePath, Buffer.from('first'), { ifNoneMatch: true })
+          expect(first.etag).toBeTruthy()
+          expect(first.etag!.startsWith('"')).toBe(etagFormat === 'quoted')
+
+          const info = await otherDevice.getFileInfo(filePath)
+          expect(info).toMatchObject({ path: filePath, name: 'conditional.json', size: 5, etag: first.etag })
+          expect(await desktop.listFiles('/AI-Gist-Backup/sync-v2')).toEqual(expect.arrayContaining([
+            expect.objectContaining({ path: filePath, etag: first.etag }),
+          ]))
+
+          const second = await desktop.writeFile(filePath, Buffer.from('second version'), { ifMatch: first.etag })
+          expect(second.etag).not.toBe(first.etag)
+          await expect(otherDevice.writeFile(filePath, Buffer.from('stale'), { ifMatch: info!.etag }))
+            .rejects.toThrow(/412|Precondition/)
+          await expect(otherDevice.writeFile(filePath, Buffer.from('duplicate'), { ifNoneMatch: true }))
+            .rejects.toThrow(/412|Precondition|已存在/)
+          expect((await desktop.readFile(filePath)).toString()).toBe('second version')
+          await Preferences.set({ key: 'cloud_backup_configs', value: JSON.stringify([config]) })
+          const mobile = MobileCloudBackupService.getInstance()
+          const mobileCopy = await mobile.readCloudSyncV2Object(config.id, filePath)
+          expect(mobileCopy?.etag).toBe(second.etag)
+          expect(Buffer.from(mobileCopy!.data).toString()).toBe('second version')
+          const mobileWrite = await mobile.writeCloudSyncV2Object(
+            config.id, filePath, Buffer.from('mobile update'), { expectedEtag: mobileCopy!.etag },
+          )
+          expect(mobileWrite.status).toBe('written')
+          expect(mobileWrite.etag).toBeTruthy()
+          await expect(desktop.writeFile(filePath, Buffer.from('stale desktop'), { ifMatch: second.etag }))
+            .rejects.toThrow(/412|Precondition/)
+          const refreshed = await desktop.getFileInfo(filePath)
+          expect(refreshed?.etag).toBe(mobileWrite.etag)
+          await desktop.writeFile(filePath, Buffer.from('third version is longer'), { ifMatch: refreshed!.etag })
+          expect(await mobile.writeCloudSyncV2Object(
+            config.id, filePath, Buffer.from('stale mobile'), { expectedEtag: mobileWrite.etag },
+          )).toMatchObject({ status: 'precondition_failed' })
+          expect(Buffer.from((await mobile.readCloudSyncV2Object(config.id, filePath))!.data).toString())
+            .toBe('third version is longer')
+          expect((await otherDevice.readFile(filePath)).toString()).toBe('third version is longer')
+          await desktop.deleteFile(filePath)
+          expect(await desktop.getFileInfo(filePath)).toBeNull()
+        } finally {
+          await conditionalServer.stop()
+        }
+      },
+    )
+
     it('正确凭据连接会执行真实写入、读取和删除校验', async () => {
       const provider = new WebDAVProvider({
         id: 'desktop-cfg',

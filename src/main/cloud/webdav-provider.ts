@@ -185,7 +185,7 @@ export class WebDAVProvider implements CloudStorageProvider {
       // 如果没有指定路径，使用默认路径 /
       const targetPath = this.normalizeRemotePath(dirPath || CONSTANTS.DEFAULT_PATHS.DEFAULT_DIR, true);
       const contents: any = await this.withRequestTimeout(
-        signal => this.client.getDirectoryContents(targetPath, { signal }),
+        signal => this.client.getDirectoryContents(targetPath, { signal, details: true }),
         '列出文件'
       );
       const files = Array.isArray(contents) ? contents : contents.data || [];
@@ -287,13 +287,14 @@ export class WebDAVProvider implements CloudStorageProvider {
   async getFileInfo(filePath: string): Promise<CloudFileInfo | null> {
     await this.ensureClient();
     try {
-      const stat: any = await this.withRequestTimeout(
+      const response: any = await this.withRequestTimeout(
         // Request detailed properties so we retain the wire ETag. webdav's
-        // shorthand `etag` field strips quotes, which breaks providers such
-        // as Jianguoyun that return unquoted ETags.
+        // shorthand `etag` field strips quotes; If-Match needs the server's
+        // original representation, whether quoted or unquoted.
         signal => this.client.stat(this.normalizeRemotePath(filePath), { signal, details: true }),
         '获取文件信息'
       );
+      const stat = response?.data ?? response;
       if (!stat) {
         return null;
       }
@@ -400,9 +401,9 @@ export class WebDAVProvider implements CloudStorageProvider {
       size: item.size || 0,
       isDirectory: item.type === 'directory',
       modifiedAt: item.lastmod || new Date().toISOString(),
-      etag: typeof item.etag === 'string'
-        ? item.etag
-        : (typeof item.props?.getetag === 'string' ? item.props.getetag : undefined),
+      etag: typeof item.props?.getetag === 'string'
+        ? item.props.getetag
+        : (typeof item.etag === 'string' ? item.etag : undefined),
     };
   }
 
@@ -424,10 +425,11 @@ export class WebDAVProvider implements CloudStorageProvider {
 
   private async verifyRemoteWrite(filePath: string, expectedData: Buffer): Promise<CloudFileWriteResult> {
     try {
-      const stat: any = await this.withRequestTimeout(
-        signal => this.client.stat(filePath, { signal }),
+      const response: any = await this.withRequestTimeout(
+        signal => this.client.stat(filePath, { signal, details: true }),
         '校验远端文件'
       );
+      const stat = response?.data ?? response;
       if (stat?.type === 'directory') {
         throw new Error('远端路径是目录，不是文件');
       }
@@ -438,9 +440,7 @@ export class WebDAVProvider implements CloudStorageProvider {
       }
 
       return {
-        etag: typeof stat?.etag === 'string'
-          ? stat.etag
-          : (typeof stat?.props?.getetag === 'string' ? stat.props.getetag : undefined),
+        etag: stat ? this.mapFileInfo(stat).etag : undefined,
         modifiedAt: typeof stat?.lastmod === 'string' ? stat.lastmod : undefined
       };
     } catch (error) {
