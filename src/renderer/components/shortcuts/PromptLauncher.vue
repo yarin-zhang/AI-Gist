@@ -400,18 +400,20 @@ async function findPrompt(promptUUID: string): Promise<PromptWithRelations | nul
 
 async function handleInvocation(invocation: ShortcutInvocation): Promise<void> {
   executionError.value = '';
-  if (invocation.kind === 'launcher') {
-    await window.electronAPI.shortcuts.hideLauncher();
-    mode.value = 'search';
-    query.value = '';
-    selectedIndex.value = 0;
-    await loadData();
-    await nextTick();
-    await window.electronAPI.shortcuts.showLauncher();
-    await nextTick();
-    searchInput.value?.focus();
-    searchInput.value?.select();
-    return;
+    if (invocation.kind === 'launcher') {
+      await window.electronAPI.shortcuts.hideLauncher();
+      mode.value = 'search';
+      query.value = '';
+      selectedIndex.value = 0;
+      // 显示窗口不应等待数据库查询完成。Windows 下后台渲染器可能被节流，
+      // 先显示空的启动器，再异步加载结果，避免快捷键唤起延迟数秒。
+      await nextTick();
+      await window.electronAPI.shortcuts.showLauncher();
+      await loadData();
+      await nextTick();
+      searchInput.value?.focus();
+      searchInput.value?.select();
+      return;
   }
   if (!invocation.promptUUID) return;
   const prompt = await findPrompt(invocation.promptUUID);
