@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlertTriangle, CircleCheck, Clock, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
+import { AlertTriangle, CircleCheck, Cloud, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
@@ -52,8 +52,10 @@ const visualState = computed(() => {
 
 const statusIcon = computed(() => {
   if (visualState.value === 'syncing') return Refresh;
-  if (visualState.value === 'scheduled') return Clock;
-  if (visualState.value === 'attention') return Clock;
+  // A scheduled check or automatic retry is still a healthy cloud-sync state.
+  // Keep the cloud glyph so a long wait does not look like a stuck timer.
+  if (visualState.value === 'scheduled') return Cloud;
+  if (visualState.value === 'attention') return Cloud;
   if (visualState.value === 'error') return AlertTriangle;
   if (visualState.value === 'success') return CircleCheck;
   return CloudOff;

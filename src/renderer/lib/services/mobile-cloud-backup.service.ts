@@ -1030,11 +1030,9 @@ export class MobileCloudBackupService {
 
   private normalizeIfMatchHeaderValue(etag: string): string {
     const value = String(etag || '').trim()
-    if (!value || value === '*' || value.startsWith('"') || value.startsWith('W/"')) {
-      return value
-    }
-
-    return `"${value.replace(/^"+|"+$/g, '')}"`
+    // Keep the exact ETag representation returned by the server. Jianguoyun
+    // returns unquoted tokens, while other WebDAV servers return quoted ETags.
+    return value
   }
 
   private async listWebDAVSyncSnapshots(config: any): Promise<CloudSyncRemoteSnapshotInfo[]> {

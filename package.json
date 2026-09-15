@@ -1,6 +1,6 @@
 {
     "name": "ai-gist",
-    "version": "2.1.1",
+    "version": "2.1.2",
     "buildRevision": 1,
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
@@ -112,5 +112,8 @@
         "uuid": "^11.1.0",
         "webdav": "^5.5.0"
     },
-    "packageManager": "yarn@4.9.2"
+    "packageManager": "yarn@4.9.2",
+    "resolutions": {
+        "app-builder-lib@npm:25.1.8": "patch:app-builder-lib@npm%3A25.1.8#~/.yarn/patches/app-builder-lib-npm-25.1.8-4ade675052.patch"
+    }
 }
