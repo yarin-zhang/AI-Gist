@@ -288,7 +288,10 @@ export class WebDAVProvider implements CloudStorageProvider {
     await this.ensureClient();
     try {
       const stat: any = await this.withRequestTimeout(
-        signal => this.client.stat(this.normalizeRemotePath(filePath), { signal }),
+        // Request detailed properties so we retain the wire ETag. webdav's
+        // shorthand `etag` field strips quotes, which breaks providers such
+        // as Jianguoyun that return unquoted ETags.
+        signal => this.client.stat(this.normalizeRemotePath(filePath), { signal, details: true }),
         '获取文件信息'
       );
       if (!stat) {
@@ -458,11 +461,11 @@ export class WebDAVProvider implements CloudStorageProvider {
 
   private normalizeIfMatchHeaderValue(etag: string): string {
     const value = etag.trim();
-    if (!value || value === '*' || value.startsWith('"') || value.startsWith('W/"')) {
-      return value;
-    }
-
-    return `"${value.replace(/^"+|"+$/g, '')}"`;
+    // WebDAV servers are expected to quote ETags, but Jianguoyun returns the
+    // token without quotes. The webdav package also strips quotes while
+    // parsing PROPFIND responses. Preserve the server representation so the
+    // conditional request matches both standard and non-standard servers.
+    return value;
   }
 
   private normalizeRemotePath(remotePath: string, allowRoot = false): string {

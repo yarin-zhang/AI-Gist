@@ -33,6 +33,8 @@ describe('prompt realtime sync details', () => {
     const routineScheduled = indicator.indexOf("status.value.status === 'scheduled') return 'scheduled'", priorSuccess)
 
     expect(indicator).toContain('CircleCheck')
+    expect(indicator).toContain('Cloud')
+    expect(indicator).not.toContain('Clock')
     expect(pendingScheduled).toBeGreaterThan(-1)
     expect(priorSuccess).toBeGreaterThan(pendingScheduled)
     expect(routineScheduled).toBeGreaterThan(priorSuccess)
