@@ -1,0 +1,142 @@
+name: Windows SignPath test (no release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing_policy_slug:
+        description: 'Existing SignPath test policy slug (not the release policy)'
+        required: true
+        type: string
+      artifact_configuration_slug:
+        description: 'Existing SignPath ZIP artifact configuration slug'
+        required: true
+        type: string
+      certificate_thumbprint:
+        description: '40-character SHA-1 thumbprint of the test certificate, copied from SignPath'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  test-signing:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check test signing configuration
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          TEST_POLICY: ${{ inputs.signing_policy_slug }}
+          RELEASE_POLICY: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          ARTIFACT_CONFIGURATION: ${{ inputs.artifact_configuration_slug }}
+          TEST_CERTIFICATE: ${{ inputs.certificate_thumbprint }}
+          RELEASE_CERTIFICATE: ${{ vars.SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT }}
+        run: |
+          foreach ($name in @('SIGNPATH_API_TOKEN', 'SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT_SLUG', 'TEST_POLICY', 'ARTIFACT_CONFIGURATION')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing test signing configuration: $name"
+            }
+          }
+          if ($env:TEST_CERTIFICATE -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw 'Copy the 40-character test certificate thumbprint from SignPath.'
+          }
+          if ($env:TEST_POLICY -eq $env:RELEASE_POLICY -or $env:TEST_CERTIFICATE -eq $env:RELEASE_CERTIFICATE) {
+            throw 'Test signing must use a separate policy and certificate from production.'
+          }
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - run: python -m pip install setuptools wheel
+      - run: yarn install --frozen-lockfile
+
+      - name: Build unsigned Windows installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          node scripts/build.js
+          yarn electron-builder --config config/electron-builder.json --win --publish never
+
+      - name: Upload unsigned installer for origin verification
+        id: unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-windows-installer-test
+          path: dist/AI-Gist-*-Windows-Setup.exe
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Submit test signing request
+        id: signing
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ inputs.signing_policy_slug }}
+          artifact-configuration-slug: ${{ inputs.artifact_configuration_slug }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-test
+
+      - name: Verify test signature on the disposable runner
+        shell: pwsh
+        env:
+          EXPECTED_CERTIFICATE: ${{ inputs.certificate_thumbprint }}
+          SIGNING_REQUEST_URL: ${{ steps.signing.outputs.signing-request-web-url }}
+        run: |
+          $installers = @(Get-ChildItem dist/signed-test -Filter 'AI-Gist-*-Windows-Setup.exe' -Recurse)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one signed test installer.' }
+          $installer = $installers[0]
+          $sig = Get-AuthenticodeSignature $installer.FullName
+          if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $env:EXPECTED_CERTIFICATE) {
+            throw 'Signed installer does not match the test certificate configured in SignPath.'
+          }
+          # Trust only the independently pinned test certificate, only on this
+          # disposable runner, then remove it even when verification fails.
+          $certPath = "Cert:\CurrentUser\Root\$($sig.SignerCertificate.Thumbprint)"
+          $alreadyTrusted = Test-Path $certPath
+          try {
+            if (-not $alreadyTrusted) {
+              $certFile = Join-Path $env:RUNNER_TEMP 'signpath-test.cer'
+              [IO.File]::WriteAllBytes($certFile, $sig.SignerCertificate.RawData)
+              Import-Certificate -FilePath $certFile -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+            }
+            $verified = Get-AuthenticodeSignature $installer.FullName
+            if ($verified.Status -ne 'Valid') {
+              throw "Test installer failed Authenticode verification: $($verified.Status) $($verified.StatusMessage)"
+            }
+            $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash
+            @(
+              '### Test signing verified (not for distribution)',
+              "Request: $env:SIGNING_REQUEST_URL",
+              "Certificate: $env:EXPECTED_CERTIFICATE",
+              "Installer SHA256: $hash",
+              'Authenticode: Valid with the pinned test certificate temporarily trusted on this runner.'
+            ) | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          } finally {
+            if (-not $alreadyTrusted -and (Test-Path $certPath)) { Remove-Item $certPath }
+          }
+          Rename-Item $installer.FullName ($installer.Name -replace '\.exe$', '-test-signed.exe')
+
+      - name: Upload verified test installer (not for distribution)
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-test-signed-not-for-distribution
+          path: dist/signed-test/**/*-test-signed.exe
+          if-no-files-found: error
+          retention-days: 7

@@ -482,6 +482,7 @@ jobs:
           SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
           SIGNPATH_PROJECT_SLUG: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT: ${{ vars.SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT }}
         run: |
           $missing = @()
           if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN)) { $missing += 'SIGNPATH_API_TOKEN' }
@@ -490,6 +491,9 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_SIGNING_POLICY_SLUG)) { $missing += 'SIGNPATH_SIGNING_POLICY_SLUG' }
 
           if ($missing.Count -eq 0) {
+            if ($env:SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT -notmatch '^[0-9A-Fa-f]{40}$') {
+              throw 'Set SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT to the production certificate thumbprint before enabling release signing. Use windows-signing-test.yml for test certificates.'
+            }
             "available=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
             "### Windows 签名状态：✅ 将提交 SignPath 签名请求" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           } else {
@@ -513,7 +517,7 @@ jobs:
 
       - name: Submit Windows installer to SignPath
         if: steps.signpath.outputs.available == 'true'
-        uses: signpath/github-action-submit-signing-request@v2
+        uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
@@ -530,6 +534,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
           SIGNED: ${{ steps.signpath.outputs.available }}
+          SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT: ${{ vars.SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT }}
         run: |
           if ($env:SIGNED -eq 'true') {
             $installer = Get-ChildItem -Path dist/signed -Filter 'AI-Gist-*-Windows-Setup.exe' -Recurse | Select-Object -First 1
@@ -538,6 +543,9 @@ jobs:
             }
 
             $sig = Get-AuthenticodeSignature -FilePath $installer.FullName
+            if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $env:SIGNPATH_RELEASE_CERTIFICATE_THUMBPRINT) {
+              throw 'Signed installer does not match the configured production certificate.'
+            }
             if ($sig.Status -ne 'Valid') {
               throw "Signed installer failed Authenticode verification: $($sig.Status) $($sig.StatusMessage)"
             }
