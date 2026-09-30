@@ -268,7 +268,7 @@ describe('desktop packaging', () => {
 
     expect(workflow).toContain("if: steps.mac-signing.outputs.available != 'true'");
     expect(workflow).toContain("if: steps.signpath.outputs.available == 'true'");
-    expect(workflow).toContain('signpath/github-action-submit-signing-request@v2');
+    expect(workflow).toContain('signpath/github-action-submit-signing-request@v3');
     expect(workflow).toContain('publishing an unsigned compatibility build');
   });
 });

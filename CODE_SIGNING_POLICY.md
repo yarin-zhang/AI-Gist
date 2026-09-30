@@ -2,7 +2,7 @@
 
 AI Gist uses free code signing provided by [SignPath.io](https://signpath.io/), with a certificate issued to [SignPath Foundation](https://signpath.org/), for official Windows releases. Official macOS releases are signed with an Apple Developer ID Application certificate and notarized by Apple when the required Apple Developer credentials are available.
 
-Older releases and builds produced while either onboarding process is pending may be unsigned. The release notes identify that status. Only artifacts produced by the repository's GitHub Actions release workflow are eligible for signing.
+Older releases and builds produced while either onboarding process is pending may be unsigned. The release notes identify that status. Only artifacts produced by the repository's GitHub Actions release workflow are eligible for production signing. The separate Windows SignPath test workflow may submit onboarding artifacts using a test certificate; these are retained only as short-lived Actions artifacts and are not distributed as releases.
 
 ## Build provenance
 
