@@ -6,6 +6,7 @@
         :variable-count="jinjaActiveNames.length"
         :show-variables-button="compactInspector" :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
         @update:content="$emit('update:content', $event)" @select-variable="selectVariable"
+        @variable-inserted="selectedJinjaVariable = $event"
         @request-add-variable="addJinjaVariable" @request-open-variables="showInspectorDrawer = true">
         <template #toolbar-prefix>
           <div class="template-status" :class="{ invalid: !templateValidation.isValid }">
@@ -60,7 +61,8 @@
       @request-add="addJinjaVariable" @request-insert="insertVariableToTemplate"
       @request-remove="removeJinjaVariableByName" @update-variable="updateJinjaVariable" />
 
-    <NDrawer v-model:show="showInspectorDrawer" :width="360" placement="right">
+    <NDrawer v-model:show="showInspectorDrawer" :width="360" placement="right"
+      @after-leave="restoreEditorFocusAfterDrawer">
       <NDrawerContent :title="t('promptEditor.variables')" closable body-content-style="padding: 0; overflow: hidden;">
         <VariableInspector :variables="jinjaVariables" :active-names="jinjaActiveNames"
           :occurrences="jinjaOccurrenceCounts" :selected-variable="selectedJinjaVariable" jinja
@@ -160,6 +162,7 @@ const templateValidation = ref<{ isValid: boolean; error?: string }>({ isValid: 
 let resizeObserver: ResizeObserver | null = null
 let validationTimer: number | null = null
 let syncingFromProps = false
+let focusEditorAfterDrawer = false
 
 const cloneVariables = (variables: JinjaVariable[]) => variables.map(variable => ({
   ...variable,
@@ -303,7 +306,15 @@ const addJinjaVariable = () => {
 
 const insertVariableToTemplate = (name: string) => {
   structuredEditorRef.value?.insertVariable(name)
+  if (!showInspectorDrawer.value) return
+  // The drawer returns focus to its trigger on close; hand it back to the editor afterwards.
+  focusEditorAfterDrawer = true
   showInspectorDrawer.value = false
+}
+
+const restoreEditorFocusAfterDrawer = () => {
+  if (focusEditorAfterDrawer) structuredEditorRef.value?.focus()
+  focusEditorAfterDrawer = false
 }
 
 const removeJinjaVariableByName = (name: string) => {

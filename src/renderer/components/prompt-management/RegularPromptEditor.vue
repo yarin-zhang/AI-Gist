@@ -5,7 +5,8 @@
         :selected-variable="selectedVariable" :readonly="isStreaming"
         :show-variables-button="compactInspector"
         :placeholder="t('promptManagement.contentPlaceholder')" @update:content="handleContentUpdate"
-        @select-variable="selectVariable" @request-add-variable="addVariable"
+        @select-variable="selectVariable" @variable-inserted="selectedVariable = $event"
+        @request-add-variable="addVariable"
         @request-open-variables="showInspectorDrawer = true" />
 
       <QuickOptimizationActions ref="quickOptimizationRef" :content="content"
@@ -22,7 +23,8 @@
       @select="selectVariable" @request-add="addVariable" @request-insert="insertExistingVariable"
       @request-remove="removeVariable" @update-variable="updateVariable" />
 
-    <NDrawer v-model:show="showInspectorDrawer" :width="360" placement="right">
+    <NDrawer v-model:show="showInspectorDrawer" :width="360" placement="right"
+      @after-leave="restoreEditorFocusAfterDrawer">
       <NDrawerContent :title="t('promptEditor.variables')" closable body-content-style="padding: 0; overflow: hidden;">
         <VariableInspector :variables="localVariables" :active-names="parsed.variableNames"
           :occurrences="occurrenceCounts" :selected-variable="selectedVariable" :readonly="isStreaming"
@@ -75,6 +77,7 @@ const compactInspector = ref(false)
 const showInspectorDrawer = ref(false)
 let resizeObserver: ResizeObserver | null = null
 let variableCache = new Map<string, EditablePromptVariable>()
+let focusEditorAfterDrawer = false
 
 const parsed = computed(() => parsePromptTemplate(props.content))
 const localVariables = computed(() => reconcilePromptVariables(props.content, [
@@ -133,7 +136,15 @@ const selectVariable = (name: string) => {
 
 const insertExistingVariable = (name: string) => {
   structuredEditorRef.value?.insertVariable(name)
+  if (!showInspectorDrawer.value) return
+  // The drawer returns focus to its trigger on close; hand it back to the editor afterwards.
+  focusEditorAfterDrawer = true
   showInspectorDrawer.value = false
+}
+
+const restoreEditorFocusAfterDrawer = () => {
+  if (focusEditorAfterDrawer) structuredEditorRef.value?.focus()
+  focusEditorAfterDrawer = false
 }
 
 const updateVariable = ({ previousName, variable }: { previousName: string; variable: EditablePromptVariable }) => {
