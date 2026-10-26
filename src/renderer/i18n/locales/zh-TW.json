@@ -1160,6 +1160,8 @@
     "templateVariable": "模板變量",
     "text": "文字",
     "title": "AI 提示詞",
+    "titleLabel": "標題",
+    "updatedLabel": "更新時間",
     "titlePlaceholder": "請輸入提示詞標題（可選）",
     "titleRequired": "請輸入標題",
     "totalCategories": "共 {count} 個分類",

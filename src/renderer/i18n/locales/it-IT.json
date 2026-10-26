@@ -1160,6 +1160,8 @@
     "templateVariable": "Variabile del modello",
     "text": "Testo",
     "title": "Prompt AI",
+    "titleLabel": "Titolo",
+    "updatedLabel": "Aggiornato",
     "titlePlaceholder": "Inserisci il titolo del prompt (facoltativo)",
     "titleRequired": "Inserisci un titolo",
     "totalCategories": "Totale categorie {count}",

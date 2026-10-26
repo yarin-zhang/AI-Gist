@@ -1160,6 +1160,8 @@
     "templateVariable": "テンプレート変数",
     "text": "テキスト",
     "title": "AIプロンプト",
+    "titleLabel": "タイトル",
+    "updatedLabel": "更新日",
     "titlePlaceholder": "プロンプトのタイトルを入力してください（オプション）",
     "titleRequired": "タイトルを入力してください",
     "totalCategories": "合計{count}カテゴリ",
