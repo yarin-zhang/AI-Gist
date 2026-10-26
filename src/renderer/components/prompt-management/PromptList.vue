@@ -207,10 +207,11 @@
                 @manage-categories="$emit('manage-categories')" />
 
             <!-- 表格视图 -->
-            <div v-else-if="viewMode === 'table'" class="data-view-surface table-view-table">
+            <div v-else-if="viewMode === 'table'" ref="tableContainerRef" class="data-view-surface table-view-table">
                 <NDataTable :columns="redesignedTableColumns" :data="prompts" :loading="initialLoading || loadingMore"
                     :row-key="(row: PromptWithRelations) => row.id!" v-model:checked-row-keys="selectedRowKeys"
-                    :pagination="tablePagination" flex-height style="height: 100%" :scroll-x="980"
+                    :pagination="tablePagination" flex-height style="height: 100%" :scroll-x="tableScrollX"
+                    :scrollbar-props="{ trigger: 'none' }"
                     :row-props="getTableRowProps" remote />
             </div>
 
@@ -383,6 +384,7 @@ import {
 import { api } from '@/lib/api'
 import { useI18n } from 'vue-i18n'
 import { useTagColors } from '@/composables/useTagColors'
+import { useElementWidth } from '@/composables/useElementWidth'
 import { useDatabase } from '@/composables/useDatabase'
 import { getRuntimeVariables, renderPromptContent } from '@/lib/utils/prompt-runtime'
 import { recordPromptUsage } from '@/lib/utils/prompt-usage'
@@ -600,12 +602,12 @@ const renderPromptIdentity = (prompt: PromptWithRelations) => h(
 
 const renderCategoryCell = (prompt: PromptWithRelations) => {
     if (!prompt.category) return h(NText, { depth: 3 }, { default: () => t('promptManagement.noCategory') })
-    return h('span', { class: 'table-category-cell' }, [
+    return h('span', { class: 'table-category-cell', title: prompt.category.name }, [
         h('span', {
             class: 'category-color-dot',
             style: { background: prompt.category.color || 'var(--content-secondary)' }
         }),
-        prompt.category.name
+        h('span', { class: 'table-category-name' }, prompt.category.name)
     ])
 }
 
@@ -941,43 +943,64 @@ const tableColumns = computed(() => [
     }
 ])
 
+// 表格列宽按容器宽度分档：标题列吸收剩余空间，容器放不下时先隐藏「更新时间」，再隐藏「标签」；
+// 仍然放不下时横向滚动，选择列固定在左、行操作固定在右，固定列的阴影提示右侧还有内容。
+// titleMin 是横向滚动前标题列的下限，titleComfortable 是决定是否隐藏次要列时为标题保留的宽度。
+const TABLE_COLUMN_WIDTH = { selection: 42, titleMin: 240, titleComfortable: 320, category: 160, tags: 190, updatedAt: 120, actions: 126 }
+const TABLE_TAGS_MIN_WIDTH = TABLE_COLUMN_WIDTH.selection + TABLE_COLUMN_WIDTH.titleComfortable
+    + TABLE_COLUMN_WIDTH.category + TABLE_COLUMN_WIDTH.tags + TABLE_COLUMN_WIDTH.actions
+const TABLE_UPDATED_AT_MIN_WIDTH = TABLE_TAGS_MIN_WIDTH + TABLE_COLUMN_WIDTH.updatedAt
+
+const tableContainerRef = ref<HTMLElement>()
+const tableContainerWidth = useElementWidth(tableContainerRef)
+// 宽度未测得（0）时按宽屏处理，避免首帧闪一下窄布局
+const showTableTagsColumn = computed(() => !tableContainerWidth.value || tableContainerWidth.value >= TABLE_TAGS_MIN_WIDTH)
+const showTableUpdatedAtColumn = computed(() => !tableContainerWidth.value || tableContainerWidth.value >= TABLE_UPDATED_AT_MIN_WIDTH)
+
 const redesignedTableColumns = computed(() => {
     const source = tableColumns.value
     const titleFor = (key: string, fallback: string) => source.find(column => column.key === key)?.title || fallback
     return [
-        { type: 'selection' as const, width: 42 },
+        { type: 'selection' as const, width: TABLE_COLUMN_WIDTH.selection, fixed: 'left' as const },
         {
             title: titleFor('title', t('promptManagement.title')),
             key: 'title',
-            width: 420,
+            minWidth: TABLE_COLUMN_WIDTH.titleMin,
             render: renderPromptIdentity
         },
         {
             title: titleFor('category', t('promptManagement.category')),
             key: 'category',
-            width: 160,
+            width: TABLE_COLUMN_WIDTH.category,
             render: renderCategoryCell
         },
-        {
+        ...(showTableTagsColumn.value ? [{
             title: titleFor('tags', t('promptManagement.tags')),
             key: 'tags',
-            width: 190,
+            width: TABLE_COLUMN_WIDTH.tags,
             render: renderTagsCell
-        },
-        {
+        }] : []),
+        ...(showTableUpdatedAtColumn.value ? [{
             title: titleFor('updatedAt', t('promptManagement.update')),
             key: 'updatedAt',
-            width: 120,
+            width: TABLE_COLUMN_WIDTH.updatedAt,
             render: (row: PromptWithRelations) => formatDate(row.updatedAt)
-        },
+        }] : []),
         {
             title: '',
             key: 'actions',
-            width: 126,
+            width: TABLE_COLUMN_WIDTH.actions,
+            fixed: 'right' as const,
             render: renderRowActions
         }
     ]
 })
+
+// 横向滚动宽度 = 当前可见列的最小宽度之和；容器更宽时标题列自动撑满
+const tableScrollX = computed(() => redesignedTableColumns.value.reduce(
+    (total, column) => total + (('width' in column ? column.width : column.minWidth) || 0),
+    0
+))
 
 // 加载文件夹视图数据。根目录默认只展示未分类提示词；存在内容筛选时跨分类展示结果。
 const applyFolderLocation = (categoryId = selectedCategory.value) => {
@@ -1867,6 +1890,7 @@ defineExpose({
 .data-view-surface :deep(.table-prompt-title) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .data-view-surface :deep(.table-prompt-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.data-view-surface :deep(.table-category-name) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .data-view-surface :deep(.category-color-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .data-view-surface :deep(.table-tags) { overflow: hidden; }
 .data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }

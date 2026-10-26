@@ -1249,6 +1249,7 @@
     "selectModelFirst": "利用可能な AI モデルを選択してください",
     "selectMultiple": "複数選択",
     "selectedCount": "{count} 件選択中",
+    "showLibrary": "プロンプト一覧を表示",
     "sortBy": "並び順",
     "sortCreated": "作成日時",
     "sortTitle": "タイトル",

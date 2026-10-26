@@ -1249,6 +1249,7 @@
     "selectModelFirst": "Select an available AI model first",
     "selectMultiple": "Select multiple",
     "selectedCount": "{count} selected",
+    "showLibrary": "Show prompt list",
     "sortBy": "Sort by",
     "sortCreated": "Recently created",
     "sortTitle": "Title",

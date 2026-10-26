@@ -26,10 +26,12 @@
             </div>
         </header>
 
-        <div class="prompt-page-content">
+        <div ref="pageContentRef" class="prompt-page-content">
             <template v-if="displayMode === 'workspace'">
+                <!-- 窄宽度下切成单栏：两个面板始终挂载，只切换显示，避免编辑中的内容因布局变化被卸载 -->
                 <NSplit v-model:size="libraryPaneSize" direction="horizontal" min="220px" max="420px"
-                    :resize-trigger-size="1" class="workspace-shell-split">
+                    :resize-trigger-size="1" :disabled="compactWorkspace" :pane1-style="libraryPaneStyle"
+                    :pane2-style="detailPaneStyle" class="workspace-shell-split">
                     <template #1>
                         <PromptLibrarySidebar :prompts="prompts" :categories="categories"
                             :selected-id="selectedPrompt?.id" :loading="loading" @select="handleSelectPrompt"
@@ -42,13 +44,22 @@
 
                     <template #2>
                         <PromptWorkspace ref="workspaceRef" :prompt="selectedPrompt" :categories="categories"
-                            :mode="workspaceMode" :draft="selectedDraft" @request-mode="handleRequestMode"
+                            :mode="workspaceMode" :draft="selectedDraft" :show-library-toggle="compactWorkspace"
+                            @open-library="libraryDrawerOpen = true" @request-mode="handleRequestMode"
                             @update:draft="updateSelectedDraft" @updated="handlePromptUpdated" @saved="handlePromptSaved"
                             @toggle-favorite="toggleFavorite" @delete="handleDeletePrompt" @create="handleCreatePrompt"
                             @cancel-edit="handleCancelNewPrompt"
                             @open-quick-optimization-config="showQuickOptimizationModal = true" />
                     </template>
                 </NSplit>
+
+                <NDrawer v-model:show="libraryDrawerOpen" placement="left" :width="libraryDrawerWidth">
+                    <div class="library-drawer-body">
+                        <PromptLibrarySidebar :prompts="prompts" :categories="categories"
+                            :selected-id="selectedPrompt?.id" :loading="loading" @select="handleDrawerSelectPrompt"
+                            @manage-categories="showCategoryManagement = true" @batch-delete="handleBatchDelete" />
+                    </div>
+                </NDrawer>
             </template>
 
             <div v-else class="legacy-view-surface">
@@ -85,7 +96,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
+import { NButton, NDrawer, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
 import { Folder, GridDots, LayoutSidebarRight, List, Plus } from '@vicons/tabler'
 import { PromptNavigationIcon } from '@/theme/navigation-icons'
 import type { Category, PromptWithRelations } from '@shared/types/database'
@@ -98,6 +109,7 @@ import QuickOptimizationConfigModal from '@/components/ai/QuickOptimizationConfi
 import PromptList from '@/components/prompt-management/PromptList.vue'
 import { api } from '@/lib/api'
 import { useDatabase } from '@/composables/useDatabase'
+import { useElementWidth } from '@/composables/useElementWidth'
 import { onDataChange } from '@/lib/services/data-change-events'
 
 const emit = defineEmits<{
@@ -118,6 +130,20 @@ const storedLibraryPaneSize = localStorage.getItem('prompt_library_pane_size')
 const libraryPaneSize = ref(storedLibraryPaneSize && /^\d+(\.\d+)?px$/.test(storedLibraryPaneSize)
     ? storedLibraryPaneSize
     : '268px')
+// 内容区放不下「列表栏最小宽度 + 可读的详情」时切成单栏：
+// 未选中提示词时列表占满，选中后详情占满，列表收进左侧抽屉
+const COMPACT_WORKSPACE_MAX_WIDTH = 760
+const pageContentRef = ref<HTMLElement>()
+const pageContentWidth = useElementWidth(pageContentRef)
+const compactWorkspace = computed(() => pageContentWidth.value > 0 && pageContentWidth.value < COMPACT_WORKSPACE_MAX_WIDTH)
+const libraryDrawerOpen = ref(false)
+const libraryDrawerWidth = computed(() => Math.min(320, Math.max(0, pageContentWidth.value - 48)))
+const showLibraryOnly = computed(() => compactWorkspace.value && !selectedPrompt.value && workspaceMode.value !== 'edit')
+const libraryPaneStyle = computed(() => {
+    if (!compactWorkspace.value) return undefined
+    return showLibraryOnly.value ? { flex: '1 1 auto', minWidth: 0 } : { display: 'none' }
+})
+const detailPaneStyle = computed(() => (showLibraryOnly.value ? { display: 'none' } : undefined))
 const showCategoryManagement = ref(false)
 const showQuickOptimizationModal = ref(false)
 const showWorkspaceModal = ref(false)
@@ -259,6 +285,11 @@ const handleSelectPrompt = async (prompt: PromptWithRelations) => {
     selectedPrompt.value = prompt
     workspaceMode.value = 'use'
     if (prompt.id) localStorage.setItem('prompt_workspace_last_id', String(prompt.id))
+}
+
+const handleDrawerSelectPrompt = async (prompt: PromptWithRelations) => {
+    await handleSelectPrompt(prompt)
+    if (selectedPrompt.value?.id === prompt.id) libraryDrawerOpen.value = false
 }
 
 const setDisplayMode = async (mode: PromptDisplayMode) => {
@@ -470,6 +501,7 @@ onBeforeUnmount(() => {
 })
 
 watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', String(size)))
+watch(compactWorkspace, compact => { if (!compact) libraryDrawerOpen.value = false })
 </script>
 
 <style scoped>
@@ -512,6 +544,7 @@ watch(libraryPaneSize, size => localStorage.setItem('prompt_library_pane_size', 
 .workspace-shell-split :deep(.n-split__resize-trigger-wrapper)::before { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
 .workspace-resize-line { width: 1px; height: 100%; background: var(--border-default); transition: background-color .12s ease; }
 .workspace-shell-split :deep(.n-split__resize-trigger-wrapper:hover) .workspace-resize-line { background: var(--border-strong); }
+.library-drawer-body { height: 100%; display: flex; min-height: 0; background: var(--surface-primary); }
 .legacy-view-surface { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; padding: var(--page-padding); }
 
 @media (max-width: 1120px) {

@@ -1249,6 +1249,7 @@
     "selectModelFirst": "请先选择可用的 AI 模型",
     "selectMultiple": "多选管理",
     "selectedCount": "已选择 {count} 条",
+    "showLibrary": "显示提示词列表",
     "sortBy": "排序方式",
     "sortCreated": "创建时间",
     "sortTitle": "标题",
