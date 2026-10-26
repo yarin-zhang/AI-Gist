@@ -153,16 +153,34 @@ export function createVariable(name: string): EditablePromptVariable {
   }
 }
 
+// A variable whose properties differ from createVariable() carries user intent and
+// must survive being removed from the text; a bare name does not.
+export function isVariableConfigured(variable: EditablePromptVariable): boolean {
+  return variable.type !== 'text'
+    || variable.required === false
+    || Boolean(variable.defaultValue)
+    || Boolean(variable.placeholder)
+    || Boolean(variable.description)
+    || Boolean(variable.options?.length)
+    || Boolean(variable.validation && Object.values(variable.validation).some(value => value !== undefined && value !== ''))
+}
+
+export interface ReconcileOptions {
+  /** Decides whether a variable no longer referenced by the text stays as "unused". Defaults to keeping all. */
+  retainUnused?: (variable: EditablePromptVariable) => boolean
+}
+
 export function reconcilePromptVariables(
   content: string,
-  variables: EditablePromptVariable[] = []
+  variables: EditablePromptVariable[] = [],
+  { retainUnused = () => true }: ReconcileOptions = {}
 ): ReconciledPromptVariables {
   const parsed = parsePromptTemplate(content)
   const existing = new Map(variables.filter(variable => variable.name).map(variable => [variable.name, variable]))
   const active = parsed.variableNames.map(name => cloneVariable(existing.get(name) || createVariable(name)))
   const activeNames = new Set(parsed.variableNames)
-  const unused = variables
-    .filter(variable => variable.name && !activeNames.has(variable.name))
+  const unused = Array.from(existing.values())
+    .filter(variable => !activeNames.has(variable.name) && retainUnused(variable))
     .map(cloneVariable)
 
   return { active, unused, all: [...active, ...unused] }

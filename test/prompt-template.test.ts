@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { PromptWithRelations } from '../src/shared/types/database'
+import type { EditablePromptVariable } from '../src/renderer/lib/utils/prompt-template'
 import {
   createPromptDraft,
+  createVariable,
   getActivePromptVariables,
   getMissingPromptVariables,
+  isVariableConfigured,
   normalizeVariableType,
   parsePromptTemplate,
   reconcilePromptVariables,
@@ -56,6 +59,29 @@ describe('prompt template core', () => {
       { name: 'topic', type: 'text', required: true },
     ])
     expect(reconciled.unused).toMatchObject([{ name: 'old' }])
+  })
+
+  it('drops transient names typed into a placeholder but keeps created or configured ones', () => {
+    const retained = new Set(['Variable 1'])
+    const retainUnused = (variable: EditablePromptVariable) => retained.has(variable.name) || isVariableConfigured(variable)
+    let variables: EditablePromptVariable[] = [createVariable('Variable 1')]
+
+    for (const typed of ['t', 'to', 'top', 'topi', 'topic', 'a', 'au', 'audience']) {
+      variables = reconcilePromptVariables(`Write about {{${typed}}}`, variables, { retainUnused }).all
+    }
+    expect(variables.map(variable => variable.name)).toEqual(['audience', 'Variable 1'])
+
+    const configured = { ...createVariable('tone'), type: 'select', options: ['Formal'] }
+    const reconciled = reconcilePromptVariables('{{voice}}', [configured, createVariable('draft')], { retainUnused })
+    expect(reconciled.unused.map(variable => variable.name)).toEqual(['tone'])
+  })
+
+  it('treats any non-default property as a configured variable', () => {
+    expect(isVariableConfigured(createVariable('name'))).toBe(false)
+    expect(isVariableConfigured({ ...createVariable('name'), description: 'Who' })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), required: false })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), type: 'textarea' })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), validation: {} })).toBe(false)
   })
 
   it('renames and removes every occurrence atomically', () => {

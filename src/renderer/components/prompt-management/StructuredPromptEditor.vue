@@ -107,6 +107,13 @@ const displayedVariableCount = computed(() => (
 const readonlyCompartment = new Compartment()
 let editorView: EditorView | null = null
 let lastSelection = EditorSelection.cursor(props.content.length)
+let pendingContentSync = false
+
+const flushContentSync = (view: EditorView) => {
+  if (!pendingContentSync || view.composing || view !== editorView) return
+  pendingContentSync = false
+  emit('update:content', view.state.doc.toString())
+}
 
 interface DecorationState {
   visual: boolean
@@ -258,7 +265,13 @@ onMounted(() => {
       editorTheme,
       EditorView.updateListener.of(update => {
         if (update.selectionSet) lastSelection = update.state.selection
-        if (update.docChanged) emit('update:content', update.state.doc.toString())
+        if (update.docChanged) pendingContentSync = true
+        // IME composition puts raw pinyin into the document; sync only the committed text.
+        if (!update.view.composing) flushContentSync(update.view)
+      }),
+      EditorView.domEventHandlers({
+        // CodeMirror may apply the committed text without another update, so flush after it settles.
+        compositionend: (_event, view) => { setTimeout(() => flushContentSync(view)) },
       }),
     ],
   })

@@ -40,8 +40,8 @@ import { useI18n } from 'vue-i18n'
 import { NDrawer, NDrawerContent } from 'naive-ui'
 import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
 import {
-  createVariable, parsePromptTemplate, reconcilePromptVariables, removeVariableOccurrences,
-  replaceVariableName,
+  createVariable, isVariableConfigured, parsePromptTemplate, reconcilePromptVariables,
+  removeVariableOccurrences, replaceVariableName,
 } from '@/lib/utils/prompt-template'
 import StructuredPromptEditor from './StructuredPromptEditor.vue'
 import VariableInspector from './VariableInspector.vue'
@@ -74,25 +74,42 @@ const selectedVariable = ref('')
 const compactInspector = ref(false)
 const showInspectorDrawer = ref(false)
 let resizeObserver: ResizeObserver | null = null
+// Remembers each variable's last configuration so a placeholder that is retyped gets it back.
 let variableCache = new Map<string, EditablePromptVariable>()
+// Names the user created, renamed to, or that arrived from the stored prompt. Only these
+// (or configured variables) stay listed as "unused" once they leave the text; names that
+// merely appeared while typing a placeholder are dropped.
+const retainedNames = new Set<string>()
+let lastEmittedNames = ''
+
+const namesKey = (variables: EditablePromptVariable[]) => variables.map(variable => variable.name).join('\n')
+const retainUnused = (variable: EditablePromptVariable) => (
+  retainedNames.has(variable.name) || isVariableConfigured(variable)
+)
+const emitVariables = (variables: EditablePromptVariable[], source: 'auto' | 'user') => {
+  lastEmittedNames = namesKey(variables)
+  emit('update:variables', variables, source)
+}
 
 const parsed = computed(() => parsePromptTemplate(props.content))
 const localVariables = computed(() => reconcilePromptVariables(props.content, [
   ...props.variables,
   ...Array.from(variableCache.values()).filter(cached => !props.variables.some(variable => variable.name === cached.name)),
-]).all)
+], { retainUnused }).all)
 const occurrenceCounts = computed(() => Object.fromEntries(
   Array.from(parsed.value.occurrences.entries()).map(([name, occurrences]) => [name, occurrences.length])
 ))
 
 watch(() => props.variables, variables => {
+  // Anything other than the echo of our own emit comes from the stored prompt or the parent.
+  if (namesKey(variables) !== lastEmittedNames) variables.forEach(variable => retainedNames.add(variable.name))
   variables.forEach(variable => variableCache.set(variable.name, { ...variable, options: [...(variable.options || [])] }))
 }, { deep: true, immediate: true })
 
 watch(() => props.content, () => {
-  const reconciled = reconcilePromptVariables(props.content, localVariables.value)
+  const reconciled = reconcilePromptVariables(props.content, localVariables.value, { retainUnused })
   reconciled.all.forEach(variable => variableCache.set(variable.name, variable))
-  emit('update:variables', reconciled.all, 'auto')
+  emitVariables(reconciled.all, 'auto')
   if (selectedVariable.value && !reconciled.all.some(variable => variable.name === selectedVariable.value)) {
     selectedVariable.value = reconciled.active[0]?.name || reconciled.unused[0]?.name || ''
   }
@@ -121,7 +138,8 @@ const addVariable = () => {
   const name = generateUniqueVariableName()
   const next = createVariable(name)
   variableCache.set(name, next)
-  emit('update:variables', [...localVariables.value, next], 'user')
+  retainedNames.add(name)
+  emitVariables([...localVariables.value, next], 'user')
   selectedVariable.value = name
   nextTick(() => structuredEditorRef.value?.insertVariable(name))
 }
@@ -140,16 +158,19 @@ const updateVariable = ({ previousName, variable }: { previousName: string; vari
   const nextVariables = localVariables.value.map(item => item.name === previousName ? variable : item)
   variableCache.delete(previousName)
   variableCache.set(variable.name, variable)
+  retainedNames.delete(previousName)
+  retainedNames.add(variable.name)
   if (variable.name !== previousName) {
     emit('update:content', replaceVariableName(props.content, previousName, variable.name))
     selectedVariable.value = variable.name
   }
-  emit('update:variables', nextVariables, 'user')
+  emitVariables(nextVariables, 'user')
 }
 
 const removeVariable = (name: string) => {
   variableCache.delete(name)
-  emit('update:variables', localVariables.value.filter(variable => variable.name !== name), 'user')
+  retainedNames.delete(name)
+  emitVariables(localVariables.value.filter(variable => variable.name !== name), 'user')
   if (parsed.value.occurrences.has(name)) emit('update:content', removeVariableOccurrences(props.content, name))
   const remaining = localVariables.value.filter(variable => variable.name !== name)
   selectedVariable.value = remaining[0]?.name || ''
