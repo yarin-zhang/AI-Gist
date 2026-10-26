@@ -808,6 +808,7 @@
     "liveResult": "即時結果",
     "progress": "已填寫 {filled}/{total}",
     "result": "最終結果",
+    "unfilledHint": "未填寫：{name}，點擊前往填寫",
     "viewMode": "使用檢視"
   },
   "promptManagement": {
@@ -1219,6 +1220,7 @@
     "categories": "分類",
     "clickToEdit": "點擊可編輯",
     "completeRequired": "請先完成必填變數",
+    "completeRequiredCount": "還有 {count} 個必填變數未填寫",
     "continueEditing": "繼續編輯",
     "copiedAndRecorded": "已複製提示詞並記錄本次使用",
     "copyPrompt": "複製提示詞",
@@ -1257,6 +1259,7 @@
     "sortUpdated": "最近更新",
     "sortUsage": "使用次數",
     "tableView": "表格",
+    "unfilledCount": "{count} 項未填寫",
     "unsavedChanges": "有未儲存的變更",
     "unsavedChangesMessage": "目前編輯內容尚未儲存。放棄後無法恢復這些變更。",
     "use": "使用",

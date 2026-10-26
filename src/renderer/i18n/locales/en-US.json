@@ -808,6 +808,7 @@
     "liveResult": "Live result",
     "progress": "{filled}/{total} filled",
     "result": "Final result",
+    "unfilledHint": "Not filled: {name}. Click to fill it in.",
     "viewMode": "Use view"
   },
   "promptManagement": {
@@ -1219,6 +1220,7 @@
     "categories": "Categories",
     "clickToEdit": "Click to edit",
     "completeRequired": "Complete the required variables first",
+    "completeRequiredCount": "{count} required variable is still empty | {count} required variables are still empty",
     "continueEditing": "Continue editing",
     "copiedAndRecorded": "Prompt copied and usage recorded",
     "copyPrompt": "Copy prompt",
@@ -1257,6 +1259,7 @@
     "sortUpdated": "Recently updated",
     "sortUsage": "Usage count",
     "tableView": "Table",
+    "unfilledCount": "{count} not filled",
     "unsavedChanges": "Unsaved changes",
     "unsavedChangesMessage": "Your current edits have not been saved. Discarding them cannot be undone.",
     "use": "Use",

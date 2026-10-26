@@ -23,7 +23,12 @@
           {{ t('promptWorkspace.useHistory') }}
         </NButton>
       </NFlex>
-      <NFlex size="small">
+      <NFlex size="small" align="center">
+        <NButton v-if="unfilledVariables.length" text size="small" class="unfilled-indicator"
+          :type="missingVariables.length ? 'error' : 'warning'" @click="focusFirstUnfilled">
+          <template #icon><NIcon size="16"><AlertCircle /></NIcon></template>
+          {{ t('promptWorkspace.unfilledCount', { count: unfilledVariables.length }) }}
+        </NButton>
         <NButton secondary size="small" @click="openAIRun">
           <template #icon><NIcon size="16"><Robot /></NIcon></template>
           {{ t('promptWorkspace.runWithAI') }}
@@ -95,13 +100,14 @@ import {
   NAlert, NButton, NDrawer, NDrawerContent, NEmpty, NFlex, NIcon, NImage, NTag, NText,
   useMessage,
 } from 'naive-ui'
-import { Copy, History, Robot } from '@vicons/tabler'
+import { AlertCircle, Copy, History, Robot } from '@vicons/tabler'
 import type { PromptWithRelations } from '@shared/types/database'
 import AIModelSelector from '@/components/common/AIModelSelector.vue'
 import { api } from '@/lib/api'
 import {
   createWorkspaceDraft, deriveWorkspaceVariables, getMissingRequiredVariables, renderWorkspacePrompt,
 } from '@/lib/utils/prompt-workspace'
+import { getUnfilledPromptVariables } from '@/lib/utils/prompt-template'
 import { readPromptUsageHistory, recordPromptUsage, type PromptUsageRecord } from '@/lib/utils/prompt-usage'
 import PromptFillCanvas from './PromptFillCanvas.vue'
 
@@ -133,6 +139,7 @@ const historyPromptId = ref<number | null>(null)
 const variables = computed(() => deriveWorkspaceVariables(props.prompt))
 const missingVariables = computed(() => getMissingRequiredVariables(variables.value, props.draft))
 const rendered = computed(() => renderWorkspacePrompt(props.prompt, props.draft, variables.value))
+const unfilledVariables = computed(() => getUnfilledPromptVariables(variables.value, props.draft).map(variable => variable.name))
 const canUse = computed(() => Boolean(rendered.value.content.trim()) && !missingVariables.value.length && !rendered.value.error)
 
 const initializeDraft = () => emit('update:draft', createWorkspaceDraft(variables.value, props.draft))
@@ -178,7 +185,16 @@ const restoreHistory = (record: PromptUsageRecord) => {
 
 const validateUse = async () => {
   const valid = await fillCanvasRef.value?.validateAndFocus()
+  if (missingVariables.value.length) {
+    const count = missingVariables.value.length
+    message.warning(t('promptWorkspace.completeRequiredCount', { count }, count))
+  }
   return valid !== false && canUse.value
+}
+
+const focusFirstUnfilled = () => {
+  const name = missingVariables.value[0] || unfilledVariables.value[0]
+  if (name) fillCanvasRef.value?.focusVariable(name)
 }
 
 const copyText = async (text: string) => {
