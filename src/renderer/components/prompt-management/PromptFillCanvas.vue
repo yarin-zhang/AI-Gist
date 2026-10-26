@@ -53,7 +53,8 @@
             <span v-if="segment.kind === 'text'">{{ segment.text }}</span>
             <PromptVariableField v-else-if="variableByName.get(segment.name)" :variable="variableByName.get(segment.name)!"
               :model-value="values[segment.name]" inline :compact="compact"
-              :first-occurrence="segment.firstOccurrence" :error="showError(segment.name)"
+              :first-occurrence="segment.firstOccurrence" :multiline="multilineStarts.has(segment.start)"
+              :error="showError(segment.name)"
               @update:model-value="updateValue(segment.name, $event)" @blur="markTouched(segment.name)" />
             <span v-else>{{ segment.raw }}</span>
           </template>
@@ -61,7 +62,12 @@
       </template>
 
       <div v-else class="final-prompt-result">
-        <pre>{{ rendered.content }}</pre>
+        <pre><template v-for="(segment, index) in resultSegments" :key="index"><template
+          v-if="segment.kind === 'text'">{{ segment.text }}</template><button v-else type="button"
+          class="unfilled-placeholder" :class="{ required: segment.required }" :data-unfilled-variable="segment.name"
+          :title="t('promptFill.unfilledHint', { name: segment.name })"
+          :aria-label="t('promptFill.unfilledHint', { name: segment.name })"
+          @click="focusVariable(segment.name)">{{ segment.raw }}</button></template></pre>
       </div>
     </div>
 
@@ -78,7 +84,8 @@ import { NAlert, NButton, NIcon, NText } from 'naive-ui'
 import { FileText, Forms } from '@vicons/tabler'
 import type { PromptWithRelations } from '@shared/types/database'
 import {
-  getActivePromptVariables, getMissingPromptVariables, isEmptyPromptValue,
+  buildPromptResultSegments, findMultilineVariableStarts, getActivePromptVariables, getMissingPromptVariables,
+  getUnfilledPromptVariables,
   parsePromptTemplate, renderPrompt,
 } from '@/lib/utils/prompt-template'
 import PromptVariableField from './PromptVariableField.vue'
@@ -104,10 +111,13 @@ const touched = ref(new Set<string>())
 const viewMode = ref<'fill' | 'result'>('fill')
 const variables = computed(() => getActivePromptVariables(props.prompt))
 const parsed = computed(() => parsePromptTemplate(props.prompt.content || ''))
+const multilineStarts = computed(() => findMultilineVariableStarts(props.prompt.content || '', parsed.value.segments))
 const variableByName = computed(() => new Map(variables.value.map(variable => [variable.name, variable])))
 const missing = computed(() => getMissingPromptVariables(variables.value, props.values))
 const rendered = computed(() => renderPrompt(props.prompt, props.values, variables.value))
-const filledCount = computed(() => variables.value.filter(variable => !isEmptyPromptValue(props.values[variable.name])).length)
+const unfilled = computed(() => getUnfilledPromptVariables(variables.value, props.values).map(variable => variable.name))
+const filledCount = computed(() => variables.value.length - unfilled.value.length)
+const resultSegments = computed(() => buildPromptResultSegments(props.prompt, props.values, variables.value))
 
 watch(() => props.prompt.id, () => {
   touched.value = new Set()
@@ -154,6 +164,7 @@ defineExpose({
   renderedContent: computed(() => rendered.value.content),
   renderError: computed(() => rendered.value.error || ''),
   missingVariables: missing,
+  unfilledVariables: unfilled,
 })
 </script>
 
@@ -167,6 +178,12 @@ defineExpose({
 .inline-prompt-document { width: 100%; color: var(--content-primary); font-size: 14px; line-height: var(--line-height-relaxed); white-space: pre-wrap; overflow-wrap: anywhere; }
 .final-prompt-result { width: 100%; }
 .final-prompt-result pre, .jinja-live-result pre { margin: 0; color: var(--content-primary); font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; line-height: var(--line-height-relaxed); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Unfilled variables keep their {{name}} source in the result so a gap is visible before copying. */
+.unfilled-placeholder { display: inline; margin: 0; padding: 0 3px; border: 1px solid color-mix(in srgb, var(--accent-warning) 45%, var(--border-default)); border-radius: var(--radius-control); background: color-mix(in srgb, var(--accent-warning) 14%, var(--surface-primary)); color: var(--content-primary); font: inherit; line-height: inherit; cursor: pointer; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.unfilled-placeholder.required { border-color: color-mix(in srgb, var(--accent-error) 45%, var(--border-default)); background: color-mix(in srgb, var(--accent-error) 12%, var(--surface-primary)); }
+.unfilled-placeholder:hover { background: color-mix(in srgb, var(--accent-warning) 24%, var(--surface-primary)); }
+.unfilled-placeholder.required:hover { background: color-mix(in srgb, var(--accent-error) 20%, var(--surface-primary)); }
+.unfilled-placeholder:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 .jinja-variable-shelf { width: 100%; margin: 0 0 var(--section-gap); padding: var(--content-padding); border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .shelf-description { display: block; margin-top: 2px; font-size: 13px; }
 .jinja-field-grid { margin-top: var(--content-padding); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--content-padding); }
