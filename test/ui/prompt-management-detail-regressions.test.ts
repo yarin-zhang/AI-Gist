@@ -339,11 +339,14 @@ describe('prompt management detail regressions', () => {
 
   it('uses colored category and tag chips in cards without empty taxonomy copy', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const taxonomy = readRendererFile('components/prompt-management/PromptCardTaxonomy.vue')
 
     expect(list).not.toContain('prompt-card-kind')
     expect(list).not.toContain("prompt.isJinjaTemplate ? 'Jinja'")
-    expect(list).toContain(':color="getCategoryTagColor(prompt.category)"')
-    expect(list).toContain('getTagsArray(prompt.tags).slice(0, 2)')
+    expect(list).toContain('<PromptCardTaxonomy :category="prompt.category" :tags="getTagsArray(prompt.tags)">')
+    expect(taxonomy).toContain('<NTag v-if="category"')
+    expect(taxonomy).toContain(':color="getCategoryTagColor(category)"')
+    expect(taxonomy).toContain(':color="getTagColor(tag)"')
     expect(list).not.toContain('<span v-else class="prompt-card-category">')
   })
 
