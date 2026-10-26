@@ -123,6 +123,22 @@ describe('desktop design-system contract', () => {
     expect(globalStyles).not.toContain('-webkit-app-region: no-drag');
   });
 
+  // Gitea #380：上一项的选中底色淡出时，帧被节流就会停在选中色，看起来两项同时选中。
+  it('repaints menu selection changes without color transitions', () => {
+    const globalStyles = readFileSync(resolve(rendererRoot, 'assets/styles/global.css'), 'utf8');
+    const menuRule = (selector: string) => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return globalStyles.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    };
+
+    expect(menuRule('.n-menu .n-menu-item .n-menu-item-content::before')).toMatch(/transition:\s*none/);
+    for (const part of ['.n-menu-item-content__icon', '.n-menu-item-content-header']) {
+      const rule = menuRule(`.n-menu .n-menu-item .n-menu-item-content ${part}`);
+      expect(rule).toContain('transition:');
+      expect(rule).not.toMatch(/\b(?:background-)?color\b/);
+    }
+  });
+
   it('maps desktop and mobile structural surfaces to canonical tokens', () => {
     const themeSource = readFileSync(resolve(rendererRoot, 'theme/index.ts'), 'utf8');
     const mobileStyles = readFileSync(resolve(rendererRoot, 'assets/styles/mobile.css'), 'utf8');

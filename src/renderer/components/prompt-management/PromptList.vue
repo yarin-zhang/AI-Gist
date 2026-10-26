@@ -675,7 +675,7 @@ const tableColumns = computed(() => [
         type: 'selection' as const
     },
     {
-        title: t('promptManagement.title'),
+        title: t('promptManagement.titleLabel'),
         key: 'title',
         width: 200,
         ellipsis: {
@@ -908,7 +908,7 @@ const tableColumns = computed(() => [
         render: (row: PromptWithRelations) => t('promptManagement.useCount', { count: row.useCount || 0 })
     },
     {
-        title: t('promptManagement.update'),
+        title: t('promptManagement.updatedLabel'),
         key: 'updatedAt',
         width: 120,
         sorter: true,
@@ -963,7 +963,7 @@ const redesignedTableColumns = computed(() => {
     return [
         { type: 'selection' as const, width: TABLE_COLUMN_WIDTH.selection, fixed: 'left' as const },
         {
-            title: titleFor('title', t('promptManagement.title')),
+            title: titleFor('title', t('promptManagement.titleLabel')),
             key: 'title',
             minWidth: TABLE_COLUMN_WIDTH.titleMin,
             render: renderPromptIdentity
@@ -981,7 +981,7 @@ const redesignedTableColumns = computed(() => {
             render: renderTagsCell
         }] : []),
         ...(showTableUpdatedAtColumn.value ? [{
-            title: titleFor('updatedAt', t('promptManagement.update')),
+            title: titleFor('updatedAt', t('promptManagement.updatedLabel')),
             key: 'updatedAt',
             width: TABLE_COLUMN_WIDTH.updatedAt,
             render: (row: PromptWithRelations) => formatDate(row.updatedAt)

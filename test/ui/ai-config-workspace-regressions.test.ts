@@ -29,6 +29,16 @@ describe('AI configuration workspace regressions', () => {
     expect(page).toMatch(/id:\s*'preset:groq'[\s\S]*?icon:\s*LetterX/)
   })
 
+  it('keeps header actions on the right and lets the subtitle use the free width', () => {
+    const page = readRendererFile('pages/AIConfigPage.vue')
+
+    expect(page).toMatch(/\.ai-command-bar\s*\{[^}]*display:\s*flex/s)
+    expect(page).toMatch(/\.page-identity\s*\{[^}]*flex:\s*1 1 auto/s)
+    expect(page).toMatch(/\.page-actions\s*\{[^}]*margin-left:\s*auto/s)
+    expect(page).not.toMatch(/\.page-subtitle\s*\{[^}]*max-width/s)
+    expect(page).toMatch(/\.provider-card-copy small\s*\{[^}]*-webkit-line-clamp:\s*2/s)
+  })
+
   it('distinguishes an explicit preferred configuration from fallback behavior', () => {
     const page = readRendererFile('pages/AIConfigPage.vue')
 

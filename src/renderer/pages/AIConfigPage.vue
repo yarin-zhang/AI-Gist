@@ -3,7 +3,7 @@
         <header class="ai-command-bar">
             <div class="page-identity">
                 <span class="page-identity-icon"><NIcon size="18"><AIConfigNavigationIcon /></NIcon></span>
-                <div>
+                <div class="page-identity-copy">
                     <NText strong class="page-title">{{ t('aiConfig.title') }}</NText>
                     <NText depth="3" class="page-subtitle">{{ t('aiConfig.subtitle') }}</NText>
                 </div>
@@ -1142,16 +1142,19 @@ defineExpose({ openAddConfigModal })
 
 <style scoped>
 .ai-config-page { width: 100%; height: calc(100vh - 24px); min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-body); }
-.ai-command-bar { flex: 0 0 60px; min-height: 60px; display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(300px, 1fr); align-items: center; gap: var(--section-gap); padding: 0 var(--page-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
+.ai-command-bar { flex: 0 0 60px; min-height: 60px; display: flex; align-items: center; gap: var(--section-gap); padding: 0 var(--page-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
 .page-identity, .modal-title-row, .workspace-identity { display: flex; align-items: center; min-width: 0; gap: 12px; }
 .page-identity-icon, .modal-title-icon, .workspace-provider-icon, .provider-icon { display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
-.page-identity { gap: 10px; }
+.page-identity { flex: 1 1 auto; gap: 10px; }
+.page-identity-copy { min-width: 0; }
 .page-identity-icon { width: 32px; height: 32px; flex: 0 0 32px; color: var(--accent-primary); border: 0; border-radius: var(--radius-panel); }
 .page-title { display: block; font-size: var(--font-size-lg); line-height: 1.25; }
-.page-subtitle { display: block; max-width: 320px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); }
+.page-subtitle { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); }
 .modal-subtitle, .workspace-subtitle, .section-description, .editor-section-heading > .n-text, .provider-help .n-text { display: block; margin-top: 3px; font-size: var(--font-size-sm); }
-.preference-summary { justify-self: center; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px 10px; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preference-summary { flex: 0 1 auto; max-width: 40%; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px 10px; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-sm); white-space: nowrap; }
+.preference-summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .page-actions, .workspace-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.page-actions { flex: 0 0 auto; margin-left: auto; }
 .ai-page-content { flex: 1; height: 0; min-height: 0; display: flex; overflow: hidden; }
 .page-state { flex: 1; margin: var(--page-padding); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .config-workspace-split { flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
@@ -1234,7 +1237,7 @@ defineExpose({ openAddConfigModal })
 .provider-card:hover { border-color: var(--border-strong); }
 .provider-card-copy { flex: 1; min-width: 0; }
 .provider-card-copy strong, .provider-card-copy small { display: block; }
-.provider-card-copy small { margin-top: 3px; color: var(--content-secondary); font-size: var(--font-size-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-card-copy small { margin-top: 3px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--content-secondary); font-size: var(--font-size-xs); line-height: 1.4; overflow: hidden; }
 .provider-card-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--content-secondary); border-radius: var(--radius-control); background: var(--surface-secondary); }
 .form-panel, .connection-test-panel { padding: var(--content-padding); }
 .model-list-heading { margin-bottom: 12px; }
@@ -1248,7 +1251,6 @@ defineExpose({ openAddConfigModal })
 .dirty-indicator { min-height: 20px; font-size: var(--font-size-xs); }
 
 @media (max-width: 1240px) {
-    .ai-command-bar { grid-template-columns: minmax(240px, 1fr) auto; }
     .preference-summary { display: none; }
     .workspace-actions .n-button:not(.n-button--circle) { padding-left: 9px; padding-right: 9px; }
     .workspace-title { max-width: 240px; }
