@@ -149,6 +149,61 @@ export function findEditingVariableSegment(
   return null
 }
 
+const FENCE_LINE_PATTERN = /^[ \t]*(```|~~~)/
+
+/**
+ * Placeholders that sit on a line of their own, or inside a fenced code block, usually stand
+ * for multi-line content (a diff, a log, a code snippet). Returns the start offsets of those
+ * occurrences so the fill view can give them a multi-line field instead of a single-line one,
+ * which would silently turn every newline into a space.
+ */
+export function findMultilineVariableStarts(
+  content: string,
+  segments: PromptTemplateSegment[] = parsePromptTemplate(content).segments,
+): Set<number> {
+  const starts = new Set<number>()
+  const fencedLines: [number, number][] = []
+  let fenceStart: number | null = null
+  let lineStart = 0
+  while (lineStart <= content.length) {
+    const newline = content.indexOf('\n', lineStart)
+    const lineEnd = newline >= 0 ? newline : content.length
+    if (FENCE_LINE_PATTERN.test(content.slice(lineStart, lineEnd))) {
+      if (fenceStart === null) fenceStart = lineEnd
+      else {
+        fencedLines.push([fenceStart, lineStart])
+        fenceStart = null
+      }
+    }
+    if (newline < 0) break
+    lineStart = newline + 1
+  }
+  // An unterminated fence runs to the end of the document, as Markdown renders it.
+  if (fenceStart !== null) fencedLines.push([fenceStart, content.length])
+
+  for (const segment of segments) {
+    if (segment.kind !== 'variable') continue
+    const before = content.slice(content.lastIndexOf('\n', segment.start - 1) + 1, segment.start)
+    const afterEnd = content.indexOf('\n', segment.end)
+    const after = content.slice(segment.end, afterEnd >= 0 ? afterEnd : content.length)
+    const ownLine = !before.trim() && !after.trim()
+    const fenced = fencedLines.some(([start, end]) => segment.start > start && segment.start < end)
+    if (ownLine || fenced) starts.add(segment.start)
+  }
+  return starts
+}
+
+/** Names of variables with at least one occurrence that calls for multi-line input. */
+export function findMultilineVariableNames(content: string): Set<string> {
+  const { segments } = parsePromptTemplate(content)
+  const starts = findMultilineVariableStarts(content, segments)
+  return new Set(segments
+    .filter((segment): segment is PromptVariableSegment => segment.kind === 'variable' && starts.has(segment.start))
+    .map(segment => segment.name))
+}
+
+export const hasLineBreak = (value: unknown) => typeof value === 'string' && /[\r\n]/.test(value)
+
 export function normalizeVariableType(type: string): CanonicalPromptVariableType {
   if (type === 'textarea') return 'textarea'
   if (type === 'select') return 'select'

@@ -808,6 +808,7 @@
     "liveResult": "即時結果",
     "progress": "已填寫 {filled}/{total}",
     "result": "最終結果",
+    "switchedToMultiline": "內容包含換行，已切換為多行文字",
     "viewMode": "使用檢視"
   },
   "promptManagement": {

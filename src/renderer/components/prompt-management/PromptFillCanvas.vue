@@ -53,7 +53,8 @@
             <span v-if="segment.kind === 'text'">{{ segment.text }}</span>
             <PromptVariableField v-else-if="variableByName.get(segment.name)" :variable="variableByName.get(segment.name)!"
               :model-value="values[segment.name]" inline :compact="compact"
-              :first-occurrence="segment.firstOccurrence" :error="showError(segment.name)"
+              :first-occurrence="segment.firstOccurrence" :multiline="multilineStarts.has(segment.start)"
+              :error="showError(segment.name)"
               @update:model-value="updateValue(segment.name, $event)" @blur="markTouched(segment.name)" />
             <span v-else>{{ segment.raw }}</span>
           </template>
@@ -78,7 +79,7 @@ import { NAlert, NButton, NIcon, NText } from 'naive-ui'
 import { FileText, Forms } from '@vicons/tabler'
 import type { PromptWithRelations } from '@shared/types/database'
 import {
-  getActivePromptVariables, getMissingPromptVariables, isEmptyPromptValue,
+  findMultilineVariableStarts, getActivePromptVariables, getMissingPromptVariables, isEmptyPromptValue,
   parsePromptTemplate, renderPrompt,
 } from '@/lib/utils/prompt-template'
 import PromptVariableField from './PromptVariableField.vue'
@@ -104,6 +105,7 @@ const touched = ref(new Set<string>())
 const viewMode = ref<'fill' | 'result'>('fill')
 const variables = computed(() => getActivePromptVariables(props.prompt))
 const parsed = computed(() => parsePromptTemplate(props.prompt.content || ''))
+const multilineStarts = computed(() => findMultilineVariableStarts(props.prompt.content || '', parsed.value.segments))
 const variableByName = computed(() => new Map(variables.value.map(variable => [variable.name, variable])))
 const missing = computed(() => getMissingPromptVariables(variables.value, props.values))
 const rendered = computed(() => renderPrompt(props.prompt, props.values, variables.value))

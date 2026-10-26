@@ -808,6 +808,7 @@
     "liveResult": "Live result",
     "progress": "{filled}/{total} filled",
     "result": "Final result",
+    "switchedToMultiline": "Pasted text has line breaks, so this field switched to multi-line",
     "viewMode": "Use view"
   },
   "promptManagement": {
