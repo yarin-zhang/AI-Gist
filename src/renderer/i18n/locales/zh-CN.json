@@ -808,6 +808,7 @@
     "liveResult": "实时结果",
     "progress": "已填写 {filled}/{total}",
     "result": "最终结果",
+    "unfilledHint": "未填写：{name}，点击去填写",
     "viewMode": "使用视图"
   },
   "promptManagement": {
@@ -1217,6 +1218,7 @@
     "categories": "分类",
     "clickToEdit": "点击可编辑",
     "completeRequired": "请先完成必填变量",
+    "completeRequiredCount": "还有 {count} 个必填变量未填写",
     "continueEditing": "继续编辑",
     "copiedAndRecorded": "已复制提示词并记录本次使用",
     "copyPrompt": "复制提示词",
@@ -1255,6 +1257,7 @@
     "sortUpdated": "最近更新",
     "sortUsage": "使用次数",
     "tableView": "表格",
+    "unfilledCount": "{count} 项未填写",
     "unsavedChanges": "有未保存的更改",
     "unsavedChangesMessage": "当前编辑内容尚未保存。放弃后无法恢复这些更改。",
     "use": "使用",

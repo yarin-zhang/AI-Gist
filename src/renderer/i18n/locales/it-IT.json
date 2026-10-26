@@ -808,6 +808,7 @@
     "liveResult": "Risultato in tempo reale",
     "progress": "{filled}/{total} riempito",
     "result": "Risultato finale",
+    "unfilledHint": "Non compilato: {name}. Fai clic per compilarlo.",
     "viewMode": "Modalità di visualizzazione"
   },
   "promptManagement": {
@@ -1217,6 +1218,7 @@
     "categories": "Categorie",
     "clickToEdit": "Fare clic per modificare",
     "completeRequired": "Completa prima le variabili obbligatorie",
+    "completeRequiredCount": "{count} variabile obbligatoria ancora vuota | {count} variabili obbligatorie ancora vuote",
     "continueEditing": "Continua a modificare",
     "copiedAndRecorded": "Prompt copiato e utilizzo registrato",
     "copyPrompt": "Copia prompt",
@@ -1255,6 +1257,7 @@
     "sortUpdated": "Aggiornato di recente",
     "sortUsage": "Conteggio utilizzo",
     "tableView": "Tabella",
+    "unfilledCount": "{count} da compilare",
     "unsavedChanges": "Modifiche non salvate",
     "unsavedChangesMessage": "Le modifiche correnti non sono state salvate. Se le scarti, non potrai annullare l'operazione.",
     "use": "Usa",
