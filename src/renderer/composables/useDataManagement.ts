@@ -41,10 +41,13 @@ export function useDataManagement() {
     success.value = null;
   };
 
-  // 获取本地备份列表
-  const getBackupList = async (): Promise<BackupInfo[]> => {
+  // 获取本地备份列表。
+  // 只有用户点「刷新备份列表」时才让按钮进入加载态；挂载和创建/恢复后的静默刷新
+  // 通常几毫秒就结束，切换加载态只会让按钮图标淡出又淡入，看起来像图标空白 (#389)。
+  const getBackupList = async (options: { showLoading?: boolean } = {}): Promise<BackupInfo[]> => {
+    const { showLoading = false } = options;
     try {
-      setLoading('refreshBackupList', true);
+      if (showLoading) setLoading('refreshBackupList', true);
       clearMessages();
       const backups = await localBackupService.list();
       backupList.value = [...backups];
@@ -54,7 +57,7 @@ export function useDataManagement() {
       error.value = err instanceof Error ? err.message : '获取备份列表失败';
       return [];
     } finally {
-      setLoading('refreshBackupList', false);
+      if (showLoading) setLoading('refreshBackupList', false);
     }
   };
 
