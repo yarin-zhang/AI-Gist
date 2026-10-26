@@ -148,6 +148,14 @@ body.dark {
   background-color: var(--surface-body, #0f1115);
 }
 
+/* 切换主题时一帧到位，避免组件停在深浅之间的过渡色（见 theme/runtime.ts） */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
 #app {
   width: 100vw;
   height: 100vh;
