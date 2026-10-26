@@ -95,15 +95,34 @@ const paginatedBackups = computed(() => {
     return cloudBackups.value.slice(start, start + pageSize.value);
 });
 
+// 静默加载列表：挂载、切换存储和创建/删除后使用，不让「刷新备份列表」按钮闪成加载态 (#389)。
+let pendingListLoad: { storageId: string; promise: Promise<void> } | null = null;
+const loadCloudBackupList = () => {
+    const storageId = props.config.id;
+    if (pendingListLoad?.storageId === storageId) return pendingListLoad.promise;
+    const promise = (async () => {
+        try {
+            const backups = await CloudBackupAPI.getCloudBackupList(storageId);
+            // 等待期间切换了存储位置时，丢弃旧位置的结果
+            if (storageId !== props.config.id) return;
+            cloudBackups.value = backups;
+            if (currentPage.value > totalPages.value) currentPage.value = Math.max(totalPages.value, 1);
+        } catch (error) {
+            console.error('刷新云端备份列表失败:', error);
+            message.error(t('dataBackup.loadCloudBackupsFailed'));
+        } finally {
+            if (pendingListLoad?.promise === promise) pendingListLoad = null;
+        }
+    })();
+    pendingListLoad = { storageId, promise };
+    return promise;
+};
+
 const refreshCloudBackupList = async () => {
     if (loading.refresh) return;
     loading.refresh = true;
     try {
-        cloudBackups.value = await CloudBackupAPI.getCloudBackupList(props.config.id);
-        if (currentPage.value > totalPages.value) currentPage.value = Math.max(totalPages.value, 1);
-    } catch (error) {
-        console.error('刷新云端备份列表失败:', error);
-        message.error(t('dataBackup.loadCloudBackupsFailed'));
+        await loadCloudBackupList();
     } finally { loading.refresh = false; }
 };
 
@@ -118,7 +137,7 @@ const createCloudBackup = async () => {
         });
         if (!result.success) return message.error(result.error || t('dataBackup.createCloudBackupFailed'));
         message.success(result.message || t('dataBackup.createCloudBackupSuccess'));
-        await refreshCloudBackupList();
+        await loadCloudBackupList();
     } catch (error) {
         console.error('创建云端备份失败:', error);
         message.error(error instanceof Error ? error.message : t('dataBackup.createCloudBackupFailed'));
@@ -143,7 +162,7 @@ const deleteCloudBackup = async (backupId: string) => {
         const result = await CloudBackupAPI.deleteCloudBackup(props.config.id, backupId);
         if (!result.success) return message.error(result.error || t('dataBackup.deleteFailed'));
         message.success(result.message || t('dataBackup.deleteSuccess'));
-        await refreshCloudBackupList();
+        await loadCloudBackupList();
     } catch (error) {
         console.error('删除云端备份失败:', error);
         message.error(t('dataBackup.deleteFailed'));
@@ -160,10 +179,10 @@ const formatSize = (size: number) => {
 
 watch(() => props.config.id, () => {
     currentPage.value = 1;
-    void refreshCloudBackupList();
+    void loadCloudBackupList();
 });
 watch(pageSize, () => { currentPage.value = 1; });
-onMounted(refreshCloudBackupList);
+onMounted(loadCloudBackupList);
 </script>
 
 <style scoped>
