@@ -1,5 +1,6 @@
 <template>
-    <NModal :show="show" :mask-closable="false" :close-on-esc="false" display-directive="show">
+    <NModal :show="show" :mask-closable="false" :close-on-esc="false" display-directive="show"
+        @after-leave="resetCreation">
         <div class="prompt-creation-modal" role="dialog" aria-modal="true">
             <header class="creation-header">
                 <div>
@@ -70,7 +71,12 @@ const draftPrompt = ref<PromptWithRelations>()
 const editorKey = ref(0)
 const editorRef = ref<InstanceType<typeof PromptEditModal>>()
 
+// 弹窗关闭后才重置：在淡出动画中重置会让用户看到空表单闪一下（Issue #388）。
+// 若关闭动画未结束就再次打开，after-leave 不会触发，此时在打开时补做重置。
+let resetPending = false
+
 const resetCreation = () => {
+    resetPending = false
     activeMethod.value = 'editor'
     draftPrompt.value = undefined
     editorKey.value += 1
@@ -104,14 +110,16 @@ const handleEditorVisibility = (visible: boolean) => {
 }
 
 watch(() => props.show, show => {
-    if (show) resetCreation()
+    if (!show) resetPending = true
+    else if (resetPending) resetCreation()
 })
 
 defineExpose({
     get hasUnsavedChanges() {
         return Boolean(editorRef.value?.hasUnsavedChanges)
     },
-    discardChanges: () => editorRef.value?.discardChanges?.(),
+    // 放弃更改后弹窗随即关闭，编辑器会在 after-leave 时整体重建
+    discardChanges: () => { resetPending = true },
     refreshQuickOptimizationConfigs: () => editorRef.value?.refreshQuickOptimizationConfigs?.(),
 })
 </script>
