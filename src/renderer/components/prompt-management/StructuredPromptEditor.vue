@@ -118,6 +118,13 @@ const displayedVariableCount = computed(() => (
 ))
 const readonlyCompartment = new Compartment()
 let editorView: EditorView | null = null
+let pendingContentSync = false
+
+const flushContentSync = (view: EditorView) => {
+  if (!pendingContentSync || view.composing || view !== editorView) return
+  pendingContentSync = false
+  emit('update:content', view.state.doc.toString())
+}
 // CodeMirror keeps its selection after blur, so side-panel and toolbar inserts reuse it.
 // Until the user places a cursor, inserts append to the end instead of the start.
 let hasUserCursor = false
@@ -335,7 +342,13 @@ onMounted(() => {
       editorTheme,
       EditorView.updateListener.of(update => {
         if (update.view.hasFocus && (update.selectionSet || update.focusChanged)) hasUserCursor = true
-        if (update.docChanged) emit('update:content', update.state.doc.toString())
+        if (update.docChanged) pendingContentSync = true
+        // IME composition puts raw pinyin into the document; sync only the committed text.
+        if (!update.view.composing) flushContentSync(update.view)
+      }),
+      EditorView.domEventHandlers({
+        // CodeMirror may apply the committed text without another update, so flush after it settles.
+        compositionend: (_event, view) => { setTimeout(() => flushContentSync(view)) },
       }),
     ],
   })

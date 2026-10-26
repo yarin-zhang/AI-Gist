@@ -284,13 +284,15 @@ const updateOptions = (options: string[]) => {
 
 <style scoped>
 .variable-inspector { box-sizing: border-box; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); background: var(--surface-primary); }
-.variable-inspector :deep(> .n-card-header) { flex: 0 0 auto; min-height: 52px; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-.variable-inspector :deep(> .n-card__content) { flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
+.variable-inspector > :deep(.n-card-header) { flex: 0 0 auto; min-height: 52px; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+/* Matches the global `.n-card > .n-card-header + .n-card-content` rule so the padding reset wins. */
+.variable-inspector > :deep(.n-card-header + .n-card-content) { flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
 .inspector-header, .property-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); }
 .inspector-subtitle, .property-subtitle { display: block; margin-top: 2px; font-size: 12px; }
 .inspector-layout { height: 100%; min-height: 0; display: grid; grid-template-rows: minmax(150px, 42%) minmax(0, 1fr); }
-.variable-directory { min-height: 0; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-.variable-directory :deep(.n-scrollbar-content) { padding: var(--compact-padding); }
+/* NScrollbar's root does not carry the scoped attribute, so it is styled through :deep from the grid. */
+.inspector-layout > :deep(.variable-directory) { min-height: 0; border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
+.inspector-layout > :deep(.variable-directory .n-scrollbar-content) { padding: var(--compact-padding); }
 .variable-group + .variable-group { margin-top: var(--content-padding); }
 .group-label { display: block; margin: 0 4px 6px; font-size: 12px; font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: .04em; }
 .variable-directory-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border-radius: var(--radius-control); }
@@ -309,8 +311,8 @@ const updateOptions = (options: string[]) => {
 .variable-directory-meta { flex: 1 1 auto; justify-content: flex-end; color: var(--content-secondary); font-size: 12px; font-weight: var(--font-weight-normal); white-space: nowrap; }
 .variable-directory-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .variable-empty { padding: 28px 12px; }
-.variable-properties { min-height: 0; background: var(--surface-primary); }
-.variable-properties :deep(.n-scrollbar-content) { padding: var(--content-padding); }
+.inspector-layout > :deep(.variable-properties) { min-height: 0; background: var(--surface-primary); }
+.inspector-layout > :deep(.variable-properties .n-scrollbar-content) { padding: var(--content-padding); }
 .property-heading { margin-bottom: var(--content-padding); }
 .property-title { display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .variable-form :deep(.n-form-item) { margin-bottom: 12px; }

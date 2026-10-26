@@ -17,6 +17,18 @@ describe('structured prompt editor wiring', () => {
     expect(core).toContain('reconcilePromptVariables')
   })
 
+  it('syncs content only after IME composition and drops transient variable names', () => {
+    const editor = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
+    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
+    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
+
+    expect(editor).toContain('update.view.composing')
+    expect(editor).toContain('compositionend')
+    expect(regular).toContain('{ retainUnused }')
+    expect(inspector).toContain('.variable-inspector > :deep(.n-card-header + .n-card-content)')
+    expect(inspector).toContain('.inspector-layout > :deep(.variable-directory)')
+  })
+
   it('uses the shared fill canvas in the workspace and shortcut launcher', () => {
     const workspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
     const launcher = readRendererFile('components/shortcuts/PromptLauncher.vue')
