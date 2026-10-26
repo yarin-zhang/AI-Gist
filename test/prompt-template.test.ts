@@ -6,9 +6,12 @@ import {
   createPromptDraft,
   createVariable,
   findEditingVariableSegment,
+  findMultilineVariableNames,
+  findMultilineVariableStarts,
   getActivePromptVariables,
   getMissingPromptVariables,
   getUnfilledPromptVariables,
+  hasLineBreak,
   isVariableConfigured,
   normalizeVariableType,
   parsePromptTemplate,
@@ -142,6 +145,45 @@ describe('findEditingVariableSegment', () => {
   it('checks every selection endpoint', () => {
     const toneInside = segments.filter(segment => segment.kind === 'variable')[1].start + 3
     expect(findEditingVariableSegment(segments, [0, toneInside])?.name).toBe('tone')
+  })
+})
+
+describe('findMultilineVariableStarts', () => {
+  const startsOf = (content: string) => {
+    const { segments } = parsePromptTemplate(content)
+    const starts = findMultilineVariableStarts(content, segments)
+    return segments
+      .filter(segment => segment.kind === 'variable')
+      .map(segment => [segment.name, starts.has(segment.start)])
+  }
+
+  it('flags a placeholder on its own line or inside a fenced code block (#382)', () => {
+    expect(startsOf('Review this:\n```diff\n{{diff}}\n```\nFocus on {{focus}}.')).toEqual([
+      ['diff', true],
+      ['focus', false],
+    ])
+    expect(startsOf('Context:\n  {{context}}  \nThanks')).toEqual([['context', true]])
+    expect(startsOf('```ts\nconst x = {{value}}\n```')).toEqual([['value', true]])
+    expect(startsOf('~~~\n{{a}} and {{b}}')).toEqual([['a', true], ['b', true]])
+  })
+
+  it('keeps placeholders in running text and fence info strings single-line', () => {
+    expect(startsOf('Translate {{text}} into {{language}}')).toEqual([
+      ['text', false],
+      ['language', false],
+    ])
+    expect(startsOf('{{a}} {{b}}')).toEqual([['a', false], ['b', false]])
+    expect(startsOf('```{{lang}}\ncode\n```\n{{after}} text')).toEqual([
+      ['lang', false],
+      ['after', false],
+    ])
+  })
+
+  it('aggregates by variable name for list-style fill forms', () => {
+    expect([...findMultilineVariableNames('Say {{x}}\n{{x}}\n{{y}} here')]).toEqual(['x'])
+    expect(hasLineBreak('a\r\nb')).toBe(true)
+    expect(hasLineBreak('ab')).toBe(false)
+    expect(hasLineBreak(3)).toBe(false)
   })
 })
 

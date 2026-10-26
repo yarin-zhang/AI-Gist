@@ -77,6 +77,7 @@
               <PromptVariableFillForm
                 ref="fillFormRef"
                 :variables="variables"
+                :content="prompt?.isJinjaTemplate ? '' : prompt?.content"
                 v-model="draft"
                 :render-error="rendered.error"
               />
