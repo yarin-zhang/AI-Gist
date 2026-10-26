@@ -1160,6 +1160,8 @@
     "templateVariable": "Template Variable",
     "text": "Text",
     "title": "AI Prompts",
+    "titleLabel": "Title",
+    "updatedLabel": "Updated",
     "titlePlaceholder": "Enter prompt title (optional)",
     "titleRequired": "Please enter a title",
     "totalCategories": "{count} category total | {count} categories total",
