@@ -55,7 +55,7 @@
                                     :style="{ height: '100%' }">
                                     <NScrollbar :style="{ height: `${contentHeight - 130}px` }">
                                         <NFlex vertical size="medium" style="padding-right: 12px;">
-                                            <NFormItem :label="t('promptManagement.title')" path="title">
+                                            <NFormItem :label="t('promptManagement.titleLabel')" path="title">
                                                 <NInput v-model:value="formData.title"
                                                     :placeholder="t('promptManagement.titlePlaceholder')" />
                                             </NFormItem>

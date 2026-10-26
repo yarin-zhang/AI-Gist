@@ -23,6 +23,18 @@ describe('prompt management detail regressions', () => {
     expect(fillCanvas).not.toContain(':error="missing.value.includes')
   })
 
+  it('marks unfilled variables in the final result and counts them next to copy (#381)', () => {
+    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
+    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
+
+    expect(fillCanvas).toContain('buildPromptResultSegments(props.prompt, props.values, variables.value)')
+    expect(fillCanvas).toContain('class="unfilled-placeholder"')
+    expect(fillCanvas).toContain('@click="focusVariable(segment.name)"')
+    expect(fillCanvas).not.toContain('<pre>{{ rendered.content }}</pre>\n      </div>\n    </div>')
+    expect(useWorkspace).toContain("t('promptWorkspace.unfilledCount', { count: unfilledVariables.length })")
+    expect(useWorkspace).toContain("t('promptWorkspace.completeRequiredCount'")
+  })
+
   it('uses normal-flow filters and flex-height data tables', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
     const page = readRendererFile('pages/PromptManagementPage.vue')
@@ -327,11 +339,14 @@ describe('prompt management detail regressions', () => {
 
   it('uses colored category and tag chips in cards without empty taxonomy copy', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const taxonomy = readRendererFile('components/prompt-management/PromptCardTaxonomy.vue')
 
     expect(list).not.toContain('prompt-card-kind')
     expect(list).not.toContain("prompt.isJinjaTemplate ? 'Jinja'")
-    expect(list).toContain(':color="getCategoryTagColor(prompt.category)"')
-    expect(list).toContain('getTagsArray(prompt.tags).slice(0, 2)')
+    expect(list).toContain('<PromptCardTaxonomy :category="prompt.category" :tags="getTagsArray(prompt.tags)">')
+    expect(taxonomy).toContain('<NTag v-if="category"')
+    expect(taxonomy).toContain(':color="getCategoryTagColor(category)"')
+    expect(taxonomy).toContain(':color="getTagColor(tag)"')
     expect(list).not.toContain('<span v-else class="prompt-card-category">')
   })
 
