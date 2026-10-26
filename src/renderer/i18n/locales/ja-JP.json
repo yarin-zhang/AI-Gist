@@ -809,6 +809,7 @@
     "progress": "{filled}/{total} 入力済み",
     "result": "最終結果",
     "switchedToMultiline": "改行を含むため、複数行入力に切り替えました",
+    "unfilledHint": "未入力：{name}（クリックして入力）",
     "viewMode": "使用ビュー"
   },
   "promptManagement": {
@@ -1161,6 +1162,8 @@
     "templateVariable": "テンプレート変数",
     "text": "テキスト",
     "title": "AIプロンプト",
+    "titleLabel": "タイトル",
+    "updatedLabel": "更新日",
     "titlePlaceholder": "プロンプトのタイトルを入力してください（オプション）",
     "titleRequired": "タイトルを入力してください",
     "totalCategories": "合計{count}カテゴリ",
@@ -1218,6 +1221,7 @@
     "categories": "カテゴリー",
     "clickToEdit": "クリックして編集",
     "completeRequired": "必須変数を入力してください",
+    "completeRequiredCount": "必須変数が {count} 件未入力です",
     "continueEditing": "編集を続ける",
     "copiedAndRecorded": "プロンプトをコピーし、使用を記録しました",
     "copyPrompt": "プロンプトをコピー",
@@ -1256,6 +1260,7 @@
     "sortUpdated": "最近更新",
     "sortUsage": "使用回数",
     "tableView": "テーブル",
+    "unfilledCount": "未入力 {count} 件",
     "unsavedChanges": "未保存の変更があります",
     "unsavedChangesMessage": "現在の編集内容は保存されていません。破棄すると元に戻せません。",
     "use": "使用",
