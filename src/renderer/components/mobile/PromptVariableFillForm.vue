@@ -67,6 +67,7 @@
           :value="kindOf(variable) === 'number' ? numberValue(variable) : stringValue(variable)"
           @ionInput="handleInput(variable, $event.detail.value)"
           @ionBlur="markTouched(variable.name)"
+          @paste="handlePaste(variable, $event)"
         ></ion-input>
       </ion-item>
 
@@ -84,11 +85,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { IonInput, IonItem, IonList, IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue'
 import { useI18n } from '~/composables/useI18n'
 import {
+  findMultilineVariableNames,
   getMissingPromptVariables,
+  hasLineBreak,
   isEmptyPromptValue,
   normalizeVariableType,
   type EditablePromptVariable,
@@ -103,6 +106,8 @@ const props = defineProps<{
   // 这个 prop 把渲染错误从父组件（详情页）传进来，让本组件的 validateAndFocus()
   // 独立满足同样的契约，不依赖调用方在外部再补一次 rendered.error 检查。
   renderError?: string
+  // 提示词正文：变量独占一行或在代码块里时，按多行文本渲染（与桌面端 PromptFillCanvas 同一规则）。
+  content?: string
 }>()
 
 const emit = defineEmits<{
@@ -115,7 +120,20 @@ const itemElements = new Map<string, HTMLElement>()
 
 const missing = computed(() => getMissingPromptVariables(props.variables, props.modelValue))
 
-const kindOf = (variable: EditablePromptVariable) => normalizeVariableType(variable.type)
+// ion-input 是单行输入框，会把换行吞成空格。文本变量在「位置像多行内容」或「值里已有换行」时
+// 改用 ion-textarea；一旦切过去就保持多行，避免删掉最后一个换行时控件来回切换。
+const multilineNames = computed(() => findMultilineVariableNames(props.content || ''))
+const expandedNames = ref<Set<string>>(new Set())
+watch(() => props.modelValue, values => {
+  const added = Object.keys(values).filter(name => hasLineBreak(values[name]) && !expandedNames.value.has(name))
+  if (added.length) expandedNames.value = new Set([...expandedNames.value, ...added])
+}, { immediate: true, deep: true })
+
+const kindOf = (variable: EditablePromptVariable) => {
+  const kind = normalizeVariableType(variable.type)
+  if (kind === 'text' && (multilineNames.value.has(variable.name) || expandedNames.value.has(variable.name))) return 'textarea'
+  return kind
+}
 const labelFor = (variable: EditablePromptVariable) => (variable.required ? `${variable.name} *` : variable.name)
 // 与桌面端 PromptVariableField 的兜底规则保持一致：没有单独配置 placeholder 时，用变量名兜底。
 const placeholderFor = (variable: EditablePromptVariable) => variable.placeholder || variable.name
@@ -145,6 +163,28 @@ const handleInput = (variable: EditablePromptVariable, rawValue: string | number
   }
   const parsed = Number(rawValue)
   update(variable.name, Number.isFinite(parsed) ? parsed : '')
+}
+
+// 粘贴多行文本时浏览器会先把换行压平再触发 ionInput，所以在 paste 阶段自己插入原文；
+// 值里有了换行后字段会切换成 ion-textarea，再把焦点和光标挪过去。
+const handlePaste = async (variable: EditablePromptVariable, event: ClipboardEvent) => {
+  const pasted = event.clipboardData?.getData('text/plain') ?? ''
+  const input = event.target as HTMLInputElement | null
+  if (kindOf(variable) !== 'text' || !(input instanceof HTMLInputElement) || !hasLineBreak(pasted)) return
+  event.preventDefault()
+  const text = pasted.replace(/\r\n?/g, '\n')
+  const start = input.selectionStart ?? input.value.length
+  const end = input.selectionEnd ?? start
+  const caret = start + text.length
+  update(variable.name, input.value.slice(0, start) + text + input.value.slice(end))
+  await nextTick()
+  const textarea = itemElements.get(variable.name)?.querySelector('ion-textarea') as (HTMLElement & {
+    setFocus?: () => Promise<void>
+    getInputElement?: () => Promise<HTMLTextAreaElement>
+  }) | null
+  await textarea?.setFocus?.()
+  const native = await textarea?.getInputElement?.()
+  native?.setSelectionRange(caret, caret)
 }
 
 const handleChange = (name: string, value: any) => {

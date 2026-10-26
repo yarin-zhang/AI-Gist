@@ -808,6 +808,7 @@
     "liveResult": "实时结果",
     "progress": "已填写 {filled}/{total}",
     "result": "最终结果",
+    "switchedToMultiline": "内容包含换行，已切换为多行文本",
     "unfilledHint": "未填写：{name}，点击去填写",
     "viewMode": "使用视图"
   },

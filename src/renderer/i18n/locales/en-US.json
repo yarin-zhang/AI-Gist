@@ -808,6 +808,7 @@
     "liveResult": "Live result",
     "progress": "{filled}/{total} filled",
     "result": "Final result",
+    "switchedToMultiline": "Pasted text has line breaks, so this field switched to multi-line",
     "unfilledHint": "Not filled: {name}. Click to fill it in.",
     "viewMode": "Use view"
   },

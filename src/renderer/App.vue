@@ -34,6 +34,10 @@ const isDesktopShell = PlatformDetector.isDesktopShell()
 const isNativeMobile = PlatformDetector.isMobile()
 const isLauncherSurface = new URLSearchParams(window.location.search).get('surface') === 'launcher'
 
+// 桌面页面顶部是 60px 的命令栏，正中是视图切换、右侧是主操作；
+// 顶部提示默认距窗口顶边 12px，会正好盖住它们，所以改为显示在命令栏下方 (#389)
+const messageContainerStyle = isLauncherSurface ? undefined : { top: 'calc(60px + var(--spacing-md))' }
+
 // 使用主题管理
 const { naiveTheme, getThemeOverrides, initTheme } = useTheme()
 
@@ -84,7 +88,7 @@ onMounted(async () => {
 <template>
     <!-- 桌面端：使用 Naive UI -->
     <NConfigProvider v-if="isDesktopShell" :theme="naiveTheme" :theme-overrides="getThemeOverrides()" :locale="naiveLocale" :date-locale="naiveDateLocale">
-        <NMessageProvider>
+        <NMessageProvider :container-style="messageContainerStyle">
             <NDialogProvider>
                 <AppInitializer>
                     <!-- 国际化错误检测横幅 -->

@@ -290,25 +290,14 @@
 
                             <template #footer>
                                 <div class="prompt-card-footer">
-                                    <div class="prompt-card-taxonomy">
-                                        <NTag v-if="supportsGlobalShortcuts && shortcutBindingFor(prompt.uuid)" size="small" type="success" :bordered="false">
-                                            <template #icon><NIcon><Keyboard /></NIcon></template>
-                                            {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
-                                        </NTag>
-                                        <NTag v-if="prompt.category" size="small" :bordered="false"
-                                            :color="getCategoryTagColor(prompt.category)" class="prompt-card-taxonomy-tag">
-                                            {{ prompt.category.name }}
-                                        </NTag>
-                                        <NTag v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag"
-                                            size="small" :bordered="false" :color="getTagColor(tag)"
-                                            class="prompt-card-taxonomy-tag">
-                                            {{ tag }}
-                                        </NTag>
-                                        <NText v-if="getTagsArray(prompt.tags).length > 2" depth="3"
-                                            class="prompt-card-tag-overflow">
-                                            +{{ getTagsArray(prompt.tags).length - 2 }}
-                                        </NText>
-                                    </div>
+                                    <PromptCardTaxonomy :category="prompt.category" :tags="getTagsArray(prompt.tags)">
+                                        <template v-if="supportsGlobalShortcuts && shortcutBindingFor(prompt.uuid)" #leading>
+                                            <NTag size="small" type="success" :bordered="false">
+                                                <template #icon><NIcon><Keyboard /></NIcon></template>
+                                                {{ displayAccelerator(shortcutBindingFor(prompt.uuid)!.accelerator) }}
+                                            </NTag>
+                                        </template>
+                                    </PromptCardTaxonomy>
                                     <NText depth="3" class="prompt-card-date">{{ formatDate(prompt.updatedAt) }}</NText>
                                 </div>
                             </template>
@@ -361,6 +350,7 @@ import {
     NButtonGroup,
     NImage,
     NCarousel,
+    NEllipsis,
     useMessage,
     useDialog
 } from 'naive-ui'
@@ -393,6 +383,7 @@ import type { PromptWithRelations, CategoryWithRelations } from '@shared/types/d
 import type { PromptShortcutBinding, ShortcutState } from '@shared/types/preferences'
 import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue'
 import PromptFolderExplorer from '@/components/prompt-management/PromptFolderExplorer.vue'
+import PromptCardTaxonomy from '@/components/prompt-management/PromptCardTaxonomy.vue'
 import { PlatformDetector } from '@shared/platform'
 
 interface Emits {
@@ -602,19 +593,19 @@ const renderPromptIdentity = (prompt: PromptWithRelations) => h(
 
 const renderCategoryCell = (prompt: PromptWithRelations) => {
     if (!prompt.category) return h(NText, { depth: 3 }, { default: () => t('promptManagement.noCategory') })
-    return h('span', { class: 'table-category-cell', title: prompt.category.name }, [
+    return h('span', { class: 'table-category-cell' }, [
         h('span', {
             class: 'category-color-dot',
             style: { background: prompt.category.color || 'var(--content-secondary)' }
         }),
-        h('span', { class: 'table-category-name' }, prompt.category.name)
+        h(NEllipsis, { class: 'table-category-name', tooltip: { delay: 300 } }, { default: () => prompt.category!.name })
     ])
 }
 
 const renderTagsCell = (prompt: PromptWithRelations) => {
     const tags = getTagsArray(prompt.tags || '')
     if (!tags.length) return '-'
-    return h(NFlex, { size: 5, wrap: false, class: 'table-tags' }, {
+    return h(NFlex, { size: 5, wrap: false, align: 'center', class: 'table-tags' }, {
         default: () => [
             ...tags.slice(0, 2).map(tag => h(NTag, {
                 size: 'small',
@@ -1863,14 +1854,10 @@ defineExpose({
 .prompt-card-title { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-base); }
 .prompt-card-main { min-height: 76px; }
 .prompt-card-thumbnail { width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; border-radius: var(--radius-image); }
-.prompt-card-footer { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.prompt-card-taxonomy { min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
-.prompt-card-taxonomy-tag { flex: 0 1 auto; min-width: 0; max-width: 92px; }
-.prompt-card-taxonomy-tag :deep(.n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
-.prompt-card-tag-overflow { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
-.table-category-cell { min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.category-color-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
-.prompt-card-date { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* 分类与标签至少保留 190px；卡片更窄时日期换到下一行，同一行卡片宽度一致，换行也一致 */
+.prompt-card-footer { min-height: 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; }
+.prompt-card-footer > .prompt-card-taxonomy { flex: 1 1 190px; }
+.prompt-card-date { flex: 0 0 auto; margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .data-view-surface { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; overflow: hidden; border-radius: var(--radius-panel); }
 .data-view-surface :deep(.n-data-table) { flex: 1 1 0; min-height: 0; overflow: hidden; }
@@ -1889,13 +1876,13 @@ defineExpose({
 .data-view-surface :deep(.table-prompt-copy) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .data-view-surface :deep(.table-prompt-title) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .data-view-surface :deep(.table-prompt-description) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.data-view-surface :deep(.table-category-cell) { max-width: 140px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; color: var(--content-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.data-view-surface :deep(.table-category-name) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.data-view-surface :deep(.table-category-cell) { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; color: var(--content-secondary); font-size: 12px; }
+.data-view-surface :deep(.table-category-name) { flex: 0 1 auto; min-width: 0; }
 .data-view-surface :deep(.category-color-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .data-view-surface :deep(.table-tags) { overflow: hidden; }
-.data-view-surface :deep(.table-tags .n-tag) { max-width: 82px; }
+.data-view-surface :deep(.table-tags .n-tag) { flex: 0 1 auto; min-width: 0; max-width: 82px; }
 .data-view-surface :deep(.table-tags .n-tag__content) { overflow: hidden; text-overflow: ellipsis; }
-.data-view-surface :deep(.table-tag-overflow) { font-size: 12px; }
+.data-view-surface :deep(.table-tag-overflow) { flex: 0 0 auto; display: inline-flex; align-items: center; height: 22px; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 /* 高亮匹配的标签 */
 .highlighted-tag {

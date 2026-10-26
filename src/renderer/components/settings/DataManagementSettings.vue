@@ -550,7 +550,7 @@ const handleCreateBackup = async () => {
 };
 
 const handleRefreshBackupList = async () => {
-    await getBackupList();
+    await getBackupList({ showLoading: true });
 };
 
 const handleRestoreBackup = async (backupId: string) => {

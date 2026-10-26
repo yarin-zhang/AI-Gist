@@ -808,6 +808,7 @@
     "liveResult": "リアルタイム結果",
     "progress": "{filled}/{total} 入力済み",
     "result": "最終結果",
+    "switchedToMultiline": "改行を含むため、複数行入力に切り替えました",
     "unfilledHint": "未入力：{name}（クリックして入力）",
     "viewMode": "使用ビュー"
   },

@@ -808,6 +808,7 @@
     "liveResult": "Risultato in tempo reale",
     "progress": "{filled}/{total} riempito",
     "result": "Risultato finale",
+    "switchedToMultiline": "Il testo incollato contiene a capo: il campo è passato a più righe",
     "unfilledHint": "Non compilato: {name}. Fai clic per compilarlo.",
     "viewMode": "Modalità di visualizzazione"
   },
