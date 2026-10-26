@@ -33,9 +33,19 @@
           </template>
           {{ t('promptEditor.variables') }} · {{ displayedVariableCount }}
         </NTooltip>
-        <NTooltip>
+        <NDropdown v-if="insertableVariableNames.length" trigger="click" placement="bottom-end"
+          :options="insertVariableOptions" :disabled="readonly" @select="handleInsertVariableSelect">
+          <NButton size="small" :disabled="readonly" :aria-label="t('promptEditor.insertVariable')"
+            @mousedown.prevent>
+            <template #icon><NIcon size="16"><Braces /></NIcon></template>
+            <span class="toolbar-button-label">{{ t('promptEditor.insertVariable') }}</span>
+            <NIcon size="16" class="toolbar-button-chevron"><ChevronDown /></NIcon>
+          </NButton>
+        </NDropdown>
+        <NTooltip v-else>
           <template #trigger>
-            <NButton size="small" :disabled="readonly" @click="$emit('request-add-variable')">
+            <NButton size="small" :disabled="readonly" :aria-label="t('promptEditor.insertVariable')"
+              @mousedown.prevent @click="$emit('request-add-variable')">
               <template #icon><NIcon size="16"><Braces /></NIcon></template>
               <span class="toolbar-button-label">{{ t('promptEditor.insertVariable') }}</span>
             </NButton>
@@ -55,10 +65,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NText, NTooltip } from 'naive-ui'
-import { AdjustmentsHorizontal, AlertTriangle, Braces, Code, LayoutCards } from '@vicons/tabler'
+import { NButton, NDropdown, NIcon, NText, NTooltip, type DropdownOption } from 'naive-ui'
+import {
+  AdjustmentsHorizontal, AlertTriangle, Braces, ChevronDown, Code, LayoutCards, Plus,
+} from '@vicons/tabler'
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import {
@@ -92,6 +104,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:content': [value: string]
   'select-variable': [name: string]
+  'variable-inserted': [name: string]
   'request-add-variable': []
   'request-open-variables': []
 }>()
@@ -105,7 +118,20 @@ const displayedVariableCount = computed(() => (
 ))
 const readonlyCompartment = new Compartment()
 let editorView: EditorView | null = null
-let lastSelection = EditorSelection.cursor(props.content.length)
+// CodeMirror keeps its selection after blur, so side-panel and toolbar inserts reuse it.
+// Until the user places a cursor, inserts append to the end instead of the start.
+let hasUserCursor = false
+
+const NEW_VARIABLE_KEY = '__new_variable__'
+const renderMenuIcon = (icon: typeof Braces) => () => h(NIcon, { size: 16 }, { default: () => h(icon) })
+const insertableVariableNames = computed(() => Array.from(new Set(
+  props.variables.map(variable => variable.name).filter(Boolean),
+)))
+const insertVariableOptions = computed<DropdownOption[]>(() => [
+  ...insertableVariableNames.value.map(name => ({ key: name, label: name, icon: renderMenuIcon(Braces) })),
+  { key: 'divider', type: 'divider' },
+  { key: NEW_VARIABLE_KEY, label: t('promptEditor.addVariable'), icon: renderMenuIcon(Plus) },
+])
 
 interface DecorationState {
   visual: boolean
@@ -308,7 +334,7 @@ onMounted(() => {
       editorPlaceholder(props.placeholder),
       editorTheme,
       EditorView.updateListener.of(update => {
-        if (update.selectionSet) lastSelection = update.state.selection
+        if (update.view.hasFocus && (update.selectionSet || update.focusChanged)) hasUserCursor = true
         if (update.docChanged) emit('update:content', update.state.doc.toString())
       }),
     ],
@@ -341,15 +367,23 @@ const setVisualMode = (value: boolean) => {
 
 const insertVariable = (name: string) => {
   if (!editorView || props.readonly) return
-  const selection = editorView.hasFocus ? editorView.state.selection.main : lastSelection.main
+  const { state } = editorView
+  const selection = hasUserCursor || editorView.hasFocus
+    ? state.selection.main
+    : EditorSelection.cursor(state.doc.length)
   const placeholder = `{{${name}}}`
   editorView.dispatch({
     changes: { from: selection.from, to: selection.to, insert: placeholder },
     selection: { anchor: selection.from + placeholder.length },
     scrollIntoView: true,
   })
-  emit('select-variable', name)
+  emit('variable-inserted', name)
   editorView.focus()
+}
+
+const handleInsertVariableSelect = (key: string | number) => {
+  if (key === NEW_VARIABLE_KEY) emit('request-add-variable')
+  else insertVariable(String(key))
 }
 
 const focusVariable = (name: string, occurrence = 0) => {
@@ -380,6 +414,7 @@ defineExpose({
 .editor-view-switch { flex: 0 1 auto; }
 .editor-toolbar-actions { flex: 0 0 auto; gap: 4px; }
 .variable-count { white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.toolbar-button-chevron { margin-left: 2px; color: var(--content-secondary); }
 .toolbar-button-count { min-width: 16px; color: var(--content-secondary); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
 .structured-editor-host { flex: 1; min-height: 0; overflow: hidden; user-select: text; -webkit-user-select: text; }
 .structured-editor-host.readonly { opacity: .78; }
