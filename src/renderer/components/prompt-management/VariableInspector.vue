@@ -19,31 +19,55 @@
       <NScrollbar class="variable-directory">
         <div v-if="activeVariables.length" class="variable-group">
           <NText depth="3" class="group-label">{{ t('promptEditor.inUse') }}</NText>
-          <button v-for="variable in activeVariables" :key="variable.name" type="button"
-            class="variable-directory-item" :class="{ selected: selectedVariable === variable.name }"
-            @click="$emit('select', variable.name)">
-            <span class="variable-directory-main">
-              <NIcon size="16"><Braces /></NIcon>
-              <span class="variable-directory-name">{{ variable.name }}</span>
-            </span>
-            <span class="variable-directory-meta">
-              <span>{{ typeLabel(variable.type) }}</span>
-              <span v-if="occurrences[variable.name]">×{{ occurrences[variable.name] }}</span>
-            </span>
-          </button>
+          <div v-for="variable in activeVariables" :key="variable.name" class="variable-directory-row"
+            :class="{ selected: selectedVariable === variable.name }">
+            <button type="button" class="variable-directory-item" @mousedown.prevent
+              @click="$emit('select', variable.name)">
+              <span class="variable-directory-main">
+                <NIcon size="16"><Braces /></NIcon>
+                <span class="variable-directory-name">{{ variable.name }}</span>
+              </span>
+              <span class="variable-directory-meta">
+                <span class="variable-directory-type">{{ typeLabel(variable.type) }}</span>
+                <span v-if="occurrences[variable.name]">×{{ occurrences[variable.name] }}</span>
+              </span>
+            </button>
+            <NTooltip>
+              <template #trigger>
+                <NButton size="small" quaternary class="variable-insert-button" :disabled="readonly"
+                  :aria-label="t('promptEditor.insertVariableNamed', { name: variable.name })"
+                  @mousedown.prevent @click="$emit('request-insert', variable.name)">
+                  {{ t('promptEditor.insert') }}
+                </NButton>
+              </template>
+              {{ t('promptEditor.insertAtCursor') }}
+            </NTooltip>
+          </div>
         </div>
 
         <div v-if="unusedVariables.length" class="variable-group unused-group">
           <NText depth="3" class="group-label">{{ t('promptEditor.unused') }}</NText>
-          <button v-for="variable in unusedVariables" :key="variable.name" type="button"
-            class="variable-directory-item unused" :class="{ selected: selectedVariable === variable.name }"
-            @click="$emit('select', variable.name)">
-            <span class="variable-directory-main">
-              <NIcon size="16"><AlertCircle /></NIcon>
-              <span class="variable-directory-name">{{ variable.name }}</span>
-            </span>
-            <span class="variable-directory-meta">{{ t('promptEditor.notInserted') }}</span>
-          </button>
+          <div v-for="variable in unusedVariables" :key="variable.name" class="variable-directory-row unused"
+            :class="{ selected: selectedVariable === variable.name }">
+            <button type="button" class="variable-directory-item" @mousedown.prevent
+              @click="$emit('select', variable.name)">
+              <span class="variable-directory-main">
+                <NIcon size="16"><AlertCircle /></NIcon>
+                <span class="variable-directory-name">{{ variable.name }}</span>
+              </span>
+              <span class="variable-directory-meta">{{ t('promptEditor.notInserted') }}</span>
+            </button>
+            <NTooltip>
+              <template #trigger>
+                <NButton size="small" quaternary class="variable-insert-button" :disabled="readonly"
+                  :aria-label="t('promptEditor.insertVariableNamed', { name: variable.name })"
+                  @mousedown.prevent @click="$emit('request-insert', variable.name)">
+                  {{ t('promptEditor.insert') }}
+                </NButton>
+              </template>
+              {{ t('promptEditor.insertAtCursor') }}
+            </NTooltip>
+          </div>
         </div>
 
         <NEmpty v-if="!variables.length" size="small" :description="t('promptEditor.noVariables')" class="variable-empty">
@@ -66,14 +90,6 @@
             </NText>
           </div>
           <NFlex size="small">
-            <NTooltip v-if="isUnused(selected.name)">
-              <template #trigger>
-                <NButton size="small" quaternary :disabled="readonly" @click="$emit('request-insert', selected.name)">
-                  <template #icon><NIcon size="16"><CursorText /></NIcon></template>
-                </NButton>
-              </template>
-              {{ t('promptEditor.insertAtCursor') }}
-            </NTooltip>
             <NPopconfirm :positive-text="t('common.delete')" :negative-text="t('common.cancel')"
               @positive-click="$emit('request-remove', selected.name)">
               <template #trigger>
@@ -157,7 +173,7 @@ import {
   NButton, NCard, NDynamicInput, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput,
   NInputNumber, NPopconfirm, NScrollbar, NSelect, NSwitch, NText, NTooltip,
 } from 'naive-ui'
-import { AlertCircle, Braces, CursorText, Plus, Trash } from '@vicons/tabler'
+import { AlertCircle, Braces, Plus, Trash } from '@vicons/tabler'
 import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
 import { normalizeVariableType, validateVariableName } from '@/lib/utils/prompt-template'
 
@@ -279,16 +295,21 @@ const updateOptions = (options: string[]) => {
 .inspector-layout > :deep(.variable-directory .n-scrollbar-content) { padding: var(--compact-padding); }
 .variable-group + .variable-group { margin-top: var(--content-padding); }
 .group-label { display: block; margin: 0 4px 6px; font-size: 12px; font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: .04em; }
-.variable-directory-item { width: 100%; min-height: 38px; padding: 7px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: var(--radius-control); color: var(--content-primary); background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.variable-directory-item:hover { background: var(--interactive-hover); }
-.variable-directory-item.selected { background: var(--surface-tertiary); font-weight: var(--font-weight-medium); }
+.variable-directory-row { display: flex; align-items: center; gap: 2px; padding-right: 4px; border-radius: var(--radius-control); }
+.variable-directory-row:hover { background: var(--interactive-hover); }
+.variable-directory-row.selected { background: var(--surface-tertiary); font-weight: var(--font-weight-medium); }
+.variable-directory-item { flex: 1 1 auto; min-width: 0; min-height: 38px; padding: 7px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: var(--radius-control); color: var(--content-primary); background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .variable-directory-item:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
-.variable-directory-item.unused { color: var(--content-secondary); }
+.variable-directory-row.unused .variable-directory-item { color: var(--content-secondary); }
+.variable-insert-button { flex: 0 0 auto; }
 .variable-directory-main, .variable-directory-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .variable-directory-main :deep(.n-icon) { flex: 0 0 auto; color: var(--accent-primary); }
 .unused .variable-directory-main :deep(.n-icon) { color: var(--accent-warning); }
 .variable-directory-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.variable-directory-meta { flex: 0 0 auto; color: var(--content-secondary); font-size: 12px; font-weight: var(--font-weight-normal); }
+/* The name keeps priority over the type label when the insert action narrows the row. */
+.variable-directory-main { flex: 0 0 auto; max-width: 60%; }
+.variable-directory-meta { flex: 1 1 auto; justify-content: flex-end; color: var(--content-secondary); font-size: 12px; font-weight: var(--font-weight-normal); white-space: nowrap; }
+.variable-directory-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .variable-empty { padding: 28px 12px; }
 .inspector-layout > :deep(.variable-properties) { min-height: 0; background: var(--surface-primary); }
 .inspector-layout > :deep(.variable-properties .n-scrollbar-content) { padding: var(--content-padding); }

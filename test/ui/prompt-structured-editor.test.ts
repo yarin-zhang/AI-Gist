@@ -99,4 +99,32 @@ describe('structured prompt editor wiring', () => {
     expect(useWorkspace).toContain('@click="openHistory"')
     expect(useWorkspace).toContain('historyPromptId')
   })
+
+  it('lets every existing variable be inserted at the editor cursor (issue 373)', () => {
+    const structured = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
+    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
+    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
+    const jinja = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
+
+    // Toolbar: existing variables first, then a create entry.
+    expect(structured).toContain('<NDropdown v-if="insertableVariableNames.length"')
+    expect(structured).toContain('NEW_VARIABLE_KEY')
+    expect(structured).toContain("{ key: 'divider', type: 'divider' }")
+    expect(structured).toMatch(/handleInsertVariableSelect[\s\S]*?emit\('request-add-variable'\)[\s\S]*?insertVariable\(String\(key\)\)/)
+
+    // Inserts reuse the editor's own selection after blur instead of a stale snapshot.
+    expect(structured).not.toContain('lastSelection')
+    expect(structured).toContain('hasUserCursor || editorView.hasFocus')
+    expect(structured).toContain("emit('variable-inserted', name)")
+
+    // Inspector: every row (in use or unused) has an insert action, separate from selecting.
+    expect(inspector.match(/class="variable-insert-button"/g)).toHaveLength(2)
+    expect(inspector).not.toContain('v-if="isUnused(selected.name)"')
+    expect(inspector.match(/class="variable-directory-item" @mousedown\.prevent/g)).toHaveLength(2)
+
+    for (const editor of [regular, jinja]) {
+      expect(editor).toContain('@variable-inserted=')
+      expect(editor).toContain('@after-leave="restoreEditorFocusAfterDrawer"')
+    }
+  })
 })

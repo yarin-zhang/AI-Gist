@@ -133,6 +133,22 @@ function findUnclosedVariables(
   return diagnostics
 }
 
+/**
+ * 找出光标（或选区端点）正落在 `{{` 与 `}}` 之间的变量占位符。
+ * 编辑器对这个占位符保留源码形态，避免输入或输入法组合过程中被替换成变量块。
+ * 端点恰好在占位符边界上不算“正在编辑”。
+ */
+export function findEditingVariableSegment(
+  segments: PromptTemplateSegment[],
+  positions: number[],
+): PromptVariableSegment | null {
+  for (const segment of segments) {
+    if (segment.kind !== 'variable') continue
+    if (positions.some(position => position > segment.start && position < segment.end)) return segment
+  }
+  return null
+}
+
 export function normalizeVariableType(type: string): CanonicalPromptVariableType {
   if (type === 'textarea') return 'textarea'
   if (type === 'select') return 'select'

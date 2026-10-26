@@ -4,6 +4,7 @@ import type { EditablePromptVariable } from '../src/renderer/lib/utils/prompt-te
 import {
   createPromptDraft,
   createVariable,
+  findEditingVariableSegment,
   getActivePromptVariables,
   getMissingPromptVariables,
   isVariableConfigured,
@@ -118,5 +119,26 @@ describe('prompt template core', () => {
     })
     expect(getActivePromptVariables(source).map(variable => variable.name)).toEqual(['name'])
     expect(renderPrompt(source, { name: 'Ada' }).content).toBe('Ada / Ada')
+  })
+})
+
+describe('findEditingVariableSegment', () => {
+  const { segments } = parsePromptTemplate('请翻译成 {{yuyan}}，风格 {{tone}}')
+  const yuyanStart = '请翻译成 '.length
+  const yuyanEnd = yuyanStart + '{{yuyan}}'.length
+
+  it('returns the placeholder whose braces surround the cursor', () => {
+    expect(findEditingVariableSegment(segments, [yuyanStart + 4])?.name).toBe('yuyan')
+  })
+
+  it('ignores cursors on placeholder boundaries or outside placeholders', () => {
+    expect(findEditingVariableSegment(segments, [yuyanStart])).toBeNull()
+    expect(findEditingVariableSegment(segments, [yuyanEnd])).toBeNull()
+    expect(findEditingVariableSegment(segments, [1])).toBeNull()
+  })
+
+  it('checks every selection endpoint', () => {
+    const toneInside = segments.filter(segment => segment.kind === 'variable')[1].start + 3
+    expect(findEditingVariableSegment(segments, [0, toneInside])?.name).toBe('tone')
   })
 })
