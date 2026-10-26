@@ -23,6 +23,18 @@ describe('prompt management detail regressions', () => {
     expect(fillCanvas).not.toContain(':error="missing.value.includes')
   })
 
+  it('marks unfilled variables in the final result and counts them next to copy (#381)', () => {
+    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
+    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
+
+    expect(fillCanvas).toContain('buildPromptResultSegments(props.prompt, props.values, variables.value)')
+    expect(fillCanvas).toContain('class="unfilled-placeholder"')
+    expect(fillCanvas).toContain('@click="focusVariable(segment.name)"')
+    expect(fillCanvas).not.toContain('<pre>{{ rendered.content }}</pre>\n      </div>\n    </div>')
+    expect(useWorkspace).toContain("t('promptWorkspace.unfilledCount', { count: unfilledVariables.length })")
+    expect(useWorkspace).toContain("t('promptWorkspace.completeRequiredCount'")
+  })
+
   it('uses normal-flow filters and flex-height data tables', () => {
     const list = readRendererFile('components/prompt-management/PromptList.vue')
     const page = readRendererFile('pages/PromptManagementPage.vue')

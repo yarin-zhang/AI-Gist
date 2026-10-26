@@ -1,10 +1,10 @@
 <template>
   <NTooltip trigger="hover" placement="bottom" :disabled="!(inline && error)" content-style="max-width: 220px">
     <template #trigger>
-      <span class="prompt-variable-field" :class="[`type-${normalizedType}`, { inline, error, compact }]"
+      <span ref="fieldEl" class="prompt-variable-field" :class="[`type-${displayType}`, { inline, error, compact }]"
         :style="fieldStyle"
         :data-variable-field="variable.name" :data-first-occurrence="firstOccurrence ? 'true' : 'false'">
-        <span v-if="!inline || normalizedType === 'textarea'" class="field-label">
+        <span v-if="!inline || displayType === 'textarea'" class="field-label">
           <span>{{ variable.name }}</span>
           <span v-if="variable.required" class="required-mark" aria-hidden="true">*</span>
           <NTooltip v-if="variable.description">
@@ -24,10 +24,11 @@
             @update:value="$emit('update:modelValue', $event)" />
           <span v-if="inline" class="boolean-label">{{ variable.name }}</span>
         </span>
-        <NInput v-else size="small" :value="stringValue" :type="normalizedType === 'textarea' ? 'textarea' : 'text'"
-          :autosize="normalizedType === 'textarea' ? { minRows: compact ? 2 : 3, maxRows: 7 } : undefined"
-          :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="inputProps"
-          @update:value="$emit('update:modelValue', $event)" @blur="$emit('blur')" />
+        <NInput v-else size="small" :value="stringValue" :type="displayType === 'textarea' ? 'textarea' : 'text'"
+          :autosize="displayType === 'textarea' ? { minRows: compact ? 2 : 3, maxRows: 7 } : undefined"
+          :placeholder="placeholder" :status="error ? 'error' : undefined" :input-props="textInputProps"
+          @update:value="$emit('update:modelValue', $event)" @blur="handleTextBlur" />
+        <span v-if="switchedToMultiline" class="field-note" role="status">{{ t('promptFill.switchedToMultiline') }}</span>
 
         <!-- Non-inline (grid) fields have their own row, so the message can sit in normal flow.
              Inline fields sit inside running text: a visible message would cover whatever follows,
@@ -41,12 +42,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NIcon, NInput, NInputNumber, NSelect, NSwitch, NTooltip } from 'naive-ui'
 import { InfoCircle } from '@vicons/tabler'
 import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
-import { normalizeVariableType } from '@/lib/utils/prompt-template'
+import { hasLineBreak, normalizeVariableType } from '@/lib/utils/prompt-template'
 
 const props = withDefaults(defineProps<{
   variable: EditablePromptVariable
@@ -55,19 +56,23 @@ const props = withDefaults(defineProps<{
   error?: boolean
   firstOccurrence?: boolean
   compact?: boolean
+  /** The placeholder's position (own line, code block) suggests multi-line content. */
+  multiline?: boolean
 }>(), {
   inline: false,
   error: false,
   firstOccurrence: true,
   compact: false,
+  multiline: false,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   'update:modelValue': [value: any]
   blur: []
 }>()
 
 const { t } = useI18n()
+const fieldEl = ref<HTMLElement>()
 const normalizedType = computed(() => normalizeVariableType(props.variable.type))
 const placeholder = computed(() => props.variable.placeholder || props.variable.name)
 const stringValue = computed(() => props.modelValue === undefined || props.modelValue === null ? '' : String(props.modelValue))
@@ -81,6 +86,42 @@ const inputProps = computed(() => ({
   'aria-label': props.variable.name,
   tabindex: props.firstOccurrence ? 0 : -1,
 }))
+
+// A single-line <input> drops every newline it is given, so a text variable is shown as a
+// textarea whenever its placement or its value calls for multiple lines. Once expanded it stays
+// expanded while mounted, so deleting the last newline doesn't swap the control mid-edit.
+const expanded = ref(false)
+watch(stringValue, value => { if (hasLineBreak(value)) expanded.value = true }, { immediate: true })
+const displayType = computed(() => (
+  normalizedType.value === 'text' && (props.multiline || expanded.value) ? 'textarea' : normalizedType.value
+))
+
+const switchedToMultiline = ref(false)
+const handlePaste = async (event: ClipboardEvent) => {
+  const pasted = event.clipboardData?.getData('text/plain') ?? ''
+  const input = event.target as HTMLInputElement | null
+  if (displayType.value !== 'text' || !input || !hasLineBreak(pasted)) return
+  // Insert the clipboard text ourselves before the browser flattens it, then hand the edit over
+  // to a textarea with the caret right after the pasted block.
+  event.preventDefault()
+  const text = pasted.replace(/\r\n?/g, '\n')
+  const start = input.selectionStart ?? input.value.length
+  const end = input.selectionEnd ?? start
+  const caret = start + text.length
+  emit('update:modelValue', input.value.slice(0, start) + text + input.value.slice(end))
+  expanded.value = true
+  await nextTick()
+  const textarea = fieldEl.value?.querySelector('textarea')
+  textarea?.focus()
+  textarea?.setSelectionRange(caret, caret)
+  // Set after the swap: the replaced <input> may report a blur while it is torn down.
+  switchedToMultiline.value = true
+}
+const textInputProps = computed(() => ({ ...inputProps.value, onPaste: handlePaste }))
+const handleTextBlur = () => {
+  switchedToMultiline.value = false
+  emit('blur')
+}
 
 // Inline text fields size themselves to their content instead of a fixed/viewport-relative width.
 // Full-width glyphs (CJK, fullwidth punctuation, etc.) render close to twice as wide as the `ch`
@@ -113,7 +154,7 @@ const inlineFieldWidthCh = computed(() => {
   return Math.min(Math.max(contentUnits + FIELD_MARGIN_CH, FIELD_MIN_CH), FIELD_MAX_CH)
 })
 const fieldStyle = computed(() => (
-  props.inline && normalizedType.value === 'text'
+  props.inline && displayType.value === 'text'
     ? { '--field-ch': String(inlineFieldWidthCh.value) }
     : undefined
 ))
@@ -133,12 +174,13 @@ const fieldStyle = computed(() => (
    fit), so a plain percentage here has no well-defined containing block to resolve against and
    would silently fall back to the browser's default input width. */
 .prompt-variable-field.type-text.inline :deep(.n-input) { width: clamp(64px, calc(var(--field-ch, 22) * 1ch), 92vw); }
-.prompt-variable-field.type-textarea { width: 100%; margin: 10px 0; padding: var(--compact-padding); border-radius: var(--radius-panel); background: var(--surface-secondary); }
+.prompt-variable-field.type-textarea { box-sizing: border-box; width: 100%; margin: 10px 0; padding: var(--compact-padding); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .field-label { display: flex; align-items: center; gap: 4px; color: var(--content-secondary); font-size: 13px; font-weight: var(--font-weight-medium); }
 .required-mark { color: var(--accent-error); }
 .field-help { color: var(--content-tertiary); cursor: help; }
 .boolean-field { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; }
 .boolean-label { color: var(--content-secondary); font-size: 13px; }
+.field-note { color: var(--content-tertiary); font-size: 12px; line-height: 1.3; }
 .field-error { color: var(--accent-error); font-size: 12px; line-height: 1.3; }
 /* Kept off-screen (not display:none) so screen readers still announce the alert; the input's own
    error-status border is the persistent visual cue, and the wrapping NTooltip surfaces the same

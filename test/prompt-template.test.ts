@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest'
 import type { PromptWithRelations } from '../src/shared/types/database'
 import type { EditablePromptVariable } from '../src/renderer/lib/utils/prompt-template'
 import {
+  buildPromptResultSegments,
   createPromptDraft,
   createVariable,
   findEditingVariableSegment,
+  findMultilineVariableNames,
+  findMultilineVariableStarts,
   getActivePromptVariables,
   getMissingPromptVariables,
+  getUnfilledPromptVariables,
+  hasLineBreak,
   isVariableConfigured,
   normalizeVariableType,
   parsePromptTemplate,
@@ -140,5 +145,88 @@ describe('findEditingVariableSegment', () => {
   it('checks every selection endpoint', () => {
     const toneInside = segments.filter(segment => segment.kind === 'variable')[1].start + 3
     expect(findEditingVariableSegment(segments, [0, toneInside])?.name).toBe('tone')
+  })
+})
+
+describe('findMultilineVariableStarts', () => {
+  const startsOf = (content: string) => {
+    const { segments } = parsePromptTemplate(content)
+    const starts = findMultilineVariableStarts(content, segments)
+    return segments
+      .filter(segment => segment.kind === 'variable')
+      .map(segment => [segment.name, starts.has(segment.start)])
+  }
+
+  it('flags a placeholder on its own line or inside a fenced code block (#382)', () => {
+    expect(startsOf('Review this:\n```diff\n{{diff}}\n```\nFocus on {{focus}}.')).toEqual([
+      ['diff', true],
+      ['focus', false],
+    ])
+    expect(startsOf('Context:\n  {{context}}  \nThanks')).toEqual([['context', true]])
+    expect(startsOf('```ts\nconst x = {{value}}\n```')).toEqual([['value', true]])
+    expect(startsOf('~~~\n{{a}} and {{b}}')).toEqual([['a', true], ['b', true]])
+  })
+
+  it('keeps placeholders in running text and fence info strings single-line', () => {
+    expect(startsOf('Translate {{text}} into {{language}}')).toEqual([
+      ['text', false],
+      ['language', false],
+    ])
+    expect(startsOf('{{a}} {{b}}')).toEqual([['a', false], ['b', false]])
+    expect(startsOf('```{{lang}}\ncode\n```\n{{after}} text')).toEqual([
+      ['lang', false],
+      ['after', false],
+    ])
+  })
+
+  it('aggregates by variable name for list-style fill forms', () => {
+    expect([...findMultilineVariableNames('Say {{x}}\n{{x}}\n{{y}} here')]).toEqual(['x'])
+    expect(hasLineBreak('a\r\nb')).toBe(true)
+    expect(hasLineBreak('ab')).toBe(false)
+    expect(hasLineBreak(3)).toBe(false)
+  })
+})
+
+describe('final result with unfilled variables (#381)', () => {
+  const source = prompt({
+    content: 'You are a senior {{language}} engineer.\nFocus areas: {{ focus }}\nTone: {{tone}} ({{language}})',
+    variables: [
+      { ...createVariable('language') },
+      { ...createVariable('focus'), required: false },
+      { ...createVariable('tone'), required: false, defaultValue: 'calm' },
+    ] as any,
+  })
+
+  it('keeps unfilled placeholders instead of rendering them as blanks', () => {
+    expect(buildPromptResultSegments(source, { language: '  ', focus: '' })).toEqual([
+      { kind: 'text', text: 'You are a senior ' },
+      { kind: 'unfilled', name: 'language', raw: '{{language}}', required: true },
+      { kind: 'text', text: ' engineer.\nFocus areas: ' },
+      { kind: 'unfilled', name: 'focus', raw: '{{ focus }}', required: false },
+      { kind: 'text', text: '\nTone: calm (' },
+      { kind: 'unfilled', name: 'language', raw: '{{language}}', required: true },
+      { kind: 'text', text: ')' },
+    ])
+  })
+
+  it('joins filled segments to exactly the copied content', () => {
+    const values = { language: 'Go', focus: 'security', tone: 'direct' }
+    expect(buildPromptResultSegments(source, values)).toEqual([
+      { kind: 'text', text: renderPrompt(source, values).content },
+    ])
+  })
+
+  it('lists variables that would render blank, counting defaults and booleans as filled', () => {
+    const variables = [
+      ...getActivePromptVariables(source),
+      { ...createVariable('enabled'), type: 'boolean' },
+    ]
+    expect(getUnfilledPromptVariables(variables, { language: '', focus: ' ', enabled: false }).map(item => item.name))
+      .toEqual(['language', 'focus'])
+  })
+
+  it('leaves Jinja output to the template engine', () => {
+    const jinja = prompt({ isJinjaTemplate: true, content: 'Hello {{ name }}' })
+    expect(buildPromptResultSegments(jinja, { name: '' })).toEqual([{ kind: 'text', text: 'Hello ' }])
   })
 })

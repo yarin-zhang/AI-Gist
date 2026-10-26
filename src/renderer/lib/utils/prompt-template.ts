@@ -149,6 +149,61 @@ export function findEditingVariableSegment(
   return null
 }
 
+const FENCE_LINE_PATTERN = /^[ \t]*(```|~~~)/
+
+/**
+ * Placeholders that sit on a line of their own, or inside a fenced code block, usually stand
+ * for multi-line content (a diff, a log, a code snippet). Returns the start offsets of those
+ * occurrences so the fill view can give them a multi-line field instead of a single-line one,
+ * which would silently turn every newline into a space.
+ */
+export function findMultilineVariableStarts(
+  content: string,
+  segments: PromptTemplateSegment[] = parsePromptTemplate(content).segments,
+): Set<number> {
+  const starts = new Set<number>()
+  const fencedLines: [number, number][] = []
+  let fenceStart: number | null = null
+  let lineStart = 0
+  while (lineStart <= content.length) {
+    const newline = content.indexOf('\n', lineStart)
+    const lineEnd = newline >= 0 ? newline : content.length
+    if (FENCE_LINE_PATTERN.test(content.slice(lineStart, lineEnd))) {
+      if (fenceStart === null) fenceStart = lineEnd
+      else {
+        fencedLines.push([fenceStart, lineStart])
+        fenceStart = null
+      }
+    }
+    if (newline < 0) break
+    lineStart = newline + 1
+  }
+  // An unterminated fence runs to the end of the document, as Markdown renders it.
+  if (fenceStart !== null) fencedLines.push([fenceStart, content.length])
+
+  for (const segment of segments) {
+    if (segment.kind !== 'variable') continue
+    const before = content.slice(content.lastIndexOf('\n', segment.start - 1) + 1, segment.start)
+    const afterEnd = content.indexOf('\n', segment.end)
+    const after = content.slice(segment.end, afterEnd >= 0 ? afterEnd : content.length)
+    const ownLine = !before.trim() && !after.trim()
+    const fenced = fencedLines.some(([start, end]) => segment.start > start && segment.start < end)
+    if (ownLine || fenced) starts.add(segment.start)
+  }
+  return starts
+}
+
+/** Names of variables with at least one occurrence that calls for multi-line input. */
+export function findMultilineVariableNames(content: string): Set<string> {
+  const { segments } = parsePromptTemplate(content)
+  const starts = findMultilineVariableStarts(content, segments)
+  return new Set(segments
+    .filter((segment): segment is PromptVariableSegment => segment.kind === 'variable' && starts.has(segment.start))
+    .map(segment => segment.name))
+}
+
+export const hasLineBreak = (value: unknown) => typeof value === 'string' && /[\r\n]/.test(value)
+
 export function normalizeVariableType(type: string): CanonicalPromptVariableType {
   if (type === 'textarea') return 'textarea'
   if (type === 'select') return 'select'
@@ -261,6 +316,58 @@ export function getMissingPromptVariables(
     .map(variable => variable.name)
 }
 
+function renderVariableValue(variable: EditablePromptVariable | undefined, value: any): string {
+  return String(value ?? variable?.defaultValue ?? '')
+}
+
+/** 渲染后会变成空白的变量（值和默认值都为空），按模板中首次出现的顺序返回。 */
+export function getUnfilledPromptVariables(
+  variables: EditablePromptVariable[],
+  values: Record<string, any>
+): EditablePromptVariable[] {
+  return variables.filter(variable => !renderVariableValue(variable, values[variable.name]).trim())
+}
+
+export type PromptResultSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'unfilled'; name: string; raw: string; required: boolean }
+
+/**
+ * 「最终结果」的展示分段：已填写的变量直接替换成值，未填写的保留为占位分段，
+ * 让界面能把它们标出来，而不是像 renderPrompt 那样替换成空字符串。
+ * Jinja 模板由模板引擎整体渲染，没有可对应的占位位置，因此只返回整段文本。
+ */
+export function buildPromptResultSegments(
+  prompt: PromptWithRelations,
+  values: Record<string, any>,
+  variables = getActivePromptVariables(prompt)
+): PromptResultSegment[] {
+  const rendered = renderPrompt(prompt, values, variables)
+  if (prompt.isJinjaTemplate || rendered.error) return [{ kind: 'text', text: rendered.content }]
+
+  const content = prompt.content || ''
+  const variableByName = new Map(variables.map(variable => [variable.name, variable]))
+  const segments: PromptResultSegment[] = []
+  const pushText = (text: string) => {
+    if (!text) return
+    const last = segments[segments.length - 1]
+    if (last?.kind === 'text') last.text += text
+    else segments.push({ kind: 'text', text })
+  }
+
+  parsePromptTemplate(content).segments.forEach(segment => {
+    const variable = segment.kind === 'variable' ? variableByName.get(segment.name) : undefined
+    if (segment.kind === 'text' || !variable) {
+      pushText(content.slice(segment.start, segment.end))
+      return
+    }
+    const value = renderVariableValue(variable, values[segment.name])
+    if (value.trim()) pushText(value)
+    else segments.push({ kind: 'unfilled', name: segment.name, raw: segment.raw, required: variable.required })
+  })
+  return segments
+}
+
 export function renderPrompt(
   prompt: PromptWithRelations,
   values: Record<string, any>,
@@ -274,8 +381,7 @@ export function renderPrompt(
       if (segment.kind === 'text' || !variableNames.has(segment.name)) {
         return (prompt.content || '').slice(segment.start, segment.end)
       }
-      const variable = variables.find(item => item.name === segment.name)
-      return String(values[segment.name] ?? variable?.defaultValue ?? '')
+      return renderVariableValue(variables.find(item => item.name === segment.name), values[segment.name])
     }).join('')
     return { content }
   } catch (error) {

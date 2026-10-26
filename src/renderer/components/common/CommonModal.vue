@@ -252,8 +252,11 @@ const observeEmbeddedContainer = async () => {
     resizeObserver?.disconnect();
     if (!containerRef.value) return;
 
+    // 用 offsetHeight 取布局高度：外层 NModal 进场动画带 scale(0.5)，
+    // getBoundingClientRect 会量到缩小后的尺寸，而 transform 恢复时 ResizeObserver
+    // 不会再触发，导致内容区一直停在约一半高度（GitHub issue #192）。
     const updateHeight = () => {
-        embeddedHeight.value = containerRef.value?.getBoundingClientRect().height || 0;
+        embeddedHeight.value = containerRef.value?.offsetHeight || 0;
     };
 
     updateHeight();
