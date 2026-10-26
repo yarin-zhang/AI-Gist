@@ -1256,6 +1256,7 @@
     "selectModelFirst": "請先選擇可用的 AI 模型",
     "selectMultiple": "多選管理",
     "selectedCount": "已選擇 {count} 條",
+    "showLibrary": "顯示提示詞列表",
     "sortBy": "排序方式",
     "sortCreated": "創建時間",
     "sortTitle": "標題",

@@ -3,6 +3,15 @@
         <template v-if="prompt || mode === 'edit'">
             <header class="workspace-header">
                 <div class="workspace-primary-row">
+                    <NTooltip v-if="showLibraryToggle">
+                        <template #trigger>
+                            <NButton quaternary size="small" class="workspace-library-toggle"
+                                :aria-label="t('promptWorkspace.showLibrary')" @click="$emit('open-library')">
+                                <template #icon><NIcon size="16"><LayoutSidebarLeftExpand /></NIcon></template>
+                            </NButton>
+                        </template>
+                        {{ t('promptWorkspace.showLibrary') }}
+                    </NTooltip>
                     <div class="workspace-identity">
                         <div class="workspace-title-row">
                             <input v-if="editingTitle" ref="titleInputRef" v-model="titleDraft" type="text"
@@ -129,7 +138,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NText, NTooltip, useMessage } from 'naive-ui'
-import { Edit, FileText as PromptIcon, PlayerPlay, Plus, Star, Stars, Trash, X } from '@vicons/tabler'
+import { Edit, FileText as PromptIcon, LayoutSidebarLeftExpand, PlayerPlay, Plus, Star, Stars, Trash, X } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import { api } from '@/lib/api'
 import { buildAISummaryPrompt, parseAISummaryResponse } from '@/lib/utils/ai-summary'
@@ -144,6 +153,8 @@ const props = defineProps<{
     mode: PromptWorkspaceMode
     draft: Record<string, any>
     closable?: boolean
+    /** 单栏布局下列表栏收起，在标题左侧提供打开列表的入口 */
+    showLibraryToggle?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -157,6 +168,7 @@ const emit = defineEmits<{
     'cancel-edit': []
     'open-quick-optimization-config': []
     close: []
+    'open-library': []
 }>()
 
 const { t } = useI18n()
@@ -375,13 +387,14 @@ defineExpose({
 .workspace-header { flex: 0 0 auto; border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
 .workspace-primary-row { min-height: 60px; padding: 9px var(--page-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); }
 .workspace-identity { flex: 1 1 auto; min-width: 0; }
+.workspace-library-toggle { flex: 0 0 auto; width: 32px; padding: 0; margin-right: -8px; }
 .workspace-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.workspace-title { max-width: min(620px, 52vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
+.workspace-title { max-width: min(620px, 100%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; }
 .workspace-description { display: block; max-width: 660px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .workspace-field-editable { cursor: text; border-radius: var(--radius-control); padding: 1px 6px; margin: -1px -6px; }
 .workspace-field-editable:hover { background: var(--interactive-hover); }
 .workspace-field-editable:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
-.workspace-title-input { max-width: min(620px, 52vw); width: 100%; font: inherit; font-weight: 600; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; color: var(--content-primary); background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); padding: 1px 6px; margin: -1px -6px; outline: none; }
+.workspace-title-input { max-width: min(620px, 100%); width: 100%; font: inherit; font-weight: 600; font-size: 18px; line-height: 1.3; letter-spacing: -.015em; color: var(--content-primary); background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); padding: 1px 6px; margin: -1px -6px; outline: none; }
 .workspace-title-input:focus-visible { outline: 2px solid var(--interactive-focus); outline-offset: 1px; border-color: var(--border-strong); }
 .workspace-title-input:disabled { opacity: .6; }
 .workspace-description-input { display: block; width: 100%; max-width: 660px; margin-top: 2px; font: inherit; font-size: 13px; line-height: 1.5; color: var(--content-secondary); background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); padding: 3px 6px; resize: none; outline: none; overflow-y: auto; }
@@ -407,6 +420,5 @@ defineExpose({
 .empty-description { max-width: 420px; margin-bottom: 8px; }
 @media (max-width: 1080px) {
     .workspace-meta { display: none; }
-    .workspace-title { max-width: 34vw; }
 }
 </style>
