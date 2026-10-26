@@ -76,11 +76,12 @@
                                                     :custom-request="handleCustomRequest"
                                                     :disabled="saving" 
                                                     :multiple="true">
-                                                    <NUploadDragger>
-                                                        <NText style="font-size: var(--font-size-xs);">
-                                                            {{ t('promptManagement.uploadImage') }}
-                                                        </NText>
-                                                    </NUploadDragger>
+                                                    <!-- image-card 模式下 NUpload 已自带拖拽容器，这里只放内容 -->
+                                                    <div class="image-upload-trigger"
+                                                        :title="t('promptManagement.uploadImage')">
+                                                        <NIcon size="20"><Upload /></NIcon>
+                                                        <span>{{ t('promptManagement.uploadImageAction') }}</span>
+                                                    </div>
                                                 </NUpload>
                                             </NFormItem>
                                         </NFlex>
@@ -114,7 +115,13 @@
                                                     :max-tag-count="50"
                                                     :loading="loadingTags"
                                                     :render-tag="renderPromptTag"
-                                                />
+                                                >
+                                                    <template #empty>
+                                                        <NText depth="3" class="tag-select-empty">
+                                                            {{ t('promptManagement.tagsEmptyHint') }}
+                                                        </NText>
+                                                    </template>
+                                                </NSelect>
                                             </NFormItem>
                                         </NFlex>
                                     </NScrollbar>
@@ -505,13 +512,12 @@ import {
     NTooltip,
     NSpin,
     NUpload,
-    NUploadDragger,
     NImage,
     NP,
     useMessage,
     useDialog,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo, Upload } from "@vicons/tabler";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import { useTagColors } from "@/composables/useTagColors";
@@ -2152,15 +2158,11 @@ const handleSave = async () => {
         // 立即发送 saved 事件，通知父组件刷新数据
         emit("saved", savedPrompt);
 
-        // 短暂延迟后关闭弹窗，确保数据已经刷新
+        // 短暂延迟后关闭弹窗，确保数据已经刷新。
+        // 不在这里重置表单：此时弹窗正在淡出，重置会闪出空白表单（Issue #388）。
+        // 独立弹窗由 show 监听在关闭后重置，嵌入式由宿主在关闭动画结束后重建或换入新 prompt。
         setTimeout(() => {
             emit("update:show", false);
-            // 额外的安全措施：如果是新建模式，确保表单被重置
-            if (!isEdit.value) {
-                nextTick(() => {
-                    resetForm();
-                });
-            }
         }, 100);
     } catch (error) {
         message.error(isEdit.value ? t('promptManagement.updateFailed') : t('promptManagement.createFailed'));
@@ -2344,6 +2346,8 @@ defineExpose({
 .edit-workspace-tabs :deep(.n-tabs-pane-wrapper) { width: 100%; }
 .edit-info-split :deep(.n-split__resize-trigger-wrapper) { position: relative; background: transparent; }
 .edit-info-resize-handle { width: 100%; height: 100%; background: transparent; }
+.image-upload-trigger { box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: var(--spacing-sm); color: var(--content-secondary); font-size: var(--font-size-xs); line-height: 1.3; text-align: center; }
+.tag-select-empty { display: block; padding: 10px 12px; font-size: var(--font-size-sm); text-align: center; }
 
 .prompt-edit-embedded :deep(.modal-content) {
     padding-top: 8px !important;
