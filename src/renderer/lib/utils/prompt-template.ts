@@ -133,6 +133,22 @@ function findUnclosedVariables(
   return diagnostics
 }
 
+/**
+ * 找出光标（或选区端点）正落在 `{{` 与 `}}` 之间的变量占位符。
+ * 编辑器对这个占位符保留源码形态，避免输入或输入法组合过程中被替换成变量块。
+ * 端点恰好在占位符边界上不算“正在编辑”。
+ */
+export function findEditingVariableSegment(
+  segments: PromptTemplateSegment[],
+  positions: number[],
+): PromptVariableSegment | null {
+  for (const segment of segments) {
+    if (segment.kind !== 'variable') continue
+    if (positions.some(position => position > segment.start && position < segment.end)) return segment
+  }
+  return null
+}
+
 export function normalizeVariableType(type: string): CanonicalPromptVariableType {
   if (type === 'textarea') return 'textarea'
   if (type === 'select') return 'select'
@@ -153,16 +169,34 @@ export function createVariable(name: string): EditablePromptVariable {
   }
 }
 
+// A variable whose properties differ from createVariable() carries user intent and
+// must survive being removed from the text; a bare name does not.
+export function isVariableConfigured(variable: EditablePromptVariable): boolean {
+  return variable.type !== 'text'
+    || variable.required === false
+    || Boolean(variable.defaultValue)
+    || Boolean(variable.placeholder)
+    || Boolean(variable.description)
+    || Boolean(variable.options?.length)
+    || Boolean(variable.validation && Object.values(variable.validation).some(value => value !== undefined && value !== ''))
+}
+
+export interface ReconcileOptions {
+  /** Decides whether a variable no longer referenced by the text stays as "unused". Defaults to keeping all. */
+  retainUnused?: (variable: EditablePromptVariable) => boolean
+}
+
 export function reconcilePromptVariables(
   content: string,
-  variables: EditablePromptVariable[] = []
+  variables: EditablePromptVariable[] = [],
+  { retainUnused = () => true }: ReconcileOptions = {}
 ): ReconciledPromptVariables {
   const parsed = parsePromptTemplate(content)
   const existing = new Map(variables.filter(variable => variable.name).map(variable => [variable.name, variable]))
   const active = parsed.variableNames.map(name => cloneVariable(existing.get(name) || createVariable(name)))
   const activeNames = new Set(parsed.variableNames)
-  const unused = variables
-    .filter(variable => variable.name && !activeNames.has(variable.name))
+  const unused = Array.from(existing.values())
+    .filter(variable => !activeNames.has(variable.name) && retainUnused(variable))
     .map(cloneVariable)
 
   return { active, unused, all: [...active, ...unused] }

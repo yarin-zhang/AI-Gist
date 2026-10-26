@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { PromptWithRelations } from '../src/shared/types/database'
+import type { EditablePromptVariable } from '../src/renderer/lib/utils/prompt-template'
 import {
   createPromptDraft,
+  createVariable,
+  findEditingVariableSegment,
   getActivePromptVariables,
   getMissingPromptVariables,
+  isVariableConfigured,
   normalizeVariableType,
   parsePromptTemplate,
   reconcilePromptVariables,
@@ -58,6 +62,29 @@ describe('prompt template core', () => {
     expect(reconciled.unused).toMatchObject([{ name: 'old' }])
   })
 
+  it('drops transient names typed into a placeholder but keeps created or configured ones', () => {
+    const retained = new Set(['Variable 1'])
+    const retainUnused = (variable: EditablePromptVariable) => retained.has(variable.name) || isVariableConfigured(variable)
+    let variables: EditablePromptVariable[] = [createVariable('Variable 1')]
+
+    for (const typed of ['t', 'to', 'top', 'topi', 'topic', 'a', 'au', 'audience']) {
+      variables = reconcilePromptVariables(`Write about {{${typed}}}`, variables, { retainUnused }).all
+    }
+    expect(variables.map(variable => variable.name)).toEqual(['audience', 'Variable 1'])
+
+    const configured = { ...createVariable('tone'), type: 'select', options: ['Formal'] }
+    const reconciled = reconcilePromptVariables('{{voice}}', [configured, createVariable('draft')], { retainUnused })
+    expect(reconciled.unused.map(variable => variable.name)).toEqual(['tone'])
+  })
+
+  it('treats any non-default property as a configured variable', () => {
+    expect(isVariableConfigured(createVariable('name'))).toBe(false)
+    expect(isVariableConfigured({ ...createVariable('name'), description: 'Who' })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), required: false })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), type: 'textarea' })).toBe(true)
+    expect(isVariableConfigured({ ...createVariable('name'), validation: {} })).toBe(false)
+  })
+
   it('renames and removes every occurrence atomically', () => {
     const content = '{{ name }} greets {{name}} and {{other}}'
     expect(replaceVariableName(content, 'name', '角色')).toBe('{{角色}} greets {{角色}} and {{other}}')
@@ -92,5 +119,26 @@ describe('prompt template core', () => {
     })
     expect(getActivePromptVariables(source).map(variable => variable.name)).toEqual(['name'])
     expect(renderPrompt(source, { name: 'Ada' }).content).toBe('Ada / Ada')
+  })
+})
+
+describe('findEditingVariableSegment', () => {
+  const { segments } = parsePromptTemplate('请翻译成 {{yuyan}}，风格 {{tone}}')
+  const yuyanStart = '请翻译成 '.length
+  const yuyanEnd = yuyanStart + '{{yuyan}}'.length
+
+  it('returns the placeholder whose braces surround the cursor', () => {
+    expect(findEditingVariableSegment(segments, [yuyanStart + 4])?.name).toBe('yuyan')
+  })
+
+  it('ignores cursors on placeholder boundaries or outside placeholders', () => {
+    expect(findEditingVariableSegment(segments, [yuyanStart])).toBeNull()
+    expect(findEditingVariableSegment(segments, [yuyanEnd])).toBeNull()
+    expect(findEditingVariableSegment(segments, [1])).toBeNull()
+  })
+
+  it('checks every selection endpoint', () => {
+    const toneInside = segments.filter(segment => segment.kind === 'variable')[1].start + 3
+    expect(findEditingVariableSegment(segments, [0, toneInside])?.name).toBe('tone')
   })
 })
