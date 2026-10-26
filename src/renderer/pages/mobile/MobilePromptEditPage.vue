@@ -354,10 +354,10 @@ const toggleFavorite = () => {
 // 分类 chip 的选中态着色：沿用桌面端“分类自带颜色”的视觉语言
 const categoryChipStyle = (category: Category) => {
   if (formData.value.categoryId !== category.id) return undefined
-  const { color, textColor } = getCategoryTagColor(category)
+  const { color, textColor, borderColor } = getCategoryTagColor(category)
   return {
-    backgroundColor: `${color}1f`,
-    borderColor: color,
+    backgroundColor: color,
+    borderColor,
     color: textColor
   }
 }
