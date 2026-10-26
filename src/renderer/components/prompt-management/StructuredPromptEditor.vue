@@ -63,14 +63,13 @@ import { autocompletion, type CompletionContext, type CompletionResult } from '@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import {
   Compartment, EditorSelection, EditorState, StateEffect, StateField,
-  type Text,
 } from '@codemirror/state'
 import {
   Decoration, EditorView, keymap, placeholder as editorPlaceholder,
   WidgetType, type DecorationSet,
 } from '@codemirror/view'
-import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
-import { parsePromptTemplate, validateVariableName } from '@/lib/utils/prompt-template'
+import type { EditablePromptVariable, ParsedPromptTemplate } from '@/lib/utils/prompt-template'
+import { findEditingVariableSegment, parsePromptTemplate, validateVariableName } from '@/lib/utils/prompt-template'
 
 const props = withDefaults(defineProps<{
   content: string
@@ -111,11 +110,15 @@ let lastSelection = EditorSelection.cursor(props.content.length)
 interface DecorationState {
   visual: boolean
   selected: string
+  focused: boolean
+  parsed: ParsedPromptTemplate
+  editingStart: number
   decorations: DecorationSet
   atomicRanges: DecorationSet
 }
 
 const setDecorationConfig = StateEffect.define<{ visual: boolean; selected: string }>()
+const setEditorFocused = StateEffect.define<boolean>()
 
 class VariableWidget extends WidgetType {
   constructor(
@@ -161,8 +164,14 @@ class VariableWidget extends WidgetType {
   ignoreEvent() { return false }
 }
 
-const buildDecorations = (doc: Text, visual: boolean, selected: string) => {
-  const parsed = parsePromptTemplate(doc.toString())
+// 光标所在或输入法正在组合的 `{{…}}` 保持源码形态，光标离开（或编辑器失焦）后再渲染成变量块。
+const findEditingStart = (parsed: ParsedPromptTemplate, selection: EditorSelection, focused: boolean) => {
+  if (!focused) return -1
+  const positions = selection.ranges.flatMap(range => [range.anchor, range.head])
+  return findEditingVariableSegment(parsed.segments, positions)?.start ?? -1
+}
+
+const buildDecorations = (parsed: ParsedPromptTemplate, visual: boolean, selected: string, editingStart: number) => {
   diagnosticCount.value = parsed.diagnostics.length
   const ranges: any[] = []
   const atomicRanges: any[] = []
@@ -170,7 +179,8 @@ const buildDecorations = (doc: Text, visual: boolean, selected: string) => {
   for (const segment of parsed.segments) {
     if (segment.kind !== 'variable') continue
     const occurrenceCount = parsed.occurrences.get(segment.name)?.length || 1
-    const decoration = visual
+    const renderAsToken = visual && segment.start !== editingStart
+    const decoration = renderAsToken
       ? Decoration.replace({
         widget: new VariableWidget(segment.name, occurrenceCount, selected === segment.name),
       })
@@ -179,7 +189,7 @@ const buildDecorations = (doc: Text, visual: boolean, selected: string) => {
         attributes: { 'data-variable': segment.name },
       })
     ranges.push(decoration.range(segment.start, segment.end))
-    if (visual) atomicRanges.push(decoration.range(segment.start, segment.end))
+    if (renderAsToken) atomicRanges.push(decoration.range(segment.start, segment.end))
   }
 
   for (const diagnostic of parsed.diagnostics) {
@@ -197,25 +207,34 @@ const buildDecorations = (doc: Text, visual: boolean, selected: string) => {
 const variableDecorations = StateField.define<DecorationState>({
   create(state) {
     const visual = !props.sourceOnly
-    const built = buildDecorations(state.doc, visual, props.selectedVariable)
-    return { visual, selected: props.selectedVariable, ...built }
+    const parsed = parsePromptTemplate(state.doc.toString())
+    const built = buildDecorations(parsed, visual, props.selectedVariable, -1)
+    return { visual, selected: props.selectedVariable, focused: false, parsed, editingStart: -1, ...built }
   },
   update(value, transaction) {
-    let visual = value.visual
-    let selected = value.selected
+    let { visual, selected, focused } = value
     let configChanged = false
     transaction.effects.forEach(effect => {
-      if (!effect.is(setDecorationConfig)) return
-      visual = effect.value.visual
-      selected = effect.value.selected
-      configChanged = true
+      if (effect.is(setDecorationConfig)) {
+        visual = effect.value.visual
+        selected = effect.value.selected
+        configChanged = true
+      } else if (effect.is(setEditorFocused)) {
+        focused = effect.value
+      }
     })
-    if (!transaction.docChanged && !configChanged) return value
-    const built = buildDecorations(transaction.state.doc, visual, selected)
-    return { visual, selected, ...built }
+    const parsed = transaction.docChanged ? parsePromptTemplate(transaction.state.doc.toString()) : value.parsed
+    const editingStart = findEditingStart(parsed, transaction.state.selection, focused)
+    if (!transaction.docChanged && !configChanged && editingStart === value.editingStart) {
+      return focused === value.focused ? value : { ...value, focused }
+    }
+    const built = buildDecorations(parsed, visual, selected, editingStart)
+    return { visual, selected, focused, parsed, editingStart, ...built }
   },
   provide: field => EditorView.decorations.from(field, value => value.decorations),
 })
+
+const editorFocusTracker = EditorView.focusChangeEffect.of((_state, focused) => setEditorFocused.of(focused))
 
 const variableAtomicRanges = EditorView.atomicRanges.of(view => view.state.field(variableDecorations).atomicRanges)
 
@@ -228,7 +247,9 @@ const completionSource = (context: CompletionContext): CompletionResult | null =
   if (typed && !existingNames.includes(typed) && !validateVariableName(typed, props.variables)) {
     options.unshift({ label: t('promptEditor.createVariable', { name: typed }), type: 'keyword', apply: `{{${typed}}}` })
   }
-  return { from: token.from, options, filter: false }
+  // 光标在 `{{}}` 中间时，把后面已有的 `}}` 一并替换掉，避免补全后变成 `{{name}}}}`
+  const to = context.state.sliceDoc(context.pos, context.pos + 2) === '}}' ? context.pos + 2 : context.pos
+  return { from: token.from, to, options, filter: false }
 }
 
 const editorTheme = EditorView.theme({
@@ -240,6 +261,35 @@ const editorTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--interactive-focus)' },
   '.cm-gutters': { display: 'none' },
+  // 补全浮层：跟随设计令牌，覆盖 CodeMirror 默认的白底样式
+  '.cm-tooltip': {
+    border: '1px solid var(--border-default)',
+    borderRadius: 'var(--radius-panel)',
+    color: 'var(--content-primary)',
+    backgroundColor: 'var(--surface-primary)',
+    boxShadow: 'var(--shadow-popover)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete': { overflow: 'hidden' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    minWidth: '200px',
+    maxHeight: '240px',
+    padding: '4px',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: '4px 8px',
+    borderRadius: 'var(--radius-control)',
+    color: 'var(--content-primary)',
+    lineHeight: '22px',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li:hover': { backgroundColor: 'var(--interactive-hover)' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    color: 'var(--content-primary)',
+    backgroundColor: 'var(--surface-tertiary)',
+    fontWeight: 'var(--font-weight-medium)',
+  },
+  '.cm-completionMatchedText': { textDecoration: 'none', color: 'var(--accent-primary)' },
 })
 
 onMounted(() => {
@@ -252,7 +302,8 @@ onMounted(() => {
       EditorView.lineWrapping,
       variableDecorations,
       variableAtomicRanges,
-      autocompletion({ override: [completionSource], activateOnTyping: true }),
+      editorFocusTracker,
+      autocompletion({ override: [completionSource], activateOnTyping: true, icons: false }),
       readonlyCompartment.of(EditorState.readOnly.of(props.readonly)),
       editorPlaceholder(props.placeholder),
       editorTheme,
