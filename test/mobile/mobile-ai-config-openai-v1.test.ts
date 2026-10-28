@@ -8,8 +8,9 @@ describe('mobile OpenAI configuration guidance', () => {
     const page = read('src/renderer/pages/mobile/MobileAIConfigEditPage.vue')
 
     expect(page).toContain("t('aiConfig.openaiBaseURLHint')")
-    expect(page).toMatch(/v-if="formData\.type === 'openai' && !isCustomSelected"/)
-    expect(page).toContain('class="base-url-hint"')
+    expect(page).toMatch(/v-if="formData\.type === 'openai' && !isCustomSelected" class="[^"]*\bbase-url-hint\b/)
+    // 自定义服务和 Groq 等预设都算「自定义」，只有官方 OpenAI 才提示 /v1
+    expect(page).toContain('const isCustomSelected = computed(() => Boolean(selectedProviderChoice.value.custom))')
   })
 
   it('defines the hint in every supported locale', () => {

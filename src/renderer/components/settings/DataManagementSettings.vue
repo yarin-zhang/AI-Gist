@@ -1,423 +1,186 @@
 <template>
-    <NCard size="small">
-        <NTabs v-model:value="activeBackupLocation" type="line" animated>
-            <NTabPane name="local" :tab="t('dataBackup.local')">
-                <NFlex vertical :size="16" style="padding-top: 4px;">
-
-            <!-- 数据备份恢复 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText strong>{{ t('dataManagement.backupManagement') }}</NText>
-                        <NFlex :size="12" wrap>
-                            <NButton type="primary" @click="handleCreateBackup" :loading="loading.backup">
-                                <template #icon>
-                                    <NIcon>
-                                        <Upload />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.createBackup') }}
-                            </NButton>
-                            <NButton @click="handleRefreshBackupList" :loading="loading.refreshBackupList">
-                                <template #icon>
-                                    <NIcon>
-                                        <Refresh />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.refreshBackupList') }}
-                            </NButton>
-                            <NButton v-if="capabilities.localBackupDirectory" @click="handleOpenBackupDirectory">
-                                <template #icon>
-                                    <NIcon>
-                                        <Folder />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.openBackupDirectory') }}
-                            </NButton>
-                        </NFlex>
-                    </NFlex>
-
-                    <!-- 备份版本列表 -->
-                    <div v-if="backupList.length > 0">
-                        <NFlex vertical :size="12">
-                            <NText strong>{{ t('dataManagement.backupVersionList') }}</NText>
-
-                            <div class="backup-list" :class="{ 'backup-list--scrollable': showAllBackups }">
-                                <div v-for="backup in visibleBackups" :key="backup.id" class="backup-row">
-                                    <div class="backup-row-info">
-                                        <div class="backup-row-title">{{ backup.version }}</div>
-                                        <NTooltip trigger="hover" placement="bottom-start">
-                                            <template #trigger>
-                                                <NText depth="3" class="backup-row-meta">{{ backup.createdAt }}</NText>
-                                            </template>
-                                            {{ t('dataManagement.backupFileNameTooltip', { name: backup.name }) }}
-                                        </NTooltip>
-                                    </div>
-
-                                    <div class="backup-row-actions">
-                                        <NPopconfirm @positive-click="handleRestoreBackup(backup.id)"
-                                            :negative-text="t('common.cancel')"
-                                            :positive-text="t('dataBackup.confirmRestore')" placement="top"
-                                            :show-icon="false">
-                                            <template #trigger>
-                                                <NButton type="primary" tertiary size="tiny"
-                                                    :loading="loading.restore"
-                                                    :disabled="loading.restore">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Recharging />
-                                                        </NIcon>
-                                                    </template>
-                                                    {{ t('dataManagement.restore') }}
-                                                </NButton>
-                                            </template>
-                                            <div style="max-width: 300px;">
-                                                <p>{{ t('dataManagement.restoreWarning') }}</p>
-                                            </div>
-                                        </NPopconfirm>
-                                        <NPopconfirm @positive-click="handleDeleteBackup(backup.id)"
-                                            :negative-text="t('common.cancel')"
-                                            :positive-text="t('common.confirm')">
-                                            <template #trigger>
-                                                <NButton type="error" quaternary size="tiny">
-                                                    <template #icon>
-                                                        <NIcon>
-                                                            <Trash />
-                                                        </NIcon>
-                                                    </template>
-                                                    {{ t('dataManagement.delete') }}
-                                                </NButton>
-                                            </template>
-                                            {{ t('dataManagement.confirmDeleteBackup') }}
-                                        </NPopconfirm>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-if="backupList.length > BACKUP_PREVIEW_COUNT" class="backup-list-toggle">
-                                <NButton text size="small" @click="showAllBackups = !showAllBackups">
-                                    <template #icon>
-                                        <NIcon>
-                                            <ChevronUp v-if="showAllBackups" />
-                                            <ChevronDown v-else />
-                                        </NIcon>
-                                    </template>
-                                    {{ showAllBackups
-                                        ? t('dataManagement.collapseBackupList')
-                                        : t('dataManagement.showMoreBackups', { count: hiddenBackupCount }) }}
-                                </NButton>
-                            </div>
-                        </NFlex>
-                    </div>
-
-                    <div v-else>
-                        <NText depth="3" style="font-size: 14px;">
-                            {{ t('dataManagement.noBackups') }}
-                        </NText>
-                    </div>
-                </NFlex>
-            </div>
-
-            <NDivider />
-
-            <!-- 完整备份导出/导入 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText strong>{{ t('dataManagement.fullBackupManagement') }}</NText>
-                        <NText depth="3" style="font-size: 12px; ">
-                            {{ t('dataManagement.fullBackupDescription') }}
-                        </NText>
-
-                        <NFlex :size="12" wrap>
-                            <NButton type="primary" @click="handleExportFullBackup" :loading="loading.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <Archive />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.exportFullBackup') }}
-                            </NButton>
-                            <NButton @click="handleImportFullBackup" :loading="loading.import">
-                                <template #icon>
-                                    <NIcon>
-                                        <Folder />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.importFullBackup') }}
-                            </NButton>
-                        </NFlex>
-                    </NFlex>
-                </NFlex>
-            </div>
-
-            <NDivider />
-
-            <!-- 选择性数据导出 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText strong>{{ t('dataManagement.selectiveDataExport') }}</NText>
-                        <NText depth="3" style="font-size: 12px; ">
-                            {{ t('dataManagement.exportDescription') }}
-                        </NText>
-
-                        <!-- 数据类型选择 -->
-                        <NCard size="small">
-                            <NFlex vertical :size="12">
-                                <NText depth="2" style="font-size: 14px;">{{ t('dataManagement.selectDataTypeToExport')
-                                    }}</NText>
-                                <NFlex vertical :size="8">
-                                    <NRadio :checked="exportOptions.selectedType === 'prompts'" value="prompts"
-                                        @update:checked="handleTypeSelection('prompts', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>{{ t('dataManagement.promptLibrary') }}</NText>
-                                            <NTag size="small" type="info">{{ t('dataManagement.promptCount', { count: dataStats.prompts }) }}</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                    <NRadio :checked="exportOptions.selectedType === 'categories'" value="categories"
-                                        @update:checked="handleTypeSelection('categories', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>{{ t('dataManagement.categoryManagement') }}</NText>
-                                            <NTag size="small" type="info">{{ t('dataManagement.categoryCount', { count: dataStats.categories }) }}</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                    <NRadio :checked="exportOptions.selectedType === 'aiConfigs'" value="aiConfigs"
-                                        @update:checked="handleTypeSelection('aiConfigs', $event)">
-                                        <NFlex align="center" :size="8">
-                                            <NText>{{ t('dataManagement.aiConfiguration') }}</NText>
-                                            <NTag size="small" type="info">{{ t('dataManagement.aiConfigCount', { count: dataStats.aiConfigs }) }}</NTag>
-                                            <NTag size="small" type="warning">{{
-                                                t('dataManagement.containsSensitiveInfo') }}</NTag>
-                                        </NFlex>
-                                    </NRadio>
-                                </NFlex>
-                            </NFlex>
-                        </NCard>
-
-                        <NFlex :size="12" wrap>
-                            <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" type="primary"
-                                @click="handleExportSelectedData('csv')" :disabled="!hasSelectedData || !isCSVSupported"
-                                :loading="loading.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.exportToCSV') }}
-                            </NButton>
-                            <NButton @click="handleExportSelectedData('json')" :disabled="!hasSelectedData"
-                                :loading="loading.export">
-                                <template #icon>
-                                    <NIcon>
-                                        <FileExport />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.exportToJSON') }}
-                            </NButton>
-                        </NFlex>
-
-                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="warning" show-icon>
-                            <template #header>{{ t('dataManagement.securityWarning') }}</template>
-                            {{ t('dataManagement.securityWarningText') }}
-                        </NAlert>
-
-                        <NAlert v-if="exportOptions.selectedType === 'aiConfigs'" type="info" show-icon>
-                            <template #header>{{ t('dataManagement.formatNote') }}</template>
-                            {{ t('dataManagement.formatNoteText') }}
-                        </NAlert>
-                    </NFlex>
-                </NFlex>
-            </div>
-
-            <NDivider />
-
-            <!-- 数据库维护 -->
-            <div>
-                <NFlex vertical :size="16">
-                    <NFlex vertical :size="12">
-                        <NText strong>{{ t('dataManagement.databaseMaintenance') }}</NText>
-                        <NText depth="3" style="font-size: 12px">
-                            {{ t('dataManagement.maintenanceDescription') }}
-                        </NText>
-                        <NFlex :size="12" wrap>
-                            <NButton type="primary" @click="handleCheckDatabaseHealth">
-                                <template #icon>
-                                    <NIcon>
-                                        <AlertCircle />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.checkDatabaseHealth') }}
-                            </NButton>
-                            <NButton type="warning" @click="handleRepairDatabase">
-                                <template #icon>
-                                    <NIcon>
-                                        <Database />
-                                    </NIcon>
-                                </template>
-                                {{ t('dataManagement.repairDatabase') }}
-                            </NButton>
-                            <NPopconfirm @positive-click="handleClearDatabase" :negative-text="t('common.cancel')"
-                                :positive-text="t('dataManagement.clearDatabase')" placement="top">
-                                <template #trigger>
-                                    <NButton type="error" :loading="loading.clearDatabase">
-                                        <template #icon>
-                                            <NIcon>
-                                                <DatabaseOff />
-                                            </NIcon>
-                                        </template>
-                                        {{ t('dataManagement.clearDatabase') }}
-                                    </NButton>
-                                </template>
-                                <div style="max-width: 350px;">
-                                    <p><strong>{{ t('dataManagement.clearDatabaseWarning') }}</strong></p>
-                                    <p>{{ t('dataManagement.clearDatabaseWarningText') }}</p>
-                                    <ul style="margin: 8px 0; padding-left: 20px;">
-                                        <li v-for="item in t('dataManagement.clearDatabaseWarningItems')" :key="item">{{
-                                            item }}
-                                        </li>
-                                    </ul>
-                                    <p><strong>{{ t('dataManagement.confirmClearDatabase') }}</strong></p>
-                                </div>
-                            </NPopconfirm>
-                        </NFlex>
-                    </NFlex>
-                </NFlex>
-            </div>
-
-            <!-- 消息提示 -->
-            <NAlert v-if="error" type="error" show-icon closable @close="clearMessages">
-                {{ error }}
-            </NAlert>
-            
-            <NAlert v-if="success" type="success" show-icon closable @close="clearMessages">
-                {{ success }}
-            </NAlert>
-
-            <NCollapse>
-                <NCollapseItem :title="t('dataBackup.automaticBackupSettings')" name="automatic-backup-settings">
-                    <NFlex vertical :size="16" style="padding-top: 4px;">
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('dataBackup.automaticBackupDescription') }}
-                        </NText>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('dataBackup.automaticBackupLifecycleDescription') }}
-                        </NText>
-                        <NFlex align="center" justify="space-between" :size="12" wrap>
-                            <NText>{{ t('dataBackup.enableAutomaticBackup') }}</NText>
-                            <NSwitch v-model:value="autoBackupEnabled" @update:value="saveAutoBackupEnabled" />
-                        </NFlex>
-                        <NFlex align="end" :size="12" wrap>
-                            <NFlex vertical :size="4">
-                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.automaticBackupInterval') }}</NText>
-                                <NSelect v-model:value="autoBackupIntervalSelection"
-                                    :options="autoBackupIntervalOptions"
-                                    style="width: 220px;"
-                                    @update:value="handleAutoBackupIntervalSelection" />
-                            </NFlex>
-                            <NFlex v-if="autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL" vertical :size="4">
-                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.customIntervalMinutes') }}</NText>
-                                <NInputNumber v-model:value="autoBackupIntervalMinutes"
-                                    :min="MIN_AUTO_BACKUP_INTERVAL_MINUTES"
-                                    :max="MAX_AUTO_BACKUP_INTERVAL_MINUTES"
-                                    :step="1" style="width: 180px;">
-                                    <template #suffix>{{ t('dataBackup.minutes') }}</template>
-                                </NInputNumber>
-                            </NFlex>
-                            <NFlex vertical :size="4">
-                                <NText depth="3" style="font-size: 13px;">{{ t('dataBackup.automaticBackupRetention') }}</NText>
-                                <NInputNumber v-model:value="autoBackupRetention" :min="1" :max="100"
-                                    style="width: 160px;">
-                                    <template #suffix>{{ t('dataBackup.copies') }}</template>
-                                </NInputNumber>
-                            </NFlex>
-                            <NButton secondary @click="saveAutoBackupSettings" :loading="autoBackupLoading">
-                                {{ t('dataBackup.saveAutomaticBackupSettings') }}
-                            </NButton>
-                            <NButton secondary @click="runAutoBackupNow"
-                                :loading="autoBackupStatus.status === 'backing-up'">
-                                {{ t('dataBackup.createNow') }}
-                            </NButton>
-                        </NFlex>
-                        <NText depth="3" style="font-size: 12px;">
-                            {{ t('dataBackup.lastAutomaticBackup', {
-                                time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none')
-                            }) }}
-                            <template v-if="autoBackupStatus.nextBackupAt">
-                                · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}
-                            </template>
-                            <template v-if="autoBackupStatus.error">
-                                · {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
-                            </template>
-                        </NText>
-                    </NFlex>
-                </NCollapseItem>
-            </NCollapse>
-                </NFlex>
-            </NTabPane>
-
-            <NTabPane v-for="config in storageConfigs" :key="config.id" :name="config.id"
-                :tab="config.name" :disabled="!config.enabled" display-directive="show:lazy">
-                <CloudBackupLocationPane :config="config" />
-            </NTabPane>
-        </NTabs>
-
-        <NAlert v-if="storageConfigs.length === 0" type="info" style="margin-top: var(--section-gap);">
-            {{ t('dataBackup.noCloudStorageDescription') }}
-            <template #action>
-                <NButton size="small" secondary @click="emit('navigate-section', 'cloud-backup')">
-                    {{ t('dataBackup.configureCloudStorage') }}
-                </NButton>
+    <div class="backup-settings">
+        <!-- 自动备份：开关、间隔、保留份数都是改完即保存，和数据同步页一致 (#443) -->
+        <UiPanel :title="t('dataBackup.automaticBackupTitle')" body="rows">
+            <template #actions>
+                <span class="backup-settings__meta">
+                    {{ t('dataBackup.lastAutomaticBackup', { time: autoBackupStatus.lastBackupAt ? formatBackupDate(autoBackupStatus.lastBackupAt) : t('dataBackup.none') }) }}<template
+                        v-if="autoBackupStatus.nextBackupAt"> · {{ t('dataBackup.nextAutomaticBackup', { time: formatBackupDate(autoBackupStatus.nextBackupAt) }) }}</template>
+                </span>
             </template>
-        </NAlert>
+            <UiSettingRow :title="t('dataBackup.enableAutomaticBackup')" :description="t('dataBackup.automaticBackupLifecycleDescription')">
+                <NSwitch v-model:value="autoBackupEnabled" :aria-label="t('dataBackup.enableAutomaticBackup')" @update:value="saveAutoBackupEnabled" />
+            </UiSettingRow>
+            <UiSettingRow :title="t('dataBackup.automaticBackupInterval')">
+                <span class="backup-settings__inline">
+                    <NInputNumber v-if="autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL" v-model:value="autoBackupIntervalMinutes"
+                        class="backup-settings__number" :show-button="false" :min="MIN_AUTO_BACKUP_INTERVAL_MINUTES" :max="MAX_AUTO_BACKUP_INTERVAL_MINUTES"
+                        :input-props="{ 'aria-label': t('dataBackup.customIntervalMinutes') }"
+                        @blur="saveAutoBackupInterval" @keydown.enter.prevent="saveAutoBackupInterval">
+                        <template #suffix>{{ t('dataBackup.minutes') }}</template>
+                    </NInputNumber>
+                    <NSelect v-model:value="autoBackupIntervalSelection" class="backup-settings__select" :options="autoBackupIntervalOptions"
+                        :aria-label="t('dataBackup.automaticBackupInterval')" @update:value="handleAutoBackupIntervalSelection" />
+                </span>
+            </UiSettingRow>
+            <UiSettingRow :title="t('dataBackup.automaticBackupRetention')" :description="t('dataBackup.retentionDescription')">
+                <NInputNumber v-model:value="autoBackupRetention" class="backup-settings__number" :show-button="false" :min="1" :max="100"
+                    :input-props="{ 'aria-label': t('dataBackup.automaticBackupRetention') }"
+                    @blur="saveAutoBackupRetention" @keydown.enter.prevent="saveAutoBackupRetention">
+                    <template #suffix>{{ t('dataBackup.copies') }}</template>
+                </NInputNumber>
+            </UiSettingRow>
+            <p v-if="autoBackupStatus.error" class="backup-settings__error" role="alert">
+                {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+            </p>
+        </UiPanel>
 
-    </NCard>
+        <!-- 备份版本 -->
+        <UiPanel :title="t('dataBackup.versionsTitle')" body="flush">
+            <template #actions>
+                <span class="backup-settings__actions">
+                    <NButton v-if="activeBackupLocation === 'local' && capabilities.localBackupDirectory" quaternary size="tiny"
+                        @click="handleOpenBackupDirectory">{{ t('dataManagement.openBackupDirectory') }}</NButton>
+                    <NButton quaternary size="tiny" class="backup-settings__icon" :aria-label="t('dataManagement.refreshBackupList')"
+                        :loading="activeBackupLocation === 'local' ? loading.refreshBackupList : cloudPaneRef?.loading.refresh"
+                        @click="handleRefresh">
+                        <template #icon><NIcon :size="14"><Refresh /></NIcon></template>
+                    </NButton>
+                    <NButton size="tiny" :loading="activeBackupLocation === 'local' ? loading.backup : cloudPaneRef?.loading.create"
+                        @click="handleCreate">
+                        <template #icon><NIcon :size="12"><Plus /></NIcon></template>{{ t('dataManagement.createBackup') }}
+                    </NButton>
+                </span>
+            </template>
+
+            <div class="backup-versions">
+                <UiSegmented v-if="storageConfigs.length" v-model="activeBackupLocation" :label="t('dataBackup.versionsTitle')"
+                    :options="locationOptions" />
+                <!-- 停用的存储在分段里点不动，说明原因和去哪里启用 (#445) -->
+                <p v-if="hasDisabledStorage" class="backup-location-hint">
+                    <span>{{ t('dataBackup.disabledStorageHint') }}</span>
+                    <NButton text type="primary" size="tiny" @click="emit('navigate-section', 'cloud-backup')">
+                        {{ t('dataBackup.configureCloudStorage') }}
+                    </NButton>
+                </p>
+
+                <template v-if="activeBackupLocation === 'local'">
+                    <div v-if="backupList.length" class="backup-list" :class="{ 'backup-list--scrollable': showAllBackups }">
+                        <div v-for="backup in visibleBackups" :key="backup.id" class="backup-row">
+                            <div class="backup-row__info">
+                                <NTooltip trigger="hover" placement="bottom-start">
+                                    <template #trigger><span class="backup-row__title">{{ backup.createdAt }}</span></template>
+                                    {{ t('dataManagement.backupFileNameTooltip', { name: backup.name }) }}
+                                </NTooltip>
+                                <span class="backup-row__meta">{{ backup.meta }}</span>
+                            </div>
+                            <span class="backup-row__actions">
+                                <NPopconfirm :negative-text="t('common.cancel')" :positive-text="t('dataBackup.confirmRestore')"
+                                    :show-icon="false" @positive-click="handleRestoreBackup(backup.id)">
+                                    <template #trigger>
+                                        <NButton :loading="loading.restore" :disabled="loading.restore">{{ t('dataManagement.restore') }}</NButton>
+                                    </template>
+                                    <div class="backup-confirm">{{ t('dataManagement.restoreWarning') }}</div>
+                                </NPopconfirm>
+                                <NPopconfirm :negative-text="t('common.cancel')" :positive-text="t('common.confirm')"
+                                    @positive-click="handleDeleteBackup(backup.id)">
+                                    <template #trigger>
+                                        <NButton quaternary type="error" class="backup-settings__icon" :aria-label="t('dataManagement.delete')">
+                                            <template #icon><NIcon :size="14"><Trash /></NIcon></template>
+                                        </NButton>
+                                    </template>
+                                    <div class="backup-confirm">{{ t('dataBackup.confirmDeleteBackupAt', { time: backup.createdAt }) }}</div>
+                                </NPopconfirm>
+                            </span>
+                        </div>
+                    </div>
+                    <p v-else class="backup-empty">{{ t('dataManagement.noBackups') }}</p>
+                    <NButton v-if="backupList.length > BACKUP_PREVIEW_COUNT" quaternary size="tiny" class="backup-toggle"
+                        @click="showAllBackups = !showAllBackups">
+                        {{ showAllBackups ? t('dataManagement.collapseBackupList') : t('dataManagement.showMoreBackups', { count: hiddenBackupCount }) }}
+                    </NButton>
+                </template>
+                <CloudBackupLocationPane v-else-if="activeStorage" ref="cloudPaneRef" :config="activeStorage" />
+
+                <UiAlert tone="warning">{{ t('dataBackup.restoreOverwriteNotice') }}</UiAlert>
+                <div v-if="storageConfigs.length === 0" class="ui-alert backup-cloud-hint">
+                    <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><InfoCircle /></NIcon>
+                    <span class="backup-cloud-hint__text">{{ t('dataBackup.noCloudStorageDescription') }}</span>
+                    <NButton size="tiny" @click="emit('navigate-section', 'cloud-backup')">{{ t('dataBackup.configureCloudStorage') }}</NButton>
+                </div>
+            </div>
+        </UiPanel>
+
+        <!-- 完整备份 -->
+        <!-- 说明在上、按钮在下：意大利语、日语的长按钮不会把说明挤成窄条，也不会伸出面板 (#449) -->
+        <UiPanel :title="t('dataBackup.fullBackupTitle')" data-settings-anchor="full-backup">
+            <div class="backup-full">
+                <p class="backup-full__text">{{ t('dataManagement.fullBackupDescription') }}</p>
+                <div class="backup-full__actions">
+                    <NButton :loading="loading.import" @click="handleImportFullBackup">{{ t('dataManagement.importFullBackup') }}</NButton>
+                    <NButton :loading="fullExportLoading" @click="handleExportFullBackup">{{ t('dataManagement.exportFullBackup') }}</NButton>
+                </div>
+            </div>
+        </UiPanel>
+
+        <!-- 选择性导出 -->
+        <UiPanel :title="t('dataBackup.selectiveExportTitle')">
+            <template #actions><span class="backup-settings__meta">{{ t('dataBackup.selectiveExportHint') }}</span></template>
+            <div class="backup-export">
+                <div class="backup-export__options" role="radiogroup" :aria-label="t('dataManagement.selectDataTypeToExport')">
+                    <label v-for="option in exportTypeOptions" :key="option.value" class="backup-export__option">
+                        <input type="radio" name="export-type" :value="option.value" :checked="exportOptions.selectedType === option.value"
+                            @change="handleTypeSelection(option.value, true)" />
+                        <span>{{ option.label }}</span>
+                        <span class="backup-settings__meta">{{ option.count }}</span>
+                        <span v-if="option.value === 'aiConfigs'" class="ui-tag ui-tag--warning">{{ t('dataBackup.containsApiKeys') }}</span>
+                    </label>
+                </div>
+                <UiAlert v-if="exportOptions.selectedType === 'aiConfigs'" tone="warning">
+                    <strong>{{ t('dataManagement.securityWarning') }}</strong> {{ t('dataManagement.securityWarningText') }}
+                    {{ t('dataManagement.formatNoteText') }}
+                </UiAlert>
+                <div class="backup-export__buttons">
+                    <NButton v-if="exportOptions.selectedType !== 'aiConfigs'" :disabled="!hasSelectedData || !isCSVSupported"
+                        :loading="selectiveExportLoading" @click="handleExportSelectedData('csv')">{{ t('dataManagement.exportToCSV') }}</NButton>
+                    <NButton :disabled="!hasSelectedData" :loading="selectiveExportLoading" @click="handleExportSelectedData('json')">
+                        {{ t('dataManagement.exportToJSON') }}
+                    </NButton>
+                </div>
+            </div>
+        </UiPanel>
+
+        <!-- 数据库维护 -->
+        <UiPanel :title="t('dataManagement.databaseMaintenance')" body="rows">
+            <template #actions><span class="backup-settings__meta">{{ t('dataBackup.maintenanceHint') }}</span></template>
+            <UiSettingRow :title="t('dataBackup.checkAndRepair')" :description="t('dataBackup.checkAndRepairDescription')">
+                <span class="backup-settings__actions">
+                    <NButton :loading="loading.healthCheck" @click="handleCheckDatabaseHealth">{{ t('dataManagement.checkDatabaseHealth') }}</NButton>
+                    <NButton :loading="loading.repair" @click="handleRepairDatabase">{{ t('dataManagement.repairDatabase') }}</NButton>
+                </span>
+            </UiSettingRow>
+            <UiSettingRow :description="t('dataBackup.clearDatabaseDescription')">
+                <template #title><span class="backup-danger-title">{{ t('dataManagement.clearDatabase') }}</span></template>
+                <!-- 最危险的操作用正式的确认弹窗，并要求先勾选确认，不再是按钮旁边的小气泡 (#446) -->
+                <NButton type="error" ghost :loading="loading.clearDatabase" @click="requestClearDatabase">{{ t('dataManagement.clearDatabase') }}</NButton>
+            </UiSettingRow>
+        </UiPanel>
+    </div>
 </template>
 
 <script setup lang="ts">
-import {
-    NCard,
-    NFlex,
-    NText,
-    NButton,
-    NIcon,
-    NAlert,
-    NDivider,
-    NPopconfirm,
-    NTag,
-    NTooltip,
-    NCheckbox,
-    NRadio,
-    NTabs,
-    NTabPane,
-    NCollapse,
-    NCollapseItem,
-    NSwitch,
-    NInputNumber,
-    NSelect,
-    useMessage,
-} from "naive-ui";
-import {
-    FileExport,
-    FileImport,
-    Upload,
-    Download,
-    AlertCircle,
-    Database,
-    Refresh,
-    Trash,
-    Recharging,
-    DatabaseOff,
-    Archive,
-    Folder,
-    ChevronDown,
-    ChevronUp,
-} from "@vicons/tabler";
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { NButton, NCheckbox, NIcon, NInputNumber, NPopconfirm, NSelect, NSwitch, NTooltip, useDialog, useMessage } from "naive-ui";
+import { InfoCircle, Plus, Refresh, Trash } from "@vicons/tabler";
+import UiAlert from '@/components/ui/UiAlert.vue';
+import UiPanel from '@/components/ui/UiPanel.vue';
+import UiSegmented from '@/components/ui/UiSegmented.vue';
+import UiSettingRow from '@/components/ui/UiSettingRow.vue';
+import { ref, computed, h, onMounted, onUnmounted } from "vue";
 import { useI18n } from 'vue-i18n';
 import { useDataManagement } from '@renderer/composables/useDataManagement';
 import { PlatformDetector } from '@shared/platform';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
+import type { FullBackupImportSummary } from '@/lib/api/data-management.api';
 import {
     automaticBackupService,
     AUTOMATIC_BACKUP_INTERVAL_PRESETS,
@@ -427,12 +190,15 @@ import {
     MIN_AUTO_BACKUP_INTERVAL_MINUTES,
 } from '@/lib/services/automatic-backup.service';
 import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
+import { LOCAL_SAFETY_BACKUP_TRIGGERS } from '@/lib/services/local-backup.service';
+import { onDataChange } from '@/lib/services/data-change-events';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
-import { formatDateTime } from '@/lib/utils/date';
+import { formatFriendlyDate } from '@/lib/utils/date';
 import CloudBackupLocationPane from './CloudBackupLocationPane.vue';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const message = useMessage();
+const dialog = useDialog();
 const capabilities = PlatformDetector.getCapabilities();
 const emit = defineEmits<{ 'navigate-section': [section: string] }>();
 
@@ -444,7 +210,9 @@ const autoBackupEnabled = ref(true);
 const autoBackupIntervalMinutes = ref(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
 const autoBackupIntervalSelection = ref<AutoBackupIntervalSelection>(DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES);
 const autoBackupRetention = ref(DEFAULT_AUTO_BACKUP_RETENTION);
-const autoBackupLoading = ref(false);
+// 最近一次保存成功的值：失焦和回车都会触发保存，值没变就不重复保存；取消时也靠它还原
+let savedAutoBackupInterval = DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES;
+let savedAutoBackupRetention = DEFAULT_AUTO_BACKUP_RETENTION;
 const autoBackupStatus = ref<AutomaticBackupStatus>(automaticBackupService.getStatus());
 let unsubscribeBackupStatus: (() => void) | null = null;
 const autoBackupIntervalOptions = computed(() => [
@@ -499,7 +267,10 @@ const dataStats = ref({
 // description 文本（那段文本的语言取决于创建备份那一刻的界面语言，与当前语言
 // 切换无关）。这里始终按 backupType 现算标题文案；日期只在副标题行展示一次
 // （通过 formatDateTime），避免标题和副标题重复显示同一个日期。
-const formatBackupTypeLabel = (backup: { backupType?: string }) => {
+const formatBackupTypeLabel = (backup: { backupType?: string; trigger?: string }) => {
+  if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.restore) return t('dataBackup.safetyBackupRestore');
+  if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.clear) return t('dataBackup.safetyBackupClear');
+  if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.import) return t('dataBackup.safetyBackupImport');
   return backup.backupType === 'automatic'
     ? t('dataManagement.backupTypeAutomatic')
     : t('dataManagement.backupTypeManual');
@@ -508,17 +279,54 @@ const formatBackupTypeLabel = (backup: { backupType?: string }) => {
 // 备份版本列表：默认只展示最近的几条，其余收进「查看更多」
 const BACKUP_PREVIEW_COUNT = 3;
 const showAllBackups = ref(false);
+// 副标题：类型 · 提示词数量（备份内容可读时）· 大小。同一分钟里的两份备份靠提示词数量也能分开
+const formatBackupMeta = (backup: any) => {
+    const prompts = backup.payload?.data?.prompts;
+    return [
+        formatBackupTypeLabel(backup),
+        ...(Array.isArray(prompts) ? [t('promptBrowse.itemCount', { count: prompts.length }, prompts.length)] : []),
+        `${(backup.size / 1024).toFixed(2)} KB`,
+    ].join(' · ');
+};
 const formattedBackups = computed(() => backupList.value.map((backup: any) => ({
     id: backup.id,
     name: backup.name,
-    createdAt: formatDateTime(backup.createdAt),
-    size: `${(backup.size / 1024).toFixed(2)} KB`,
-    version: formatBackupTypeLabel(backup)
+    createdAt: formatFriendlyDate(backup.createdAt, locale.value, { withTime: true }),
+    meta: formatBackupMeta(backup),
 })));
 const visibleBackups = computed(() => showAllBackups.value
     ? formattedBackups.value
     : formattedBackups.value.slice(0, BACKUP_PREVIEW_COUNT));
 const hiddenBackupCount = computed(() => Math.max(backupList.value.length - BACKUP_PREVIEW_COUNT, 0));
+
+const cloudPaneRef = ref<InstanceType<typeof CloudBackupLocationPane>>();
+const activeStorage = computed(() => storageConfigs.value.find(config => config.id === activeBackupLocation.value) || null);
+const locationOptions = computed(() => [
+    { value: 'local', label: t('dataBackup.localLocation') },
+    ...storageConfigs.value.map(config => ({
+        value: config.id,
+        label: config.enabled
+            ? t('dataBackup.cloudLocation', { name: config.name })
+            : t('dataBackup.cloudLocationDisabled', { name: config.name }),
+        disabled: !config.enabled,
+    })),
+]);
+const hasDisabledStorage = computed(() => storageConfigs.value.some(config => !config.enabled));
+const hasEnabledStorage = computed(() => storageConfigs.value.some(config => config.enabled));
+const exportTypeOptions = computed(() => [
+    { value: 'prompts' as const, label: t('dataManagement.promptLibrary'), count: t('dataManagement.promptCount', { count: dataStats.value.prompts }) },
+    { value: 'categories' as const, label: t('dataManagement.categoryManagement'), count: t('dataManagement.categoryCount', { count: dataStats.value.categories }) },
+    { value: 'aiConfigs' as const, label: t('dataManagement.aiConfiguration'), count: t('dataManagement.aiConfigCount', { count: dataStats.value.aiConfigs }) },
+]);
+
+const handleRefresh = async () => {
+    if (activeBackupLocation.value === 'local') await handleRefreshBackupList();
+    else await cloudPaneRef.value?.refreshCloudBackupList();
+};
+const handleCreate = async () => {
+    if (activeBackupLocation.value === 'local') await handleCreateBackup();
+    else await cloudPaneRef.value?.createCloudBackup();
+};
 
 // 选择性导出选项
 const exportOptions = ref({
@@ -544,33 +352,89 @@ const handleTypeSelection = (type: 'prompts' | 'categories' | 'aiConfigs', check
     }
 };
 
+// 操作结果统一用顶部居中的 toast：用户多半停在页面下方操作，原来页顶的横幅根本看不到 (#441)。
+// 失败提示多留一会儿并可手动关闭，保证用户读得完原因。
+const notifyResult = () => {
+    if (error.value) message.error(error.value, { duration: 6000, closable: true });
+    else if (success.value) message.success(success.value);
+    clearMessages();
+};
+
+// 导入、恢复、清空之后「选择性导出」里的条数要跟着变 (#441)
+const refreshDataStats = async () => {
+    const stats = await getDataStatistics();
+    if (stats) dataStats.value = stats;
+};
+
+// 「导出完整备份」和「选择性导出」共用 loading.export，用 activeExport 区分是哪个按钮在转
+const activeExport = ref<'full' | 'selective' | null>(null);
+const fullExportLoading = computed(() => !!loading.value.export && activeExport.value === 'full');
+const selectiveExportLoading = computed(() => !!loading.value.export && activeExport.value === 'selective');
+
 // 事件处理函数
 const handleCreateBackup = async () => {
     await createBackup();
+    notifyResult();
 };
 
 const handleRefreshBackupList = async () => {
     await getBackupList({ showLoading: true });
+    notifyResult();
 };
 
 const handleRestoreBackup = async (backupId: string) => {
-    await restoreBackup(backupId);
+    const restored = await restoreBackup(backupId);
+    notifyResult();
+    if (restored) await Promise.all([getBackupList(), refreshDataStats()]);
 };
 
 const handleDeleteBackup = async (backupId: string) => {
     await deleteBackup(backupId);
+    notifyResult();
 };
 
 const handleOpenBackupDirectory = async () => {
     await openBackupDirectory();
+    notifyResult();
 };
 
 const handleExportFullBackup = async () => {
-    await exportFullBackup();
+    activeExport.value = 'full';
+    try {
+        await exportFullBackup();
+    } finally { activeExport.value = null; }
+    notifyResult();
 };
 
+// 导入会替换本机全部数据：选好文件后先说清楚文件里有什么、会发生什么，再动手
+const approveImport = (summary: FullBackupImportSummary) => new Promise<boolean>(resolve => {
+    let settled = false;
+    const finish = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+    };
+    dialog.warning({
+        title: t('dataBackup.importConfirmTitle'),
+        content: t('dataBackup.importConfirmContent', { ...summary }),
+        positiveText: t('dataBackup.importConfirmPositive'),
+        negativeText: t('common.cancel'),
+        maskClosable: false,
+        onPositiveClick: () => finish(true),
+        onNegativeClick: () => finish(false),
+        onClose: () => finish(false),
+        onAfterLeave: () => finish(false),
+    });
+});
+
 const handleImportFullBackup = async () => {
-    await importFullBackup();
+    if (await importFullBackup(approveImport)) {
+        message.success(t('dataBackup.importDoneWithBackup'));
+        clearMessages();
+        await refreshDataStats();
+        return;
+    }
+    notifyResult();
 };
 
 const handleExportSelectedData = async (format: 'csv' | 'json') => {
@@ -581,19 +445,54 @@ const handleExportSelectedData = async (format: 'csv' | 'json') => {
         includePrompts: exportOptions.value.selectedType === 'prompts',
         includeAIConfigs: exportOptions.value.selectedType === 'aiConfigs',
     };
-    await exportSelectedData(format, options);
+    activeExport.value = 'selective';
+    try {
+        await exportSelectedData(format, options);
+    } finally { activeExport.value = null; }
+    notifyResult();
 };
 
 const handleCheckDatabaseHealth = async () => {
     await checkDatabaseHealth();
+    notifyResult();
 };
 
 const handleRepairDatabase = async () => {
     await repairDatabase();
+    notifyResult();
 };
 
 const handleClearDatabase = async () => {
-    await clearDatabase();
+    const cleared = await clearDatabase();
+    notifyResult();
+    if (cleared) await refreshDataStats();
+};
+
+// 清空前说清楚：会先自动备份、去哪里找回、开着同步时会影响其他设备；勾选确认后才能点「清空」(#446)
+const requestClearDatabase = () => {
+    const acknowledged = ref(false);
+    const confirmDialog = dialog.error({
+        title: t('dataBackup.clearConfirmTitle'),
+        content: () => h('div', { class: 'backup-clear-confirm' }, [
+            h('p', { style: 'margin: 0 0 8px' }, t('dataBackup.clearConfirmContent')),
+            h('p', { style: 'margin: 0 0 8px' }, t('dataBackup.clearConfirmBackup')),
+            hasEnabledStorage.value ? h('p', { style: 'margin: 0 0 8px' }, t('dataBackup.clearConfirmSync')) : null,
+            h(NCheckbox, {
+                checked: acknowledged.value,
+                'onUpdate:checked': (value: boolean) => {
+                    acknowledged.value = value;
+                    confirmDialog.positiveButtonProps = { type: 'error', disabled: !value };
+                },
+            }, { default: () => t('dataBackup.clearConfirmAcknowledge') }),
+        ]),
+        positiveText: t('dataBackup.clearConfirmPositive'),
+        negativeText: t('common.cancel'),
+        positiveButtonProps: { type: 'error', disabled: true },
+        onPositiveClick: () => {
+            if (!acknowledged.value) return false;
+            void handleClearDatabase();
+        },
+    });
 };
 
 const loadStorageConfigs = async () => {
@@ -615,6 +514,8 @@ const loadAutomaticBackupSettings = async () => {
         automaticBackupService.getIntervalMinutes(),
         automaticBackupService.getRetention(),
     ]);
+    savedAutoBackupInterval = autoBackupIntervalMinutes.value;
+    savedAutoBackupRetention = autoBackupRetention.value;
     autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
         ? autoBackupIntervalMinutes.value
         : CUSTOM_AUTO_BACKUP_INTERVAL;
@@ -622,7 +523,11 @@ const loadAutomaticBackupSettings = async () => {
 
 const handleAutoBackupIntervalSelection = (value: AutoBackupIntervalSelection) => {
     autoBackupIntervalSelection.value = value;
-    if (typeof value === 'number') autoBackupIntervalMinutes.value = value;
+    // 选「自定义」时先让用户填分钟数，填完（失焦或回车）再保存
+    if (typeof value === 'number') {
+        autoBackupIntervalMinutes.value = value;
+        void saveAutoBackupInterval();
+    }
 };
 
 const saveAutoBackupEnabled = async (enabled: boolean) => {
@@ -630,14 +535,61 @@ const saveAutoBackupEnabled = async (enabled: boolean) => {
     message.success(enabled ? t('dataBackup.automaticBackupEnabled') : t('dataBackup.automaticBackupDisabled'));
 };
 
-const saveAutoBackupSettings = async () => {
-    autoBackupLoading.value = true;
+// 间隔和保留份数改完即保存（和同页的开关、数据同步页的检查间隔一致），
+// 不再需要额外点「保存备份策略」，也就不会改完忘了保存、离开后悄悄丢失 (#443)
+const saveAutoBackupInterval = async () => {
+    const minutes = autoBackupIntervalMinutes.value;
+    if (typeof minutes !== 'number' || minutes === savedAutoBackupInterval) return;
     try {
-        autoBackupIntervalMinutes.value = await automaticBackupService.setIntervalMinutes(autoBackupIntervalMinutes.value);
-        autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(autoBackupIntervalMinutes.value)
-            ? autoBackupIntervalMinutes.value
-            : CUSTOM_AUTO_BACKUP_INTERVAL;
-        const retentionResult = await automaticBackupService.setRetention(autoBackupRetention.value);
+        const saved = await automaticBackupService.setIntervalMinutes(minutes);
+        savedAutoBackupInterval = saved;
+        autoBackupIntervalMinutes.value = saved;
+        autoBackupIntervalSelection.value = isAutomaticBackupIntervalPreset(saved) ? saved : CUSTOM_AUTO_BACKUP_INTERVAL;
+        message.success(t('dataBackup.automaticBackupIntervalSaved', { interval: formatAutomaticBackupInterval(saved) }));
+    } catch (error) {
+        console.error('保存自动备份间隔失败:', error);
+        message.error(t('dataBackup.automaticBackupSettingsSaveFailed'));
+    }
+};
+
+const automaticBackupCount = computed(() => backupList.value.filter(backup => backup.backupType === 'automatic').length);
+
+// 调低保留份数会立刻删除多出来的旧自动备份：会删的时候先确认，取消就恢复原来的份数
+const confirmRetentionPrune = (retention: number) => new Promise<boolean>(resolve => {
+    const pruneCount = automaticBackupCount.value - retention;
+    if (pruneCount <= 0) return resolve(true);
+    let settled = false;
+    const finish = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+    };
+    dialog.warning({
+        title: t('dataBackup.retentionPruneTitle'),
+        content: t('dataBackup.retentionPruneContent', { retention, count: pruneCount }),
+        positiveText: t('dataBackup.retentionPrunePositive'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: () => finish(true),
+        onNegativeClick: () => finish(false),
+        onClose: () => finish(false),
+        onAfterLeave: () => finish(false),
+    });
+});
+
+// 回车保存时要拦掉回车的默认行为（模板里的 .prevent）：否则确认框一弹出，
+// 同一次回车会落到确认框的按钮上，把它直接关掉
+let savingRetention = false;
+const saveAutoBackupRetention = async () => {
+    const retention = autoBackupRetention.value;
+    if (typeof retention !== 'number' || retention === savedAutoBackupRetention || savingRetention) return;
+    savingRetention = true;
+    try {
+        if (!(await confirmRetentionPrune(retention))) {
+            autoBackupRetention.value = savedAutoBackupRetention;
+            return;
+        }
+        const retentionResult = await automaticBackupService.setRetention(retention);
+        savedAutoBackupRetention = retentionResult.retention;
         autoBackupRetention.value = retentionResult.retention;
         if (retentionResult.warnings.length > 0) {
             message.warning(t('dataBackup.automaticBackupRetentionWarning', {
@@ -648,116 +600,252 @@ const saveAutoBackupSettings = async () => {
                 count: retentionResult.deletedCount,
                 deferred: retentionResult.deferredCount
             }));
-        } else {
+        } else if (retentionResult.deletedCount > 0) {
             message.success(t('dataBackup.automaticBackupRetentionApplied', {
                 count: retentionResult.deletedCount
             }));
+        } else {
+            message.success(t('dataBackup.automaticBackupRetentionSaved', { count: retentionResult.retention }));
         }
+        if (retentionResult.deletedCount > 0) await getBackupList();
     } catch (error) {
-        console.error('保存自动备份设置失败:', error);
+        console.error('保存自动备份保留份数失败:', error);
         message.error(t('dataBackup.automaticBackupSettingsSaveFailed'));
     } finally {
-        autoBackupLoading.value = false;
+        savingRetention = false;
     }
 };
 
-const runAutoBackupNow = async () => {
-    await automaticBackupService.runNow('manual');
-    const status = automaticBackupService.getStatus();
-    if (status.error) message.error(status.error);
-    else if (status.lastRunAction === 'unchanged') message.success(t('dataBackup.automaticBackupUnchanged'));
-    else message.success(t('dataBackup.automaticBackupCreatedAndRotated', { count: status.deletedCount || 0 }));
+const formatBackupDate = (value: string) => formatFriendlyDate(value, locale.value, { withTime: true });
+
+// 同步、其他窗口改了数据时统计也要跟上；连续写入只刷新一次
+let unsubscribeDataChanges: (() => void) | null = null;
+let statsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+const scheduleStatsRefresh = () => {
+    if (statsRefreshTimer) clearTimeout(statsRefreshTimer);
+    statsRefreshTimer = setTimeout(() => {
+        statsRefreshTimer = null;
+        void refreshDataStats();
+    }, 300);
 };
 
-const formatBackupDate = (value: string) => formatDateTime(value);
-
-// 监听备份列表变化
-watch(() => backupList.value.length, (newLength, oldLength) => {
-    console.log(`备份列表长度变化: ${oldLength} -> ${newLength}`);
-});
+// 自动备份在后台新建版本后，版本列表也跟着刷新
+let lastAutoBackupAt: string | undefined;
 
 // 初始化
 onMounted(async () => {
     unsubscribeBackupStatus = automaticBackupService.onStatusChange(status => {
         autoBackupStatus.value = status;
+        if (status.lastBackupAt && lastAutoBackupAt && status.lastBackupAt !== lastAutoBackupAt) void getBackupList();
+        lastAutoBackupAt = status.lastBackupAt;
     });
-    console.log('组件挂载，开始加载数据...');
+    unsubscribeDataChanges = onDataChange(['prompts', 'categories', 'ai_configs'], scheduleStatsRefresh);
     await Promise.all([
         getBackupList(),
         loadStorageConfigs(),
         loadAutomaticBackupSettings(),
+        refreshDataStats(),
     ]);
-    console.log('备份列表加载完成，当前长度:', backupList.value.length);
-    
-    // 加载数据统计
-    const stats = await getDataStatistics();
-    if (stats) {
-        dataStats.value = stats;
-    }
-    console.log('数据统计加载完成');
+    notifyResult();
 });
 
 onUnmounted(() => {
     unsubscribeBackupStatus?.();
+    unsubscribeDataChanges?.();
+    if (statsRefreshTimer) clearTimeout(statsRefreshTimer);
 });
 </script>
 
 <style scoped>
+.backup-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.backup-settings__meta {
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+}
+
+.backup-settings__inline,
+.backup-settings__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.backup-settings__actions {
+    gap: 4px;
+}
+
+.backup-settings__select {
+    width: 160px;
+}
+
+.backup-settings__number {
+    width: 120px;
+}
+
+.backup-settings__icon {
+    width: 28px;
+    padding: 0;
+}
+
+.backup-settings__error {
+    margin: 0;
+    padding: 8px 0 12px;
+    color: var(--accent-error);
+    font-size: var(--font-size-sm);
+}
+
+.backup-versions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px 16px;
+}
+
+.backup-versions > .ui-seg {
+    align-self: flex-start;
+}
+
 .backup-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
 }
 
 .backup-list--scrollable {
-    max-height: 320px;
+    max-height: 360px;
     overflow-y: auto;
-    padding-right: 4px;
 }
 
 .backup-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 10px;
-    border-radius: var(--radius-panel);
-    transition: background-color .12s ease;
+    min-height: 56px;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
-.backup-row:hover {
-    background: var(--interactive-hover);
-}
-
-.backup-row-info {
-    flex: 1;
-    min-width: 0;
+.backup-row__info {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
 
-.backup-row-title {
-    font-size: 14px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.backup-row-meta {
-    font-size: 12px;
+.backup-row__title {
     width: fit-content;
+    font-size: var(--font-size-base);
     cursor: default;
 }
 
-.backup-row-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
+.backup-row__meta {
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
 }
 
-.backup-list-toggle {
+.backup-row__actions {
     display: flex;
-    justify-content: center;
+    flex: none;
+    gap: 4px;
+}
+
+.backup-empty {
+    margin: 0;
+    padding: 16px 0;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.backup-toggle {
+    align-self: flex-start;
+    margin: 4px 0;
+}
+
+.backup-cloud-hint {
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* 长文案（意大利语等）时按钮换到下一行，说明不被挤成窄条 */
+.backup-cloud-hint__text {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.backup-confirm {
+    max-width: 320px;
+}
+
+.backup-confirm p {
+    margin: 0 0 6px;
+}
+
+.backup-full {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.backup-full__text {
+    margin: 0;
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.backup-full__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.backup-location-hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.backup-export {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.backup-export__options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.backup-export__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-base);
+    cursor: pointer;
+}
+
+.backup-export__option input {
+    margin: 0;
+    accent-color: var(--accent-primary);
+}
+
+.backup-export__buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.backup-danger-title {
+    color: var(--accent-error);
 }
 </style>

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH,
+  createCloudSyncCategoryNameLookup,
+  createCloudSyncConflictPreview,
   createCloudSyncDataChecksum,
   createCloudSyncSemanticChecksum,
   createCloudSyncSnapshot,
+  getCloudSyncConflictId,
   getCloudSyncRecordKey,
   mergeCloudSyncData,
   validateCloudSyncSnapshot
@@ -475,6 +479,80 @@ describe('cloud sync engine', () => {
     expect(result.data.prompts?.[0].title).toBe('Remote')
   })
 
+  it('lets the user keep a chosen side for each conflicting record', () => {
+    const base = {
+      prompts: [
+        { id: 1, uuid: 'prompt-1', title: 'Base', content: 'A', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { id: 2, uuid: 'prompt-2', title: 'Base 2', content: 'B', updatedAt: '2026-01-01T00:00:00.000Z' }
+      ]
+    }
+    const local = {
+      prompts: [
+        { id: 1, uuid: 'prompt-1', title: 'Local', content: 'Local body', updatedAt: '2026-01-02T00:00:00.000Z' },
+        { id: 2, uuid: 'prompt-2', title: 'Local 2', content: 'B', updatedAt: '2026-01-02T00:00:00.000Z' }
+      ]
+    }
+    const remote = {
+      prompts: [
+        { id: 7, uuid: 'prompt-1', title: 'Remote', content: 'A', updatedAt: '2026-01-03T00:00:00.000Z' },
+        { id: 8, uuid: 'prompt-2', title: 'Remote 2', content: 'B', updatedAt: '2026-01-03T00:00:00.000Z' }
+      ]
+    }
+    const preview = mergeCloudSyncData(local, remote, base)
+    expect(preview.conflicts.map(getCloudSyncConflictId)).toEqual(['prompts::uuid:prompt-1', 'prompts::uuid:prompt-2'])
+
+    const result = mergeCloudSyncData(local, remote, base, {
+      resolutions: { 'prompts::uuid:prompt-1': 'local', 'prompts::uuid:prompt-2': 'remote' }
+    })
+
+    const byUuid = Object.fromEntries((result.data.prompts || []).map(prompt => [prompt.uuid, prompt]))
+    // 选本机时整条保留本机版本，连同本机独有的正文修改
+    expect(byUuid['prompt-1']).toMatchObject({ title: 'Local', content: 'Local body' })
+    expect(byUuid['prompt-2']).toMatchObject({ title: 'Remote 2' })
+    expect(result.conflicts.map(conflict => conflict.resolution)).toEqual(['keep-local', 'take-remote'])
+  })
+
+  it('lets the user keep a deletion over an edit from the other side', () => {
+    const base = {
+      categories: [{ id: 1, uuid: 'cat-1', name: 'Original', updatedAt: '2026-01-01T00:00:00.000Z' }]
+    }
+
+    const localDeleteWins = mergeCloudSyncData(
+      { categories: [] },
+      { categories: [{ id: 2, uuid: 'cat-1', name: 'Remote edit', updatedAt: '2026-01-02T00:00:00.000Z' }] },
+      base,
+      { resolutions: { 'categories::uuid:cat-1': 'local' } }
+    )
+    expect(localDeleteWins.data.categories).toEqual([])
+    expect(localDeleteWins.conflicts[0]).toMatchObject({ reason: 'delete_vs_update', resolution: 'keep-local' })
+
+    const remoteDeleteWins = mergeCloudSyncData(
+      { categories: [{ id: 1, uuid: 'cat-1', name: 'Local edit', updatedAt: '2026-01-02T00:00:00.000Z' }] },
+      { categories: [] },
+      base,
+      { resolutions: { 'categories::uuid:cat-1': 'remote' } }
+    )
+    expect(remoteDeleteWins.data.categories).toEqual([])
+    expect(remoteDeleteWins.conflicts[0]).toMatchObject({ reason: 'delete_vs_update', resolution: 'take-remote' })
+  })
+
+  it('ignores a stored choice once the record no longer conflicts', () => {
+    const base = {
+      prompts: [{ id: 1, uuid: 'prompt-1', title: 'Base', content: 'A', updatedAt: '2026-01-01T00:00:00.000Z' }]
+    }
+    const local = {
+      prompts: [{ id: 1, uuid: 'prompt-1', title: 'Local title', content: 'A', updatedAt: '2026-01-02T00:00:00.000Z' }]
+    }
+    const remote = {
+      prompts: [{ id: 7, uuid: 'prompt-1', title: 'Base', content: 'Remote body', updatedAt: '2026-01-03T00:00:00.000Z' }]
+    }
+
+    const result = mergeCloudSyncData(local, remote, base, { resolutions: { 'prompts::uuid:prompt-1': 'remote' } })
+
+    expect(result.hasConflicts).toBe(false)
+    expect(result.data.prompts?.[0]).toMatchObject({ title: 'Local title', content: 'Remote body' })
+  })
+
   it('creates sync snapshots without mutating input data', () => {
     const data = {
       aiConfigs: [
@@ -911,5 +989,51 @@ describe('cloud sync engine', () => {
       expect.objectContaining({ collectionName: 'categories', recordUuid: 'cat-1' }),
       expect.objectContaining({ collectionName: 'prompts', recordUuid: 'prompt-1' })
     ]))
+  })
+})
+
+describe('conflict previews (#447)', () => {
+  it('shows a prompt title, category name, tags and the beginning of the body', () => {
+    const categoryNameOf = createCloudSyncCategoryNameLookup({
+      categories: [{ id: 3, uuid: 'cat-3', name: '写作' }, { id: 4, uuid: 'cat-4', name: 'Deleted', isDeleted: true }]
+    })
+    const preview = createCloudSyncConflictPreview('prompts', {
+      uuid: 'p', title: '  周报  ', content: 'x'.repeat(CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH + 50), categoryId: 3,
+      tags: ['工作', ' 周报 '], description: '每周五用', imageBlobs: ['data:image/png;base64,AAAA']
+    }, { categoryNameOf })
+
+    expect(preview?.title).toBe('周报')
+    expect(preview?.fields).toEqual([
+      { key: 'category', value: '写作' },
+      { key: 'tags', value: '工作, 周报' },
+      { key: 'description', value: '每周五用' }
+    ])
+    expect(preview?.excerpt?.endsWith('…')).toBe(true)
+    expect(Array.from(preview?.excerpt || '').length).toBe(CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH + 1)
+    expect(JSON.stringify(preview)).not.toContain('image/png')
+    expect(categoryNameOf({ categoryId: 4 })).toBeUndefined()
+    expect(categoryNameOf({ categoryUuid: 'cat-3', categoryId: 99 })).toBe('写作')
+  })
+
+  it('never exposes API keys or endpoints of AI configs, nor secret-looking settings', () => {
+    const ai = createCloudSyncConflictPreview('aiConfigs', {
+      name: 'OpenAI', type: 'openai', apiKey: 'sk-secret', baseURL: 'https://api.example.com?token=x', defaultModel: 'gpt-4o'
+    })
+    expect(ai).toEqual({ title: 'OpenAI', fields: [{ key: 'provider', value: 'openai' }, { key: 'model', value: 'gpt-4o' }] })
+    expect(JSON.stringify(ai)).not.toContain('sk-secret')
+
+    expect(createCloudSyncConflictPreview('settings', { key: 'webdav.password', value: 'hunter2' })?.fields).toEqual([])
+    expect(createCloudSyncConflictPreview('settings', { key: 'theme', value: 'dark' })?.fields).toEqual([{ key: 'value', value: 'dark' }])
+  })
+
+  it('returns no preview for a deleted or missing side', () => {
+    expect(createCloudSyncConflictPreview('prompts', undefined)).toBeUndefined()
+    expect(createCloudSyncConflictPreview('prompts', { uuid: 'p', title: 'x', isDeleted: true })).toBeUndefined()
+    expect(createCloudSyncConflictPreview('categories', { uuid: 'c', name: 'x', _deleted: true })).toBeUndefined()
+  })
+
+  it('does not split emoji when truncating', () => {
+    const preview = createCloudSyncConflictPreview('prompts', { title: 't', content: '😀'.repeat(CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH + 5) })
+    expect(preview?.excerpt).toBe('😀'.repeat(CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH) + '…')
   })
 })

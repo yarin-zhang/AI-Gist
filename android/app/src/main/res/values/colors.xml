@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 覆盖 Capacitor 默认的靛蓝 / 粉色，和 design-tokens.json 的主色一致 -->
+<resources>
+    <!-- accent.primary -->
+    <color name="colorPrimary">#2667E0</color>
+    <!-- accent.primaryHover：旧版本 Android 的状态栏底色，白色图标在上面依然清楚 -->
+    <color name="colorPrimaryDark">#1A56C4</color>
+    <color name="colorAccent">#2667E0</color>
+</resources>

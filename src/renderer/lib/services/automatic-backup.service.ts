@@ -75,7 +75,8 @@ export interface AutomaticBackupServiceDeps {
   backupService?: {
     list(): Promise<LocalBackupInfo[]>;
     create(options: {
-      description: string;
+      /** 不传时由备份服务按当前语言生成 */
+      description?: string;
       backupType: 'automatic';
       trigger: AutomaticBackupTrigger;
       retention: number;

@@ -1,70 +1,63 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ t('aiConfig.editGenerationPrompt') }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="handleSave" :disabled="saving">
-            {{ t('common.save') }}
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="t('aiConfig.systemPrompt')" leading="none" solid>
+      <template #start>
+        <button type="button" class="m-btn-c" :aria-label="t('common.back')" @click="handleBack">
+          <ion-icon :icon="chevronBack" />
+        </button>
+      </template>
+      <template #end>
+        <button type="button" class="m-save" :disabled="saving || !originalConfig" @click="handleSave">
+          {{ t('common.save') }}
+        </button>
+      </template>
+    </MobileNavBar>
 
-    <ion-content :fullscreen="true">
-      <div class="editor-container">
-        <!-- 提示信息 -->
-        <div class="section-content info-card">
-          <p class="info-text">{{ t('aiConfig.systemPromptTip') }}</p>
+    <ion-content class="m-page-content">
+      <div class="m-body prompt-body">
+        <!-- 说明 -->
+        <div class="prompt-tip" role="note">
+          <ion-icon :icon="informationCircleOutline" aria-hidden="true" />
+          <span>{{ t('models.systemPromptTip') }}</span>
         </div>
 
-        <!-- 编辑器 -->
-        <div class="section-content editor-card">
-          <ion-textarea
-            v-model="systemPrompt"
-            :placeholder="t('aiConfig.systemPromptPlaceholder')"
-            :auto-grow="true"
-            :rows="15"
-            class="system-prompt-textarea"
-          ></ion-textarea>
+        <!-- 编辑器：占满剩余高度 -->
+        <div class="m-card prompt-editor">
+          <textarea v-model="systemPrompt" class="prompt-editor__input" :aria-label="t('aiConfig.systemPrompt')"
+            :placeholder="t('aiConfig.systemPromptPlaceholder')" />
+          <div class="prompt-editor__meta">
+            <span>{{ isDefaultPrompt ? t('aiConfig.systemPromptDefault') : t('aiConfig.systemPromptCustomized') }}</span>
+            <span>{{ t('mobileModels.charCount', { count: systemPrompt.length }) }}</span>
+          </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <ion-button expand="block" fill="outline" color="medium" @click="handleReset">
-            <ion-icon slot="start" :icon="refreshOutline"></ion-icon>
-            {{ t('aiConfig.resetToDefault') }}
-          </ion-button>
-        </div>
+        <button type="button" class="m-cta m-cta-2 prompt-reset" :disabled="isDefaultPrompt" @click="handleReset">
+          <ion-icon :icon="refreshOutline" aria-hidden="true" />
+          {{ t('aiConfig.resetToDefault') }}
+        </button>
       </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
-  IonButtons,
-  IonButton,
-  IonBackButton,
-  IonTextarea,
   IonIcon,
-  alertController
+  useBackButton
 } from '@ionic/vue'
-import { refreshOutline } from 'ionicons/icons'
+import { chevronBack, informationCircleOutline, refreshOutline } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 import type { AIConfig } from '@shared/types'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import { DEFAULT_SYSTEM_PROMPT_KEY } from '~/lib/services/mobile-ai-generator.service'
+import { confirmAlert } from '~/components/mobile/models/useConfigActions'
+import { useSwipeBackGuard } from '~/components/mobile/useSwipeBackGuard'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -72,20 +65,14 @@ const router = useRouter()
 
 // 状态
 const systemPrompt = ref('')
+const snapshot = ref('')
 const originalConfig = ref<AIConfig | null>(null)
 const saving = ref(false)
 
-// 默认系统提示词
-const DEFAULT_SYSTEM_PROMPT = `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
-
-要求：
-1. 提示词应该清晰、具体、可操作
-2. 包含必要的上下文和约束条件
-3. 使用适当的格式和结构
-4. 考虑不同的使用场景
-5. 提供具体的输出格式要求
-
-请直接返回优化后的提示词内容，不需要额外的解释。`
+// 默认系统提示词：和 AI 生成实际使用的是同一段多语言文案（同一个 key）
+const defaultPrompt = computed(() => t(DEFAULT_SYSTEM_PROMPT_KEY))
+const isDefaultPrompt = computed(() => systemPrompt.value.trim() === defaultPrompt.value.trim())
+const isDirty = computed(() => originalConfig.value !== null && systemPrompt.value !== snapshot.value)
 
 // 加载配置
 const loadConfig = async () => {
@@ -95,7 +82,8 @@ const loadConfig = async () => {
 
     if (config) {
       originalConfig.value = config
-      systemPrompt.value = config.systemPrompt || DEFAULT_SYSTEM_PROMPT
+      systemPrompt.value = config.systemPrompt || defaultPrompt.value
+      snapshot.value = systemPrompt.value
     } else {
       showToast(t('aiConfig.configNotFound'), 'danger')
       router.back()
@@ -106,46 +94,67 @@ const loadConfig = async () => {
   }
 }
 
-// 重置为默认
+// 重置为默认（只改编辑器内容，保存后生效）
 const handleReset = async () => {
-  const alert = await alertController.create({
+  const confirmed = await confirmAlert({
     header: t('common.confirm'),
     message: t('aiConfig.resetToDefault'),
-    buttons: [
-      {
-        text: t('common.cancel'),
-        role: 'cancel'
-      },
-      {
-        text: t('common.confirm'),
-        handler: () => {
-          systemPrompt.value = DEFAULT_SYSTEM_PROMPT
-          showToast(t('common.update'))
-        }
-      }
-    ]
+    confirmText: t('common.confirm'),
+    cancelText: t('common.cancel')
   })
-
-  await alert.present()
+  if (confirmed) {
+    systemPrompt.value = defaultPrompt.value
+  }
 }
 
-// 保存
+const leavePage = () => {
+  if (window.history.length > 1) router.back()
+  else router.replace(`/ai-config/${route.params.id}`)
+}
+
+// 返回：有未保存的修改先确认
+const handleBack = async () => {
+  if (saving.value) return
+  if (isDirty.value) {
+    const discard = await confirmAlert({
+      header: t('aiConfig.workspace.unsavedChanges'),
+      message: t('aiConfig.workspace.unsavedPromptMessage'),
+      confirmText: t('aiConfig.workspace.discardChanges'),
+      cancelText: t('aiConfig.workspace.continueEditing'),
+      destructive: true
+    })
+    if (!discard) return
+  }
+  leavePage()
+}
+
+useBackButton(10, () => {
+  handleBack()
+})
+
+// iOS 边缘右滑返回：有未保存的修改时关闭，只能点返回按钮走确认
+useSwipeBackGuard(isDirty)
+
+// 保存：内容为空或与默认一致时存空值，生成时自动使用内置默认提示词
 const handleSave = async () => {
   if (!originalConfig.value) return
 
   saving.value = true
 
   try {
+    const content = systemPrompt.value.trim()
+    const value = !content || content === defaultPrompt.value.trim() ? '' : systemPrompt.value
     await api.aiConfigs.update.mutate({
       id: originalConfig.value.id!,
       data: {
         ...originalConfig.value,
-        systemPrompt: systemPrompt.value
+        systemPrompt: value
       }
     })
 
+    snapshot.value = systemPrompt.value
     showToast(t('aiConfig.systemPromptUpdateSuccess'))
-    router.back()
+    leavePage()
   } catch (error) {
     console.error('保存失败:', error)
     showToast(t('aiConfig.updateFailed'), 'danger')
@@ -166,61 +175,67 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/*
- * 说明卡片 / 编辑器容器复用 MobileAIConfigDetailPage.vue、MobileAIConfigEditPage.vue
- * 里已经在用的“分组内容块”样式（secondary 背景 + 边框 + 大圆角），
- * 而不是裸的 ion-card，以便和同一功能下的其它移动端页面保持一致的卡片语言。
- */
-.editor-container {
+/* 页面撑满一屏，编辑卡片吃掉剩余高度 */
+.prompt-body {
+  box-sizing: border-box;
+  min-height: 100%;
+  gap: 14px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.prompt-tip {
   display: flex;
-  flex-direction: column;
-  gap: var(--section-gap);
-  padding: var(--content-padding);
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--m-radius-card);
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
 }
 
-.section-content {
-  background: var(--surface-secondary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  overflow: hidden;
+.prompt-tip ion-icon {
+  flex: none;
+  margin-top: 2px;
+  font-size: 18px;
 }
 
-.info-card {
-  padding: var(--content-padding);
+.prompt-editor {
+  flex: 1;
+  gap: 10px;
+  min-height: 320px;
+  padding: 16px 18px;
 }
 
-.info-text {
-  color: var(--ion-color-medium);
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  margin: 0;
+.prompt-editor__input {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--m-font-body);
+  line-height: 1.75;
+  resize: none;
 }
 
-.editor-card {
-  padding: var(--content-padding);
+.prompt-editor__input::placeholder {
+  color: var(--content-muted);
 }
 
-/* 去掉 ion-textarea 自身的内边距/背景，让它与 .editor-card 融为一体，
-   同时保留清晰可辨的编辑区域边界（由外层卡片的背景+边框提供）。 */
-.system-prompt-textarea {
-  --background: transparent;
-  --padding-start: 0;
-  --padding-end: 0;
-  --padding-top: 0;
-  --padding-bottom: 0;
-  --placeholder-color: var(--content-tertiary);
-  --placeholder-opacity: 1;
-  --color: var(--content-primary);
-  font-family: monospace;
-  font-size: var(--mobile-font-size-body);
-  line-height: var(--mobile-line-height-normal);
-  min-height: 360px;
-}
-
-.action-buttons {
+.prompt-editor__meta {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   gap: 12px;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+}
+
+.prompt-reset ion-icon {
+  font-size: 18px;
 }
 </style>

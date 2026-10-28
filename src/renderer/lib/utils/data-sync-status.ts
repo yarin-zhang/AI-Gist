@@ -16,6 +16,7 @@
 export type DataSyncStatusKind =
     | 'retryScheduled'
     | 'error'
+    | 'conflict'
     | 'paused'
     | 'syncing'
     | 'pending'
@@ -37,21 +38,64 @@ export interface DataSyncStatusInput {
     pendingChanges: boolean;
     /** 是否存在过至少一次成功的同步（lastSyncAt 或 lastResult.success）。 */
     hasSucceededBefore: boolean;
+    /** 是否有已启用的云端存储；没有时其他状态都不作数，只显示「未开启同步」。 */
     hasStorageConfigs: boolean;
+    /** 两边都改过的数据在等用户选择处理方式（同步已暂停发布）。 */
+    hasPendingConflict?: boolean;
 }
 
 export function resolveDataSyncStatusKind(input: DataSyncStatusInput): DataSyncStatusKind {
+    // 没有可用的存储时什么都不会同步：本地变更、下次检查、上次同步结果都不该再露出来 (#425)
+    if (!input.hasStorageConfigs) return 'notConfigured';
     if (input.hasScheduledRetry) return 'retryScheduled';
     if (input.isError) return 'error';
+    if (input.hasPendingConflict) return 'conflict';
     if (!input.autoSyncEnabled) return 'paused';
     if (input.isSyncing) return 'syncing';
     if (input.pendingChanges) return 'pending';
     if (input.hasSucceededBefore) return 'current';
-    return input.hasStorageConfigs ? 'ready' : 'notConfigured';
+    return 'ready';
+}
+
+/** 同步服务状态里参与判断的字段（结构类型，这里不依赖整个同步服务） */
+export interface DataSyncStatusSnapshot {
+    status: string;
+    pending?: boolean;
+    nextSyncAt?: string;
+    lastSyncAt?: string;
+    lastResult?: { success?: boolean };
+    pendingChanges?: boolean;
+    autoSyncEnabled?: boolean;
+    hasEnabledStorage?: boolean;
+}
+
+/**
+ * 设置页的状态卡片和窗口底部的状态栏都从这里把同步服务的状态转成判断输入，
+ * 两处对「有没有存储」「本地变更算不算待同步」的理解必须一致，不能各写一份 (#425)。
+ * 调用方手里有更新的存储列表或自动同步开关时，以调用方传入的为准。
+ */
+export function createDataSyncStatusInput(
+    snapshot: DataSyncStatusSnapshot,
+    context: { canAutoRetryError: boolean; hasStorageConfigs?: boolean; autoSyncEnabled?: boolean },
+): DataSyncStatusInput {
+    const isError = snapshot.status === 'error';
+    return {
+        hasScheduledRetry: isError && !!snapshot.pending && !!snapshot.nextSyncAt,
+        isError,
+        canAutoRetryError: context.canAutoRetryError,
+        autoSyncEnabled: context.autoSyncEnabled ?? snapshot.autoSyncEnabled ?? true,
+        isSyncing: snapshot.status === 'syncing',
+        pendingChanges: !!snapshot.pendingChanges,
+        hasSucceededBefore: !!(snapshot.lastSyncAt || snapshot.lastResult?.success),
+        // 还没查过存储列表时按「有存储」处理，避免启动瞬间闪一下「未开启同步」
+        hasStorageConfigs: context.hasStorageConfigs ?? snapshot.hasEnabledStorage ?? true,
+        hasPendingConflict: snapshot.status === 'conflict',
+    };
 }
 
 const ALERT_TYPE_BY_KIND: Record<Exclude<DataSyncStatusKind, 'error'>, 'success' | 'info' | 'warning'> = {
     retryScheduled: 'warning',
+    conflict: 'warning',
     paused: 'warning',
     syncing: 'info',
     pending: 'info',
@@ -66,4 +110,16 @@ export function resolveDataSyncAlertType(
 ): 'success' | 'info' | 'warning' | 'error' {
     if (kind === 'error') return canAutoRetryError ? 'warning' : 'error';
     return ALERT_TYPE_BY_KIND[kind];
+}
+
+/**
+ * 诊断失败原因时用的来源：最近一次失败的同步结果优先（带错误码和结构化诊断），
+ * 否则用状态里记下的错误文字。自动重试安排好之后 lastResult 可能还是更早的成功结果，
+ * 不能拿它来诊断。状态卡片和状态栏都用这一个来源，判断出的严重程度才会一致。
+ */
+export function getDataSyncErrorSource<TResult extends { success?: boolean; error?: string }>(
+    snapshot: { error?: string; lastResult?: TResult },
+): TResult | string | undefined {
+    if (snapshot.lastResult && snapshot.lastResult.success === false) return snapshot.lastResult;
+    return snapshot.error || snapshot.lastResult?.error;
 }

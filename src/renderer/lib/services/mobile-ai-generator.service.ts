@@ -10,6 +10,7 @@ import {
   getConfiguredBaseURL,
   getDefaultModels as getProviderDefaultModels
 } from '@shared/ai-provider-metadata'
+import i18n from '~/i18n'
 
 const GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com'
 const GOOGLE_API_VERSION = 'v1beta'
@@ -30,17 +31,12 @@ function buildOpenAICompatibleHeaders(config: AIConfig): Record<string, string> 
 }
 
 /**
- * 默认系统提示词
+ * 默认系统提示词：配置没有自定义时使用。
+ * 系统提示词页展示的「默认」也读这个 key，两边始终是同一段文字（跟随界面语言）。
  */
-const DEFAULT_SYSTEM_PROMPT = `你是一个专业的 AI 提示词工程师。你的任务是根据用户的需求，生成高质量、结构化的 AI 提示词。
+export const DEFAULT_SYSTEM_PROMPT_KEY = 'aiConfig.workspace.defaultSystemPrompt'
 
-要求：
-1. 提示词应该清晰、具体、易于理解
-2. 包含必要的上下文和约束条件
-3. 使用适当的格式和结构
-4. 确保提示词能够引导 AI 生成期望的输出
-
-请直接输出生成的提示词内容，不要添加额外的解释或说明。`
+export const getDefaultSystemPrompt = (): string => String(i18n.global.t(DEFAULT_SYSTEM_PROMPT_KEY))
 
 /**
  * AI 生成服务类
@@ -101,7 +97,7 @@ export class AIGeneratorService {
     config: AIConfig,
     onProgress?: (content: string) => void
   ): Promise<AIGenerationResult> {
-    const systemPrompt = config.systemPrompt || DEFAULT_SYSTEM_PROMPT
+    const systemPrompt = config.systemPrompt?.trim() ? config.systemPrompt : getDefaultSystemPrompt()
     const userPrompt = `用户需求：${request.topic}\n\n请生成一个符合上述需求的 AI 提示词。`
 
     // 根据不同的 AI 服务类型调用对应的 API

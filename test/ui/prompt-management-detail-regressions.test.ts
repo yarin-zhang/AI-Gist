@@ -4,108 +4,37 @@ import { describe, expect, it } from 'vitest'
 const readRendererFile = (path: string) => readFileSync(`src/renderer/${path}`, 'utf8')
 
 describe('prompt management detail regressions', () => {
-  it('keeps the workspace header compact and free of decorative status metadata', () => {
-    const workspace = readRendererFile('components/prompt-management/PromptWorkspace.vue')
 
-    expect(workspace).not.toContain('workspace-breadcrumb')
-    expect(workspace).not.toContain('edit-status-dot')
-    expect(workspace).toContain('hasUnsavedChanges')
+  it('lets prompts be dragged onto a folder to change their category', () => {
+    const folder = readRendererFile('components/prompts/PromptFolderView.vue')
+    const page = readRendererFile('pages/PromptsPage.vue')
+
+    expect(folder).toContain('draggable="true"')
+    expect(folder).toContain('@drop.prevent="drop(category.id!)"')
+    expect(folder).toContain("emit('move', prompt, categoryId)")
+    expect(page).toContain('@move="handleFolderMove"')
+    expect(page).toMatch(/const handleFolderMove = async[\s\S]*?actions\.moveToCategory\(\[prompt\], categoryId/)
   })
 
-  it('does not show required-variable errors before a field has been touched', () => {
-    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
-    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
+  it('does not accept drops on "All prompts", only on categories and Uncategorized (#408)', () => {
+    const folder = readRendererFile('components/prompts/PromptFolderView.vue')
+    const allButton = folder.match(/<button[^>]*filters\.categoryId = null"[^>]*>/)?.[0] || ''
+    const noneButton = folder.match(/<button[^>]*filters\.categoryId = 'none'"[^>]*>/)?.[0] || ''
 
-    expect(useWorkspace).toContain('<PromptFillCanvas')
-    expect(fillCanvas).toContain('const touched = ref(new Set<string>())')
-    expect(fillCanvas).toContain(':error="showError(segment.name)"')
-    expect(fillCanvas).toContain('@blur="markTouched(segment.name)"')
-    expect(fillCanvas).not.toContain(':error="missing.value.includes')
-  })
-
-  it('marks unfilled variables in the final result and counts them next to copy (#381)', () => {
-    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
-    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
-
-    expect(fillCanvas).toContain('buildPromptResultSegments(props.prompt, props.values, variables.value)')
-    expect(fillCanvas).toContain('class="unfilled-placeholder"')
-    expect(fillCanvas).toContain('@click="focusVariable(segment.name)"')
-    expect(fillCanvas).not.toContain('<pre>{{ rendered.content }}</pre>\n      </div>\n    </div>')
-    expect(useWorkspace).toContain("t('promptWorkspace.unfilledCount', { count: unfilledVariables.length })")
-    expect(useWorkspace).toContain("t('promptWorkspace.completeRequiredCount'")
-  })
-
-  it('uses normal-flow filters and flex-height data tables', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const page = readRendererFile('pages/PromptManagementPage.vue')
-
-    expect(list).toContain('class="prompt-filter-bar ui-toolbar"')
-    expect(list).not.toContain('position: sticky')
-    expect(list).not.toContain("calc(100vh - 250px)")
-    expect(list.match(/\bflex-height\b/g)?.length).toBe(1)
-    expect(list).toContain('grid-scroll-region')
-    expect(list).toContain('.n-data-table-base-table-body) { min-height: 0; }')
-    expect(list).toMatch(/\.advanced-filter-panel\s*\{[^}]*overflow-y:\s*auto/s)
-    expect(list).toContain('<PromptFolderExplorer v-if="viewMode === \'tree\'"')
-    expect(list).not.toContain('redesignedTreeTableColumns')
-    expect(page).toContain('overflow: hidden')
-  })
-
-  it('uses a Finder-style folder explorer for prompt classification', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const explorer = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
-
-    expect(explorer).toContain('class="folder-explorer ui-surface"')
-    expect(explorer).toContain('class="folder-sidebar ui-surface-muted"')
-    expect(explorer).toContain('class="asset-glyph folder-glyph"')
-    expect(explorer).toContain('class="asset-glyph prompt-file-glyph"')
-    expect(explorer).toContain('stroke-width: 3.1')
-    expect(explorer).toContain('<line v-for="line in getSkeletonLines(prompt.content)"')
-    expect(explorer).not.toContain('<NIcon size="58"><Folder')
-    expect(explorer).toContain('class="prompt-file-attachments"')
-    expect(explorer).toContain('getPromptImages(prompt).slice(0, 3)')
-    expect(explorer).toContain('class="prompt-file-attachment-count"')
-    expect(list).toContain(':resolve-image-url="getImageUrlFromBlob"')
-    expect(explorer).toContain('@dblclick="navigateTo(category.id || null)"')
-    expect(explorer).toContain('@dblclick="openPrompt(prompt)"')
-    expect(explorer).toContain('@dragstart="handleDragStart($event, prompt)"')
-    expect(explorer).toContain('handleDragLeave($event, `category-${category.id}`)')
-    expect(explorer).toContain('event.dataTransfer.setDragImage(preview')
-    expect(explorer).toContain("emit('move', prompt, categoryId)")
-    expect(list).toContain('api.prompts.update.mutate({')
-    expect(list).toContain('data: { categoryId: targetCategoryId ?? undefined }')
-    expect(list).toContain('await loadFolderData(false)')
-    expect(list).toContain('const requestId = ++folderLoadRequestId')
-    expect(list).toContain('const folderPromptCache = ref<PromptWithRelations[]>([])')
-    expect(list).toMatch(/handleFolderNavigate = \(categoryId[\s\S]*?applyFolderLocation\(categoryId\)/)
-    expect(list).not.toContain('prompts.value = prompts.value.filter(item => item.id !== prompt.id)')
-    expect(list).toContain('const globalResults = categoryId === null')
+    expect(allButton).not.toBe('')
+    expect(allButton).not.toMatch(/@drag|@drop/)
+    expect(noneButton).toContain('@drop.prevent="drop(null)"')
+    expect(folder).not.toContain("markDrop('all')")
   })
 
   it('lets the card grid consume the full desktop workspace width', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const grid = readRendererFile('components/prompts/PromptCardGrid.vue')
 
-    expect(list).toMatch(/\.prompt-list\s*\{[^}]*flex:\s*1 1 0[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*min-width:\s*0/s)
-    expect(list).toMatch(/\.grid-scroll-region\s*\{[^}]*width:\s*100%/s)
-    expect(list).toMatch(/\.prompt-grid\s*\{[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*grid-template-columns:\s*repeat\(auto-fill, minmax\(286px, 1fr\)\)/s)
-  })
-
-  it('places category management in the folder sidebar instead of the filter toolbar', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const explorer = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
-    const page = readRendererFile('pages/PromptManagementPage.vue')
-    const toolbarMarkup = list.slice(0, list.indexOf('<PromptFolderExplorer'))
-
-    expect(toolbarMarkup).not.toContain("$emit('manage-categories')")
-    expect(explorer).toContain('class="folder-category-settings"')
-    expect(explorer).toContain("emit('manage-categories')")
-    expect(list).toContain("(e: 'manage-categories'): void")
-    expect(page).toContain('@manage-categories="showCategoryManagement = true"')
+    expect(grid).toMatch(/\.card-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(280px, 100%\), 1fr\)\)/s)
   })
 
   it('lets users persistently adjust category order', () => {
     const modal = readRendererFile('components/prompt-management/CategoryManageModal.vue')
-    const folder = readRendererFile('components/prompt-management/PromptFolderExplorer.vue')
     const service = readRendererFile('lib/services/category.service.ts')
 
     expect(modal).toContain('<GripVertical />')
@@ -123,249 +52,29 @@ describe('prompt management detail regressions', () => {
     expect(modal).toContain('api.categories.reorder.mutate')
     expect(service).toContain('async reorderCategories(')
     expect(service).toContain('sortCategoriesByOrder(await this.getAll<Category>')
-    expect(folder).toContain('sortCategoriesByOrder(props.categories)')
   })
 
-  it('records usage for copy actions in every legacy prompt view', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
+  it('records usage for copy actions in the card, table and folder views', () => {
+    const actions = readRendererFile('composables/prompt/usePromptActions.ts')
 
-    expect(list).toContain("import { recordPromptUsage } from '@/lib/utils/prompt-usage'")
-    expect(list.match(/recordPromptUsage\(\{/g)?.length).toBe(2)
-    expect(list).toContain('prompt.useCount = updated.useCount')
-    expect(list).toContain('incrementUseCount: id => api.prompts.incrementUseCount.mutate(id)')
+    expect(actions).toContain("import { recordPromptUsage } from '@/lib/utils/prompt-usage'")
+    expect(actions).toContain('incrementUseCount: id => api.prompts.incrementUseCount.mutate(id)')
+    expect(actions).toContain('`[${variable.name}]`')
   })
 
-  it('keeps the creation editor content and variable panes at full available height', () => {
-    const creation = readRendererFile('components/prompt-management/PromptCreationModal.vue')
-    const editModal = readRendererFile('components/prompt-management/PromptEditModal.vue')
-    const regularEditor = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
+  it('shows categories as neutral tags with a color dot in cards', () => {
+    const grid = readRendererFile('components/prompts/PromptCardGrid.vue')
 
-    expect(creation).toMatch(/\.creation-content\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/s)
-    expect(creation).toMatch(/\.creation-content :deep\(\.prompt-edit-embedded\)\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
-    expect(editModal).toContain('class="edit-workspace-form"')
-    expect(editModal).toContain(':pane-style="workspacePaneStyle"')
-    expect(editModal).toContain(':pane-wrapper-style="workspacePaneWrapperStyle"')
-    expect(editModal).toMatch(/\.edit-workspace-tabs\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%[^}]*min-height:\s*0/s)
-    expect(regularEditor).toContain('<StructuredPromptEditor')
-    expect(regularEditor).toContain('<VariableInspector')
-    expect(regularEditor).toMatch(/\.regular-editor-workspace\s*\{[^}]*height:\s*100%[^}]*min-height:\s*0/s)
-    expect(regularEditor).toMatch(/\.editor-primary-column\s*\{[^}]*min-height:\s*0[^}]*display:\s*flex/s)
-    expect(regularEditor).toContain('new ResizeObserver')
-    expect(regularEditor).not.toContain('contentHeight - 130')
+    expect(grid).toContain('<span class="ui-tag prompt-card__category" :title="categoryName(prompt)">')
+    // 分类名放进 .ui-tag__text：太长时省略，不再压到「使用 N 次」上（#453）
+    expect(grid).toContain('<UiCategoryDot :color="category(prompt)?.color" /><span class="ui-tag__text">{{ categoryName(prompt) }}</span>')
+    expect(grid).not.toContain('getCategoryTagColor')
   })
 
-  it('uses a cohesive full-height workspace for AI-assisted prompt creation', () => {
-    const creation = readRendererFile('components/prompt-management/PromptCreationModal.vue')
-    const generator = readRendererFile('components/ai/AIGeneratorComponent.vue')
-
-    expect(creation).toContain("t('promptWorkspace.manualCreate')")
-    expect(creation).toContain("t('promptManagement.aiGenerate')")
-    expect(creation).not.toContain('<small>')
-    expect(creation).toMatch(/\.ai-creation-pane\s*\{[^}]*padding:\s*var\(--content-padding\)[^}]*overflow:\s*hidden/s)
-    expect(generator).toContain('class="generator-workspace-grid"')
-    expect(generator).toContain('class="generator-panel requirement-panel"')
-    expect(generator).toContain('class="generator-panel result-panel"')
-    expect(generator).toContain('class="workspace-textarea result-textarea"')
-    expect(generator).not.toContain('<n-split')
-    expect(generator).toMatch(/\.generator-workspace-grid\s*\{[^}]*height:\s*100%[^}]*grid-template-columns:/s)
-    expect(generator).toMatch(/\.generator-panel\s*\{[^}]*height:\s*100%[^}]*display:\s*flex[^}]*overflow:\s*hidden/s)
-    expect(generator).toMatch(/\.requirement-form-item\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
-    expect(generator).toMatch(/\.history-scroll\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*0/s)
-  })
-
-  it('anchors the main sidebar toggle to the bottom of the sidebar region', () => {
-    const mainPage = readRendererFile('pages/MainPage.vue')
-
-    expect(mainPage).toContain('<div class="main-layout">')
-    expect(mainPage).toContain('class="main-layout-body"')
-    expect(mainPage).toContain('content-style="height: 100%;"')
-    expect(mainPage).toMatch(/\.main-sider-content\s*\{[^}]*display:\s*grid/s)
-    expect(mainPage).toMatch(/\.main-sider-content\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) 48px/s)
-    expect(mainPage).toMatch(/\.main-sider-brand\s*\{[^}]*grid-row:\s*1/s)
-    expect(mainPage).toMatch(/\.main-sider-menu\s*\{[^}]*grid-row:\s*2/s)
-    expect(mainPage).toMatch(/\.main-sider-menu\s*\{[^}]*overflow-y:\s*auto/s)
-    expect(mainPage).toMatch(/\.main-sider-toggle\s*\{[^}]*grid-row:\s*3/s)
-    expect(mainPage).toMatch(/\.main-sider-toggle\s*\{[^}]*box-sizing:\s*border-box/s)
-    expect(mainPage).not.toMatch(/\.main-sider-toggle\s*\{[^}]*position:\s*absolute/s)
-  })
-
-  it('shares navigation icons between the sidebar and page headers', () => {
-    const icons = readRendererFile('theme/navigation-icons.ts')
-    const mainPage = readRendererFile('pages/MainPage.vue')
-    const promptPage = readRendererFile('pages/PromptManagementPage.vue')
-    const aiConfigPage = readRendererFile('pages/AIConfigPage.vue')
+  it('keeps settings sections inside panels instead of divider-separated cards', () => {
     const settingsPage = readRendererFile('pages/SettingsPage.vue')
 
-    expect(icons).toContain('Star as PromptNavigationIcon')
-    expect(icons).toContain('Diamonds as AIConfigNavigationIcon')
-    expect(icons).toContain('Settings as SettingsNavigationIcon')
-    expect(mainPage).toContain('h(PromptNavigationIcon)')
-    expect(mainPage).toContain('h(AIConfigNavigationIcon)')
-    expect(mainPage).toContain('h(SettingsNavigationIcon)')
-    expect(promptPage).toContain('<PromptNavigationIcon />')
-    expect(aiConfigPage).toContain('<AIConfigNavigationIcon />')
-    expect(settingsPage).toContain('<SettingsNavigationIcon />')
-  })
-
-  it('shows the About logo beside the expanded sidebar brand name', () => {
-    const mainPage = readRendererFile('pages/MainPage.vue')
-
-    expect(mainPage).toContain("new URL('../assets/images/logo.png', import.meta.url).href")
-    expect(mainPage).toContain('<img :src="appIcon" class="main-sider-brand-logo" alt="" />')
-    expect(mainPage).toMatch(/\.main-sider-brand-logo\s*\{[^}]*width:\s*30px/s)
-    expect(mainPage).toMatch(/\.main-sider-brand-logo\s*\{[^}]*border-radius:\s*var\(--radius-image\)/s)
-  })
-
-  it('keeps the workspace split drag gutter visually flush with both panes', () => {
-    const page = readRendererFile('pages/PromptManagementPage.vue')
-
-    expect(page).toContain(':resize-trigger-size="1"')
-    expect(page).toMatch(/n-split__resize-trigger-wrapper\)[^}]*background:\s*transparent/s)
-    expect(page).toMatch(/n-split__resize-trigger-wrapper\)::before[^}]*inset:\s*0 -4px/s)
-    expect(page).toMatch(/\.workspace-resize-line\s*\{[^}]*width:\s*1px/s)
-  })
-
-  it('allows the category pane to collapse to a single visible category row', () => {
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-
-    expect(sidebar).toContain('MIN_CATEGORY_PANE_HEIGHT = 82')
-    expect(sidebar).toContain(':max="librarySplitMax"')
-    expect(sidebar).toContain('new ResizeObserver(updateLibrarySplitBounds)')
-    expect(sidebar).not.toContain(':max="0.82"')
-  })
-
-  it('lets the sidebar category panel collapse without a no-op v-show on NScrollbar', () => {
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-
-    // NScrollbar's rendered root (without a `container` prop) is another component
-    // (VResizeObserver), not a plain element, so `v-show` placed directly on it never
-    // toggles `display` and the category list stays visible. It must sit on a real div.
-    // NCollapseTransition renders its own wrapping div and fully unmounts its slot
-    // content while collapsed, so it sidesteps the same pitfall while animating like
-    // the Quick Optimize panel (issue #33: the two collapse affordances must feel the
-    // same, not just behave the same).
-    expect(sidebar).toContain('<NCollapseTransition :show="!isCategoryListCollapsed" class="category-list-wrapper">')
-    expect(sidebar).not.toMatch(/<NScrollbar[^>]*v-show/)
-    expect(sidebar).not.toMatch(/<div[^>]*v-show="!isCategoryListCollapsed"/)
-    expect(sidebar).toContain("import { NButton, NCollapseTransition, NDropdown")
-
-    // Collapsing must free the space back to the prompt list pane instead of leaving
-    // a blank gap, and the resize handle must be disabled while collapsed.
-    expect(sidebar).toContain(':disabled="categoryPaneCollapsedForLayout"')
-    expect(sidebar).toContain(":pane1-style=\"promptPaneStyle\"")
-    expect(sidebar).toContain(":pane2-style=\"categoryPaneStyle\"")
-    expect(sidebar).toContain("categoryPaneCollapsedForLayout.value ? { flex: '1 1 auto' } : undefined")
-    expect(sidebar).toContain("categoryPaneCollapsedForLayout.value ? { flex: '0 0 auto' } : undefined")
-
-    // Collapsed state must be persisted and restored across app launches.
-    expect(sidebar).toContain("ref(localStorage.getItem('prompt_library_category_collapsed') === 'true')")
-    expect(sidebar).toContain("watch(isCategoryListCollapsed, collapsed => localStorage.setItem('prompt_library_category_collapsed', String(collapsed)))")
-    expect(sidebar).toContain('const toggleCategoryList = () => {')
-
-    // The toggle already has visible text ("Categories"), so an aria-label would
-    // override its accessible name with just the expand/collapse verb.
-    const toggleStart = sidebar.indexOf('class="category-heading-toggle"')
-    const toggleMarkup = sidebar.slice(toggleStart, sidebar.indexOf('</button>', toggleStart))
-    expect(toggleMarkup).not.toContain('aria-label')
-    expect(toggleMarkup).toContain('aria-expanded')
-  })
-
-  it('defers the category pane content-fit switch by a tick so collapsing does not reverse-jump', () => {
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-
-    // This is a string-level guard, not a runtime layout test: jsdom does not implement
-    // real CSS layout (offsetHeight/getBoundingClientRect are stubs), so this repo's
-    // test setup cannot reproduce or assert against the actual reflow bug below — that
-    // was verified with a frame/microtask-level sampler against a live browser instead
-    // (see the PR/commit description). This test only pins the structural fix in place
-    // so a future edit doesn't silently re-couple the two signals.
-    //
-    // Bug this guards against: NCollapseTransition's leave hook measures the category
-    // pane's *current* rendered height synchronously, in the same reactive flush that
-    // flips `isCategoryListCollapsed`. Two things in that same flush would otherwise
-    // inflate that measurement past what was actually on screen: (1) the pane's
-    // flex-basis switching from its ratio-constrained height to content-fit
-    // (`flex: 0 0 auto`), which lets it balloon to the list's full unclamped content
-    // height, and (2) NSplit's resize handle disabling, which unmounts its 9px trigger
-    // element and hands that space to the still-unstyled pane. Either one alone already
-    // produces a one-frame reverse jump on collapse (category pane briefly grows,
-    // prompt pane briefly shrinks) before the real shrink animation starts. Deferring
-    // both signals by one tick (via categoryPaneCollapsedForLayout) lets the leave hook
-    // measure the correct, already-visible height first. Expanding has no such hazard,
-    // so it stays synchronous.
-    expect(sidebar).toContain('const categoryPaneCollapsedForLayout = ref(isCategoryListCollapsed.value)')
-    expect(sidebar).toMatch(/watch\(isCategoryListCollapsed,\s*\(collapsed\)\s*=>\s*\{\s*if\s*\(collapsed\)\s*\{\s*nextTick\(\(\)\s*=>\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*true\s*\}\)\s*\}\s*else\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*false\s*\}\s*\}\)/)
-    expect(sidebar).toContain("import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'")
-    expect(sidebar).toContain(':disabled="categoryPaneCollapsedForLayout"')
-    expect(sidebar).not.toContain(':disabled="isCategoryListCollapsed"')
-  })
-
-  it('allows the active category filter to be clicked again to clear it', () => {
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-
-    expect(sidebar).toMatch(/key\.startsWith\('category:'\)\s*&&\s*activeFilter\.value\s*===\s*key/)
-    expect(sidebar).toMatch(/activeFilter\.value\s*=\s*'all'[\s\S]*?return/)
-  })
-
-  it('uses shared prompt-tag colors in list and edit surfaces', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-    const editor = readRendererFile('components/prompt-management/PromptEditModal.vue')
-    const launcher = readRendererFile('components/shortcuts/PromptLauncher.vue')
-
-    expect(list).toContain('color: getTagColor(tag)')
-    expect(sidebar).toContain(':color="getTagColor(tag)"')
-    expect(sidebar).toContain('getPromptTags(prompt).slice(0, 2)')
-    expect(sidebar).toContain('prompt-list-tag-overflow')
-    expect(editor).toContain(':render-tag="renderPromptTag"')
-    expect(editor).toContain(':color="getTagColor(tag)"')
-    expect(launcher).toContain(':color="getTagColor(tag)"')
-  })
-
-  it('uses neutral stars by default and warning color only for favorited prompts', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-    const workspace = readRendererFile('components/prompt-management/PromptWorkspace.vue')
-
-    expect(list).not.toContain('Heart')
-    expect(sidebar).not.toContain('Heart')
-    expect(list).toContain('<Star />')
-    expect(list).toContain("prompt.isFavorite ? 'var(--accent-warning)' : undefined")
-    expect(list).toContain("row.isFavorite ? 'var(--accent-warning)' : undefined")
-    expect(sidebar).not.toContain('iconColor')
-    expect(workspace).toContain(":color=\"prompt.isFavorite ? 'var(--accent-warning)' : undefined\"")
-    expect(list).not.toContain("isFavorite ? 'error' : 'default'")
-  })
-
-  it('uses colored category and tag chips in cards without empty taxonomy copy', () => {
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
-    const taxonomy = readRendererFile('components/prompt-management/PromptCardTaxonomy.vue')
-
-    expect(list).not.toContain('prompt-card-kind')
-    expect(list).not.toContain("prompt.isJinjaTemplate ? 'Jinja'")
-    expect(list).toContain('<PromptCardTaxonomy :category="prompt.category" :tags="getTagsArray(prompt.tags)">')
-    expect(taxonomy).toContain('<NTag v-if="category"')
-    expect(taxonomy).toContain(':color="getCategoryTagColor(category)"')
-    expect(taxonomy).toContain(':color="getTagColor(tag)"')
-    expect(list).not.toContain('<span v-else class="prompt-card-category">')
-  })
-
-  it('keeps settings dividers compact inside the scrollable detail area', () => {
-    const settingsPage = readRendererFile('pages/SettingsPage.vue')
-
-    expect(settingsPage).toMatch(/\.settings-content-inner :deep\(\.n-divider:not\(\.n-divider--vertical\)\)\s*\{[^}]*margin:\s*0/s)
-    expect(settingsPage).not.toContain('.settings-content :deep(.n-divider')
-  })
-
-  it('defaults the sidebar prompt list to creation-time order and reserves updated-time sort for "recent" (issue #15)', () => {
-    const sidebar = readRendererFile('components/prompt-management/PromptLibrarySidebar.vue')
-
-    expect(sidebar).toContain("import { sortPromptsForLibrary, type PromptLibrarySortBy } from '@/lib/utils/prompt-library-sort'")
-    expect(sidebar).toContain("const sortBy = ref<PromptLibrarySortBy>('created')")
-    expect(sidebar).toContain("{ label: t('promptWorkspace.sortCreated'), key: 'created' }")
-    expect(sidebar).toContain('result = sortPromptsForLibrary(result, sortBy.value)')
-    // The "recent" (最近使用) view keeps sorting by updatedAt regardless of the
-    // default sort field — it is the documented exception in issue #15.
-    expect(sidebar).toContain("result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())")
+    expect(settingsPage).not.toContain('<NDivider')
+    expect(settingsPage).not.toContain('<NCard')
   })
 })

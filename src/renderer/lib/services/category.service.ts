@@ -8,6 +8,7 @@ import { Category, CategoryWithRelations, Prompt, PromptWithRelations, PromptVar
 import { generateUUID } from '../utils/uuid';
 import { emitDataChange } from './data-change-events';
 import { getNextCategorySortOrder, sortCategoriesByOrder } from '../utils/category-order';
+import { CategoryNameConflictError, findCategoryNameConflict, normalizeCategoryName } from '../utils/category-name';
 
 /**
  * 分类数据服务类
@@ -35,8 +36,15 @@ export class CategoryService extends BaseDatabaseService {
    */
   async createCategory(data: Omit<Category, 'id' | 'uuid' | 'createdAt' | 'updatedAt'>): Promise<Category> {
     const categories = await this.getAll<Category>('categories');
+    // 名称去掉首尾空格后判重（不区分大小写），前后带空格不能绕过唯一索引建出两个看起来一样的分类
+    const name = normalizeCategoryName(data.name);
+    if (!name) throw new Error('Category name is required');
+    const conflict = findCategoryNameConflict(categories, name);
+    if (conflict) throw new CategoryNameConflictError(conflict.name);
+
     const categoryWithUUID = {
       ...data,
+      name,
       sortOrder: Number.isFinite(Number(data.sortOrder))
         ? Number(data.sortOrder)
         : getNextCategorySortOrder(categories),
@@ -118,7 +126,14 @@ export class CategoryService extends BaseDatabaseService {
    * @returns Promise<Category> 更新后的完整分类记录
    */
   async updateCategory(id: number, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Category> {
-    return this.update<Category>('categories', id, data);
+    if (data.name === undefined) return this.update<Category>('categories', id, data);
+
+    // 改名同样去掉首尾空格后判重，和分类自己比较时允许只改大小写
+    const name = normalizeCategoryName(data.name);
+    if (!name) throw new Error('Category name is required');
+    const conflict = findCategoryNameConflict(await this.getAll<Category>('categories'), name, id);
+    if (conflict) throw new CategoryNameConflictError(conflict.name);
+    return this.update<Category>('categories', id, { ...data, name });
   }
 
   /**
@@ -196,6 +211,20 @@ export class CategoryService extends BaseDatabaseService {
    */
   async deleteCategory(id: number): Promise<void> {
     return this.delete('categories', id);
+  }
+
+  /**
+   * 删除分类，分类里的提示词移到「未分类」，提示词本身不删
+   * @param id number 要删除的分类ID
+   * @returns Promise<number> 移到「未分类」的提示词数量
+   */
+  async deleteCategoryAndUncategorizePrompts(id: number): Promise<number> {
+    const prompts = await this.getByIndex<Prompt>('prompts', 'categoryId', id);
+    for (const prompt of prompts) {
+      if (prompt.id) await this.update<Prompt>('prompts', prompt.id, { categoryId: undefined });
+    }
+    await this.delete('categories', id);
+    return prompts.length;
   }
 
   /**

@@ -1,205 +1,123 @@
 <template>
-    <CommonModal :show="show" :body-padding="0" @update:show="handleModalShowUpdate">
-        <template #header>
-            <div class="modal-title-row">
-                <span class="modal-title-icon"><NIcon size="20"><Settings /></NIcon></span>
-                <div>
-                    <NText strong class="modal-title">{{ t('quickOptimization.title') }}</NText>
-                    <NText depth="3" class="modal-subtitle">{{ t('quickOptimization.subtitle') }}</NText>
-                </div>
-            </div>
-        </template>
-
-        <template #content="{ contentHeight }">
-            <div class="optimization-content" :style="{ height: `${contentHeight}px` }">
-                <div class="optimization-guide ui-toolbar">
-                    <div class="guide-copy">
-                        <span class="guide-icon"><NIcon size="18"><Bulb /></NIcon></span>
-                        <div>
-                            <NText strong class="guide-title">{{ t('quickOptimization.workspace.guideTitle') }}</NText>
-                            <NText depth="3" class="guide-description">
-                                {{ t('quickOptimization.workspace.guideDescription') }}
-                            </NText>
-                        </div>
-                    </div>
-                    <NButton size="small" secondary :disabled="loading || saving" @click="createExampleDraft">
-                        <template #icon><NIcon size="16"><Plus /></NIcon></template>
-                        {{ t('quickOptimization.workspace.addExample') }}
+    <UiModal :show="show" width="var(--overlay-width-workspace)" height="640px" flush :title="t('quickOptimization.title')"
+        :subtitle="t('quickOptimization.subtitle')" :close-label="t('common.close')" @close="requestClose">
+        <div class="optimization-workspace">
+            <aside class="optimization-library" :aria-label="t('quickOptimization.workspace.libraryTitle')">
+                <div class="library-summary">
+                    <span class="library-summary__title">
+                        {{ t('quickOptimization.workspace.libraryTitle') }}
+                        <span class="library-summary__count">{{ t('quickOptimization.workspace.enabledSummary', { enabled: enabledCount, total: configs.length }) }}</span>
+                    </span>
+                    <NButton quaternary size="tiny" @click="createDraft">
+                        <template #icon><NIcon :size="12"><Plus /></NIcon></template>
+                        {{ t('quickOptimization.workspace.add') }}
                     </NButton>
                 </div>
 
-                <div class="optimization-workspace">
-                <aside class="optimization-library">
-                    <div class="library-summary">
-                        <div>
-                            <NText strong>{{ t('quickOptimization.workspace.libraryTitle') }}</NText>
-                            <NText depth="3">{{ t('quickOptimization.workspace.enabledSummary', { enabled: enabledCount, total: configs.length }) }}</NText>
-                        </div>
-                        <NTooltip>
-                            <template #trigger>
-                                <NButton quaternary circle size="small" :aria-label="t('quickOptimization.addConfig')" @click="createDraft">
-                                    <template #icon><NIcon size="16"><Plus /></NIcon></template>
-                                </NButton>
-                            </template>
-                            {{ t('quickOptimization.addConfig') }}
-                        </NTooltip>
-                    </div>
-
-                    <div v-if="loading" class="library-state"><NSpin size="small" /></div>
-                    <NResult v-else-if="loadError" status="error" :title="t('quickOptimization.workspace.loadFailed')"
-                        :description="loadError" class="library-state">
-                        <template #footer><NButton size="small" @click="loadConfigs">{{ t('common.retry') }}</NButton></template>
-                    </NResult>
-                    <div v-else-if="configs.length === 0 && !creating" class="library-state">
-                        <NEmpty size="small" :description="t('quickOptimization.noConfig')">
-                            <template #extra>
-                                <NFlex vertical size="small">
-                                    <NButton size="small" type="primary" @click="createDraft">{{ t('quickOptimization.addConfig') }}</NButton>
-                                    <NButton size="small" :loading="initializing" @click="initializeDefaults">{{ t('quickOptimization.initializeDefaults') }}</NButton>
-                                </NFlex>
-                            </template>
-                        </NEmpty>
-                    </div>
-                    <NScrollbar v-else class="optimization-list">
-                        <div v-for="(config, index) in configs" :key="config.id"
-                            class="optimization-item" :class="{ active: !creating && selectedConfig?.id === config.id }">
-                            <button type="button" class="optimization-select" @click="selectConfig(config)">
-                                <span class="drag-order">{{ index + 1 }}</span>
-                                <span class="optimization-copy">
-                                    <strong>{{ config.name }}</strong>
-                                    <small>{{ config.description || t('quickOptimization.workspace.noDescription') }}</small>
-                                </span>
-                            </button>
-                            <span class="item-controls">
-                                <NSwitch size="small" :value="config.enabled" :disabled="!config.enabled && enabledCount >= 5"
-                                    :loading="togglingId === config.id" @update:value="value => toggleConfig(config, value)" />
+                <div v-if="loading" class="library-state"><NSpin :size="16" /></div>
+                <div v-else-if="loadError" class="library-state">
+                    <span>{{ t('quickOptimization.workspace.loadFailed') }}</span>
+                    <NButton size="tiny" @click="loadConfigs">{{ t('common.retry') }}</NButton>
+                </div>
+                <!-- 空状态只给两条路：用默认动作，或者用上面的「添加」自己写 -->
+                <div v-else-if="configs.length === 0 && !creating" class="library-state">
+                    <span class="library-state__hint">{{ t('quickOptimization.workspace.emptyHint') }}</span>
+                    <NButton size="small" type="primary" :loading="initializing" @click="initializeDefaults">{{ t('quickOptimization.useDefaults') }}</NButton>
+                </div>
+                <NScrollbar v-else class="optimization-list">
+                    <div v-for="config in configs" :key="config.id" class="optimization-item"
+                        :class="{ active: !creating && selectedConfig?.id === config.id }">
+                        <button type="button" class="optimization-select" @click="selectConfig(config)">
+                            <span class="optimization-copy">
+                                <strong :class="{ 'is-disabled': !config.enabled }">{{ config.name }}</strong>
+                                <small>{{ config.description || t('quickOptimization.workspace.noDescription') }}</small>
                             </span>
-                        </div>
-                    </NScrollbar>
-
-                    <div v-if="configs.length" class="library-help">
-                        <NText depth="3">{{ t('quickOptimization.workspace.limitHelp') }}</NText>
+                        </button>
+                        <NSwitch size="small" :value="config.enabled" :disabled="!config.enabled && enabledCount >= 5"
+                            :loading="togglingId === config.id" :aria-label="t('quickOptimization.workspace.enableNamed', { name: config.name })"
+                            @update:value="value => toggleConfig(config, value)" />
                     </div>
-                </aside>
+                </NScrollbar>
 
-                <main v-if="selectedConfig || creating" class="optimization-editor">
-                    <header class="editor-header">
-                        <div>
-                            <NText strong class="editor-title">
-                                {{ creating ? (draft.name || t('quickOptimization.addConfig')) : selectedConfig?.name }}
-                            </NText>
-                            <NText depth="3" class="editor-subtitle">{{ creating ? t('quickOptimization.workspace.createDescription') : t('quickOptimization.workspace.editDescription') }}</NText>
-                        </div>
-                        <NFlex v-if="selectedConfig && !creating" size="small">
-                            <NTooltip>
-                                <template #trigger>
-                                    <NButton quaternary circle size="small" :disabled="selectedIndex <= 0" :aria-label="t('quickOptimization.workspace.moveUp')" @click="moveSelected(-1)">
-                                        <template #icon><NIcon size="16"><ArrowUp /></NIcon></template>
-                                    </NButton>
-                                </template>
-                                {{ t('quickOptimization.workspace.moveUp') }}
-                            </NTooltip>
-                            <NTooltip>
-                                <template #trigger>
-                                    <NButton quaternary circle size="small" :disabled="selectedIndex < 0 || selectedIndex >= configs.length - 1" :aria-label="t('quickOptimization.workspace.moveDown')" @click="moveSelected(1)">
-                                        <template #icon><NIcon size="16"><ArrowDown /></NIcon></template>
-                                    </NButton>
-                                </template>
-                                {{ t('quickOptimization.workspace.moveDown') }}
-                            </NTooltip>
-                            <NTooltip>
-                                <template #trigger>
-                                    <NButton quaternary circle size="small" type="error" :aria-label="t('common.delete')" @click="deleteSelected">
-                                        <template #icon><NIcon size="16"><Trash /></NIcon></template>
-                                    </NButton>
-                                </template>
-                                {{ t('common.delete') }}
-                            </NTooltip>
-                        </NFlex>
-                    </header>
+                <p v-if="configs.length" class="ui-help library-help">{{ t('quickOptimization.workspace.limitHelp') }}</p>
+                <NButton v-if="configs.length" quaternary size="tiny" class="library-example" :disabled="loading || saving" @click="createExampleDraft">
+                    {{ t('quickOptimization.workspace.addExample') }}
+                </NButton>
+            </aside>
 
-                    <NScrollbar class="editor-scroll">
-                        <NForm ref="formRef" :model="draft" :rules="formRules" label-placement="top" class="optimization-form">
-                            <section class="form-section ui-surface">
-                                <div class="form-grid">
-                                    <NFormItem :label="t('quickOptimization.configName')" path="name">
-                                        <NInput v-model:value="draft.name" :placeholder="t('quickOptimization.configNamePlaceholder')" />
-                                    </NFormItem>
-                                    <NFormItem :label="t('quickOptimization.enabledStatus')" path="enabled" class="enabled-field">
-                                        <div class="switch-field">
-                                            <NSwitch v-model:value="draft.enabled" :disabled="!draft.enabled && enabledCount >= 5 && !selectedConfig?.enabled" />
-                                            <NText depth="3">{{ draft.enabled ? t('quickOptimization.enabled') : t('quickOptimization.disabled') }}</NText>
-                                        </div>
-                                    </NFormItem>
-                                    <NFormItem :label="t('quickOptimization.description')" path="description" class="form-span-2">
-                                        <NInput v-model:value="draft.description" type="textarea" :autosize="{ minRows: 2, maxRows: 8 }"
-                                            :placeholder="t('quickOptimization.descriptionPlaceholder')" />
-                                    </NFormItem>
-                                </div>
-                            </section>
-
-                            <section class="form-section ui-surface">
-                                <div class="section-heading">
-                                    <div>
-                                        <NText strong>{{ t('quickOptimization.promptTemplate') }}</NText>
-                                        <NText depth="3">{{ t('quickOptimization.workspace.templateHelp') }}</NText>
-                                    </div>
-                                    <NTooltip>
-                                        <template #trigger>
-                                            <NButton size="small" secondary class="variable-insert-button"
-                                                @mousedown.prevent @click="insertContentVariable">
-                                                <template #icon><NIcon size="16"><Braces /></NIcon></template>
-                                                {{ t('quickOptimization.workspace.contentVariable') }}
-                                            </NButton>
-                                        </template>
-                                        {{ t('quickOptimization.workspace.insertVariableHint') }}
-                                    </NTooltip>
-                                </div>
-                                <NFormItem path="prompt" :show-label="false">
-                                    <NInput ref="templateInputRef" v-model:value="draft.prompt" type="textarea"
-                                        :autosize="{ minRows: 12, maxRows: 28 }" show-count class="template-input"
-                                        :placeholder="t('quickOptimization.promptTemplatePlaceholder')"
-                                        @focus="rememberTemplateCursor" @click="rememberTemplateCursor"
-                                        @keyup="rememberTemplateCursor" @select="rememberTemplateCursor" />
-                                </NFormItem>
-                            </section>
-                        </NForm>
-                    </NScrollbar>
-                </main>
-
-                <div v-else class="editor-empty">
-                    <NEmpty :description="t('quickOptimization.workspace.selectConfig')">
-                        <template #extra><NButton type="primary" size="small" @click="createDraft">{{ t('quickOptimization.addConfig') }}</NButton></template>
-                    </NEmpty>
+            <section v-if="selectedConfig || creating" class="optimization-editor">
+                <div class="editor-header">
+                    <span class="editor-subtitle">{{ creating ? t('quickOptimization.workspace.createDescription') : t('quickOptimization.workspace.editDescription') }}</span>
+                    <span v-if="selectedConfig && !creating" class="editor-order">
+                        <NButton quaternary size="tiny" :disabled="selectedIndex <= 0" @click="moveSelected(-1)">
+                            <template #icon><NIcon :size="12"><ArrowUp /></NIcon></template>
+                            {{ t('quickOptimization.workspace.moveUp') }}
+                        </NButton>
+                        <NButton quaternary size="tiny" :disabled="selectedIndex < 0 || selectedIndex >= configs.length - 1" @click="moveSelected(1)">
+                            <template #icon><NIcon :size="12"><ArrowDown /></NIcon></template>
+                            {{ t('quickOptimization.workspace.moveDown') }}
+                        </NButton>
+                    </span>
                 </div>
-                </div>
-            </div>
+
+                <NForm ref="formRef" :model="draft" :rules="formRules" label-placement="top" class="optimization-form">
+                    <div class="form-grid">
+                        <NFormItem :label="t('quickOptimization.configName')" path="name">
+                            <NInput v-model:value="draft.name" :placeholder="t('quickOptimization.configNamePlaceholder')" />
+                        </NFormItem>
+                        <NFormItem :label="t('quickOptimization.enabledStatus')" path="enabled">
+                            <div class="switch-field">
+                                <NSwitch v-model:value="draft.enabled" :disabled="!draft.enabled && enabledCount >= 5 && !selectedConfig?.enabled" />
+                                <span>{{ draft.enabled ? t('quickOptimization.enabled') : t('quickOptimization.disabled') }}</span>
+                            </div>
+                        </NFormItem>
+                    </div>
+                    <NFormItem :label="t('quickOptimization.description')" path="description">
+                        <NInput v-model:value="draft.description" type="textarea" :autosize="{ minRows: 2, maxRows: 8 }"
+                            :placeholder="t('quickOptimization.descriptionPlaceholder')" />
+                    </NFormItem>
+                    <NFormItem path="prompt" class="template-item">
+                        <template #label>
+                            <span class="template-label">
+                                {{ t('quickOptimization.promptTemplate') }}
+                                <NButton size="tiny" @mousedown.prevent @click="insertContentVariable">
+                                    {{ t('quickOptimization.workspace.insert') }}<span class="ui-var ui-var--name template-token">{{ contentToken }}</span>
+                                </NButton>
+                            </span>
+                        </template>
+                        <NInput ref="templateInputRef" v-model:value="draft.prompt" type="textarea" class="template-input"
+                            :autosize="{ minRows: 12, maxRows: 28 }" :placeholder="t('quickOptimization.promptTemplatePlaceholder')"
+                            @click="rememberTemplateCursor" @keyup="rememberTemplateCursor" @select="rememberTemplateCursor" />
+                    </NFormItem>
+                    <p class="ui-help">{{ t('quickOptimization.workspace.templateHelp') }}</p>
+                </NForm>
+            </section>
+            <section v-else class="optimization-editor optimization-editor--empty">
+                <span>{{ t('quickOptimization.workspace.selectConfig') }}</span>
+            </section>
+        </div>
+
+        <template #footer-start>
+            <NButton v-if="selectedConfig && !creating" quaternary type="error" @click="deleteSelected">{{ t('common.delete') }}</NButton>
         </template>
-
         <template #footer>
-            <NFlex justify="space-between" align="center">
-                <NText depth="3" class="dirty-indicator">{{ dirty ? t('quickOptimization.workspace.unsavedChanges') : '' }}</NText>
-                <NFlex>
-                    <NButton @click="requestClose">{{ t('common.close') }}</NButton>
-                    <NButton v-if="selectedConfig || creating" type="primary" :loading="saving" @click="saveDraft">
-                        {{ creating ? t('common.create') : t('common.save') }}
-                    </NButton>
-                </NFlex>
-            </NFlex>
+            <NButton @click="requestClose">{{ t('common.close') }}</NButton>
+            <NButton type="primary" :loading="saving" :disabled="!(selectedConfig || creating) || !dirty" @click="saveDraft">
+                {{ t('common.save') }}
+            </NButton>
         </template>
-    </CommonModal>
+    </UiModal>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-    NButton, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput, NResult, NScrollbar,
-    NSpin, NSwitch, NText, NTooltip, useDialog, useMessage,
+    NButton, NForm, NFormItem, NIcon, NInput, NScrollbar, NSpin, NSwitch, useDialog, useMessage,
 } from 'naive-ui'
-import { ArrowDown, ArrowUp, Braces, Bulb, Plus, Settings, Trash } from '@vicons/tabler'
+import { ArrowDown, ArrowUp, Plus } from '@vicons/tabler'
 import type { CreateQuickOptimizationConfig, QuickOptimizationConfig, UpdateQuickOptimizationConfig } from '@shared/types/ai'
-import CommonModal from '@/components/common/CommonModal.vue'
+import UiModal from '@/components/ui/UiModal.vue'
 import { api } from '@/lib/api'
 
 interface Props { show: boolean }
@@ -225,6 +143,7 @@ const formRef = ref<any>()
 const templateInputRef = ref<any>()
 const snapshot = ref('')
 const templateSelection = reactive({ start: 0, end: 0 })
+const contentToken = '{{content}}'
 
 const draft = reactive({
     name: '',
@@ -346,6 +265,7 @@ const saveDraft = async () => {
     try {
         const data = { name: draft.name.trim(), description: draft.description.trim() || undefined, prompt: draft.prompt, enabled: draft.enabled }
         let savedConfig: QuickOptimizationConfig | null = null
+        const wasCreating = creating.value
         if (creating.value) {
             savedConfig = await api.quickOptimizationConfigs.create.mutate({ ...data, sortOrder: configs.value.length + 1 } as CreateQuickOptimizationConfig)
         } else if (selectedConfig.value?.id) {
@@ -354,6 +274,7 @@ const saveDraft = async () => {
         if (savedConfig?.id) selectedId.value = savedConfig.id
         await loadConfigs()
         emit('configs-updated')
+        message.success(t(wasCreating ? 'quickOptimization.workspace.created' : 'quickOptimization.workspace.saved', { name: data.name }))
     } catch (error) { message.error(t('quickOptimization.workspace.saveFailed', { error: (error as Error).message })) }
     finally { saving.value = false }
 }
@@ -396,7 +317,7 @@ const deleteSelected = () => {
     const config = selectedConfig.value
     if (!config?.id) return
     dialog.error({
-        title: t('common.confirm'), content: t('quickOptimization.workspace.deleteConfirm', { name: config.name }),
+        title: t('quickOptimization.workspace.deleteTitle'), content: t('quickOptimization.workspace.deleteConfirm', { name: config.name }),
         positiveText: t('common.delete'), negativeText: t('common.cancel'),
         onPositiveClick: async () => {
             try {
@@ -404,6 +325,7 @@ const deleteSelected = () => {
                 selectedId.value = null
                 await loadConfigs()
                 emit('configs-updated')
+                message.success(t('quickOptimization.workspace.deleted', { name: config.name }))
             } catch (error) { message.error(t('quickOptimization.workspace.operationFailed')) }
         },
     })
@@ -412,9 +334,10 @@ const deleteSelected = () => {
 const initializeDefaults = async () => {
     initializing.value = true
     try {
-        await api.quickOptimizationConfigs.initializeDefaults.mutate()
+        const count = await api.quickOptimizationConfigs.initializeDefaults.mutate()
         await loadConfigs()
         emit('configs-updated')
+        if (count) message.success(t('quickOptimization.workspace.defaultsAdded', { count }, count))
     } catch (error) { message.error(t('quickOptimization.workspace.operationFailed')) }
     finally { initializing.value = false }
 }
@@ -423,68 +346,211 @@ const requestClose = async () => {
     if (!(await confirmDiscard())) return
     emit('update:show', false)
 }
-const handleModalShowUpdate = (value: boolean) => { if (!value) requestClose() }
 
 watch(() => props.show, show => { if (show) loadConfigs() })
 </script>
 
 <style scoped>
-.modal-title-row { display: flex; align-items: flex-start; gap: 12px; }
-.modal-title-row > div { min-width: 0; }
-.modal-title-icon { width: 36px; height: 36px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); }
-.modal-title { display: block; font-size: var(--font-size-xl); line-height: var(--line-height-normal); overflow-wrap: anywhere; }
-.modal-subtitle, .editor-subtitle, .library-summary .n-text:last-child, .section-heading .n-text:last-child { display: block; margin-top: 3px; font-size: var(--font-size-sm); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
-.optimization-content { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-primary); }
-.optimization-guide { flex: 0 0 auto; min-height: 70px; padding: 10px var(--content-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--section-gap); border-width: 0 0 1px; }
-.guide-copy { min-width: 0; display: flex; align-items: center; gap: var(--compact-padding); }
-.guide-copy > div { min-width: 0; }
-.guide-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-primary); }
-.guide-title, .guide-description { display: block; line-height: var(--line-height-normal); }
-.guide-title { font-size: var(--font-size-base); }
-.guide-description { max-width: 820px; margin-top: 2px; font-size: var(--font-size-sm); white-space: normal; overflow-wrap: anywhere; }
-.optimization-workspace { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: hidden; background: var(--surface-primary); }
-.optimization-library { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border-default); background: var(--surface-primary); }
-.library-summary { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: var(--compact-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-.library-summary > div { min-width: 0; }
-.optimization-list { flex: 1; min-height: 0; padding: 7px; background: var(--surface-primary); }
-.optimization-item { width: 100%; min-height: 60px; box-sizing: border-box; display: flex; align-items: flex-start; gap: 4px; padding: 4px 8px 4px 4px; margin-bottom: 2px; color: var(--content-primary); border-radius: var(--radius-panel); background: transparent; }
-.optimization-item:hover { background: var(--interactive-hover); }
-.optimization-item.active { background: var(--surface-tertiary); }
-.optimization-select { appearance: none; flex: 1; min-width: 0; min-height: 52px; box-sizing: border-box; display: flex; align-items: flex-start; gap: 9px; padding: 4px; color: inherit; border: 0; border-radius: var(--radius-control); outline: none; background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.optimization-select:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
-.drag-order { width: 24px; height: 24px; margin-top: 1px; display: grid; place-items: center; flex: 0 0 auto; color: var(--content-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
-.optimization-copy { flex: 1; min-width: 0; }
-.optimization-copy strong, .optimization-copy small { display: block; white-space: normal; overflow-wrap: anywhere; }
-.optimization-copy strong { line-height: var(--line-height-normal); }
-.optimization-copy small { margin-top: 4px; color: var(--content-secondary); font-size: var(--font-size-xs); font-weight: normal; line-height: var(--line-height-normal); }
-.item-controls { flex: 0 0 auto; margin-top: 8px; }
-.library-help { padding: 9px 12px; border-top: 1px solid var(--border-default); background: var(--surface-secondary); font-size: var(--font-size-xs); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
-.library-state { flex: 1; display: grid; place-items: center; padding: 20px; }
-.optimization-editor { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-body); }
-.editor-header { min-height: 62px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px var(--content-padding); border-bottom: 1px solid var(--border-default); background: var(--surface-primary); }
-.editor-header > div:first-child { min-width: 0; }
-.editor-title { display: block; font-size: var(--font-size-lg); line-height: var(--line-height-normal); white-space: normal; overflow-wrap: anywhere; }
-.editor-scroll { flex: 1; min-height: 0; }
-.optimization-form { max-width: 860px; display: flex; flex-direction: column; gap: var(--section-gap); margin: 0 auto; padding: var(--page-padding); }
-.form-section { padding: var(--content-padding); }
-.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 0 16px; }
-.form-span-2 { grid-column: 1 / -1; }
-.switch-field { min-height: 34px; display: flex; align-items: center; gap: 9px; }
-.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.section-heading > div { min-width: 0; }
-.variable-insert-button { flex: 0 0 auto; }
-.template-input :deep(.n-input__textarea-el) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-.editor-empty { display: grid; place-items: center; background: var(--surface-body); }
-.dirty-indicator { min-height: 20px; font-size: var(--font-size-xs); }
-
-@media (max-width: 980px) {
-    .optimization-workspace { grid-template-columns: 270px minmax(0, 1fr); }
-    .form-grid { grid-template-columns: 1fr; }
-    .form-span-2 { grid-column: auto; }
+.optimization-workspace {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--surface-primary);
 }
 
-@media (max-width: 720px) {
-    .optimization-guide { align-items: stretch; flex-direction: column; }
-    .optimization-guide > .n-button { align-self: flex-start; }
+.optimization-library {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 2px;
+    width: 300px;
+    min-height: 0;
+    padding: 12px 8px;
+    border-right: 1px solid var(--border-default);
+    background: var(--surface-secondary);
+}
+
+.library-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6px 8px 8px;
+}
+
+.library-summary__title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.library-summary__count {
+    margin-left: 4px;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+}
+
+.library-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 8px;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.library-state__hint {
+    max-width: 240px;
+    text-align: center;
+}
+
+.optimization-list {
+    flex: 1;
+    min-height: 0;
+}
+
+.optimization-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 10px 0 0;
+    border-radius: var(--radius-control);
+}
+
+.optimization-item:hover {
+    background: var(--surface-tertiary);
+}
+
+.optimization-item.active {
+    background: var(--accent-soft);
+}
+
+.optimization-item.active .optimization-copy strong:not(.is-disabled) {
+    color: var(--accent-soft-text);
+}
+
+.optimization-select {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--content-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.optimization-select:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+}
+
+.optimization-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.optimization-copy strong, .optimization-copy small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.optimization-copy strong {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+}
+
+.optimization-item.active .optimization-copy strong {
+    font-weight: var(--font-weight-medium);
+}
+
+.optimization-copy strong.is-disabled {
+    color: var(--content-tertiary);
+}
+
+.optimization-copy small {
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.library-help {
+    padding: 8px 8px 0;
+}
+
+.library-example {
+    align-self: flex-start;
+    margin: 4px 0 0 2px;
+}
+
+.optimization-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    padding: 20px 24px;
+    overflow: auto;
+}
+
+.optimization-editor--empty {
+    align-items: center;
+    justify-content: center;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.editor-subtitle {
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.editor-order {
+    display: flex;
+    gap: 4px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 12px;
+}
+
+.switch-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.template-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.template-token {
+    margin-left: 4px;
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+.template-input :deep(textarea) {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
 }
 </style>

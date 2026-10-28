@@ -2,6 +2,7 @@ import { isBackupPayload, parseBackupPayload, unwrapBackupData } from '@shared/b
 import type { ImportResult } from '@shared/types/data-management'
 import { DatabaseServiceManager } from './database-manager.service'
 import { cloudSyncService, type CloudSyncRestoreSuspension } from './cloud-sync.service'
+import { localBackupService } from './local-backup.service'
 
 export interface RestorePreview {
   categories: number
@@ -83,6 +84,21 @@ export class DataRestoreService {
         errorCode: 'INVALID_DATA',
         error: error instanceof Error ? error.message : String(error),
         message: '恢复数据校验失败'
+      }
+    }
+
+    // 恢复会整体覆盖本机数据：先备份当前数据，备份失败就不继续，避免数据无法找回
+    try {
+      await localBackupService.createSafetyBackup('restore')
+    } catch (error) {
+      return {
+        success: false,
+        atomic: true,
+        phase: 'prepare',
+        retryable: true,
+        error: error instanceof Error ? error.message : String(error),
+        message: '恢复前没能备份当前数据，已取消恢复，本机数据没有变化',
+        preview
       }
     }
 

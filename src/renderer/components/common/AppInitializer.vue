@@ -2,31 +2,20 @@
   <div class="app-initializer">
     <!-- 数据库初始化加载屏幕 -->
     <div v-if="!isDatabaseReady && !hasInitializationCompleted" class="loading-screen">
-      <div class="loading-content">
-        <div class="loading-spinner">
-          <NSpin size="large" />
-        </div>
-        <div class="loading-text">
-          <NText v-if="!databaseError" style="font-size: 18px;">
-            正在初始化应用...
-          </NText>
-          <div v-else>
-            <NText type="error" style="font-size: 18px; display: block; margin-bottom: 12px;">
-              数据库初始化失败
-            </NText>
-            <NText depth="3" style="font-size: 14px; display: block; margin-bottom: 16px;">
-              {{ databaseError }}
-            </NText>
-            <NFlex justify="center" :size="12">
-              <NButton type="primary" @click="retry" :loading="isRetrying" size="large">
-                重试
-              </NButton>
-              <NButton @click="continueWithoutDb" size="large" quaternary>
-                继续使用应用
-              </NButton>
-            </NFlex>
+      <div class="loading-content" role="status" aria-live="polite">
+        <img :src="appIcon" alt="" class="loading-logo" />
+        <template v-if="!databaseError">
+          <NSpin :size="20" />
+          <span class="loading-title">{{ t('appInit.loading') }}</span>
+        </template>
+        <template v-else>
+          <span class="loading-title loading-title--error">{{ t('appInit.failedTitle') }}</span>
+          <span class="loading-detail">{{ databaseError }}</span>
+          <div class="loading-actions">
+            <NButton type="primary" :loading="isRetrying" @click="retry">{{ t('common.retry') }}</NButton>
+            <NButton quaternary @click="continueWithoutDb">{{ t('appInit.continue') }}</NButton>
           </div>
-        </div>
+        </template>
       </div>
     </div>
 
@@ -39,10 +28,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { NSpin, NText, NButton, NFlex } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
+import { NButton, NSpin } from 'naive-ui'
+import appIcon from '~/assets/images/logo.png'
 import { useDatabase } from '~/composables/useDatabase'
 import { initDatabaseState } from '~/composables/useDatabase'
 
+const { t } = useI18n()
 const { isDatabaseReady, databaseError, clearError } = useDatabase()
 
 const hasInitializationCompleted = ref(false)
@@ -94,53 +86,55 @@ onMounted(() => {
 
 .loading-screen {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: var(--n-color);
+  inset: 0;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  background: var(--surface-body);
 }
 
 .loading-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  padding: 40px;
-  background: var(--surface-primary);
-  border-radius: var(--radius-modal);
-  box-shadow: var(--shadow-overlay);
-  border: 1px solid var(--border-default);
-  min-width: 320px;
+  gap: 12px;
+  max-width: 420px;
+  padding: 24px;
   text-align: center;
 }
 
-.loading-spinner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.loading-logo {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: 13px;
 }
 
-.loading-text {
+.loading-title {
+  color: var(--content-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.loading-title--error {
+  color: var(--accent-error);
+}
+
+.loading-detail {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.loading-actions {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .app-content {
   width: 100%;
   height: 100%;
-}
-
-/* 适配暗色主题 */
-@media (prefers-color-scheme: dark) {
-  .loading-screen {
-    background: var(--n-color);
-  }
 }
 </style>

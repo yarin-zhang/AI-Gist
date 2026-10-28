@@ -1,72 +1,45 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.settings') }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <ion-content class="m-page-content" :fullscreen="true" :scroll-events="true">
+      <MobileLargeTitle :title="t('mainPage.menu.settings')" />
 
-    <ion-content :fullscreen="true" :scroll-events="true" @ionScroll="onIonScroll">
-      <!-- 大标题：静止时展开，向下滚动时收起为工具栏小标题 -->
-      <div class="mobile-large-title-bar" :style="{ '--collapse-progress': headerProgress }">
-        <h1 class="mobile-large-title-text" aria-hidden="true">{{ t('mainPage.menu.settings') }}</h1>
-      </div>
+      <!-- 设置首页只做导航：同步状态卡和每一行都进入独立的二级页面 -->
+      <div class="m-body m-body--tabbed settings-home">
+        <div class="m-card settings-sync-card">
+          <button type="button" class="settings-sync-card__main" @click="go(ROUTES.dataSync)">
+            <span class="m-tile m-tile-lg" :class="`m-tile--${syncView.tileTone}`" aria-hidden="true">
+              <ion-icon :icon="syncView.icon" />
+            </span>
+            <span class="settings-sync-card__text">
+              <span class="settings-sync-card__title">{{ syncView.title }}</span>
+              <span class="settings-sync-card__sub">{{ syncCardSubtitle }}</span>
+            </span>
+            <span v-if="syncView.kind !== 'conflict'" class="m-btn-c m-btn-c--plain settings-sync-card__go" aria-hidden="true">
+              <ion-icon :icon="syncOutline" />
+            </span>
+          </button>
+          <!-- 有冲突待处理时，卡片右侧直接给出处理入口 -->
+          <button v-if="syncView.kind === 'conflict'" type="button" class="settings-sync-card__action" @click="openConflictSheet">
+            {{ t('mobileSettings.sync.resolveConflicts') }}
+          </button>
+        </div>
 
-      <!-- 设置首页只做导航：每一项都进入独立的二级页面 -->
-      <ion-list-header class="mobile-settings-group-header">
-        <ion-label>{{ t('mobileSettings.groups.data') }}</ion-label>
-      </ion-list-header>
-      <div class="mobile-grouped-card">
-        <ion-list>
-          <ion-item button detail @click="go('/mobile/settings/data-sync')">
-            <ion-icon :icon="syncOutline" slot="start"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ t('dataSync.title') }}</h3>
-              <p>{{ t('mobileSettings.entries.dataSyncDescription') }}</p>
-            </ion-label>
-            <ion-note slot="end">{{ syncSummary }}</ion-note>
-          </ion-item>
+        <MobileGroup :title="t('mobileSettings.groups.data')">
+          <MobileRow :title="t('dataSync.title')" :icon="syncOutline" tone="blue" :value="storageSummary"
+            show-chevron @click="go(ROUTES.dataSync)" />
+          <MobileRow :title="t('dataBackup.title')" :icon="archiveOutline" tone="green" :value="backupSummary"
+            show-chevron @click="go(ROUTES.dataBackup)" />
+        </MobileGroup>
 
-          <ion-item button detail @click="go('/mobile/settings/data-backup')">
-            <ion-icon :icon="archiveOutline" slot="start"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ t('dataBackup.title') }}</h3>
-              <p>{{ t('mobileSettings.entries.dataBackupDescription') }}</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </div>
+        <MobileGroup :title="t('mobileSettings.groups.preferences')">
+          <MobileRow :title="t('settings.sections.general')" :icon="optionsOutline" tone="violet" :value="generalSummary"
+            show-chevron @click="go(ROUTES.general)" />
+        </MobileGroup>
 
-      <ion-list-header class="mobile-settings-group-header">
-        <ion-label>{{ t('mobileSettings.groups.preferences') }}</ion-label>
-      </ion-list-header>
-      <div class="mobile-grouped-card">
-        <ion-list>
-          <ion-item button detail @click="go('/mobile/settings/general')">
-            <ion-icon :icon="optionsOutline" slot="start"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ t('settings.sections.general') }}</h3>
-              <p>{{ t('mobileSettings.entries.generalDescription') }}</p>
-            </ion-label>
-            <ion-note slot="end">{{ generalSummary }}</ion-note>
-          </ion-item>
-        </ion-list>
-      </div>
-
-      <ion-list-header class="mobile-settings-group-header">
-        <ion-label>{{ t('mobileSettings.groups.other') }}</ion-label>
-      </ion-list-header>
-      <div class="mobile-grouped-card">
-        <ion-list>
-          <ion-item button detail @click="go('/mobile/about')">
-            <ion-icon :icon="informationCircleOutline" slot="start"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ t('settings.menus.about.title') }}</h3>
-              <p>{{ t('mobileSettings.entries.aboutDescription') }}</p>
-            </ion-label>
-            <ion-note slot="end">{{ appVersion }}</ion-note>
-          </ion-item>
-        </ion-list>
+        <MobileGroup :title="t('mobileSettings.groups.other')">
+          <MobileRow :title="t('mobileSettings.entries.about')" :icon="informationCircleOutline" tone="grey" :value="appVersion"
+            show-chevron @click="go(ROUTES.about)" />
+        </MobileGroup>
       </div>
     </ion-content>
   </ion-page>
@@ -75,50 +48,77 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonList,
-  IonListHeader,
-  IonItem,
-  IonLabel,
-  IonIcon,
-  IonNote,
-  onIonViewWillEnter
-} from '@ionic/vue'
+import { IonPage, IonContent, IonIcon, onIonViewWillEnter } from '@ionic/vue'
 import {
   syncOutline,
   archiveOutline,
   optionsOutline,
   informationCircleOutline
 } from 'ionicons/icons'
+import MobileLargeTitle from '~/components/mobile/ui/MobileLargeTitle.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import MobileRow from '~/components/mobile/ui/MobileRow.vue'
 import { useI18n } from '~/composables/useI18n'
 import { useTheme } from '~/composables/useTheme'
-import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import { cloudSyncService, type CloudSyncStatus } from '~/lib/services/cloud-sync.service'
+import { formatFriendlyDate } from '~/lib/utils/date'
+import type { CloudStorageConfig } from '@shared/types/cloud-backup'
+import { describeSyncStatus, formatRelative, loadLocalBackupSummary, requestConflictSheet } from './settings/shared'
+
+const ROUTES = {
+  dataSync: '/mobile/settings/data-sync',
+  dataBackup: '/mobile/settings/data-backup',
+  general: '/mobile/settings/general',
+  about: '/mobile/about'
+} as const
 
 const router = useRouter()
 const { t, locale, supportedLocales } = useI18n()
 const { themeSource } = useTheme()
-const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
 
 const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '')
-const storageCount = ref(0)
+const storageConfigs = ref<CloudStorageConfig[]>([])
+const autoSyncEnabled = ref(true)
+const latestLocalBackupAt = ref<string>()
 const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus())
+const restoreSuspensionCount = ref(cloudSyncService.getRestoreSuspensions().length)
+// 相对时间（「2 分钟前」）在每次回到本页时刷新
+const now = ref(new Date())
 let unsubscribeSyncStatus: (() => void) | null = null
 
-// 未配置存储时不展示同步状态，否则会让用户以为同步已经在工作。
-const syncSummary = computed(() => {
-  if (storageCount.value === 0) return t('mobileSettings.sync.notConfigured')
-  if (cloudSyncService.getRestoreSuspensions().length > 0) {
-    return t('cloudBackup.syncStatusValues.paused')
+const syncView = computed(() => describeSyncStatus({
+  status: syncStatus.value,
+  autoSyncEnabled: autoSyncEnabled.value,
+  storageCount: storageConfigs.value.length,
+  restoreSuspensionCount: restoreSuspensionCount.value
+}))
+
+// 状态卡上显示的存储：正在同步的那个，没有就取第一个已启用的
+const primaryStorage = computed(() =>
+  storageConfigs.value.find(config => config.id === syncStatus.value.storageId && config.enabled)
+  || storageConfigs.value.find(config => config.enabled))
+
+// 一切正常时显示「坚果云 · 2 分钟前同步」，其余状态显示状态说明
+const syncCardSubtitle = computed(() => {
+  const view = syncView.value
+  const lastSyncAt = syncStatus.value.lastSyncAt
+  if (view.kind === 'current' && primaryStorage.value && lastSyncAt) {
+    return `${primaryStorage.value.name} · ${t('mobileSettings.sync.syncedAgo', { time: formatRelative(lastSyncAt, now.value) })}`
   }
-  return t(`cloudBackup.syncStatusValues.${syncStatus.value.status}`)
+  if (view.kind === 'notConfigured') return t('mobileSettings.entries.dataSyncDescription')
+  return view.description
 })
+
+const storageSummary = computed(() => {
+  if (storageConfigs.value.length === 0) return t('mobileSettings.sync.notConfigured')
+  const storage = primaryStorage.value || storageConfigs.value[0]
+  return storage.type === 'webdav' ? 'WebDAV' : 'iCloud'
+})
+
+const backupSummary = computed(() => latestLocalBackupAt.value
+  ? formatFriendlyDate(latestLocalBackupAt.value, locale.value, { withTime: false, now: now.value })
+  : t('dataBackup.none'))
 
 const generalSummary = computed(() => {
   const language = supportedLocales.find(item => item.code === locale.value)?.name || locale.value
@@ -134,51 +134,124 @@ const go = (path: string) => {
   void router.push(path)
 }
 
-const loadStorageCount = async () => {
-  try {
-    storageCount.value = (await CloudBackupAPI.getStorageConfigs()).length
-  } catch (error) {
-    console.error('加载云端存储配置失败:', error)
-    storageCount.value = 0
-  }
+/**
+ * 冲突处理面板（SyncConflictSheet）挂在数据同步页上：首页登记一次打开请求再跳过去，
+ * 同步页进入时取走请求并打开面板。
+ */
+const openConflictSheet = () => {
+  requestConflictSheet()
+  go(ROUTES.dataSync)
+}
+
+const loadSummary = async () => {
+  now.value = new Date()
+  restoreSuspensionCount.value = cloudSyncService.getRestoreSuspensions().length
+  const [configs, enabled, backups] = await Promise.all([
+    CloudBackupAPI.getStorageConfigs().catch(error => {
+      console.error('加载云端存储配置失败:', error)
+      return [] as CloudStorageConfig[]
+    }),
+    cloudSyncService.getAutoSyncEnabled().catch(() => true),
+    loadLocalBackupSummary()
+  ])
+  storageConfigs.value = configs
+  autoSyncEnabled.value = enabled
+  latestLocalBackupAt.value = backups.latestAt
 }
 
 onMounted(() => {
   unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => {
     syncStatus.value = status
+    restoreSuspensionCount.value = cloudSyncService.getRestoreSuspensions().length
   })
 })
 
 // Tab 页会被 Ionic 缓存，返回时用生命周期钩子刷新摘要而不是 onMounted。
 onIonViewWillEnter(() => {
-  void loadStorageCount()
+  void loadSummary()
 })
 
 onUnmounted(() => unsubscribeSyncStatus?.())
 </script>
 
 <style scoped>
-/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
-
-/* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
-ion-item ion-icon[slot='start'] {
-  margin-inline-end: 16px;
+.m-body.settings-home {
+  padding-top: 16px;
 }
 
-ion-content {
-  /* 让列表底部留出浮动导航（AI 入口条 + 标签栏）的空间，避免最后一项被遮挡 */
-  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-clearance));
+.m-card.settings-sync-card {
+  flex-direction: row;
+  align-items: center;
+  overflow: hidden;
 }
 
-/*
- * 分组标题现在放在圆角卡片外面（贴近原生 iOS 设置页的分组样式），
- * 第一组紧跟大标题，顶部留白可以比后续分组略小。
- */
-.mobile-settings-group-header {
-  margin-top: 4px;
+.settings-sync-card__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.mobile-settings-group-header:first-of-type {
-  margin-top: 0;
+.settings-sync-card__main:active {
+  background: var(--surface-secondary);
+}
+
+.settings-sync-card__action {
+  position: relative;
+  flex: none;
+  height: 34px;
+  margin-right: 16px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 17px;
+  background: var(--accent-warning-bg);
+  color: var(--accent-warning);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-sync-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-sync-card__title {
+  color: var(--content-primary);
+  font-size: var(--m-font-body);
+  font-weight: 600;
+}
+
+.settings-sync-card__sub {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.settings-sync-card__go {
+  pointer-events: none;
+}
+
+/* 胶囊按钮看起来 34px，点按区域扩到 44px */
+.settings-sync-card__action::after {
+  position: absolute;
+  inset: -5px 0;
+  content: "";
 }
 </style>

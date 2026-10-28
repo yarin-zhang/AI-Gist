@@ -39,7 +39,8 @@ export async function getAIModels(config: AIConfig): Promise<string[]> {
   }
   
   try {
-    return await window.electronAPI.ai.getModels(config);
+    // 只返回服务实际给出的列表（或服务本身不提供列表时的内置模型），获取失败时的常见模型不算
+    return (await window.electronAPI.ai.getModels(config)).models;
   } catch (error) {
     return [];
   }

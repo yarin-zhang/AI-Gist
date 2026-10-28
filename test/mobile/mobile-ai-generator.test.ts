@@ -9,18 +9,28 @@
  * 修复点：
  * 1. MobileAIConfigEditPage.handleSave — 新建时生成 configId
  * 2. AIConfigService.createAIConfig     — 服务层兜底，若 configId 缺失自动生成
- * 3. MobileAIGeneratorPage.loadConfigs  — 直接从已加载列表中选首选，消除二次 DB 查询的不一致
- * 4. MobileAIGeneratorPage.generatePrompt — 用 indexOf 代替 split，正确解析含 ':' 的模型名
+ * 3. 加载配置后直接从已加载列表中选首选，消除二次 DB 查询的不一致
+ * 4. 解析 selectedModelKey 时用 indexOf 代替 split，正确解析含 ':' 的模型名
+ * （3、4 现在由 components/mobile/prompt/mobile-ai.ts 提供，下面直接测试真实实现）
  *
  * 覆盖：
  * - createAIConfig：configId 缺失时的兜底行为
  * - parseModelKey：首个冒号切分逻辑，含冒号的模型名
- * - selectPreferredModel：loadConfigs 自动选择逻辑（isPreferred 优先、回退第一个）
+ * - pickDefaultModelKey：加载后自动选择的模型（isPreferred 优先、回退第一个）
  * - resolveConfig：generatePrompt 全流程；configId 为 undefined 时的原始 Bug 复现
  */
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import type { AIConfig } from '@shared/types/ai'
+import {
+  buildMobileModelOptions,
+  getConfigModels,
+  parseModelKey,
+  pickDefaultModelKey,
+  resolveModelKey,
+} from '~/components/mobile/prompt/mobile-ai'
 
 // ---------------------------------------------------------------------------
 // 工具函数
@@ -90,18 +100,9 @@ describe('createAIConfig — configId 兜底生成', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. parseModelKey — generatePrompt 中解析 selectedModelKey
+// 2. parseModelKey — 生成页解析 selectedModelKey（components/mobile/prompt/mobile-ai.ts）
 //    对应修复：使用 indexOf 代替 split，避免含 ':' 的模型名被截断
 // ---------------------------------------------------------------------------
-
-function parseModelKey(key: string): { configId: string; model: string } {
-  const firstColon = key.indexOf(':')
-  if (firstColon === -1) return { configId: key, model: '' }
-  return {
-    configId: key.substring(0, firstColon),
-    model: key.substring(firstColon + 1),
-  }
-}
 
 function parseModelKeyOld(key: string): { configId: string; model: string } {
   const [configId, model] = key.split(':')
@@ -150,42 +151,18 @@ describe('parseModelKey', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 3. selectPreferredModel — loadConfigs 自动选择逻辑
+// 3. pickDefaultModelKey — 加载配置后自动选中的模型
 //    对应修复：从已加载列表直接查找，消除二次 DB 查询
 // ---------------------------------------------------------------------------
 
-function selectPreferredModel(enabledConfigs: AIConfig[]): {
-  selectedModelKey: string
-  selectedConfigName: string
-} {
-  const preferred = enabledConfigs.find(c => c.isPreferred) ?? enabledConfigs[0]
-  if (preferred?.defaultModel) {
-    return {
-      selectedModelKey: `${preferred.configId}:${preferred.defaultModel}`,
-      selectedConfigName: preferred.name,
-    }
-  }
-  return { selectedModelKey: '', selectedConfigName: '' }
-}
-
-function getConfigModels(config: AIConfig): string[] {
-  const models = new Set<string>()
-  if (config.defaultModel) models.add(config.defaultModel)
-  for (const model of config.models || []) {
-    models.add(model)
-  }
-  if (config.customModel) models.add(config.customModel)
-  return [...models]
-}
-
-describe('selectPreferredModel', () => {
+describe('pickDefaultModelKey', () => {
   it('无配置时返回空 key', () => {
-    expect(selectPreferredModel([]).selectedModelKey).toBe('')
+    expect(pickDefaultModelKey([])).toBe('')
   })
 
   it('单个配置自动选中', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4' })
-    expect(selectPreferredModel([config]).selectedModelKey).toBe('cfg1:gpt-4')
+    expect(pickDefaultModelKey([config])).toBe('cfg1:gpt-4')
   })
 
   it('优先选 isPreferred 的配置', () => {
@@ -194,7 +171,7 @@ describe('selectPreferredModel', () => {
       makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: true }),
       makeConfig({ configId: 'cfg3', defaultModel: 'gpt-4o', isPreferred: false }),
     ]
-    expect(selectPreferredModel(configs).selectedModelKey).toBe('cfg2:gpt-4')
+    expect(pickDefaultModelKey(configs)).toBe('cfg2:gpt-4')
   })
 
   it('无 isPreferred 时回退到第一个', () => {
@@ -202,12 +179,12 @@ describe('selectPreferredModel', () => {
       makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
       makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: false }),
     ]
-    expect(selectPreferredModel(configs).selectedModelKey).toBe('cfg1:gpt-3.5-turbo')
+    expect(pickDefaultModelKey(configs)).toBe('cfg1:gpt-3.5-turbo')
   })
 
-  it('配置无 defaultModel 时不设置 key', () => {
-    const config = makeConfig({ configId: 'cfg1', defaultModel: undefined })
-    expect(selectPreferredModel([config]).selectedModelKey).toBe('')
+  it('配置没有 defaultModel 时用模型列表里的第一个；一个模型都没有时不设置 key', () => {
+    expect(pickDefaultModelKey([makeConfig({ configId: 'cfg1', defaultModel: undefined })])).toBe('cfg1:gpt-4')
+    expect(pickDefaultModelKey([makeConfig({ configId: 'cfg1', defaultModel: undefined, models: [] })])).toBe('')
   })
 
   it('[回归] defaultModel 优先于远端模型列表顺序', () => {
@@ -221,7 +198,7 @@ describe('selectPreferredModel', () => {
       'first-remote-model',
       'second-remote-model'
     ])
-    expect(selectPreferredModel([config]).selectedModelKey).toBe('cfg1:selected-model')
+    expect(pickDefaultModelKey([config])).toBe('cfg1:selected-model')
   })
 
   it('[回归] defaultModel、models 和 customModel 组合后保持唯一', () => {
@@ -238,24 +215,30 @@ describe('selectPreferredModel', () => {
       makeConfig({ configId: 'cfg1', defaultModel: 'gpt-3.5-turbo', isPreferred: false }),
       makeConfig({ configId: 'cfg2', defaultModel: 'gpt-4', isPreferred: true }),
     ]
-    const { selectedModelKey } = selectPreferredModel(configs)
-    const { configId } = parseModelKey(selectedModelKey)
+    const { configId } = parseModelKey(pickDefaultModelKey(configs))
     expect(configs.find(c => c.configId === configId)).toBeDefined()
+  })
+
+  it('模型选择面板把首选配置排在最前，每个配置先列默认模型', () => {
+    const configs = [
+      makeConfig({ configId: 'cfg1', name: 'A', defaultModel: 'a-1', models: ['a-2'] }),
+      makeConfig({ configId: 'cfg2', name: 'B', defaultModel: 'b-1', isPreferred: true }),
+    ]
+    expect(buildMobileModelOptions(configs).map(option => option.key)).toEqual(['cfg2:b-1', 'cfg2:gpt-4', 'cfg1:a-1', 'cfg1:a-2'])
   })
 })
 
 // ---------------------------------------------------------------------------
-// 4. resolveConfig — generatePrompt 全流程
+// 4. resolveConfig — 生成全流程
 // ---------------------------------------------------------------------------
 
 function resolveConfig(selectedModelKey: string, configs: AIConfig[]): { config: AIConfig; model: string } {
-  const { configId, model } = parseModelKey(selectedModelKey)
-  const config = configs.find(c => c.configId === configId)
-  if (!config) throw new Error('未找到选中的配置')
-  return { config, model }
+  const resolved = resolveModelKey(configs, selectedModelKey)
+  if (!resolved) throw new Error('未找到选中的配置')
+  return { config: resolved.config, model: resolved.model }
 }
 
-describe('resolveConfig（generatePrompt 全流程）', () => {
+describe('resolveConfig（生成全流程）', () => {
   it('正常情况：能找到 config', () => {
     const config = makeConfig({ configId: 'cfg1', defaultModel: 'gpt-4' })
     const { config: found, model } = resolveConfig('cfg1:gpt-4', [config])
@@ -283,7 +266,7 @@ describe('resolveConfig（generatePrompt 全流程）', () => {
     const configs = [
       makeConfig({ configId: 'config_1710000000000_abc123', defaultModel: 'gpt-4', isPreferred: true }),
     ]
-    const { selectedModelKey } = selectPreferredModel(configs)
+    const selectedModelKey = pickDefaultModelKey(configs)
     expect(() => resolveConfig(selectedModelKey, configs)).not.toThrow()
     const { config } = resolveConfig(selectedModelKey, configs)
     expect(config.configId).toBe('config_1710000000000_abc123')
@@ -305,10 +288,37 @@ describe('resolveConfig（generatePrompt 全流程）', () => {
     expect(savedConfig.configId).not.toBe('undefined')
 
     // 加载后选择
-    const { selectedModelKey } = selectPreferredModel([savedConfig])
+    const selectedModelKey = pickDefaultModelKey([savedConfig])
     expect(selectedModelKey).toContain(savedConfig.configId)
 
     // 生成时查找
     expect(() => resolveConfig(selectedModelKey, [savedConfig])).not.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 5. 页面接线：生成仍走 AIGeneratorService，继续调整在当前结果上多轮进行
+// ---------------------------------------------------------------------------
+
+describe('MobileAIGeneratorPage 接线', () => {
+  const page = readFileSync(resolve(process.cwd(), 'src/renderer/pages/mobile/MobileAIGeneratorPage.vue'), 'utf8')
+
+  it('按需求生成沿用移动端的 AIGeneratorService，并写生成记录', () => {
+    expect(page).toContain("import { AIGeneratorService } from '~/lib/services/mobile-ai-generator.service'")
+    expect(page).toContain('await AIGeneratorService.generatePrompt(')
+    expect(page).toContain('await api.aiGenerationHistory.create.mutate({')
+  })
+
+  it('有结果后输入框用来继续调整当前结果', () => {
+    expect(page).toMatch(/if \(base\) await refine\(text, base\)\s*\n\s*else await generate\(text\)/)
+    expect(page).toContain("t('promptManagement.adjustPromptInstruction')")
+  })
+
+  it('不再依赖已删除的浮动导航弹层', () => {
+    expect(page).not.toMatch(/presentedAsModal|floating-prompt-actions|mobile-floating-nav/)
+  })
+
+  it('生成记录只列真正的生成，不含试运行', () => {
+    expect(page).toContain(".filter(item => !String(item.historyId || '').startsWith('use_'))")
   })
 })

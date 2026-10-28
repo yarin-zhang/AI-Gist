@@ -1,9 +1,10 @@
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import {
   getDefaultModels as getProviderDefaultModels,
   getTestModelPriority
 } from '@shared/ai-provider-metadata';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * Google Gemini 供应商实现
@@ -100,51 +101,22 @@ export class GoogleProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`获取 Google Gemini 模型列表 - baseURL: ${config.baseURL}`);
-    
-    try {
-      const models = await this.fetchRemoteModels(config);
-      console.log(`Google Gemini 解析出的模型列表:`, models);
-
-      if (models.length > 0) {
-        return models;
-      }
-    } catch (error) {
-      console.error(`获取 Google Gemini 模型列表失败，使用默认列表:`, error);
-      
-      // 详细的错误分析和诊断
-      if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          console.error('Google Gemini API 认证失败，请检查 API Key 是否正确');
-        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-          console.error('Google Gemini API 权限不足，请检查 API Key 权限');
-        } else if (error.message.includes('ECONNRESET')) {
-          console.error('网络连接被重置，可能是防火墙或网络策略阻止了连接');
-        } else if (error.message.includes('ConnectTimeoutError') || error.message.includes('timeout')) {
-          console.error('连接超时，可能是网络问题或 Google 服务不可达');
-        } else if (error.message.includes('fetch failed')) {
-          console.error('网络请求失败，请检查网络连接和 DNS 解析');
-        } else {
-          console.error('未知网络错误:', error.message);
-        }
-      }
-    }
-    
-    // 返回默认模型列表作为后备
-    return this.getDefaultModels();
+    // 拿不到时不再直接返回内置列表，常见模型只作为备选交给界面
+    return this.resolveModelList(() => this.fetchRemoteModels(config), this.getDefaultModels());
   }
 
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
 
     const model = config.defaultModel || config.customModel || this.getDefaultModel();
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const response = await this.makeGoogleRequest(config, model, testPrompt);
@@ -422,11 +394,11 @@ export class GoogleProvider extends BaseAIProvider {
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试 Google Gemini 模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       const response = await this.makeGoogleRequest(config, model, testPrompt);
       
       console.log(`Google Gemini 模型 ${model} 测试成功`);

@@ -18,8 +18,9 @@ import '@ionic/vue/css/display.css'
 // 导入 Ionic 暗色模式调色板
 import '@ionic/vue/css/palettes/dark.class.css'
 import './assets/styles/mobile.css'
+import './assets/styles/mobile-v5.css'
 
-import { IonicVue } from '@ionic/vue'
+import { IonicVue, type AnimationBuilder } from '@ionic/vue'
 import { Capacitor } from '@capacitor/core'
 import type { App } from 'vue'
 import { PlatformDetector } from '@shared/platform'
@@ -35,15 +36,15 @@ export async function setupIonic(app: App) {
   // Web 移动版没有原生平台信息，Ionic 默认会回退到 Material Design。
   // 只为 Web 移动壳固定 iOS 模式；原生 Android/iOS 继续使用平台默认行为。
   const platformConfig = PlatformDetector.isWeb() ? { mode: 'ios' as const } : undefined
-  let ionicConfig = platformConfig
 
   // iOS 26+ 把底栏交给系统渲染（见 lib/mobile/native-tab-bar.ts）。转场动画必须在
   // IonicVue 初始化时传入，所以原生底栏的模块要在这里、而不是等 App 挂载后才加载。
+  let navAnimation: AnimationBuilder | undefined
   if (supportsNativeTabBar(Capacitor.getPlatform(), window.CSS)) {
     document.documentElement.classList.add(NATIVE_TAB_BAR_CLASS)
-    const { nativeUINavAnimation } = await import('./lib/mobile/ios-native-ui')
-    ionicConfig = { ...platformConfig, navAnimation: nativeUINavAnimation }
+    navAnimation = (await import('./lib/mobile/ios-native-ui')).nativeUINavAnimation
   }
 
+  const ionicConfig = navAnimation ? { ...platformConfig, navAnimation } : platformConfig
   app.use(IonicVue, ionicConfig)
 }

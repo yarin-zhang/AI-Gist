@@ -6,15 +6,15 @@ const locales = ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'it-IT']
 
 describe('prompt title and updated field labels (#379)', () => {
   it('labels the title field and table columns with field names, not the page title', () => {
-    const editModal = readRendererFile('components/prompt-management/PromptEditModal.vue')
-    const list = readRendererFile('components/prompt-management/PromptList.vue')
+    const header = readRendererFile('components/prompts/PromptHeader.vue')
+    const table = readRendererFile('components/prompts/PromptTable.vue')
 
-    expect(editModal).toContain(`:label="t('promptManagement.titleLabel')" path="title"`)
-    expect(editModal).not.toContain(`:label="t('promptManagement.title')"`)
-    expect(list).not.toContain(`t('promptManagement.title')`)
-    expect(list).not.toContain(`t('promptManagement.update')`)
-    expect(list.match(/t\('promptManagement\.titleLabel'\)/g)?.length).toBe(2)
-    expect(list.match(/t\('promptManagement\.updatedLabel'\)/g)?.length).toBe(2)
+    expect(header).toContain(`:aria-label="t('promptPage.titleLabel')"`)
+    expect(header).not.toContain(`t('promptManagement.title')`)
+    expect(table).not.toContain(`t('promptManagement.title')`)
+    expect(table).not.toContain(`t('promptManagement.update')`)
+    expect(table).toContain(`t('promptManagement.titleLabel')`)
+    expect(table).toContain(`t('promptManagement.updatedLabel')`)
   })
 
   it.each(locales)('keeps field labels distinct from the page title in %s', (locale) => {

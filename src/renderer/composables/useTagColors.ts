@@ -1,5 +1,6 @@
 import { useThemeVars } from 'naive-ui'
 import {
+    CATEGORY_COLORS,
     COLOR_SWATCHES,
     getCategoryTagColor as getSharedCategoryTagColor,
     getTagColor as getSharedTagColor,
@@ -22,6 +23,7 @@ export function useTagColors() {
         getTagsArray,
         getCategoryTagColor,
         COLOR_SWATCHES,
+        CATEGORY_COLORS,
         themeVars
     }
 }

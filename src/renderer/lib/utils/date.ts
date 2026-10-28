@@ -20,3 +20,50 @@ export const formatDateTime = (value: string | number | Date): string => {
 
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
+
+const toDate = (value: string | number | Date): Date => (value instanceof Date ? value : new Date(value));
+
+const startOfDay = (date: Date): number => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+/**
+ * 列表和元信息里的友好日期：今天 10:24、昨天 21:08、10月20日、2025年9月18日。
+ * 日期部分交给 Intl 按界面语言输出，避免每种语言各写一套规则。
+ * 「今天 / Today」单独显示时首字母大写；嵌在句子里（如「Updated today」）时传 capitalize: false。
+ */
+export const formatFriendlyDate = (
+    value: string | number | Date,
+    locale: string,
+    options: { withTime?: boolean; now?: Date; capitalize?: boolean } = {}
+): string => {
+    const date = toDate(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const now = options.now ?? new Date();
+    const dayOffset = Math.round((startOfDay(date) - startOfDay(now)) / 86_400_000);
+    const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+
+    if (dayOffset === 0 || dayOffset === -1) {
+        const day = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(dayOffset, 'day');
+        const label = options.capitalize === false ? day : day.charAt(0).toUpperCase() + day.slice(1);
+        return options.withTime === false ? label : `${label} ${time}`;
+    }
+
+    const sameYear = date.getFullYear() === now.getFullYear();
+    const dateText = new Intl.DateTimeFormat(locale, sameYear
+        ? { month: 'short', day: 'numeric' }
+        : { year: 'numeric', month: 'short', day: 'numeric' }
+    ).format(date);
+    return options.withTime ? `${dateText} ${time}` : dateText;
+};
+
+/** 状态栏里的「2 分钟前」：一小时内按分钟，今天之内按小时，更早的退回友好日期 */
+export const formatRelativeTime = (value: string | number | Date, locale: string, now = new Date()): string => {
+    const date = toDate(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const minutes = Math.round((date.getTime() - now.getTime()) / 60_000);
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+
+    if (Math.abs(minutes) < 1) return rtf.format(0, 'second');
+    if (Math.abs(minutes) < 60) return rtf.format(minutes, 'minute');
+    if (startOfDay(date) === startOfDay(now)) return rtf.format(Math.round(minutes / 60), 'hour');
+    return formatFriendlyDate(date, locale, { now });
+};

@@ -27,21 +27,19 @@ const readRendererFile = (path: string) => readFileSync(`src/renderer/${path}`, 
  * 两处调用与之保持一致。
  */
 describe('quick optimization: selectedConfig date fields survive non-Date values', () => {
-  it('no longer assumes selectedConfig.createdAt/updatedAt are always Date instances', () => {
-    const modal = readRendererFile('components/prompt-management/PromptEditModal.vue')
+  it('serializes AI configs for IPC without assuming Date instances', async () => {
+    const request = readRendererFile('lib/utils/ai-request.ts')
+    expect(request).toContain('createdAt: toISOString(config.createdAt)')
+    expect(request).toContain('updatedAt: toISOString(config.updatedAt)')
 
-    // 修复前的写法：`selectedConfig.createdAt ? selectedConfig.createdAt.toISOString() : ...`
-    // 一旦 createdAt 是非空字符串，三元表达式的真分支依然会调用 `.toISOString()` 而抛错。
-    expect(modal).not.toMatch(/selectedConfig\.createdAt \? selectedConfig\.createdAt\.toISOString\(\)/)
-    expect(modal).not.toMatch(/selectedConfig\.updatedAt \? selectedConfig\.updatedAt\.toISOString\(\)/)
-
-    // 修复后：先判断是否为 Date 实例，只有真的是 Date 时才调用 .toISOString()。
-    const guardedCreatedAt = modal.match(/createdAt: selectedConfig\.createdAt instanceof Date[^\n]*/g) || []
-    const guardedUpdatedAt = modal.match(/updatedAt: selectedConfig\.updatedAt instanceof Date[^\n]*/g) || []
-
-    // optimizePrompt 和 applyManualAdjustment 两处都需要修复。
-    expect(guardedCreatedAt).toHaveLength(2)
-    expect(guardedUpdatedAt).toHaveLength(2)
+    const { serializeAIConfig } = await import('../../src/renderer/lib/utils/ai-request')
+    const restored = serializeAIConfig({
+      configId: 'c', name: 'n', type: 'openai', baseURL: '', models: ['m'], enabled: true,
+      createdAt: '2026-08-19T07:11:30.502Z' as unknown as Date,
+      updatedAt: new Date('2026-08-20T00:00:00.000Z'),
+    })
+    expect(restored.createdAt).toBe('2026-08-19T07:11:30.502Z')
+    expect(restored.updatedAt).toBe('2026-08-20T00:00:00.000Z')
   })
 
   it('reproduces the crash for the old unguarded expression and proves the fixed expression is safe', () => {
@@ -69,13 +67,12 @@ describe('quick optimization: selectedConfig date fields survive non-Date values
     expect(buildWithFixedExpression(restoredCreatedAt)).toBe(restoredCreatedAt)
   })
 
-  it('keeps the same defensive convention already used by AIGeneratorComponent.vue for the same field', () => {
-    // 同一个"序列化 AIConfig 供 IPC 传递"的场景，AIGeneratorComponent.vue 早就用
-    // instanceof Date 处理过这个问题；这里确认两处实现现在使用一致的判断方式，
-    // 避免以后再次出现"一个地方修了、另一个复制出来的地方没修"的情况。
-    const generator = readRendererFile('components/ai/AIGeneratorComponent.vue')
-    expect(generator).toContain(
-      "createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,"
-    )
+  it('routes every AI call in the prompt page through the shared serializer', () => {
+    const session = readRendererFile('composables/prompt/usePromptAISession.ts')
+    const generation = readRendererFile('composables/prompt/usePromptGeneration.ts')
+    for (const source of [session, generation]) {
+      expect(source).toContain("from '@/lib/utils/ai-request'")
+      expect(source).not.toContain('toISOString()')
+    }
   })
 })

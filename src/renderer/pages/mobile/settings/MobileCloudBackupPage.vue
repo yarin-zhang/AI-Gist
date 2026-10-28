@@ -1,61 +1,59 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')" default-href="/mobile/settings/data-backup"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ config?.name || t('dataBackup.cloudBackup') }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button :disabled="busy.refresh" @click="refresh">
-            <ion-icon slot="icon-only" :icon="refreshOutline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="t('dataBackup.cloudBackup')" fallback="/mobile/settings/data-backup" />
 
-    <ion-content :fullscreen="true">
-      <div class="explainer">
-        <p>{{ t('dataBackup.cloudLocationDescription') }}</p>
+    <ion-content class="m-page-content">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
+        <ion-refresher-content />
+      </ion-refresher>
+
+      <div class="m-body cloud-body">
+        <p class="m-desc">{{ t('dataBackup.cloudLocationDescription') }}</p>
+
+        <button type="button" class="m-cta" :disabled="!config || busy.create" @click="createBackup">
+          <ion-spinner v-if="busy.create" name="crescent" aria-hidden="true" />
+          <ion-icon v-else :icon="cloudUploadOutline" aria-hidden="true" />
+          {{ t('dataBackup.createCloudBackup') }}
+        </button>
+
+        <section class="m-section">
+          <span class="m-gt">{{ listTitle }}</span>
+          <div class="m-group cloud-versions">
+            <ion-item-sliding v-for="backup in backups" :key="backup.id" class="cloud-version">
+              <ion-item lines="none" class="cloud-version__item">
+                <span class="cloud-version__row">
+                  <span class="m-tile m-tile--teal" aria-hidden="true"><ion-icon :icon="cloudDoneOutline" /></span>
+                  <span class="cloud-version__text">
+                    <span class="cloud-version__title">{{ getBackupTitle(backup) }}</span>
+                    <span class="cloud-version__sub">{{ formatFriendly(backup.createdAt) }} · {{ formatSize(backup.size) }}</span>
+                  </span>
+                  <button type="button" class="m-chip cloud-version__restore" @click.stop="restoreBackup(backup)">
+                    {{ t('dataBackup.restore') }}
+                  </button>
+                </span>
+              </ion-item>
+
+              <ion-item-options side="end">
+                <ion-item-option color="danger" class="cloud-version__option" @click="deleteFromSwipe($event, backup)">
+                  <ion-icon slot="top" :icon="trashOutline" />
+                  {{ t('common.delete') }}
+                </ion-item-option>
+              </ion-item-options>
+            </ion-item-sliding>
+
+            <div v-if="backups.length === 0" class="m-row m-row--static cloud-versions__empty">
+              <ion-spinner v-if="busy.refresh" name="crescent" />
+              <span v-else class="title">{{ t('dataBackup.noCloudBackups') }}</span>
+            </div>
+          </div>
+          <p v-if="backups.length > 0" class="m-note cloud-versions__hint">{{ t('mobileSettings.backup.cloudSwipeHint') }}</p>
+        </section>
+
+        <div class="cloud-warning" role="note">
+          <ion-icon :icon="warningOutline" aria-hidden="true" />
+          <span>{{ t('dataBackup.restoreWarning') }}</span>
+        </div>
       </div>
-
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('cloudBackup.cloudBackupList') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button :detail="false" :disabled="busy.create" @click="createBackup">
-          <ion-icon :icon="cloudUploadOutline" slot="start" color="primary"></ion-icon>
-          <ion-label color="primary">{{ t('dataBackup.createCloudBackup') }}</ion-label>
-          <ion-spinner v-if="busy.create" slot="end" name="crescent"></ion-spinner>
-        </ion-item>
-
-        <ion-item-sliding v-for="backup in backups" :key="backup.id">
-          <ion-item>
-            <ion-icon :icon="documentTextOutline" slot="start"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ backup.name }}</h3>
-              <p v-if="backup.description">{{ backup.description }}</p>
-              <p>{{ formatDateTime(backup.createdAt) }} · {{ formatSize(backup.size) }}</p>
-            </ion-label>
-          </ion-item>
-
-          <ion-item-options side="end">
-            <ion-item-option color="primary" @click="restoreBackup(backup)">
-              <ion-icon slot="top" :icon="arrowUndoOutline"></ion-icon>
-              {{ t('dataBackup.restore') }}
-            </ion-item-option>
-            <ion-item-option color="danger" @click="deleteBackup(backup)">
-              <ion-icon slot="top" :icon="trashOutline"></ion-icon>
-              {{ t('common.delete') }}
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
-
-        <ion-item v-if="backups.length === 0 && !busy.refresh" lines="none">
-          <ion-note class="section-note">{{ t('dataBackup.noCloudBackups') }}</ion-note>
-        </ion-item>
-      </ion-list>
     </ion-content>
   </ion-page>
 </template>
@@ -65,46 +63,50 @@ import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonBackButton,
-  IonButton,
   IonContent,
-  IonList,
-  IonListHeader,
   IonItem,
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
-  IonLabel,
   IonIcon,
-  IonNote,
   IonSpinner,
+  IonRefresher,
+  IonRefresherContent,
   onIonViewWillEnter
 } from '@ionic/vue'
 import {
-  refreshOutline,
+  cloudDoneOutline,
   cloudUploadOutline,
-  documentTextOutline,
   trashOutline,
-  arrowUndoOutline
+  warningOutline
 } from 'ionicons/icons'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
 import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import { cloudSyncService } from '~/lib/services/cloud-sync.service'
+import { formatFriendlyDate } from '~/lib/utils/date'
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup'
-import { confirmAction, formatDateTime, formatSize, showToast, withLoading } from './shared'
+import { confirmAction, formatSize, showToast, withLoading } from './shared'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const storageId = computed(() => String(route.params.storageId || ''))
 const config = ref<CloudStorageConfig | null>(null)
 const backups = ref<CloudBackupInfo[]>([])
 const busy = reactive({ refresh: false, create: false })
+
+const listTitle = computed(() => config.value
+  ? t('mobileSettings.backup.cloudListTitle', { name: config.value.name, count: backups.value.length })
+  : t('cloudBackup.cloudBackupList'))
+
+const formatFriendly = (value: string) => formatFriendlyDate(value, locale.value, { withTime: true })
+
+// 标题按备份类型现算，不用创建时写进文件的 description（那是创建那一刻的界面语言）
+const getBackupTitle = (backup: CloudBackupInfo) => backup.backupType === 'automatic'
+  ? t('mobileSettings.backup.automaticCloudBackup')
+  : t('mobileSettings.backup.manualCloudBackup')
 
 const loadConfig = async () => {
   try {
@@ -118,6 +120,12 @@ const loadConfig = async () => {
     console.error('加载云端存储配置失败:', error)
     await showToast(t('dataBackup.loadStorageConfigsFailed'), 'danger')
   }
+}
+
+// 失败提示带上做的是哪件事：「创建云端备份失败：…」，没有具体原因时只说哪件事失败了
+const failedWith = (context: string, reason?: unknown) => {
+  const text = reason instanceof Error ? reason.message : String(reason ?? '').trim()
+  return text ? t('mobileSettings.failedWith', { context, reason: text }) : context
 }
 
 const loadBackups = async () => {
@@ -134,7 +142,7 @@ const loadBackups = async () => {
       await showToast(t('cloudBackup.backupDirectoryCreated'), 'warning')
     } else {
       backups.value = []
-      await showToast(`${t('dataBackup.loadCloudBackupsFailed')}: ${message}`, 'danger')
+      await showToast(failedWith(t('dataBackup.loadCloudBackupsFailed'), message), 'danger')
     }
   } finally {
     busy.refresh = false
@@ -144,6 +152,14 @@ const loadBackups = async () => {
 const refresh = async () => {
   await loadConfig()
   if (config.value) await loadBackups()
+}
+
+const handleRefresh = async (event: CustomEvent) => {
+  try {
+    await refresh()
+  } finally {
+    (event.target as HTMLIonRefresherElement | null)?.complete()
+  }
 }
 
 const createBackup = async () => {
@@ -159,17 +175,14 @@ const createBackup = async () => {
       }))
 
     if (!result.success) {
-      await showToast(result.error || t('dataBackup.createCloudBackupFailed'), 'danger')
+      await showToast(failedWith(t('dataBackup.createCloudBackupFailed'), result.error), 'danger')
       return
     }
     await showToast(t('dataBackup.createCloudBackupSuccess'))
     await loadBackups()
   } catch (error) {
     console.error('创建云端备份失败:', error)
-    await showToast(
-      error instanceof Error ? error.message : t('dataBackup.createCloudBackupFailed'),
-      'danger'
-    )
+    await showToast(failedWith(t('dataBackup.createCloudBackupFailed'), error), 'danger')
   } finally {
     busy.create = false
   }
@@ -178,7 +191,7 @@ const createBackup = async () => {
 const restoreBackup = async (backup: CloudBackupInfo) => {
   const confirmed = await confirmAction({
     header: t('dataBackup.restore'),
-    message: [backup.name, '', t('dataBackup.restoreWarning')].join('\n'),
+    message: [`${getBackupTitle(backup)} · ${formatFriendly(backup.createdAt)}`, '', t('dataBackup.restoreWarning')].join('\n'),
     confirmText: t('dataBackup.confirmRestore'),
     destructive: true
   })
@@ -189,7 +202,7 @@ const restoreBackup = async (backup: CloudBackupInfo) => {
       CloudBackupAPI.restoreCloudBackup(storageId.value, backup.id))
 
     if (!result.success) {
-      await showToast(result.error || t('dataBackup.restoreFailed'), 'danger')
+      await showToast(failedWith(t('dataBackup.restoreFailed'), result.error), 'danger')
       return
     }
 
@@ -205,17 +218,14 @@ const restoreBackup = async (backup: CloudBackupInfo) => {
     }
   } catch (error) {
     console.error('恢复云端备份失败:', error)
-    await showToast(
-      error instanceof Error ? error.message : t('dataBackup.restoreFailed'),
-      'danger'
-    )
+    await showToast(failedWith(t('dataBackup.restoreFailed'), error), 'danger')
   }
 }
 
 const deleteBackup = async (backup: CloudBackupInfo) => {
   const confirmed = await confirmAction({
     header: t('common.delete'),
-    message: [backup.name, '', t('dataBackup.confirmDeleteCloudBackup')].join('\n'),
+    message: [`${getBackupTitle(backup)} · ${formatFriendly(backup.createdAt)}`, '', t('dataBackup.confirmDeleteCloudBackup')].join('\n'),
     confirmText: t('common.delete'),
     destructive: true
   })
@@ -224,7 +234,7 @@ const deleteBackup = async (backup: CloudBackupInfo) => {
   try {
     const result = await CloudBackupAPI.deleteCloudBackup(storageId.value, backup.id)
     if (!result.success) {
-      await showToast(result.error || t('dataBackup.deleteFailed'), 'danger')
+      await showToast(failedWith(t('dataBackup.deleteFailed'), result.error), 'danger')
       return
     }
     await showToast(t('dataBackup.deleteSuccess'))
@@ -235,32 +245,125 @@ const deleteBackup = async (backup: CloudBackupInfo) => {
   }
 }
 
+const deleteFromSwipe = async (event: Event, backup: CloudBackupInfo) => {
+  const sliding = (event.target as HTMLElement | null)?.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null
+  await sliding?.close()
+  await deleteBackup(backup)
+}
+
 onIonViewWillEnter(refresh)
 </script>
 
 <style scoped>
-/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
-
-/* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
-ion-item ion-icon[slot='start'] {
-  margin-inline-end: 16px;
+.m-body.cloud-body {
+  padding-top: 4px;
 }
 
-.explainer {
-  padding: 16px 16px 4px;
+.m-cta ion-icon {
+  font-size: 18px;
 }
 
-.explainer p {
-  margin: 0;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-relaxed);
-  color: var(--ion-color-medium);
+.m-cta ion-spinner {
+  width: 18px;
+  height: 18px;
 }
 
-.section-note {
-  padding: 4px 0 8px;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  white-space: normal;
+.cloud-version + .cloud-version .cloud-version__row::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 42px;
+  height: 1px;
+  background: var(--border-subtle);
+  content: "";
+}
+
+.cloud-version__item {
+  --background: var(--surface-primary);
+  --padding-start: 16px;
+  --padding-end: 0;
+  --inner-padding-end: 16px;
+  --min-height: 64px;
+  font-size: var(--m-font-body);
+}
+
+.cloud-version__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+}
+
+.cloud-version__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.cloud-version__title {
+  color: var(--content-primary);
+}
+
+.cloud-version__sub {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+}
+
+.m-chip.cloud-version__restore {
+  position: relative;
+  height: 32px;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* 胶囊看起来 32px，点按区域扩到 44px */
+.m-chip.cloud-version__restore::after {
+  position: absolute;
+  inset: -6px 0;
+  content: "";
+}
+
+.cloud-version__option {
+  width: 76px;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+}
+
+.cloud-version__option ion-icon {
+  font-size: 18px;
+}
+
+.m-row.cloud-versions__empty {
+  justify-content: center;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+  text-align: center;
+}
+
+.m-note.cloud-versions__hint {
+  padding-top: 8px;
+}
+
+.cloud-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--m-radius-card);
+  background: var(--accent-warning-bg);
+  color: var(--accent-warning);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+}
+
+.cloud-warning ion-icon {
+  flex: none;
+  margin-top: 3px;
+  font-size: 18px;
 }
 </style>

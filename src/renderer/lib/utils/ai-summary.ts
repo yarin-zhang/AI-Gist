@@ -1,7 +1,7 @@
 /**
  * AI 摘要生成的纯逻辑：构建发送给 AI 的总结指令、解析模型返回的 JSON。
  *
- * 从 PromptWorkspace 的“一键 AI 生成标题/描述”按钮中抽出，方便单独覆盖
+ * 供提示词页 AI 面板的「生成标题和描述」使用，方便单独覆盖
  * “模型没有严格返回 JSON 时如何兜底”这一类边界情况的单元测试。
  */
 
@@ -11,6 +11,8 @@ const DESCRIPTION_MAX_LENGTH = 200
 export interface AISummaryResult {
   title: string
   description: string
+  /** 只有调用方给了候选分类时才有；模型没挑出合适的分类时为空字符串 */
+  category?: string
 }
 
 /**
@@ -19,7 +21,13 @@ export interface AISummaryResult {
  * 指令文本本身使用英文书写以获得更稳定的指令遵循效果，但明确要求模型必须
  * 按提示词内容本身使用的语言作答（不受指令语言影响），并严格返回 JSON。
  */
-export function buildAISummaryPrompt(content: string): string {
+export function buildAISummaryPrompt(content: string, categories: string[] = []): string {
+  const categoryRules = categories.length
+    ? [
+      `- Also pick the single best matching category for this prompt from this list: ${JSON.stringify(categories)}. Use the category name exactly as written, or an empty string if none fits.`,
+      '- Respond with strictly valid JSON only, in exactly this shape: {"title": "...", "description": "...", "category": "..."}',
+    ]
+    : ['- Respond with strictly valid JSON only, in exactly this shape: {"title": "...", "description": "..."}']
   return [
     'You are a concise naming assistant for a prompt library tool.',
     'Read the prompt content below and produce a very short title and a short description that summarize what it does.',
@@ -29,7 +37,7 @@ export function buildAISummaryPrompt(content: string): string {
     '- The title must be extremely short (a few words, or a short phrase for CJK languages) and must not simply repeat the content verbatim.',
     '- The description must be one short sentence that adds context the title does not already cover.',
     '- Do not wrap the response in Markdown, code fences, or add any explanation before or after it.',
-    '- Respond with strictly valid JSON only, in exactly this shape: {"title": "...", "description": "..."}',
+    ...categoryRules,
     '',
     'Prompt content:',
     '"""',
@@ -76,18 +84,25 @@ function truncate(value: string, maxLength: number): string {
   return `${trimmed.slice(0, maxLength - 1).trimEnd()}…`
 }
 
+/** 模型的回复里解析不出可用的标题；调用方据此提示「没能生成标题」，不改动原有数据 */
+export class AISummaryParseError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AISummaryParseError'
+  }
+}
+
 /**
  * 解析 AI 返回的总结内容。
  *
- * 优先按 JSON 解析（允许模型用 ```json ... ``` 代码块包裹）；如果模型没有
- * 遵循 JSON 格式，但返回的是一段可以直接当标题用的简短纯文本，则把它当作
- * 标题使用（fallback，描述留空）；彻底无法识别时抛出错误，交给调用方走
- * 统一的失败提示。
+ * 按 JSON 解析（允许模型用 ```json ... ``` 代码块包裹、前后带几句说明）。
+ * 模型没有返回带标题的 JSON 时抛出 AISummaryParseError：拒答、道歉之类的
+ * 纯文本不能当成标题写进提示词。
  */
 export function parseAISummaryResponse(raw: string): AISummaryResult {
   const text = (raw || '').trim()
   if (!text) {
-    throw new Error('AI summary response was empty')
+    throw new AISummaryParseError('AI summary response was empty')
   }
 
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
@@ -103,21 +118,17 @@ export function parseAISummaryResponse(raw: string): AISummaryResult {
       const title = typeof parsed?.title === 'string' ? parsed.title.trim() : ''
       const description = typeof parsed?.description === 'string' ? parsed.description.trim() : ''
       if (title) {
-        return {
+        const result: AISummaryResult = {
           title: truncate(title, TITLE_MAX_LENGTH),
           description: truncate(description, DESCRIPTION_MAX_LENGTH),
         }
+        if (typeof parsed?.category === 'string') result.category = parsed.category.trim()
+        return result
       }
     } catch {
       // 这个候选范围不是合法 JSON，继续尝试下一个候选起点
     }
   }
 
-  // Fallback：模型没有返回合法 JSON，但给出的是一段简短纯文本时，直接当标题使用
-  const firstLine = candidate.split(/\r?\n/)[0].trim()
-  if (firstLine && firstLine.length <= TITLE_MAX_LENGTH && !firstLine.includes('{')) {
-    return { title: firstLine, description: '' }
-  }
-
-  throw new Error('Could not parse a title and description from the AI response')
+  throw new AISummaryParseError('Could not parse a title and description from the AI response')
 }

@@ -41,3 +41,45 @@ describe('DataManagementAPI Web file fallback', () => {
   })
 })
 
+
+describe('DataManagementAPI Web import picker', () => {
+  beforeEach(() => {
+    ;(PlatformDetector as any)._platform = null
+    ;(window as any).electronAPI = undefined
+  })
+
+  it('settles with null when the user cancels the file picker instead of leaving the button spinning (#441)', async () => {
+    let picker: HTMLInputElement | undefined
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (tagName === 'input') {
+        picker = element as HTMLInputElement
+        Object.defineProperty(element, 'click', { value: vi.fn() })
+      }
+      return element
+    })
+
+    const selection = DataManagementAPI.selectImportFile('json')
+    picker?.dispatchEvent(new Event('cancel'))
+
+    await expect(selection).resolves.toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('reports a cancelled import without an error message', async () => {
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (tagName === 'input') {
+        Object.defineProperty(element, 'click', { value: () => element.dispatchEvent(new Event('cancel')) })
+      }
+      return element
+    })
+
+    const result = await DataManagementAPI.importFullBackup()
+
+    expect(result).toMatchObject({ success: false, cancelled: true, errorCode: 'cancelled' })
+    vi.restoreAllMocks()
+  })
+})

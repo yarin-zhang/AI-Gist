@@ -121,6 +121,65 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
       expect(csv).toContain('提示词A')
     })
 
+    const csvPrompts = [
+      {
+        id: 7,
+        title: '客服话术, "模板"',
+        description: '回复投诉',
+        content: '语气 {{tone}}。\n\n要点：{{points}}，再次 {{tone}}',
+        categoryId: 1,
+        tags: ['客服', '模板'],
+        createdAt: new Date('2026-10-27T06:32:39.000Z'),
+        updatedAt: '2026-10-28T01:02:03.000Z'
+      },
+      { id: 8, title: '未分类的', content: '纯文本', tags: '甲,乙', createdAt: new Date('2026-10-27T00:00:00.000Z') }
+    ]
+
+    const writtenContent = () => (window as any).electronAPI.invoke.mock.calls.find(
+      (c: any[]) => c[0] === 'data:write-file'
+    )[1].content as string
+
+    it('只导出提示词时生成带 BOM 的单张表，按 RFC 4180 转义，分类写名称', async () => {
+      const result = await DataManagementAPI.exportDataToFile(
+        { prompts: csvPrompts },
+        '/path/prompts.csv',
+        'csv',
+        { categories: [{ id: 1, name: '客服' }] }
+      )
+      expect(result).toBe(true)
+
+      const csv = writtenContent()
+      expect(csv.startsWith('﻿')).toBe(true)
+      const lines = csv.slice(1).split('\r\n')
+      expect(lines[0]).toBe('"ID","Title","Description","Content","Category","Tags","Variables","CreatedAt","UpdatedAt"')
+      // 正文里的换行留在引号里，不会拆成新记录；引号写两遍
+      expect(csv).toContain('"客服话术, ""模板"""')
+      expect(csv).toContain('"语气 {{tone}}。\n\n要点：{{points}}，再次 {{tone}}"')
+      expect(csv).toContain('"客服","客服, 模板","tone, points","2026-10-27T06:32:39.000Z","2026-10-28T01:02:03.000Z"')
+      // 未分类留空，不写 undefined；字符串标签原样保留
+      expect(csv).toContain('"8","未分类的","","纯文本","","甲,乙","","2026-10-27T00:00:00.000Z",""')
+      expect(csv).not.toContain('undefined')
+      expect(csv).not.toContain('Prompts')
+    })
+
+    it('导出的 CSV 能原样读回来', async () => {
+      await DataManagementAPI.exportDataToFile({ prompts: csvPrompts }, '/path/prompts.csv', 'csv', {
+        categories: [{ id: 1, name: '客服' }]
+      })
+      const csv = writtenContent()
+      ;(window as any).electronAPI.invoke = vi.fn().mockResolvedValue({ success: true, content: csv })
+
+      const data = await DataManagementAPI.importDataFromFile('/path/prompts.csv', 'csv')
+      expect(data.prompts).toHaveLength(2)
+      expect(data.prompts[0]).toMatchObject({
+        Title: '客服话术, "模板"',
+        Content: csvPrompts[0].content,
+        Category: '客服',
+        Tags: '客服, 模板'
+      })
+      expect(data.prompts[1].Category).toBe('')
+    })
+
     it('importDataFromFile 解析 CSV 并返回结构化数据', async () => {
       const csvContent = [
         'Categories',
@@ -270,6 +329,51 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
       expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
     })
 
+    it('确认时拿到文件里的条目数，用户取消就不替换数据库', async () => {
+      const approve = vi.fn().mockResolvedValue(false)
+      const beforeReplace = vi.fn()
+
+      const result = await DataManagementAPI.importFullBackup({ approve, beforeReplace })
+
+      expect(approve).toHaveBeenCalledWith({
+        prompts: mockExportData.prompts.length,
+        categories: mockExportData.categories.length,
+        aiConfigs: mockExportData.aiConfigs.length,
+      })
+      expect(result).toMatchObject({ success: false, cancelled: true })
+      expect(beforeReplace).not.toHaveBeenCalled()
+      expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
+    })
+
+    it('确认后先执行导入前备份，再替换数据库', async () => {
+      const order: string[] = []
+      ;(window as any).databaseAPI.replaceAllData.mockImplementation(async () => {
+        order.push('replace')
+        return { success: true }
+      })
+
+      const result = await DataManagementAPI.importFullBackup({
+        approve: async () => true,
+        beforeReplace: async () => { order.push('backup') },
+      })
+
+      expect(result.success).toBe(true)
+      expect(order).toEqual(['backup', 'replace'])
+    })
+
+    it('导入前备份失败时不替换数据库', async () => {
+      const result = await DataManagementAPI.importFullBackup({
+        approve: async () => true,
+        beforeReplace: async () => { throw new Error('备份失败') },
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe('backupFailed')
+      expect(result.message).toContain('备份失败')
+      expect(result.message).toContain('本机数据没有改动')
+      expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
+    })
+
     it('用户取消选择文件时返回失败', async () => {
       ;(window as any).electronAPI.invoke = vi.fn().mockImplementation(async (channel: string) => {
         if (channel === 'data:select-import-file') return null
@@ -292,8 +396,70 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
       try {
         const result = await DataManagementAPI.importFullBackup()
         expect(result.success).toBe(false)
+        expect(result.errorCode).toBe('invalidJson')
       } finally {
         errorSpy.mockRestore()
+      }
+    })
+
+    // #442：不同的失败原因要分开说明，并且都在替换数据之前拦下
+    const importContent = async (content: string, options = {}) => {
+      ;(window as any).electronAPI.invoke = vi.fn().mockImplementation(async (channel: string) => {
+        if (channel === 'data:select-import-file') return '/path/file.json'
+        if (channel === 'data:read-file') return { success: true, content }
+        return { success: true }
+      })
+      return DataManagementAPI.importFullBackup(options)
+    }
+
+    it('语法正确但不是备份的 JSON 在确认之前就被拒绝', async () => {
+      const approve = vi.fn().mockResolvedValue(true)
+      for (const content of ['{"foo":1}', '[1,2,3]', '"text"', '{"prompts":"not-an-array"}']) {
+        const result = await importContent(content, { approve })
+        expect(result).toMatchObject({ success: false, errorCode: 'notBackup' })
+        expect(result.message).toContain('不是 AI Gist 导出的完整备份')
+      }
+      expect(approve).not.toHaveBeenCalled()
+      expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
+    })
+
+    it('格式版本太新时提示升级，不替换数据库', async () => {
+      const payload = { ...createBackupPayload({ id: 'b', name: 'b', createdAt: '2026-06-12T00:00:00.000Z', data: mockExportData }), schemaVersion: 9 }
+      const result = await importContent(JSON.stringify(payload))
+      expect(result).toMatchObject({ success: false, errorCode: 'unsupportedVersion' })
+      expect(result.message).toContain('9')
+      expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
+    })
+
+    it('读不出文件时说明本机数据没有改动', async () => {
+      ;(window as any).electronAPI.invoke = vi.fn().mockImplementation(async (channel: string) => {
+        if (channel === 'data:select-import-file') return '/path/file.json'
+        if (channel === 'data:read-file') return { success: false }
+        return { success: true }
+      })
+      const result = await DataManagementAPI.importFullBackup()
+      expect(result).toMatchObject({ success: false, errorCode: 'readFailed' })
+      expect(result.message).toContain('本机数据没有改动')
+    })
+
+    it('数据库替换失败时返回 importFailed 和原因', async () => {
+      ;(window as any).databaseAPI.replaceAllData.mockResolvedValueOnce({ success: false, error: 'quota exceeded' })
+      const result = await DataManagementAPI.importFullBackup()
+      expect(result).toMatchObject({ success: false, errorCode: 'importFailed' })
+      expect(result.message).toContain('quota exceeded')
+    })
+
+    it('提示跟随界面语言，英文界面不再出现中文', async () => {
+      const { default: i18n } = await import('../../src/renderer/i18n')
+      const previous = i18n.global.locale.value
+      i18n.global.locale.value = 'en-US'
+      try {
+        const result = await importContent('not valid json{{{')
+        expect(result.errorCode).toBe('invalidJson')
+        expect(result.message).toContain('valid JSON')
+        expect(result.message).not.toMatch(/[一-鿿]/)
+      } finally {
+        i18n.global.locale.value = previous
       }
     })
   })

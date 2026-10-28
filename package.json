@@ -1,6 +1,6 @@
 {
     "name": "ai-gist",
-    "version": "2.1.4",
+    "version": "3.0.0",
     "buildRevision": 1,
     "description": "本地优先的 AI 提示词管理工具，能够管理 AI 提示词 + 变量填充 + 分类标签。",
     "main": "./main/main.js",
@@ -63,6 +63,8 @@
         "@electron/get": "^2.0.0",
         "@erkamyaman/capacitor-foldable": "^8.4.2",
         "@eslint/js": "^9.29.0",
+        "@fontsource-variable/inter": "^5",
+        "@fontsource/jetbrains-mono": "^5",
         "@google/generative-ai": "^0.24.1",
         "@ionic/vue": "^8.0.0",
         "@ionic/vue-router": "^8.0.0",
@@ -83,6 +85,7 @@
         "chalk": "^4.1.2",
         "chokidar": "^4.0.3",
         "commander": "^15.0.0",
+        "diff": "^8",
         "electron": "^32.1.2",
         "electron-builder": "^25.1.6",
         "eslint": "^9.29.0",
@@ -105,6 +108,7 @@
         "vue-eslint-parser": "^10.1.4",
         "vue-i18n": "9",
         "vue-router": "^4.0.0",
+        "vue-tsc": "^2",
         "zod": "^3.25.40"
     },
     "dependencies": {

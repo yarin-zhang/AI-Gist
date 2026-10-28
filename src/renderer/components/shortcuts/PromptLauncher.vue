@@ -1,145 +1,74 @@
 <template>
-  <div class="launcher-shell">
-    <NCard v-if="mode === 'search'" class="launcher-card" size="small" :bordered="true">
-      <template #header>
-        <NInput
-          ref="searchInput"
-          v-model:value="query"
-          size="medium"
-          clearable
-          autofocus
-          :placeholder="t('shortcuts.launcherPlaceholder')"
-          :input-props="searchInputProps"
-          @update:value="handleQueryChanged"
-        >
-          <template #prefix><NIcon><Search /></NIcon></template>
-          <template #suffix><NText depth="3" class="escape-hint">Esc</NText></template>
-        </NInput>
-      </template>
+  <div class="launcher" role="dialog" :aria-label="t('launcher.title')">
+    <label class="launcher__search">
+      <NIcon :size="18" class="launcher__search-icon"><Search /></NIcon>
+      <input ref="searchInput" v-model="query" class="launcher__input" autofocus spellcheck="false"
+        :placeholder="t('shortcuts.launcherPlaceholder')" v-bind="searchInputProps" @input="handleQueryChanged" />
+      <span class="launcher__count">{{ t('shortcuts.resultCount', { count: results.length }) }}</span>
+      <span class="ui-kbd">esc</span>
+    </label>
 
-      <NScrollbar ref="resultScrollbar" class="result-scrollbar">
-        <NList id="prompt-launcher-results" v-if="results.length" hoverable clickable :show-divider="false">
-          <NListItem
-            v-for="(item, index) in results"
-            :id="resultDomId(item)"
-            :key="item.key"
-            :ref="element => setResultElement(element, index)"
-            class="launcher-result"
-            :class="{
-              'launcher-result--selected': index === selectedIndex,
-              'launcher-result--with-extra': item.kind === 'prompt' && hasPromptExtra(item.prompt),
-            }"
-            role="option"
-            :aria-selected="index === selectedIndex"
-            @mouseenter="selectResult(index)"
-            @click="executeItem(item, state?.preferences.defaultAction || 'copy')"
-          >
-            <NThing>
-              <template #avatar>
-                <NIcon size="16" class="result-icon" :class="{ 'result-icon--selected': index === selectedIndex }">
-                  <component :is="item.kind === 'prompt' ? FileText : item.icon" />
-                </NIcon>
-              </template>
-              <template #header>
-                <NText :strong="index === selectedIndex">{{ item.label }}</NText>
-              </template>
-              <template #description>
-                <NText depth="3" class="result-description">{{ item.description }}</NText>
-              </template>
-              <template #header-extra>
-                <NFlex
-                  v-if="item.kind === 'prompt' && hasPromptExtra(item.prompt)"
-                  :size="6"
-                  :wrap="false"
-                  align="center"
-                  justify="end"
-                  class="result-extra"
-                >
-                  <NFlex
-                    v-if="item.prompt.category?.name || promptTags(item.prompt).length"
-                    :size="4"
-                    :wrap="false"
-                    align="center"
-                    justify="end"
-                    class="result-taxonomy"
-                  >
-                    <NTag
-                      v-if="item.prompt.category?.name"
-                      size="small"
-                      :bordered="false"
-                      :color="getCategoryTagColor(item.prompt.category)"
-                      class="result-category"
-                    >
-                      {{ item.prompt.category.name }}
-                    </NTag>
-                    <NTag
-                      v-for="tag in visiblePromptTags(item.prompt)"
-                      :key="tag"
-                      size="small"
-                      :bordered="false"
-                      :color="getTagColor(tag)"
-                      class="result-tag"
-                    >
-                      {{ tag }}
-                    </NTag>
-                    <NText v-if="hiddenPromptTagCount(item.prompt)" depth="3" class="result-tag-overflow">
-                      +{{ hiddenPromptTagCount(item.prompt) }}
-                    </NText>
-                  </NFlex>
-                  <NDivider
-                    v-if="hasPromptTaxonomy(item.prompt) && (bindingFor(item.prompt.uuid) || runtimeVariables(item.prompt).length)"
-                    vertical
-                  />
-                  <NText v-if="bindingFor(item.prompt.uuid)" depth="3" class="result-meta">
-                    {{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}
-                  </NText>
-                  <NText v-else-if="runtimeVariables(item.prompt).length" depth="3" class="result-meta">
-                    {{ t('shortcuts.variablesCount', { count: runtimeVariables(item.prompt).length }) }}
-                  </NText>
-                </NFlex>
-              </template>
-            </NThing>
-          </NListItem>
-        </NList>
-        <NEmpty v-else :description="t('shortcuts.noLauncherResults')" size="small" />
-      </NScrollbar>
+    <div class="launcher__body">
+      <div id="prompt-launcher-results" ref="resultList" class="launcher__results" role="listbox"
+        :aria-label="t('launcher.title')">
+        <template v-for="(item, index) in results" :key="item.key">
+          <span v-if="index === 0 && item.kind === 'prompt'" class="ui-overline launcher__group">{{ t('launcher.prompts') }}</span>
+          <span v-if="item.kind === 'command' && (index === 0 || results[index - 1].kind === 'prompt')"
+            class="ui-overline launcher__group">{{ t('launcher.commands') }}</span>
+          <button :id="resultDomId(item)" :ref="element => setResultElement(element, index)" type="button" tabindex="-1"
+            role="option" class="launcher__item" :class="{ 'is-selected': index === selectedIndex, 'launcher__item--prompt': item.kind === 'prompt' }"
+            :aria-selected="index === selectedIndex" @mousemove="selectResult(index)" @click="handleItemClick(index)">
+            <template v-if="item.kind === 'prompt'">
+              <span class="launcher__item-text">
+                <span class="launcher__item-title">{{ item.label }}</span>
+                <span class="launcher__item-meta">{{ promptMeta(item.prompt) }}</span>
+              </span>
+              <span v-if="bindingFor(item.prompt.uuid)" class="ui-kbd">{{ displayAccelerator(bindingFor(item.prompt.uuid)!.accelerator) }}</span>
+            </template>
+            <template v-else>
+              <NIcon :size="16" class="launcher__item-icon"><component :is="item.icon" /></NIcon>
+              <span class="launcher__item-title">{{ item.label }}</span>
+            </template>
+          </button>
+        </template>
+        <div v-if="!results.length" class="launcher__empty">{{ t('shortcuts.noLauncherResults') }}</div>
+      </div>
 
-      <template #footer>
-        <NFlex justify="space-between" align="center" :wrap="false">
-          <NText depth="3" class="result-count">{{ t('shortcuts.resultCount', { count: results.length }) }}</NText>
-          <NFlex :size="8" :wrap="false" align="center" class="keyboard-hints">
-            <span><span class="key-cap">↑↓</span> {{ t('shortcuts.navigate') }}</span>
-            <NDivider vertical />
-            <span><span class="key-cap">Enter</span> {{ defaultActionLabel }}</span>
-            <NDivider vertical />
-            <span><span class="key-cap">{{ modifierLabel }} K</span> {{ t('shortcuts.actions') }}</span>
-          </NFlex>
-        </NFlex>
-      </template>
-    </NCard>
-
-    <NCard v-else class="launcher-card variable-card" size="small" :bordered="true">
-      <template #header>
-        <NFlex align="center" justify="space-between">
-          <div>
-            <NText strong class="variable-title">{{ activePrompt?.title }}</NText>
-            <NText depth="3" class="variable-description">{{ t('shortcuts.fillVariablesDesc') }}</NText>
+      <section class="launcher__detail">
+        <template v-if="selectedPrompt">
+          <div class="launcher__detail-head">
+            <span class="launcher__hint">{{ fillHint }}</span>
+            <NButton quaternary size="tiny" @click="openBindingEditor(selectedPrompt)">
+              {{ bindingFor(selectedPrompt.uuid) ? t('launcher.editShortcut') : t('launcher.setShortcut') }}
+            </NButton>
           </div>
-          <NButton circle quaternary @click="backToSearch"><template #icon><NIcon><X /></NIcon></template></NButton>
-        </NFlex>
-      </template>
-      <PromptFillCanvas v-if="activePrompt" ref="fillCanvasRef" :prompt="activePrompt"
-        :values="variableValues" compact @update:values="variableValues = $event" />
-      <NAlert v-if="executionError" type="error" :show-icon="false">{{ executionError }}</NAlert>
-      <template #footer>
-        <NFlex justify="flex-end">
-          <NButton @click="backToSearch">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :loading="executing" @click="executeActivePrompt">
-            {{ desiredAction === 'paste' ? t('shortcuts.copyAndPaste') : t('shortcuts.copyPrompt') }}
-          </NButton>
-        </NFlex>
-      </template>
-    </NCard>
+          <div ref="detailScroll" class="launcher__detail-body">
+            <VariableFieldList v-if="selectedPrompt.isJinjaTemplate && selectedVariables.length" ref="fieldListRef" jinja
+              :variables="selectedVariables" :values="selectedValues" :reveal-missing="revealedMissing"
+              @update:values="updateSelectedValues" />
+            <LauncherInlineFill v-else-if="selectedVariables.length" ref="inlineFillRef" :prompt="selectedPrompt"
+              :values="selectedValues" :reveal-missing="revealedMissing" @update:values="updateSelectedValues" />
+            <p v-else class="launcher__plain">{{ selectedPrompt.content }}</p>
+          </div>
+          <p v-if="executionError" class="launcher__error" role="alert">{{ executionError }}</p>
+        </template>
+        <div v-else-if="selectedCommand" class="launcher__command">
+          <NIcon :size="24" class="launcher__command-icon"><component :is="selectedCommand.icon" /></NIcon>
+          <span class="launcher__command-title">{{ selectedCommand.label }}</span>
+        </div>
+      </section>
+    </div>
+
+    <footer class="launcher__footer">
+      <span><span class="ui-kbd">↑↓</span> {{ t('shortcuts.navigate') }}</span>
+      <span><span class="ui-kbd">tab</span> {{ t('launcher.nextVariable') }}</span>
+      <button v-if="selectedPrompt" type="button" class="launcher__link" @click="openPromptDetail(selectedPrompt)">
+        {{ t('launcher.detail') }}
+      </button>
+      <span class="launcher__spacer" />
+      <span v-if="defaultAction !== 'paste'"><span class="ui-kbd">{{ pasteHint }}</span> {{ t('shortcuts.copyAndPaste') }}</span>
+      <span class="launcher__primary-hint"><span class="ui-kbd">↵</span> {{ selectedCommand ? t('launcher.run') : defaultActionLabel }}</span>
+    </footer>
 
     <ShortcutBindingModal
       v-if="bindingPrompt"
@@ -150,112 +79,66 @@
       @close="showBindingModal = false"
       @saved="handleBindingSaved"
     />
-
-    <NModal :show="showActionModal" @update:show="value => showActionModal = value">
-      <NCard v-if="bindingPrompt" class="action-card" :title="bindingPrompt.title">
-        <NFlex vertical :size="8">
-          <NButton block @click="openPromptDetail">{{ t('promptManagement.detailModal.detail') }}</NButton>
-          <NButton block type="primary" @click="openBindingEditor">
-            {{ bindingFor(bindingPrompt.uuid) ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding') }}
-          </NButton>
-        </NFlex>
-      </NCard>
-    </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
-import {
-  NAlert, NButton, NCard, NDivider, NEmpty, NFlex, NIcon, NInput,
-  NList, NListItem, NModal, NScrollbar, NTag, NText, NThing, type InputInst, type ScrollbarInst,
-} from 'naive-ui';
-import { FilePlus, FileText, Search, Settings, X } from '@vicons/tabler';
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component, type ComponentPublicInstance } from 'vue';
+import { NButton, NIcon } from 'naive-ui';
+import { FilePlus, Home, Keyboard, Search } from '@vicons/tabler';
 import { useI18n } from 'vue-i18n';
 import type { PromptShortcutBinding, PromptWithRelations, ShortcutAction, ShortcutInvocation, ShortcutState } from '@shared/types';
-import { apiClientManager } from '@/lib/api';
-import {
-  createDefaultVariableValues,
-  getRuntimeVariables,
-  hasMissingRequiredValues,
-  renderPromptContent,
-} from '@/lib/utils/prompt-runtime';
-import ShortcutBindingModal from './ShortcutBindingModal.vue';
-import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
 import { useTagColors } from '@/composables/useTagColors';
-import { recordPromptUsage } from '@/lib/utils/prompt-usage';
-import PromptFillCanvas from '@/components/prompt-management/PromptFillCanvas.vue';
+import { apiClientManager } from '@/lib/api';
+import { displayAccelerator, displayShortcutHint } from '@/lib/utils/accelerator';
+import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
+import {
+  createPromptDraft, getActivePromptVariables, getMissingPromptVariables, getUnfilledPromptVariables,
+  isEmptyPromptValue, renderPrompt,
+} from '@/lib/utils/prompt-template';
+import { getLastUsedValues, recordPromptUsage } from '@/lib/utils/prompt-usage';
+import VariableFieldList from '@/components/prompts/VariableFieldList.vue';
+import LauncherInlineFill from './LauncherInlineFill.vue';
+import ShortcutBindingModal from './ShortcutBindingModal.vue';
 
-type PromptResult = { kind: 'prompt'; key: string; label: string; description: string; prompt: PromptWithRelations };
+type PromptResult = { kind: 'prompt'; key: string; label: string; prompt: PromptWithRelations };
 type CommandResult = {
-  kind: 'command'; key: string; label: string; description: string; icon: any;
+  kind: 'command'; key: string; label: string; icon: Component;
   target: 'home' | 'new-prompt' | 'shortcuts';
 };
 type LauncherResult = PromptResult | CommandResult;
 
 const { t } = useI18n();
-const { getCategoryTagColor, getTagColor, getTagsArray } = useTagColors();
-const searchInput = ref<InputInst | null>(null);
-const resultScrollbar = ref<ScrollbarInst | null>(null);
+const { getTagsArray } = useTagColors();
+const searchInput = ref<HTMLInputElement | null>(null);
+const resultList = ref<HTMLElement | null>(null);
+const inlineFillRef = ref<InstanceType<typeof LauncherInlineFill>>();
+const fieldListRef = ref<InstanceType<typeof VariableFieldList>>();
 const prompts = ref<PromptWithRelations[]>([]);
 const state = ref<ShortcutState | null>(null);
 const query = ref('');
 const selectedIndex = ref(0);
-const mode = ref<'search' | 'variables'>('search');
-const activePrompt = ref<PromptWithRelations | null>(null);
-const variableValues = ref<Record<string, any>>({});
-const fillCanvasRef = ref<InstanceType<typeof PromptFillCanvas>>();
-const desiredAction = ref<ShortcutAction>('copy');
+// 通过提示词快捷键唤起时，把这条提示词放在结果最前面，并按快捷键设定的动作执行
+const pinned = ref<{ uuid: string; action: ShortcutAction } | null>(null);
+// 本次唤起期间每条提示词填过的值，上下切换时不丢
+const valuesByPrompt = ref<Record<string, Record<string, any>>>({});
+const revealedMissing = ref(new Set<string>());
 const executing = ref(false);
 const executionError = ref('');
 const showBindingModal = ref(false);
-const showActionModal = ref(false);
 const bindingPrompt = ref<PromptWithRelations | null>(null);
-const modifierLabel = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl';
 const resultElements = new Map<number, HTMLElement>();
-const defaultActionLabel = computed(() => state.value?.preferences.defaultAction === 'paste'
-  ? t('shortcuts.actionPaste')
-  : t('shortcuts.actionCopy'));
-const activeDescendant = computed(() => {
-  const item = results.value[selectedIndex.value];
-  return item ? resultDomId(item) : undefined;
-});
-const searchInputProps = computed(() => ({
-  role: 'combobox',
-  'aria-autocomplete': 'list',
-  'aria-controls': 'prompt-launcher-results',
-  'aria-activedescendant': activeDescendant.value,
-}));
+
+const defaultAction = computed<ShortcutAction>(() => state.value?.preferences.defaultAction || 'copy');
+const defaultActionLabel = computed(() => defaultAction.value === 'paste' ? t('shortcuts.copyAndPaste') : t('shortcuts.actionCopy'));
+const pasteHint = displayShortcutHint('⌘↵', 'Ctrl ↵');
 
 const commands = computed<CommandResult[]>(() => [
-  { kind: 'command', key: 'command:home', label: t('shortcuts.commandOpenApp'), description: t('shortcuts.commandOpenAppDesc'), icon: markRaw(FileText), target: 'home' },
-  { kind: 'command', key: 'command:new', label: t('shortcuts.commandNewPrompt'), description: t('shortcuts.commandNewPromptDesc'), icon: markRaw(FilePlus), target: 'new-prompt' },
-  { kind: 'command', key: 'command:settings', label: t('shortcuts.commandManage'), description: t('shortcuts.commandManageDesc'), icon: markRaw(Settings), target: 'shortcuts' },
+  { kind: 'command', key: 'command:new', label: t('shortcuts.commandNewPrompt'), icon: markRaw(FilePlus), target: 'new-prompt' },
+  { kind: 'command', key: 'command:home', label: t('shortcuts.commandOpenApp'), icon: markRaw(Home), target: 'home' },
+  { kind: 'command', key: 'command:settings', label: t('shortcuts.commandManage'), icon: markRaw(Keyboard), target: 'shortcuts' },
 ]);
 
-function promptTags(prompt: PromptWithRelations): string[] {
-  return getTagsArray(prompt.tags);
-}
-
-function normalizedTags(prompt: PromptWithRelations): string {
-  return promptTags(prompt).join(' ');
-}
-
-function visiblePromptTags(prompt: PromptWithRelations): string[] {
-  return promptTags(prompt).slice(0, 3);
-}
-
-function hiddenPromptTagCount(prompt: PromptWithRelations): number {
-  return Math.max(promptTags(prompt).length - 3, 0);
-}
-
-function hasPromptTaxonomy(prompt: PromptWithRelations): boolean {
-  return Boolean(prompt.category?.name || promptTags(prompt).length);
-}
-
-function hasPromptExtra(prompt: PromptWithRelations): boolean {
-  return Boolean(hasPromptTaxonomy(prompt) || bindingFor(prompt.uuid) || runtimeVariables(prompt).length);
-}
 
 function scorePrompt(prompt: PromptWithRelations, search: string): number {
   const needle = search.toLowerCase().trim();
@@ -265,7 +148,7 @@ function scorePrompt(prompt: PromptWithRelations, search: string): number {
   if (recentIndex >= 0) score += 100 - recentIndex * 3;
   if (!needle) return score;
   const title = prompt.title.toLowerCase();
-  const tags = normalizedTags(prompt).toLowerCase();
+  const tags = getTagsArray(prompt.tags).join(' ').toLowerCase();
   const category = prompt.category?.name?.toLowerCase() || '';
   const content = prompt.content.toLowerCase();
   let matchScore = 0;
@@ -276,40 +159,70 @@ function scorePrompt(prompt: PromptWithRelations, search: string): number {
   if (category.includes(needle)) matchScore += 250;
   if (content.includes(needle)) matchScore += 100;
   if (matchScore === 0) return -1;
-  score += matchScore;
-  return score;
+  return score + matchScore;
 }
 
 const results = computed<LauncherResult[]>(() => {
   const needle = query.value.trim().toLowerCase();
+  const pinnedUUID = !needle ? pinned.value?.uuid : undefined;
   const promptResults = prompts.value
     .filter(prompt => prompt.isActive !== false)
-    .map(prompt => ({ prompt, score: scorePrompt(prompt, needle) }))
+    .map(prompt => ({ prompt, score: prompt.uuid === pinnedUUID ? Number.MAX_SAFE_INTEGER : scorePrompt(prompt, needle) }))
     .filter(item => !needle || item.score >= 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 12)
-    .map(({ prompt }): PromptResult => ({
-      kind: 'prompt', key: `prompt:${prompt.uuid}`, label: prompt.title,
-      description: prompt.description?.trim() || prompt.content.slice(0, 80),
-      prompt,
-    }));
-  const commandResults = commands.value.filter(command => !needle || `${command.label} ${command.description}`.toLowerCase().includes(needle));
+    .map(({ prompt }): PromptResult => ({ kind: 'prompt', key: `prompt:${prompt.uuid}`, label: prompt.title, prompt }));
+  const commandResults = commands.value.filter(command => !needle || command.label.toLowerCase().includes(needle));
   return [...promptResults, ...commandResults];
 });
 
-const missingRequired = computed(() => activePrompt.value ? hasMissingRequiredValues(activePrompt.value, variableValues.value) : true);
+const selectedItem = computed(() => results.value[selectedIndex.value]);
+const selectedPrompt = computed(() => selectedItem.value?.kind === 'prompt' ? selectedItem.value.prompt : null);
+const selectedCommand = computed(() => selectedItem.value?.kind === 'command' ? selectedItem.value : null);
+const selectedVariables = computed(() => selectedPrompt.value ? getActivePromptVariables(selectedPrompt.value) : []);
+const selectedValues = computed(() => selectedPrompt.value ? valuesFor(selectedPrompt.value) : {});
+
+const fillHint = computed(() => {
+  if (!selectedVariables.value.length) return t('launcher.noVariablesHint');
+  const unfilled = getUnfilledPromptVariables(selectedVariables.value, selectedValues.value).length;
+  const filled = selectedVariables.value.length - unfilled;
+  return t('launcher.fillProgress', { filled, total: selectedVariables.value.length }, filled);
+});
+
+const activeDescendant = computed(() => selectedItem.value ? resultDomId(selectedItem.value) : undefined);
+const searchInputProps = computed(() => ({
+  role: 'combobox',
+  'aria-expanded': true,
+  'aria-autocomplete': 'list' as const,
+  'aria-controls': 'prompt-launcher-results',
+  'aria-activedescendant': activeDescendant.value,
+}));
+
+function promptMeta(prompt: PromptWithRelations): string {
+  const count = getActivePromptVariables(prompt).length;
+  const variables = count ? t('shortcuts.variablesCount', { count }) : t('launcher.noVariables');
+  return prompt.category?.name ? `${prompt.category.name} · ${variables}` : variables;
+}
 
 function bindingFor(promptUUID: string): PromptShortcutBinding | undefined {
   return state.value?.preferences.promptBindings.find(binding => binding.promptUUID === promptUUID);
 }
 
-function runtimeVariables(prompt: PromptWithRelations) {
-  return getRuntimeVariables(prompt);
+// 还没填过的提示词先用上次复制时的值，没有记录的变量用默认值
+function valuesFor(prompt: PromptWithRelations): Record<string, any> {
+  const existing = valuesByPrompt.value[prompt.uuid];
+  if (existing) return existing;
+  const variables = getActivePromptVariables(prompt);
+  const known = new Set(variables.map(variable => variable.name));
+  const lastUsed = prompt.id ? getLastUsedValues(prompt.id) : {};
+  return createPromptDraft(variables, Object.fromEntries(Object.entries(lastUsed)
+    .filter(([name, value]) => known.has(name) && !isEmptyPromptValue(value))));
 }
 
-function displayAccelerator(accelerator: string): string {
-  if (!navigator.platform.includes('Mac')) return accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Control/g, 'Ctrl');
-  return accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '');
+function updateSelectedValues(values: Record<string, any>): void {
+  if (!selectedPrompt.value) return;
+  valuesByPrompt.value = { ...valuesByPrompt.value, [selectedPrompt.value.uuid]: values };
+  executionError.value = '';
 }
 
 function resultDomId(item: LauncherResult): string {
@@ -326,26 +239,45 @@ function setResultElement(element: Element | ComponentPublicInstance | null, ind
 }
 
 function scrollSelectedIntoView(): void {
-  const selected = resultElements.get(selectedIndex.value);
-  const viewport = selected?.closest<HTMLElement>('.n-scrollbar-container');
-  if (!selected || !viewport) return;
-
-  const selectedRect = selected.getBoundingClientRect();
-  const viewportRect = viewport.getBoundingClientRect();
-  let offset = 0;
-  if (selectedRect.top < viewportRect.top) offset = selectedRect.top - viewportRect.top;
-  else if (selectedRect.bottom > viewportRect.bottom) offset = selectedRect.bottom - viewportRect.bottom;
-  if (offset !== 0) resultScrollbar.value?.scrollBy({ top: offset, behavior: 'auto' });
+  resultElements.get(selectedIndex.value)?.scrollIntoView({ block: 'nearest' });
 }
 
 function selectResult(index: number): void {
+  if (index === selectedIndex.value) return;
   selectedIndex.value = clampLauncherSelection(index, results.value.length);
   void nextTick(scrollSelectedIntoView);
 }
 
 function handleQueryChanged(): void {
+  pinned.value = null;
   selectedIndex.value = 0;
   void nextTick(scrollSelectedIntoView);
+}
+
+function focusSearch(select = false): void {
+  searchInput.value?.focus();
+  if (select) searchInput.value?.select();
+}
+
+function focusFirstField(): boolean {
+  if (fieldListRef.value && selectedVariables.value[0]) {
+    fieldListRef.value.focusField(selectedVariables.value[0].name);
+    return true;
+  }
+  return inlineFillRef.value?.focusFirst() ?? false;
+}
+
+function focusField(name: string): void {
+  if (fieldListRef.value) fieldListRef.value.focusField(name);
+  else inlineFillRef.value?.focusField(name);
+}
+
+function resetSession(): void {
+  query.value = '';
+  selectedIndex.value = 0;
+  valuesByPrompt.value = {};
+  revealedMissing.value = new Set();
+  executionError.value = '';
 }
 
 async function loadData(): Promise<void> {
@@ -400,20 +332,18 @@ async function findPrompt(promptUUID: string): Promise<PromptWithRelations | nul
 
 async function handleInvocation(invocation: ShortcutInvocation): Promise<void> {
   executionError.value = '';
-    if (invocation.kind === 'launcher') {
-      await window.electronAPI.shortcuts.hideLauncher();
-      mode.value = 'search';
-      query.value = '';
-      selectedIndex.value = 0;
-      // 显示窗口不应等待数据库查询完成。Windows 下后台渲染器可能被节流，
-      // 先显示空的启动器，再异步加载结果，避免快捷键唤起延迟数秒。
-      await nextTick();
-      await window.electronAPI.shortcuts.showLauncher();
-      await loadData();
-      await nextTick();
-      searchInput.value?.focus();
-      searchInput.value?.select();
-      return;
+  if (invocation.kind === 'launcher') {
+    await window.electronAPI.shortcuts.hideLauncher();
+    pinned.value = null;
+    resetSession();
+    // 显示窗口不应等待数据库查询完成。Windows 下后台渲染器可能被节流，
+    // 先显示空的启动器，再异步加载结果，避免快捷键唤起延迟数秒。
+    await nextTick();
+    await window.electronAPI.shortcuts.showLauncher();
+    await loadData();
+    await nextTick();
+    focusSearch(true);
+    return;
   }
   if (!invocation.promptUUID) return;
   const prompt = await findPrompt(invocation.promptUUID);
@@ -424,48 +354,63 @@ async function handleInvocation(invocation: ShortcutInvocation): Promise<void> {
   if (invocation.promptUUID.startsWith('legacy-id:') && invocation.bindingId) {
     await window.electronAPI.shortcuts.resolveLegacyBinding(invocation.bindingId, prompt.uuid);
   }
-  await preparePrompt(prompt, invocation.action || 'copy');
+  await openPrompt(prompt, invocation.action || 'copy');
 }
 
-async function preparePrompt(prompt: PromptWithRelations, action: ShortcutAction): Promise<void> {
-  activePrompt.value = prompt;
-  desiredAction.value = action;
-  variableValues.value = createDefaultVariableValues(prompt);
-  if (getRuntimeVariables(prompt).length > 0) {
-    mode.value = 'variables';
-    await nextTick();
-    await window.electronAPI.shortcuts.showLauncher();
+// 提示词快捷键：没有变量直接执行，有变量就在启动器里填好再执行
+async function openPrompt(prompt: PromptWithRelations, action: ShortcutAction): Promise<void> {
+  resetSession();
+  prompts.value = [prompt, ...prompts.value.filter(item => item.uuid !== prompt.uuid)];
+  pinned.value = { uuid: prompt.uuid, action };
+  selectedIndex.value = 0;
+  if (!getActivePromptVariables(prompt).length) {
+    await executePrompt(prompt, action);
     return;
   }
-  await executeActivePrompt();
+  await nextTick();
+  await window.electronAPI.shortcuts.showLauncher();
+  await nextTick();
+  if (!focusFirstField()) focusSearch();
 }
 
-async function executeActivePrompt(): Promise<void> {
-  if (!activePrompt.value) return;
-  if (missingRequired.value) {
-    await fillCanvasRef.value?.validateAndFocus();
+async function executePrompt(prompt: PromptWithRelations, action: ShortcutAction): Promise<void> {
+  if (executing.value) return;
+  const variables = getActivePromptVariables(prompt);
+  const values = valuesFor(prompt);
+  const missing = getMissingPromptVariables(variables, values);
+  if (missing.length) {
+    revealedMissing.value = new Set([...revealedMissing.value, ...missing]);
+    await window.electronAPI.shortcuts.showLauncher();
+    await nextTick();
+    focusField(missing[0]);
+    return;
+  }
+  const rendered = renderPrompt(prompt, values, variables);
+  if (rendered.error) {
+    executionError.value = rendered.error;
+    await window.electronAPI.shortcuts.showLauncher();
     return;
   }
   executing.value = true;
   executionError.value = '';
   try {
-    const content = renderPromptContent(activePrompt.value, variableValues.value);
     await window.electronAPI.shortcuts.executeText({
-      promptUUID: activePrompt.value.uuid,
-      title: activePrompt.value.title,
-      content,
-      action: desiredAction.value,
+      promptUUID: prompt.uuid,
+      title: prompt.title,
+      content: rendered.content,
+      action,
     });
-    if (activePrompt.value.id) {
+    if (prompt.id) {
       await recordPromptUsage({
-        promptId: activePrompt.value.id,
-        content,
-        variables: { ...variableValues.value },
+        promptId: prompt.id,
+        content: rendered.content,
+        variables: { ...values },
         incrementUseCount: id => apiClientManager.prompt.prompts.incrementUseCount.mutate(id),
       });
     }
     state.value = await window.electronAPI.shortcuts.getState();
-    mode.value = 'search';
+    pinned.value = null;
+    revealedMissing.value = new Set();
   } catch (caught) {
     executionError.value = caught instanceof Error ? caught.message : String(caught);
     await window.electronAPI.shortcuts.showLauncher();
@@ -474,37 +419,31 @@ async function executeActivePrompt(): Promise<void> {
   }
 }
 
-async function executeItem(item: LauncherResult, action: ShortcutAction): Promise<void> {
+async function executeSelected(paste: boolean): Promise<void> {
+  const item = selectedItem.value;
+  if (!item) return;
   if (item.kind === 'command') {
     await window.electronAPI.shortcuts.navigateMain(item.target);
     return;
   }
-  await preparePrompt(item.prompt, action);
+  const pinnedAction = pinned.value?.uuid === item.prompt.uuid ? pinned.value.action : undefined;
+  await executePrompt(item.prompt, paste ? 'paste' : (pinnedAction || defaultAction.value));
 }
 
-function backToSearch(): void {
-  mode.value = 'search';
-  activePrompt.value = null;
-  executionError.value = '';
-  nextTick(() => searchInput.value?.focus());
+function handleItemClick(index: number): void {
+  selectedIndex.value = index;
+  const item = results.value[index];
+  if (item?.kind === 'command') void executeSelected(false);
+  else void nextTick(() => { if (!focusFirstField()) void executeSelected(false); });
 }
 
-function openActions(): void {
-  const item = results.value[selectedIndex.value];
-  if (!item || item.kind !== 'prompt') return;
-  bindingPrompt.value = item.prompt;
-  showActionModal.value = true;
-}
-
-function openBindingEditor(): void {
-  showActionModal.value = false;
+function openBindingEditor(prompt: PromptWithRelations): void {
+  bindingPrompt.value = prompt;
   showBindingModal.value = true;
 }
 
-async function openPromptDetail(): Promise<void> {
-  if (!bindingPrompt.value) return;
-  showActionModal.value = false;
-  await window.electronAPI.shortcuts.navigateMain('home', bindingPrompt.value.uuid);
+async function openPromptDetail(prompt: PromptWithRelations): Promise<void> {
+  await window.electronAPI.shortcuts.navigateMain('home', prompt.uuid);
 }
 
 async function handleBindingSaved(): Promise<void> {
@@ -516,44 +455,41 @@ async function handleBindingSaved(): Promise<void> {
 
 function handleWindowKeydown(event: KeyboardEvent): void {
   if (showBindingModal.value) return;
-  if (showActionModal.value) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      showActionModal.value = false;
-    }
-    return;
-  }
+  if (event.isComposing || event.keyCode === 229) return;
+  const target = event.target as HTMLElement | null;
+  const inSearch = target === searchInput.value;
+  const inDetail = Boolean(target?.closest('.launcher__detail'));
+
   if (event.key === 'Escape') {
     event.preventDefault();
     event.stopPropagation();
-    if (mode.value === 'variables') backToSearch();
+    // 正在填变量时先回到搜索框，再按一次才关闭
+    if (inDetail) focusSearch();
     else void window.electronAPI.shortcuts.hideLauncher();
     return;
   }
-  if (mode.value !== 'search') {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+  if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && (inSearch || !inDetail)) {
+    event.preventDefault();
+    event.stopPropagation();
+    selectedIndex.value = moveLauncherSelection(selectedIndex.value, results.value.length, event.key === 'ArrowDown' ? 1 : -1);
+    void nextTick(scrollSelectedIntoView);
+    return;
+  }
+  if (event.key === 'Tab' && inSearch && !event.shiftKey) {
+    if (focusFirstField()) {
       event.preventDefault();
       event.stopPropagation();
-      void executeActivePrompt();
     }
     return;
   }
-  if (event.isComposing || event.keyCode === 229) return;
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+  if (event.key === 'Enter') {
+    const modifier = event.metaKey || event.ctrlKey;
+    // 多行输入框里回车是换行，⌘↵ / Ctrl+↵ 才执行
+    if (!modifier && target instanceof HTMLTextAreaElement) return;
+    if (!modifier && target instanceof HTMLButtonElement && !target.closest('[role="radiogroup"], .launcher__results')) return;
     event.preventDefault();
     event.stopPropagation();
-    const direction = event.key === 'ArrowDown' ? 1 : -1;
-    selectedIndex.value = moveLauncherSelection(selectedIndex.value, results.value.length, direction);
-    void nextTick(scrollSelectedIntoView);
-  } else if (event.key === 'Enter') {
-    event.preventDefault();
-    event.stopPropagation();
-    const item = results.value[selectedIndex.value];
-    if (item) void executeItem(item, event.ctrlKey || event.metaKey ? 'paste' : (state.value?.preferences.defaultAction || 'copy'));
-  } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault();
-    event.stopPropagation();
-    openActions();
+    void executeSelected(modifier);
   }
 }
 
@@ -568,6 +504,10 @@ watch(() => results.value.length, length => {
   selectedIndex.value = clampLauncherSelection(selectedIndex.value, length);
   void nextTick(scrollSelectedIntoView);
 });
+watch(selectedPrompt, () => {
+  executionError.value = '';
+  revealedMissing.value = new Set();
+});
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleWindowKeydown, true);
   removeInvocationListener?.();
@@ -575,237 +515,237 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.launcher-shell {
+.launcher {
+  display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
-  box-sizing: border-box;
+  overflow: hidden;
   background: var(--surface-primary);
+  color: var(--content-primary);
 }
 
-.launcher-card {
+.launcher__search {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.launcher__search-icon {
+  color: var(--content-tertiary);
+}
+
+.launcher__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
   border: 0;
-  border-radius: 0;
-}
-
-.launcher-card :deep(.n-card-content) {
-  display: flex;
-  flex: 1 1 0;
-  height: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-}
-
-.launcher-card :deep(.n-card-header) {
-  flex: 0 0 auto;
-  padding: var(--compact-padding) var(--compact-padding) var(--spacing-sm);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-secondary);
-}
-
-.launcher-card :deep(.n-card__footer) {
-  flex: 0 0 auto;
-  padding: var(--spacing-xs) var(--compact-padding);
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-secondary);
-}
-
-.result-scrollbar,
-.variable-scrollbar {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
-}
-
-.result-scrollbar :deep(.n-scrollbar-container),
-.variable-scrollbar :deep(.n-scrollbar-container) {
-  max-height: 100%;
-}
-
-.launcher-card :deep(.n-list) {
+  outline: none;
   background: transparent;
-  padding: var(--spacing-xs) var(--spacing-sm);
-}
-
-.launcher-card :deep(.n-list .launcher-result) {
-  padding: 0;
-  border-radius: var(--radius-sm);
-  transition: background-color 100ms ease;
-}
-
-.launcher-card :deep(.launcher-result .n-list-item__main) {
-  min-width: 0;
-  padding: var(--spacing-xs) var(--spacing-sm);
-}
-
-.launcher-result--selected {
-  background: var(--surface-tertiary);
-}
-
-.launcher-card :deep(.launcher-result .n-thing .n-thing-header__title) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-tight);
-}
-
-.launcher-card :deep(.launcher-result .n-thing-main) {
-  min-width: 0;
-  width: 100%;
-  overflow: hidden;
-}
-
-.launcher-card :deep(.launcher-result .n-thing) {
-  min-width: 0;
-  width: 100%;
-}
-
-.launcher-card :deep(.launcher-result .n-thing-avatar-header-wrapper),
-.launcher-card :deep(.launcher-result .n-thing-header-wrapper) {
-  min-width: 0;
-  width: 100%;
-  overflow: hidden;
-}
-
-.launcher-card :deep(.launcher-result .n-thing-avatar) {
-  margin-top: 1px;
-  margin-right: var(--spacing-sm);
-}
-
-.launcher-card :deep(.launcher-result .n-thing-header) {
-  min-width: 0;
-  margin-bottom: var(--spacing-xs);
-  gap: var(--spacing-sm);
-}
-
-.launcher-card :deep(.launcher-result .n-thing-header__extra) {
-  min-width: 0;
-  flex: 0 1 60%;
-  width: 60%;
-  max-width: 60%;
-}
-
-.launcher-card :deep(.launcher-result--with-extra .n-thing-header__title) {
-  flex: 0 1 38%;
-  max-width: 38%;
-}
-
-.launcher-card :deep(.launcher-result .n-thing-main__description) {
-  min-width: 0;
-  width: 100%;
-  overflow: hidden;
-  line-height: var(--line-height-tight);
-}
-
-.result-description {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-xs);
-}
-
-.result-extra,
-.result-taxonomy {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.result-extra {
-  width: 100%;
-}
-
-.result-taxonomy {
-  flex: 1 1 auto;
-}
-
-.result-category,
-.result-tag {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 112px;
-}
-
-.result-taxonomy :deep(.n-tag__content) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.result-tag-overflow {
-  flex: 0 0 auto;
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-tight);
-  color: var(--content-tertiary);
-}
-
-.result-icon {
-  color: var(--content-tertiary);
-  transition: color 100ms ease;
-}
-
-.result-icon--selected {
-  color: var(--accent-primary);
-}
-
-.result-meta,
-.escape-hint {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-tight);
-}
-
-.result-count,
-.key-cap {
-  font-size: var(--font-size-xs);
-}
-
-.key-cap {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: var(--font-weight-medium);
-  color: var(--content-secondary);
-}
-
-.keyboard-hints {
-  color: var(--content-tertiary);
-  font-size: var(--font-size-xs);
-}
-
-.variable-card :deep(.n-card-content) {
-  flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  min-height: 0;
-}
-
-.variable-card :deep(.prompt-fill-canvas) {
-  flex: 1;
-  min-height: 0;
-}
-
-.variable-title {
+  color: var(--content-primary);
+  font: inherit;
   font-size: var(--font-size-lg);
 }
 
-.variable-description {
-  display: block;
-  margin-top: var(--spacing-xs);
+.launcher__input::placeholder {
+  color: var(--content-muted);
 }
 
-.action-card {
-  width: min(360px, calc(100vw - 32px));
+.launcher__count {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.launcher__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.launcher__results {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  width: 280px;
+  padding: 6px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-default);
+}
+
+.launcher__group {
+  padding: 6px 10px 2px;
+}
+
+.launcher__group:not(:first-child) {
+  padding-top: 10px;
+}
+
+.launcher__item {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--font-size-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.launcher__item--prompt {
+  min-height: 48px;
+}
+
+.launcher__item.is-selected {
+  background: var(--accent-soft);
+}
+
+.launcher__item-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.launcher__item-title,
+.launcher__item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.launcher__item.is-selected .launcher__item-title {
+  font-weight: var(--font-weight-medium);
+}
+
+.launcher__item-meta {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.launcher__item-icon {
+  color: var(--content-tertiary);
+}
+
+.launcher__item.is-selected .launcher__item-icon {
+  color: var(--accent-primary);
+}
+
+.launcher__empty {
+  padding: 24px 10px;
+  color: var(--content-tertiary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.launcher__detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.launcher__detail-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.launcher__hint {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.launcher__detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.launcher__plain {
+  margin: 0;
+  color: var(--content-secondary);
+  font-size: var(--font-size-base);
+  line-height: 2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.launcher__error {
+  flex: none;
+  margin: 0;
+  color: var(--accent-error);
+  font-size: var(--font-size-sm);
+}
+
+.launcher__command {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.launcher__command-icon {
+  color: var(--accent-primary);
+}
+
+.launcher__command-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.launcher__footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-default);
+  color: var(--content-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.launcher__footer .ui-kbd {
+  margin-right: 4px;
+}
+
+.launcher__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--content-secondary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.launcher__link:hover {
+  color: var(--content-primary);
+}
+
+.launcher__spacer {
+  flex: 1;
+}
+
+.launcher__primary-hint {
+  color: var(--content-primary);
+  font-weight: var(--font-weight-medium);
 }
 </style>

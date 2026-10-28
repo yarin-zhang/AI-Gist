@@ -1,5 +1,6 @@
 // 本地模块导入
 import {
+  CloudConnectionCheckResult,
   CloudStorageProvider,
   CloudFileInfo,
   CloudFileWriteOptions,
@@ -150,6 +151,14 @@ export class WebDAVProvider implements CloudStorageProvider {
    * @returns 连接是否成功
    */
   async testConnection(): Promise<boolean> {
+    return (await this.checkConnection()).success;
+  }
+
+  /**
+   * 测试连接并带回失败原因：服务器返回的原始错误（去掉本地加的中文前缀，隐去地址里的账号和密码），
+   * 设置页据此分辨是密码不对、地址写错还是服务器没响应（与 Web 版一致）
+   */
+  async checkConnection(): Promise<CloudConnectionCheckResult> {
     await this.ensureClient();
     try {
       await this.initializeDirectories();
@@ -165,10 +174,12 @@ export class WebDAVProvider implements CloudStorageProvider {
       const remoteData = await this.readFile(probePath);
       await this.deleteFile(probePath);
 
-      return Buffer.compare(remoteData, probeData) === 0;
+      return Buffer.compare(remoteData, probeData) === 0
+        ? { success: true }
+        : { success: false, error: CONSTANTS.ERROR_MESSAGES.WRITE_VERIFY_FAILED };
     } catch (error) {
       this.logOperationError(CONSTANTS.LOG_MESSAGES.CONNECTION_TEST_FAILED, error);
-      return false;
+      return { success: false, error: this.describeConnectionError(error) };
     }
   }
 
@@ -535,6 +546,38 @@ export class WebDAVProvider implements CloudStorageProvider {
       ? String((error as { code?: string }).code || '')
       : '';
     return code && !message.includes(code) ? `${message} (${code})` : message;
+  }
+
+  /**
+   * 连接测试失败时交给界面的原因：剥掉各个操作外面套的中文前缀，只留服务器 / 网络层的原话；
+   * 隐去地址里的账号密码，以及报错里原样带出来的密码
+   */
+  private describeConnectionError(error: unknown): string {
+    const wrappers = [
+      CONSTANTS.ERROR_MESSAGES.LIST_FILES_FAILED,
+      CONSTANTS.ERROR_MESSAGES.READ_FILE_FAILED,
+      CONSTANTS.ERROR_MESSAGES.WRITE_FILE_FAILED,
+      CONSTANTS.ERROR_MESSAGES.DELETE_FILE_FAILED,
+      CONSTANTS.ERROR_MESSAGES.CREATE_DIRECTORY_FAILED,
+      CONSTANTS.ERROR_MESSAGES.WRITE_VERIFY_FAILED
+    ];
+    let message = this.getErrorMessage(error);
+    for (let stripped = true; stripped;) {
+      stripped = false;
+      for (const wrapper of wrappers) {
+        if (message.startsWith(`${wrapper}: `)) {
+          message = message.slice(wrapper.length + 2);
+          stripped = true;
+        }
+      }
+    }
+    message = message.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1');
+    const password = this.config.password || '';
+    // 太短的密码可能和普通文字撞上，只替换足够长的
+    if (password.length >= 4) {
+      message = message.split(password).join('****');
+    }
+    return message;
   }
 
   private isDirectoryAlreadyExistsError(error: unknown): boolean {

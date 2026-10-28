@@ -64,9 +64,18 @@ export interface CloudBackupDeleteReference {
 
 export type CloudBackupDeleteTarget = string | CloudBackupDeleteReference;
 
+/** 连接测试结果：失败时带上服务器返回的原因（已隐去密码），设置页据此给出具体说明 */
+export interface CloudConnectionCheckResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface CloudStorageProvider {
   // 测试连接
   testConnection(): Promise<boolean>;
+
+  // 测试连接并带回失败原因（可选；没有实现时只能知道成功与否）
+  checkConnection?(): Promise<CloudConnectionCheckResult>;
   
   // 初始化目录结构（可选方法）
   initializeDirectories?(): Promise<void>;

@@ -6,6 +6,47 @@
 import { BaseDatabaseService } from './base-database.service';
 import { QuickOptimizationConfig, CreateQuickOptimizationConfig, UpdateQuickOptimizationConfig } from '@shared/types/ai';
 import { generateUUID } from '../utils/uuid';
+import i18n from '../../i18n';
+
+/** 默认的快速优化动作：名称、说明和模板都在语言包 quickOptimization.defaults 下，跟随界面语言生成 */
+const DEFAULT_ACTIONS = [
+  { key: 'shorter', enabled: true },
+  { key: 'richer', enabled: true },
+  { key: 'general', enabled: true },
+  { key: 'extractVariables', enabled: true },
+  { key: 'professional', enabled: false }
+] as const;
+
+/** 本机是否已经预置过默认动作；用户删光后不再自动加回来 */
+const DEFAULTS_SEEDED_KEY = 'ai-gist:quick-optimization-defaults-seeded';
+
+const translate = (key: string) => (i18n.global.t as (key: string) => string)(key);
+
+export function buildDefaultQuickOptimizationConfigs(t: (key: string) => string = translate): CreateQuickOptimizationConfig[] {
+  return DEFAULT_ACTIONS.map((action, index) => ({
+    name: t(`quickOptimization.defaults.${action.key}.name`),
+    description: t(`quickOptimization.defaults.${action.key}.description`),
+    prompt: t(`quickOptimization.defaults.${action.key}.prompt`),
+    enabled: action.enabled,
+    sortOrder: index + 1
+  }));
+}
+
+const readSeededFlag = (): boolean => {
+  try {
+    return globalThis.localStorage?.getItem(DEFAULTS_SEEDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const writeSeededFlag = () => {
+  try {
+    globalThis.localStorage?.setItem(DEFAULTS_SEEDED_KEY, '1');
+  } catch {
+    // 存不了标记时下次还会检查一遍，列表不为空就不会重复添加
+  }
+};
 
 /**
  * 快速优化提示词配置数据服务类
@@ -13,6 +54,7 @@ import { generateUUID } from '../utils/uuid';
  */
 export class QuickOptimizationService extends BaseDatabaseService {
   private static instance: QuickOptimizationService;
+  private seedingDefaults: Promise<void> | null = null;
 
   /**
    * 获取快速优化提示词配置服务单例实例
@@ -174,58 +216,36 @@ export class QuickOptimizationService extends BaseDatabaseService {
   }
 
   /**
-   * 初始化默认的快速优化提示词配置
-   * @returns Promise<void> 初始化完成
+   * 初始化默认的快速优化提示词配置（按当前界面语言生成）
+   * @returns Promise<number> 新添加的配置数量；已经有配置时不添加，返回 0
    */
-  async initializeDefaultConfigs(): Promise<void> {
+  async initializeDefaultConfigs(): Promise<number> {
     const existingConfigs = await this.getAllQuickOptimizationConfigs();
     
     // 如果已经有配置，不重复初始化
     if (existingConfigs.length > 0) {
-      return;
+      return 0;
     }
 
-    const defaultConfigs: CreateQuickOptimizationConfig[] = [
-      {
-        name: '更简短',
-        description: '将提示词优化得更加简短和精炼，保留核心要求，去除冗余内容',
-        prompt: '请将以下提示词优化得更加简短和精炼，保留核心要求，去除冗余内容：\n\n{{content}}',
-        enabled: true,
-        sortOrder: 1
-      },
-      {
-        name: '更丰富',
-        description: '将提示词优化得略微丰富和详细一些，添加更多具体的要求和细节',
-        prompt: '请将以下提示词优化得略微丰富和详细一些，添加更多具体的要求和细节，但不要过于复杂：\n\n{{content}}',
-        enabled: true,
-        sortOrder: 2
-      },
-      {
-        name: '更通用',
-        description: '将提示词优化得更加通用，适用于更广泛的场景和用途',
-        prompt: '请将以下提示词优化得更加通用，适用于更广泛的场景和用途，但不要过于复杂：\n\n{{content}}',
-        enabled: true,
-        sortOrder: 3
-      },
-      {
-        name: '提取变量',
-        description: '分析提示词，将其中可以变化的部分提取为变量',
-        prompt: '请分析以下提示词，将其中可以变化的、最有价值的 3~5 个部分提取为变量，使用 {{变量名}} 的格式标记：\n\n{{content}}',
-        enabled: true,
-        sortOrder: 4
-      },
-      {
-        name: '更专业',
-        description: '将提示词优化得更加专业和正式，适合商业或学术场景',
-        prompt: '请将以下提示词优化得更加专业和正式，适合商业或学术场景使用：\n\n{{content}}',
-        enabled: false,
-        sortOrder: 5
-      }
-    ];
-
+    const defaultConfigs = buildDefaultQuickOptimizationConfigs();
     for (const config of defaultConfigs) {
       await this.createQuickOptimizationConfig(config);
     }
+    return defaultConfigs.length;
+  }
+
+  /**
+   * 首次使用时预置默认动作：每台设备只做一次，列表里已有配置时只记下标记。
+   * 并发调用（AI 面板和弹窗同时加载）共用同一次初始化，避免重复添加。
+   */
+  async ensureDefaultConfigs(): Promise<void> {
+    if (readSeededFlag()) return;
+    if (!this.seedingDefaults) {
+      this.seedingDefaults = this.initializeDefaultConfigs()
+        .then(() => writeSeededFlag())
+        .finally(() => { this.seedingDefaults = null; });
+    }
+    return this.seedingDefaults;
   }
 
   /**

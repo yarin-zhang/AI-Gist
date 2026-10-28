@@ -406,9 +406,10 @@ export class AIConfigApiClient {
       /**
        * 使用真实提示词测试AI配置
        * @param id AI配置ID
+       * @param prompt 测试提示词，页面按界面语言传入；不传时各端用同一个默认
        * @returns Promise<测试结果> 测试结果
        */
-      mutate: async (id: number): Promise<{
+      mutate: async (id: number, prompt?: string): Promise<{
         success: boolean;
         error?: string;
         response?: string;
@@ -428,17 +429,18 @@ export class AIConfigApiClient {
 
           if (isElectron) {
             // Electron 环境
-            const result = await window.electronAPI.ai.intelligentTest(config);
+            const result = await window.electronAPI.ai.intelligentTest(config, prompt);
             return {
               success: result.success,
               error: result.error,
               response: result.response,
-              inputPrompt: 'Test prompt'
+              // 主进程和 Web 后端都会返回实际发出的测试提示词，直接显示它而不是占位文字
+              inputPrompt: (result as { inputPrompt?: string }).inputPrompt
             };
           } else {
             // 移动端环境：使用移动端智能测试
             const { intelligentTestAIConfig } = await import('../services/mobile-ai.service');
-            const result = await intelligentTestAIConfig(config);
+            const result = await intelligentTestAIConfig(config, prompt);
             return {
               success: result.success,
               error: result.error,

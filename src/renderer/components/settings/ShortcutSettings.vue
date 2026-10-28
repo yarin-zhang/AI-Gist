@@ -1,96 +1,94 @@
 <template>
-  <NFlex vertical :size="16">
-    <NAlert v-if="state && !state.pasteCapability.permissionGranted" type="info" :title="t('shortcuts.autoPasteUnavailable')">
-      {{ state.pasteCapability.reason }}
-      <template v-if="state.pasteCapability.supported" #action>
-        <NButton size="small" @click="requestPastePermission">{{ t('shortcuts.requestPermission') }}</NButton>
+  <div class="shortcut-settings">
+    <UiPageHeader :title="t('settings.sections.shortcuts')" :description="t('settings.sectionDescriptions.shortcuts.description')">
+      <template #actions>
+        <NButton quaternary @click="resetAll">{{ t('shortcuts.resetToDefault') }}</NButton>
       </template>
-    </NAlert>
+    </UiPageHeader>
 
-    <NCard size="small" :title="t('shortcuts.globalCommands')">
-      <NFlex vertical :size="16">
-        <section v-for="command in commandRows" :key="command.id" class="shortcut-row">
-          <div class="shortcut-copy">
-            <NText strong>{{ command.label }}</NText>
-            <NText depth="3" class="description">{{ command.description }}</NText>
-          </div>
-          <NTag size="small" :type="statusType(command.status?.state)">
-            {{ statusLabel(command.status?.state) }}
-          </NTag>
-          <NButton
-            quaternary
-            class="accelerator-button"
-            :title="command.binding.accelerator ? displayAccelerator(command.binding.accelerator) : t('shortcuts.notSet')"
-            @click="startCommandCapture(command.id)"
-          >
-            <ShortcutKeyCombo :accelerator="command.binding.accelerator" :empty-label="t('shortcuts.notSet')" />
+    <div v-if="state && !state.pasteCapability.permissionGranted" class="ui-alert ui-alert--warning shortcut-settings__alert">
+      <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><AlertTriangle /></NIcon>
+      <span class="shortcut-settings__alert-text">
+        {{ t('shortcuts.autoPasteUnavailable') }}<template v-if="state.pasteCapability.reason">：{{ state.pasteCapability.reason }}</template>
+      </span>
+      <NButton v-if="state.pasteCapability.supported" size="tiny" @click="requestPastePermission">{{ t('shortcuts.requestPermission') }}</NButton>
+    </div>
+
+    <UiPanel :title="t('shortcuts.globalCommands')" body="rows">
+      <UiSettingRow v-for="command in commandRows" :key="command.id" :title="command.label" :description="command.description">
+        <span class="shortcut-settings__controls">
+          <span class="ui-tag" :class="statusClass(command.binding.accelerator ? command.status?.state : undefined, !command.binding.accelerator)">
+            {{ command.binding.accelerator ? statusLabel(command.status?.state) : t('shortcuts.notSet') }}
+          </span>
+          <NButton class="shortcut-settings__key" :class="{ 'ui-mono': command.binding.accelerator }" @click="startCommandCapture(command.id)">
+            {{ command.binding.accelerator ? displayAccelerator(command.binding.accelerator) : t('shortcuts.inputShortcut') }}
           </NButton>
-          <NSwitch :value="command.binding.enabled" @update:value="enabled => toggleCommand(command.id, enabled)" />
-        </section>
-      </NFlex>
-    </NCard>
+          <NSwitch :value="command.binding.enabled" :aria-label="command.label" @update:value="enabled => toggleCommand(command.id, enabled)" />
+        </span>
+      </UiSettingRow>
+    </UiPanel>
 
-    <NCard size="small" :title="t('shortcuts.behavior')">
-      <NFlex align="center" justify="space-between">
-        <div>
-          <NText strong>{{ t('shortcuts.defaultAction') }}</NText>
-          <NText depth="3" class="description">{{ t('shortcuts.defaultActionDesc') }}</NText>
-        </div>
-        <NSelect
-          style="width: 180px"
-          :value="state?.preferences.defaultAction"
-          :options="actionOptions"
-          @update:value="updateDefaultAction"
-        />
-      </NFlex>
-    </NCard>
+    <UiPanel :title="t('shortcuts.behavior')" body="rows">
+      <UiSettingRow :title="t('shortcuts.defaultAction')" :description="t('shortcuts.defaultActionDesc')">
+        <UiSegmented :model-value="state?.preferences.defaultAction || 'copy'" :options="actionOptions"
+          :label="t('shortcuts.defaultAction')" @update:model-value="updateDefaultAction" />
+      </UiSettingRow>
+    </UiPanel>
 
-    <NCard size="small" :title="t('shortcuts.promptBindings')">
-      <NEmpty v-if="!state?.preferences.promptBindings.length" :description="t('shortcuts.noPromptBindings')" />
-      <NFlex v-else vertical :size="8">
-        <section v-for="binding in state.preferences.promptBindings" :key="binding.id" class="shortcut-row binding-row">
-          <div class="shortcut-copy">
-            <NText strong>{{ promptTitle(binding.promptUUID) }}</NText>
-            <NText depth="3" class="description">
-              {{ binding.action === 'paste' ? t('shortcuts.actionPaste') : t('shortcuts.actionCopy') }}
-            </NText>
-          </div>
-          <NTag size="small" :type="statusType(bindingStatus(binding.id)?.state)">
-            {{ statusLabel(bindingStatus(binding.id)?.state) }}
-          </NTag>
-          <NButton
-            quaternary
-            class="accelerator-button"
-            :title="displayAccelerator(binding.accelerator)"
-            @click="editBinding(binding)"
-          >
-            <ShortcutKeyCombo :accelerator="binding.accelerator" :empty-label="t('shortcuts.notSet')" />
-          </NButton>
-          <NSwitch :value="binding.enabled" @update:value="enabled => toggleBinding(binding, enabled)" />
-          <NButton text type="error" @click="removeBinding(binding.id)"><NIcon><Trash /></NIcon></NButton>
-        </section>
-      </NFlex>
+    <UiPanel :title="t('shortcuts.promptBindings')" body="flush">
+      <template #actions><span class="shortcut-settings__hint">{{ t('shortcuts.assignFromPromptHint') }}</span></template>
+      <div v-if="!state?.preferences.promptBindings.length" class="shortcut-settings__empty">{{ t('shortcuts.noPromptBindings') }}</div>
+      <table v-else class="binding-table">
+        <thead>
+          <tr>
+            <th>{{ t('shortcuts.bindingPrompt') }}</th>
+            <th>{{ t('shortcuts.bindingKey') }}</th>
+            <th>{{ t('shortcutBinding.afterPress') }}</th>
+            <th>{{ t('shortcuts.bindingStatus') }}</th>
+            <th class="binding-table__actions"><span class="sr-only">{{ t('shortcuts.actions') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="binding in state.preferences.promptBindings" :key="binding.id">
+            <td class="binding-table__title">{{ promptTitle(binding.promptUUID) }}</td>
+            <td class="ui-mono binding-table__key">{{ displayAccelerator(binding.accelerator) }}</td>
+            <td>{{ binding.action === 'paste' ? t('shortcuts.actionPaste') : t('shortcuts.actionCopy') }}</td>
+            <td><span class="ui-tag" :class="statusClass(bindingStatus(binding.id)?.state)">{{ statusLabel(bindingStatus(binding.id)?.state) }}</span></td>
+            <td class="binding-table__actions">
+              <span class="binding-table__buttons">
+                <NSwitch size="small" :value="binding.enabled" :aria-label="t('shortcuts.enableBinding', { name: promptTitle(binding.promptUUID) })"
+                  @update:value="enabled => toggleBinding(binding, enabled)" />
+                <NButton v-if="promptFor(binding.promptUUID)" quaternary size="tiny" class="binding-table__icon"
+                  :aria-label="t('shortcuts.editBindingFor', { name: promptTitle(binding.promptUUID) })" @click="editBinding(binding)">
+                  <template #icon><NIcon :size="14"><Edit /></NIcon></template>
+                </NButton>
+                <NButton v-else quaternary size="tiny" type="error" class="binding-table__icon"
+                  :aria-label="t('shortcuts.removeBindingFor', { name: promptTitle(binding.promptUUID) })" @click="removeBinding(binding.id)">
+                  <template #icon><NIcon :size="14"><Trash /></NIcon></template>
+                </NButton>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </UiPanel>
+
+    <UiModal :show="showCommandCapture" :title="t('shortcuts.inputShortcut')" :close-label="t('common.close')" @close="cancelCommandCapture">
+      <div class="capture">
+        <span class="capture__hint">{{ t('shortcuts.pressShortcut') }}</span>
+        <span class="capture__keys">
+          <template v-if="capturedKeys.length">
+            <span v-for="key in capturedKeys" :key="key" class="ui-kbd capture__key">{{ key }}</span>
+          </template>
+          <span v-else class="capture__waiting">{{ t('shortcuts.waitingInput') }}</span>
+        </span>
+        <span v-if="captureError" class="capture__error" role="alert">{{ captureError }}</span>
+      </div>
       <template #footer>
-        <NFlex justify="space-between" align="center">
-          <NText depth="3">{{ t('shortcuts.assignFromPromptHint') }}</NText>
-          <NButton secondary @click="resetAll">{{ t('shortcuts.resetToDefault') }}</NButton>
-        </NFlex>
+        <NButton @click="cancelCommandCapture">{{ t('common.cancel') }}</NButton>
+        <NButton type="primary" :disabled="!capturedAccelerator" @click="saveCommandCapture">{{ t('common.confirm') }}</NButton>
       </template>
-    </NCard>
-
-    <NModal :show="showCommandCapture" :mask-closable="false">
-      <NCard class="capture-card" :title="t('shortcuts.inputShortcut')">
-        <NFlex vertical align="center" :size="16">
-          <NText>{{ t('shortcuts.pressShortcut') }}</NText>
-          <NText strong class="captured-key">{{ capturedAccelerator || t('shortcuts.waitingInput') }}</NText>
-          <NText v-if="captureError" type="error">{{ captureError }}</NText>
-          <NSpace>
-            <NButton @click="cancelCommandCapture">{{ t('common.cancel') }}</NButton>
-            <NButton type="primary" :disabled="!capturedAccelerator" @click="saveCommandCapture">{{ t('common.confirm') }}</NButton>
-          </NSpace>
-        </NFlex>
-      </NCard>
-    </NModal>
+    </UiModal>
 
     <ShortcutBindingModal
       v-if="editingBinding && promptFor(editingBinding.promptUUID)"
@@ -101,16 +99,13 @@
       @close="showBindingModal = false"
       @saved="bindingSaved"
     />
-  </NFlex>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import {
-  NAlert, NButton, NCard, NEmpty, NFlex, NIcon, NModal, NSelect, NSpace,
-  NSwitch, NTag, NText, useMessage,
-} from 'naive-ui';
-import { Trash } from '@vicons/tabler';
+import { NButton, NIcon, NSwitch, useMessage } from 'naive-ui';
+import { AlertTriangle, Edit, Trash } from '@vicons/tabler';
 import { useI18n } from 'vue-i18n';
 import type {
   PromptShortcutBinding, PromptWithRelations, ShortcutAction, ShortcutCommandId,
@@ -118,7 +113,12 @@ import type {
 } from '@shared/types';
 import { apiClientManager } from '@/lib/api';
 import ShortcutBindingModal from '@/components/shortcuts/ShortcutBindingModal.vue';
-import ShortcutKeyCombo from '@/components/shortcuts/ShortcutKeyCombo.vue';
+import UiModal from '@/components/ui/UiModal.vue';
+import UiPageHeader from '@/components/ui/UiPageHeader.vue';
+import UiPanel from '@/components/ui/UiPanel.vue';
+import UiSegmented from '@/components/ui/UiSegmented.vue';
+import UiSettingRow from '@/components/ui/UiSettingRow.vue';
+import { displayAccelerator } from '@/lib/utils/accelerator';
 
 const { t } = useI18n();
 const message = useMessage();
@@ -133,9 +133,14 @@ const editingBinding = ref<PromptShortcutBinding | null>(null);
 let shortcutsDisabled = false;
 
 const actionOptions = computed(() => [
-  { label: t('shortcuts.actionCopy'), value: 'copy' },
-  { label: t('shortcuts.actionPaste'), value: 'paste' },
+  { label: t('shortcuts.actionCopy'), value: 'copy' as ShortcutAction },
+  { label: t('shortcuts.actionPaste'), value: 'paste' as ShortcutAction },
 ]);
+const capturedKeys = computed(() => {
+  const display = displayAccelerator(capturedAccelerator.value);
+  if (!display) return [];
+  return display.includes('+') ? display.split('+') : Array.from(display.match(/[⌘⌃⌥⇧]|[^⌘⌃⌥⇧]+/g) || []);
+});
 
 const commandRows = computed(() => state.value ? [
   {
@@ -173,11 +178,11 @@ function bindingStatus(id: string): ShortcutRegistrationStatus | undefined {
   return state.value?.registrations.find(status => status.id === `prompt:${id}`);
 }
 
-function statusType(status?: ShortcutRegistrationState): 'success' | 'warning' | 'error' | 'default' {
-  if (status === 'registered') return 'success';
-  if (status === 'disabled') return 'default';
-  if (status === 'conflict' || status === 'invalid-target') return 'error';
-  return 'warning';
+function statusClass(status?: ShortcutRegistrationState, unset = false): string {
+  if (unset || status === 'disabled') return '';
+  if (status === 'registered') return 'ui-tag--success';
+  if (status === 'conflict' || status === 'invalid-target') return 'ui-tag--error';
+  return 'ui-tag--warning';
 }
 
 function statusLabel(status?: ShortcutRegistrationState): string {
@@ -199,11 +204,6 @@ function promptFor(uuid: string): PromptWithRelations | undefined {
 
 function promptTitle(uuid: string): string {
   return promptFor(uuid)?.title || t('shortcuts.missingPrompt');
-}
-
-function displayAccelerator(accelerator: string): string {
-  if (!navigator.platform.includes('Mac')) return accelerator.replace(/CommandOrControl/g, 'Ctrl').replace(/Control/g, 'Ctrl');
-  return accelerator.replace(/CommandOrControl|Command/g, '⌘').replace(/Control/g, '⌃').replace(/Alt|Option/g, '⌥').replace(/Shift/g, '⇧').replace(/\+/g, '');
 }
 
 function eventAccelerator(event: KeyboardEvent): string {
@@ -335,15 +335,134 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.shortcut-row { display: grid; grid-template-columns: minmax(180px, 1fr) auto 190px auto; gap: 12px; align-items: center; }
-.binding-row { grid-template-columns: minmax(180px, 1fr) auto 190px auto auto; }
-.shortcut-copy { min-width: 0; }
-.description { display: block; margin-top: 4px; font-size: 12px; }
-.accelerator-button { justify-content: center; }
-.capture-card { width: min(420px, calc(100vw - 32px)); }
-.captured-key { font-size: 20px; color: var(--n-color-target); }
-@media (max-width: 800px) {
-  .shortcut-row, .binding-row { grid-template-columns: 1fr auto; }
-  .accelerator-button { grid-column: 1 / -1; }
+.shortcut-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shortcut-settings__alert {
+  align-items: center;
+}
+
+.shortcut-settings__alert-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.shortcut-settings__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shortcut-settings__key.ui-mono {
+  font-size: var(--font-size-sm);
+}
+
+.shortcut-settings__hint {
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.shortcut-settings__empty {
+  padding: 24px 16px;
+  color: var(--content-tertiary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.binding-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.binding-table th {
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-secondary);
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+}
+
+.binding-table td {
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--content-primary);
+}
+
+.binding-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.binding-table__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.binding-table__actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.binding-table__buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.binding-table__icon {
+  width: 22px;
+  padding: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.capture__hint {
+  color: var(--content-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.capture__keys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.capture__key {
+  min-width: 32px;
+  height: 32px;
+  font-size: var(--font-size-base);
+}
+
+.capture__waiting {
+  color: var(--content-tertiary);
+}
+
+.capture__error {
+  color: var(--accent-error);
+  font-size: var(--font-size-sm);
 }
 </style>

@@ -9,6 +9,7 @@ import {
   getConfiguredBaseURL,
   getDefaultModels as getProviderDefaultModels
 } from '@shared/ai-provider-metadata'
+import { resolveTestPrompt } from '@shared/ai-default-prompts'
 
 const GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com'
 const GOOGLE_API_VERSION = 'v1beta'
@@ -128,15 +129,15 @@ function buildOpenAICompatibleHeaders(config: AIConfig | { type: AIConfig['type'
 
 /**
  * 智能测试 AI 配置
- * 发送真实的测试请求到 AI 服务
+ * 发送真实的测试请求到 AI 服务。prompt 由页面按界面语言传入，没有传入时用默认测试提示词（与桌面端一致）
  */
-export async function intelligentTestAIConfig(config: AIConfig): Promise<{
+export async function intelligentTestAIConfig(config: AIConfig, prompt?: string): Promise<{
   success: boolean
   error?: string
   response?: string
   inputPrompt?: string
 }> {
-  const testPrompt = '请用一句话简单介绍一下你自己。'
+  const testPrompt = resolveTestPrompt(prompt)
 
   try {
     console.log('[AI Service] 开始智能测试:', {

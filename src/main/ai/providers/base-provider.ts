@@ -1,5 +1,5 @@
 import { net } from 'electron';
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import { buildPrompts } from './prompt-templates';
 import { NetworkProxyManager } from '../../electron/network-proxy';
 import { preferencesManager } from '../../electron/preferences-manager';
@@ -57,19 +57,19 @@ export interface AIProvider {
   testConfig(config: AIConfig): Promise<AITestResult>;
   
   /**
-   * 获取可用模型列表
+   * 获取可用模型列表，并说明列表是从服务拿到的还是内置的
    */
-  getAvailableModels(config: AIConfig): Promise<string[]>;
+  getAvailableModels(config: AIConfig): Promise<AIModelListResult>;
   
   /**
    * 测试特定模型
    */
-  testModel(config: AIConfig, model: string): Promise<AIModelTestResult>;
+  testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult>;
   
   /**
    * 智能测试 - 发送真实提示词并获取AI响应
    */
-  intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult>;
+  intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult>;
   
   /**
    * 生成提示词
@@ -423,11 +423,37 @@ export abstract class BaseAIProvider implements AIProvider {
     };
   }
 
+  /**
+   * 把「从服务拉模型列表」整理成统一结果：拿到就是 remote；
+   * 请求失败或服务返回空列表时不再拿内置列表冒充成功，内置常见模型放进 fallbackModels，由用户明确选择
+   */
+  protected async resolveModelList(
+    fetchRemote: () => Promise<string[]>,
+    fallbackModels: string[] = []
+  ): Promise<AIModelListResult> {
+    try {
+      const models = await fetchRemote();
+      if (models.length > 0) {
+        return { models, modelSource: 'remote' };
+      }
+      return { models: [], modelSource: 'unavailable', fallbackModels };
+    } catch (error) {
+      console.error('获取模型列表失败:', error);
+      return {
+        models: [],
+        modelSource: 'unavailable',
+        fallbackModels,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
   // 抽象方法，子类必须实现
   abstract testConfig(config: AIConfig): Promise<AITestResult>;
-  abstract getAvailableModels(config: AIConfig): Promise<string[]>;
-  abstract testModel(config: AIConfig, model: string): Promise<AIModelTestResult>;
-  abstract intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult>;
+  abstract getAvailableModels(config: AIConfig): Promise<AIModelListResult>;
+  // prompt：渲染层按界面语言传入的测试提示词，没有传入时用 resolveTestPrompt 给的默认
+  abstract testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult>;
+  abstract intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult>;
   abstract generatePrompt(request: AIGenerationRequest & { config: AIConfig }): Promise<AIGenerationResult>;
   abstract generatePromptWithStream(
     request: AIGenerationRequest,

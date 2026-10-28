@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PromptWithRelations } from '../src/shared/types/database'
-import { sortPromptsForLibrary } from '../src/renderer/lib/utils/prompt-library-sort'
+import { defaultSortOrder, sortPromptsForLibrary } from '../src/renderer/lib/utils/prompt-library-sort'
 
 const prompt = (overrides: Partial<PromptWithRelations> = {}): PromptWithRelations => ({
   id: 1,
@@ -73,6 +73,25 @@ describe('sortPromptsForLibrary', () => {
     const result = sortPromptsForLibrary([zebra, apple], 'title')
 
     expect(result.map(p => p.title)).toEqual(['Apple', 'Zebra'])
+  })
+
+  it('reverses any field when the opposite direction is requested', () => {
+    const older = prompt({ id: 1, title: 'Banana', useCount: 1, createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: new Date('2026-05-01T00:00:00Z') })
+    const newer = prompt({ id: 2, title: 'apple', useCount: 5, createdAt: new Date('2026-03-01T00:00:00Z'), updatedAt: new Date('2026-02-01T00:00:00Z') })
+    const middle = prompt({ id: 3, title: 'Cherry', useCount: 3, createdAt: new Date('2026-02-01T00:00:00Z'), updatedAt: new Date('2026-04-01T00:00:00Z') })
+    const all = [older, newer, middle]
+
+    expect(sortPromptsForLibrary(all, 'created', 'asc').map(p => p.id)).toEqual([1, 3, 2])
+    expect(sortPromptsForLibrary(all, 'updated', 'asc').map(p => p.id)).toEqual([2, 3, 1])
+    expect(sortPromptsForLibrary(all, 'usage', 'asc').map(p => p.id)).toEqual([1, 3, 2])
+    expect(sortPromptsForLibrary(all, 'title', 'desc').map(p => p.title)).toEqual(['Cherry', 'Banana', 'apple'])
+  })
+
+  it('starts dates and usage newest / most first and titles from A to Z', () => {
+    expect(defaultSortOrder('created')).toBe('desc')
+    expect(defaultSortOrder('updated')).toBe('desc')
+    expect(defaultSortOrder('usage')).toBe('desc')
+    expect(defaultSortOrder('title')).toBe('asc')
   })
 
   it('does not mutate the input array', () => {

@@ -218,6 +218,19 @@ export class CloudBackupAPI {
     error?: string;
   }> {
     const client = getCloudBackupClient();
+    // 移动端走 dataRestoreService，那里会先做保护性备份；Web 和桌面直接覆盖本机数据，要在这里先备份
+    if (!client || !PlatformDetector.isMobile()) {
+      try {
+        const { localBackupService } = await import('../services/local-backup.service');
+        await localBackupService.createSafetyBackup('restore');
+      } catch (error) {
+        return {
+          success: false,
+          message: '云端备份恢复失败',
+          error: `恢复前没能备份当前数据，已取消恢复：${error instanceof Error ? error.message : String(error)}`
+        };
+      }
+    }
     if (client) {
       const downloaded = await client.restoreCloudBackup(storageId, backupId) as any;
       if (!downloaded.success) {

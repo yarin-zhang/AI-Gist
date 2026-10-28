@@ -160,13 +160,13 @@ class IpcHandlers {
     });
 
     // 智能测试 - 发送真实提示词并获取AI响应
-    ipcMain.handle('ai:intelligent-test', async (_, config: any) => {
-      return await aiServiceManager.processIntelligentTest(config);
+    ipcMain.handle('ai:intelligent-test', async (_, config: any, prompt?: string) => {
+      return await aiServiceManager.processIntelligentTest(config, prompt);
     });
 
     // 测试特定模型
-    ipcMain.handle('ai:test-model', async (_, config: any, model: string) => {
-      return await aiServiceManager.processTestModel(config, model);
+    ipcMain.handle('ai:test-model', async (_, config: any, model: string, prompt?: string) => {
+      return await aiServiceManager.processTestModel(config, model, prompt);
     });
 
     // 流式生成 Prompt

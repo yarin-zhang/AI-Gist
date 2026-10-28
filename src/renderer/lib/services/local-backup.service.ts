@@ -47,6 +47,8 @@ export interface LocalBackupCreateOptions {
   deviceId?: string;
   data?: any;
   retention?: number;
+  /** 数据没变时能否复用最近一份备份；'manual' 表示只复用不会被保留策略清理的手动备份 */
+  reuse?: 'any' | 'manual';
 }
 
 export interface LocalBackupCreateResult {
@@ -83,6 +85,14 @@ export function getDefaultLocalBackupDescription(backupType: BackupType = 'manua
   }
 }
 
+/** 恢复备份、清空数据库前自动创建的保护性备份，列表里按 trigger 显示成单独的类型 */
+export type LocalSafetyBackupReason = 'restore' | 'clear' | 'import';
+export const LOCAL_SAFETY_BACKUP_TRIGGERS: Record<LocalSafetyBackupReason, string> = {
+  restore: 'pre-restore',
+  clear: 'pre-clear',
+  import: 'pre-import'
+};
+
 export class LocalBackupService {
   private readonly database: NonNullable<LocalBackupServiceDeps['database']>;
   private readonly repository: LocalBackupRepository;
@@ -105,8 +115,9 @@ export class LocalBackupService {
     const dataChecksum = createLocalBackupSemanticChecksum(data);
     const backups = await this.list();
     const latest = backups[0];
+    const reusable = latest && (options.reuse !== 'manual' || latest.backupType !== 'automatic');
 
-    if (latest && await this.backupMatches(latest, data, dataChecksum)) {
+    if (reusable && await this.backupMatches(latest, data, dataChecksum)) {
       const deletedCount = options.retention === undefined
         ? 0
         : await this.pruneAutomatic(options.retention, backups);
@@ -146,6 +157,19 @@ export class LocalBackupService {
       ? 0
       : await this.pruneAutomatic(options.retention, [backup, ...backups]);
     return { action: 'created', backup, deletedCount };
+  }
+
+  /**
+   * 覆盖或清空本机数据前先把当前数据存一份本地备份（手动类型，不会被自动备份的保留策略清理）。
+   * 数据和最近一份手动备份相同时直接复用那一份；最近一份是自动备份时仍然另存，
+   * 否则它之后被保留策略轮换掉，覆盖前的数据就没有备份了。
+   */
+  async createSafetyBackup(reason: LocalSafetyBackupReason): Promise<LocalBackupCreateResult> {
+    return this.create({
+      backupType: 'manual',
+      trigger: LOCAL_SAFETY_BACKUP_TRIGGERS[reason],
+      reuse: 'manual'
+    });
   }
 
   async restore(backupId: string): Promise<boolean> {

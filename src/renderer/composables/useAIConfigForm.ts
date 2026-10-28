@@ -1,6 +1,7 @@
 import { ref, reactive, computed } from 'vue'
 import type { AIProviderType } from '@shared/types'
 import { getDefaultBaseURL, getProviderMetadata } from '@shared/ai-provider-metadata'
+import { getConfigTypeLabel } from './ai/useAIProviderChoices'
 
 export interface AIConfigFormData {
   type: AIProviderType
@@ -9,7 +10,6 @@ export interface AIConfigFormData {
   apiKey: string
   models: string[]
   defaultModel: string
-  customModel: string
 }
 
 export function useAIConfigForm() {
@@ -20,8 +20,7 @@ export function useAIConfigForm() {
     baseURL: '',
     apiKey: '',
     models: [],
-    defaultModel: '',
-    customModel: ''
+    defaultModel: ''
   })
 
   // 计算属性：是否需要Base URL
@@ -67,7 +66,7 @@ export function useAIConfigForm() {
 
     // 自动填充配置名称（仅在新建模式下）
     if (!isEditMode) {
-      formData.name = getProviderMetadata(type).displayName
+      formData.name = getConfigTypeLabel(type)
     }
 
     // 清空模型相关数据
@@ -176,7 +175,6 @@ export function useAIConfigForm() {
     formData.apiKey = ''
     formData.models = []
     formData.defaultModel = ''
-    formData.customModel = ''
   }
 
   return {

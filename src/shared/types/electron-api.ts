@@ -7,8 +7,9 @@
 import type { 
   AIConfig, 
   AIGenerationRequest, 
-  AIGenerationResult, 
-  AIConfigTestResult 
+  AIGenerationResult,
+  AIConfigTestResult,
+  AIModelListResult
 } from './ai';
 
 // 导入云端备份类型
@@ -98,11 +99,12 @@ export default interface ElectronApi {
     updateConfig: (id: string, config: Partial<AIConfig>) => Promise<AIConfig | null>
     removeConfig: (id: string) => Promise<boolean>
     testConfig: (config: AIConfig) => Promise<AIConfigTestResult>
-    testModel: (config: AIConfig, model: string) => Promise<{ success: boolean; error?: string; model?: string; response?: string }>
-    getModels: (config: AIConfig) => Promise<string[]>
+    /** prompt：渲染层按界面语言给的测试提示词；不传时后端用默认 */
+    testModel: (config: AIConfig, model: string, prompt?: string) => Promise<{ success: boolean; error?: string; model?: string; response?: string }>
+    getModels: (config: AIConfig) => Promise<AIModelListResult>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
     generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
-    intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
+    intelligentTest: (config: AIConfig, prompt?: string) => Promise<AIConfigTestResult>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
     debugPrompt: (prompt: string, config: AIConfig) => Promise<AIGenerationResult>
   }

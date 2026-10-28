@@ -1,9 +1,6 @@
 // 基础样式
 @use "./common.scss";
-
-// 动画效果
-@use "./common-animations.scss";
-@use "./router-animations.scss";
+@use "./design-system.scss";
 
 // 组件覆盖
 @use "./overrides/naive-override.scss"; 
