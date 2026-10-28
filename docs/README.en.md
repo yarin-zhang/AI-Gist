@@ -12,7 +12,7 @@
 
 It supports variable substitution, Jinja templates, AI-powered generation and refinement, version history, cloud backups, and more.
 
-![Main screenshot](images/image-main.png?v=202608170119)
+![Main screenshot](images/image-main.png?v=202610290030)
 
 [🏠 Official website](https://getaigist.com) | [🔗 Download from GitHub](https://github.com/yarin-zhang/AI-Gist/releases) | [🇨🇳 中文 README](../README.md)
 
@@ -27,7 +27,7 @@ AI Gist provides the essential features for creating, organizing, and using AI p
 * **Filtering and categorization**: Quickly filter, find, and organize prompts using tags, categories, ratings, favorites, and more.
 * **Version history**: Keep track of changes so you can reuse and continuously improve your prompts, with a record you can revisit later.
 
-![Features 01](images/image-main-dark.png?v=202608162327)
+![Features 01](images/image-main-dark.png?v=202610290030)
 
 AI Gist also integrates AI models to help you generate and refine prompts more efficiently. Polish it before you use it.
 
@@ -36,7 +36,7 @@ AI Gist also integrates AI models to help you generate and refine prompts more e
 * **AI refinement**: Rewrite prompts with AI to make them more specific and detailed, with support for custom refinement instructions.
 * **AI variable extraction**: Let AI identify potential variables automatically instead of adding placeholders manually.
 
-![Features 02](images/image-ai-generator.png?v=202608162327)
+![Features 02](images/image-ai-generator.png?v=202610290030)
 
 AI Gist puts privacy and data security first. All data is stored locally, and cloud backup makes it easy to keep data in sync across devices.
 
@@ -44,7 +44,7 @@ AI Gist puts privacy and data security first. All data is stored locally, and cl
 * **Data control**: You retain full control of your data, with complete export and import support, plus export to the widely compatible CSV format.
 * **Cloud backup**: Back up and restore through WebDAV or iCloud to share data across multiple devices.
 
-![Features 03](images/image-data-cloud-backup.png?v=202608162327)
+![Features 03](images/image-data-cloud-backup.png?v=202610290030)
 
 * **Cross-platform support**: Available on Windows, macOS, and Linux desktop, as well as Android (APK) and iOS (App Store).
 * **Multiple languages**: Supports Simplified Chinese, Traditional Chinese, English, and Japanese.
@@ -171,51 +171,51 @@ You are also welcome to join the QQ group to exchange ideas with the developer a
 
 <div align="center">
 
-![Variable filling](images/image-variable-fill.png?v=202608162327)
+![Variable filling](images/image-variable-fill.png?v=202610290030)
 
 Variable filling
 
-![Prompt editing](images/image-edit-prompt.png?v=202608162327)
+![Prompt editing](images/image-edit-prompt.png?v=202610290030)
 
 Prompt editing
 
-![Jinja template](images/image-jinja-template.png?v=202608162327)
+![Jinja template](images/image-jinja-template.png?v=202610290030)
 
 Jinja template
 
-![AI model management](images/image-ai-config.png?v=202608162327)
+![AI model management](images/image-ai-config.png?v=202610290030)
 
 AI model management
 
-![Add AI configuration](images/image-ai-add-config.png?v=202608162327)
+![Add AI configuration](images/image-ai-add-config.png?v=202610290030)
 
 Add AI configuration
 
-![Quick AI adjustment](images/image-ai-quick-adjust.png?v=202608162327)
+![Quick AI adjustment](images/image-ai-quick-adjust.png?v=202610290030)
 
 Quick AI adjustment
 
-![Advanced filtering](images/image-filter.png?v=202608162327)
+![Advanced filtering](images/image-filter.png?v=202610290030)
 
 Advanced filtering
 
-![Table view](images/image-table-view.png?v=202608162327)
+![Table view](images/image-table-view.png?v=202610290030)
 
 Table view
 
-![Folder view](images/image-folder-view.png?v=202608162327)
+![Folder view](images/image-folder-view.png?v=202610290030)
 
 Folder view
 
-![Category management](images/image-category.png?v=202608162327)
+![Category management](images/image-category.png?v=202610290030)
 
 Category management
 
-![Data backup](images/image-data-local-backup.png?v=202608162327)
+![Data backup](images/image-data-local-backup.png?v=202610290030)
 
 Data backup
 
-![Light mode](images/image-main-light.png?v=202608162327)
+![Light mode](images/image-main-light.png?v=202610290030)
 
 Light mode
 
