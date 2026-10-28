@@ -78,6 +78,35 @@ jobs:
 
           echo "PROVISIONING_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
 
+      - name: Set signing on the App target
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # 签名设置只写进 App target 的 Release 配置。写在 xcodebuild 命令行上会套到
+          # 所有 target，带资源的 SPM 包（如 capacitor-foldable 的 PrivacyInfo 资源包）
+          # 不接受描述文件，归档会直接失败。
+          PBXPROJ=ios/App/App.xcodeproj/project.pbxproj
+          plutil -convert xml1 "$PBXPROJ"
+          python3 - "$PBXPROJ" <<'PY'
+          import os, plistlib, sys
+
+          path = sys.argv[1]
+          with open(path, 'rb') as f:
+              project = plistlib.load(f)
+          objects = project['objects']
+          target = next(o for o in objects.values() if o.get('isa') == 'PBXNativeTarget' and o.get('name') == 'App')
+          config_ids = objects[target['buildConfigurationList']]['buildConfigurations']
+          release = next(objects[i] for i in config_ids if objects[i]['name'] == 'Release')
+          release['buildSettings'].update({
+              'CODE_SIGN_STYLE': 'Manual',
+              'CODE_SIGN_IDENTITY': 'Apple Distribution',
+              'DEVELOPMENT_TEAM': os.environ['APPLE_TEAM_ID'],
+              'PROVISIONING_PROFILE_SPECIFIER': os.environ['PROVISIONING_PROFILE_NAME'],
+          })
+          with open(path, 'wb') as f:
+              plistlib.dump(project, f)
+          PY
+
       - name: Archive and export IPA
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -97,10 +126,6 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$ARCHIVE_PATH" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY='Apple Distribution' \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_NAME" \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
