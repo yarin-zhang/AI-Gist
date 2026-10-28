@@ -6,9 +6,7 @@
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <div class="m-wash" aria-hidden="true" />
-
-      <MobileLargeTitle :title="t('mobileNav.models')" :subtitle="subtitle">
+      <MobileLargeTitle :title="t('mobileNav.models')">
         <button type="button" class="m-btn-c" :aria-label="t('aiConfig.addConfig')" @click="handleCreate">
           <ion-icon :icon="add" />
         </button>
@@ -32,11 +30,10 @@
         </div>
 
         <template v-else>
-          <!-- 全局首选：品牌色大卡片，带连接状态和快捷操作 -->
+          <!-- 全局首选：单独一张卡片，显示默认模型和连接状态，点进详情页 -->
           <PreferredConfigCard v-if="preferredConfig" :config="preferredConfig"
             :visual="visualForConfig(preferredConfig)" :status="statusForConfig(preferredConfig)"
-            @open="handleView(preferredConfig)" @test="handleTestPreferred(preferredConfig)"
-            @clear="handleClearPreferred" />
+            @open="handleView(preferredConfig)" />
 
           <!-- 多个已启用配置但没有首选：提醒去设一个，并直接给出入口 -->
           <div v-else-if="enabledCount > 1" class="m-card models-hint" role="note">
@@ -128,8 +125,8 @@ import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
 import ProviderTile from '~/components/mobile/models/ProviderTile.vue'
 import PreferredConfigCard from '~/components/mobile/models/PreferredConfigCard.vue'
 import { useMobileProviderCatalog } from '~/components/mobile/models/provider-catalog'
-import { connectionBadgeView, statusForConfig, testSavedConfigConnection } from '~/components/mobile/models/connection-status'
-import { describeMobileAIFailure, isMobileSupportedProvider } from '~/components/mobile/prompt/mobile-ai'
+import { connectionBadgeView, statusForConfig } from '~/components/mobile/models/connection-status'
+import { isMobileSupportedProvider } from '~/components/mobile/prompt/mobile-ai'
 import { useConfigActions } from '~/components/mobile/models/useConfigActions'
 
 const { t } = useI18n()
@@ -147,9 +144,6 @@ let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let realtimeRefreshRunning = false
 
 const enabledCount = computed(() => configs.value.filter(config => config.enabled).length)
-const subtitle = computed(() => loading.value || configs.value.length === 0
-  ? ''
-  : t('aiConfig.workspace.configCount', { count: configs.value.length }))
 
 // 行副标题：模型数量，首选的加「首选」，禁用的直接写「已禁用」
 const getRowSubtitle = (config: AIConfig) => {
@@ -219,16 +213,6 @@ const handleCreate = () => {
   router.push('/ai-config/create')
 }
 
-// 首选卡片：测试连接，结果和耗时显示在卡片上
-const handleTestPreferred = async (config: AIConfig) => {
-  const status = await testSavedConfigConnection(config)
-  if (status.state === 'ok') {
-    showToast(t('aiConfig.connectionTestSuccess'))
-  } else {
-    showToast(describeMobileAIFailure(t('mobileModels.connectionFailedShort'), status.error || '', t), 'danger')
-  }
-}
-
 // 没有首选时：从移动端能用的已启用配置里挑一个设为首选
 const handlePickPreferred = async () => {
   const candidates = configs.value.filter(config => config.enabled && isMobileSupportedProvider(config.type))
@@ -247,13 +231,6 @@ const handlePickPreferred = async () => {
     ]
   })
   await sheet.present()
-}
-
-// 清除首选配置
-const handleClearPreferred = async () => {
-  if (await actions.clearPreferred({ confirm: true })) {
-    await loadConfigs({ showLoading: false })
-  }
 }
 
 // 删除配置

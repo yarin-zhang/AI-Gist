@@ -1,47 +1,26 @@
 <template>
   <section class="m-section">
     <div class="m-gt"><span>{{ t('aiConfig.globalPreferred') }}</span></div>
-    <div class="preferred-card">
-      <span class="preferred-card__orb" aria-hidden="true" />
-      <ion-icon :icon="star" class="preferred-card__star" aria-hidden="true" />
-
-      <button type="button" class="preferred-card__main" @click="emit('open')">
-        <span class="preferred-card__head">
-          <ProviderTile :visual="visual" size="lg" variant="inverse" />
-          <span class="preferred-card__names">
-            <span class="preferred-card__name">{{ config.name }}</span>
-            <span class="preferred-card__model">{{ modelLabel }}</span>
-          </span>
-        </span>
-        <span class="preferred-card__foot">
-          <span class="preferred-card__status" :class="`is-${badge.badge}`">
-            <span class="preferred-card__dot" aria-hidden="true" />
-            <span>{{ badge.label }}</span>
-          </span>
-          <span class="preferred-card__caption">{{ t('mobileModels.preferredCaption') }}</span>
-        </span>
-      </button>
-
-      <div class="preferred-card__actions">
-        <button type="button" class="preferred-card__action" :disabled="status?.state === 'testing'"
-          @click="emit('test')">
-          <ion-spinner v-if="status?.state === 'testing'" name="crescent" />
-          <ion-icon v-else :icon="flashOutline" aria-hidden="true" />
-          {{ t('aiConfig.testConnection') }}
-        </button>
-        <button type="button" class="preferred-card__action" @click="emit('clear')">
-          <ion-icon :icon="starOutline" aria-hidden="true" />
-          {{ t('aiConfig.cancelPreferred') }}
-        </button>
-      </div>
-    </div>
+    <!-- 和列表行同样朴素的白卡片：测试连接、取消首选都在详情页里 -->
+    <button type="button" class="m-card preferred-card" @click="emit('open')">
+      <ProviderTile :visual="visual" size="md" />
+      <span class="preferred-card__names">
+        <span class="preferred-card__name">{{ config.name }}</span>
+        <span class="preferred-card__model">{{ modelLabel }}</span>
+      </span>
+      <span class="m-pill preferred-card__status" :class="badge.tone">
+        <span v-if="badge.dot" class="preferred-card__dot" aria-hidden="true" />
+        {{ badge.label }}
+      </span>
+      <ion-icon :icon="chevronForward" class="preferred-card__chev" aria-hidden="true" />
+    </button>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IonIcon, IonSpinner } from '@ionic/vue'
-import { flashOutline, star, starOutline } from 'ionicons/icons'
+import { IonIcon } from '@ionic/vue'
+import { chevronForward } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import type { AIConfig } from '@shared/types'
 import ProviderTile from './ProviderTile.vue'
@@ -54,75 +33,43 @@ const props = defineProps<{
   status?: ConnectionStatus
 }>()
 
-const emit = defineEmits<{ open: []; test: []; clear: [] }>()
+const emit = defineEmits<{ open: [] }>()
 
 const { t } = useI18n()
 
 const modelLabel = computed(() => props.config.defaultModel || props.config.customModel
   || t('aiConfig.workspace.noDefaultModel'))
 
-// 状态和列表、详情页同一套判断；status 变化（测试中 → 结果）时重新计算
+// 状态和列表、详情页同一套判断；连接正常且测过耗时的只显示耗时。status 变化（测试中 → 结果）时重新计算
 const badge = computed(() => {
-  void props.status
-  return connectionBadgeView(props.config, t, { withElapsed: true })
+  const view = connectionBadgeView(props.config, t)
+  const elapsed = props.status?.elapsed
+  if (view.badge === 'ok' && elapsed !== undefined) return { ...view, label: t('models.elapsed', { ms: elapsed }) }
+  return view
 })
 </script>
 
 <style scoped>
-.preferred-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--accent-brand), var(--accent-primary));
-  box-shadow: var(--shadow-floating);
-  color: var(--content-inverse);
-}
-
-.preferred-card__orb {
-  position: absolute;
-  right: -40px;
-  bottom: -60px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--content-inverse) 10%, transparent);
-  pointer-events: none;
-}
-
-.preferred-card__star {
-  position: absolute;
-  top: 20px;
-  right: 22px;
-  color: var(--category-amber);
-  font-size: 24px;
-}
-
-.preferred-card__main {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px 18px 14px;
+/* 写成两个类，压过全局 .m-card 的纵向排列 */
+.m-card.preferred-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
   border: 0;
-  background: transparent;
-  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.preferred-card__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding-right: 32px;
+.m-card.preferred-card:active {
+  background: var(--surface-secondary);
 }
 
 .preferred-card__names {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -130,110 +77,35 @@ const badge = computed(() => {
 
 .preferred-card__name {
   overflow: hidden;
-  font-size: var(--m-font-block);
+  font-size: var(--m-font-body);
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .preferred-card__model {
   overflow: hidden;
+  color: var(--content-tertiary);
   font-family: var(--font-family-mono);
   font-size: var(--m-font-sub);
-  opacity: 0.86;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.preferred-card__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .preferred-card__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--content-inverse) 18%, transparent);
-  font-size: var(--m-font-sub);
-  font-weight: 500;
+  flex: none;
 }
 
 .preferred-card__dot {
   width: 6px;
   height: 6px;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--content-inverse) 60%, transparent);
+  background: currentColor;
 }
 
-.preferred-card__status.is-ok .preferred-card__dot {
-  background: var(--indicator-success);
-}
-
-.preferred-card__status.is-error .preferred-card__dot {
-  background: var(--indicator-error);
-}
-
-.preferred-card__status.is-testing .preferred-card__dot,
-.preferred-card__status.is-noModel .preferred-card__dot {
-  background: var(--indicator-warning);
-}
-
-.preferred-card__caption {
-  font-size: var(--m-font-caption);
-  opacity: 0.86;
-}
-
-.preferred-card__actions {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid color-mix(in srgb, var(--content-inverse) 18%, transparent);
-}
-
-.preferred-card__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 46px;
-  padding: 0 8px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: var(--m-font-sub);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.preferred-card__action + .preferred-card__action {
-  border-left: 1px solid color-mix(in srgb, var(--content-inverse) 18%, transparent);
-}
-
-.preferred-card__action:active {
-  background: color-mix(in srgb, var(--content-inverse) 10%, transparent);
-}
-
-.preferred-card__action:disabled {
-  opacity: 0.7;
-}
-
-.preferred-card__action ion-icon {
-  font-size: 16px;
-}
-
-.preferred-card__action ion-spinner {
-  --color: currentColor;
-  width: 16px;
-  height: 16px;
+.preferred-card__chev {
+  flex: none;
+  color: var(--border-strong);
+  font-size: 18px;
 }
 </style>

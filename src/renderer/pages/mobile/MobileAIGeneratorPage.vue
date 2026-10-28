@@ -9,8 +9,6 @@
     </MobileNavBar>
 
     <ion-content ref="contentRef" class="m-page-content">
-      <div class="m-wash" aria-hidden="true" />
-
       <!-- 只有第一次加载显示转圈；从别的页面返回时静默刷新，不打断对话 -->
       <div v-if="models.loading.value && !models.configs.value.length" class="loading-container">
         <ion-spinner></ion-spinner>
@@ -66,20 +64,16 @@
         <template v-for="turn in turns" :key="turn.id">
           <div class="gen-bubble">{{ turn.request }}</div>
 
-          <span class="gen-status">
-            <span class="m-tile gen-status__tile" aria-hidden="true">
-              <ion-spinner v-if="turn.status === 'streaming'" name="dots" />
-              <ion-icon v-else :icon="turn.status === 'error' ? alertCircleOutline : sparkles" />
-            </span>
-            <span class="gen-status__text">
-              <template v-if="turn.status === 'streaming'">{{ t('aiGenerator.generating') }}</template>
-              <template v-else-if="turn.status === 'error'">{{ t('aiGenerator.generateFailed') }}</template>
-              <template v-else-if="turn.status === 'stopped'">{{ t('aiGenerator.stopped') }}</template>
-              <template v-else-if="variableCountOf(turn)">
-                {{ t('mobilePrompt.generatedWith') }} <b class="gen-status__count">{{ t('promptLibrary.variableCount', { count: variableCountOf(turn) }) }}</b>
-              </template>
-              <template v-else>{{ t('promptGenerate.succeeded') }}</template>
-            </span>
+          <!-- 每轮结果上方一行灰色小字：进行中、失败、停止，或识别到几个变量 -->
+          <span class="gen-status" :class="{ 'gen-status--error': turn.status === 'error' }">
+            <ion-spinner v-if="turn.status === 'streaming'" name="dots" aria-hidden="true" />
+            <template v-if="turn.status === 'streaming'">{{ t('aiGenerator.generating') }}</template>
+            <template v-else-if="turn.status === 'error'">{{ t('aiGenerator.generateFailed') }}</template>
+            <template v-else-if="turn.status === 'stopped'">{{ t('aiGenerator.stopped') }}</template>
+            <template v-else-if="variableCountOf(turn)">
+              {{ t('mobilePrompt.variablesDetected', { count: variableCountOf(turn) }) }}
+            </template>
+            <template v-else>{{ t('promptGenerate.succeeded') }}</template>
           </span>
 
           <!-- 失败或还没出内容就停下的一轮：说明原因，最后一轮可以直接重试 -->
@@ -128,7 +122,7 @@
     <ion-footer v-if="models.configs.value.length" class="ion-no-border gen-footer">
       <div class="composer">
         <textarea ref="composerRef" v-model="composer" class="composer__input" rows="1"
-          :placeholder="latestResult ? t('mobilePrompt.refinePlaceholder') : t('aiGenerator.requirementPlaceholder')"
+          :placeholder="latestResult ? t('mobilePrompt.refineLabel') : t('aiGenerator.requirementPlaceholder')"
           :aria-label="latestResult ? t('mobilePrompt.refineLabel') : t('aiGenerator.requirement')"
           @input="autoGrowComposer"></textarea>
         <div class="composer__bar">
@@ -208,7 +202,6 @@ import {
 } from '@ionic/vue'
 import {
   addCircleOutline,
-  alertCircleOutline,
   arrowUp,
   arrowUpCircleOutline,
   checkmark,
@@ -814,13 +807,13 @@ onMounted(async () => {
   padding-top: 8px;
 }
 
-/* 需求气泡：品牌渐变实底，白字，靠右 */
+/* 需求气泡：主色实底，白字，靠右 */
 .gen-bubble {
   align-self: flex-end;
   max-width: 300px;
   padding: 12px 16px;
   border-radius: 20px 20px 6px 20px;
-  background: linear-gradient(135deg, var(--accent-brand), var(--accent-primary));
+  background: var(--accent-primary);
   color: var(--content-inverse);
   font-size: var(--m-font-body);
   line-height: 1.6;
@@ -831,30 +824,19 @@ onMounted(async () => {
 .gen-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.gen-status__tile {
-  border-radius: 15px;
-  background: var(--accent-soft);
-  color: var(--accent-primary);
-  font-size: 16px;
-}
-
-.gen-status__tile ion-spinner {
-  width: 18px;
-  height: 18px;
-  color: var(--accent-primary);
-}
-
-.gen-status__text {
-  color: var(--content-secondary);
+  gap: 6px;
+  color: var(--content-tertiary);
   font-size: var(--m-font-sub);
 }
 
-.gen-status__count {
-  color: var(--variable-text);
-  font-weight: 600;
+.gen-status--error {
+  color: var(--accent-error);
+}
+
+.gen-status ion-spinner {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-primary);
 }
 
 .gen-card {
@@ -895,10 +877,6 @@ onMounted(async () => {
   height: 44px;
 }
 
-.gen-card__button.m-cta-2 {
-  box-shadow: inset 0 0 0 1px var(--border-default);
-}
-
 .gen-footer {
   padding: 8px var(--m-gutter) calc(env(safe-area-inset-bottom, 0px) + 12px);
   background: transparent;
@@ -911,7 +889,7 @@ onMounted(async () => {
   padding: 12px 12px 10px 16px;
   border-radius: 24px;
   background: var(--surface-primary);
-  box-shadow: var(--shadow-floating);
+  box-shadow: inset 0 0 0 1px var(--border-default);
 }
 
 .composer__input {
@@ -969,7 +947,7 @@ onMounted(async () => {
   height: 36px;
   border: 0;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent-brand), var(--accent-primary));
+  background: var(--accent-primary);
   color: var(--content-inverse);
   font-size: 18px;
   cursor: pointer;

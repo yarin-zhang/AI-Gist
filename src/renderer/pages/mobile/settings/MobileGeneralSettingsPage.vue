@@ -93,8 +93,8 @@ const previewStyle = {
   '--preview-light-bg': lightVars['surface-primary'],
   '--preview-light-line': lightVars['border-default'],
   '--preview-light-accent': lightVars['accent-brand'],
-  '--preview-dark-bg': darkVars['surface-primary'],
-  '--preview-dark-line': darkVars['border-strong'],
+  '--preview-dark-bg': darkVars['surface-body'],
+  '--preview-dark-line': darkVars['border-default'],
   '--preview-dark-accent': darkVars['accent-text']
 }
 
@@ -151,7 +151,9 @@ const handleThemeChange = async (value: ThemeSource) => {
   flex-direction: row;
   gap: 0;
   padding: 0;
-  box-shadow: inset 0 0 0 1px var(--border-default);
+  /* 两半各自铺底色，描边要画在它们上面 */
+  outline: 1px solid var(--border-strong);
+  outline-offset: -1px;
 }
 
 .theme-preview__half {
@@ -170,6 +172,10 @@ const handleThemeChange = async (value: ThemeSource) => {
 .theme-preview__half--dark,
 .theme-preview--dark {
   background: var(--preview-dark-bg);
+}
+
+.theme-preview--dark {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
 .theme-preview__line {

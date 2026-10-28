@@ -26,7 +26,7 @@ The desktop design language is **bordered panels on tinted surfaces, with shadow
 | Category | `--category-blue`, `-orange`, `-pink`, `-violet`, `-green`, `-teal`, `-amber`, `-grey` |
 | Accent | `--accent-favorite` (favorite star only, never a fill or a button) |
 | Focus | `--focus-ring` |
-| Elevation | `--shadow-popover` (dropdowns, tooltips, popconfirm), `--shadow-overlay` (modals, drawers), `--shadow-card` (mobile cards only), `--overlay-backdrop` |
+| Elevation | `--shadow-popover` (dropdowns, tooltips, popconfirm), `--shadow-overlay` (modals, drawers), `--shadow-card` (mobile tab bar, home action bar and theme cards only), `--overlay-backdrop` |
 | Type | `--font-family-sans`, `--font-family-mono`, `--font-size-*`, `--font-weight-*`, `--line-height-*` |
 | Size | `--control-height-xs/sm/md/lg` (22/28/34/40), `--radius-control` 6, `--radius-panel` 8, `--radius-modal` 10, `--radius-image` 8 |
 | Layout | `--rail-width` 52, `--list-width` 264, `--nav-width` 232, `--side-panel-width` 340, `--statusbar-height` 26, `--page-header-height` 60, `--reading-width` 760, `--page-padding-document` 40, `--page-padding-detail` 32, `--page-padding-list` 24, `--content-padding` 16, `--compact-padding` 12, `--section-gap` 16 |
@@ -157,10 +157,13 @@ One concept has one name everywhere, in every locale. Reuse an existing message 
 Mobile pages follow the `V5 · 移动` boards: iOS-style Ionic pages that reuse the shared tokens. Desktop Naive UI layout rules do not apply to Ionic components.
 
 - Sizes: 28/700 large titles, 22/600 block titles, 16 body and list rows, 14 secondary text, 12 captions.
-- Canvas is `--surface-body`. Cards and grouped lists are `--surface-primary`, radius 16, `--shadow-card`, no border. Bottom sheets are radius 28.
+- Keep mobile plain: no gradients, glows, background washes or marketing copy.
+- Canvas is `--surface-body`. Cards and grouped lists are flat `--surface-primary` blocks, radius 16, with no shadow and no border. On white pages (the prompt use page) and inside sheets they get a 1px `--border-default` line instead (`.m-on-white`). Bottom sheets are radius 28.
+- Only things that float over content carry a shadow: bottom sheets, the capsule tab bar and the home action bar. The theme preview cards and the logo on the About page keep their soft shadow as drawn.
 - Grouped settings rows are at least 54px high and start with a 30px colored icon tile (radius 9) using category or status colors.
-- Navigation is a floating capsule tab bar (prompts, models, settings). Selected tabs use `--accent-soft` with `--accent-primary` icon and text, and switch from outline to filled Ionicons.
-- Touch targets are at least 44px. Primary calls to action are 50px high with radius 14; chips are 34px pills; selected chips are filled `--accent-primary`.
+- Navigation is a floating capsule tab bar (prompts, models, settings). Selected tabs switch from outline to filled Ionicons and use `--accent-text` for icon and label, with no background.
+- The prompt home shows two columns by default (cards with the first image as cover, or a content excerpt with variable names marked); list rows are the alternative. Categories are text tabs (all, favorites, each category) with a short `--accent-primary` underline. Above the tab bar sits the action bar: an "AI 生成" pill on `--accent-soft` and a round `--accent-primary` add button, with content fading out behind it.
+- Touch targets are at least 44px. Primary calls to action are 50px high with radius 14; secondary ones are `--surface-primary` with a 1px `--border-default` line. Chips are 34px pills; selected chips are filled `--accent-primary`.
 - Icons are `ionicons`. Ionic `--ion-color-*` variables map to the shared tokens in `assets/styles/mobile.css`; components never use Ionic's default palette colors directly.
 
 ## Implementation checklist

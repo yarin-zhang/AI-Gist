@@ -33,7 +33,8 @@ describe('移动端长文字布局', () => {
     expect(read('src/renderer/components/mobile/prompt/useMobileModels.ts')).toContain('`${current.model} · ${current.config.name}`')
   })
 
-  it('首页卡片的超长标签以省略号结尾（m-pill 是 flex 容器，改成行内块）', () => {
-    expect(styles('src/renderer/pages/mobile/MobilePromptPage.vue')).toMatch(/\.m-pill\.prompt-card__tag \{[^}]*display: inline-block;[^}]*text-overflow: ellipsis;/)
+  it('首页列表行和双列卡片里的长分类名以省略号结尾', () => {
+    expect(styles('src/renderer/pages/mobile/MobilePromptPage.vue')).toMatch(/\.prompt-row__caption \{[^}]*text-overflow: ellipsis;/)
+    expect(styles('src/renderer/components/mobile/MobileWaterfallView.vue')).toMatch(/\.waterfall__category \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/)
   })
 })

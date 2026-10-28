@@ -1,26 +1,27 @@
 <!--
-  提示词列表的瀑布流显示方式：两列卡片，按估算高度贪心分配到较矮的一列。
-  有附图的提示词以第一张图作封面。
+  提示词首页的双列显示（V5-M-List）：两列卡片，按估算高度贪心分配到较矮的一列。
+  有附图的提示词以第一张图作封面；没有图的显示正文摘录，变量标成变量名。
 -->
 <template>
-  <div class="waterfall">
-    <div v-for="(column, columnIndex) in [leftColumn, rightColumn]" :key="columnIndex" class="waterfall__column">
-      <button v-for="item in column" :key="item.prompt.id" type="button" class="m-card waterfall__card"
-        @click="emit('view', item.prompt)">
-        <img v-if="item.imageUrl" :src="item.imageUrl" class="waterfall__image" loading="lazy" alt="" />
-        <span class="waterfall__content">
-          <span class="waterfall__title-row">
-            <span class="waterfall__title">{{ promptDisplayTitle(item.prompt, t('promptLibrary.untitled'), 40) }}</span>
-            <ion-icon v-if="item.prompt.isFavorite" :icon="star" class="waterfall__star"
-              :aria-label="t('promptLibrary.favorited')" />
+  <div class="m-wf-grid">
+    <div v-for="(column, columnIndex) in columns" :key="columnIndex" class="m-wf-col">
+      <button v-for="item in column" :key="item.prompt.id" type="button" class="m-wf" @click="emit('view', item.prompt)">
+        <img v-if="coverOf(item.prompt)" :src="coverOf(item.prompt)!" loading="lazy" alt="" />
+        <span class="m-wf-b" :class="{ 'waterfall__text-body': !coverOf(item.prompt) }">
+          <span class="m-wf-t">{{ promptDisplayTitle(item.prompt, t('promptLibrary.untitled'), 40) }}</span>
+          <span v-if="!coverOf(item.prompt) && item.excerpt.length" class="m-wf-x">
+            <template v-for="(segment, index) in item.excerpt" :key="index">
+              <span v-if="segment.variable" class="m-var m-var--name">{{ segment.text }}</span>
+              <template v-else>{{ segment.text }}</template>
+            </template>
           </span>
-          <span v-if="promptSnippet(item.prompt)" class="waterfall__desc">{{ promptSnippet(item.prompt) }}</span>
-          <span class="waterfall__meta">
-            <span v-if="item.variableCount" class="m-pill m-pill-var">{{ t('promptLibrary.variableCount', { count: item.variableCount }) }}</span>
-            <span class="waterfall__category">
-              <span class="waterfall__dot" :style="{ background: categoryColor(categoryOf(item.prompt)) }" aria-hidden="true" />
-              {{ categoryOf(item.prompt)?.name || t('promptLibrary.uncategorized') }}
-            </span>
+          <span class="m-wf-meta">
+            <span class="waterfall__dot" :style="{ background: categoryColor(categoryOf(item.prompt)) }" aria-hidden="true" />
+            <span class="waterfall__category">{{ categoryOf(item.prompt)?.name || t('promptLibrary.uncategorized') }}</span>
+            <ion-icon v-if="item.prompt.isFavorite" :icon="star" class="waterfall__star" role="img"
+              :aria-label="t('promptLibrary.favorited')" />
+            <span v-if="item.variableCount" class="waterfall__vars" role="img"
+              :aria-label="t('promptLibrary.variableCount', { count: item.variableCount })">{{ `{ } ${item.variableCount}` }}</span>
           </span>
         </span>
       </button>
@@ -29,18 +30,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from 'vue'
+import { computed } from 'vue'
 import { IonIcon } from '@ionic/vue'
 import { star } from 'ionicons/icons'
 import type { Prompt, Category } from '@shared/types'
 import type { PromptWithRelations } from '@shared/types/database'
 import { useI18n } from '~/composables/useI18n'
-import { getActivePromptVariables } from '~/lib/utils/prompt-template'
-import { categoryColor, promptDisplayTitle, promptSnippet } from './prompt/prompt-meta'
+import { getActivePromptVariables, parsePromptTemplate } from '~/lib/utils/prompt-template'
+import { categoryColor, plainTemplateText, promptDisplayTitle, promptSnippet } from './prompt/prompt-meta'
+import { usePromptCovers } from './prompt/usePromptCovers'
+
+interface ExcerptSegment {
+  text: string
+  variable?: boolean
+}
 
 interface WaterfallItem {
   prompt: Prompt
-  imageUrl: string | null
+  excerpt: ExcerptSegment[]
   variableCount: number
 }
 
@@ -54,30 +61,30 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-// 生成的 object URL，列表变化或卸载时统一回收
-const objectUrls: string[] = []
+const { coverOf } = usePromptCovers(() => props.prompts)
 
 const categoryById = computed(() => new Map(props.categories.map(category => [category.id, category])))
 const categoryOf = (prompt: Prompt) => (prompt.categoryId ? categoryById.value.get(prompt.categoryId) : undefined)
 
-const buildImageUrl = (prompt: Prompt): string | null => {
-  const blob = prompt.imageBlobs?.find(item => item instanceof Blob && item.size > 0)
-  if (!blob) return null
-  const url = URL.createObjectURL(blob)
-  objectUrls.push(url)
-  return url
+// 摘录：有描述用描述；否则取正文（第一行已经当标题的从第二行起），普通模板里的变量单独标出
+const excerptOf = (prompt: Prompt): ExcerptSegment[] => {
+  if (prompt.description?.trim()) return [{ text: prompt.description.trim() }]
+  const snippet = promptSnippet(prompt)
+  if (!snippet) return []
+  if (prompt.isJinjaTemplate) return [{ text: plainTemplateText(snippet) }]
+  return parsePromptTemplate(snippet).segments.map(segment => (
+    segment.kind === 'text' ? { text: segment.text } : { text: segment.name, variable: true }
+  ))
 }
 
-// 估算卡片高度（用于贪心分配列）
-const estimateHeight = (prompt: Prompt): number => {
-  let height = 96
-  if (prompt.imageBlobs?.length) height += 160
-  if (promptSnippet(prompt)) height += 40
-  return height
+// 估算卡片高度（用于贪心分配列）：封面图约 230，摘录 13px 字号一行约 14 个汉字，最多 6 行
+const estimateHeight = (item: WaterfallItem): number => {
+  if (item.prompt.imageBlobs?.length) return 290
+  const length = item.excerpt.reduce((sum, segment) => sum + segment.text.length, 0)
+  return 64 + Math.min(6, Math.ceil(length / 14)) * 23
 }
 
-const columns = computed<{ left: WaterfallItem[]; right: WaterfallItem[] }>(() => {
+const columns = computed<[WaterfallItem[], WaterfallItem[]]>(() => {
   const left: WaterfallItem[] = []
   const right: WaterfallItem[] = []
   let leftHeight = 0
@@ -86,10 +93,10 @@ const columns = computed<{ left: WaterfallItem[]; right: WaterfallItem[] }>(() =
   for (const prompt of props.prompts) {
     const item: WaterfallItem = {
       prompt,
-      imageUrl: buildImageUrl(prompt),
+      excerpt: excerptOf(prompt),
       variableCount: getActivePromptVariables(prompt as PromptWithRelations).length,
     }
-    const height = estimateHeight(prompt)
+    const height = estimateHeight(item)
     if (leftHeight <= rightHeight) {
       left.push(item)
       leftHeight += height
@@ -99,122 +106,14 @@ const columns = computed<{ left: WaterfallItem[]; right: WaterfallItem[] }>(() =
     }
   }
 
-  return { left, right }
+  return [left, right]
 })
-
-const leftColumn = computed(() => columns.value.left)
-const rightColumn = computed(() => columns.value.right)
-
-const revokeAll = () => {
-  objectUrls.forEach(url => URL.revokeObjectURL(url))
-  objectUrls.length = 0
-}
-
-// prompts 变化时先回收旧 URL，computed 随后重建
-watch(() => props.prompts, revokeAll, { flush: 'pre' })
-
-onUnmounted(revokeAll)
 </script>
 
 <style scoped>
-.waterfall {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.waterfall__column {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-
-.waterfall__card {
-  overflow: hidden;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.waterfall__card:active {
-  opacity: 0.75;
-}
-
-.waterfall__image {
-  display: block;
-  width: 100%;
-  max-height: 240px;
-  object-fit: cover;
-  background: var(--surface-secondary);
-}
-
-.waterfall__content {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-}
-
-.waterfall__title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.waterfall__title {
-  display: -webkit-box;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--content-primary);
-  font-size: var(--m-font-body);
-  font-weight: 600;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.waterfall__star {
-  flex: none;
-  margin-top: 2px;
-  color: var(--accent-favorite);
-  font-size: 16px;
-}
-
-.waterfall__desc {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--content-secondary);
-  font-size: var(--m-font-sub);
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.waterfall__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.waterfall__category {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--content-tertiary);
-  font-size: var(--m-font-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 没有封面图的卡片，标题离上边缘多留一点 */
+.waterfall__text-body {
+  padding-top: 12px;
 }
 
 .waterfall__dot {
@@ -222,5 +121,27 @@ onUnmounted(revokeAll)
   height: 8px;
   flex: none;
   border-radius: 2px;
+}
+
+.waterfall__category {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waterfall__star {
+  flex: none;
+  color: var(--accent-favorite);
+  font-size: 14px;
+}
+
+.waterfall__vars {
+  flex: none;
+  color: var(--variable-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 500;
 }
 </style>

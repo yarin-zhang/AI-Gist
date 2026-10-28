@@ -1,7 +1,6 @@
 <template>
   <ion-page>
     <ion-content class="m-page-content" :fullscreen="true">
-      <div class="m-wash" aria-hidden="true" />
       <MobileLargeTitle :title="t('mainPage.menu.settings')" />
 
       <!-- 设置首页只做导航：同步状态卡和每一行都进入独立的二级页面 -->

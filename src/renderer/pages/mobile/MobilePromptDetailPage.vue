@@ -19,7 +19,7 @@
       </template>
     </MobileNavBar>
 
-    <ion-content class="m-page-content use-content">
+    <ion-content class="m-page-content m-on-white use-content">
       <!-- 只有第一次加载显示转圈；从编辑页返回时原地刷新，填写进度不受影响 -->
       <div v-if="loading && !prompt" class="loading-container">
         <ion-spinner></ion-spinner>
@@ -103,7 +103,7 @@
         </button>
         <button v-if="hasAIConfig" type="button" class="plain-panel__run" @click="openTryRun">
           <ion-icon :icon="playCircleOutline" aria-hidden="true" />
-          {{ t('mobilePrompt.tryRun') }}
+          {{ t('promptAI.run') }}
         </button>
       </div>
     </ion-footer>
@@ -560,7 +560,8 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--surface-primary) 88%, transparent);
 }
 
-.use-content {
+/* 写成两个类，压过全局 .m-page-content 的灰底 */
+.m-page-content.use-content {
   --background: var(--surface-primary);
 }
 

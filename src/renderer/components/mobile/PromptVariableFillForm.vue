@@ -89,7 +89,7 @@
 
     <button v-if="canRun" type="button" class="fill-run" @click="emit('run')">
       <ion-icon :icon="playCircleOutline" aria-hidden="true" />
-      {{ t('mobilePrompt.tryRun') }}
+      {{ t('promptAI.run') }}
     </button>
   </section>
 </template>

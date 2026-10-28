@@ -36,26 +36,23 @@ describe('移动端文案', () => {
 
   it('拼接处有空格、没有重复标点', () => {
     const generator = read('src/renderer/pages/mobile/MobileAIGeneratorPage.vue')
-    expect(generator).toContain("{{ t('mobilePrompt.generatedWith') }} <b class=\"gen-status__count\">")
+    expect(generator).toContain("{{ t('mobilePrompt.variablesDetected', { count: variableCountOf(turn) }) }}")
     expect(locale('zh-CN').promptPage.updatedAt).toBe('{date} 更新')
     expect(locale('zh-TW').promptPage.updatedAt).toBe('{date} 更新')
     expect(read('src/renderer/pages/mobile/settings/shared.ts')).toContain("joinSentences(diagnosis.message, translate('mobileSettings.sync.retryAt'")
   })
 
-  it('同一件事用同一个叫法；取消首选的确认按钮写明结果', () => {
+  it('同一件事用同一个叫法', () => {
     expect(read('src/renderer/pages/mobile/MobilePromptDetailPage.vue')).toContain("t('mobilePrompt.rawTemplateCopied')")
     expect(read('src/renderer/pages/mobile/MobileSystemPromptEditPage.vue')).toContain(":title=\"t('aiConfig.systemPrompt')\"")
     expect(read('src/renderer/pages/mobile/MobileAIConfigEditPage.vue')).toContain("t('mobileModels.enterServiceEndpoint')")
-    const actions = read('src/renderer/components/mobile/models/useConfigActions.ts')
-    expect(actions).toContain("confirmText: t('mobileModels.removePreferred')")
-    expect(actions).toContain("cancelText: t('mobileModels.keepPreferred')")
     expect(read('src/renderer/pages/mobile/MobileAIConfigPage.vue')).toContain('@click="handlePickPreferred"')
   })
 
   it('新增文案五种语言都有', () => {
     const keys = [
       'mobileAI.failedWith', 'mobileModels.desktopOnly', 'mobileModels.desktopOnlyConfigNote', 'mobileModels.desktopOnlyProviders',
-      'mobileModels.noModelSelected', 'mobileModels.keepPreferred', 'mobileModels.removePreferred', 'mobileModels.enterServiceEndpoint',
+      'mobileModels.noModelSelected', 'mobileModels.enterServiceEndpoint',
       'mobileModels.requestTestFailed', 'mobilePrompt.rawTemplateCopied', 'promptFill.listHint', 'mobileSettings.sync.retryAt',
       'mobileSettings.sync.errorDetailLabel', 'mobileSettings.failedWith',
     ]

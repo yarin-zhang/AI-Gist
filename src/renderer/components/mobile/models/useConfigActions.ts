@@ -86,19 +86,8 @@ export function useConfigActions() {
     }
   }
 
-  /** 取消首选。confirm 为 true 时先弹确认（列表页的快捷操作），详情页的开关直接生效 */
-  const clearPreferred = async (options: { confirm?: boolean } = {}): Promise<boolean> => {
-    if (options.confirm) {
-      // 两个按钮直接写明结果，避免「取消」到底是取消操作还是取消首选分不清
-      const confirmed = await confirmAlert({
-        header: t('aiConfig.cancelPreferred'),
-        message: t('mobileModels.clearPreferredMessage'),
-        confirmText: t('mobileModels.removePreferred'),
-        cancelText: t('mobileModels.keepPreferred')
-      })
-      if (!confirmed) return false
-    }
-
+  /** 取消首选（详情页的开关，直接生效） */
+  const clearPreferred = async (): Promise<boolean> => {
     try {
       await api.aiConfigs.clearPreferred.mutate()
       showToast(t('aiConfig.globalPreferredCleared'))

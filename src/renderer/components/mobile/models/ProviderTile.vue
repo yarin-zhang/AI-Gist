@@ -13,10 +13,10 @@ import type { ProviderVisual } from './provider-catalog'
 
 const props = withDefaults(defineProps<{
   visual: ProviderVisual
-  /** sm 36（列表行、宫格）/ md 44（详情页头）/ lg 48（首选卡片） */
-  size?: 'sm' | 'md' | 'lg'
-  /** soft：浅色底 + 彩色字；inverse：放在品牌渐变上的白底；muted：已禁用 */
-  variant?: 'soft' | 'inverse' | 'muted'
+  /** sm 36（列表行、宫格）/ md 44（详情页头、首选卡片） */
+  size?: 'sm' | 'md'
+  /** soft：浅色底 + 彩色字；muted：已禁用 */
+  variant?: 'soft' | 'muted'
 }>(), {
   size: 'sm',
   variant: 'soft'
@@ -61,19 +61,8 @@ const tone = computed(() => props.visual.tone)
   font-size: 18px;
 }
 
-.provider-tile--lg {
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
-  font-size: 20px;
-}
-
 .provider-tile ion-icon {
   font-size: 1.15em;
-}
-
-.provider-tile--inverse {
-  background: var(--content-inverse);
 }
 
 .provider-tile--muted {

@@ -20,12 +20,12 @@
           <section class="m-section">
             <span class="m-gt">{{ t('promptLibrary.viewMenu') }}</span>
             <div class="m-seg" role="radiogroup" :aria-label="t('promptLibrary.viewMenu')">
-              <button type="button" role="radio" :class="{ on: viewMode === 'list' }" :aria-checked="viewMode === 'list'"
-                @click="emit('update:viewMode', 'list')">{{ t('mobilePrompt.viewList') }}</button>
               <button type="button" role="radio" :class="{ on: viewMode === 'waterfall' }"
                 :aria-checked="viewMode === 'waterfall'" @click="emit('update:viewMode', 'waterfall')">
                 {{ t('mobilePrompt.viewWaterfall') }}
               </button>
+              <button type="button" role="radio" :class="{ on: viewMode === 'list' }" :aria-checked="viewMode === 'list'"
+                @click="emit('update:viewMode', 'list')">{{ t('mobilePrompt.viewList') }}</button>
             </div>
           </section>
 

@@ -21,16 +21,19 @@ const ownSources = [
 describe('mobile models tab root (V5-M-Models)', () => {
   it('uses the tab-root skeleton and clears the floating tab bar', () => {
     expect(listPage).toContain('<ion-content class="m-page-content" :fullscreen="true">')
-    expect(listPage).toContain('<div class="m-wash" aria-hidden="true" />')
+    expect(listPage).not.toContain('m-wash')
     expect(listPage).toContain('<MobileLargeTitle')
     expect(listPage).toMatch(/class="m-body m-body--tabbed/)
   })
 
-  it('shows the preferred configuration as a large card with quick actions', () => {
-    expect(listPage).toMatch(/<PreferredConfigCard v-if="preferredConfig"/)
-    expect(listPage).toContain('@test="handleTestPreferred(preferredConfig)"')
-    expect(listPage).toContain('@clear="handleClearPreferred"')
-    expect(listPage).toContain('actions.clearPreferred({ confirm: true })')
+  it('shows the preferred configuration as a plain card that opens its detail page', () => {
+    expect(listPage).toMatch(/<PreferredConfigCard v-if="preferredConfig"[\s\S]*?@open="handleView\(preferredConfig\)" \/>/)
+    const card = read(join(modelsDir, 'PreferredConfigCard.vue'))
+    expect(card).toContain('class="m-card preferred-card"')
+    expect(card).not.toMatch(/gradient|shadow-floating/)
+    // 测试连接和取消首选在详情页里
+    expect(detailPage).toContain('testSavedConfigConnection(config.value)')
+    expect(detailPage).toContain('@ionChange="handleTogglePreferred"')
   })
 
   it('keeps the empty state, pull to refresh and swipe actions', () => {

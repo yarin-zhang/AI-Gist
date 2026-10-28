@@ -6,9 +6,16 @@
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <div class="m-wash" aria-hidden="true" />
-
-      <MobileLargeTitle :title="t('mobileNav.prompts')" :subtitle="subtitle">
+      <MobileLargeTitle :title="t('mobileNav.prompts')">
+        <button type="button" class="m-btn-c" :aria-label="t('promptLibrary.search')" :aria-expanded="searchOpen"
+          @click="toggleSearch">
+          <ion-icon :icon="searchOutline" />
+        </button>
+        <button type="button" class="m-btn-c"
+          :aria-label="viewMode === 'waterfall' ? t('mobilePrompt.switchToList') : t('mobilePrompt.switchToGrid')"
+          @click="viewMode = viewMode === 'waterfall' ? 'list' : 'waterfall'">
+          <ion-icon :icon="viewMode === 'waterfall' ? listOutline : gridOutline" />
+        </button>
         <button type="button" class="m-btn-c filter-button" :aria-label="t('mobilePrompt.filterTitle')"
           @click="openFilterSheet">
           <ion-icon :icon="optionsOutline" />
@@ -16,49 +23,44 @@
         </button>
       </MobileLargeTitle>
 
-      <div class="m-body m-body--tabbed m-body--fab list-body">
-        <label class="m-input">
+      <!-- 搜索框：点放大镜展开，「取消」清空并收起 -->
+      <div v-if="searchOpen" class="search-row">
+        <label class="m-input search-row__field">
           <ion-icon :icon="searchOutline" aria-hidden="true" />
-          <input v-model="searchText" type="search" enterkeyhint="search" :aria-label="t('promptManagement.searchPrompt')"
-            :placeholder="t('mobilePrompt.searchPlaceholder')" @input="handleSearch" @keydown.enter="blurTarget" />
+          <input ref="searchInputRef" v-model="searchText" type="search" enterkeyhint="search"
+            :aria-label="t('promptManagement.searchPrompt')" :placeholder="t('mobilePrompt.searchPlaceholder')"
+            @input="handleSearch" @keydown.enter="blurTarget" />
           <button v-if="searchText" type="button" class="search-clear" :aria-label="t('common.clear')" @click="clearSearch">
             <ion-icon :icon="closeCircle" />
           </button>
         </label>
+        <button type="button" class="m-btn search-row__cancel" @click="closeSearch">{{ t('common.cancel') }}</button>
+      </div>
 
-        <!-- AI 入口：没有可用模型时进入生成页会提示先添加配置 -->
-        <button v-if="!searchText" type="button" class="ai-entry" @click="navigateToAIGenerator">
-          <span class="ai-entry__glow" aria-hidden="true" />
-          <span class="ai-entry__text">
-            <span class="ai-entry__title">{{ t('mobilePrompt.aiEntryTitle') }}</span>
-            <span class="ai-entry__desc">{{ t('mobilePrompt.aiEntryDescription') }}</span>
-          </span>
-          <span class="m-tile m-tile-lg ai-entry__tile" aria-hidden="true"><ion-icon :icon="sparkles" /></span>
+      <!-- 分类页签：全部 / 收藏 / 各分类；从筛选面板选了「未分类」时补一个页签 -->
+      <nav ref="scopeTabsRef" class="m-tabs" :aria-label="t('promptManagement.category')">
+        <button type="button" :class="{ on: activeScope === 'all' }" :aria-pressed="activeScope === 'all'"
+          @click="selectScope('all')">
+          {{ t('promptLibrary.scopeAll') }}
         </button>
+        <button type="button" :class="{ on: activeScope === 'favorites' }" :aria-pressed="activeScope === 'favorites'"
+          @click="selectScope('favorites')">
+          {{ t('promptLibrary.scopeFavorites') }}
+        </button>
+        <button v-for="category in categories" :key="category.id" type="button"
+          :class="{ on: activeScope === category.id }" :aria-pressed="activeScope === category.id"
+          @click="selectScope(category.id ?? 'all')">
+          {{ category.name }}
+        </button>
+        <button v-if="selectedCategory === 'none'" type="button" class="on" aria-pressed="true">
+          {{ t('promptLibrary.uncategorized') }}
+        </button>
+      </nav>
 
-        <!-- 快捷筛选：全部 / 收藏 / 分类，当前标签筛选也在这里显示，可以直接移除 -->
-        <div class="m-chips quick-chips">
-          <button type="button" class="m-chip" :class="{ on: selectedCategory === null && !showFavoritesOnly }"
-            :aria-pressed="selectedCategory === null && !showFavoritesOnly" @click="showAll">
-            {{ t('promptLibrary.scopeAll') }}
-          </button>
-          <button type="button" class="m-chip" :class="{ on: showFavoritesOnly }" :aria-pressed="showFavoritesOnly"
-            @click="showFavoritesOnly = !showFavoritesOnly">
-            <ion-icon :icon="showFavoritesOnly ? star : starOutline" aria-hidden="true" />
-            {{ t('promptLibrary.scopeFavorites') }}
-          </button>
-          <button v-for="category in categories" :key="category.id" type="button" class="m-chip"
-            :class="{ on: selectedCategory === category.id }" :aria-pressed="selectedCategory === category.id"
-            @click="toggleCategory(category.id ?? null)">
-            <span class="chip-dot"
-              :style="{ background: selectedCategory === category.id ? 'currentColor' : categoryColor(category) }" />
-            {{ category.name }}
-          </button>
-          <button v-if="selectedCategory === 'none'" type="button" class="m-chip on" @click="selectedCategory = null">
-            {{ t('promptLibrary.uncategorized') }}
-            <ion-icon :icon="closeCircle" :aria-label="t('promptBrowse.removeFilter')" />
-          </button>
-          <button v-if="selectedTag" type="button" class="m-chip on" @click="selectedTag = null">
+      <div class="m-body m-body--tabbed m-body--acts list-body" :class="{ 'list-body--grid': viewMode === 'waterfall' }">
+        <!-- 标签筛选在筛选面板里选，这里显示出来，可以直接移除 -->
+        <div v-if="selectedTag" class="m-chips tag-chips">
+          <button type="button" class="m-chip on" @click="selectedTag = null">
             <ion-icon :icon="pricetagOutline" aria-hidden="true" />
             {{ selectedTag }}
             <ion-icon :icon="closeCircle" :aria-label="t('promptBrowse.removeFilter')" />
@@ -90,32 +92,20 @@
           </button>
         </div>
 
-        <!-- 列表显示：左滑出现编辑、删除 -->
-        <div v-else-if="viewMode === 'list'" class="prompt-list">
-          <ion-item-sliding v-for="prompt in prompts" :key="prompt.id" class="prompt-slide">
-            <ion-item button :detail="false" lines="none" class="prompt-card" @click="handleView(prompt)">
-              <div class="prompt-card__inner">
-                <span class="m-tile m-tile-lg" :style="categoryTileStyle(categoryOf(prompt))" aria-hidden="true">
-                  <ion-icon :icon="documentTextOutline" />
+        <!-- 列表显示（V5-M-ListRows）：一组行，有附图的带缩略图；左滑出现编辑、删除 -->
+        <div v-else-if="viewMode === 'list'" class="m-group prompt-list">
+          <ion-item-sliding v-for="(prompt, index) in prompts" :key="prompt.id">
+            <ion-item button :detail="false" :lines="index === prompts.length - 1 ? 'none' : 'inset'" class="prompt-row"
+              @click="handleView(prompt)">
+              <img v-if="coverOf(prompt)" :src="coverOf(prompt)!" class="prompt-row__thumb" loading="lazy" alt="" />
+              <span class="prompt-row__text">
+                <span class="prompt-row__title-row">
+                  <span class="prompt-row__title">{{ promptDisplayTitle(prompt, t('promptLibrary.untitled')) }}</span>
+                  <ion-icon v-if="prompt.isFavorite" :icon="star" class="prompt-row__star" role="img"
+                    :aria-label="t('promptLibrary.favorited')" />
                 </span>
-                <span class="prompt-card__text">
-                  <span class="prompt-card__title-row">
-                    <span class="prompt-card__title">{{ promptDisplayTitle(prompt, t('promptLibrary.untitled')) }}</span>
-                    <ion-icon v-if="prompt.isFavorite" :icon="star" class="prompt-card__star"
-                      :aria-label="t('promptLibrary.favorited')" />
-                  </span>
-                  <span v-if="promptSnippet(prompt)" class="prompt-card__desc">{{ promptSnippet(prompt) }}</span>
-                  <span class="prompt-card__meta">
-                    <span v-if="variableCountOf(prompt)" class="m-pill m-pill-var">
-                      {{ t('promptLibrary.variableCount', { count: variableCountOf(prompt) }) }}
-                    </span>
-                    <span v-if="prompt.isJinjaTemplate" class="m-pill m-pill-blue">Jinja</span>
-                    <span v-for="tag in getTagsArray(prompt.tags).slice(0, 2)" :key="tag" class="m-pill prompt-card__tag">#{{ tag }}</span>
-                    <span v-if="getTagsArray(prompt.tags).length > 2" class="m-pill">+{{ getTagsArray(prompt.tags).length - 2 }}</span>
-                    <span class="prompt-card__caption">{{ metaCaption(prompt) }}</span>
-                  </span>
-                </span>
-              </div>
+                <span class="prompt-row__caption">{{ rowCaption(prompt) }}</span>
+              </span>
             </ion-item>
 
             <ion-item-options side="end">
@@ -131,7 +121,7 @@
           </ion-item-sliding>
         </div>
 
-        <!-- 瀑布流显示 -->
+        <!-- 双列显示（V5-M-List，默认） -->
         <mobile-waterfall-view
           v-else
           :prompts="prompts"
@@ -150,9 +140,17 @@
       </div>
     </ion-content>
 
-    <button type="button" class="m-fab" :aria-label="t('promptLibrary.create')" @click="handleCreate">
-      <ion-icon :icon="add" />
-    </button>
+    <!-- 底部操作条：AI 生成 + 新建，内容滚到它后面时淡出 -->
+    <div class="m-fade" aria-hidden="true" />
+    <div class="m-acts">
+      <button type="button" class="m-ai" @click="navigateToAIGenerator">
+        <ion-icon :icon="sparkles" aria-hidden="true" />
+        <span>{{ t('promptManagement.aiGenerate') }}</span>
+      </button>
+      <button type="button" class="m-add" :aria-label="t('promptLibrary.create')" @click="handleCreate">
+        <ion-icon :icon="add" />
+      </button>
+    </div>
 
     <MobilePromptFilterSheet
       :open="showFilterModal"
@@ -172,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onActivated, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, watch, onActivated, onUnmounted } from 'vue'
 import {
   IonPage,
   IonContent,
@@ -195,13 +193,13 @@ import {
   add,
   closeCircle,
   createOutline,
-  documentTextOutline,
+  gridOutline,
+  listOutline,
   optionsOutline,
   pricetagOutline,
   searchOutline,
   sparkles,
   star,
-  starOutline,
   trashOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
@@ -209,11 +207,8 @@ import { useAIConfigStatus } from '~/composables/useAIConfigStatus'
 import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import { formatFriendlyDate } from '~/lib/utils/date'
-import { countPromptUsageToday } from '~/lib/utils/prompt-usage'
 import { collectPromptTags } from '~/lib/utils/prompt-library'
 import { getActivePromptVariables } from '~/lib/utils/prompt-template'
-import { getTagsArray } from '~/lib/utils/tag-colors'
 import type { Prompt, Category } from '@shared/types'
 import type { PromptWithRelations } from '@shared/types/database'
 import { useRouter } from 'vue-router'
@@ -223,18 +218,16 @@ import MobilePromptFilterSheet from '~/components/mobile/prompt/MobilePromptFilt
 import EmptyPromptsIllustration from '~/components/mobile/illustrations/EmptyPromptsIllustration.vue'
 import NoSearchResultsIllustration from '~/components/mobile/illustrations/NoSearchResultsIllustration.vue'
 import {
-  categoryColor,
-  categoryTileStyle,
   promptDisplayTitle,
-  promptSnippet,
   type MobileCategoryFilter,
   type MobilePromptSort
 } from '~/components/mobile/prompt/prompt-meta'
+import { usePromptCovers } from '~/components/mobile/prompt/usePromptCovers'
 
 const DEFAULT_SORT: MobilePromptSort = 'updatedAt'
 const VIEW_MODE_KEY = 'mobilePromptViewMode'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const router = useRouter()
 
 // 滚动位置相关
@@ -260,21 +253,24 @@ const selectedTag = ref<string | null>(null)
 const showFavoritesOnly = ref(false)
 const sortType = ref<MobilePromptSort>(DEFAULT_SORT)
 const showFilterModal = ref(false)
+const searchOpen = ref(false)
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const scopeTabsRef = ref<HTMLElement | null>(null)
 const currentPage = ref(1)
 const pageSize = 20
 const hasNextPage = ref(false)
-// 当前搜索/筛选下的结果数，以及整个提示词库的条数（副标题用）
+// 当前搜索/筛选下的结果数（筛选面板底部按钮用）
 const totalCount = ref(0)
-const libraryTotal = ref(0)
-const usedToday = ref(countPromptUsageToday())
+const { coverOf } = usePromptCovers(() => prompts.value)
 // 是否存在已启用的 AI 配置：跨组件共享状态，进入页面和配置变化时刷新
 const { refreshAIConfigStatus } = useAIConfigStatus()
 
+// 默认双列；用户切到列表后记住
 const readViewMode = (): 'list' | 'waterfall' => {
   try {
-    return localStorage.getItem(VIEW_MODE_KEY) === 'waterfall' ? 'waterfall' : 'list'
+    return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'waterfall'
   } catch {
-    return 'list'
+    return 'waterfall'
   }
 }
 
@@ -288,18 +284,21 @@ watch(viewMode, val => {
   }
 })
 
-const subtitle = computed(() => [
-  t('mobilePrompt.listCount', { count: libraryTotal.value }),
-  t('mobilePrompt.usedToday', { count: usedToday.value })
-].join(' · '))
-
 // 是否有激活的筛选
 const hasActiveFilters = computed(() => {
   return selectedCategory.value !== null || showFavoritesOnly.value || selectedTag.value !== null
 })
 
-// 筛选按钮上的小圆点：有筛选条件或改过排序
-const filterBadge = computed(() => hasActiveFilters.value || sortType.value !== DEFAULT_SORT)
+// 当前页签：选了分类就是那个分类，否则看是不是只看收藏
+const activeScope = computed<'all' | 'favorites' | number | 'none'>(() => {
+  if (selectedCategory.value !== null) return selectedCategory.value
+  return showFavoritesOnly.value ? 'favorites' : 'all'
+})
+
+// 筛选按钮上的小圆点：只标页签和标签芯片上看不出来的条件（改过排序、收藏和分类同时生效）
+const filterBadge = computed(() => (
+  sortType.value !== DEFAULT_SORT || (showFavoritesOnly.value && selectedCategory.value !== null)
+))
 
 // 是否处于搜索或筛选状态：用于区分「完全没有数据」与「搜索/筛选后没有匹配结果」两种空状态
 const isSearchOrFilterActive = computed(() => {
@@ -311,10 +310,11 @@ const categoryOf = (prompt: Prompt) => (prompt.categoryId ? categoryById.value.g
 
 const variableCountOf = (prompt: Prompt) => getActivePromptVariables(prompt as PromptWithRelations).length
 
-const metaCaption = (prompt: Prompt) => {
+// 列表行第二行：分类 · 变量数
+const rowCaption = (prompt: Prompt) => {
   const category = categoryOf(prompt)?.name || t('promptLibrary.uncategorized')
-  const date = prompt.updatedAt ? formatFriendlyDate(prompt.updatedAt, locale.value, { withTime: false }) : ''
-  return date ? `${category} · ${date}` : category
+  const count = variableCountOf(prompt)
+  return count ? `${category} · ${t('promptLibrary.variableCount', { count })}` : category
 }
 
 // 加载提示词列表
@@ -340,13 +340,7 @@ const loadPrompts = async (append = false, options: { showLoading?: boolean } = 
       isFavorite: showFavoritesOnly.value || undefined,
       sortBy: sortType.value
     }
-    const filtered = isSearchOrFilterActive.value
-
-    const [result, library] = await Promise.all([
-      api.prompts.getAll.query(filters),
-      // 有搜索或筛选时，副标题的总条数要另查一次整个库
-      filtered && !append ? api.prompts.getAll.query({ page: 1, limit: 1 }) : Promise.resolve(null)
-    ])
+    const result = await api.prompts.getAll.query(filters)
 
     if (loadId !== promptLoadSequence) {
       return
@@ -359,8 +353,6 @@ const loadPrompts = async (append = false, options: { showLoading?: boolean } = 
     }
     hasNextPage.value = result.hasNextPage || false
     totalCount.value = result.total || 0
-    if (library) libraryTotal.value = library.total || 0
-    else if (!filtered) libraryTotal.value = totalCount.value
   } catch (error) {
     if (loadId !== promptLoadSequence) {
       return
@@ -422,9 +414,29 @@ const clearSearch = () => {
   loadPrompts()
 }
 
+const focusSearch = async () => {
+  await nextTick()
+  searchInputRef.value?.focus()
+}
+
+// 放大镜：没展开就展开并聚焦；已经展开、还没输入时收起
+const toggleSearch = () => {
+  if (searchOpen.value && !searchText.value) {
+    searchOpen.value = false
+    return
+  }
+  searchOpen.value = true
+  void focusSearch()
+}
+
+// 「取消」：清空搜索词并收起
+const closeSearch = () => {
+  searchOpen.value = false
+  if (searchText.value || searchTimer) clearSearch()
+}
+
 // 下拉刷新
 const handleRefresh = async (event: any) => {
-  usedToday.value = countPromptUsageToday()
   await Promise.all([loadCategories(), loadPrompts()])
   event.target.complete()
 }
@@ -436,15 +448,21 @@ const loadMore = async (event: any) => {
   event.target.complete()
 }
 
-// 快捷筛选
-const showAll = () => {
-  selectedCategory.value = null
-  showFavoritesOnly.value = false
+// 页签：全部、收藏、某个分类三选一
+const selectScope = (scope: 'all' | 'favorites' | number) => {
+  selectedCategory.value = typeof scope === 'number' ? scope : null
+  showFavoritesOnly.value = scope === 'favorites'
 }
 
-const toggleCategory = (categoryId: number | null) => {
-  selectedCategory.value = selectedCategory.value === categoryId ? null : categoryId
-}
+// 当前页签在横向滚动区外面时（比如从筛选面板选的分类）滚到中间
+watch(activeScope, async () => {
+  await nextTick()
+  const nav = scopeTabsRef.value
+  const tab = nav?.querySelector<HTMLElement>('.on')
+  if (!nav || !tab) return
+  if (tab.offsetLeft >= nav.scrollLeft && tab.offsetLeft + tab.offsetWidth <= nav.scrollLeft + nav.clientWidth) return
+  nav.scrollTo({ left: tab.offsetLeft - (nav.clientWidth - tab.offsetWidth) / 2, behavior: 'smooth' })
+})
 
 // 筛选面板的「重置」：分类、标签、收藏和排序都回到默认
 const resetFilters = () => {
@@ -462,6 +480,7 @@ const clearSearchAndFilters = () => {
   }
   const filtersChanged = hasActiveFilters.value
   searchText.value = ''
+  searchOpen.value = false
   selectedCategory.value = null
   selectedTag.value = null
   showFavoritesOnly.value = false
@@ -521,7 +540,6 @@ const handleDelete = async (prompt: Prompt) => {
             await api.prompts.delete.mutate(prompt.id!)
             prompts.value = prompts.value.filter(item => item.id !== prompt.id)
             totalCount.value = Math.max(0, totalCount.value - 1)
-            libraryTotal.value = Math.max(0, libraryTotal.value - 1)
             await showToast(t('promptManagement.deleteSuccess'))
             scheduleRealtimeRefresh()
           } catch (error) {
@@ -541,7 +559,6 @@ const showToast = async (message: string, color: string = 'success') => {
 }
 
 const reloadRealtimeData = async (showLoading = false) => {
-  usedToday.value = countPromptUsageToday()
   await Promise.all([
     loadCategories(),
     loadPrompts(false, { showLoading }),
@@ -601,8 +618,6 @@ onIonViewWillEnter(() => {
   const isMutation = lastNavIntent === 'mutation'
   lastNavIntent = null
   isPageActive = true
-  // 从使用页复制回来后，「今天用了几次」要跟着变
-  usedToday.value = countPromptUsageToday()
 
   const shouldReload = pendingRealtimeRefresh || isMutation
   didReloadOnEnter = shouldReload
@@ -643,8 +658,14 @@ onUnmounted(() => {
 
 <style scoped>
 .list-body {
-  gap: 14px;
-  padding-top: 14px;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+/* 双列卡片之间只留 8px，左右边距也收窄到 10px */
+.list-body--grid {
+  padding-right: 10px;
+  padding-left: 10px;
 }
 
 .filter-button {
@@ -660,6 +681,24 @@ onUnmounted(() => {
   border-radius: 4px;
   background: var(--accent-primary);
   box-shadow: 0 0 0 2px var(--surface-primary);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 0 var(--m-gutter);
+}
+
+.search-row__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-row__cancel {
+  flex: none;
+  color: var(--accent-text);
+  font-weight: 500;
 }
 
 .m-input input::-webkit-search-cancel-button {
@@ -682,125 +721,48 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* AI 入口卡片：品牌渐变实底，白字 */
-.ai-entry {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  overflow: hidden;
-  width: 100%;
-  padding: 16px 16px 16px 18px;
-  border: 0;
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--accent-brand), var(--accent-primary));
-  box-shadow: var(--shadow-floating);
-  color: var(--content-inverse);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+.tag-chips ion-icon {
+  font-size: 15px;
 }
 
-.ai-entry:active {
-  opacity: 0.9;
+/* 列表行：最低 68，有附图时行首是 44px 缩略图 */
+.prompt-row {
+  --background: var(--surface-primary);
+  --background-activated: var(--surface-secondary);
+  --background-activated-opacity: 1;
+  --border-color: var(--border-subtle);
+  --padding-start: 16px;
+  --padding-end: 0;
+  --inner-padding-end: 16px;
+  --min-height: 68px;
 }
 
-.ai-entry__glow {
-  position: absolute;
-  top: -36px;
-  right: -28px;
-  width: 120px;
-  height: 120px;
-  border-radius: 60px;
-  background: color-mix(in srgb, var(--content-inverse) 10%, transparent);
+.prompt-row__thumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  margin-right: 12px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-tertiary);
 }
 
-.ai-entry__text {
-  position: relative;
+.prompt-row__text {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  padding: 10px 0;
 }
 
-.ai-entry__title {
-  font-size: var(--m-font-body);
-  font-weight: 600;
-}
-
-.ai-entry__desc {
-  font-size: var(--m-font-sub);
-  opacity: 0.86;
-}
-
-.ai-entry__tile {
-  position: relative;
-  background: color-mix(in srgb, var(--content-inverse) 18%, transparent);
-  color: var(--accent-favorite);
-}
-
-.quick-chips .chip-dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 2px;
-}
-
-.quick-chips ion-icon {
-  font-size: 15px;
-}
-
-.prompt-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* 每条提示词是一张圆角卡片，左滑露出操作按钮 */
-.prompt-slide {
-  overflow: hidden;
-  border-radius: var(--m-radius-card);
-  box-shadow: var(--shadow-card);
-}
-
-.prompt-card {
-  --background: var(--surface-primary);
-  --background-activated: var(--surface-secondary);
-  --background-activated-opacity: 1;
-  --padding-start: 14px;
-  --padding-end: 0;
-  --inner-padding-end: 14px;
-  --padding-top: 14px;
-  --padding-bottom: 14px;
-  --min-height: 0;
-  --border-width: 0;
-  --inner-border-width: 0;
-}
-
-.prompt-card__inner {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-}
-
-.prompt-card__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.prompt-card__title-row {
+.prompt-row__title-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.prompt-card__title {
+.prompt-row__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -811,43 +773,16 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.prompt-card__star {
+.prompt-row__star {
   flex: none;
   color: var(--accent-favorite);
-  font-size: 16px;
+  font-size: 14px;
 }
 
-.prompt-card__desc {
-  overflow: hidden;
-  color: var(--content-secondary);
-  font-size: var(--m-font-sub);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.prompt-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  min-width: 0;
-  margin-top: 4px;
-}
-
-/* m-pill 是 flex 容器，省略号不生效；标签胶囊改成行内块，超长时以省略号结尾 */
-.m-pill.prompt-card__tag {
-  display: inline-block;
-  max-width: 96px;
-  overflow: hidden;
-  line-height: 22px;
-  text-overflow: ellipsis;
-}
-
-.prompt-card__caption {
-  min-width: 0;
+.prompt-row__caption {
   overflow: hidden;
   color: var(--content-tertiary);
-  font-size: var(--m-font-caption);
+  font-size: var(--m-font-sub);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

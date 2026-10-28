@@ -17,11 +17,10 @@ const SETTINGS_PAGES = [SETTINGS_HOME, DATA_SYNC, STORAGE_CONFIG, DATA_BACKUP, L
 const ALL_SETTINGS_PAGES = [...SETTINGS_PAGES, GENERAL, ABOUT]
 
 describe('mobile sync and restore UI wiring', () => {
-  it('normalizes prompt tags before rendering list chips', () => {
-    const source = read('src/renderer/pages/mobile/MobilePromptPage.vue')
-    expect(source).toContain('getTagsArray(prompt.tags).slice(0, 2)')
-    expect(source).toContain('getTagsArray(prompt.tags).length - 2')
-    expect(source).not.toContain('(prompt.tags || []).slice(0, 2)')
+  it('normalizes prompt tags before rendering tag pills', () => {
+    const source = read('src/renderer/pages/mobile/MobilePromptDetailPage.vue')
+    expect(source).toContain('const promptTags = computed(() => getTagsArray(prompt.value?.tags))')
+    expect(source).toContain('<span v-for="tag in promptTags" :key="tag" class="m-pill">#{{ tag }}</span>')
   })
 
   it('refreshes visible prompt data from database change events after a remote apply', () => {

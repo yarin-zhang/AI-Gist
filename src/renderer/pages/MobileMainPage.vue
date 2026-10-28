@@ -3,7 +3,7 @@
     <ion-tabs>
       <ion-router-outlet></ion-router-outlet>
 
-      <!-- V5 底部胶囊导航：提示词 / 模型 / 设置，选中项换实心图标并铺浅蓝底 -->
+      <!-- V5 底部胶囊导航：提示词 / 模型 / 设置，选中项换实心图标、文字变蓝 -->
       <div slot="bottom" class="m-tabbar-wrap">
         <ion-tab-bar id="mobile-tab-bar" class="m-tabbar" :aria-label="t('mobileNav.label')">
           <ion-tab-button tab="prompts" href="/tabs/prompts">
