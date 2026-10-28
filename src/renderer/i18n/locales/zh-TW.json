@@ -1118,6 +1118,7 @@
     "regularModeEnabled": "常規模式已啟用",
     "required": "必填",
     "rollback": "復原",
+    "rollbackConfirmation": "確定要回滾到這個版本嗎？編輯區的目前內容會被取代，儲存後才會生效。",
     "rollbackFailed": "回滾失敗",
     "rollbackToVersion": "回滾到此版本",
     "rolledBackToVersion": "已回滾到版本 {version}",

@@ -1118,6 +1118,7 @@
     "regularModeEnabled": "Modalità normale abilitata",
     "required": "Obbligatorio",
     "rollback": "Ripristina versione",
+    "rollbackConfirmation": "Tornare a questa versione? Il contenuto attuale dell'editor verrà sostituito; la modifica avrà effetto dopo il salvataggio.",
     "rollbackFailed": "Rollback non riuscito",
     "rollbackToVersion": "Torna a questa versione",
     "rolledBackToVersion": "Rollback alla versione {version}",

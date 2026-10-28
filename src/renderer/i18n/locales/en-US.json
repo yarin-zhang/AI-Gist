@@ -1118,6 +1118,7 @@
     "regularModeEnabled": "Regular mode enabled",
     "required": "Required",
     "rollback": "Rollback",
+    "rollbackConfirmation": "Roll back to this version? The current content in the editor will be replaced, and the change takes effect once you save.",
     "rollbackFailed": "Rollback failed",
     "rollbackToVersion": "Roll back to this version",
     "rolledBackToVersion": "Rolled back to version {version}",
