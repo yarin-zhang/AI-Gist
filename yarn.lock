@@ -132,12 +132,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/android@npm:^8.1.0":
-  version: 8.2.0
-  resolution: "@capacitor/android@npm:8.2.0"
+"@capacitor/android@npm:^8.5.3":
+  version: 8.5.3
+  resolution: "@capacitor/android@npm:8.5.3"
   peerDependencies:
-    "@capacitor/core": ^8.2.0
-  checksum: 10c0/ebf23b65fa7217af79ec99236777a464df08cff4887f8ce06a928750ef127a8cd6efdf978bbe34eef091e34b03833f745ac8dbb7ff516cd9185074c9599d297e
+    "@capacitor/core": ^8.5.0
+  checksum: 10c0/25bfc9a76920e49ccb96e4dcb34a1861f54e8541cdb2f6a2d85d51bff8b8b9f24823a159e55d63417895d12211b66178d87decfbcd22270d7d2edd9156df3121
   languageName: node
   linkType: hard
 
@@ -209,9 +209,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/cli@npm:^8.1.0":
-  version: 8.2.0
-  resolution: "@capacitor/cli@npm:8.2.0"
+"@capacitor/cli@npm:^8.5.3":
+  version: 8.5.3
+  resolution: "@capacitor/cli@npm:8.5.3"
   dependencies:
     "@ionic/cli-framework-output": "npm:^2.2.8"
     "@ionic/utils-subprocess": "npm:^3.0.1"
@@ -229,20 +229,21 @@ __metadata:
     semver: "npm:^7.6.3"
     tar: "npm:^7.5.3"
     tslib: "npm:^2.8.1"
+    xcode: "npm:^3.0.1"
     xml2js: "npm:^0.6.2"
   bin:
     cap: bin/capacitor
     capacitor: bin/capacitor
-  checksum: 10c0/94d6a4f7c105b84ad78302e3bddb28fe47bcbf95436c435319bb83d19565b4a5082313066ef1eb583d664fe66c81ea07e45bebd4b64dd797bcddd801cd4f22ad
+  checksum: 10c0/0a95f8c110b7f0a321bac57a40054d603733a85e358e1cb915900aa1f5ece4b54463aa85bda0d165adae08f7520841de25a5b34824a0a35e00693191b411465a
   languageName: node
   linkType: hard
 
-"@capacitor/core@npm:^8.1.0":
-  version: 8.2.0
-  resolution: "@capacitor/core@npm:8.2.0"
+"@capacitor/core@npm:^8.5.3":
+  version: 8.5.3
+  resolution: "@capacitor/core@npm:8.5.3"
   dependencies:
     tslib: "npm:^2.1.0"
-  checksum: 10c0/9cb050f76adfd300f82a5cf4e8c48d266db2dc70889e5b342b6439aa8f7edcf87e98ff946d98be42aed01ea6cfe8660a6e5a153097c3df898de47554d04ab00b
+  checksum: 10c0/d6ea860b1ab19c2121e06d673f35a55b8e04732881eff7657baa762ef8fa263db04246ed0a80c0ede6c8d22e4075561db785837435fe1677820d25dc377e09b3
   languageName: node
   linkType: hard
 
@@ -257,12 +258,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@capacitor/ios@npm:^8.1.0":
-  version: 8.2.0
-  resolution: "@capacitor/ios@npm:8.2.0"
+"@capacitor/ios@npm:^8.5.3":
+  version: 8.5.3
+  resolution: "@capacitor/ios@npm:8.5.3"
   peerDependencies:
-    "@capacitor/core": ^8.2.0
-  checksum: 10c0/9c382f652cd97f7a7475db81d3701daf7c17077ee7ab3af9b690b9ddcd88d445268bfada6c1e36051532d7f9cc3cb87b208dd8b0f7adde0dd347d2a5ebc85307
+    "@capacitor/core": ^8.5.0
+  checksum: 10c0/dec9ee7edf74fb505169813e4a3fc5b470bc4e12787683e320b58ad3a3dce2998eabddf88312c8fa06481b636c7aff4dee5e43d229f96029740fc9169bc62047
   languageName: node
   linkType: hard
 
@@ -552,6 +553,15 @@ __metadata:
   version: 0.8.0
   resolution: "@emotion/hash@npm:0.8.0"
   checksum: 10c0/706303d35d416217cd7eb0d36dbda4627bb8bdf4a32ea387e8dd99be11b8e0a998e10af21216e8a5fade518ad955ff06aa8890f20e694ce3a038ae7fc1000556
+  languageName: node
+  linkType: hard
+
+"@erkamyaman/capacitor-foldable@npm:^8.4.2":
+  version: 8.4.2
+  resolution: "@erkamyaman/capacitor-foldable@npm:8.4.2"
+  peerDependencies:
+    "@capacitor/core": ^8.0.0
+  checksum: 10c0/ccab2d3288dbc08ddc64f70ebc1bb1b5404ee78c9a8347a78aa6479ef9b1dbad2a078fbda79892b6bb21cedb7bf77e44a6a6cbccaa92d710c27a6ccdf1081742
   languageName: node
   linkType: hard
 
@@ -1581,6 +1591,57 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@rdlabo/capacitor-native-ui@npm:2.0.3":
+  version: 2.0.3
+  resolution: "@rdlabo/capacitor-native-ui@npm:2.0.3"
+  dependencies:
+    "@rdlabo/ionic-theme-utils": "npm:0.1.5"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0 <9"
+    "@ionic/core": ">=8.8.1 <10"
+  peerDependenciesMeta:
+    "@capacitor/core":
+      optional: true
+    "@ionic/core":
+      optional: true
+  checksum: 10c0/4deff7a543e3dee8e64b01ad9653d5c5892fa34637138c9316b89035d7f1903bed585b7a4951427b7eba893a73862843906cd8bf4b6fe92b7508acb2ab39c9f0
+  languageName: node
+  linkType: hard
+
+"@rdlabo/ionic-theme-ios27@npm:2.0.3":
+  version: 2.0.3
+  resolution: "@rdlabo/ionic-theme-ios27@npm:2.0.3"
+  dependencies:
+    "@rdlabo/capacitor-native-ui": "npm:2.0.3"
+    "@rdlabo/ionic-theme-utils": "npm:0.1.5"
+    "@stencil/core": "npm:^4.43.5"
+    ionicons: "npm:^8.1.0"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0 <9"
+    "@ionic/core": ">=8.8.1 <10"
+  peerDependenciesMeta:
+    "@capacitor/core":
+      optional: true
+  checksum: 10c0/be367caca9c4974207b3852001310f02474e86a6036e4028c05dac1f81d6b87cc756b501991b3452866d67ec1e644141cc88b64d2791c1d68957e4334030bddc
+  languageName: node
+  linkType: hard
+
+"@rdlabo/ionic-theme-utils@npm:0.1.5":
+  version: 0.1.5
+  resolution: "@rdlabo/ionic-theme-utils@npm:0.1.5"
+  peerDependencies:
+    "@ionic/core": ">=8.8.1 <10"
+  peerDependenciesMeta:
+    "@ionic/core":
+      optional: true
+  bin:
+    rdlabo-build-theme: scripts/build-theme.mjs
+    rdlabo-check-esm: scripts/check-esm.mjs
+    rdlabo-copy-structured-list: scripts/copy-structured-list.mjs
+  checksum: 10c0/4923df4c9d18e27d69c89d922792aebc9b6566758ef753b4f0364f26cb7b6fa7c7a52b19d0fb7ffc6fbe38d954c4ab58f80284ff1316076a04754680f149923b
+  languageName: node
+  linkType: hard
+
 "@rollup/rollup-android-arm-eabi@npm:4.59.0":
   version: 4.59.0
   resolution: "@rollup/rollup-android-arm-eabi@npm:4.59.0"
@@ -1942,6 +2003,41 @@ __metadata:
   bin:
     stencil: bin/stencil
   checksum: 10c0/3a56eaac89387c80135c74772c1a1f4ea0ae3d22580c1c5b736092621c3058ac55957af0362dc33ca544bc581996014e4f9469c449f46f4f857c5833d4873ee8
+  languageName: node
+  linkType: hard
+
+"@stencil/core@npm:^4.43.5":
+  version: 4.45.2
+  resolution: "@stencil/core@npm:4.45.2"
+  dependencies:
+    "@rollup/rollup-darwin-arm64": "npm:4.44.0"
+    "@rollup/rollup-darwin-x64": "npm:4.44.0"
+    "@rollup/rollup-linux-arm64-gnu": "npm:4.44.0"
+    "@rollup/rollup-linux-arm64-musl": "npm:4.44.0"
+    "@rollup/rollup-linux-x64-gnu": "npm:4.44.0"
+    "@rollup/rollup-linux-x64-musl": "npm:4.44.0"
+    "@rollup/rollup-win32-arm64-msvc": "npm:4.44.0"
+    "@rollup/rollup-win32-x64-msvc": "npm:4.44.0"
+  dependenciesMeta:
+    "@rollup/rollup-darwin-arm64":
+      optional: true
+    "@rollup/rollup-darwin-x64":
+      optional: true
+    "@rollup/rollup-linux-arm64-gnu":
+      optional: true
+    "@rollup/rollup-linux-arm64-musl":
+      optional: true
+    "@rollup/rollup-linux-x64-gnu":
+      optional: true
+    "@rollup/rollup-linux-x64-musl":
+      optional: true
+    "@rollup/rollup-win32-arm64-msvc":
+      optional: true
+    "@rollup/rollup-win32-x64-msvc":
+      optional: true
+  bin:
+    stencil: bin/stencil
+  checksum: 10c0/dcdba53408fcef8963ba3d5d9c2592c7534beebdb1713df440aed5bc6001f7cecdb42d85dd0e4695491b43dc77f83a7264af6c2f2dc3c5ddfce46d5f0c64dc80
   languageName: node
   linkType: hard
 
@@ -2806,14 +2902,14 @@ __metadata:
   resolution: "ai-gist@workspace:."
   dependencies:
     "@anthropic-ai/sdk": "npm:^0.53.0"
-    "@capacitor/android": "npm:^8.1.0"
+    "@capacitor/android": "npm:^8.5.3"
     "@capacitor/app": "npm:^8.0.1"
     "@capacitor/assets": "npm:^3.0.5"
     "@capacitor/camera": "npm:^8.0.2"
-    "@capacitor/cli": "npm:^8.1.0"
-    "@capacitor/core": "npm:^8.1.0"
+    "@capacitor/cli": "npm:^8.5.3"
+    "@capacitor/core": "npm:^8.5.3"
     "@capacitor/filesystem": "npm:^8.1.2"
-    "@capacitor/ios": "npm:^8.1.0"
+    "@capacitor/ios": "npm:^8.5.3"
     "@capacitor/preferences": "npm:^8.0.1"
     "@capacitor/share": "npm:^8.0.1"
     "@capacitor/splash-screen": "npm:^8.0.1"
@@ -2822,6 +2918,7 @@ __metadata:
     "@codemirror/state": "npm:^6.7.1"
     "@codemirror/view": "npm:^6.43.6"
     "@electron/get": "npm:^2.0.0"
+    "@erkamyaman/capacitor-foldable": "npm:^8.4.2"
     "@eslint/js": "npm:^9.29.0"
     "@google/generative-ai": "npm:^0.24.1"
     "@ionic/vue": "npm:^8.0.0"
@@ -2831,6 +2928,8 @@ __metadata:
     "@langchain/google-genai": "npm:^0.2.10"
     "@langchain/ollama": "npm:^0.2.1"
     "@langchain/openai": "npm:^0.5.12"
+    "@rdlabo/capacitor-native-ui": "npm:2.0.3"
+    "@rdlabo/ionic-theme-ios27": "npm:2.0.3"
     "@types/nunjucks": "npm:^3.2.6"
     "@types/uuid": "npm:^10.0.0"
     "@typescript-eslint/eslint-plugin": "npm:^8.35.0"
@@ -6296,6 +6395,15 @@ __metadata:
   dependencies:
     "@stencil/core": "npm:^4.35.3"
   checksum: 10c0/4f12586359ed5d68dafff0440ff7ca4c195bdea5fff1f9fa4626add1e4fcea78a862db87c20930199f93817737695425b319aede65ef2111cf0191cdc346ce80
+  languageName: node
+  linkType: hard
+
+"ionicons@npm:^8.1.0":
+  version: 8.1.0
+  resolution: "ionicons@npm:8.1.0"
+  dependencies:
+    "@stencil/core": "npm:^4.43.5"
+  checksum: 10c0/e5a517dca32ebd4428856ccbc45b844b1b51acfd6a1ecee8818d7316b87beee79ba6fde02ef5abdbfc6e7921dbedfc60402876daa0a7340093d8f5ae5562bd0c
   languageName: node
   linkType: hard
 

@@ -28,6 +28,12 @@ html.ai-gist-mobile {
    * 同心，把月牙缺口填平；gutter 本身不需要为此收紧。
    */
   --mobile-nav-gutter: var(--mobile-page-gutter);
+  /*
+   * 左右两侧的实际留白：iPhone 横屏时刘海/灵动岛那一侧、iPhone Duo 系统竖条那一侧
+   * 的安全区比 gutter 宽，两侧也不一定相等，所以左右分开取 max，不能写成同一个值。
+   */
+  --mobile-nav-inset-left: max(var(--mobile-nav-gutter), env(safe-area-inset-left, 0px));
+  --mobile-nav-inset-right: max(var(--mobile-nav-gutter), env(safe-area-inset-right, 0px));
   --mobile-nav-bottom-offset: 10px;
   --mobile-nav-item-gap: 8px;
   --mobile-nav-radius: 999px;
@@ -57,6 +63,8 @@ html.ai-gist-mobile {
   --mobile-nav-shelf-width-minimized: 46px;
   --mobile-nav-tabbar-height-minimized: 44px;
   --mobile-nav-tabbar-width-minimized: 220px;
+  /* 标签栏外框高度（内容高度 + 上下各 1px 边框），入口条据此悬停在标签栏上方 */
+  --mobile-nav-tabbar-outer-height: calc(var(--mobile-tabbar-content-height) + 2px);
   --mobile-nav-surface: color-mix(in srgb, var(--surface-primary) 72%, transparent);
   --mobile-nav-border: color-mix(in srgb, var(--border-default) 65%, transparent);
   --mobile-nav-blur: 22px;
@@ -110,6 +118,15 @@ html.ai-gist-mobile {
   --ion-font-family: var(--font-cjk-fallback), -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 }
 
+/*
+ * iOS 26+ 的标签栏交给系统渲染（见 lib/mobile/native-tab-bar.ts）。系统 UITabBar
+ * 的 Liquid Glass 胶囊高 62pt，Native UI 把它贴着网页占位的底边对齐，所以占位也要
+ * 一样高：否则系统胶囊会向上多出 8pt，压住上方的入口条。
+ */
+html.ai-gist-mobile.ai-gist-native-tabs {
+  --mobile-tabbar-content-height: 60px;
+}
+
 body.ai-gist-mobile {
   overscroll-behavior-y: none;
   -webkit-font-smoothing: antialiased;
@@ -119,6 +136,20 @@ body.ai-gist-mobile {
 html.ai-gist-mobile ion-content {
   --background: var(--surface-body);
   --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  /*
+   * 左右安全区：Ionic 只让 ion-item / ion-toolbar 这类组件把 --ion-safe-area-left/right
+   * 加进自己的 padding，页面里自绘的卡片、大标题、空状态不会，横屏时会钻到刘海
+   * 下面，iPhone Duo 上会被右侧的系统竖条盖住。统一在滚动层补上 inset，再把内部的
+   * Ionic 安全区变量清零，避免 ion-item 叠加第二次（与 vertical-bars.css 的做法一致，
+   * 出现竖条时它的规则优先级更高，会接管这里）。
+   */
+  --ion-safe-area-left: 0px;
+  --ion-safe-area-right: 0px;
+}
+
+html.ai-gist-mobile ion-content::part(scroll) {
+  padding-left: calc(var(--padding-start, 0px) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--padding-end, 0px) + env(safe-area-inset-right, 0px));
 }
 
 html.ai-gist-mobile ion-toolbar {
@@ -388,22 +419,44 @@ html.ai-gist-mobile ion-segment-button ion-label {
  * 因此都被移出正常文档流（position: fixed），不再占用 flex 布局中的独立高度，
  * 而是作为悬浮在内容之上的两片独立玻璃层——这样内容可以在它们身后滚动、
  * 透过背板的模糊/半透明背景显现，而不是被推挤到一段专属的空白条带上方。
+ *
+ * 标签栏不能再包在入口条的容器里（iOS 原生投影和 iPhone Duo 竖条都要求它是
+ * ion-tabs 的直接子元素），所以两者各自定位：标签栏贴底，入口条的 bottom 等于
+ * 标签栏的 bottom + 外框高度 + 间距，标签栏收起时入口条跟着同步下沉。
  * ------------------------------------------------------------------ */
 
 html.ai-gist-mobile .mobile-floating-nav {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: calc(
+    env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset) +
+    var(--mobile-nav-tabbar-outer-height) + var(--mobile-nav-item-gap)
+  );
   z-index: 10;
   display: flex;
   flex-direction: column;
-  /* 默认贴右对齐：AI 入口条收起时贴右悬浮；标签栏用 align-self 常量居中，见下方 */
+  /* 默认贴右对齐：AI 入口条收起时贴右悬浮 */
   align-items: flex-end;
-  gap: var(--mobile-nav-item-gap);
-  padding: 0 var(--mobile-nav-gutter)
-    calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+  padding: 0 var(--mobile-nav-inset-right) 0 var(--mobile-nav-inset-left);
   pointer-events: none;
+  transition: bottom var(--mobile-nav-transition);
+}
+
+/* 网页标签栏收起成小胶囊时入口条跟着下沉；系统标签栏不收起，入口条位置不变 */
+html.ai-gist-mobile:not(.ai-gist-native-tabs) .mobile-floating-nav--minimized {
+  --mobile-nav-tabbar-outer-height: calc(var(--mobile-nav-tabbar-height-minimized) + 2px);
+}
+
+/*
+ * iPhone Duo 竖条（ion-app.ios-theme-vertical-bars 由 setVerticalBarsLayout 加上）：
+ * 标签栏被系统挪到侧边，底部不再有标签栏，入口条落回底部，并在竖条那一侧让出
+ * 竖条宽度 + gutter。两个 resolved 变量由 vertical-bars.css 按竖条所在边给出。
+ */
+html.ai-gist-mobile ion-app.ios-theme-vertical-bars .mobile-floating-nav {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+  padding-left: calc(var(--ios-theme-vertical-bars-safe-area-left-resolved, 0px) + var(--mobile-nav-gutter));
+  padding-right: calc(var(--ios-theme-vertical-bars-safe-area-right-resolved, 0px) + var(--mobile-nav-gutter));
 }
 
 html.ai-gist-mobile .mobile-ai-entry {
@@ -486,22 +539,31 @@ html.ai-gist-mobile .mobile-prompt-actions__secondary ion-icon {
 }
 
 html.ai-gist-mobile ion-tab-bar {
-  pointer-events: auto;
-  /* 常量对齐：始终水平居中，不随收起/展开切换，只有 width 在两种状态间平滑过渡 */
-  align-self: center;
+  position: fixed;
   /*
-   * 这里是 content-box（见下方 height 注释），`width: 100%` 只计算内容宽度，
-   * 自身的 padding + 1px border 会在这之外各再多占 padding+1px。实测下来若真写
-   * 100%，胶囊会比 .mobile-floating-nav 留出的内容区宽 2*(padding+1px)，向两侧
-   * 各溢出这么多——这正是「新建提示词」入口条（没有 padding/border，天然贴合
-   * 内容区）和下面标签栏两侧边距对不齐的根因。用 calc 减掉这部分，让标签栏的
-   * 可视外框正好卡在 .mobile-floating-nav 的内容区边缘，两者边距严格一致。
+   * 常量对齐：left/right 卡在两侧 inset 上，margin auto 让它在两者之间水平居中，
+   * 收起/展开只有 width 在变，居中关系不变。iOS 原生投影会把测得的系统胶囊宽度
+   * 以 !important 写回 width，同样靠这里的 margin auto 保持居中。
    */
-  width: calc(100% - (var(--mobile-nav-tabbar-padding-inline) * 2) - 2px);
+  left: var(--mobile-nav-inset-left);
+  right: var(--mobile-nav-inset-right);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+  z-index: 10;
+  margin: 0 auto;
+  /*
+   * 这里是 content-box（见下方 height 注释），width 只计算内容宽度，自身的
+   * padding + 1px border 会在这之外各再多占 padding+1px，所以要从两侧 inset 之间的
+   * 宽度里再减掉这部分，标签栏的可视外框才正好卡在 inset 上，和上方入口条
+   * （没有 padding/border，天然贴合 inset）两侧边距严格一致。
+   */
+  width: calc(
+    100% - var(--mobile-nav-inset-left) - var(--mobile-nav-inset-right) -
+    (var(--mobile-nav-tabbar-padding-inline) * 2) - 2px
+  );
   --background: var(--mobile-nav-surface);
   border: 1px solid var(--mobile-nav-border);
   border-radius: var(--mobile-nav-radius);
-  /* content-box：这里的 height 只是内容高度，安全区已由外层 .mobile-floating-nav 统一处理 */
+  /* content-box：这里的 height 只是内容高度，安全区已经算在 bottom 里 */
   height: var(--mobile-tabbar-content-height);
   min-height: 0;
   padding: 0 var(--mobile-nav-tabbar-padding-inline);
@@ -593,10 +655,14 @@ html.ai-gist-mobile ion-tab-button ion-label {
 }
 
 /*
- * 滚动向下时收起：标签栏收缩为纯图标、居中的小型胶囊（align-self: center 是常量，
+ * 滚动向下时收起：标签栏收缩为纯图标、居中的小型胶囊（margin auto 居中是常量，
  * 从未切换，收缩时会自动保持居中）；AI 入口条同样收缩为一个圆形图标按钮，
  * 贴右悬浮（父容器 align-items: flex-end 同样是常量）。
  * 两个状态之间只有 width / opacity 等连续属性在变化，因此过渡是平滑的。
+ *
+ * 标签栏的收起态挂在 ion-tab-bar 自己的 [data-nav-minimized] 上（原因见
+ * MobileMainPage.vue），iOS 系统标签栏从不带这个属性；入口条的收起态仍然是
+ * 容器上的 .mobile-floating-nav--minimized。
  *
  * 下面 `.mobile-floating-nav--minimized .mobile-ai-entry(__label)` 是后代选择器，
  * 不要求直接子元素，因此提示词 Tab 两按钮布局里嵌套了一层 `.mobile-prompt-actions`
@@ -612,12 +678,12 @@ html.ai-gist-mobile ion-tab-button ion-label {
  * 选择器 specificity 严格高于展开态规则，不再依赖书写顺序；独立单按钮场景
  * （其余两个 Tab）继续走原来的后代选择器。
  */
-html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-bar {
+html.ai-gist-mobile ion-tab-bar[data-nav-minimized] {
   width: var(--mobile-nav-tabbar-width-minimized);
   height: var(--mobile-nav-tabbar-height-minimized);
 }
 
-html.ai-gist-mobile .mobile-floating-nav--minimized ion-tab-button ion-label {
+html.ai-gist-mobile ion-tab-bar[data-nav-minimized] ion-tab-button ion-label {
   opacity: 0;
   max-width: 0;
   max-height: 0;
@@ -636,7 +702,19 @@ html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry__label {
   max-width: 0;
 }
 
+/*
+ * 系统标签栏：网页占位只负责提供位置、文字和选中态，不能有任何过渡——Native UI
+ * 一旦检测到 ion-tab-bar 在做 CSS 过渡，就会在动画期间退回网页渲染。插件把测得的
+ * 系统胶囊宽度写回 width 时也不应该触发过渡。
+ */
+html.ai-gist-mobile.ai-gist-native-tabs ion-tab-bar,
+html.ai-gist-mobile.ai-gist-native-tabs ion-tab-button,
+html.ai-gist-mobile.ai-gist-native-tabs ion-tab-button ion-label {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html.ai-gist-mobile .mobile-floating-nav,
   html.ai-gist-mobile .mobile-ai-entry,
   html.ai-gist-mobile .mobile-ai-entry__label,
   html.ai-gist-mobile ion-tab-bar,

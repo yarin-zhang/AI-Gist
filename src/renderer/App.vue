@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed } from 'vue'
 import {
     NLayout,
     NConfigProvider,
@@ -28,6 +28,7 @@ import I18nErrorBanner from '~/components/common/I18nErrorBanner.vue'
 import NotificationHandler from '~/components/common/NotificationHandler.vue'
 import MobileBackButtonHandler from '~/components/mobile/MobileBackButtonHandler.vue'
 import PromptLauncher from '~/components/shortcuts/PromptLauncher.vue'
+import { isNativeTabBarEnabled } from '~/lib/mobile/native-tab-bar'
 
 // 检测运行壳：Web 桌面浏览器使用桌面壳，Web 手机浏览器和原生移动端使用移动壳
 const isDesktopShell = PlatformDetector.isDesktopShell()
@@ -82,6 +83,20 @@ onMounted(async () => {
     } catch (error) {
         console.error('❌ [App] 主题初始化失败:', error)
     }
+})
+
+// iOS 26+ 的底栏交给系统渲染（是否启用由 setup-ionic.ts 在 Ionic 初始化时决定）。
+// Native UI 要求在 ion-app 挂载后、整个应用只启动一次，所以放在根组件而不是 Tab 页里。
+let stopNativeUI: (() => void) | undefined
+let unmounted = false
+onMounted(async () => {
+    if (isDesktopShell || !isNativeTabBarEnabled()) return
+    const { mountIOSNativeUI } = await import('~/lib/mobile/ios-native-ui')
+    if (!unmounted) stopNativeUI = mountIOSNativeUI()
+})
+onBeforeUnmount(() => {
+    unmounted = true
+    stopNativeUI?.()
 })
 </script>
 
