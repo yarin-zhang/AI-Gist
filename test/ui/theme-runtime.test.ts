@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyDocumentTheme, resolveTheme } from '@renderer/theme/runtime';
+import { getIonicCssVars } from '@renderer/theme';
 
 describe('theme runtime', () => {
   afterEach(() => {
@@ -26,8 +27,34 @@ describe('theme runtime', () => {
     expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
     expect(document.documentElement.classList.contains('ion-palette-dark')).toBe(true);
     expect(document.body.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.style.getPropertyValue('--surface-body')).toBe('rgb(15, 17, 21)');
-    expect(document.documentElement.style.getPropertyValue('--overlay-backdrop')).toBe('rgba(0, 0, 0, 0.62)');
+    expect(document.documentElement.style.getPropertyValue('--surface-body')).toBe('rgb(13, 18, 25)');
+    expect(document.documentElement.style.getPropertyValue('--overlay-backdrop')).toBe('rgba(5, 8, 14, 0.62)');
+  });
+
+  // Ionic 深色色板 .ion-palette-dark.ios 的优先级高于 mobile.css 里的映射，色板必须写在 <html> 行内
+  it('writes the token-derived Ionic palette inline on the mobile shell', () => {
+    applyDocumentTheme('dark', 'mobile');
+    const style = document.documentElement.style;
+
+    expect(style.getPropertyValue('--ion-background-color')).toBe('rgb(13, 18, 25)');
+    expect(style.getPropertyValue('--ion-background-color-rgb')).toBe('13, 18, 25');
+    expect(style.getPropertyValue('--ion-color-primary')).toBe('rgb(38, 103, 224)');
+    expect(style.getPropertyValue('--ion-color-primary-contrast')).toBe('rgb(255, 255, 255)');
+    expect(style.getPropertyValue('--ion-text-color-step-950')).toBeTruthy();
+  });
+
+  it('derives every Ionic color with rgb, contrast, shade and tint variants', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      const vars = getIonicCssVars(theme);
+      for (const name of ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium', 'light', 'dark']) {
+        for (const suffix of ['', '-rgb', '-contrast', '-contrast-rgb', '-shade', '-tint']) {
+          expect(vars[`ion-color-${name}${suffix}`], `${theme} ${name}${suffix}`).toBeTruthy();
+        }
+      }
+      expect(vars['ion-background-color-step-50']).toMatch(/^rgb\(/);
+    }
+    // 深色主题下的语义色偏亮，色块上的文字改用深色
+    expect(getIonicCssVars('dark')['ion-color-success-contrast']).toBe('rgb(23, 32, 51)');
   });
 
   it('removes Ionic dark state when applying a desktop light theme', () => {

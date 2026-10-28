@@ -6,34 +6,39 @@ import { describe, expect, it } from 'vitest'
 // replaced every newline of a pasted diff with a space. Vitest has no SFC transform here, so
 // these checks pin the wiring; the helpers are covered in test/prompt-template.test.ts.
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
-const FIELD = read('src/renderer/components/prompt-management/PromptVariableField.vue')
-const CANVAS = read('src/renderer/components/prompt-management/PromptFillCanvas.vue')
+const FIELDS = read('src/renderer/components/prompts/VariableFieldList.vue')
+const PAGE = read('src/renderer/components/prompts/PromptPage.vue')
+const LAUNCHER = read('src/renderer/components/shortcuts/LauncherInlineFill.vue')
 const MOBILE_FORM = read('src/renderer/components/mobile/PromptVariableFillForm.vue')
 const MOBILE_PAGE = read('src/renderer/pages/mobile/MobilePromptDetailPage.vue')
 const LOCALES = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT']
 
 describe('multi-line variable fill wiring (#382)', () => {
-  it('desktop field renders text variables as a textarea when placement or value is multi-line', () => {
-    expect(FIELD).toContain("normalizedType.value === 'text' && (props.multiline || expanded.value) ? 'textarea'")
-    expect(FIELD).toMatch(/watch\(stringValue, value => \{ if \(hasLineBreak\(value\)\) expanded\.value = true \}/)
-    expect(FIELD).toContain(":type=\"displayType === 'textarea' ? 'textarea' : 'text'\"")
+  it('desktop variable panel renders text variables as a textarea when placement or value is multi-line', () => {
+    expect(FIELDS).toContain('props.multilineNames.has(variable.name) || expanded.value.has(variable.name) || hasLineBreak(stringValue(variable))')
+    expect(PAGE).toContain('findMultilineVariableNames(form.value.content)')
   })
 
-  it('desktop field intercepts multi-line pastes before the <input> flattens them', () => {
-    expect(FIELD).toContain('onPaste: handlePaste')
-    expect(FIELD).toContain('event.preventDefault()')
-    expect(FIELD).toContain("t('promptFill.switchedToMultiline')")
+  it('desktop variable panel intercepts multi-line pastes before the <input> flattens them', () => {
+    expect(FIELDS).toContain('onPaste: (event: ClipboardEvent) => handlePaste(event, variable)')
+    expect(FIELDS).toContain('event.preventDefault()')
   })
 
-  it('fill canvas passes the placement hint for each occurrence', () => {
-    expect(CANVAS).toContain(':multiline="multilineStarts.has(segment.start)"')
-    expect(CANVAS).toContain('findMultilineVariableStarts(')
+  it('launcher inline fill uses the placement hint and keeps pasted newlines', () => {
+    expect(LAUNCHER).toContain('findMultilineVariableStarts(')
+    expect(LAUNCHER).toContain('multilineStarts.value.has(segment.start)')
+    expect(LAUNCHER).toContain('@paste="handlePaste($event, segment.name)"')
+    expect(LAUNCHER).toContain('event.preventDefault()')
   })
 
   it('mobile form applies the same rule and keeps pasted newlines', () => {
     expect(MOBILE_PAGE).toContain(":content=\"prompt?.isJinjaTemplate ? '' : prompt?.content\"")
     expect(MOBILE_FORM).toContain('findMultilineVariableNames(')
     expect(MOBILE_FORM).toContain('@paste="handlePaste(variable, $event)"')
+    expect(MOBILE_FORM).toContain('event.preventDefault()')
+    // 切成多行文本框后给出提示，焦点和光标挪到新的文本框里
+    expect(MOBILE_FORM).toContain("t('promptFill.switchedToMultiline')")
+    expect(MOBILE_FORM).toContain('textarea.setSelectionRange(caret, caret)')
   })
 
   it.each(LOCALES)('%s has the switched-to-multi-line notice', locale => {

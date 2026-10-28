@@ -1,0 +1,411 @@
+// V5 组件库里的通用小部件。尺寸、颜色只取设计令牌；components/ui 下的组件也复用这些类。
+
+// 由颜色令牌组合出来的描边效果：分段选中项的 1px 描边。
+// 列表选中项只用浅色底表示，不加左侧彩色竖条或彩色边框。
+:root {
+	--hairline-ring: 0 0 0 1px var(--border-default);
+}
+
+// ---------- 文字 ----------
+.ui-title-page {
+	margin: 0;
+	font-size: var(--font-size-2xl);
+	font-weight: var(--font-weight-semibold);
+	line-height: 1.3;
+	letter-spacing: -0.01em;
+	color: var(--content-primary);
+}
+
+.ui-title-section {
+	margin: 0;
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-semibold);
+	line-height: 1.4;
+	color: var(--content-primary);
+}
+
+.ui-overline {
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-medium);
+	letter-spacing: 0.02em;
+	color: var(--content-tertiary);
+}
+
+.ui-help {
+	margin: 0;
+	font-size: var(--font-size-xs);
+	line-height: var(--line-height-normal);
+	color: var(--content-tertiary);
+}
+
+.ui-mono {
+	font-family: var(--font-family-mono);
+}
+
+// ---------- 快捷键 / 计数 / 状态点 / 分类色块 ----------
+.ui-kbd {
+	display: inline-flex;
+	align-items: center;
+	height: 20px;
+	padding: 0 6px;
+	border: 1px solid var(--border-default);
+	border-bottom-width: 2px;
+	border-radius: 4px;
+	background: var(--surface-primary);
+	color: var(--content-secondary);
+	font-family: var(--font-family-mono);
+	font-size: var(--font-size-xs);
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.ui-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--surface-tertiary);
+	color: var(--content-secondary);
+	font-size: var(--font-size-xs);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+
+	&--primary {
+		background: var(--accent-primary);
+		color: #fff;
+	}
+}
+
+.ui-dot {
+	display: inline-block;
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--indicator-neutral);
+
+	&--success { background: var(--indicator-success); }
+	&--warning { background: var(--indicator-warning); }
+	&--error { background: var(--indicator-error); }
+}
+
+.ui-cat-dot {
+	display: inline-block;
+	flex: none;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	background: var(--category-grey);
+}
+
+// ---------- 标签 ----------
+// 标签最宽不超过所在容器。放用户数据（分类名、标签名）时把文字套进 .ui-tag__text：
+// 这样的标签空间不够时可以收缩，文字显示省略号；没有 .ui-tag__text 的状态标签保持原宽、不被挤压。
+// 圆点、图标、移除按钮这些子元素不收缩。
+.ui-tag {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	height: 22px;
+	padding: 0 8px;
+	overflow: hidden;
+	border-radius: var(--radius-tag);
+	background: var(--surface-tertiary);
+	color: var(--content-secondary);
+	font-size: var(--font-size-xs);
+	line-height: 1;
+	white-space: nowrap;
+
+	&:has(> .ui-tag__text) {
+		flex-shrink: 1;
+		min-width: 0;
+	}
+
+	> * {
+		flex: none;
+	}
+
+	> .ui-tag__text {
+		flex: 0 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		line-height: var(--line-height-normal);
+		text-overflow: ellipsis;
+	}
+
+	&--line {
+		background: var(--surface-primary);
+		box-shadow: inset 0 0 0 1px var(--border-default);
+	}
+
+	&--success {
+		background: var(--accent-success-bg);
+		color: var(--accent-success);
+	}
+
+	&--warning {
+		background: var(--accent-warning-bg);
+		color: var(--accent-warning);
+	}
+
+	&--error {
+		background: var(--accent-error-bg);
+		color: var(--accent-error);
+	}
+}
+
+// ---------- 正文里的变量标记 ----------
+.ui-var {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: var(--radius-control);
+	background: var(--variable-bg);
+	box-shadow: inset 0 0 0 1px var(--variable-border);
+	color: var(--variable-text);
+	font: inherit;
+	line-height: 1.75;
+	text-align: left;
+	cursor: pointer;
+
+	// 取值很长时只让取值换行，变量名保持完整
+	&__label {
+		flex: none;
+		font-size: var(--font-size-xs);
+		color: var(--variable-label);
+		white-space: nowrap;
+	}
+
+	&--name {
+		font-family: var(--font-family-mono);
+		font-size: var(--font-size-sm);
+	}
+
+	&--missing {
+		background: var(--surface-primary);
+		box-shadow: none;
+		outline: 1.5px dashed var(--variable-missing);
+		outline-offset: -1.5px;
+		color: var(--accent-warning);
+	}
+
+	&--active {
+		box-shadow: inset 0 0 0 1px var(--accent-primary), var(--focus-ring);
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: inset 0 0 0 1px var(--accent-primary), var(--focus-ring);
+	}
+}
+
+// ---------- AI 修改与版本对比 ----------
+.ui-diff-insert {
+	background: var(--diff-insert-bg);
+	color: var(--diff-insert-text);
+	text-decoration: none;
+}
+
+.ui-diff-delete {
+	background: var(--diff-delete-bg);
+	color: var(--diff-delete-text);
+	text-decoration: line-through;
+}
+
+// ---------- 页内提醒横条（未保存等） ----------
+.ui-warn-bar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--accent-warning-border);
+	background: var(--accent-warning-bg);
+	color: var(--content-primary);
+	font-size: var(--font-size-sm);
+}
+
+// ---------- 提示条（连接结果、操作说明） ----------
+.ui-alert {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--accent-soft-border);
+	border-radius: var(--radius-control);
+	background: var(--accent-soft);
+	color: var(--content-primary);
+	font-size: var(--font-size-sm);
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+
+	&__icon {
+		flex: none;
+		margin-top: 2px;
+		color: var(--accent-primary);
+	}
+
+	&--success {
+		border-color: var(--accent-success-border);
+		background: var(--accent-success-bg);
+
+		.ui-alert__icon { color: var(--accent-success); }
+	}
+
+	&--warning {
+		border-color: var(--accent-warning-border);
+		background: var(--accent-warning-bg);
+
+		.ui-alert__icon { color: var(--accent-warning); }
+	}
+
+	&--error {
+		border-color: var(--accent-error-border);
+		background: var(--accent-error-bg);
+
+		.ui-alert__icon { color: var(--accent-error); }
+	}
+}
+
+// 灰底文字块：AI 回复、测试结果
+.ui-muted-box {
+	padding: 10px 12px;
+	border-radius: var(--radius-control);
+	background: var(--surface-secondary);
+	color: var(--content-primary);
+	font-size: var(--font-size-sm);
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+// ---------- 面板 ----------
+.ui-panel {
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-panel);
+	background: var(--surface-primary);
+
+	&__header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		min-height: 48px;
+		padding: 0 16px;
+		border-bottom: 1px solid var(--border-default);
+		border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+		background: var(--surface-secondary);
+	}
+
+	&__body {
+		padding: 16px;
+	}
+
+	&__rows {
+		padding: 0 16px;
+	}
+
+	&__footer {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 12px 16px;
+		border-top: 1px solid var(--border-default);
+		border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+		background: var(--surface-secondary);
+	}
+}
+
+// 设置行：左边说明，右边控件
+.ui-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 24px;
+	padding: 14px 0;
+	border-bottom: 1px solid var(--border-subtle);
+
+	&:last-child {
+		border-bottom: 0;
+	}
+
+	&__text {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	&__title {
+		font-size: var(--font-size-base);
+		font-weight: var(--font-weight-medium);
+		color: var(--content-primary);
+	}
+
+	&__description {
+		font-size: var(--font-size-sm);
+		color: var(--content-tertiary);
+	}
+
+	&__control {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+	}
+}
+
+// ---------- 空状态 ----------
+.ui-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 40px 24px;
+	text-align: center;
+
+	&__icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 56px;
+		height: 56px;
+		margin-bottom: 4px;
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-panel);
+		background: var(--surface-secondary);
+		color: var(--content-tertiary);
+	}
+
+	&__title {
+		font-size: var(--font-size-lg);
+		font-weight: var(--font-weight-semibold);
+		color: var(--content-primary);
+	}
+
+	&__description {
+		font-size: var(--font-size-sm);
+		color: var(--content-tertiary);
+	}
+
+	&__actions {
+		display: flex;
+		gap: 8px;
+		margin-top: 8px;
+	}
+}
+
+// 下拉菜单里的危险操作
+.n-dropdown-option.is-danger .n-dropdown-option-body,
+.n-dropdown-option.is-danger .n-dropdown-option-body__prefix {
+	color: var(--accent-error);
+}

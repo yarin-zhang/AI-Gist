@@ -1,11 +1,12 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import {
   getConfiguredBaseURL,
   getDefaultModels as getProviderDefaultModels,
   getTestModelPriority
 } from '@shared/ai-provider-metadata';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * OpenAI 兼容供应商（OpenAI、DeepSeek、Mistral等）
@@ -132,34 +133,25 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`获取 ${config.type} 模型列表 - baseURL: ${config.baseURL}`);
     
     if (this.providersWithoutModelList.has(config.type)) {
-      return this.getDefaultModels(config.type);
+      return { models: this.getDefaultModels(config.type), modelSource: 'default' };
     }
 
-    try {
-      const models = await this.fetchRemoteModels(config);
-      if (models.length > 0) {
-        return models;
-      }
-    } catch (error) {
-      console.error(`获取 ${config.type} 模型列表失败，使用默认列表:`, error);
-    }
-    
-    // 返回常见的模型作为后备
-    return this.getDefaultModels(config.type);
+    // 拿不到时不再直接返回内置列表，常见模型只作为备选交给界面
+    return this.resolveModelList(() => this.fetchRemoteModels(config), this.getDefaultModels(config.type));
   }
 
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试 ${config.type} 模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       
       const llm = new ChatOpenAI({
         openAIApiKey: config.apiKey,
@@ -193,7 +185,7 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
@@ -203,7 +195,7 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
       return { success: false, error: '未设置默认模型' };
     }
 
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const llm = new ChatOpenAI({

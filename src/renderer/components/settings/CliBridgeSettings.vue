@@ -1,48 +1,49 @@
 <template>
-    <NCard size="small">
-        <NFlex vertical :size="16">
-            <NFlex justify="space-between" align="center" :size="16">
-                <div>
-                    <NText>{{ t('cliBridge.enable') }}</NText>
-                    <NText depth="3" class="setting-description">{{ t('cliBridge.enableTip') }}</NText>
+    <div class="cli-settings">
+        <UiPanel body="rows">
+            <UiSettingRow :title="t('cliBridge.enable')" :description="t('cliBridge.enableTip')">
+                <span class="cli-settings__status">
+                    <span v-if="status.running" class="ui-tag ui-tag--success">
+                        <span class="ui-dot ui-dot--success" />{{ t('cliBridge.statusRunning', { port: status.port }) }}
+                    </span>
+                    <span v-else class="ui-tag">{{ t('cliBridge.statusStopped') }}</span>
+                    <NSwitch :value="enabled" :loading="loading" :aria-label="t('cliBridge.enable')" @update:value="handleToggle" />
+                </span>
+            </UiSettingRow>
+        </UiPanel>
+
+        <UiPanel v-if="status.running" :title="t('cliBridge.tryItTitle')">
+            <div class="cli-settings__try">
+                <div class="cli-settings__field">
+                    <span class="cli-settings__label">{{ t('cliBridge.tryItAgentLabel') }}</span>
+                    <div class="cli-settings__copy">
+                        <span class="cli-settings__text">{{ t('cliBridge.tryItHintAgentExample') }}</span>
+                        <NButton quaternary size="tiny" class="cli-settings__copy-button" :aria-label="t('cliBridge.copyPhrase')"
+                            @click="copyText(t('cliBridge.tryItHintAgentExample'))">
+                            <template #icon><NIcon :size="14"><Copy /></NIcon></template>
+                        </NButton>
+                    </div>
                 </div>
-                <NSwitch :value="enabled" :loading="loading" @update:value="handleToggle" />
-            </NFlex>
-
-            <NDivider />
-
-            <NFlex vertical :size="8">
-                <NFlex align="center" :size="8">
-                    <NTag :type="status.running ? 'success' : 'default'" size="small" :bordered="false">
-                        {{ status.running ? t('cliBridge.statusRunning', { port: status.port }) : t('cliBridge.statusStopped') }}
-                    </NTag>
-                </NFlex>
-
-                <template v-if="status.running">
-                    <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHintAgentLabel') }}</NText>
-                    <NFlex align="center" :size="8" class="cli-command-row">
-                        <code class="code-inline cli-command-code">{{ t('cliBridge.tryItHintAgentExample') }}</code>
-                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyText(t('cliBridge.tryItHintAgentExample'))">
-                            <template #icon><NIcon size="14"><Copy /></NIcon></template>
+                <div class="cli-settings__field">
+                    <span class="cli-settings__label">{{ t('cliBridge.tryItTerminalLabel') }}</span>
+                    <div class="cli-settings__copy">
+                        <span class="cli-settings__text ui-mono">{{ STATUS_COMMAND }}</span>
+                        <NButton quaternary size="tiny" class="cli-settings__copy-button" :aria-label="t('cliBridge.copyCommand')"
+                            @click="copyText(STATUS_COMMAND)">
+                            <template #icon><NIcon :size="14"><Copy /></NIcon></template>
                         </NButton>
-                    </NFlex>
-
-                    <NText depth="3" class="setting-description">{{ t('cliBridge.tryItHint') }}</NText>
-                    <NFlex align="center" :size="8" class="cli-command-row">
-                        <code class="code-inline cli-command-code">{{ STATUS_COMMAND }}</code>
-                        <NButton quaternary circle size="tiny" :title="t('cliBridge.copyCommand')" @click="copyText(STATUS_COMMAND)">
-                            <template #icon><NIcon size="14"><Copy /></NIcon></template>
-                        </NButton>
-                    </NFlex>
-                </template>
-            </NFlex>
-        </NFlex>
-    </NCard>
+                    </div>
+                </div>
+            </div>
+        </UiPanel>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { NButton, NCard, NDivider, NFlex, NIcon, NSwitch, NTag, NText, useMessage } from 'naive-ui';
+import { NButton, NIcon, NSwitch, useMessage } from 'naive-ui';
+import UiPanel from '@/components/ui/UiPanel.vue';
+import UiSettingRow from '@/components/ui/UiSettingRow.vue';
 import { useI18n } from 'vue-i18n';
 import { Copy } from '@vicons/tabler';
 import type { CliBridgeStatus } from '@shared/types';
@@ -101,17 +102,64 @@ onMounted(refreshStatus);
 </script>
 
 <style scoped>
-.setting-description {
-    display: block;
-    margin-top: 4px;
-    font-size: 12px;
+.cli-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.cli-command-row {
-    max-width: 100%;
+.cli-settings__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.cli-command-code {
+.cli-settings__status .ui-tag {
+    gap: 6px;
+}
+
+.cli-settings__try {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cli-settings__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cli-settings__label {
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.cli-settings__copy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--control-height-sm);
+    padding: 4px 4px 4px 10px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--surface-secondary);
+}
+
+.cli-settings__text {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-base);
     overflow-wrap: anywhere;
+}
+
+.cli-settings__text.ui-mono {
+    font-size: var(--font-size-sm);
+}
+
+.cli-settings__copy-button {
+    width: 22px;
+    padding: 0;
 }
 </style>

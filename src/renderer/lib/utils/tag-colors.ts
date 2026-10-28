@@ -25,6 +25,18 @@ export const COLOR_SWATCHES = [
   '#94A3B833',
 ] as const;
 
+/** V5 固定的 8 个分类色，与设计令牌 palette.*.category 一致；分类色只用作小色块。 */
+export const CATEGORY_COLORS = [
+  '#3A86FF',
+  '#FB5607',
+  '#FF006E',
+  '#8338EC',
+  '#06B57A',
+  '#00B4D8',
+  '#FFBE0B',
+  '#98A1AF',
+] as const;
+
 export function hashTagText(value: string): number {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {

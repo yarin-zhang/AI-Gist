@@ -1,303 +1,199 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ isEditMode ? t('aiConfig.editConfig') : t('aiConfig.addConfig') }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="handleSave" :disabled="saving">
-            {{ t('common.save') }}
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="isEditMode ? t('aiConfig.editConfig') : t('aiConfig.addConfig')" leading="none" solid>
+      <template #start>
+        <button type="button" class="m-btn edit-nav__cancel" @click="handleCancel">{{ t('common.cancel') }}</button>
+      </template>
+      <template #end>
+        <button type="button" class="m-save" :disabled="saving" @click="handleSave">{{ t('common.save') }}</button>
+      </template>
+    </MobileNavBar>
 
-    <ion-content :fullscreen="true">
-      <div class="form-container">
-        <!-- 基本配置 -->
-        <div class="form-section">
-          <div class="section-title">{{ t('aiConfig.basicConfig') }}</div>
-          <div class="form-content">
-            <ion-list lines="none">
+    <ion-content class="m-page-content">
+      <div class="m-body edit-body">
+        <!-- 服务类型：常用三项 + 「全部」，全部服务商在底部面板里按 自定义 → 在线 → 本地 分组
+             （issue #58：手机连接本地模型不方便，本地服务排最后） -->
+        <section class="m-section">
+          <div class="m-gt"><span>{{ t('aiConfig.serviceType') }}</span></div>
+          <div class="edit-providers">
+            <ProviderChoiceButton v-for="choice in quickChoices" :key="choice.id" :visual="getChoiceVisual(choice)"
+              :label="choice.label" :selected="choice.id === selectedChoiceId" @select="selectType(choice)" />
+            <ProviderChoiceButton :visual="moreVisual"
+              :label="t('mobileModels.allProviders', { count: availableChoiceCount })"
+              @select="showTypeModal = true" />
+          </div>
+          <!-- 从桌面端同步来的 Ollama / LM Studio / Azure 配置：可以编辑，但移动端的 AI 功能用不了 -->
+          <p v-if="desktopOnlySelected" class="m-note service-description">
+            <ion-icon :icon="desktopOutline" aria-hidden="true" />
+            <span>{{ t('mobileModels.desktopOnlyConfigNote') }}</span>
+          </p>
+          <!-- 服务说明：前面加信息图标，和上方的服务商宫格区分开（issue #145） -->
+          <p v-if="getServiceInfo.description" class="m-note service-description">
+            <ion-icon :icon="informationCircleOutline" aria-hidden="true" />
+            <span>{{ getServiceInfo.description }}</span>
+          </p>
+        </section>
 
-          <!-- 服务类型：卡片式弹层选择，分组顺序为「自定义服务」→「在线服务」→「本地服务」
-               （严格按 issue #58 原文的三条顺序需求：自定义优先，在线次之，本地最后——
-               手机连接本地模型不方便，不适合作为默认优先项） -->
-          <ion-item button detail lines="none" @click="showTypeModal = true">
-            <ion-label>{{ t('aiConfig.serviceType') }}</ion-label>
-            <div class="type-trigger-value" slot="end">
-              <span class="provider-icon" aria-hidden="true"><component :is="selectedProviderChoice.icon" /></span>
-              <span class="type-trigger-name">{{ selectedProviderChoice.label }}</span>
+        <!-- 连接：每个字段标签单独一行、输入框占满下一行，长地址不会被挤短（issue #145） -->
+        <section class="m-section">
+          <div class="m-gt"><span>{{ t('aiConfig.workspace.connectionSection') }}</span></div>
+          <div class="m-group">
+            <label class="m-field">
+              <span>{{ t('aiConfig.configName') }}</span>
+              <input v-model="formData.name" :placeholder="t('aiConfig.pleaseEnterConfigName')" autocomplete="off"
+                required>
+            </label>
+
+            <div v-if="needsApiKey" class="m-field">
+              <label for="ai-config-api-key">{{ t('mobileModels.apiKey') }}</label>
+              <div class="edit-secret">
+                <input id="ai-config-api-key" v-model="formData.apiKey" :type="showApiKey ? 'text' : 'password'"
+                  :placeholder="t('aiConfig.workspace.apiKeyPlaceholder')" autocomplete="off" autocapitalize="off"
+                  spellcheck="false">
+                <button type="button" class="edit-secret__toggle"
+                  :aria-label="showApiKey ? t('mobileModels.hideSecret') : t('mobileModels.showSecret')"
+                  @click="showApiKey = !showApiKey">
+                  <ion-icon :icon="showApiKey ? eyeOffOutline : eyeOutline" />
+                </button>
+              </div>
             </div>
-          </ion-item>
 
-          <!-- 配置名称 - 选择服务类型后显示。label-placement="stacked" 让标签独占一行、
-               输入框独占下方一行，避免和「兼容服务地址」一样标签与输入框同行挤占宽度
-               （issue #145：过长的 placeholder/value 会被截断看不全）。 -->
-          <ion-item v-if="formData.type" lines="none">
-            <ion-input
-              v-model="formData.name"
-              label-placement="stacked"
-              :label="t('aiConfig.configName')"
-              :placeholder="t('aiConfig.pleaseEnterConfigName')"
-              required
-            ></ion-input>
-          </ion-item>
+            <label v-if="needsBaseURL" class="m-field">
+              <span>{{ getBaseURLInfo.label }}</span>
+              <input v-model="formData.baseURL" type="url" inputmode="url" :placeholder="getBaseURLInfo.placeholder"
+                autocomplete="off" autocapitalize="off" spellcheck="false">
+            </label>
+          </div>
 
-          <!-- Base URL -->
-          <ion-item v-if="formData.type && needsBaseURL" lines="none">
-            <ion-input
-              v-model="formData.baseURL"
-              label-placement="stacked"
-              :label="getBaseURLInfo.label"
-              :placeholder="getBaseURLInfo.placeholder"
-              type="url"
-            ></ion-input>
-          </ion-item>
-
-          <p
-            v-if="formData.type === 'openai' && !isCustomSelected"
-            class="base-url-hint"
-          >
+          <p v-if="formData.type === 'openai' && !isCustomSelected" class="m-note base-url-hint">
             {{ t('aiConfig.openaiBaseURLHint') }}
           </p>
 
-          <!-- API Key -->
-          <ion-item v-if="formData.type && needsApiKey" lines="none">
-            <ion-input
-              v-model="formData.apiKey"
-              label-placement="stacked"
-              :label="getApiKeyLabel"
-              placeholder="API Key"
-              type="password"
-            ></ion-input>
-          </ion-item>
-
-          <!-- 服务信息：前面加一个小的信息图标，与上方表单字段区分开，避免视觉上混在一起
-               （issue #145）。 -->
-          <ion-item v-if="formData.type && getServiceInfo.description" lines="none">
-            <div class="service-info">
-              <p class="service-description">
-                <ion-icon :icon="informationCircleOutline" class="service-description-icon" aria-hidden="true"></ion-icon>
-                <span>{{ getServiceInfo.description }}</span>
-              </p>
-              <div class="service-links">
-                <ion-button
-                  v-if="getApiKeyInfo.apiKeyUrl"
-                  fill="outline"
-                  size="small"
-                  @click="openUrl(getApiKeyInfo.apiKeyUrl)"
-                >
-                  <ion-icon :icon="keyOutline" slot="start"></ion-icon>
-                  {{ t('aiConfig.getApiKey') }}
-                </ion-button>
-                <ion-button
-                  v-if="getApiKeyInfo.docUrl"
-                  fill="outline"
-                  size="small"
-                  @click="openUrl(getApiKeyInfo.docUrl)"
-                >
-                  <ion-icon :icon="documentTextOutline" slot="start"></ion-icon>
-                  {{ t('aiConfig.viewDocumentation') }}
-                </ion-button>
-              </div>
-            </div>
-          </ion-item>
-
-          <!-- 测试连接：改用 iOS 列表行按钮（图标 + 主色文字），与备份页
-               「创建备份」等主操作行使用同一套约定，而不是撑满宽度的纯色块状按钮
-               （issue #145）。 -->
-          <ion-item
-            v-if="formData.type"
-            button
-            :detail="false"
-            lines="none"
-            :disabled="testingConnection || !canTestConnection"
-            @click="handleTestConnection"
-          >
-            <ion-icon :icon="flashOutline" slot="start" color="primary"></ion-icon>
-            <ion-label color="primary">{{ t('aiConfig.testConnection') }}</ion-label>
-            <ion-spinner v-if="testingConnection" slot="end" name="crescent"></ion-spinner>
-          </ion-item>
-
-          <!-- 测试结果 -->
-          <ion-item v-if="testResult" lines="none">
-            <div class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
-              <ion-icon
-                :icon="testResult.success ? checkmarkCircle : closeCircle"
-                :color="testResult.success ? 'success' : 'danger'"
-              ></ion-icon>
-              <div class="test-result-content">
-                <div class="test-result-message">{{ testResult.message }}</div>
-                <!-- 显示详细错误信息 -->
-                <div v-if="!testResult.success && testResult.message" class="test-result-detail">
-                  {{ testResult.message }}
-                </div>
-              </div>
-            </div>
-          </ion-item>
-            </ion-list>
+          <div v-if="getApiKeyInfo.apiKeyUrl || getApiKeyInfo.docUrl" class="edit-links">
+            <button v-if="getApiKeyInfo.apiKeyUrl" type="button" @click="openUrl(getApiKeyInfo.apiKeyUrl)">
+              <ion-icon :icon="keyOutline" aria-hidden="true" />
+              {{ t('aiConfig.getApiKey') }}
+            </button>
+            <button v-if="getApiKeyInfo.docUrl" type="button" @click="openUrl(getApiKeyInfo.docUrl)">
+              <ion-icon :icon="documentTextOutline" aria-hidden="true" />
+              {{ t('aiConfig.viewDocumentation') }}
+            </button>
           </div>
-        </div>
+        </section>
 
-        <!-- 模型配置 -->
-        <div v-if="shouldShowModelConfig" class="form-section">
-          <div class="section-title">{{ t('aiConfig.modelConfig') }}</div>
-          <div class="form-content">
-            <ion-list lines="none">
-
-          <!-- 模型列表 -->
-          <ion-item lines="none">
-            <div class="models-container">
-              <ion-label position="stacked">{{ t('aiConfig.modelList') }}</ion-label>
-              <div class="models-chips">
-                <ion-chip
-                  v-for="(model, index) in formData.models"
-                  :key="index"
-                  @click="removeModel(index)"
-                >
-                  <ion-label>{{ model }}</ion-label>
-                  <ion-icon :icon="close"></ion-icon>
-                </ion-chip>
-                <ion-chip @click="showAddModelAlert" color="primary">
-                  <ion-icon :icon="add"></ion-icon>
-                  <ion-label>{{ t('aiConfig.addModel') }}</ion-label>
-                </ion-chip>
-              </div>
-            </div>
-          </ion-item>
-
-          <!-- 默认模型 -->
-          <ion-item v-if="formData.models.length > 0" lines="none">
-            <ion-select
-              v-model="formData.defaultModel"
-              :label="t('aiConfig.defaultModel')"
-              :placeholder="t('aiConfig.pleaseSelectDefaultModel')"
-            >
-              <ion-select-option v-for="model in formData.models" :key="model" :value="model">
-                {{ model }}
-              </ion-select-option>
-            </ion-select>
-          </ion-item>
-
-          <!-- 自定义模型 -->
-          <ion-item lines="none">
-            <ion-input
-              v-model="formData.customModel"
-              :label="t('aiConfig.customModel')"
-              :placeholder="t('aiConfig.customModelPlaceholder')"
-            ></ion-input>
-          </ion-item>
-            </ion-list>
+        <!-- 模型：轻点设为默认模型；「编辑」后轻点移除 -->
+        <section class="m-section">
+          <div class="m-gt">
+            <span class="edit-models__title">
+              {{ t('models.modelsPanel') }}
+              <small v-if="formData.models.length > 0">
+                {{ t('aiConfig.workspace.modelCount', { count: formData.models.length }) }}
+              </small>
+            </span>
+            <button v-if="formData.models.length > 0" type="button" @click="editingModels = !editingModels">
+              {{ editingModels ? t('mobileModels.done') : t('common.edit') }}
+            </button>
           </div>
+
+          <div class="edit-models" :class="{ 'is-editing': editingModels }">
+            <button v-for="(model, index) in formData.models" :key="`${model}-${index}`" type="button"
+              class="m-chip edit-model" :class="{ on: !editingModels && model === formData.defaultModel }"
+              :aria-pressed="!editingModels && model === formData.defaultModel"
+              :aria-label="editingModels ? `${t('common.delete')} ${model}` : model"
+              @click="handleModelChip(model, index)">
+              <ion-icon v-if="editingModels" :icon="closeCircle" aria-hidden="true" />
+              <ion-icon v-else-if="model === formData.defaultModel" :icon="checkmark" aria-hidden="true" />
+              <span>{{ model }}</span>
+            </button>
+            <button v-if="!editingModels" type="button" class="m-chip edit-model edit-model--add"
+              @click="showAddModelAlert">
+              <ion-icon :icon="add" aria-hidden="true" />
+              {{ t('aiConfig.addModel') }}
+            </button>
+          </div>
+
+          <!-- 和桌面向导一致，只保留「添加模型」一种方式：旧的「自定义模型」打开时已并进上面的列表 -->
+          <p class="m-note edit-models__note">
+            {{ formData.models.length > 0 ? t('mobileModels.modelChipHint') : t('mobileModels.modelsEmptyHint') }}
+          </p>
+        </section>
+
+        <!-- 测试连接：次级按钮（白底卡片），不是整条主色块按钮（issue #145） -->
+        <button type="button" class="m-cta m-cta-2 edit-test" :disabled="testingConnection || !canTestConnection"
+          @click="handleTestConnection">
+          <ion-spinner v-if="testingConnection" name="crescent" />
+          <ion-icon v-else :icon="flashOutline" aria-hidden="true" />
+          {{ t('aiConfig.testConnection') }}
+        </button>
+
+        <!-- 测试结果：失败时给出原因和处理办法，原始信息收在详情里 -->
+        <div v-if="testResult" class="m-card edit-test-result" role="status">
+          <span class="m-tile" :class="testResult.success ? 'm-tile--success' : 'm-tile--error'" aria-hidden="true">
+            <ion-icon :icon="testResult.success ? checkmarkCircle : closeCircle" />
+          </span>
+          <MobileAIErrorNote v-if="testResult.error" class="edit-test-result__error" :error="testResult.error" />
+          <p v-else>{{ testResult.message }}</p>
         </div>
       </div>
     </ion-content>
 
-    <!-- 服务类型选择弹层：卡片式列表，分组顺序为「自定义服务」→「在线服务」→「本地服务」 -->
-    <ion-modal :is-open="showTypeModal" @didDismiss="showTypeModal = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ t('aiConfig.serviceType') }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="showTypeModal = false">
-              {{ t('common.close') }}
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content class="type-modal-content">
-        <template v-for="group in typeGroups" :key="group.key">
-          <ion-list-header class="type-group-header">
-            <ion-icon :icon="group.icon"></ion-icon>
-            <ion-label>{{ group.label }}</ion-label>
-          </ion-list-header>
-          <div class="mobile-grouped-card">
-            <ion-list lines="full">
-              <ion-item
-                v-for="provider in group.providers"
-                :key="provider.id"
-                button
-                :detail="false"
-                @click="selectType(provider)"
-              >
-                <span class="provider-icon" slot="start" aria-hidden="true"><component :is="provider.icon" /></span>
-                <ion-label class="ion-text-wrap">
-                  <h3>{{ provider.label }}</h3>
-                  <p>{{ provider.description }}</p>
-                </ion-label>
-                <ion-icon
-                  v-if="selectedChoiceId === provider.id"
-                  :icon="checkmarkCircle"
-                  slot="end"
-                  color="primary"
-                ></ion-icon>
-              </ion-item>
-            </ion-list>
-          </div>
-        </template>
-      </ion-content>
-    </ion-modal>
+    <ProviderPickerSheet :open="showTypeModal" :groups="groups" :selected-id="selectedChoiceId" :note="desktopOnlyNote"
+      @close="showTypeModal = false" @select="selectType" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type Component } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
-  IonButtons,
-  IonButton,
-  IonBackButton,
-  IonList,
-  IonListHeader,
-  IonItem,
-  IonLabel,
-  IonInput,
-  IonSelect,
-  IonSelectOption,
-  IonModal,
-  IonChip,
   IonIcon,
   IonSpinner,
-  alertController
+  alertController,
+  useBackButton
 } from '@ionic/vue'
 import {
   add,
-  close,
+  checkmark,
   checkmarkCircle,
   closeCircle,
-  keyOutline,
+  desktopOutline,
   documentTextOutline,
-  cloudOutline,
-  hardwareChipOutline,
-  extensionPuzzleOutline,
+  ellipsisHorizontal,
+  eyeOffOutline,
+  eyeOutline,
   flashOutline,
-  informationCircleOutline
+  informationCircleOutline,
+  keyOutline
 } from 'ionicons/icons'
-import {
-  Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
-  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
-} from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigForm } from '~/composables/useAIConfigForm'
 import { api } from '~/lib/api'
+import { mergeLegacyCustomModel, shouldPreferNewConfig } from '~/lib/utils/ai-config-models'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import { getDefaultBaseURL } from '@shared/ai-provider-metadata'
-import type { AIConfig, AIProviderType } from '@shared/types'
+import type { AIConfig } from '@shared/types'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import ProviderChoiceButton from '~/components/mobile/models/ProviderChoiceButton.vue'
+import ProviderPickerSheet from '~/components/mobile/models/ProviderPickerSheet.vue'
+import {
+  getChoiceVisual,
+  useMobileProviderCatalog,
+  type ProviderChoice,
+  type ProviderVisual
+} from '~/components/mobile/models/provider-catalog'
+import { rememberConnectionStatus, type ConnectionStatus } from '~/components/mobile/models/connection-status'
+import { describeMobileAIError, isMobileSupportedProvider, type MobileAIErrorView } from '~/components/mobile/prompt/mobile-ai'
+import MobileAIErrorNote from '~/components/mobile/prompt/MobileAIErrorNote.vue'
+import { confirmAlert } from '~/components/mobile/models/useConfigActions'
+import { useSwipeBackGuard } from '~/components/mobile/useSwipeBackGuard'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
 // 使用 composable。needsBaseURL / getBaseURLInfo / getApiKeyInfo 在组合式函数里只按
-// AIProviderType 判断，无法识别本页新增的「自定义服务」卡片（type 仍是 openai/anthropic，
+// AIProviderType 判断，无法识别「自定义服务」和预设服务（type 仍是 openai/anthropic，
 // 但需要不同的字段展示逻辑），因此这里取原始值并在下方结合 isCustomSelected 派生出
 // 同名的、感知自定义状态的版本，其余用法不变。
 const {
@@ -305,232 +201,86 @@ const {
   needsBaseURL: baseNeedsBaseURL,
   needsApiKey,
   handleTypeChange,
-  getApiKeyLabel,
   getBaseURLInfo: baseGetBaseURLInfo,
   getApiKeyInfo: baseGetApiKeyInfo,
   resetForm
 } = useAIConfigForm()
 
+// 服务商目录与桌面端共用（在线 / 本地 / 自定义，含 Groq、Moonshot 等预设）
+const {
+  groups,
+  availableChoiceCount,
+  desktopOnlyNames,
+  compatibilityProviderChoices,
+  featuredChoices,
+  findChoice,
+  officialChoiceFor,
+  resolveProviderChoiceId
+} = useMobileProviderCatalog()
+
 // 状态
 const saving = ref(false)
 const testingConnection = ref(false)
+const showApiKey = ref(false)
+const editingModels = ref(false)
+const showTypeModal = ref(false)
+// 编辑时保留原来的启用状态，保存不会把已禁用的配置悄悄打开
+const loadedEnabled = ref(true)
 const testResult = ref<{
   success: boolean
   message: string
+  error?: MobileAIErrorView
   models?: string[]
   modelSource?: 'remote' | 'default' | 'unavailable'
 } | null>(null)
+// 最近一次测试时的连接信息和结果：保存时连接信息没变，就把结果记到这个配置上（模型页直接显示）
+let lastTest: { key: string; status: ConnectionStatus } | null = null
+const connectionKey = () => JSON.stringify([formData.type, formData.baseURL.trim(), formData.apiKey.trim()])
 
 // 判断是否为编辑模式
 const isEditMode = computed(() => !!route.params.id)
-const shouldShowModelConfig = computed(() => {
-  return !!testResult.value?.success || isEditMode.value || formData.models.length > 0 || !!formData.customModel
-})
 
-// 服务商信息（名称 + 描述）。按类型取值，供当前选中态展示和选择弹层的卡片列表共用
-const getServiceInfoByType = (type: AIProviderType) => {
-  const info: Record<AIProviderType, { name: string; description: string }> = {
-    openai: {
-      name: 'OpenAI',
-      description: t('aiConfig.serviceDescriptions.openai')
-    },
-    anthropic: {
-      name: 'Anthropic Claude',
-      description: t('aiConfig.serviceDescriptions.anthropic')
-    },
-    google: {
-      name: 'Google Gemini AI',
-      description: t('aiConfig.serviceDescriptions.google')
-    },
-    azure: {
-      name: 'Azure OpenAI',
-      description: t('aiConfig.serviceDescriptions.azure')
-    },
-    deepseek: {
-      name: 'DeepSeek',
-      description: t('aiConfig.serviceDescriptions.deepseek')
-    },
-    siliconflow: {
-      name: '硅基流动',
-      description: t('aiConfig.serviceDescriptions.siliconflow')
-    },
-    tencent: {
-      name: '腾讯云',
-      description: t('aiConfig.serviceDescriptions.tencent')
-    },
-    aliyun: {
-      name: '阿里云',
-      description: t('aiConfig.serviceDescriptions.aliyun')
-    },
-    mistral: {
-      name: 'Mistral AI',
-      description: t('aiConfig.serviceDescriptions.mistral')
-    },
-    zhipu: {
-      name: '智谱AI',
-      description: t('aiConfig.serviceDescriptions.zhipu')
-    },
-    openrouter: {
-      name: 'OpenRouter',
-      description: t('aiConfig.serviceDescriptions.openrouter')
-    },
-    ollama: {
-      name: 'Ollama',
-      description: t('aiConfig.serviceDescriptions.ollama')
-    },
-    lmstudio: {
-      name: 'LM Studio',
-      description: t('aiConfig.serviceDescriptions.lmstudio')
-    }
-  }
-  return info[type] || { name: '', description: '' }
-}
-
-// 计算属性：当前选中服务商信息。自定义服务的名称/描述来自选中的卡片本身（复用兼容服务的
-// 文案），而不是按 type（openai/anthropic）取通用服务商介绍。
-const getServiceInfo = computed(() => isCustomSelected.value
-  ? { name: selectedProviderChoice.value.label, description: selectedProviderChoice.value.description }
-  : getServiceInfoByType(formData.type))
-
-// 服务类型选择弹层：三个分组，顺序严格按 issue #58 原文——
-// 1. 自定义服务（最前）：OpenAI 兼容服务 / Claude 兼容服务，参照桌面端 AIConfigPage.vue
-//    的 compatibilityProviderChoices 实现——type 仍是 openai/anthropic，仅加 custom
-//    标记、baseURL 留空，不引入新的 AIProviderType 或数据模型改动。
-// 2. 在线服务（第二）
-// 3. 本地服务（最后）：手机连接本地模型不方便，不适合作为默认优先项。
-// 注意：这个顺序是 issue 原文的三条需求本身要求的顺序，与桌面端当前实现顺序
-// （本地→在线→自定义）不同——「和桌面端保持一致」指的是复用桌面端已有的自定义服务
-// 功能，不是照抄桌面端现状的分组顺序。
-const showTypeModal = ref(false)
-
-const localTypeOrder: AIProviderType[] = ['ollama', 'lmstudio']
-const onlineTypeOrder: AIProviderType[] = [
-  'openai', 'anthropic', 'google', 'azure', 'mistral',
-  'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow'
-]
-
-// 卡片头像用的短缩写，仅作视觉标识，不引入新的配色体系
-const providerInitials: Record<AIProviderType, string> = {
-  ollama: 'Ol',
-  lmstudio: 'LM',
-  openai: 'Op',
-  anthropic: 'An',
-  google: 'Go',
-  azure: 'Az',
-  mistral: 'Mi',
-  openrouter: 'Or',
-  deepseek: 'De',
-  tencent: '腾',
-  aliyun: '阿',
-  zhipu: '智',
-  siliconflow: '硅'
-}
-
-// Reuse the established provider marks from the desktop provider picker. These
-// are vector icons, so they stay crisp inside the circular mobile affordance.
-const providerIcons: Record<AIProviderType, Component> = {
-  openai: Atom,
-  ollama: BrandOpenSource,
-  anthropic: LetterA,
-  google: BrandGoogle,
-  azure: BrandWindows,
-  lmstudio: DeviceDesktop,
-  deepseek: LetterD,
-  mistral: LetterM,
-  siliconflow: Circles,
-  tencent: LetterT,
-  aliyun: Cloud,
-  zhipu: LetterZ,
-  openrouter: Route
-}
-
-interface ProviderCardChoice {
-  id: string
-  type: AIProviderType
-  label: string
-  description: string
-  initial: string
-  icon: Component
-  custom?: boolean
-  placeholder?: string
-}
-
-const buildProviderChoice = (type: AIProviderType): ProviderCardChoice => {
-  const info = getServiceInfoByType(type)
-  return {
-    id: `official:${type}`,
-    type,
-    label: info.name,
-    description: info.description,
-    initial: providerInitials[type],
-    icon: providerIcons[type]
-  }
-}
-
-// 自定义服务分组：复用桌面端 AIConfigPage.vue 的 custom:openai / custom:claude 概念
-// （type 仍是 'openai' / 'anthropic'，只是加 custom 标记 + 空 baseURL），共用同一套
-// i18n 文案（aiConfig.workspace.customOpenAI* / customClaude*），不新增翻译 key。
-const compatibilityChoices = computed<ProviderCardChoice[]>(() => [
-  {
-    id: 'custom:openai',
-    type: 'openai',
-    label: t('aiConfig.workspace.customOpenAI'),
-    description: t('aiConfig.workspace.customOpenAIDesc'),
-    initial: providerInitials.openai,
-    icon: Api,
-    custom: true,
-    placeholder: 'https://your-provider.example/v1'
-  },
-  {
-    id: 'custom:claude',
-    type: 'anthropic',
-    label: t('aiConfig.workspace.customClaude'),
-    description: t('aiConfig.workspace.customClaudeDesc'),
-    initial: providerInitials.anthropic,
-    icon: LetterA,
-    custom: true,
-    placeholder: 'https://your-provider.example'
-  }
-])
-
-const typeGroups = computed(() => [
-  {
-    key: 'custom',
-    label: t('aiConfig.workspace.customServices'),
-    icon: extensionPuzzleOutline,
-    providers: compatibilityChoices.value
-  },
-  {
-    key: 'online',
-    label: t('aiConfig.onlineServices'),
-    icon: cloudOutline,
-    providers: onlineTypeOrder.map(buildProviderChoice)
-  },
-  {
-    key: 'local',
-    label: t('aiConfig.localServices'),
-    icon: hardwareChipOutline,
-    providers: localTypeOrder.map(buildProviderChoice)
-  }
-])
-
-// 当前选中的卡片 id（official:xxx / custom:openai / custom:claude）。
-// 因为自定义服务和官方服务可能共用同一个 AIProviderType（如 custom:openai 与
-// official:openai 都是 type:'openai'），仅凭 formData.type 无法区分选中的是哪张卡片，
+// 当前选中的服务商 id（official:xxx / preset:xxx / custom:openai / custom:claude）。
+// 自定义服务、预设服务和官方服务可能共用同一个 AIProviderType（如 custom:openai 与
+// official:openai 都是 type:'openai'），仅凭 formData.type 无法区分选中的是哪一项，
 // 需要单独的 id 状态。
 const selectedChoiceId = ref('custom:openai')
-const allProviderChoices = computed(() => typeGroups.value.flatMap(group => group.providers))
-const selectedProviderChoice = computed(() =>
-  allProviderChoices.value.find(choice => choice.id === selectedChoiceId.value)
-  || buildProviderChoice(formData.type)
-)
+const selectedProviderChoice = computed(() => findChoice(selectedChoiceId.value)
+  || officialChoiceFor(formData.type)
+  || compatibilityProviderChoices.value[0])
 const isCustomSelected = computed(() => Boolean(selectedProviderChoice.value.custom))
 
+const quickChoices = computed(() => featuredChoices(selectedChoiceId.value))
+const desktopOnlySelected = computed(() => !isMobileSupportedProvider(formData.type))
+
+const formatNames = (names: string[]) => {
+  try {
+    return new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(names)
+  } catch {
+    return names.join(', ')
+  }
+}
+const desktopOnlyNote = computed(() => desktopOnlyNames.value.length
+  ? t('mobileModels.desktopOnlyProviders', { names: formatNames(desktopOnlyNames.value) })
+  : '')
+
+// 自定义兼容服务的地址字段叫「兼容服务地址」，漏填时的提示用同一个叫法
+const baseURLRequiredMessage = () => isCustomSelected.value
+  ? t('mobileModels.enterServiceEndpoint')
+  : t('aiConfig.pleaseEnterBaseURL')
+const moreVisual: ProviderVisual = { initial: '', tone: 'grey', icon: ellipsisHorizontal }
+
+// 当前选中服务商的名称和说明（自定义/预设服务的说明来自选项本身）
+const getServiceInfo = computed(() => ({
+  name: selectedProviderChoice.value.label,
+  description: selectedProviderChoice.value.description
+}))
+
 // needsBaseURL / canTestConnection / getBaseURLInfo / getApiKeyInfo：在组合式函数原始值
-// 基础上叠加「自定义服务」的差异化展示逻辑（参照桌面端 isCustomProviderChoice 的处理）：
+// 基础上叠加「自定义服务」的差异化展示逻辑（参照桌面端的处理）：
 // - 自定义 Claude 兼容服务的 type 是 anthropic，但和普通 Anthropic 不同，必须填 Base URL；
-// - Base URL 标签/占位符改为「兼容服务地址」+ 具体协议示例，不使用官方默认地址自动填充；
-// - 自定义服务没有已知的获取 Key / 文档链接，不展示这两个按钮。
+// - Base URL 标签改为「兼容服务地址」+ 具体协议示例，不使用官方默认地址自动填充；
+// - 自定义兼容服务没有已知的获取 Key / 文档链接，预设服务用预设自带的链接。
 const needsBaseURL = computed(() => isCustomSelected.value || baseNeedsBaseURL.value)
 const canTestConnection = computed(() => (
   (!needsApiKey.value || Boolean(formData.apiKey.trim()))
@@ -539,40 +289,35 @@ const canTestConnection = computed(() => (
 const getBaseURLInfo = computed(() => isCustomSelected.value
   ? {
       label: t('aiConfig.workspace.customServiceEndpoint'),
-      placeholder: selectedProviderChoice.value.placeholder || t('aiConfig.useOfficialEndpoint')
+      placeholder: selectedProviderChoice.value.placeholder
+        || selectedProviderChoice.value.baseURL
+        || t('aiConfig.useOfficialEndpoint')
     }
-  : baseGetBaseURLInfo.value)
+  : { label: t('aiConfig.baseURL'), placeholder: baseGetBaseURLInfo.value.placeholder })
 const getApiKeyInfo = computed(() => isCustomSelected.value
-  ? { apiKeyUrl: '', docUrl: '' }
+  ? {
+      apiKeyUrl: selectedProviderChoice.value.apiKeyUrl || '',
+      docUrl: selectedProviderChoice.value.docUrl || ''
+    }
   : baseGetApiKeyInfo.value)
 
-const selectType = (choice: ProviderCardChoice) => {
+const selectType = (choice: ProviderChoice) => {
   const isSame = selectedChoiceId.value === choice.id
   selectedChoiceId.value = choice.id
   if (!isSame) {
     formData.type = choice.type
     onTypeChange()
     if (choice.custom) {
-      // 自定义服务：Base URL 必须留空让用户自己填，不能沿用 handleTypeChange 按
-      // type 自动填充的官方默认地址；配置名称同样只在新建模式下才自动带入卡片标题。
-      formData.baseURL = ''
+      // 自定义服务：Base URL 留空让用户自己填（预设服务带入预设地址），不能沿用
+      // handleTypeChange 按 type 自动填充的官方默认地址；配置名称只在新建模式下带入。
+      formData.baseURL = choice.baseURL || ''
       if (!isEditMode.value) {
-        formData.name = choice.label
+        formData.name = choice.defaultName || choice.label
       }
     }
   }
   showTypeModal.value = false
 }
-
-// 判断已保存的配置是否为「自定义服务」：与桌面端 AIConfigPage.vue 的 isCustomConfig
-// 判断逻辑一致——openai 类型但 baseURL 不是官方默认地址，或 anthropic 类型但填了
-// baseURL（官方 Anthropic 不需要 baseURL），即视为自定义。
-const normalizeURL = (value?: string) => (value || '').trim().replace(/\/+$/, '')
-const isCustomConfig = (config: AIConfig) => (
-  config.type === 'openai' && normalizeURL(config.baseURL) !== normalizeURL(getDefaultBaseURL('openai'))
-) || (
-  config.type === 'anthropic' && Boolean(normalizeURL(config.baseURL))
-)
 
 // 加载配置数据（编辑模式）
 const loadConfig = async () => {
@@ -587,12 +332,13 @@ const loadConfig = async () => {
       formData.name = config.name
       formData.baseURL = config.baseURL
       formData.apiKey = config.apiKey || ''
-      formData.models = config.models
-      formData.defaultModel = config.defaultModel || ''
-      formData.customModel = config.customModel || ''
-      selectedChoiceId.value = isCustomConfig(config)
-        ? (config.type === 'anthropic' ? 'custom:claude' : 'custom:openai')
-        : `official:${config.type}`
+      // 旧数据里的「自定义模型」并进可用模型列表；没有默认模型时它就是默认模型（与桌面向导一致）
+      const { models, defaultModel } = mergeLegacyCustomModel(config)
+      formData.models = models
+      formData.defaultModel = defaultModel
+      loadedEnabled.value = config.enabled
+      // 与桌面端判断一致：预设地址 → 预设；openai 非官方地址或 anthropic 填了地址 → 自定义
+      selectedChoiceId.value = resolveProviderChoiceId(config)
     }
   } catch (error) {
     console.error('加载配置失败:', error)
@@ -604,6 +350,7 @@ const loadConfig = async () => {
 const onTypeChange = () => {
   handleTypeChange(formData.type, isEditMode.value)
   testResult.value = null
+  editingModels.value = false
 }
 
 const getModelListDisplayMessage = (result: {
@@ -643,7 +390,7 @@ const handleTestConnection = async () => {
     return
   }
   if (needsBaseURL.value && !formData.baseURL) {
-    showToast(t('aiConfig.pleaseEnterBaseURL'), 'warning')
+    showToast(baseURLRequiredMessage(), 'warning')
     return
   }
   if (needsApiKey.value && !formData.apiKey) {
@@ -653,6 +400,8 @@ const handleTestConnection = async () => {
 
   testingConnection.value = true
   testResult.value = null
+  const key = connectionKey()
+  const started = performance.now()
 
   try {
     // 使用统一的 API 调用（会自动根据平台选择实现）
@@ -662,12 +411,23 @@ const handleTestConnection = async () => {
       apiKey: formData.apiKey
     })
 
+    lastTest = {
+      key,
+      status: result.success
+        ? { state: 'ok', elapsed: Math.round(performance.now() - started) }
+        : { state: 'error', error: result.error }
+    }
+
     if (result.success) {
       const resultMessage = getModelListDisplayMessage(result)
 
       // 如果获取到模型，自动填充
       if (result.models && result.models.length > 0) {
-        formData.models = result.models
+        // 已选的默认模型（包括并进来的旧「自定义模型」）服务没返回时也留在列表里，和桌面向导一致
+        formData.models = formData.defaultModel && !result.models.includes(formData.defaultModel)
+          ? [formData.defaultModel, ...result.models]
+          : result.models
+        editingModels.value = false
 
         // 如果还没有设置默认模型，自动设置第一个
         if (!formData.defaultModel) {
@@ -691,22 +451,25 @@ const handleTestConnection = async () => {
         showToast(resultMessage, 'warning')
       }
     } else {
-      // 显示详细的错误信息
+      // 按错误类别给出说明，原始信息收进详情
       const errorMessage = result.error || t('aiConfig.connectionTestFailed')
       testResult.value = {
         success: false,
-        message: errorMessage
+        message: errorMessage,
+        error: describeMobileAIError(errorMessage, t)
       }
-      showToast(errorMessage, 'danger')
+      showToast(t('mobileModels.connectionFailedShort'), 'danger')
     }
   } catch (error) {
     console.error('[Page] 测试连接失败:', error)
     const errorMessage = (error as Error).message || t('aiConfig.testFailed')
+    lastTest = { key, status: { state: 'error', error: errorMessage } }
     testResult.value = {
       success: false,
-      message: errorMessage
+      message: errorMessage,
+      error: describeMobileAIError(error, t)
     }
-    showToast(errorMessage, 'danger')
+    showToast(t('mobileModels.connectionFailedShort'), 'danger')
   } finally {
     testingConnection.value = false
   }
@@ -731,8 +494,12 @@ const showAddModelAlert = async () => {
       {
         text: t('common.add'),
         handler: (data) => {
-          if (data.modelName && data.modelName.trim()) {
-            formData.models.push(data.modelName.trim())
+          const modelName = data.modelName?.trim()
+          if (modelName && !formData.models.includes(modelName)) {
+            formData.models.push(modelName)
+            if (!formData.defaultModel) {
+              formData.defaultModel = modelName
+            }
           }
         }
       }
@@ -746,16 +513,68 @@ const showAddModelAlert = async () => {
 const removeModel = (index: number) => {
   const removedModel = formData.models[index]
   formData.models.splice(index, 1)
-  // 如果删除的是默认模型，清空默认模型
+  // 删掉的是默认模型时改用列表第一个，和桌面向导一致
   if (formData.defaultModel === removedModel) {
-    formData.defaultModel = ''
+    formData.defaultModel = formData.models[0] || ''
   }
+  if (formData.models.length === 0) {
+    editingModels.value = false
+  }
+}
+
+// 模型芯片：平时轻点设为默认模型，编辑状态下轻点移除
+const handleModelChip = (model: string, index: number) => {
+  if (editingModels.value) {
+    removeModel(index)
+    return
+  }
+  formData.defaultModel = model
 }
 
 // 打开URL
 const openUrl = (url: string) => {
   window.open(url, '_blank')
 }
+
+// 未保存修改检测：加载完成后记一份快照，取消/返回时对比
+const snapshot = ref('')
+const serializeForm = () => JSON.stringify({
+  ...formData,
+  models: [...formData.models],
+  choice: selectedChoiceId.value
+})
+const takeSnapshot = () => {
+  snapshot.value = serializeForm()
+}
+const isDirty = computed(() => snapshot.value !== '' && serializeForm() !== snapshot.value)
+
+const leavePage = () => {
+  if (window.history.length > 1) router.back()
+  else router.replace('/tabs/ai-config')
+}
+
+// 取消 / 系统返回：有改动先确认
+const handleCancel = async () => {
+  if (saving.value) return
+  if (isDirty.value) {
+    const discard = await confirmAlert({
+      header: t('aiConfig.workspace.unsavedChanges'),
+      message: t('aiConfig.workspace.unsavedEditorMessage'),
+      confirmText: t('aiConfig.workspace.discardChanges'),
+      cancelText: t('aiConfig.workspace.continueEditing'),
+      destructive: true
+    })
+    if (!discard) return
+  }
+  leavePage()
+}
+
+useBackButton(10, () => {
+  handleCancel()
+})
+
+// iOS 边缘右滑返回：有未保存的修改时关闭，只能点取消走确认
+useSwipeBackGuard(isDirty)
 
 // 保存配置
 const handleSave = async () => {
@@ -765,7 +584,7 @@ const handleSave = async () => {
     return
   }
   if (needsBaseURL.value && !formData.baseURL) {
-    showToast(t('aiConfig.pleaseEnterBaseURL'), 'warning')
+    showToast(baseURLRequiredMessage(), 'warning')
     return
   }
   if (needsApiKey.value && !formData.apiKey) {
@@ -779,9 +598,6 @@ const handleSave = async () => {
     if (!formData.defaultModel && formData.models.length > 0) {
       formData.defaultModel = formData.models[0]
     }
-    if (!formData.defaultModel && formData.customModel) {
-      formData.defaultModel = formData.customModel
-    }
 
     const configData: Partial<AIConfig> = {
       type: formData.type,
@@ -790,24 +606,37 @@ const handleSave = async () => {
       apiKey: formData.apiKey,
       models: formData.models,
       defaultModel: formData.defaultModel,
-      customModel: formData.customModel,
-      enabled: true
+      // 「自定义模型」已经并进可用模型列表，这里清掉旧字段，免得删掉的模型还从它冒出来
+      customModel: '',
+      enabled: isEditMode.value ? loadedEnabled.value : true
     }
 
+    let savedId: number | undefined
     if (isEditMode.value) {
+      savedId = Number(route.params.id)
       await api.aiConfigs.update.mutate({
-        id: Number(route.params.id),
+        id: savedId,
         data: configData as AIConfig
       })
       showToast(t('aiConfig.configUpdateSuccess'))
     } else {
       // 新建时必须生成 configId，否则生成器页面无法通过 configId 查找配置
-      configData.configId = `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      await api.aiConfigs.create.mutate(configData as AIConfig)
+      configData.configId = `config_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      // 还没有别的启用配置时，新加的这个就是 AI 功能实际在用的，直接设为首选（与桌面向导一致）
+      const preferNew = shouldPreferNewConfig(await api.aiConfigs.getAll.query())
+      const created = await api.aiConfigs.create.mutate(configData as AIConfig)
+      savedId = created?.id
+      if (preferNew && savedId) await api.aiConfigs.setPreferred.mutate(savedId)
       showToast(t('aiConfig.configAddSuccess'))
     }
+    // 保存的正是刚测试过的连接信息：把测试结果记到这个配置上，模型页如实显示「可用」或「连接失败」。
+    // 改过地址或凭据又没重新测试时，旧结果的指纹对不上，会自动变回「未验证」
+    if (lastTest && lastTest.key === connectionKey()) {
+      rememberConnectionStatus({ id: savedId, type: formData.type, baseURL: formData.baseURL, apiKey: formData.apiKey }, lastTest.status)
+    }
 
-    router.back()
+    takeSnapshot()
+    leavePage()
   } catch (error) {
     console.error('保存配置失败:', error)
     showToast(
@@ -828,10 +657,10 @@ const showToast = async (message: string, color: string = 'success') => {
 const initializeNewConfig = () => {
   if (isEditMode.value) return
 
-  // The default card is the OpenAI-compatible service. Keep the form data in
-  // sync with that card so the first render can be tested or saved directly.
+  // The default choice is the OpenAI-compatible service. Keep the form data in
+  // sync with that choice so the first render can be tested or saved directly.
   resetForm()
-  const defaultChoice = compatibilityChoices.value[0]
+  const defaultChoice = compatibilityProviderChoices.value[0]
   selectedChoiceId.value = defaultChoice.id
   formData.type = defaultChoice.type
   formData.name = defaultChoice.label
@@ -839,230 +668,168 @@ const initializeNewConfig = () => {
 }
 
 onMounted(() => {
-  loadConfig()
   initializeNewConfig()
+  loadConfig().finally(takeSnapshot)
 })
 </script>
 
 <style scoped>
-.form-container {
-  padding: 16px;
-  padding-bottom: 20px;
+.edit-nav__cancel {
+  color: var(--content-secondary);
 }
 
-.form-section {
-  margin-bottom: 24px;
+.edit-body {
+  gap: 18px;
 }
 
-.section-title {
-  color: var(--ion-text-color);
-  margin-bottom: 12px;
-  padding: 0 4px;
-}
-
-.form-content {
-  background: var(--surface-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-default);
-  overflow: hidden;
-}
-
-ion-list {
-  background: transparent;
-  padding: 0;
-}
-
-ion-item {
-  --background: transparent;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --inner-padding-end: 0;
-}
-
-/* label-placement="stacked" 的输入框：标签独占一行、输入框独占下一行，
-   需要比默认内联布局更高的行高，否则标签和输入框会显得过于拥挤（issue #145）。
-   只选择 stacked 的输入框，不影响下方模型配置区仍保持内联标签的「自定义模型」输入框。
-   注意：不能用属性选择器 [label-placement="stacked"]——Vue 给 Ionic 自定义元素传这个
-   prop 时走的是 DOM 属性赋值（el.labelPlacement = 'stacked'），不会反映成 HTML 属性，
-   所以 hasAttribute('label-placement') 是 false，属性选择器永远不会命中。改用 Ionic
-   渲染后真实挂在元素上的 class（input-label-placement-stacked），已用
-   getComputedStyle 实测确认命中。 */
-ion-item ion-input.input-label-placement-stacked {
-  --padding-top: 10px;
-  --padding-bottom: 10px;
-}
-
-.service-info {
-  width: 100%;
-  padding: 12px 0;
-}
-
-.base-url-hint {
-  color: var(--ion-color-medium);
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  margin: 0 16px 8px;
+/* 服务商宫格：一行四格 */
+.edit-providers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .service-description {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  color: var(--ion-color-medium);
-  font-size: var(--mobile-font-size-footnote);
-  margin: 0 0 8px 0;
-  line-height: var(--mobile-line-height-normal);
+  padding-top: 10px;
 }
 
-/* 信息图标：和上方提示文字第一行对齐，避免和上面的表单字段视觉混淆（issue #145）。 */
-.service-description-icon {
-  flex: none;
-  font-size: 16px;
-  margin-top: 2px;
-  color: var(--content-tertiary, var(--ion-color-medium));
+.base-url-hint {
+  padding-top: 8px;
 }
 
-.service-links {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid var(--border-default);
-}
-
-.service-links ion-button {
-  --border-color: var(--border-default);
-  --border-radius: var(--radius-control);
-  --color: var(--accent-primary);
-  --padding-start: 8px;
-  --padding-end: 8px;
-  margin: 0;
-  min-height: 36px;
-  font-size: var(--mobile-font-size-footnote);
-}
-
-.service-links ion-icon {
-  font-size: 16px;
-}
-
-.test-result {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  width: 100%;
-}
-
-.test-result.success {
-  background-color: color-mix(in srgb, var(--accent-success) 8%, var(--surface-primary));
-}
-
-.test-result.error {
-  background-color: color-mix(in srgb, var(--accent-error) 8%, var(--surface-primary));
-}
-
-.test-result-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.test-result-message {
-  font-weight: 500;
-}
-
-.test-result-detail {
-  font-size: var(--mobile-font-size-footnote);
-  opacity: 0.8;
-  word-break: break-word;
-}
-
-.models-container {
-  width: 100%;
-  padding: 12px 0;
-}
-
-.models-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-ion-chip {
-  margin: 0;
-}
-
-/* 服务类型触发行：右侧展示当前选中的服务商头像 + 名称，点击后打开卡片式选择弹层 */
-.type-trigger-value {
+/* API Key 输入框右侧的显示/隐藏按钮 */
+.edit-secret {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 60%;
 }
 
-.type-trigger-name {
-  color: var(--content-secondary);
-  font-size: var(--mobile-font-size-body);
-  white-space: nowrap;
+.edit-secret input {
+  flex: 1;
+}
+
+.edit-secret__toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 32px;
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--content-tertiary);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.edit-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 6px 6px 0;
+}
+
+.edit-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-links ion-icon {
+  font-size: 16px;
+}
+
+.edit-models__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.edit-models__title small {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+  font-weight: 500;
+}
+
+/* 模型芯片：等宽字体，默认模型实心主色 */
+.edit-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.edit-model {
+  max-width: 100%;
+  font-family: var(--font-family-mono);
+  font-size: var(--m-font-caption);
+}
+
+.edit-model span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 服务商头像：复用桌面端矢量标识，统一放入圆形边框避免图标错位 */
-.provider-icon {
+.edit-model ion-icon {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--border-default);
-  background: var(--surface-secondary);
-  color: var(--content-secondary);
+  font-size: 14px;
 }
 
-.provider-icon :deep(svg) {
-  width: 16px;
-  height: 16px;
-}
-
-.type-modal-content {
-  --padding-start: var(--mobile-page-gutter);
-  --padding-end: var(--mobile-page-gutter);
-  --padding-top: 12px;
-  --padding-bottom: 20px;
-}
-
-/* 分组标题：图标 + 文案，呼应桌面端「本地服务/在线服务」分组标题的视觉语言。
-   问题（issue #144）：ion-list-header 在 ios 模式下，内部投影的 ion-label 自带
-   非对称的 margin-top/margin-bottom（用于原生「大标题」样式，预期标题很高、
-   文字贴底），即使这里覆盖了宿主的 display/align-items，label 自身的 margin
-   已经把它的 flex 外边距盒撑满了整个头部高度，align-items:center 也无法把
-   图标和文字的视觉中心对齐——图标居中，文字却被自带的 margin 顶到偏下的位置。
-   修复：直接清零 ion-label 的 margin，图标和文字才会以同一个基准垂直居中。 */
-.type-group-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 16px 4px 8px;
-  color: var(--content-secondary);
-  font-size: var(--mobile-font-size-footnote);
-}
-
-.type-group-header:first-of-type {
-  margin-top: 4px;
-}
-
-.type-group-header ion-icon {
+.edit-models.is-editing .edit-model ion-icon {
+  color: var(--accent-error);
   font-size: 16px;
 }
 
-.type-group-header ion-label {
-  margin-top: 0;
-  margin-bottom: 0;
+.edit-model--add {
+  outline: 1px dashed var(--border-strong);
+  outline-offset: -1px;
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+}
+
+.edit-models__note {
+  padding-top: 8px;
+}
+
+.edit-test ion-icon {
+  font-size: 18px;
+}
+
+.edit-test ion-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.edit-test-result {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.edit-test-result p {
+  flex: 1;
+  margin: 4px 0 0;
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.edit-test-result__error {
+  flex: 1;
+  min-width: 0;
+  margin-top: 4px;
 }
 </style>

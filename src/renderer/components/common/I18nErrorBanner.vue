@@ -1,5 +1,6 @@
 <template>
-    <div v-if="hasErrors" class="i18n-error-banner">
+    <!-- 只给开发者看的文案编译错误诊断，生产环境不显示 -->
+    <div v-if="isDevelopment && hasErrors" class="i18n-error-banner">
         <NAlert type="error" :show-icon="true" :closable="false">
             <template #header>
                 <NFlex align="center" size="small">
@@ -10,7 +11,7 @@
                 </NFlex>
             </template>
             <NFlex vertical size="small">
-                <NText>检测到 {errorCount} 个国际化错误，请修复后重新加载页面：</NText>
+                <NText>检测到 {{ errorCount }} 个国际化错误，请修复后重新加载页面：</NText>
                 <div v-for="(error, index) in errors" :key="index" class="error-item">
                     <NText type="error" style="font-family: monospace; font-size: 12px;">
                         {{ error }}
@@ -29,6 +30,7 @@ import { ref, onMounted } from 'vue';
 import { NAlert, NIcon, NText, NButton, NFlex } from 'naive-ui';
 import { AlertTriangle } from '@vicons/tabler';
 
+const isDevelopment = import.meta.env.DEV;
 const errors = ref<string[]>([]);
 const hasErrors = ref(false);
 const errorCount = ref(0);
@@ -89,7 +91,7 @@ const reloadPage = () => {
 };
 
 onMounted(() => {
-    setupI18nErrorListener();
+    if (isDevelopment) setupI18nErrorListener();
 });
 </script>
 

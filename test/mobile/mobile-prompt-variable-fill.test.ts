@@ -129,7 +129,38 @@ describe('mobile prompt variable fill — 页面接线（wiring）检查', () =>
 
   it('没有变量的普通提示词保持原样展示 content，不套用填写变量 UI', () => {
     const source = read(DETAIL_PAGE)
-    expect(source).toMatch(/<div v-else class="content-section">[\s\S]*?\{\{ prompt\.content \}\}/)
+    expect(source).toMatch(/<div v-else class="m-card use-card">\s*<MobilePromptBody plain :content="prompt\.content" \/>/)
+    // 底部面板：有变量时逐个填写，没有变量时只有一个复制按钮
+    expect(source).toMatch(/<PromptVariableFillForm\s+v-if="variables\.length"/)
+    expect(source).toMatch(/<div v-else class="m-sheet plain-panel">[\s\S]*?@click="copyContent"/)
+  })
+
+  it('使用页逐个填写变量：进度、上一个、完成并复制都在填写面板里', () => {
+    const page = read(DETAIL_PAGE)
+    expect(page).toContain('v-model:active="activeIndex"')
+    expect(page).toContain('@copy="copyContent"')
+    // 正文里的变量标记可以点，点了切到对应变量
+    expect(page).toContain('mode="value"')
+    expect(page).toContain('fillFormRef.value?.focusVariable(name)')
+
+    const form = read(FILL_FORM)
+    expect(form).toContain("'update:active'")
+    expect(form).toContain("t('mobilePrompt.previous')")
+    expect(form).toContain("t('mobilePrompt.finishAndCopy')")
+    expect(form).toContain('const finishing = computed(() => isLast.value || missing.value.length === 0)')
+  })
+
+  it('打开时预填上次复制的值，复制时记录本次使用', () => {
+    const page = read(DETAIL_PAGE)
+    expect(page).toContain("import { getLastUsedValues, recordPromptUsage } from '~/lib/utils/prompt-usage'")
+    expect(page).toContain('const last = getLastUsedValues(promptId)')
+    expect(page).toMatch(/await recordPromptUsage\(\{[\s\S]*?variables: hasVariables \? \{ \.\.\.draft\.value \} : undefined/)
+  })
+
+  it('试运行前同样校验必填变量，把渲染后的文本交给试运行面板', () => {
+    const page = read(DETAIL_PAGE)
+    expect(page).toMatch(/const openTryRun = async \(\) => \{[\s\S]*?validateAndFocus\(\)[\s\S]*?tryRunText\.value = variables\.value\.length \? rendered\.value\.content : prompt\.value\.content/)
+    expect(page).toContain('<MobileTryRunSheet')
   })
 
   it('validateAndFocus() 把渲染错误传给填写表单，让表单自己也能满足"必填齐全且渲染无误"的契约', () => {
@@ -154,8 +185,9 @@ describe('mobile prompt variable fill — 详情页重新进入不应清空已�
     expect(source).toMatch(/let loadedPromptKey: string \| null = null/)
     // 重置 draft 与重置校验状态必须被同一个身份比较 if 包裹，且只有分支内才
     // 更新 loadedPromptKey——这样"相同身份"路径下三者都不会执行，草稿原样保留。
+    // 身份变化时用上次复制的值预填（没有就用默认值），同一提示词重新进入时只补新变量的默认值。
     expect(source).toMatch(
-      /const promptKey = prompt\.value[\s\S]{0,80}\n\s*if \(promptKey !== loadedPromptKey\) \{\s*\n\s*draft\.value = createPromptDraft\(variables\.value, \{\}\)\s*\n\s*fillFormRef\.value\?\.resetValidation\(\)\s*\n\s*loadedPromptKey = promptKey\s*\n\s*\}/
+      /const promptKey = prompt\.value[\s\S]{0,80}\n\s*if \(promptKey !== loadedPromptKey\) \{\s*\n\s*draft\.value = createPromptDraft\(variables\.value, pickLastUsedValues\(prompt\.value\?\.id, variables\.value\)\)\s*\n\s*fillFormRef\.value\?\.resetValidation\(\)\s*\n\s*loadedPromptKey = promptKey\s*\n[\s\S]{0,80}\} else \{[\s\S]{0,120}draft\.value = createPromptDraft\(variables\.value, draft\.value\)/
     )
     // 锁定"拿到 prompt 后立刻无条件重置 draft"这个旧的 bug 模式不会再出现。
     expect(source).not.toMatch(

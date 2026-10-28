@@ -1,42 +1,42 @@
 <template>
-  <NModal :show="show" :mask-closable="false" @update:show="value => !value && close()">
-    <NCard class="binding-card" :title="existingBinding ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding')">
-      <NFlex vertical :size="16">
-        <div>
-          <NText strong>{{ promptTitle }}</NText>
-          <NText depth="3" class="description">{{ t('shortcuts.assignPromptBindingDesc') }}</NText>
-        </div>
-        <NInput
-          :value="accelerator"
-          readonly
-          :placeholder="t('shortcuts.pressShortcut')"
-          :status="error ? 'error' : undefined"
-          @click="capturing = true"
-        />
-        <NText v-if="error" type="error" class="error-text">{{ error }}</NText>
-        <NRadioGroup v-model:value="action">
-          <NSpace>
-            <NRadio value="copy">{{ t('shortcuts.actionCopy') }}</NRadio>
-            <NRadio value="paste">{{ t('shortcuts.actionPaste') }}</NRadio>
-          </NSpace>
-        </NRadioGroup>
-        <NText depth="3" class="description">{{ t('shortcuts.pasteFallbackHint') }}</NText>
-        <NFlex justify="space-between">
-          <NButton v-if="existingBinding" type="error" secondary @click="remove">{{ t('common.delete') }}</NButton>
-          <span v-else />
-          <NSpace>
-            <NButton @click="close">{{ t('common.cancel') }}</NButton>
-            <NButton type="primary" :loading="saving" :disabled="!accelerator" @click="save">{{ t('common.confirm') }}</NButton>
-          </NSpace>
-        </NFlex>
-      </NFlex>
-    </NCard>
-  </NModal>
+  <UiModal :show="show" :title="existingBinding ? t('shortcuts.editPromptBinding') : t('shortcuts.assignPromptBinding')"
+    :close-label="t('common.close')" @close="close">
+    <div class="binding">
+      <div class="binding__intro">
+        <span class="binding__title">{{ promptTitle }}</span>
+        <span class="binding__description">{{ t('shortcuts.assignPromptBindingDesc') }}</span>
+      </div>
+      <button type="button" class="binding__capture" :class="{ 'is-error': error, 'is-capturing': capturing }"
+        :aria-label="t('shortcuts.pressShortcut')" @click="capturing = true">
+        <span v-if="keys.length" class="binding__keys">
+          <span v-for="key in keys" :key="key" class="ui-kbd binding__key">{{ key }}</span>
+        </span>
+        <span class="binding__hint">{{ error || t('shortcuts.pressShortcut') }}</span>
+      </button>
+      <div class="binding__field">
+        <span class="binding__label">{{ t('shortcutBinding.afterPress') }}</span>
+        <UiSegmented v-model="action" fill :label="t('shortcutBinding.afterPress')" :options="actionOptions" />
+        <span class="ui-help">{{ t('shortcuts.pasteFallbackHint') }}</span>
+      </div>
+    </div>
+    <template #footer-start>
+      <NButton v-if="existingBinding" quaternary type="error" :disabled="saving" @click="remove">
+        {{ t('shortcutBinding.remove') }}
+      </NButton>
+    </template>
+    <template #footer>
+      <NButton @click="close">{{ t('common.cancel') }}</NButton>
+      <NButton type="primary" :loading="saving" :disabled="!accelerator" @click="save">{{ t('common.confirm') }}</NButton>
+    </template>
+  </UiModal>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue';
-import { NButton, NCard, NFlex, NInput, NModal, NRadio, NRadioGroup, NSpace, NText } from 'naive-ui';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { NButton } from 'naive-ui';
+import UiModal from '@/components/ui/UiModal.vue';
+import UiSegmented from '@/components/ui/UiSegmented.vue';
+import { displayAccelerator } from '@/lib/utils/accelerator';
 import { useI18n } from 'vue-i18n';
 import type { PromptShortcutBinding, ShortcutAction } from '@shared/types';
 
@@ -59,6 +59,14 @@ const capturing = ref(true);
 const saving = ref(false);
 const error = ref('');
 let disabledByModal = false;
+
+const keys = computed(() => accelerator.value
+  ? displayAccelerator(accelerator.value).split(/\+|(?<=[⌘⌃⌥⇧])/).filter(Boolean)
+  : []);
+const actionOptions = computed(() => [
+  { value: 'copy' as ShortcutAction, label: t('shortcuts.actionCopy') },
+  { value: 'paste' as ShortcutAction, label: t('shortcuts.actionPaste') },
+]);
 
 watch(() => props.show, async show => {
   if (!show) return;
@@ -151,7 +159,79 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.binding-card { width: min(440px, calc(100vw - 32px)); }
-.description { display: block; margin-top: 4px; font-size: 12px; }
-.error-text { font-size: 12px; }
+.binding {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.binding__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.binding__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.binding__description {
+  color: var(--content-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.binding__capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 112px;
+  padding: 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-secondary);
+  color: var(--content-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.binding__capture.is-capturing {
+  border-color: var(--accent-brand);
+}
+
+.binding__capture.is-error {
+  border-color: var(--accent-error);
+}
+
+.binding__keys {
+  display: flex;
+  gap: 6px;
+}
+
+.binding__key {
+  height: 32px;
+  padding: 0 12px;
+  font-size: var(--font-size-lg);
+}
+
+.binding__hint {
+  font-size: var(--font-size-xs);
+}
+
+.binding__capture.is-error .binding__hint {
+  color: var(--accent-error);
+}
+
+.binding__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.binding__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
 </style>

@@ -66,7 +66,29 @@ const DEFAULT_BASE_URLS = {
   google: 'https://generativelanguage.googleapis.com'
 };
 
-const DEFAULT_SYSTEM_PROMPT = '你是一个专业的 AI 提示词工程师。请根据用户需求生成清晰、具体、结构化的 AI 提示词。';
+// 下面几段默认提示词和 src/shared/ai-default-prompts.ts、桌面主进程的 prompt-templates.ts 一致。
+// 这个文件在 Docker 里单独运行、不能引用 TypeScript，由 test/web/web-ai-default-prompts.test.ts 保证两边相同。
+// 生成提示词时默认的系统提示词：桌面「系统提示词」弹窗里显示的「默认」就是这一段
+const DEFAULT_SYSTEM_PROMPT = `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
+
+要求：
+1. 提示词应该清晰、具体、可操作
+2. 包含必要的上下文和约束条件
+3. 使用适当的格式和结构
+4. 考虑不同的使用场景
+5. 提供具体的输出格式要求
+
+请直接返回优化后的提示词内容，不需要额外的解释。`;
+// 使用默认系统提示词时，用户需求套进这段话
+const DEFAULT_USER_PROMPT_TEMPLATE = `请为以下主题生成一个专业的 AI 提示词：
+
+主题：{topic}
+
+请生成一个完整、可直接使用的提示词。`;
+// 原样发送的内容（试运行、请求测试）：不套「提示词工程师」，让模型直接回应
+const ASSISTANT_SYSTEM_PROMPT = '你是一个有用的AI助手。请直接回应用户的请求。';
+// 渲染层没有按界面语言传入测试提示词时使用
+const DEFAULT_TEST_PROMPT = '请用一句话简单介绍一下你自己。';
 let webdavModulePromise = null;
 
 function sendJson(res, status, payload) {
@@ -1208,16 +1230,41 @@ function assertApiKey(config, providerName) {
   }
 }
 
+function resolveTestPrompt(prompt) {
+  return typeof prompt === 'string' && prompt.trim() ? prompt.trim() : DEFAULT_TEST_PROMPT;
+}
+
+/** 和内置默认一字不差（忽略首尾空白）的系统提示词按「没有自定义」处理 */
+function getCustomSystemPrompt(config) {
+  const text = String(config.systemPrompt || '').trim();
+  return text === DEFAULT_SYSTEM_PROMPT.trim() ? '' : text;
+}
+
+/**
+ * 组装发给模型的消息，规则和桌面主进程 prompt-templates.ts 的 selectTemplate 一致：
+ * - 原样发送（customPrompt，试运行、请求测试）：通用助手系统提示词 + 原文；
+ * - 生成提示词且有自定义系统提示词：自定义系统提示词 +「主题：…」；
+ * - 生成提示词且没有自定义：默认系统提示词 + 默认的需求模板。
+ */
 function buildMessages(config, requestOrPrompt) {
-  const topic = typeof requestOrPrompt === 'string'
-    ? requestOrPrompt
-    : requestOrPrompt.customPrompt || requestOrPrompt.topic;
-  const systemPrompt = typeof requestOrPrompt === 'string'
-    ? (config.systemPrompt || DEFAULT_SYSTEM_PROMPT)
-    : (requestOrPrompt.systemPrompt || config.systemPrompt || DEFAULT_SYSTEM_PROMPT);
+  const request = typeof requestOrPrompt === 'string' ? { topic: requestOrPrompt } : (requestOrPrompt || {});
+  const topic = request.topic || '';
+  let systemPrompt;
+  let userPrompt;
+  if (request.customPrompt) {
+    systemPrompt = ASSISTANT_SYSTEM_PROMPT;
+    userPrompt = request.customPrompt;
+  } else if (getCustomSystemPrompt(config)) {
+    systemPrompt = config.systemPrompt;
+    userPrompt = `主题：${topic}`;
+  } else {
+    systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    userPrompt = DEFAULT_USER_PROMPT_TEMPLATE.replace('{topic}', topic);
+  }
   return {
-    systemPrompt,
-    userPrompt: topic || '请回复 OK'
+    // Web 端独有：请求里显式给了系统提示词时以它为准
+    systemPrompt: request.systemPrompt || systemPrompt,
+    userPrompt: userPrompt || '请回复 OK'
   };
 }
 
@@ -1638,44 +1685,52 @@ async function generateAIStream({ request, config, model: explicitModel }, onPro
   return createGenerationResult(prompt, config, model, generatedPrompt);
 }
 
+/**
+ * 模型列表的来源要和 Electron 主进程一致：
+ * remote = 从服务拿到；default = 这里没有接服务的列表接口，给的是内置常见模型；
+ * unavailable = 请求失败或服务返回空列表，内置常见模型只放在 fallbackModels 里，不能冒充成功
+ */
 async function getAIModels({ config }) {
   const type = getProviderType(config);
   if (type === 'anthropic' || type === 'google') {
     return { models: getDefaultModels(type), modelSource: 'default' };
   }
 
-  if (type === 'ollama') {
-    try {
-      const data = await fetchJson(`${getBaseURL(config)}/api/tags`, { method: 'GET' });
-      const models = data.models?.map(model => model.name).filter(Boolean) || [];
-      return { models: models.length ? models : getDefaultModels(type), modelSource: models.length ? 'remote' : 'default' };
-    } catch {
-      return { models: getDefaultModels(type), modelSource: 'default' };
-    }
-  }
-
+  const fallbackModels = getDefaultModels(type);
   try {
-    const data = await fetchJson(`${getBaseURL(config)}/models`, {
-      method: 'GET',
-      headers: buildOpenAIHeaders(config)
-    });
-    const models = data.data?.map(model => model.id).filter(Boolean) || [];
-    return { models: models.length ? models : getDefaultModels(type), modelSource: models.length ? 'remote' : 'default' };
-  } catch {
-    return { models: getDefaultModels(type), modelSource: 'default' };
+    const models = type === 'ollama'
+      ? ((await fetchJson(`${getBaseURL(config)}/api/tags`, { method: 'GET' })).models || []).map(model => model.name).filter(Boolean)
+      : ((await fetchJson(`${getBaseURL(config)}/models`, { method: 'GET', headers: buildOpenAIHeaders(config) })).data || [])
+        .map(model => model.id).filter(Boolean);
+    return models.length
+      ? { models, modelSource: 'remote' }
+      : { models: [], modelSource: 'unavailable', fallbackModels };
+  } catch (error) {
+    // Node 的 fetch 连不上时只说 fetch failed，真正的原因（ECONNREFUSED、ENOTFOUND）在 cause 里
+    const message = error instanceof Error ? error.message : String(error);
+    const cause = error?.cause?.code || error?.cause?.message;
+    return {
+      models: [],
+      modelSource: 'unavailable',
+      fallbackModels,
+      error: cause && !message.includes(cause) ? `${message} (${cause})` : message
+    };
   }
 }
 
-async function testAIModel({ config, model }) {
+async function testAIModel({ config, model, prompt }) {
   try {
     const selectedModel = getModel(config, model);
+    // 测试提示词由渲染层按界面语言传入，原样发送（和桌面主进程的模型测试一致）
+    const testPrompt = resolveTestPrompt(prompt);
     const result = await generateAI({
       config,
       model: selectedModel,
       request: {
         configId: config.configId || 'test',
         model: selectedModel,
-        topic: '请用一句话回复：AI Gist connection test'
+        topic: testPrompt,
+        customPrompt: testPrompt
       }
     });
     return {
@@ -1693,7 +1748,11 @@ async function testAIModel({ config, model }) {
 }
 
 async function testAIConfig({ config }) {
-  const modelInfo = await getAIModels({ config });
+  const listInfo = await getAIModels({ config });
+  // 连接测试只需要挑一个模型试一下；拿不到列表时用常见模型，并如实标成 default
+  const modelInfo = listInfo.models.length
+    ? listInfo
+    : { models: listInfo.fallbackModels || [], modelSource: listInfo.fallbackModels?.length ? 'default' : 'unavailable' };
   const model = getModel(config, modelInfo.models?.[0]);
   try {
     const modelResult = await testAIModel({ config, model });
@@ -1716,24 +1775,28 @@ async function testAIConfig({ config }) {
   }
 }
 
-async function intelligentTest({ config }) {
+async function intelligentTest({ config, prompt }) {
+  // 和桌面主进程、移动端一致：发一句测试提示词（渲染层按界面语言传入），原样发送并显示出来
+  const testPrompt = resolveTestPrompt(prompt);
   try {
     const result = await generateAI({
       config,
       request: {
         configId: config.configId || 'intelligent-test',
-        topic: '请生成一个三点式的写作提示词，用于改进一段产品说明。'
+        topic: testPrompt,
+        customPrompt: testPrompt
       }
     });
     return {
       success: true,
       response: result.generatedPrompt,
-      inputPrompt: '请生成一个三点式的写作提示词，用于改进一段产品说明。'
+      inputPrompt: testPrompt
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      inputPrompt: testPrompt
     };
   }
 }

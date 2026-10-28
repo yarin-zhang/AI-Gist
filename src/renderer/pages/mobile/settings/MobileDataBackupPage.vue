@@ -1,137 +1,138 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')" default-href="/tabs/settings"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ t('dataBackup.title') }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="t('dataBackup.title')" fallback="/tabs/settings" />
 
-    <ion-content :fullscreen="true">
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('dataBackup.local') }}</ion-label>
-        </ion-list-header>
+    <ion-content class="m-page-content">
+      <div class="m-body backup-body">
+        <p class="m-desc">{{ t('mobileSettings.backup.intro') }}</p>
 
-        <ion-item button detail @click="go('/mobile/settings/data-backup/local')">
-          <ion-icon :icon="phonePortraitOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('mobileSettings.backup.localTitle') }}</h3>
-            <p>{{ t('mobileSettings.backup.localDescription') }}</p>
-          </ion-label>
-          <ion-note slot="end">{{ localBackupSummary }}</ion-note>
-        </ion-item>
-      </ion-list>
+        <section class="m-section">
+          <span class="m-gt">{{ t('mobileSettings.backup.locationsTitle') }}</span>
+          <div class="backup-locations">
+            <button type="button" class="m-card backup-location" @click="go('/mobile/settings/data-backup/local')">
+              <span class="backup-location__head">
+                <span class="m-tile m-tile-lg m-tile--blue" aria-hidden="true"><ion-icon :icon="phonePortraitOutline" /></span>
+                <ion-icon :icon="chevronForward" class="backup-location__chev" aria-hidden="true" />
+              </span>
+              <span class="backup-location__text">
+                <span class="backup-location__title">{{ t('dataBackup.localLocation') }}</span>
+                <span class="backup-location__sub">{{ localBackupSummary }}</span>
+                <span class="backup-location__caption">{{ localLatestCaption }}</span>
+              </span>
+            </button>
 
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.backup.cloudSectionTitle') }}</ion-label>
-        </ion-list-header>
+            <button
+              v-for="config in storageConfigs"
+              :key="config.id"
+              type="button"
+              class="m-card backup-location"
+              @click="go(`/mobile/settings/data-backup/cloud/${config.id}`)"
+            >
+              <span class="backup-location__head">
+                <span class="m-tile m-tile-lg" :class="config.enabled ? 'm-tile--teal' : 'm-tile--grey'" aria-hidden="true">
+                  <ion-icon :icon="cloudOutline" />
+                </span>
+                <ion-icon :icon="chevronForward" class="backup-location__chev" aria-hidden="true" />
+              </span>
+              <span class="backup-location__text">
+                <span class="backup-location__title">{{ t('dataBackup.cloudLocation', { name: config.name }) }}</span>
+                <span class="backup-location__sub">{{ getCloudSummary(config) }}</span>
+                <span class="backup-location__caption">
+                  {{ config.enabled ? t('mobileSettings.backup.manualOnly') : t('dataSync.disabled') }}
+                </span>
+              </span>
+            </button>
 
-        <ion-item
-          v-for="config in storageConfigs"
-          :key="config.id"
-          button
-          detail
-          @click="go(`/mobile/settings/data-backup/cloud/${config.id}`)"
-        >
-          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ config.name }}</h3>
-            <p>{{ t('mobileSettings.backup.cloudDescription', { name: config.name }) }}</p>
-          </ion-label>
-        </ion-item>
+            <!-- 还没有云端存储时，第二张卡片引导去数据同步页添加 -->
+            <button
+              v-if="storageConfigs.length === 0"
+              type="button"
+              class="m-card backup-location"
+              @click="go('/mobile/settings/data-sync')"
+            >
+              <span class="backup-location__head">
+                <span class="m-tile m-tile-lg m-tile--soft" aria-hidden="true"><ion-icon :icon="addOutline" /></span>
+                <ion-icon :icon="chevronForward" class="backup-location__chev" aria-hidden="true" />
+              </span>
+              <span class="backup-location__text">
+                <span class="backup-location__title">{{ t('mobileSettings.backup.cloud') }}</span>
+                <span class="backup-location__sub">{{ t('mobileSettings.sync.notConfigured') }}</span>
+                <span class="backup-location__caption">{{ t('mobileSettings.backup.goToDataSync') }}</span>
+              </span>
+            </button>
+          </div>
+          <p v-if="storageConfigs.length === 0" class="m-note backup-locations__note">
+            {{ t('mobileSettings.backup.noStorageHint') }}
+          </p>
+        </section>
 
-        <template v-if="storageConfigs.length === 0">
-          <ion-item lines="none">
-            <ion-note class="section-note">{{ t('mobileSettings.backup.noStorageHint') }}</ion-note>
-          </ion-item>
-          <ion-item button detail @click="go('/mobile/settings/data-sync')">
-            <ion-icon :icon="addCircleOutline" slot="start" color="primary"></ion-icon>
-            <ion-label color="primary">{{ t('mobileSettings.backup.goToDataSync') }}</ion-label>
-          </ion-item>
-        </template>
-      </ion-list>
+        <MobileGroup :title="t('mobileSettings.backup.fileSectionTitle')">
+          <MobileRow :title="t('mobileSettings.backup.exportToFile')" :sub="t('mobileSettings.backup.exportDescription')"
+            :icon="shareOutline" tone="violet" show-chevron @click="handleExport" />
+          <MobileRow :title="t('mobileSettings.backup.importFromFile')" :sub="t('mobileSettings.backup.importDescription')"
+            :icon="downloadOutline" tone="orange" show-chevron @click="handleImport" />
+        </MobileGroup>
 
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.backup.fileSectionTitle') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button :detail="false" @click="handleExport">
-          <ion-icon :icon="shareOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('dataManagement.exportFullBackup') }}</h3>
-            <p>{{ t('mobileSettings.backup.exportDescription') }}</p>
-          </ion-label>
-        </ion-item>
-
-        <ion-item button :detail="false" @click="handleImport">
-          <ion-icon :icon="documentAttachOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ t('dataManagement.importFullBackup') }}</h3>
-            <p>{{ t('mobileSettings.backup.importDescription') }}</p>
-          </ion-label>
-        </ion-item>
-
-        <!-- 备份文件里的 API 密钥风险是真正需要提醒的部分，其余说明留给各条目自己的描述 -->
-        <ion-item lines="none">
-          <ion-note class="section-note">{{ t('mobileSettings.backup.fileWarning') }}</ion-note>
-        </ion-item>
-      </ion-list>
+        <!-- 备份文件里的 API 密钥风险是真正需要提醒的部分 -->
+        <p class="m-note">
+          <ion-icon :icon="informationCircleOutline" aria-hidden="true" />
+          <span>{{ t('mobileSettings.backup.fileWarning') }}</span>
+        </p>
+      </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { IonPage, IonContent, IonIcon, onIonViewWillEnter } from '@ionic/vue'
 import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonBackButton,
-  IonContent,
-  IonList,
-  IonListHeader,
-  IonItem,
-  IonLabel,
-  IonIcon,
-  IonNote,
-  onIonViewWillEnter
-} from '@ionic/vue'
-import {
+  addOutline,
+  chevronForward,
   cloudOutline,
+  downloadOutline,
+  informationCircleOutline,
   phonePortraitOutline,
-  shareOutline,
-  documentAttachOutline,
-  addCircleOutline
+  shareOutline
 } from 'ionicons/icons'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import MobileRow from '~/components/mobile/ui/MobileRow.vue'
 import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
-import { localBackupService } from '~/lib/services/local-backup.service'
 import { databaseService } from '~/lib/db'
 import { dataRestoreService } from '~/lib/services/data-restore.service'
+import { formatFriendlyDate } from '~/lib/utils/date'
 import { createBackupPayload } from '@shared/backup-integrity'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
-import { confirmAction, showToast, withLoading } from './shared'
+import { confirmAction, loadLocalBackupSummary, showToast, withLoading } from './shared'
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const storageConfigs = ref<CloudStorageConfig[]>([])
 const localBackupCount = ref(0)
+const localLatestAt = ref<string>()
+// 云端版本数在后台读取，读不到（网络、目录未创建）时卡片只显示存储类型
+const cloudBackupCounts = reactive<Record<string, number>>({})
 
 const localBackupSummary = computed(() =>
   localBackupCount.value > 0
     ? t('mobileSettings.backup.count', { count: localBackupCount.value }, localBackupCount.value)
     : t('dataBackup.none'))
+
+const localLatestCaption = computed(() => localLatestAt.value
+  ? t('mobileSettings.backup.latestAt', { time: formatFriendlyDate(localLatestAt.value, locale.value, { withTime: true }) })
+  : t('mobileSettings.backup.localDescription'))
+
+const getCloudSummary = (config: CloudStorageConfig) => {
+  const count = cloudBackupCounts[config.id]
+  if (count !== undefined) return t('mobileSettings.backup.count', { count }, count)
+  return config.type === 'webdav' ? 'WebDAV' : 'iCloud'
+}
 
 const go = (path: string) => {
   void router.push(path)
@@ -144,6 +145,14 @@ const createBackupId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+const loadCloudCounts = (configs: CloudStorageConfig[]) => {
+  for (const config of configs.filter(item => item.enabled)) {
+    CloudBackupAPI.getCloudBackupList(config.id)
+      .then(list => { cloudBackupCounts[config.id] = list.length })
+      .catch(() => { delete cloudBackupCounts[config.id] })
+  }
+}
+
 const loadSummary = async () => {
   try {
     storageConfigs.value = await CloudBackupAPI.getStorageConfigs()
@@ -152,12 +161,10 @@ const loadSummary = async () => {
     storageConfigs.value = []
   }
 
-  try {
-    localBackupCount.value = (await localBackupService.list()).length
-  } catch (error) {
-    console.error('加载本地备份列表失败:', error)
-    localBackupCount.value = 0
-  }
+  const local = await loadLocalBackupSummary()
+  localBackupCount.value = local.count
+  localLatestAt.value = local.latestAt
+  loadCloudCounts(storageConfigs.value)
 }
 
 const handleExport = async () => {
@@ -280,17 +287,69 @@ onIonViewWillEnter(loadSummary)
 </script>
 
 <style scoped>
-/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
-
-/* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
-ion-item ion-icon[slot='start'] {
-  margin-inline-end: 16px;
+.m-body.backup-body {
+  padding-top: 4px;
 }
 
-.section-note {
-  padding: 4px 0 8px;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  white-space: normal;
+.backup-locations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.m-card.backup-location {
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.m-card.backup-location:active {
+  background: var(--surface-secondary);
+}
+
+.backup-location__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.backup-location__chev {
+  color: var(--content-tertiary);
+  font-size: 14px;
+}
+
+.backup-location__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.backup-location__title {
+  overflow: hidden;
+  color: var(--content-primary);
+  font-size: var(--m-font-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backup-location__sub {
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+}
+
+.backup-location__caption {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+}
+
+.m-note.backup-locations__note {
+  padding-top: 8px;
 }
 </style>

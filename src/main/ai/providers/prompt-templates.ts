@@ -2,6 +2,11 @@
  * 统一提示词模板管理
  * 集中管理所有AI供应商使用的默认提示词模板
  */
+import {
+  DEFAULT_GENERATION_SYSTEM_PROMPT,
+  DEFAULT_GENERATION_USER_PROMPT,
+  normalizeCustomSystemPrompt
+} from '@shared/ai-default-prompts';
 
 /**
  * 提示词模板类型
@@ -48,21 +53,9 @@ export class PromptTemplateManager {
     this.addTemplate({
       name: 'ai-prompt-engineer',
       description: '专业的AI提示词工程师，生成高质量、结构化的AI提示词',
-      systemPrompt: `你是一个专业的 AI 提示词工程师。请根据用户提供的主题，生成一个高质量、结构化的 AI 提示词。
-
-要求：
-1. 提示词应该清晰、具体、可操作
-2. 包含必要的上下文和约束条件
-3. 使用适当的格式和结构
-4. 考虑不同的使用场景
-5. 提供具体的输出格式要求
-
-请直接返回优化后的提示词内容，不需要额外的解释。`,
-      userPromptTemplate: `请为以下主题生成一个专业的 AI 提示词：
-
-主题：{topic}
-
-请生成一个完整、可直接使用的提示词。`,
+      // 和桌面「系统提示词」弹窗里显示的「默认」是同一段文字（@shared/ai-default-prompts）
+      systemPrompt: DEFAULT_GENERATION_SYSTEM_PROMPT,
+      userPromptTemplate: DEFAULT_GENERATION_USER_PROMPT,
       enabled: true
     });
 
@@ -130,7 +123,8 @@ export class PromptTemplateManager {
                           request.topic.includes('调试') ||
                           request.customPrompt;
     
-    const hasCustomSystemPrompt = config.systemPrompt;
+    // 存下来的系统提示词和内置默认一字不差时也按默认处理，「重置为默认」不会切到自定义的模板
+    const hasCustomSystemPrompt = normalizeCustomSystemPrompt(config.systemPrompt);
     
     let templateName: string;
     

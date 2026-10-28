@@ -8,13 +8,34 @@
  * 弹窗文案一律使用纯文本：项目没有开启 Ionic 的 innerHTMLTemplatesEnabled，
  * 在 alert 的 message 里写 HTML 只会把标签原样显示给用户。
  */
-import { alertController, loadingController } from '@ionic/vue'
+import { actionSheetController, alertController, loadingController } from '@ionic/vue'
 import { Capacitor } from '@capacitor/core'
+import {
+  alertCircleOutline,
+  cloudDoneOutline,
+  cloudOfflineOutline,
+  cloudOutline,
+  cloudUploadOutline,
+  gitMergeOutline,
+  pauseCircleOutline,
+  syncOutline,
+  timeOutline,
+  warningOutline
+} from 'ionicons/icons'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { formatRelativeTime } from '~/lib/utils/date'
+import {
+  resolveDataSyncAlertType,
+  resolveDataSyncStatusKind,
+  type DataSyncStatusKind
+} from '~/lib/utils/data-sync-status'
 import {
   getCloudSyncErrorDiagnosis,
-  type CloudSyncResult
+  type CloudSyncResult,
+  type CloudSyncStatus
 } from '~/lib/services/cloud-sync.service'
+import { localBackupService } from '~/lib/services/local-backup.service'
+import type { MobileTileTone } from '~/components/mobile/ui/types'
 import i18n from '~/i18n'
 
 const translate = (key: string, named?: Record<string, unknown>) =>
@@ -106,10 +127,15 @@ export const presentSyncErrorDetails = async (
   }
   buttons.push({ text: translate('common.close'), role: 'cancel' })
 
+  // 除了通用说明和建议，把这次的实际错误也列出来（与说明相同时不重复）
+  const rawError = diagnosis.rawError.trim()
   const alert = await alertController.create({
     header: diagnosis.title,
     message: [
       diagnosis.message,
+      ...(rawError && rawError !== diagnosis.message.trim()
+        ? ['', `${translate('mobileSettings.sync.errorDetailLabel')}:`, rawError]
+        : []),
       '',
       `${translate('dataSync.suggestedActions')}:`,
       ...diagnosis.suggestedActions.map(action => `· ${action}`)
@@ -155,4 +181,182 @@ export const confirmAction = async (options: {
   const { role } = await alert.onDidDismiss()
   await settleOverlays()
   return role !== 'cancel' && role !== 'backdrop'
+}
+
+/**
+ * 底部弹出的单选列表（间隔、保留份数等），代替 ion-select 让分组行保持 V5 的样式。
+ * 选中项前面加 ✓，取消或点遮罩时返回 undefined。
+ */
+export const pickOption = async <T extends string | number>(options: {
+  header: string
+  current: T
+  items: { value: T; label: string }[]
+}): Promise<T | undefined> => {
+  let picked: T | undefined
+  const sheet = await actionSheetController.create({
+    header: options.header,
+    buttons: [
+      ...options.items.map(item => ({
+        text: item.value === options.current ? `✓ ${item.label}` : item.label,
+        handler: () => { picked = item.value }
+      })),
+      { text: translate('common.cancel'), role: 'cancel' }
+    ]
+  })
+  await sheet.present()
+  await sheet.onDidDismiss()
+  await settleOverlays()
+  return picked
+}
+
+/** 自动同步 / 自动备份共用的间隔文案 */
+export const formatIntervalMinutes = (minutes: number) => {
+  if (minutes < 60) return translate('dataBackup.backupEveryMinutes', { count: minutes })
+  if (minutes < 1440) return translate('dataBackup.backupEveryHours', { count: minutes / 60 })
+  if (minutes === 1440) return translate('dataBackup.backupEveryDay')
+  return translate('dataBackup.backupEveryDays', { count: minutes / 1440 })
+}
+
+export const currentLocale = () => String(i18n.global.locale.value || 'zh-CN')
+
+/** 「2 分钟前」这类相对时间，按当前界面语言输出 */
+export const formatRelative = (value?: string | null, now = new Date()) =>
+  value ? formatRelativeTime(value, currentLocale(), now) : ''
+
+/**
+ * 两句说明接在一起：第一句没有句末标点时补上；中文、日文句号后不加空格，其他语言加一个空格。
+ * （桌面端共用的 statusRetryScheduledDescription 用「；」连接，诊断说明本身已带句号，会出现「。；」）
+ */
+export const joinSentences = (first: string, second: string, locale = currentLocale()) => {
+  const cjk = /^(zh|ja)/.test(locale)
+  const lead = first.trim()
+  if (!lead) return second
+  const ended = /[。．.!！?？]$/.test(lead) ? lead : `${lead}${cjk ? '。' : '.'}`
+  return `${ended}${cjk ? '' : ' '}${second}`
+}
+
+export type MobileSyncStatusKind = DataSyncStatusKind | 'restorePaused'
+export type MobileSyncTone = 'success' | 'info' | 'warning' | 'error'
+
+export interface MobileSyncStatusView {
+  kind: MobileSyncStatusKind
+  tone: MobileSyncTone
+  /** 彩色图标方块的色调，和 tone 一一对应 */
+  tileTone: MobileTileTone
+  icon: string
+  title: string
+  description: string
+}
+
+const TILE_TONE: Record<MobileSyncTone, MobileTileTone> = {
+  success: 'success',
+  info: 'soft',
+  warning: 'warning',
+  error: 'error'
+}
+
+/**
+ * 设置首页的同步状态卡和数据同步页的状态卡共用同一套判断。
+ *
+ * 标题和颜色直接来自桌面端的 resolveDataSyncStatusKind / resolveDataSyncAlertType，
+ * 保证两端对同一个状态说同样的话、用同样的颜色。移动端只在前面多两条规则：
+ * - 没有任何存储配置时一律显示「尚未配置」，避免让用户以为同步已经在工作；
+ * - 本地恢复后同步被挂起（等用户选择合并或覆盖云端）时显示「恢复后已暂停」，
+ *   这时服务状态是 paused，桌面端的判断会落到「已是最新」，不能沿用。
+ */
+export const describeSyncStatus = (input: {
+  status: CloudSyncStatus
+  autoSyncEnabled: boolean
+  storageCount: number
+  restoreSuspensionCount: number
+}): MobileSyncStatusView => {
+  const { status } = input
+  const view = (kind: MobileSyncStatusKind, tone: MobileSyncTone, icon: string, title: string, description: string) =>
+    ({ kind, tone, tileTone: TILE_TONE[tone], icon, title, description })
+
+  if (input.storageCount === 0) {
+    return view('notConfigured', 'info', cloudOfflineOutline,
+      translate('dataSync.statusNotConfigured'), translate('dataSync.statusNotConfiguredDescription'))
+  }
+  if (input.restoreSuspensionCount > 0) {
+    return view('restorePaused', 'warning', pauseCircleOutline,
+      translate('cloudBackup.syncStatusValues.paused'), translate('cloudBackup.restoreDecisionDescription'))
+  }
+
+  const diagnosis = getCloudSyncErrorDiagnosis(status.lastResult || status.error, {
+    storageId: status.storageId,
+    reason: status.reason,
+    status: status.status,
+    failureCount: status.failureCount,
+    timestamp: status.updatedAt
+  })
+  const hasScheduledRetry = status.status === 'error' && status.pending && !!status.nextSyncAt
+  const kind = resolveDataSyncStatusKind({
+    hasScheduledRetry,
+    isError: status.status === 'error',
+    canAutoRetryError: diagnosis.canAutoRetry,
+    autoSyncEnabled: input.autoSyncEnabled,
+    isSyncing: status.status === 'syncing',
+    pendingChanges: !!status.pendingChanges,
+    hasSucceededBefore: !!(status.lastSyncAt || status.lastResult?.success),
+    hasStorageConfigs: input.storageCount > 0,
+    hasPendingConflict: status.status === 'conflict'
+  })
+  const tone = resolveDataSyncAlertType(kind, diagnosis.canAutoRetry)
+
+  switch (kind) {
+    case 'retryScheduled':
+      return view(kind, tone, timeOutline, translate('dataSync.statusRetryScheduled'),
+        joinSentences(diagnosis.message, translate('mobileSettings.sync.retryAt', { time: formatRelative(status.nextSyncAt) })))
+    case 'error':
+      return view(kind, tone, tone === 'warning' ? warningOutline : alertCircleOutline, diagnosis.title, diagnosis.message)
+    case 'conflict': {
+      // 两边都改过的数据在等用户选择，同步本身没有出错，不能按错误展示
+      const count = status.pendingConflict?.items.length || 0
+      return view(kind, tone, gitMergeOutline,
+        count > 0 ? translate('mobileSettings.sync.conflictTitle', { count }) : translate('mobileSettings.sync.conflictTitleUnknown'),
+        translate('mobileSettings.sync.conflictDescription'))
+    }
+    case 'paused':
+      return view(kind, tone, pauseCircleOutline, translate('dataSync.statusPaused'), translate('dataSync.statusPausedDescription'))
+    case 'syncing':
+      return view(kind, tone, syncOutline, translate('dataSync.statusSyncing'), translate('dataSync.statusSyncingDescription'))
+    case 'pending':
+      return view(kind, tone, cloudUploadOutline, translate('dataSync.statusPending'), translate('dataSync.pendingChanges'))
+    case 'current':
+      return view(kind, tone, cloudDoneOutline, translate('dataSync.statusCurrent'), translate('mobileSettings.sync.noPendingChanges'))
+    case 'ready':
+      return view(kind, tone, cloudOutline, translate('dataSync.statusReady'), translate('dataSync.statusAutomaticDescription'))
+    default:
+      return view('notConfigured', tone, cloudOfflineOutline,
+        translate('dataSync.statusNotConfigured'), translate('dataSync.statusNotConfiguredDescription'))
+  }
+}
+
+/** 本机备份的摘要（版本数、最近一份的时间），设置首页和数据备份页共用 */
+export const loadLocalBackupSummary = async (): Promise<{ count: number; latestAt?: string }> => {
+  try {
+    const backups = await localBackupService.list()
+    return { count: backups.length, latestAt: backups[0]?.createdAt }
+  } catch (error) {
+    console.error('加载本地备份列表失败:', error)
+    return { count: 0 }
+  }
+}
+
+/**
+ * 冲突处理面板挂在数据同步页上。其他页面（比如设置首页的状态卡）想直接打开它时，
+ * 先在这里登记一次请求再跳转，同步页进入时取走请求并打开面板；只生效一次，
+ * 之后从子页面返回同步页不会再次弹出。
+ */
+let conflictSheetRequested = false
+
+export const requestConflictSheet = () => {
+  conflictSheetRequested = true
+}
+
+export const consumeConflictSheetRequest = () => {
+  const requested = conflictSheetRequested
+  conflictSheetRequested = false
+  return requested
 }

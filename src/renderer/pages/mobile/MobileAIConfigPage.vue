@@ -1,198 +1,141 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title :style="{ opacity: headerProgress }">{{ t('mainPage.menu.aiConfig') }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="handleCreate">
-            <ion-icon :icon="add"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content :fullscreen="true" :scroll-events="true" @ionScroll="onIonScroll">
+    <ion-content class="m-page-content" :fullscreen="true">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <!-- 大标题：静止时展开，向下滚动时收起为工具栏小标题 -->
-      <div class="mobile-large-title-bar" :style="{ '--collapse-progress': headerProgress }">
-        <h1 class="mobile-large-title-text" aria-hidden="true">{{ t('mainPage.menu.aiConfig') }}</h1>
-      </div>
+      <div class="m-wash" aria-hidden="true" />
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="loading-container">
-        <ion-spinner></ion-spinner>
-      </div>
+      <MobileLargeTitle :title="t('mobileNav.models')" :subtitle="subtitle">
+        <button type="button" class="m-btn-c" :aria-label="t('aiConfig.addConfig')" @click="handleCreate">
+          <ion-icon :icon="add" />
+        </button>
+      </MobileLargeTitle>
 
-      <!-- 空状态 -->
-      <div v-else-if="configs.length === 0" class="empty-container">
-        <EmptyAIConfigIllustration />
-        <p class="empty-text">{{ t('aiConfig.noConfigs') }}</p>
-        <p class="empty-description">{{ t('aiConfig.noConfigsDescription') }}</p>
-        <ion-button @click="handleCreate">
-          {{ t('aiConfig.addConfig') }}
-        </ion-button>
-      </div>
+      <div class="m-body m-body--tabbed models-body">
+        <!-- 加载状态 -->
+        <div v-if="loading" class="models-state">
+          <ion-spinner name="crescent" />
+        </div>
 
-      <!-- 配置内容 -->
-      <div v-else>
-        <!-- 全局首选项状态显示 -->
-        <ion-card v-if="preferredConfig" class="status-card preferred-status">
-          <ion-card-content>
-            <div class="preferred-alert">
-              <div class="preferred-info">
-                <ion-icon :icon="starOutline"></ion-icon>
-                <div>
-                  <strong>{{ t('aiConfig.currentPreferredConfig') }}</strong>
-                  <p>{{ preferredConfig.name }}</p>
-                </div>
-              </div>
-              <ion-button fill="clear" size="small" @click="handleClearPreferred">
-                {{ t('aiConfig.cancelPreferred') }}
-              </ion-button>
-            </div>
-          </ion-card-content>
-        </ion-card>
+        <!-- 空状态 -->
+        <div v-else-if="configs.length === 0" class="models-empty">
+          <EmptyAIConfigIllustration />
+          <h2 class="models-empty__title">{{ t('models.emptyTitle') }}</h2>
+          <p class="models-empty__desc">{{ t('aiConfig.noConfigsDescription') }}</p>
+          <button type="button" class="m-cta models-empty__cta" @click="handleCreate">
+            <ion-icon :icon="add" aria-hidden="true" />
+            {{ t('aiConfig.addConfig') }}
+          </button>
+        </div>
 
-        <!-- 多配置无首选项警告 -->
-        <ion-card v-else-if="configs.length > 1" class="status-card warning-status">
-          <ion-card-content>
-            <div class="warning-alert">
-              <ion-icon :icon="warningOutline"></ion-icon>
+        <template v-else>
+          <!-- 全局首选：品牌色大卡片，带连接状态和快捷操作 -->
+          <PreferredConfigCard v-if="preferredConfig" :config="preferredConfig"
+            :visual="visualForConfig(preferredConfig)" :status="statusForConfig(preferredConfig)"
+            @open="handleView(preferredConfig)" @test="handleTestPreferred(preferredConfig)"
+            @clear="handleClearPreferred" />
+
+          <!-- 多个已启用配置但没有首选：提醒去设一个，并直接给出入口 -->
+          <div v-else-if="enabledCount > 1" class="m-card models-hint" role="note">
+            <span class="m-tile m-tile--warning" aria-hidden="true"><ion-icon :icon="warningOutline" /></span>
+            <span class="models-hint__body">
               <p>{{ t('aiConfig.multipleConfigsWarning') }}</p>
-            </div>
-          </ion-card-content>
-        </ion-card>
+              <button type="button" class="models-hint__action" @click="handlePickPreferred">
+                <ion-icon :icon="starOutline" aria-hidden="true" />
+                {{ t('aiConfig.setAsPreferred') }}
+              </button>
+            </span>
+          </div>
 
-        <!-- AI 配置列表 -->
-        <div class="mobile-grouped-card">
-          <ion-list>
-            <ion-item-sliding v-for="config in configs" :key="config.id">
-              <ion-item button @click="handleView(config)">
-                <span class="provider-icon" slot="start" aria-hidden="true">
-                  <component :is="getProviderIcon(config)" />
+          <!-- 全部配置：左滑可编辑、启用/禁用、删除 -->
+          <MobileGroup :title="`${t('aiConfig.workspace.allConfigs')} · ${configs.length}`">
+            <ion-item-sliding v-for="config in configs" :key="config.id" class="models-slide">
+              <ion-item button :detail="false" lines="none" class="models-row" @click="handleView(config)">
+                <span class="models-row__content">
+                  <ProviderTile :visual="visualForConfig(config)" :variant="config.enabled ? 'soft' : 'muted'" />
+                  <span class="models-row__text">
+                    <span class="models-row__name" :class="{ 'is-disabled': !config.enabled }">{{ config.name }}</span>
+                    <span class="models-row__sub">{{ getRowSubtitle(config) }}</span>
+                  </span>
+                  <span class="models-row__end">
+                    <span class="m-pill" :class="statusPillOf(config).tone">{{ statusPillOf(config).label }}</span>
+                    <ion-icon :icon="chevronForward" class="models-row__chev" aria-hidden="true" />
+                  </span>
                 </span>
-                <ion-label>
-                  <h2>{{ config.name }}</h2>
-                  <p class="config-description">
-                    {{ config.provider }} {{ config.model }}
-                  </p>
-                  <div class="config-meta">
-                    <ion-chip size="small" :color="config.isPreferred ? 'primary' : 'medium'">
-                      <ion-label>
-                        {{ config.isPreferred ? t('aiConfig.globalPreferred') : t('aiConfig.normalConfig') }}
-                      </ion-label>
-                    </ion-chip>
-                  </div>
-                </ion-label>
-                <ion-toggle
-                  slot="end"
-                  :checked="config.enabled"
-                  @ionChange="handleToggle(config, $event)"
-                  @click.stop
-                ></ion-toggle>
               </ion-item>
 
               <ion-item-options side="end">
-                <ion-item-option color="primary" @click="handleEdit(config)">
-                  <ion-icon :icon="createOutline"></ion-icon>
+                <ion-item-option color="medium" @click="handleToggle(config, !config.enabled, $event)">
+                  <ion-icon slot="top" :icon="config.enabled ? pauseCircleOutline : playCircleOutline" />
+                  {{ config.enabled ? t('mobileModels.disable') : t('mobileModels.enable') }}
+                </ion-item-option>
+                <ion-item-option color="primary" @click="handleEdit(config, $event)">
+                  <ion-icon slot="top" :icon="createOutline" />
                   {{ t('common.edit') }}
                 </ion-item-option>
-                <ion-item-option
-                  v-if="!config.isPreferred"
-                  color="danger"
-                  @click="handleDelete(config)"
-                >
-                  <ion-icon :icon="trashOutline"></ion-icon>
+                <ion-item-option color="danger" @click="handleDelete(config, $event)">
+                  <ion-icon slot="top" :icon="trashOutline" />
                   {{ t('common.delete') }}
                 </ion-item-option>
               </ion-item-options>
             </ion-item-sliding>
-          </ion-list>
-        </div>
+          </MobileGroup>
+        </template>
       </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, type Component } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonChip,
   IonIcon,
-  IonButton,
-  IonButtons,
   IonRefresher,
   IonRefresherContent,
   IonSpinner,
-  IonToggle,
+  IonItem,
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
-  IonCard,
-  IonCardContent,
-  alertController,
+  actionSheetController,
   onIonViewWillEnter,
   onIonViewWillLeave
 } from '@ionic/vue'
 import {
   add,
+  chevronForward,
   createOutline,
-  trashOutline,
+  pauseCircleOutline,
+  playCircleOutline,
   starOutline,
+  trashOutline,
   warningOutline
 } from 'ionicons/icons'
-import {
-  Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
-  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
-} from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { onDataChange } from '~/lib/services/data-change-events'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
-import type { AIConfig, AIProviderType } from '@shared/types'
+import type { AIConfig } from '@shared/types'
 import EmptyAIConfigIllustration from '~/components/mobile/illustrations/EmptyAIConfigIllustration.vue'
-import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
+import MobileLargeTitle from '~/components/mobile/ui/MobileLargeTitle.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import ProviderTile from '~/components/mobile/models/ProviderTile.vue'
+import PreferredConfigCard from '~/components/mobile/models/PreferredConfigCard.vue'
+import { useMobileProviderCatalog } from '~/components/mobile/models/provider-catalog'
+import { connectionBadgeView, statusForConfig, testSavedConfigConnection } from '~/components/mobile/models/connection-status'
+import { describeMobileAIFailure, isMobileSupportedProvider } from '~/components/mobile/prompt/mobile-ai'
+import { useConfigActions } from '~/components/mobile/models/useConfigActions'
 
 const { t } = useI18n()
 const router = useRouter()
-const { progress: headerProgress, onIonScroll } = useCollapsingHeader()
-
-const providerIcons: Record<AIProviderType, Component> = {
-  openai: Atom,
-  ollama: BrandOpenSource,
-  anthropic: LetterA,
-  google: BrandGoogle,
-  azure: BrandWindows,
-  lmstudio: DeviceDesktop,
-  deepseek: LetterD,
-  mistral: LetterM,
-  siliconflow: Circles,
-  tencent: LetterT,
-  aliyun: Cloud,
-  zhipu: LetterZ,
-  openrouter: Route
-}
-
-const normalizeURL = (value?: string) => (value || '').trim().replace(/\/+$/, '')
-const getProviderIcon = (config: AIConfig) => {
-  const isCustom = (config.type === 'openai'
-    && normalizeURL(config.baseURL) !== 'https://api.openai.com/v1')
-    || (config.type === 'anthropic' && Boolean(normalizeURL(config.baseURL)))
-  return isCustom ? Api : providerIcons[config.type] || Atom
-}
+const { visualForConfig } = useMobileProviderCatalog()
+const actions = useConfigActions()
 
 // 状态
 const configs = ref<AIConfig[]>([])
@@ -202,6 +145,21 @@ let isPageActive = true
 let pendingRealtimeRefresh = false
 let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let realtimeRefreshRunning = false
+
+const enabledCount = computed(() => configs.value.filter(config => config.enabled).length)
+const subtitle = computed(() => loading.value || configs.value.length === 0
+  ? ''
+  : t('aiConfig.workspace.configCount', { count: configs.value.length }))
+
+// 行副标题：模型数量，首选的加「首选」，禁用的直接写「已禁用」
+const getRowSubtitle = (config: AIConfig) => {
+  if (!config.enabled) return t('models.disabled')
+  const count = t('aiConfig.workspace.modelCount', { count: config.models?.length || 0 })
+  return config.isPreferred ? `${count} · ${t('models.preferred')}` : count
+}
+
+// 行尾状态：和首选卡片、详情页同一套判断（未测试显示「未验证」，不再默认「可用」）
+const statusPillOf = (config: AIConfig) => connectionBadgeView(config, t)
 
 // 加载 AI 配置列表
 const loadConfigs = async (options: { showLoading?: boolean } = {}) => {
@@ -231,35 +189,17 @@ const handleRefresh = async (event: any) => {
   event.target.complete()
 }
 
+// 左滑操作执行后收起滑块
+const closeSlidingItem = (event?: Event) => {
+  const sliding = (event?.target as HTMLElement | null)?.closest('ion-item-sliding')
+  sliding?.close()
+}
+
 // 切换启用状态
-const handleToggle = async (config: AIConfig, event: any) => {
-  const enabled = event.detail.checked
-
-  try {
-    await api.aiConfigs.update.mutate({
-      id: config.id!,
-      data: {
-        ...config,
-        enabled,
-        isPreferred: enabled ? config.isPreferred : false
-      }
-    })
-
-    config.enabled = enabled
-    if (!enabled && config.isPreferred) {
-      await api.aiConfigs.clearPreferred.mutate()
-      config.isPreferred = false
-    }
+const handleToggle = async (config: AIConfig, enabled: boolean, event?: Event) => {
+  closeSlidingItem(event)
+  if (await actions.setEnabled(config, enabled)) {
     await loadConfigs({ showLoading: false })
-    const message = enabled
-      ? t('aiConfig.configEnabled')
-      : t('aiConfig.configDisabled')
-    showToast(message)
-  } catch (error) {
-    console.error('更新 AI 配置失败:', error)
-    // 恢复状态
-    event.target.checked = !enabled
-    showToast(t('aiConfig.updateFailed'), 'danger')
   }
 }
 
@@ -269,7 +209,8 @@ const handleView = (config: AIConfig) => {
 }
 
 // 编辑配置
-const handleEdit = (config: AIConfig) => {
+const handleEdit = (config: AIConfig, event?: Event) => {
+  closeSlidingItem(event)
   router.push(`/ai-config/edit/${config.id}`)
 }
 
@@ -278,66 +219,52 @@ const handleCreate = () => {
   router.push('/ai-config/create')
 }
 
-// 清除首选配置
-const handleClearPreferred = async () => {
-  const alert = await alertController.create({
-    header: t('common.confirm'),
-    message: t('aiConfig.preferredCleared'),
+// 首选卡片：测试连接，结果和耗时显示在卡片上
+const handleTestPreferred = async (config: AIConfig) => {
+  const status = await testSavedConfigConnection(config)
+  if (status.state === 'ok') {
+    showToast(t('aiConfig.connectionTestSuccess'))
+  } else {
+    showToast(describeMobileAIFailure(t('mobileModels.connectionFailedShort'), status.error || '', t), 'danger')
+  }
+}
+
+// 没有首选时：从移动端能用的已启用配置里挑一个设为首选
+const handlePickPreferred = async () => {
+  const candidates = configs.value.filter(config => config.enabled && isMobileSupportedProvider(config.type))
+  const sheet = await actionSheetController.create({
+    header: t('aiConfig.setAsPreferred'),
     buttons: [
-      {
-        text: t('common.cancel'),
-        role: 'cancel'
-      },
-      {
-        text: t('common.confirm'),
-        handler: async () => {
-          try {
-            await api.aiConfigs.clearPreferred.mutate()
-            await loadConfigs({ showLoading: false })
-            showToast(t('aiConfig.globalPreferredCleared'))
-          } catch (error) {
-            console.error('清除首选配置失败:', error)
-            showToast(t('aiConfig.clearFailed'), 'danger')
-          }
+      ...candidates.map(config => ({
+        text: config.name,
+        handler: () => {
+          void actions.setPreferred(config).then(changed => {
+            if (changed) void loadConfigs({ showLoading: false })
+          })
         }
-      }
+      })),
+      { text: t('common.cancel'), role: 'cancel' }
     ]
   })
+  await sheet.present()
+}
 
-  await alert.present()
+// 清除首选配置
+const handleClearPreferred = async () => {
+  if (await actions.clearPreferred({ confirm: true })) {
+    await loadConfigs({ showLoading: false })
+  }
 }
 
 // 删除配置
-const handleDelete = async (config: AIConfig) => {
-  const alert = await alertController.create({
-    header: t('common.confirm'),
-    message: t('aiConfig.deleteConfirm', { name: config.name }),
-    buttons: [
-      {
-        text: t('common.cancel'),
-        role: 'cancel'
-      },
-      {
-        text: t('common.delete'),
-        role: 'destructive',
-        handler: async () => {
-          try {
-            await api.aiConfigs.delete.mutate(config.id!)
-            configs.value = configs.value.filter(item => item.id !== config.id)
-            if (preferredConfig.value?.id === config.id) {
-              preferredConfig.value = null
-            }
-            showToast(t('aiConfig.configDeleteSuccess'))
-          } catch (error) {
-            console.error('删除 AI 配置失败:', error)
-            showToast(t('aiConfig.deleteFailed'), 'danger')
-          }
-        }
-      }
-    ]
-  })
-
-  await alert.present()
+const handleDelete = async (config: AIConfig, event?: Event) => {
+  closeSlidingItem(event)
+  if (await actions.deleteConfig(config)) {
+    configs.value = configs.value.filter(item => item.id !== config.id)
+    if (preferredConfig.value?.id === config.id) {
+      preferredConfig.value = null
+    }
+  }
 }
 
 // 显示提示
@@ -405,124 +332,190 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
+.models-body {
+  padding-top: 16px;
 }
 
-.empty-container {
+.models-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+/* 空状态：插图 + 标题 + 说明 + 主按钮 */
+.models-empty {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 60px 20px;
+  gap: 8px;
+  padding: 48px 12px 0;
   text-align: center;
 }
 
-.empty-text {
-  color: var(--ion-color-medium);
-  margin-bottom: 4px;
+.models-empty__title {
+  margin: 8px 0 0;
+  color: var(--content-primary);
+  font-size: var(--m-font-block);
+  font-weight: 600;
 }
 
-.config-description {
-  color: var(--ion-color-medium);
-  font-size: var(--mobile-font-size-footnote);
-  margin-top: 4px;
+.models-empty__desc {
+  max-width: 300px;
+  margin: 0 0 16px;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
 }
 
-.provider-icon {
+.models-empty__cta {
+  max-width: 280px;
+}
+
+.models-empty__cta ion-icon {
+  font-size: 20px;
+}
+
+/* 加上 .m-card 提高优先级，否则会被 m-card 的纵向排列覆盖 */
+.m-card.models-hint {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.models-hint__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.models-hint p {
+  margin: 0;
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+}
+
+/* 文字按钮：看起来是一行链接，点按区域撑到 44px */
+.models-hint__action {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border: 1px solid var(--border-default);
-  border-radius: 50%;
-  background: var(--surface-secondary);
-  color: var(--content-secondary);
-}
-
-.provider-icon :deep(svg) {
-  width: 16px;
-  height: 16px;
-}
-
-.config-meta {
-  margin-top: 8px;
-  display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  min-height: 44px;
+  margin: -8px 0 -12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
 }
 
-ion-chip {
-  margin: 0;
+/* 分组里的可滑动行：ion-item 换成 m-row 的样子（≥64 高、行间细线从图标右侧开始） */
+.models-slide {
+  position: relative;
 }
 
-ion-card {
-  margin: 16px;
+.models-slide + .models-slide::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 64px;
+  z-index: 2;
+  height: 1px;
+  background: var(--border-subtle);
+  content: "";
 }
 
-.status-card {
-  color: var(--content-primary);
-  box-shadow: none;
+.models-row {
+  --background: var(--surface-primary);
+  --background-activated: var(--surface-secondary);
+  --background-activated-opacity: 1;
+  --background-focused: var(--surface-secondary);
+  --background-focused-opacity: 1;
+  --color: var(--content-primary);
+  --padding-start: 16px;
+  --padding-end: 0;
+  --inner-padding-end: 16px;
+  --inner-border-width: 0;
+  --border-width: 0;
+  --min-height: 64px;
+  font-size: var(--m-font-body);
 }
 
-.preferred-status {
-  --background: color-mix(in srgb, var(--accent-primary) 8%, var(--surface-primary));
-  border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--border-default));
-}
-
-.warning-status {
-  --background: color-mix(in srgb, var(--accent-warning) 10%, var(--surface-primary));
-  border-color: color-mix(in srgb, var(--accent-warning) 28%, var(--border-default));
-}
-
-ion-content {
-  /* 让列表底部留出浮动导航（AI 入口条 + 标签栏）的空间，避免最后一项被遮挡 */
-  --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-clearance));
-}
-
-.preferred-alert {
+.models-row__content {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0;
 }
 
-.preferred-info {
+.models-row__text {
   display: flex;
-  align-items: center;
-  gap: 12px;
   flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
-.preferred-info ion-icon {
-  font-size: var(--mobile-icon-size-lg);
+.models-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.preferred-info p {
-  margin: 4px 0 0 0;
-  font-size: var(--mobile-font-size-footnote);
-  opacity: 0.9;
+.models-row__name.is-disabled {
+  color: var(--content-tertiary);
 }
 
-.warning-alert {
+.models-row__sub {
+  overflow: hidden;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态标记最多占一半宽度，长语言里（Connessione non riuscita）省略结尾，配置名不会被挤没 */
+.models-row__end {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  min-width: 0;
+  max-width: 55%;
 }
 
-.warning-alert ion-icon {
-  font-size: var(--mobile-icon-size-lg);
-  flex-shrink: 0;
+.models-row__end .m-pill {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 22px;
+  text-overflow: ellipsis;
 }
 
-.warning-alert p {
-  margin: 0;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
+.models-row__chev {
+  flex: none;
+  color: var(--border-strong);
+  font-size: 18px;
+}
+
+.models-slide ion-item-option {
+  min-width: 72px;
+  font-size: var(--m-font-caption);
+  font-weight: 600;
+}
+
+.models-slide ion-item-option ion-icon {
+  margin-bottom: 4px;
+  font-size: 20px;
 }
 </style>

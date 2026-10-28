@@ -59,8 +59,10 @@ describe('issue #389 desktop UI polish', () => {
     const local = readWorkspaceFile('src/renderer/components/settings/DataManagementSettings.vue');
     expect(local).toContain('await getBackupList({ showLoading: true });');
 
+    expect(local).toContain(':loading="activeBackupLocation === \'local\' ? loading.refreshBackupList : cloudPaneRef?.loading.refresh"');
+
     const cloud = readWorkspaceFile('src/renderer/components/settings/CloudBackupLocationPane.vue');
-    expect(cloud).toContain('<NButton @click="refreshCloudBackupList" :loading="loading.refresh">');
+    expect(cloud).toContain('const refreshCloudBackupList = async () => {');
     expect(cloud).toContain('onMounted(loadCloudBackupList);');
     expect(cloud).toContain('void loadCloudBackupList();');
     expect(cloud).not.toContain('await refreshCloudBackupList();');

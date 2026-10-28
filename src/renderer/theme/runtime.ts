@@ -1,4 +1,4 @@
-import { getCssVars } from './index'
+import { getCssVars, getIonicCssVars } from './index'
 
 export type ThemeSource = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
@@ -46,6 +46,12 @@ export function applyDocumentTheme(theme: ResolvedTheme, shell: ThemeShell): voi
 
   for (const [key, value] of Object.entries(getCssVars(theme))) {
     html.style.setProperty(`--${key}`, value)
+  }
+
+  if (shell === 'mobile') {
+    for (const [key, value] of Object.entries(getIonicCssVars(theme))) {
+      html.style.setProperty(`--${key}`, value)
+    }
   }
 }
 

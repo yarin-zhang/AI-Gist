@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateTime } from '../src/renderer/lib/utils/date'
+import { formatDateTime, formatFriendlyDate } from '../src/renderer/lib/utils/date'
 
 describe('formatDateTime', () => {
   it('formats a date as yyyy-MM-dd HH:mm:ss', () => {
@@ -19,5 +19,21 @@ describe('formatDateTime', () => {
 
   it('falls back to the original value for an invalid date', () => {
     expect(formatDateTime('not-a-date')).toBe('not-a-date')
+  })
+})
+
+describe('formatFriendlyDate (#450)', () => {
+  const now = new Date(2026, 9, 27, 12, 0, 0)
+  const today = new Date(2026, 9, 27, 9, 30, 0)
+
+  it('capitalizes a standalone relative day', () => {
+    expect(formatFriendlyDate(today, 'en-US', { withTime: false, now })).toBe('Today')
+    expect(formatFriendlyDate(today, 'it-IT', { withTime: false, now })).toBe('Oggi')
+  })
+
+  it('keeps the relative day lowercase inside a sentence', () => {
+    expect(formatFriendlyDate(today, 'en-US', { withTime: false, now, capitalize: false })).toBe('today')
+    expect(formatFriendlyDate(today, 'it-IT', { withTime: false, now, capitalize: false })).toBe('oggi')
+    expect(formatFriendlyDate(today, 'ja-JP', { withTime: false, now, capitalize: false })).toBe('今日')
   })
 })

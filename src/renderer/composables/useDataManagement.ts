@@ -4,7 +4,8 @@
  */
 
 import { ref, reactive, toRef } from 'vue';
-import { DataManagementAPI } from '@renderer/lib/api/data-management.api';
+import i18n from '@renderer/i18n';
+import { DataManagementAPI, type FullBackupImportOptions } from '@renderer/lib/api/data-management.api';
 import { useDatabase } from './useDatabase';
 import { databaseService } from '@renderer/lib/db';
 import {
@@ -13,6 +14,10 @@ import {
 } from '@renderer/lib/services/local-backup.service';
 
 export type BackupInfo = LocalBackupInfo;
+
+// 提示会直接显示在设置页上，必须跟随界面语言
+const tr = (key: string, named?: Record<string, unknown>) =>
+  (i18n.global.t as (key: string, named?: Record<string, unknown>) => string)(key, named ?? {});
 
 export interface DataManagementState {
   backupList: BackupInfo[];
@@ -54,7 +59,7 @@ export function useDataManagement() {
       return backups;
     } catch (err) {
       console.error('获取备份列表失败:', err);
-      error.value = err instanceof Error ? err.message : '获取备份列表失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.getBackupListFailed');
       return [];
     } finally {
       if (showLoading) setLoading('refreshBackupList', false);
@@ -72,11 +77,11 @@ export function useDataManagement() {
         trigger: 'manual'
       });
       await getBackupList();
-      success.value = result.action === 'unchanged' ? '数据未变化，已保留现有备份' : '备份创建成功';
+      success.value = result.action === 'unchanged' ? tr('dataManagement.messages.backupUnchanged') : tr('dataManagement.messages.backupCreated');
       return result.backup;
     } catch (err) {
       console.error('创建备份失败:', err);
-      error.value = err instanceof Error ? err.message : '创建备份失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.backupCreatedFailed');
       return null;
     } finally {
       setLoading('backup', false);
@@ -89,10 +94,10 @@ export function useDataManagement() {
       setLoading('restore', true);
       clearMessages();
       await localBackupService.restore(backupId);
-      success.value = '备份恢复成功';
+      success.value = tr('dataManagement.messages.backupRestored');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '恢复备份失败';
+      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.backupRestoreFailed');
       return false;
     } finally {
       setLoading('restore', false);
@@ -106,10 +111,10 @@ export function useDataManagement() {
       clearMessages();
       await localBackupService.delete(backupId);
       await getBackupList();
-      success.value = '备份删除成功';
+      success.value = tr('settingsMessages.backupDeleteSuccess');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '删除备份失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.backupDeleteFailed');
       return false;
     } finally {
       setLoading('backup', false);
@@ -121,7 +126,7 @@ export function useDataManagement() {
     try {
       await localBackupService.openDirectory();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '无法打开备份目录';
+      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.openDirectoryFailed');
     }
   };
 
@@ -133,36 +138,43 @@ export function useDataManagement() {
 
       const result = await DataManagementAPI.exportFullBackup();
       if (result.success) {
-        success.value = '完整备份导出成功';
+        success.value = tr('settingsMessages.fullBackupExportSuccess');
         return true;
       }
+      // 在保存对话框里点了取消，不算失败
+      if (result.cancelled) return false;
 
-      error.value = result.message || '完整备份导出失败';
+      error.value = result.message || tr('settingsMessages.fullBackupExportFailed');
       return false;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '完整备份导出失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.fullBackupExportFailed');
       return false;
     } finally {
       setLoading('export', false);
     }
   };
 
-  // 完整备份导入
-  const importFullBackup = async (): Promise<boolean> => {
+  // 完整备份导入：会替换本机全部数据，先由界面确认，确认后先做一份导入前备份，备份失败就不导入
+  const importFullBackup = async (approve?: FullBackupImportOptions['approve']): Promise<boolean> => {
     try {
       setLoading('import', true);
       clearMessages();
 
-      const result = await DataManagementAPI.importFullBackup();
+      const result = await DataManagementAPI.importFullBackup({
+        approve,
+        beforeReplace: () => localBackupService.createSafetyBackup('import'),
+      });
       if (result.success) {
-        success.value = '完整备份导入成功';
+        await getBackupList();
+        success.value = tr('settingsMessages.fullBackupImportSuccess');
         return true;
       }
+      if (result.cancelled) return false;
 
-      error.value = result.message || '完整备份导入失败';
+      error.value = result.message || tr('settingsMessages.fullBackupImportFailed');
       return false;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '完整备份导入失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.fullBackupImportFailed');
       return false;
     } finally {
       setLoading('import', false);
@@ -178,7 +190,7 @@ export function useDataManagement() {
       // 1. 从数据库获取选定数据
       const result = await safeDbOperation(() => databaseService.exportAllData());
       if (!result || !result.success) {
-        throw new Error('导出数据失败');
+        throw new Error(tr('dataManagement.messages.exportDataFailed'));
       }
       
       // 2. 根据选项过滤数据
@@ -202,22 +214,24 @@ export function useDataManagement() {
       const filePath = await DataManagementAPI.selectExportPath(defaultName);
       
       if (!filePath) {
-        error.value = '未选择导出路径';
+        error.value = tr('dataManagement.messages.noExportPath');
         return false;
       }
       
       // 4. 导出数据
-      const exportSuccess = await DataManagementAPI.exportDataToFile(filteredData, filePath, format);
+      const exportSuccess = await DataManagementAPI.exportDataToFile(filteredData, filePath, format, {
+        categories: result.data?.categories
+      });
       
       if (exportSuccess) {
-        success.value = '选择性数据导出成功';
+        success.value = tr('dataManagement.messages.selectiveExportSuccess');
         return true;
       } else {
-        error.value = '选择性数据导出失败';
+        error.value = tr('dataManagement.messages.selectiveExportFailed');
         return false;
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '选择性数据导出失败';
+      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.selectiveExportFailed');
       return false;
     } finally {
       setLoading('export', false);
@@ -244,15 +258,17 @@ export function useDataManagement() {
       const result = await safeDbOperation(() => databaseService.getHealthStatus());
       
       if (result && result.healthy) {
-        success.value = '数据库健康检查通过';
+        success.value = tr('dataManagement.messages.healthCheckPassed');
       } else {
-        error.value = `数据库存在问题: ${result?.missingStores?.join(', ') || '未知问题'}`;
+        error.value = tr('dataManagement.messages.healthCheckIssues', {
+          stores: result?.missingStores?.join(', ') || tr('dataManagement.messages.unknownIssue')
+        });
       }
       
       return result;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '数据库健康检查失败';
-      return { healthy: false, missingStores: ['检查失败'] };
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.databaseHealthCheckFailed');
+      return { healthy: false, missingStores: [tr('dataManagement.messages.checkFailed')] };
     } finally {
       setLoading('healthCheck', false);
     }
@@ -267,14 +283,14 @@ export function useDataManagement() {
       const result = await safeDbOperation(() => databaseService.repairDatabase());
       
       if (result && result.success) {
-        success.value = '数据库修复成功';
+        success.value = tr('dataManagement.messages.repairSuccess');
         return true;
       } else {
-        error.value = result?.message || '数据库修复失败';
+        error.value = result?.message || tr('dataManagement.messages.repairFailed');
         return false;
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '数据库修复失败';
+      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.repairFailed');
       return false;
     } finally {
       setLoading('repair', false);
@@ -287,17 +303,19 @@ export function useDataManagement() {
       setLoading('clearDatabase', true);
       clearMessages();
       
+      // 清空前先备份当前数据（界面承诺「先自动备份，再删除」），备份失败就不清空
+      await localBackupService.createSafetyBackup('clear');
+
       // 清空所有表
       await safeDbOperation(() => databaseService.forceCleanAllTables());
       
-      // 清空备份列表
-      backupList.value = [];
-      localStorage.removeItem('ai-gist-backups');
+      // 本地备份存在独立的库里，清空数据不会删掉它们（包括刚做的保护性备份），刷新一下列表
+      await getBackupList();
       
-      success.value = '数据库清空成功';
+      success.value = tr('settingsMessages.databaseCleared');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '数据库清空失败';
+      error.value = err instanceof Error ? err.message : tr('settingsMessages.databaseClearFailed');
       return false;
     } finally {
       setLoading('clearDatabase', false);

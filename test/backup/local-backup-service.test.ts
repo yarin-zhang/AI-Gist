@@ -78,6 +78,20 @@ describe('LocalBackupService', () => {
     expect(repository.write).toHaveBeenCalledTimes(1)
   })
 
+  it('safety backups never reuse an automatic backup that retention may delete later', async () => {
+    const { service, repository } = createService()
+
+    await service.create({ backupType: 'automatic' })
+    const safety = await service.createSafetyBackup('clear')
+    const reused = await service.createSafetyBackup('import')
+
+    expect(safety.action).toBe('created')
+    expect(safety.backup).toMatchObject({ backupType: 'manual', trigger: 'pre-clear' })
+    // 最近一份已经是同样数据的手动备份时可以复用
+    expect(reused).toMatchObject({ action: 'unchanged', backup: { id: safety.backup.id } })
+    expect(repository.write).toHaveBeenCalledTimes(2)
+  })
+
   it('requires an exact semantic signature even when a stored checksum claims a match', async () => {
     const { service, repository } = createService()
     const storedData = { ...emptyData, prompts: [{ id: 1, uuid: 'prompt-a', title: 'Old' }] }

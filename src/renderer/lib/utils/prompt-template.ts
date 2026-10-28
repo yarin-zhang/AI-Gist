@@ -280,6 +280,17 @@ export function removeVariableOccurrences(content: string, name: string): string
     .join('')
 }
 
+/** 删除变量定义时，正文里的 `{{name}}` 变回普通文字 name，句子不会缺一块 */
+export function unwrapVariableOccurrences(content: string, name: string): string {
+  return parsePromptTemplate(content).segments
+    .map(segment => (
+      segment.kind === 'variable' && segment.name === name
+        ? name
+        : content.slice(segment.start, segment.end)
+    ))
+    .join('')
+}
+
 export function getActivePromptVariables(prompt: PromptWithRelations): EditablePromptVariable[] {
   if (prompt.isJinjaTemplate) {
     if (prompt.variables?.length) return prompt.variables.map(cloneVariable)
@@ -301,6 +312,32 @@ export function createPromptDraft(
       : variable.defaultValue ?? ''
   })
   return next
+}
+
+/**
+ * 变量的默认值（或类型）改了以后同步填写值：还空着、或者仍是旧默认值的字段换成新默认值，
+ * 用户自己填过的值不动。没有需要更新的字段时返回 null。
+ */
+export function applyChangedDefaults(
+  previous: EditablePromptVariable[],
+  next: EditablePromptVariable[],
+  values: Record<string, any>
+): Record<string, any> | null {
+  const before = new Map(previous.map(variable => [variable.name, variable]))
+  const result = { ...values }
+  let changed = false
+  next.forEach(variable => {
+    const old = before.get(variable.name)
+    if (!old) return
+    const oldDefault = createPromptDraft([old])[variable.name]
+    const newDefault = createPromptDraft([variable])[variable.name]
+    const current = values[variable.name]
+    if (oldDefault === newDefault || current === newDefault) return
+    if (!isEmptyPromptValue(current) && String(current) !== String(oldDefault)) return
+    result[variable.name] = newDefault
+    changed = true
+  })
+  return changed ? result : null
 }
 
 export function isEmptyPromptValue(value: any): boolean {
@@ -368,13 +405,55 @@ export function buildPromptResultSegments(
   return segments
 }
 
+/**
+ * Jinja 模板里 list / dict 类型的变量在界面上按文本填写，渲染前换成真正的数组 / 对象，
+ * 否则 `{% for item in items %}` 会把字符串逐字符展开。
+ * list：可以填 JSON 数组，否则按行拆分（每行一项，去掉首尾空白和空行）；
+ * dict：只接受 JSON 对象，解析不了时保持原文。
+ */
+export function parseJinjaVariableValue(type: string, value: any): any {
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (type === 'list') {
+    if (text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text)
+        if (Array.isArray(parsed)) return parsed
+      } catch {
+        // 不是合法的 JSON 数组，按行拆分
+      }
+    }
+    return text ? text.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : []
+  }
+  if (type === 'dict' && text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+    } catch {
+      // 解析失败时保持原文
+    }
+  }
+  return value
+}
+
+function buildJinjaContext(values: Record<string, any>, variables: EditablePromptVariable[]): Record<string, any> {
+  const context = { ...values }
+  variables.forEach(variable => {
+    const type = String(variable.type)
+    if ((type === 'list' || type === 'dict') && variable.name in context) {
+      context[variable.name] = parseJinjaVariableValue(type, context[variable.name])
+    }
+  })
+  return context
+}
+
 export function renderPrompt(
   prompt: PromptWithRelations,
   values: Record<string, any>,
   variables = getActivePromptVariables(prompt)
 ): { content: string; error?: string } {
   try {
-    if (prompt.isJinjaTemplate) return { content: jinjaService.render(prompt.content || '', values) }
+    if (prompt.isJinjaTemplate) return { content: jinjaService.render(prompt.content || '', buildJinjaContext(values, variables)) }
 
     const variableNames = new Set(variables.map(variable => variable.name))
     const content = parsePromptTemplate(prompt.content || '').segments.map(segment => {

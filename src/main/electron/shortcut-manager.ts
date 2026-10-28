@@ -265,7 +265,7 @@ export class ShortcutManager {
     if (this.launcherLoadPromise) return this.launcherLoadPromise;
     this.launcherLoadPromise = (async () => {
       const launcher = new BrowserWindow({
-        width: 700,
+        width: 800,
         height: 460,
         show: false,
         frame: false,
@@ -276,7 +276,7 @@ export class ShortcutManager {
         transparent: false,
         hasShadow: true,
         roundedCorners: true,
-        backgroundColor: nativeTheme.shouldUseDarkColors ? '#101014' : '#ffffff',
+        backgroundColor: nativeTheme.shouldUseDarkColors ? '#141A24' : '#ffffff',
         webPreferences: {
           preload: join(__dirname, '..', 'preload.js'),
           nodeIntegration: false,
@@ -340,7 +340,7 @@ export class ShortcutManager {
     const x = Math.round(display.workArea.x + (display.workArea.width - bounds.width) / 2);
     const y = Math.round(display.workArea.y + Math.min(140, (display.workArea.height - bounds.height) / 3));
     this.launcherWindow.setPosition(x, y, false);
-    this.launcherWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#101014' : '#ffffff');
+    this.launcherWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#141A24' : '#ffffff');
     this.launcherWindow.webContents.invalidate();
     this.launcherWindow.show();
     this.launcherWindow.focus();

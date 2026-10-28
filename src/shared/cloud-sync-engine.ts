@@ -88,8 +88,15 @@ export interface CloudSyncMergeResult<TData extends CloudSyncDataSet = CloudSync
   hasConflicts: boolean;
 }
 
+export type CloudSyncConflictSide = 'local' | 'remote';
+
 export interface CloudSyncMergeOptions {
   prefer?: 'local' | 'remote' | 'newer';
+  /**
+   * 用户在冲突弹窗里逐项选定保留的一方，键由 getCloudSyncConflictId 生成。
+   * 只对真正冲突的记录生效：选中的一方整条保留（删除也算一种版本）。
+   */
+  resolutions?: Record<string, CloudSyncConflictSide>;
 }
 
 interface CloudSyncRelationContext {
@@ -412,6 +419,128 @@ export function mergeCloudSyncData<TData extends CloudSyncDataSet>(
   };
 }
 
+export function getCloudSyncConflictId(conflict: Pick<CloudSyncConflict, 'collection' | 'key'>): string {
+  return `${conflict.collection}::${conflict.key}`;
+}
+
+/**
+ * 冲突弹窗里每一边展示的关键内容，用来让用户看清两边差在哪里 (#447)。
+ * 只带截断后的短文本：不带图片，也不带 API 密钥、接口地址这类敏感字段。
+ */
+export interface CloudSyncConflictPreview {
+  /** 标题或名称 */
+  title?: string;
+  /** 正文、优化模板等长文本的开头 */
+  excerpt?: string;
+  /** 其余关键字段，按展示顺序排列 */
+  fields: CloudSyncConflictPreviewField[];
+}
+
+export type CloudSyncConflictPreviewFieldKey =
+  | 'category'
+  | 'tags'
+  | 'description'
+  | 'version'
+  | 'provider'
+  | 'model'
+  | 'type'
+  | 'defaultValue'
+  | 'value';
+
+export interface CloudSyncConflictPreviewField {
+  key: CloudSyncConflictPreviewFieldKey;
+  value: string;
+}
+
+export const CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH = 240;
+const CLOUD_SYNC_CONFLICT_FIELD_LENGTH = 120;
+const SENSITIVE_SETTING_KEY_PATTERN = /key|token|secret|password|passwd|credential/i;
+
+function toConflictPreviewText(value: unknown, limit: number): string {
+  if (value === undefined || value === null) return '';
+  const raw = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value);
+  const text = raw.replace(/\r\n?/g, '\n').trim();
+  // 按字符截断，不切坏 emoji 这类代理对
+  const chars = Array.from(text);
+  return chars.length > limit ? `${chars.slice(0, limit).join('').trimEnd()}…` : text;
+}
+
+function toConflictPreviewTags(tags: unknown): string {
+  if (Array.isArray(tags)) return tags.map(tag => String(tag).trim()).filter(Boolean).join(', ');
+  return typeof tags === 'string' ? tags : '';
+}
+
+/** 按 ID / uuid 找同一边数据里的分类名，用来把提示词的分类 ID 换成名字 */
+export function createCloudSyncCategoryNameLookup(data: CloudSyncDataSet): (record: any) => string | undefined {
+  const names = new Map<string, string>();
+  for (const category of data.categories || []) {
+    if (!isPresent(category) || typeof category.name !== 'string' || !category.name.trim()) continue;
+    if (category.id !== undefined && category.id !== null) names.set(`id:${category.id}`, category.name.trim());
+    if (category.uuid) names.set(`uuid:${category.uuid}`, category.name.trim());
+  }
+  return record => {
+    if (typeof record?.category?.name === 'string' && record.category.name.trim()) return record.category.name.trim();
+    if (record?.categoryUuid && names.has(`uuid:${record.categoryUuid}`)) return names.get(`uuid:${record.categoryUuid}`);
+    if (record?.categoryId !== undefined && record?.categoryId !== null) return names.get(`id:${record.categoryId}`);
+    return undefined;
+  };
+}
+
+/** 冲突项某一边的预览；这一边已删除或没有这条记录时返回 undefined */
+export function createCloudSyncConflictPreview(
+  collection: string,
+  record: any,
+  options: { categoryNameOf?: (record: any) => string | undefined } = {}
+): CloudSyncConflictPreview | undefined {
+  if (!isPresent(record) || typeof record !== 'object') return undefined;
+
+  const fields: CloudSyncConflictPreviewField[] = [];
+  const add = (key: CloudSyncConflictPreviewFieldKey, value: unknown) => {
+    const text = toConflictPreviewText(value, CLOUD_SYNC_CONFLICT_FIELD_LENGTH);
+    if (text) fields.push({ key, value: text });
+  };
+  const titleOf = (value: unknown) => toConflictPreviewText(value, CLOUD_SYNC_CONFLICT_FIELD_LENGTH) || undefined;
+  const excerptOf = (value: unknown) => toConflictPreviewText(value, CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH) || undefined;
+
+  switch (collection) {
+    case 'prompts':
+    case 'promptHistories':
+      if (collection === 'promptHistories') add('version', record.version);
+      add('category', options.categoryNameOf?.(record));
+      add('tags', toConflictPreviewTags(record.tags));
+      add('description', record.description);
+      return { title: titleOf(record.title), excerpt: excerptOf(record.content), fields };
+    case 'categories':
+      add('description', record.description);
+      return { title: titleOf(record.name), fields };
+    case 'aiConfigs':
+      add('provider', record.type ?? record.provider);
+      add('model', record.defaultModel || record.customModel);
+      return { title: titleOf(record.name), fields };
+    case 'quickOptimizationConfigs':
+      add('description', record.description);
+      return { title: titleOf(record.name), excerpt: excerptOf(record.prompt), fields };
+    case 'promptVariables':
+      add('type', record.type);
+      add('defaultValue', record.defaultValue);
+      add('description', record.description);
+      return { title: titleOf(record.name), fields };
+    case 'settings':
+      if (!SENSITIVE_SETTING_KEY_PATTERN.test(String(record.key || ''))) add('value', record.value);
+      return { title: titleOf(record.key), fields };
+    default:
+      return { title: titleOf(record.title || record.name || record.key), fields };
+  }
+}
+
+function getUserResolution(
+  options: CloudSyncMergeOptions,
+  collection: string,
+  key: string
+): CloudSyncConflictSide | undefined {
+  return options.resolutions?.[getCloudSyncConflictId({ collection, key })];
+}
+
 export function getCloudSyncRecordKey(collection: string, record: any): string {
   if (collection === 'syncTombstones') {
     const tombstoneKey = getCloudSyncTombstoneKey(record);
@@ -550,7 +679,10 @@ function mergeWithoutBase(
       return;
     }
 
-    const chosen = chooseRecord(localRecord, remoteRecord, options);
+    const decided = getUserResolution(options, collection, key);
+    const chosen = decided
+      ? { record: decided === 'local' ? localRecord : remoteRecord, resolution: decided === 'local' ? 'keep-local' as const : 'take-remote' as const }
+      : chooseRecord(localRecord, remoteRecord, options);
     records.push(cloneValue(chosen.record));
     addConflict(conflicts, summary, {
       collection,
@@ -624,6 +756,21 @@ function mergeWithBase(
       return;
     }
 
+    // 本机删了、服务器改了：用户选本机时保留这次删除
+    if (getUserResolution(options, collection, key) === 'local') {
+      addConflict(conflicts, summary, {
+        collection,
+        key,
+        reason: 'delete_vs_update',
+        resolution: 'keep-local',
+        local: localRecord,
+        remote: remoteRecord,
+        base: baseRecord
+      });
+      summary.deleted++;
+      return;
+    }
+
     records.push(cloneValue(remoteRecord));
     addConflict(conflicts, summary, {
       collection,
@@ -653,6 +800,21 @@ function mergeWithBase(
 
     const localChanged = !recordsEqual(collection, localRecord, baseRecord, relationContexts.local, relationContexts.base);
     if (!localChanged) {
+      summary.deleted++;
+      return;
+    }
+
+    // 服务器删了、本机改了：用户选服务器时接受这次删除
+    if (getUserResolution(options, collection, key) === 'remote') {
+      addConflict(conflicts, summary, {
+        collection,
+        key,
+        reason: 'delete_vs_update',
+        resolution: 'take-remote',
+        local: localRecord,
+        remote: remoteRecord,
+        base: baseRecord
+      });
       summary.deleted++;
       return;
     }
@@ -700,6 +862,25 @@ function mergeWithBase(
     relationContexts,
     options
   );
+
+  // 同一字段两边都改了，且用户指定了保留哪一方：整条采用那一方的版本
+  const decided = mergedRecord.hasFieldConflict ? getUserResolution(options, collection, key) : undefined;
+  if (decided) {
+    records.push(cloneValue(decided === 'local' ? localRecord : remoteRecord));
+    addConflict(conflicts, summary, {
+      collection,
+      key,
+      reason: 'both_modified',
+      resolution: decided === 'local' ? 'keep-local' : 'take-remote',
+      local: localRecord,
+      remote: remoteRecord,
+      base: baseRecord
+    });
+    if (decided === 'remote') summary.updated++;
+    else summary.kept++;
+    return;
+  }
+
   records.push(cloneValue(mergedRecord.record));
 
   if (mergedRecord.hasFieldConflict) {

@@ -486,6 +486,59 @@ describe('web server API handler', () => {
       'sync-manifest.json'
     ))).rejects.toThrow()
   })
+
+  it('reports where a model list came from instead of passing built-in defaults off as fetched (#415)', async () => {
+    server = http.createServer(createWebRequestHandler({ serveStaticFiles: false }))
+    await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', () => resolve()))
+    const { port } = server.address() as AddressInfo
+    const listModels = async (config: Record<string, unknown>) => {
+      const response = await fetch(`http://127.0.0.1:${port}/api/ai/models`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config })
+      })
+      return (await response.json()).data
+    }
+
+    // 一个假的模型服务：/v1/models 返回真实列表，/empty/models 返回空列表
+    const provider = http.createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json')
+      if (req.url === '/v1/models') res.end(JSON.stringify({ data: [{ id: 'remote-a' }, { id: 'remote-b' }] }))
+      else if (req.url === '/api/tags') res.end(JSON.stringify({ models: [{ name: 'qwen3:8b' }] }))
+      else res.end(JSON.stringify({ data: [] }))
+    })
+    await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', () => resolve()))
+    const providerPort = (provider.address() as AddressInfo).port
+    // 拿到一个肯定没人监听的端口
+    const closed = http.createServer()
+    await new Promise<void>(resolve => closed.listen(0, '127.0.0.1', () => resolve()))
+    const closedPort = (closed.address() as AddressInfo).port
+    await new Promise<void>(resolve => closed.close(() => resolve()))
+
+    try {
+      expect(await listModels({ type: 'openai', apiKey: 'sk', baseURL: `http://127.0.0.1:${providerPort}/v1` }))
+        .toEqual({ models: ['remote-a', 'remote-b'], modelSource: 'remote' })
+      expect(await listModels({ type: 'ollama', baseURL: `http://127.0.0.1:${providerPort}` }))
+        .toEqual({ models: ['qwen3:8b'], modelSource: 'remote' })
+
+      const empty = await listModels({ type: 'openai', apiKey: 'sk', baseURL: `http://127.0.0.1:${providerPort}/empty` })
+      expect(empty).toMatchObject({ models: [], modelSource: 'unavailable' })
+      expect(empty.error).toBeUndefined()
+
+      for (const type of ['openai', 'ollama']) {
+        const failed = await listModels({ type, apiKey: 'sk', baseURL: `http://127.0.0.1:${closedPort}` })
+        expect(failed.models).toEqual([])
+        expect(failed.modelSource).toBe('unavailable')
+        expect(failed.fallbackModels.length).toBeGreaterThan(0)
+        expect(failed.error).toMatch(/ECONNREFUSED|fetch failed/)
+      }
+
+      // 这两个服务商在 Web 后端没有接列表接口，给的是内置常见模型，并如实标成 default
+      expect(await listModels({ type: 'anthropic', apiKey: 'sk' })).toMatchObject({ modelSource: 'default' })
+    } finally {
+      await new Promise<void>(resolve => provider.close(() => resolve()))
+    }
+  })
 })
 
 const WEB_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAADUlEQVR42mP8z8BQDwAFgwJ/lZ2nNwAAAABJRU5ErkJggg=='

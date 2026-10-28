@@ -2,10 +2,12 @@ import {
   AIGenerationRequest, 
   AIGenerationResult, 
   AIConfig,
-  AIConfigTestResult
+  AIConfigTestResult,
+  AIModelListResult
 } from '@shared/types/ai';
 import { AIProviderFactory } from './providers/provider-factory';
 import { AITestResult, AIIntelligentTestResult } from './providers/base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 // 使用共享的 AIConfig 类型，添加一个别名用于处理后的配置
 type ProcessedAIConfig = AIConfig;
@@ -135,7 +137,7 @@ class AIServiceManager {
    * @param config 原始配置
    * @returns 模型列表
    */
-  async processGetModels(config: any): Promise<string[]> {
+  async processGetModels(config: any): Promise<AIModelListResult> {
     // 将配置转换为内部格式
     const processedConfig = {
       ...config,
@@ -177,9 +179,10 @@ class AIServiceManager {
   /**
    * 处理智能测试请求
    * @param config 原始配置
+   * @param prompt 渲染层按界面语言给的测试提示词，不传时用默认
    * @returns 测试结果
    */
-  async processIntelligentTest(config: any): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
+  async processIntelligentTest(config: any, prompt?: string): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
     // 将配置转换为内部格式
     const processedConfig = {
       ...config,
@@ -188,16 +191,17 @@ class AIServiceManager {
       updatedAt: new Date(config.updatedAt)
     };
     
-    return await this.intelligentTest(processedConfig);
+    return await this.intelligentTest(processedConfig, prompt);
   }
 
   /**
    * 处理模型测试请求
    * @param config 原始配置
    * @param model 要测试的模型
+   * @param prompt 渲染层按界面语言给的测试提示词，不传时用默认
    * @returns 模型测试结果
    */
-  async processTestModel(config: any, model: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
+  async processTestModel(config: any, model: string, prompt?: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
     // 只提取必要的属性，避免不可序列化的内容
     const processedConfig = {
       configId: config.configId,
@@ -215,7 +219,7 @@ class AIServiceManager {
       updatedAt: config.updatedAt ? new Date(config.updatedAt) : new Date()
     };
     
-    return await this.testModel(processedConfig, model);
+    return await this.testModel(processedConfig, model, prompt);
   }
 
   /**
@@ -441,7 +445,7 @@ class AIServiceManager {
    * @param config AI配置
    * @returns 模型列表
    */
-  async getAvailableModels(config: ProcessedAIConfig): Promise<string[]> {
+  async getAvailableModels(config: ProcessedAIConfig): Promise<AIModelListResult> {
     console.log(`获取模型列表 - 供应商: ${config.type}, baseURL: ${config.baseURL}`);
     
     try {
@@ -449,7 +453,12 @@ class AIServiceManager {
       return await provider.getAvailableModels(config);
     } catch (error: any) {
       console.error(`获取模型列表失败 - 供应商: ${config.type}`, error);
-      return config.models || [];
+      // 不能把配置里原有的模型当成「刚获取到的列表」返回
+      return {
+        models: [],
+        modelSource: 'unavailable',
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 
@@ -460,16 +469,16 @@ class AIServiceManager {
    * @param config AI配置
    * @returns 测试结果
    */
-  async intelligentTest(config: ProcessedAIConfig): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
+  async intelligentTest(config: ProcessedAIConfig, prompt?: string): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
     try {
       const provider = AIProviderFactory.getProvider(config);
-      return await provider.intelligentTest(config);
+      return await provider.intelligentTest(config, prompt);
     } catch (error: any) {
       console.error(`智能测试失败 - 供应商: ${config.type}`, error);
       return { 
         success: false, 
         error: error.message || '智能测试失败',
-        inputPrompt: '请用一句话简单介绍一下你自己。'
+        inputPrompt: resolveTestPrompt(prompt)
       };
     }
   }
@@ -480,10 +489,10 @@ class AIServiceManager {
    * @param model 要测试的模型
    * @returns 模型测试结果
    */
-  async testModel(config: ProcessedAIConfig, model: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
+  async testModel(config: ProcessedAIConfig, model: string, prompt?: string): Promise<{ success: boolean; error?: string; model?: string; response?: string }> {
     try {
       const provider = AIProviderFactory.getProvider(config);
-      return await provider.testModel(config, model);
+      return await provider.testModel(config, model, prompt);
     } catch (error: any) {
       console.error(`模型测试失败 - 供应商: ${config.type}, 模型: ${model}`, error);
       return {

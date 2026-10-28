@@ -1738,6 +1738,82 @@ describe('CloudSyncService', () => {
     )).toBe(true)
   })
 
+  it('really reconnects after an auth failure once the credentials are fixed (#416)', async () => {
+    const { service, cloudClient } = createService(baseData)
+    cloudClient.getCloudSyncManifest.mockRejectedValueOnce(new Error('Invalid response: 401 Unauthorized'))
+
+    const failed = await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(failed).toMatchObject({ success: false, errorCode: 'REMOTE_AUTH' })
+
+    // 用户改对了密码：云端能读了，不能再拿上一次的认证失败冒充结果
+    const retried = await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(retried).toMatchObject({ success: true, action: 'uploaded' })
+    expect(cloudClient.saveCloudSyncManifest).toHaveBeenCalled()
+  })
+
+  function createDeterministicApplyFailure() {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const remoteSnapshot = createCloudSyncSnapshot({
+      ...baseData,
+      prompts: [{ ...baseData.prompts[0], title: 'Remote edit', updatedAt: '2026-01-03T00:00:00.000Z' }]
+    }, 'device-b', 'rev-remote')
+    const created = createService(baseData, {
+      ...createEmptyCloudSyncManifest('2026-01-03T00:00:00.000Z'),
+      latestSnapshot: remoteSnapshot,
+      baseSnapshot
+    })
+    created.storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+    created.database.replaceAllData.mockResolvedValue({
+      success: false,
+      atomic: true,
+      message: '数据替换失败',
+      error: '写入 prompts 记录失败',
+      errorCode: 'CONSTRAINT_ERROR',
+      retryable: false
+    })
+    return created
+  }
+
+  it('retries a guarded deterministic failure when the user explicitly asks (#416)', async () => {
+    const { service, database } = createDeterministicApplyFailure()
+
+    await service.syncNow('cfg-1', { reason: 'manual' })
+    await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(database.replaceAllData).toHaveBeenCalledTimes(1)
+
+    await service.syncNow('cfg-1', { reason: 'manual', forceRetry: true })
+    expect(database.replaceAllData).toHaveBeenCalledTimes(2)
+  })
+
+  it('forgets recorded failures and the stale error status after the storage configuration changes (#416)', async () => {
+    const { service, database } = createDeterministicApplyFailure()
+
+    const failed = await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(failed.success).toBe(false)
+    expect(service.getStatus()).toMatchObject({ status: 'error', storageId: 'cfg-1' })
+
+    // 自动同步没开时 scheduleSync 不会排队，但改过配置后旧的失败同样不再作数
+    service.scheduleSync('config-change', { storageId: 'cfg-1', delayMs: 0 })
+    expect(service.getStatus()).toMatchObject({ status: 'idle', error: undefined, lastResult: undefined })
+
+    await service.syncNow('cfg-1', { reason: 'manual' })
+    expect(database.replaceAllData).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves another storage error untouched when a different configuration changes', async () => {
+    const { service } = createDeterministicApplyFailure()
+    await service.syncNow('cfg-1', { reason: 'manual' })
+
+    service.resetStorageFailureState('cfg-2')
+    expect(service.getStatus()).toMatchObject({ status: 'error', storageId: 'cfg-1' })
+  })
+
   it('does not rollback or repeat an identical deterministic atomic apply failure', async () => {
     const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
     const remoteSnapshot = createCloudSyncSnapshot({
@@ -2019,6 +2095,115 @@ describe('CloudSyncService', () => {
     service.clearConflictLog('cfg-1')
     expect(service.getConflictLog('cfg-1')).toEqual([])
     expect(service.getStatus().conflictLogCount).toBe(0)
+  })
+
+  describe('when conflicts need a decision (ask mode)', () => {
+    const setupConflict = () => {
+      const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+      const localData = {
+        ...baseData,
+        prompts: [{ id: 1, uuid: 'prompt-1', title: 'Local edit', updatedAt: '2026-01-03T00:00:00.000Z' }]
+      }
+      const remoteData = {
+        ...baseData,
+        prompts: [{ id: 9, uuid: 'prompt-1', title: 'Remote edit', updatedAt: '2026-01-02T00:00:00.000Z' }]
+      }
+      const remoteSnapshot = createCloudSyncSnapshot(remoteData, 'device-b', 'rev-remote')
+      const manifest = {
+        ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+        latestSnapshot: remoteSnapshot,
+        baseSnapshot
+      }
+      const created = createService(localData, manifest, { conflictMode: 'ask' })
+      created.storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+        storageId: 'cfg-1',
+        deviceId: 'device-a',
+        lastSyncAt: '2026-01-01T00:00:00.000Z',
+        lastKnownRevision: 'rev-base',
+        baseSnapshot
+      }))
+      return created
+    }
+
+    it('pauses before touching local data or the cloud and reports the conflicts', async () => {
+      const { service, cloudClient, database } = setupConflict()
+
+      const result = await service.syncNow('cfg-1')
+
+      expect(result).toMatchObject({ success: true, action: 'conflict-pending', appliedLocal: false, uploadedRemote: false })
+      expect(database.replaceAllData).not.toHaveBeenCalled()
+      expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+      expect(result.pendingConflict?.items).toEqual([
+        expect.objectContaining({
+          id: 'prompts::uuid:prompt-1',
+          reason: 'both_modified',
+          label: 'Local edit',
+          localUpdatedAt: '2026-01-03T00:00:00.000Z',
+          remoteUpdatedAt: '2026-01-02T00:00:00.000Z',
+          localDeleted: false,
+          remoteDeleted: false
+        })
+      ])
+      expect(result.pendingConflict?.localCounts).toEqual({ prompts: 1, categories: 1, aiConfigs: 0 })
+      expect(service.getStatus()).toMatchObject({ status: 'conflict' })
+      expect(service.getStatus().pendingConflict?.items).toHaveLength(1)
+      expect(service.getPendingConflict('cfg-1')?.items).toHaveLength(1)
+    })
+
+    it('applies the chosen side to the conflicting record and clears the pending state', async () => {
+      const { service, cloudClient, database } = setupConflict()
+      await service.syncNow('cfg-1')
+
+      const result = await service.resolveConflicts('cfg-1', { strategy: 'remote' })
+
+      expect(result.success).toBe(true)
+      expect(result.action).not.toBe('conflict-pending')
+      expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
+        prompts: [expect.objectContaining({ uuid: 'prompt-1', title: 'Remote edit' })]
+      }))
+      expect(cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+      expect(service.getStatus().status).toBe('success')
+      expect(service.getStatus().pendingConflict).toBeUndefined()
+      expect(service.getPendingConflict('cfg-1')).toBeUndefined()
+    })
+
+    it('keeps the local version and uploads it when the user keeps local data', async () => {
+      const { service, cloudClient, database } = setupConflict()
+      await service.syncNow('cfg-1')
+
+      const result = await service.resolveConflicts('cfg-1', {
+        strategy: 'manual',
+        resolutions: { 'prompts::uuid:prompt-1': 'local' }
+      })
+
+      expect(result).toMatchObject({ success: true, uploadedRemote: true })
+      expect(database.replaceAllData).not.toHaveBeenCalled()
+      const savedManifest = cloudClient.saveCloudSyncManifest.mock.calls[0][1]
+      expect(savedManifest.latestSnapshot.data.prompts).toEqual([
+        expect.objectContaining({ uuid: 'prompt-1', title: 'Local edit' })
+      ])
+    })
+
+    it('pauses again when a manual decision leaves a conflict without a choice', async () => {
+      const { service, database } = setupConflict()
+
+      const result = await service.resolveConflicts('cfg-1', { strategy: 'manual', resolutions: {} })
+
+      expect(result.action).toBe('conflict-pending')
+      expect(database.replaceAllData).not.toHaveBeenCalled()
+    })
+
+    it('treats smart merge as the previous automatic behavior', async () => {
+      const { service, database } = setupConflict()
+
+      const result = await service.resolveConflicts('cfg-1', { strategy: 'smart' })
+
+      expect(result.success).toBe(true)
+      expect(result.conflicts[0]).toMatchObject({ resolution: 'take-newer' })
+      // 本机版本更新，智能合并保留本机，只需上传
+      expect(database.replaceAllData).not.toHaveBeenCalled()
+      expect(result.uploadedRemote).toBe(true)
+    })
   })
 
   it('keeps conflict audit logs lightweight by omitting image payloads', async () => {
@@ -3244,5 +3429,138 @@ describe('CloudSyncService', () => {
     ]))
     expect(saveAttempts).toBeGreaterThanOrEqual(2)
     service.stopAutoSync()
+  })
+})
+
+describe('CloudSyncService status for the settings card and status bar (#425)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('clears pending local changes once a storage-targeted sync covered every enabled storage', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+
+    service.startAutoSync({ syncOnStart: false, debounceMs: 60_000, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    expect(service.getStatus().pendingChanges).toBe(true)
+
+    // 新添加存储后的首次同步只针对这一个存储，但它就是全部已启用的存储
+    service.scheduleSync('config-change', { storageId: 'cfg-1', delayMs: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(service.getStatus()).toMatchObject({ status: 'success', pendingChanges: false })
+    service.stopAutoSync()
+  })
+
+  it('keeps pending changes when another enabled storage has not synced yet', async () => {
+    vi.useFakeTimers()
+    let dataChangeListener: ((change: any) => void) | undefined
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), {
+      configClient: {
+        getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig, { ...enabledWebDAVConfig, id: 'cfg-2' }])
+      },
+      subscribeToDataChanges: listener => {
+        dataChangeListener = listener
+        return vi.fn()
+      }
+    })
+
+    service.startAutoSync({ syncOnStart: false, debounceMs: 60_000, pollIntervalMs: 0, retryMs: 0 })
+    dataChangeListener?.({ storeName: 'prompts', action: 'update', id: 1, timestamp: Date.now(), sourceId: 'test' })
+    service.scheduleSync('config-change', { storageId: 'cfg-1', delayMs: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(service.getStatus()).toMatchObject({ status: 'success', pendingChanges: true })
+    service.stopAutoSync()
+  })
+
+  it('reports whether any storage is enabled and forgets the state of a deleted storage', async () => {
+    const getStorageConfigs = vi.fn().mockResolvedValue([enabledWebDAVConfig])
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), { configClient: { getStorageConfigs } })
+
+    await expect(service.refreshStorageAvailability()).resolves.toBe(true)
+    await service.syncNow('cfg-1')
+    expect(service.getStatus()).toMatchObject({ status: 'success', storageId: 'cfg-1', hasEnabledStorage: true })
+    expect(service.getStatus().lastSyncAt).toBeTruthy()
+
+    // 删掉最后一个存储：状态栏马上显示「未开启同步」，不再留着「已同步」和下次检查时间
+    await expect(service.refreshStorageAvailability([])).resolves.toBe(false)
+    expect(service.getStatus()).toMatchObject({
+      status: 'idle',
+      hasEnabledStorage: false,
+      storageId: undefined,
+      lastResult: undefined,
+      lastSyncAt: undefined,
+      nextSyncAt: undefined
+    })
+
+    // 只剩停用的存储也算没有开启同步
+    await expect(service.refreshStorageAvailability([{ ...enabledWebDAVConfig, enabled: false }])).resolves.toBe(false)
+  })
+
+  it('records the auto sync switch in the status', async () => {
+    const { service } = createService(baseData, createEmptyCloudSyncManifest(), {
+      settings: {
+        getNumberValue: vi.fn().mockResolvedValue(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES),
+        setNumberValue: vi.fn(),
+        getBooleanValue: vi.fn().mockResolvedValue(true),
+        setBooleanValue: vi.fn()
+      } as any
+    })
+
+    await service.setAutoSyncEnabled(false)
+    expect(service.getStatus().autoSyncEnabled).toBe(false)
+  })
+})
+
+describe('pending conflict previews (#447)', () => {
+  it('carries a short preview of both versions for each conflicting item', async () => {
+    const baseSnapshot = createCloudSyncSnapshot(baseData, 'device-a', 'rev-base')
+    const longContent = '第一行\n' + '正文'.repeat(400)
+    const localData = {
+      ...baseData,
+      categories: [{ id: 1, uuid: 'cat-1', name: '写作', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      prompts: [{ id: 1, uuid: 'prompt-1', categoryId: 1, title: 'Local edit', content: longContent, tags: ['a', 'b'], updatedAt: '2026-01-03T00:00:00.000Z' }]
+    }
+    const remoteData = {
+      ...baseData,
+      categories: [{ id: 7, uuid: 'cat-1', name: '写作', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      prompts: [{ id: 9, uuid: 'prompt-1', categoryId: 7, title: 'Remote edit', content: 'Remote body', tags: ['a'], updatedAt: '2026-01-02T00:00:00.000Z' }]
+    }
+    const manifest = {
+      ...createEmptyCloudSyncManifest('2026-01-02T00:00:00.000Z'),
+      latestSnapshot: createCloudSyncSnapshot(remoteData, 'device-b', 'rev-remote'),
+      baseSnapshot
+    }
+    const { service, storage } = createService(localData, manifest, { conflictMode: 'ask' })
+    storage.setItem('ai_gist_cloud_sync_state:cfg-1', JSON.stringify({
+      storageId: 'cfg-1',
+      deviceId: 'device-a',
+      lastSyncAt: '2026-01-01T00:00:00.000Z',
+      lastKnownRevision: 'rev-base',
+      baseSnapshot
+    }))
+
+    const result = await service.syncNow('cfg-1')
+    const item = result.pendingConflict?.items[0]
+
+    expect(item?.localPreview).toMatchObject({
+      title: 'Local edit',
+      fields: expect.arrayContaining([{ key: 'category', value: '写作' }, { key: 'tags', value: 'a, b' }])
+    })
+    expect(item?.remotePreview).toMatchObject({ title: 'Remote edit', excerpt: 'Remote body' })
+    // 正文只带开头一段，弹窗不会因为大字段变慢
+    expect(Array.from(item?.localPreview?.excerpt || '').length).toBeLessThanOrEqual(241)
+    expect(item?.localPreview?.excerpt?.startsWith('第一行\n')).toBe(true)
   })
 })

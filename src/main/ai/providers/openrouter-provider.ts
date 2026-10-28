@@ -1,10 +1,11 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import {
   getConfiguredBaseURL,
   getDefaultModels as getProviderDefaultModels
 } from '@shared/ai-provider-metadata';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * OpenRouter 供应商实现
@@ -91,32 +92,20 @@ export class OpenRouterProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`获取 OpenRouter 模型列表 - baseURL: ${config.baseURL}`);
-    
-    try {
-      const models = await this.fetchRemoteModels(config);
-      console.log(`OpenRouter 解析出的模型列表:`, models);
-
-      if (models.length > 0) {
-        return models;
-      }
-    } catch (error) {
-      console.error(`获取 OpenRouter 模型列表失败，使用默认列表:`, error);
-    }
-    
-    // 返回常见的模型作为后备
-    return this.getDefaultModels();
+    // 拿不到时不再直接返回内置列表，常见模型只作为备选交给界面
+    return this.resolveModelList(() => this.fetchRemoteModels(config), this.getDefaultModels());
   }
 
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试 OpenRouter 模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       
       const llm = new ChatOpenAI({
         openAIApiKey: config.apiKey,
@@ -151,7 +140,7 @@ export class OpenRouterProvider extends BaseAIProvider {
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
@@ -161,7 +150,7 @@ export class OpenRouterProvider extends BaseAIProvider {
       return { success: false, error: '未设置默认模型' };
     }
 
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const llm = new ChatOpenAI({

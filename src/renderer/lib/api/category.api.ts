@@ -140,11 +140,19 @@ export class CategoryApiClient {
       /**
        * 删除分类
        * @param id 分类ID
-       * @returns Promise<{ id: number }> 删除的分类ID
+       * @param options.movePromptsToUncategorized 分类里还有提示词时把它们移到「未分类」再删除
+       * @returns Promise<{ id: number; movedPrompts: number }> 删除的分类ID和移到「未分类」的提示词数量
        */
-      mutate: async (id: number): Promise<{ id: number }> => {
+      mutate: async (
+        id: number,
+        options: { movePromptsToUncategorized?: boolean } = {}
+      ): Promise<{ id: number; movedPrompts: number }> => {
+        if (options.movePromptsToUncategorized) {
+          const movedPrompts = await this.categoryService.deleteCategoryAndUncategorizePrompts(id);
+          return { id, movedPrompts };
+        }
         await this.categoryService.deleteCategory(id);
-        return { id };
+        return { id, movedPrompts: 0 };
       }
     },
 

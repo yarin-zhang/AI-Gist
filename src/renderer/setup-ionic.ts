@@ -18,6 +18,7 @@ import '@ionic/vue/css/display.css'
 // 导入 Ionic 暗色模式调色板
 import '@ionic/vue/css/palettes/dark.class.css'
 import './assets/styles/mobile.css'
+import './assets/styles/mobile-v5.css'
 
 import { IonicVue } from '@ionic/vue'
 import type { App } from 'vue'

@@ -1,172 +1,131 @@
 <template>
-    <CommonModal ref="modalRef" :show="show" @update:show="$emit('update:show', $event)" @close="handleClose">
-        <!-- 顶部固定区域 -->
-        <template #header>
-            <NText strong class="modal-title">{{ t('promptManagement.categoryManageTitle') }}</NText>
-            <NText depth="3" class="modal-subtitle">{{ t('promptManagement.categoryManageDesc') }}</NText>
-        </template>
-
-        <!-- 中间可操作区域：统一的单页分类列表管理 -->
-        <template #content="{ contentHeight }">
-            <div class="category-manage" :style="{ height: `${contentHeight}px` }">
-                <div class="category-manage-toolbar ui-toolbar">
-                    <NText depth="3" class="category-manage-count">
-                        {{ t('promptManagement.totalCategories', { count: categories.length }) }}
-                    </NText>
-                    <NButton type="primary" size="small" :disabled="editingCategory !== null || isCreating"
-                        @click="startCreating">
-                        <template #icon><NIcon size="16"><Plus /></NIcon></template>
-                        {{ t('promptManagement.createCategory') }}
+    <UiModal :show="show" width="var(--overlay-width-form)" :title="t('promptManagement.categoryManageTitle')"
+        :subtitle="t('promptManagement.totalCategories', { count: categories.length })" :close-label="t('common.close')"
+        @close="handleClose">
+        <div class="category-manage">
+            <section class="category-create">
+                <span class="category-create__label">{{ t('promptManagement.createCategory') }}</span>
+                <div class="category-create__row">
+                    <span class="category-swatch-preview" :style="{ backgroundColor: newCategory.color }" aria-hidden="true" />
+                    <NInput v-model:value="newCategory.name" :placeholder="t('promptManagement.categoryNamePlaceholder')"
+                        :status="createConflict ? 'error' : undefined"
+                        :input-props="{ 'aria-label': t('promptManagement.categoryName'), 'aria-invalid': Boolean(createConflict), 'aria-describedby': createConflict ? 'category-create-error' : undefined }"
+                        @keydown.enter="handleEnterKey($event, handleCreate)" />
+                    <NButton type="primary" :loading="creating" :disabled="!newCategory.name.trim() || Boolean(createConflict)" @click="handleCreate">
+                        {{ t('categoryManage.create') }}
                     </NButton>
                 </div>
+                <!-- 重名直接在输入框下面说清楚，不再只弹「创建分类失败」 -->
+                <span v-if="createConflict" id="category-create-error" class="category-error" role="alert">
+                    {{ t('categoryManage.duplicateName', { name: createConflict.name }) }}
+                </span>
+                <div class="category-swatches" role="radiogroup" :aria-label="t('promptManagement.color')">
+                    <button v-for="swatch in swatchOptions" :key="swatch.value" type="button" role="radio"
+                        class="category-swatch" :class="{ 'is-selected': sameColor(newCategory.color, swatch.value) }"
+                        :aria-checked="sameColor(newCategory.color, swatch.value)" :aria-label="swatch.label"
+                        @click="newCategory.color = swatch.value">
+                        <span :style="{ backgroundColor: swatch.value }" />
+                    </button>
+                </div>
+            </section>
 
-                <NScrollbar class="category-manage-scroll">
-                    <div class="category-manage-list">
-                        <!-- 新建分类：内联行，置顶方便快速录入 -->
-                        <div v-if="isCreating" class="category-row category-row-editing">
-                            <NColorPicker v-model:value="newCategory.color" :modes="['hex']"
-                                :swatches="COLOR_SWATCHES">
-                                <template #trigger="{ onClick, ref: setTriggerRef }">
-                                    <button type="button" class="category-color-swatch" :ref="setTriggerRef"
-                                        :style="{ backgroundColor: newCategory.color }"
-                                        :aria-label="t('promptManagement.color')" @click="onClick" />
-                                </template>
-                            </NColorPicker>
-                            <NInput v-model:value="newCategory.name" size="small" class="category-row-name-input"
-                                :placeholder="t('promptManagement.categoryNamePlaceholder')" autofocus
-                                @keyup.enter="handleCreate" />
-                            <div class="category-row-actions">
-                                <NButton size="small" type="primary" @click="handleCreate" :loading="creating">
-                                    {{ t('promptManagement.createCategory') }}
-                                </NButton>
-                                <NButton size="small" @click="cancelCreating" :disabled="creating">
-                                    {{ t('common.cancel') }}
-                                </NButton>
-                            </div>
-                        </div>
+            <hr class="category-divider" />
 
-                        <!-- 现有分类：拖拽排序 + 内联编辑/删除 -->
-                        <div v-for="category in orderedCategories" :key="category.id" class="category-order-item"
-                            :class="{
-                                dragging: draggingCategoryId === category.id,
-                                'drop-before': dropTargetCategoryId === category.id && dropPosition === 'before',
-                                'drop-after': dropTargetCategoryId === category.id && dropPosition === 'after',
-                            }" @dragover.prevent="handleCategoryDragOver($event, category)"
-                            @drop.prevent="handleCategoryDrop(category)">
-                            <div class="category-row"
-                                :class="{ 'category-row-editing': editingCategory?.id === category.id }">
-                                <template v-if="editingCategory?.id === category.id">
-                                    <NColorPicker v-model:value="editingCategory!.color" :modes="['hex']"
-                                        :swatches="COLOR_SWATCHES">
-                                        <template #trigger="{ onClick, ref: setTriggerRef }">
-                                            <button type="button" class="category-color-swatch" :ref="setTriggerRef"
-                                                :style="{ backgroundColor: editingCategory!.color }"
-                                                :aria-label="t('promptManagement.color')" @click="onClick" />
-                                        </template>
-                                    </NColorPicker>
-                                    <NInput v-model:value="editingCategory!.name" size="small"
-                                        class="category-row-name-input" :placeholder="t('promptManagement.categoryName')"
-                                        @keyup.enter="handleSaveEdit" />
-                                    <div class="category-row-actions">
-                                        <NButton size="small" type="primary" @click="handleSaveEdit"
-                                            :loading="updating">
-                                            {{ t('common.save') }}
-                                        </NButton>
-                                        <NButton size="small" @click="handleCancelEdit" :disabled="updating">
-                                            {{ t('common.cancel') }}
-                                        </NButton>
-                                    </div>
-                                </template>
-                                <template v-else>
-                                    <NButton size="small" quaternary circle class="category-drag-handle"
-                                        :draggable="orderedCategories.length > 1 && !reordering && editingCategory === null && !isCreating"
-                                        :aria-label="t('promptManagement.categoryDragHandle', { name: category.name })"
-                                        :disabled="orderedCategories.length < 2 || reordering || editingCategory !== null || isCreating"
-                                        @dragstart="handleCategoryDragStart($event, category)"
-                                        @dragend="handleCategoryDragEnd">
-                                        <template #icon><NIcon size="16"><GripVertical /></NIcon></template>
-                                    </NButton>
+            <div class="category-list">
+                <div v-for="category in orderedCategories" :key="category.id" class="category-order-item"
+                    :data-category-id="category.id"
+                    :class="{
+                        'is-editing': editingCategory?.id === category.id,
+                        dragging: draggingCategoryId === category.id,
+                        'drop-before': dropTargetCategoryId === category.id && dropPosition === 'before',
+                        'drop-after': dropTargetCategoryId === category.id && dropPosition === 'after',
+                    }" @dragover.prevent="handleCategoryDragOver($event, category)"
+                    @drop.prevent="handleCategoryDrop(category)">
+                    <NButton size="tiny" quaternary class="category-drag-handle"
+                        :draggable="orderedCategories.length > 1 && !reordering && editingCategory === null && !isCreating"
+                        :aria-label="t('promptManagement.categoryDragHandle', { name: category.name })"
+                        :disabled="orderedCategories.length < 2 || reordering || editingCategory !== null"
+                        @dragstart="handleCategoryDragStart($event, category)" @dragend="handleCategoryDragEnd">
+                        <template #icon><NIcon :size="14"><GripVertical /></NIcon></template>
+                    </NButton>
 
-                                    <span class="category-color-dot"
-                                        :style="{ backgroundColor: category.color || 'var(--accent-success)' }" />
-
-                                    <div class="category-row-info">
-                                        <NText strong class="category-row-name">{{ category.name }}</NText>
-                                        <NText depth="3" class="category-row-count">
-                                            {{ t('promptManagement.categoryPromptCount', {
-                                                count: getCategoryPromptCount(category.id)
-                                            }) }}
-                                        </NText>
-                                    </div>
-
-                                    <div class="category-row-actions">
-                                        <NTooltip>
-                                            <template #trigger>
-                                                <NButton size="small" quaternary circle @click="handleEdit(category)"
-                                                    :disabled="isCreating || (editingCategory !== null && editingCategory.id !== category.id)"
-                                                    :aria-label="t('common.edit')">
-                                                    <template #icon><NIcon size="16"><Edit /></NIcon></template>
-                                                </NButton>
-                                            </template>
-                                            {{ t('common.edit') }}
-                                        </NTooltip>
-                                        <NTooltip>
-                                            <template #trigger>
-                                                <NButton size="small" quaternary circle type="error"
-                                                    @click="handleDelete(category)"
-                                                    :disabled="getCategoryPromptCount(category.id) > 0 || isCreating || (editingCategory !== null && editingCategory.id !== category.id)"
-                                                    :aria-label="t('common.delete')">
-                                                    <template #icon><NIcon size="16"><Trash /></NIcon></template>
-                                                </NButton>
-                                            </template>
-                                            {{ t('common.delete') }}
-                                        </NTooltip>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-
-                        <NEmpty v-if="!isCreating && orderedCategories.length === 0"
-                            :description="t('promptManagement.categoryManageEmpty')" size="large" class="category-manage-empty">
-                            <template #icon>
-                                <NIcon size="48">
-                                    <FolderPlus />
-                                </NIcon>
+                    <template v-if="editingCategory?.id === category.id">
+                        <!-- 受控显示：Esc 先收起这个气泡，而不是关掉整个弹窗 -->
+                        <NPopover trigger="click" placement="bottom-start" :show-arrow="false" :show="colorPopoverShow"
+                            @update:show="value => (colorPopoverShow = value)">
+                            <template #trigger>
+                                <button type="button" class="category-swatch-button" :aria-label="t('promptManagement.color')"
+                                    :aria-expanded="colorPopoverShow">
+                                    <span :style="{ backgroundColor: editingCategory!.color }" />
+                                </button>
                             </template>
-                        </NEmpty>
-                    </div>
-                </NScrollbar>
-            </div>
-        </template>
+                            <div class="category-swatches">
+                                <button v-for="swatch in swatchOptions" :key="swatch.value" type="button" class="category-swatch"
+                                    :class="{ 'is-selected': sameColor(editingCategory!.color, swatch.value) }" :aria-label="swatch.label"
+                                    @click="editingCategory!.color = swatch.value">
+                                    <span :style="{ backgroundColor: swatch.value }" />
+                                </button>
+                            </div>
+                        </NPopover>
+                        <NInput v-model:value="editingCategory!.name" class="category-row__input"
+                            :status="editConflict ? 'error' : undefined"
+                            :input-props="{ 'aria-label': t('promptManagement.categoryName'), 'aria-invalid': Boolean(editConflict), 'aria-describedby': editConflict ? 'category-edit-error' : undefined }"
+                            @keydown.enter="handleEnterKey($event, handleSaveEdit)" />
+                        <NButton size="tiny" :disabled="updating" @click="handleCancelEdit">{{ t('common.cancel') }}</NButton>
+                        <NButton size="tiny" type="primary" :loading="updating" :disabled="!editingCategory!.name.trim() || Boolean(editConflict)"
+                            @click="handleSaveEdit">{{ t('common.save') }}</NButton>
+                        <span v-if="editConflict" id="category-edit-error" class="category-error category-row__error" role="alert">
+                            {{ t('categoryManage.duplicateName', { name: editConflict.name }) }}
+                        </span>
+                    </template>
+                    <template v-else>
+                        <UiCategoryDot :color="category.color" />
+                        <span class="category-row__name">{{ category.name }}</span>
+                        <span class="category-row__count">
+                            {{ t('promptManagement.categoryPromptCount', { count: getCategoryPromptCount(category.id!) }) }}
+                        </span>
+                        <NTooltip :show-arrow="false">
+                            <template #trigger>
+                                <NButton size="tiny" quaternary class="category-row__icon category-row__edit" :aria-label="t('categoryManage.editNamed', { name: category.name })"
+                                    :disabled="editingCategory !== null" @click="handleEdit(category)">
+                                    <template #icon><NIcon :size="14"><Edit /></NIcon></template>
+                                </NButton>
+                            </template>
+                            {{ t('common.edit') }}
+                        </NTooltip>
+                        <NTooltip :show-arrow="false">
+                            <template #trigger>
+                                <NButton size="tiny" quaternary type="error" class="category-row__icon"
+                                    :aria-label="t('categoryManage.deleteNamed', { name: category.name })"
+                                    :disabled="editingCategory !== null"
+                                    @click="handleDelete(category)">
+                                    <template #icon><NIcon :size="14"><Trash /></NIcon></template>
+                                </NButton>
+                            </template>
+                            {{ t('common.delete') }}
+                        </NTooltip>
+                    </template>
+                </div>
 
-        <!-- 底部固定区域 -->
+                <div v-if="!orderedCategories.length" class="category-empty">{{ t('promptManagement.categoryManageEmpty') }}</div>
+            </div>
+        </div>
+
+        <template #footer-start>{{ t('categoryManage.deleteHint') }}</template>
         <template #footer>
-            <NFlex justify="end" align="center">
-                <NButton @click="handleClose">{{ t('common.close') }}</NButton>
-            </NFlex>
+            <NButton @click="handleClose">{{ t('common.close') }}</NButton>
         </template>
-    </CommonModal>
+    </UiModal>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import {
-    NFlex,
-    NText,
-    NInput,
-    NButton,
-    NIcon,
-    NColorPicker,
-    NEmpty,
-    NScrollbar,
-    NTooltip,
-    useMessage,
-    useDialog
-} from 'naive-ui'
-import { Edit, FolderPlus, GripVertical, Plus, Trash } from '@vicons/tabler'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { NButton, NIcon, NInput, NPopover, NTooltip, useMessage, useDialog } from 'naive-ui'
+import { Edit, GripVertical, Trash } from '@vicons/tabler'
 import { api } from '@/lib/api'
 import { useTagColors } from '@/composables/useTagColors'
-import CommonModal from '@/components/common/CommonModal.vue'
+import UiCategoryDot from '@/components/ui/UiCategoryDot.vue'
+import UiModal from '@/components/ui/UiModal.vue'
 import { useI18n } from 'vue-i18n'
 import type { Category } from '@shared/types/database'
 import {
@@ -174,6 +133,8 @@ import {
     sortCategoriesByOrder,
     type CategoryDropPosition,
 } from '@/lib/utils/category-order'
+import { findCategoryNameConflict, isCategoryNameConflictError, normalizeCategoryName } from '@/lib/utils/category-name'
+import { handleEnterKey, isImeComposing } from '@/lib/utils/ime'
 
 interface Props {
     show: boolean
@@ -193,9 +154,15 @@ const dialog = useDialog()
 const { t } = useI18n()
 
 // 使用统一的颜色配置
-const { COLOR_SWATCHES } = useTagColors()
+const { CATEGORY_COLORS } = useTagColors()
 
-const DEFAULT_CATEGORY_COLOR = '#18a058'
+const DEFAULT_CATEGORY_COLOR: string = CATEGORY_COLORS[0]
+const SWATCH_LABEL_KEYS = ['blue', 'orange', 'pink', 'violet', 'green', 'teal', 'amber', 'grey'] as const
+const swatchOptions = computed(() => CATEGORY_COLORS.map((value, index) => ({
+    value: value as string,
+    label: t(`categoryManage.colors.${SWATCH_LABEL_KEYS[index]}`),
+})))
+const sameColor = (a?: string | null, b?: string | null) => (a || '').toLowerCase() === (b || '').toLowerCase()
 
 // 响应式数据
 const newCategory = ref({
@@ -209,6 +176,24 @@ const editingCategory = ref<{
     name: string;
     color: string;
 } | null>(null)
+const colorPopoverShow = ref(false)
+const confirmingClose = ref(false)
+
+// 输入时就判重：去掉首尾空格、不区分大小写，和服务层的规则一致
+const createConflict = computed(() => findCategoryNameConflict(props.categories, newCategory.value.name))
+const editConflict = computed(() => (
+    editingCategory.value
+        ? findCategoryNameConflict(props.categories, editingCategory.value.name, editingCategory.value.id)
+        : undefined
+))
+const editingOriginal = computed(() => props.categories.find(category => category.id === editingCategory.value?.id))
+const isEditDirty = computed(() => {
+    const editing = editingCategory.value
+    const original = editingOriginal.value
+    if (!editing || !original) return false
+    return normalizeCategoryName(editing.name) !== original.name
+        || !sameColor(editing.color, original.color || DEFAULT_CATEGORY_COLOR)
+})
 const creating = ref(false)
 const updating = ref(false)
 const reordering = ref(false)
@@ -258,15 +243,17 @@ const cancelCreating = () => {
 }
 
 const handleCreate = async () => {
-    if (!newCategory.value.name.trim()) {
+    const name = normalizeCategoryName(newCategory.value.name)
+    if (!name) {
         message.warning(t('promptManagement.enterCategoryName'))
         return
     }
+    if (createConflict.value || creating.value) return
 
     try {
         creating.value = true
         await api.categories.create.mutate({
-            name: newCategory.value.name,
+            name,
             color: newCategory.value.color,
             uuid: '', // 这个会被服务层自动生成
             isActive: true,
@@ -283,7 +270,9 @@ const handleCreate = async () => {
         await loadStatistics()
         emit('updated')
     } catch (error) {
-        message.error(t('promptManagement.categoryCreatedFailed'))
+        // 列表还没刷新时服务层也会拦下重名，同样说清楚原因
+        if (isCategoryNameConflictError(error)) message.error(t('categoryManage.duplicateName', { name: error.existingName }))
+        else message.error(t('promptManagement.categoryCreatedFailed'))
         console.error(error)
     } finally {
         creating.value = false
@@ -299,36 +288,57 @@ const handleEdit = (category: any) => {
 }
 
 const handleSaveEdit = async () => {
-    if (!editingCategory.value?.name.trim()) {
+    const editing = editingCategory.value
+    if (!editing) return
+    const name = normalizeCategoryName(editing.name)
+    if (!name) {
         message.warning(t('promptManagement.enterCategoryName'))
         return
     }
+    if (editConflict.value || updating.value) return
+
+    // 回车保存时焦点还在输入框里：先让它失焦再收起这一行。输入框带着焦点被卸载时，
+    // Naive 弹窗的过渡层会单独重渲染一次，把 v-show 重复挂到弹窗根节点上，整个弹窗随之报错卡死
+    const focused = document.activeElement as HTMLElement | null
+    if (focused?.closest('.category-order-item.is-editing')) focused.blur()
 
     try {
         updating.value = true
         await api.categories.update.mutate({
-            id: editingCategory.value.id,
+            id: editing.id,
             data: {
-                name: editingCategory.value.name,
-                color: editingCategory.value.color
+                name,
+                color: editing.color
             }
         })
 
         editingCategory.value = null
+        colorPopoverShow.value = false
         message.success(t('promptManagement.categoryUpdatedSuccess'))
         // 重新加载统计信息
         await loadStatistics()
         emit('updated')
     } catch (error) {
-        message.error(t('promptManagement.categoryUpdatedFailed'))
+        if (isCategoryNameConflictError(error)) message.error(t('categoryManage.duplicateName', { name: error.existingName }))
+        else message.error(t('promptManagement.categoryUpdatedFailed'))
         console.error(error)
     } finally {
         updating.value = false
     }
 }
 
+/** 取消这一行的编辑，焦点回到这一行的编辑按钮，下一次 Esc 才关弹窗 */
 const handleCancelEdit = () => {
+    const id = editingCategory.value?.id
+    // 同保存：先让编辑行里的输入框失焦再卸载，避免弹窗过渡层报错
+    const focused = document.activeElement as HTMLElement | null
+    if (focused?.closest('.category-order-item.is-editing')) focused.blur()
     editingCategory.value = null
+    colorPopoverShow.value = false
+    if (id === undefined) return
+    void nextTick(() => {
+        document.querySelector<HTMLElement>(`.category-order-item[data-category-id="${id}"] .category-row__edit`)?.focus()
+    })
 }
 
 const persistCategoryOrder = async (nextOrder: Category[], previousOrder: Category[]) => {
@@ -407,22 +417,23 @@ const handleCategoryDragEnd = () => {
     resetCategoryDragState()
 }
 
+// 分类里还有提示词时也能删：提示词移到「未分类」，确认框里写清楚会移走几个
 const handleDelete = (category: any) => {
     const promptCount = getCategoryPromptCount(category.id)
-    if (promptCount > 0) {
-        message.warning(t('promptManagement.categoryHasPrompts'))
-        return
-    }
 
     dialog.error({
-        title: t('common.confirm'),
-        content: t('promptManagement.confirmDeleteCategory', { name: category.name }),
+        title: t('promptManagement.confirmDeleteCategory', { name: category.name }),
+        content: promptCount > 0
+            ? t('categoryManage.deleteMovesPrompts', { count: promptCount }, promptCount)
+            : t('promptPage.deleteContent'),
         positiveText: t('common.delete'),
         negativeText: t('common.cancel'),
         onPositiveClick: async () => {
             try {
-                await api.categories.delete.mutate(category.id)
-                message.success(t('promptManagement.categoryDeletedSuccess'))
+                const result = await api.categories.delete.mutate(category.id, { movePromptsToUncategorized: promptCount > 0 })
+                message.success(result.movedPrompts > 0
+                    ? t('categoryManage.deletedAndMoved', { count: result.movedPrompts }, result.movedPrompts)
+                    : t('promptManagement.categoryDeletedSuccess'))
                 // 重新加载统计信息
                 await loadStatistics()
                 emit('updated')
@@ -434,12 +445,61 @@ const handleDelete = (category: any) => {
     })
 }
 
-const handleClose = () => {
+const closeNow = () => {
     editingCategory.value = null
+    colorPopoverShow.value = false
     cancelCreating()
     resetCategoryDragState()
     emit('update:show', false)
 }
+
+// 关弹窗（×、关闭按钮）时行内编辑改过还没保存，先确认
+const handleClose = () => {
+    if (!isEditDirty.value) {
+        closeNow()
+        return
+    }
+    confirmingClose.value = true
+    dialog.warning({
+        title: t('categoryManage.unsavedEditTitle'),
+        content: t('categoryManage.unsavedEditMessage', { name: editingOriginal.value?.name || '' }),
+        positiveText: t('promptWorkspace.discardChanges'),
+        negativeText: t('promptWorkspace.continueEditing'),
+        maskClosable: false,
+        onPositiveClick: closeNow,
+        onAfterLeave: () => { confirmingClose.value = false },
+    })
+}
+
+// ---------- Esc 分层 ----------
+// UiModal 用 Naive 默认的 Esc 关闭，不管里面还有没有气泡和行内编辑。这里在捕获阶段先看一眼：
+// 颜色气泡开着就只收起气泡；正在改某一行就只取消这一行；新建框里打了字就先清空；都没有才放行，由弹窗自己关闭。
+// 上面叠着确认框时不拦，Esc 交给确认框。
+const handleEscapeCapture = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || isImeComposing(event) || confirmingClose.value) return
+    const target = event.target as HTMLElement | null
+
+    if (colorPopoverShow.value) {
+        colorPopoverShow.value = false
+        // 焦点可能在气泡里的色块上，气泡收起后回到编辑行的颜色按钮
+        document.querySelector<HTMLElement>('.category-order-item.is-editing .category-swatch-button')?.focus()
+    } else if (editingCategory.value) {
+        handleCancelEdit()
+    } else if (newCategory.value.name && target?.closest('.category-create')) {
+        newCategory.value.name = ''
+    } else {
+        return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+}
+
+const stopEscapeCapture = () => window.removeEventListener('keydown', handleEscapeCapture, true)
+watch(() => props.show, show => {
+    if (show) window.addEventListener('keydown', handleEscapeCapture, true)
+    else stopEscapeCapture()
+}, { immediate: true })
+onBeforeUnmount(stopEscapeCapture)
 
 // 监听显示状态，重置编辑状态并加载统计信息
 watch(() => props.show, async (show) => {
@@ -468,143 +528,178 @@ watch(() => props.categories, async (newCategories) => {
 .category-manage {
     display: flex;
     flex-direction: column;
-    gap: var(--section-gap);
-    min-height: 0;
-    width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
+    gap: 16px;
 }
 
-.modal-title {
-    display: block;
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-normal);
-}
-
-.modal-subtitle {
-    display: block;
-    margin-top: 3px;
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-normal);
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-
-.category-manage-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px var(--content-padding);
-    flex: 0 0 auto;
-}
-
-.category-manage-count {
-    font-size: 12px;
-}
-
-.category-manage-scroll {
-    flex: 1;
-    min-height: 0;
-}
-
-.category-manage-list {
+.category-create {
     display: flex;
     flex-direction: column;
-    padding-right: 8px;
+    gap: 8px;
 }
 
-.category-manage-empty {
-    padding: 32px 8px;
+.category-create__label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
 }
 
-.category-order-item {
-    position: relative;
-}
-
-.category-order-item::before,
-.category-order-item::after {
-    content: '';
-    position: absolute;
-    z-index: 2;
-    left: 8px;
-    right: 8px;
-    height: 2px;
-    border-radius: var(--radius-control);
-    background: var(--accent-primary);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.category-order-item::before { top: -2px; }
-.category-order-item::after { bottom: -2px; }
-.category-order-item.drop-before::before,
-.category-order-item.drop-after::after { opacity: 1; }
-.category-order-item.dragging { opacity: .46; }
-.category-order-item.dragging .category-row { background: var(--surface-secondary); }
-
-.category-row {
+.category-create__row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 52px;
-    padding: 8px 10px;
-    margin-bottom: 2px;
-    border-radius: var(--radius-panel);
-    transition: background-color .12s ease;
+    gap: 8px;
 }
 
-.category-row:hover { background: var(--interactive-hover); }
-.category-row-editing,
-.category-row-editing:hover { background: var(--surface-tertiary); }
-
-.category-drag-handle { cursor: grab; color: var(--content-secondary); flex: 0 0 auto; }
-.category-drag-handle:active { cursor: grabbing; }
-
-.category-color-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex: 0 0 auto;
+.category-swatch-preview {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin: 0 7px;
+    border-radius: 4px;
 }
 
-.category-color-swatch {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 auto;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-control);
+.category-swatches {
+    display: flex;
+    gap: 6px;
+    padding-left: 2px;
+}
+
+.category-swatch,
+.category-swatch-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
     padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: transparent;
     cursor: pointer;
 }
 
-.category-row-info {
-    flex: 1;
-    min-width: 0;
+.category-swatch:hover,
+.category-swatch-button:hover {
+    background: var(--surface-tertiary);
+}
+
+.category-swatch.is-selected {
+    border-color: var(--content-secondary);
+}
+
+.category-swatch > span,
+.category-swatch-button > span {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+}
+
+.category-divider {
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background: var(--border-default);
+}
+
+.category-list {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.category-row-name {
+.category-order-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 6px 0 2px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.category-order-item:last-child {
+    border-bottom: 0;
+}
+
+.category-order-item.dragging {
+    opacity: 0.45;
+}
+
+.category-order-item.drop-before::before,
+.category-order-item.drop-after::after {
+    position: absolute;
+    right: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--accent-primary);
+    content: "";
+}
+
+.category-order-item.drop-before::before {
+    top: -1px;
+}
+
+.category-order-item.drop-after::after {
+    bottom: -1px;
+}
+
+.category-drag-handle {
+    width: 22px;
+    padding: 0;
+    color: var(--content-tertiary);
+    cursor: grab;
+}
+
+.category-row__name {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.category-row-count {
-    font-size: 12px;
-}
-
-.category-row-name-input {
+.category-row__input {
     flex: 1;
-    min-width: 0;
 }
 
-.category-row-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
+/* 编辑行出现重名提示时换成两行，提示和输入框左边对齐 */
+.category-order-item.is-editing {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    padding-block: 7px;
+    row-gap: 4px;
+}
+
+.category-error {
+    color: var(--accent-error);
+    font-size: var(--font-size-xs);
+}
+
+.category-create .category-error {
+    padding-left: 36px;
+}
+
+.category-row__error {
+    flex-basis: 100%;
+    padding-left: 64px;
+}
+
+.category-row__count {
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.category-row__icon {
+    width: 22px;
+    padding: 0;
+}
+
+.category-empty {
+    padding: 24px 0;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-sm);
+    text-align: center;
 }
 </style>

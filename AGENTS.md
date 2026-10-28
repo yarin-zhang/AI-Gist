@@ -1,12 +1,12 @@
 # AI Gist agent instructions
 
-Before creating or changing any desktop or desktop-Web interface under `src/renderer`, read and follow [`docs/AI_UI_DESIGN_PROMPT.md`](docs/AI_UI_DESIGN_PROMPT.md).
+Before creating or changing any desktop, desktop-Web or mobile interface under `src/renderer`, read and follow [`docs/AI_UI_DESIGN_PROMPT.md`](docs/AI_UI_DESIGN_PROMPT.md).
 
 The design prompt is a required implementation contract. New UI must use the canonical design tokens and the bordered, tinted-surface design language defined there. Do not add local theme systems or revive deprecated variables.
 
-Ionic mobile pages retain native mobile structure; apply only the shared token rules unless the task explicitly requests a mobile redesign.
+Ionic mobile pages follow the mobile section of the design prompt: iOS-style Ionic pages built on the same tokens. Desktop Naive UI layout rules do not apply to them.
 
-> Desktop UI contributions must follow [AI_UI_DESIGN_PROMPT.md](docs/AI_UI_DESIGN_PROMPT.md).
+> UI contributions must follow [AI_UI_DESIGN_PROMPT.md](docs/AI_UI_DESIGN_PROMPT.md).
 
 ## Local CLI for prompt data
 

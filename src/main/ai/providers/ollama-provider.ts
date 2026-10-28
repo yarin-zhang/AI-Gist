@@ -1,6 +1,7 @@
 import { Ollama } from '@langchain/ollama';
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * Ollama 供应商实现
@@ -18,7 +19,7 @@ export class OllamaProvider extends BaseAIProvider {
       const response = await timeoutFetch(`${config.baseURL}/api/tags`);
       
       if (response.ok) {
-        const models = await this.getAvailableModels(config);
+        const { models } = await this.getAvailableModels(config);
         return {
           success: true,
           models,
@@ -38,50 +39,35 @@ export class OllamaProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`获取 Ollama 模型列表 - baseURL: ${config.baseURL}`);
-    
-    try {
-      const url = `${config.baseURL}/api/tags`;
-      console.log(`Ollama 请求URL: ${url}`);
-      
-      const timeoutFetch = this.createTimeoutFetch(10000);
-      const response = await timeoutFetch(url);
-      console.log(`Ollama 响应状态: ${response.status}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Ollama 响应数据:', data);
-        
-        const models = data.models?.map((model: any) => model.name) || [];
-        console.log(`Ollama 解析出的模型列表:`, models);
-        
-        // 确保返回完整的模型名称（包含版本后缀）
-        if (models.length > 0) {
-          console.log('✅ Ollama 模型列表解析成功，返回完整模型名称');
-          return models;
-        } else {
-          console.warn('⚠️ Ollama 返回空模型列表');
-          return [];
-        }
-      }
-    } catch (error) {
-      console.error('获取 Ollama 模型列表失败:', error);
-      if (error instanceof Error && error.message?.includes('请求超时')) {
-        console.warn('Ollama 请求超时');
-      }
+    return this.resolveModelList(() => this.fetchRemoteModels(config));
+  }
+
+  private async fetchRemoteModels(config: AIConfig): Promise<string[]> {
+    const url = `${config.baseURL}/api/tags`;
+    console.log(`Ollama 请求URL: ${url}`);
+
+    const timeoutFetch = this.createTimeoutFetch(10000);
+    const response = await timeoutFetch(url);
+    console.log(`Ollama 响应状态: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`模型列表请求失败: HTTP ${response.status} ${response.statusText}`);
     }
-    return [];
+
+    const data = await response.json();
+    // 返回完整的模型名称（包含版本后缀）
+    return (data.models?.map((model: any) => model.name) || []).filter(Boolean);
   }
 
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试 Ollama 模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       
       const llm = new Ollama({
         baseUrl: config.baseURL,
@@ -112,7 +98,7 @@ export class OllamaProvider extends BaseAIProvider {
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
@@ -122,7 +108,7 @@ export class OllamaProvider extends BaseAIProvider {
       return { success: false, error: '未设置默认模型' };
     }
 
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const llm = new Ollama({

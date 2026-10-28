@@ -1,174 +1,105 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')" default-href="/tabs/settings"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ t('settings.menus.about.title') }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="t('settings.menus.about.title')" fallback="/tabs/settings" />
 
-    <ion-content :fullscreen="true">
-      <!-- 应用信息 -->
-      <div class="app-info">
-        <img :src="appIcon" class="app-logo" alt="App Logo" />
-        <h2>{{ t('about.appName') }}</h2>
-        <p class="app-desc">{{ t('about.appDescription') }}</p>
-        <p class="app-features">{{ t('about.appFeatures') }}</p>
-      </div>
-
-      <!-- 版本信息 -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('about.versionInfo') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item>
-          <ion-icon :icon="phonePortraitOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.currentVersion') }}</ion-label>
-          <ion-note slot="end">{{ currentVersion || '—' }}</ion-note>
-        </ion-item>
-
-        <ion-item v-if="latestVersion">
-          <ion-icon :icon="cloudOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.latestVersion') }}</ion-label>
-          <div slot="end" class="version-end">
-            <span>{{ latestVersion }}</span>
-            <ion-badge :color="hasUpdate ? 'warning' : 'success'" class="version-badge">
+    <ion-content class="m-page-content">
+      <div class="m-body about-body">
+        <div class="about-hero">
+          <img :src="appIcon" class="about-hero__logo" :alt="t('about.appName')" />
+          <h1 class="about-hero__name">{{ t('about.appName') }}</h1>
+          <span class="about-hero__tagline">{{ t('about.appDescription') }}</span>
+          <span class="about-hero__pills">
+            <span class="m-pill about-hero__version">{{ currentVersion || '—' }}</span>
+            <span v-if="latestVersion" class="m-pill" :class="hasUpdate ? 'm-pill-warn' : 'm-pill-ok'">
               {{ hasUpdate ? t('about.hasUpdate') : t('about.isLatest') }}
-            </ion-badge>
+            </span>
+          </span>
+        </div>
+
+        <button type="button" class="m-cta m-cta-2" :disabled="checking" @click="handleCheckForUpdates">
+          <ion-spinner v-if="checking" name="crescent" aria-hidden="true" />
+          <ion-icon v-else :icon="refreshOutline" aria-hidden="true" />
+          {{ t('about.checkForUpdates') }}
+        </button>
+
+        <!-- 发现新版本：下载入口和更新说明 -->
+        <div v-if="hasUpdate && latestVersion" class="m-card about-update">
+          <div class="about-update__head">
+            <span class="m-tile m-tile--warning" aria-hidden="true"><ion-icon :icon="arrowDownCircleOutline" /></span>
+            <span class="about-update__text">
+              <span class="about-update__title">{{ t('about.updateFound', { version: latestVersion }) }}</span>
+              <span class="about-update__desc">{{ t('about.newVersionDesc', { version: latestVersion }) }}</span>
+              <span v-if="publishedAt" class="about-update__meta">{{ t('about.publishedAt') }} · {{ publishedAt }}</span>
+            </span>
           </div>
-        </ion-item>
-
-        <ion-item v-if="publishedAt">
-          <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.publishedAt') }}</ion-label>
-          <ion-note slot="end">{{ publishedAt }}</ion-note>
-        </ion-item>
-      </ion-list>
-
-      <!-- 更新检查 -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('about.updateCheck') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button @click="handleCheckForUpdates" :detail="false">
-          <ion-icon :icon="refreshOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.checkForUpdates') }}</ion-label>
-          <ion-spinner v-if="checking" slot="end" name="crescent"></ion-spinner>
-        </ion-item>
-
-        <!-- 发现新版本提示 -->
-        <div v-if="hasUpdate && latestVersion" class="update-notice">
-          <ion-item lines="none" class="update-item">
-            <ion-icon :icon="arrowDownCircleOutline" slot="start" color="warning"></ion-icon>
-            <ion-label class="ion-text-wrap">
-              <p>{{ t('about.newVersionDesc', { version: latestVersion }) }}</p>
-            </ion-label>
-          </ion-item>
-          <div class="update-buttons">
-            <ion-button expand="block" @click="handleOpenDownloadPage">
-              {{ t('about.downloadNewVersion') }}
-            </ion-button>
-            <ion-button expand="block" fill="outline" @click="showReleaseNotes = !showReleaseNotes">
-              {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
-            </ion-button>
-          </div>
-          <div v-if="showReleaseNotes" class="release-notes">
-            <p>{{ releaseNotes }}</p>
-          </div>
+          <button type="button" class="m-cta" @click="handleOpenDownloadPage">
+            <ion-icon :icon="downloadOutline" aria-hidden="true" />{{ t('about.downloadNewVersion') }}
+          </button>
+          <button
+            v-if="releaseNotes"
+            type="button"
+            class="about-update__toggle"
+            :aria-expanded="showReleaseNotes"
+            @click="showReleaseNotes = !showReleaseNotes"
+          >
+            {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
+          </button>
+          <p v-if="showReleaseNotes" class="about-update__notes">{{ releaseNotes }}</p>
         </div>
 
         <!-- 检查失败提示 -->
-        <ion-item v-if="checkError" lines="none" class="error-item">
-          <ion-label class="ion-text-wrap">
-            <p>{{ checkError }}</p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
+        <p v-if="checkError" class="m-note about-error" role="alert">
+          <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
+          <span>{{ checkError }}</span>
+        </p>
 
-      <!-- 项目信息 -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('about.projectInfo') }}</ion-label>
-        </ion-list-header>
+        <MobileGroup :title="t('about.projectInfo')">
+          <MobileRow static :title="t('about.developer')" :icon="personOutline" tone="blue" :value="t('about.developerName')" />
+          <button type="button" class="m-row" @click="openURL(REPO_URL)">
+            <span class="m-tile about-tile--ink" aria-hidden="true"><ion-icon :icon="logoGithub" /></span>
+            <span class="title">{{ t('about.github') }}</span>
+            <span class="end">
+              <span>{{ t('about.githubRepo') }}</span>
+              <ion-icon :icon="chevronForward" class="chev" aria-hidden="true" />
+            </span>
+          </button>
+          <MobileRow static :title="t('about.license')" :icon="documentTextOutline" tone="green" :value="t('about.licenseType')" />
+        </MobileGroup>
 
-        <ion-item>
-          <ion-icon :icon="personOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.developer') }}</ion-label>
-          <ion-note slot="end">{{ t('about.developerName') }}</ion-note>
-        </ion-item>
-
-        <ion-item button @click="openURL('https://github.com/yarin-zhang/AI-Gist')">
-          <ion-icon :icon="logoGithub" slot="start"></ion-icon>
-          <ion-label>{{ t('about.github') }}</ion-label>
-          <ion-note slot="end">{{ t('about.githubRepo') }}</ion-note>
-        </ion-item>
-
-        <ion-item>
-          <ion-icon :icon="documentTextOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.license') }}</ion-label>
-          <ion-note slot="end">{{ t('about.licenseType') }}</ion-note>
-        </ion-item>
-      </ion-list>
-
-      <!-- 反馈与支持 -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('about.feedbackSupport') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item button @click="openURL('https://github.com/yarin-zhang/AI-Gist/issues')">
-          <ion-icon :icon="bugOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.reportIssue') }}</ion-label>
-        </ion-item>
-
-        <ion-item button @click="openURL('https://github.com/yarin-zhang/AI-Gist/issues/new?template=feature_request.md')">
-          <ion-icon :icon="bulbOutline" slot="start"></ion-icon>
-          <ion-label>{{ t('about.featureRequest') }}</ion-label>
-        </ion-item>
-      </ion-list>
+        <MobileGroup :title="t('about.feedbackSupport')">
+          <MobileRow :title="t('about.reportIssue')" :icon="bugOutline" tone="pink" show-chevron
+            @click="openURL(`${REPO_URL}/issues`)" />
+          <MobileRow :title="t('about.featureRequest')" :icon="bulbOutline" tone="violet" show-chevron
+            @click="openURL(`${REPO_URL}/issues/new?template=feature_request.md`)" />
+        </MobileGroup>
+      </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { IonPage, IonContent, IonIcon, IonSpinner } from '@ionic/vue'
 import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonBackButton,
-  IonContent,
-  IonList,
-  IonListHeader,
-  IonItem,
-  IonLabel,
-  IonNote,
-  IonBadge,
-  IonIcon,
-  IonButton,
-  IonSpinner
-} from '@ionic/vue'
-import {
-  refreshOutline,
+  alertCircleOutline,
+  arrowDownCircleOutline,
   bugOutline,
   bulbOutline,
-  arrowDownCircleOutline,
+  chevronForward,
+  documentTextOutline,
+  downloadOutline,
   logoGithub,
-  phonePortraitOutline,
-  cloudOutline,
-  calendarOutline,
   personOutline,
-  documentTextOutline
+  refreshOutline
 } from 'ionicons/icons'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import MobileRow from '~/components/mobile/ui/MobileRow.vue'
 import { useI18n } from '~/composables/useI18n'
 import { useUpdate } from '~/composables/useUpdate'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+
+const REPO_URL = 'https://github.com/yarin-zhang/AI-Gist'
 
 const { t } = useI18n()
 
@@ -202,7 +133,7 @@ const handleCheckForUpdates = async () => {
       showToast(t('about.isLatest'))
     }
   } else {
-    showToast(result.error || t('about.checkForUpdates'), 'danger')
+    showToast(result.error || t('about.checkFailed'), 'danger')
   }
 }
 
@@ -222,80 +153,124 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.app-info {
+.m-body.about-body {
+  padding-top: 4px;
+}
+
+.about-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px 16px 16px;
+  gap: 6px;
+  padding: 12px 0 4px;
   text-align: center;
 }
 
-.app-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 16px;
-  margin-bottom: 12px;
+.about-hero__logo {
+  display: block;
+  flex: none;
+  width: 88px;
+  height: 88px;
+  margin-bottom: 10px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-floating);
 }
 
-.app-info h2 {
-  font-size: var(--mobile-font-size-display);
-  font-weight: 700;
-  margin: 0 0 6px;
-}
-
-.app-desc {
-  font-size: var(--mobile-font-size-body);
-  color: var(--ion-color-medium);
-  margin: 0 0 4px;
-}
-
-.app-features {
-  font-size: var(--mobile-font-size-footnote);
-  color: var(--ion-color-medium);
+.about-hero__name {
   margin: 0;
+  color: var(--content-primary);
+  font-size: var(--m-font-block);
+  font-weight: 600;
 }
 
-.version-end {
+.about-hero__tagline {
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+}
+
+.about-hero__pills {
   display: flex;
-  align-items: center;
   gap: 6px;
+  margin-top: 4px;
 }
 
-.version-badge {
-  font-size: var(--mobile-font-size-caption);
+.about-hero__version {
+  font-family: var(--font-family-mono);
 }
 
-.update-notice {
-  padding: 0 16px 8px;
+.m-cta ion-icon {
+  font-size: 18px;
 }
 
-.update-item {
-  --padding-start: 0;
-  margin-bottom: 8px;
+.m-cta ion-spinner {
+  width: 18px;
+  height: 18px;
 }
 
-.update-buttons {
+.m-card.about-update {
+  gap: 12px;
+  padding: 16px;
+}
+
+.about-update__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.about-update__text {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
+  min-width: 0;
 }
 
-.release-notes {
-  margin-top: 12px;
+.about-update__title {
+  font-size: var(--m-font-body);
+  font-weight: 600;
+}
+
+.about-update__desc {
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  line-height: 1.5;
+}
+
+.about-update__meta {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+}
+
+.about-update__toggle {
+  min-height: 44px;
+  margin-top: -4px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.about-update__notes {
+  margin: 0;
   padding: 12px;
+  border-radius: 12px;
   background: var(--surface-secondary);
-  border-radius: 8px;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-relaxed);
-  white-space: pre-wrap;
   color: var(--content-primary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
-.error-item {
-  --background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-primary));
-  --border-color: color-mix(in srgb, var(--accent-error) 28%, var(--border-default));
-  margin: 0 16px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+.m-note.about-error {
+  color: var(--accent-error);
+}
+
+/* GitHub 的图标方块用正文色，和品牌标识保持一致 */
+.m-tile.about-tile--ink {
+  background: var(--content-primary);
+  color: var(--surface-primary);
 }
 </style>

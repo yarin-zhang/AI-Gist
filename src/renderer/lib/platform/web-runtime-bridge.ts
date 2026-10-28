@@ -43,12 +43,12 @@ export function installWebRuntimeBridge(): void {
       updateConfig: async (_id: string, config: any) => config,
       removeConfig: async () => false,
       testConfig: (config: any) => webAIService.testConfig(config),
-      testModel: (config: any, model: string) => webAIService.testModel(config, model),
+      testModel: (config: any, model: string, prompt?: string) => webAIService.testModel(config, model, prompt),
       getModels: (config: any) => webAIService.getModels(config),
       generatePrompt: (request: any, config: any) => webAIService.generatePrompt(request, config),
       generatePromptStream: (request: any, config: any, onProgress: any) =>
         webAIService.generatePromptStream(request, config, onProgress),
-      intelligentTest: (config: any) => webAIService.intelligentTest(config),
+      intelligentTest: (config: any, prompt?: string) => webAIService.intelligentTest(config, prompt),
       stopGeneration: () => webAIService.stopGeneration(),
       debugPrompt: (prompt: string, config: any) => webAIService.debugPrompt(prompt, config)
     },

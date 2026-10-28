@@ -1,6 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * LM Studio 供应商实现
@@ -21,7 +22,7 @@ export class LMStudioProvider extends BaseAIProvider {
       
       const response = await timeoutFetch(testUrl);
       if (response.ok) {
-        const models = await this.getAvailableModels(config);
+        const { models } = await this.getAvailableModels(config);
         console.log('LM Studio 连接测试成功，获取到模型:', models);
         return {
           success: true,
@@ -43,49 +44,35 @@ export class LMStudioProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`获取 LM Studio 模型列表 - baseURL: ${config.baseURL}`);
-    
-    try {
-      const baseUrl = config.baseURL || 'http://localhost:1234';
-      const url = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
-      console.log(`LM Studio 请求URL: ${url}`);
-      
-      const timeoutFetch = this.createTimeoutFetch(10000);
-      const response = await timeoutFetch(url);
-      console.log(`LM Studio 响应状态: ${response.status}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('LM Studio 响应数据:', data);
-        
-        const models = data.data?.map((model: any) => model.id) || [];
-        console.log(`LM Studio 解析出的模型列表:`, models);
-        
-        if (models.length > 0) {
-          return models;
-        } else {
-          console.warn('LM Studio 返回空模型列表，可能未加载模型');
-          return [];
-        }
-      } else {
-        console.warn(`LM Studio API 响应异常: ${response.status} ${response.statusText}`);
-        return [];
-      }
-    } catch (error) {
-      console.error('获取 LM Studio 模型列表失败:', error);
-      return [];
+    return this.resolveModelList(() => this.fetchRemoteModels(config));
+  }
+
+  private async fetchRemoteModels(config: AIConfig): Promise<string[]> {
+    const baseUrl = config.baseURL || 'http://localhost:1234';
+    const url = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
+    console.log(`LM Studio 请求URL: ${url}`);
+
+    const timeoutFetch = this.createTimeoutFetch(10000);
+    const response = await timeoutFetch(url);
+    console.log(`LM Studio 响应状态: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`模型列表请求失败: HTTP ${response.status} ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return (data.data?.map((model: any) => model.id) || []).filter(Boolean);
   }
 
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试 LM Studio 模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       
       const baseUrl = config.baseURL || 'http://localhost:1234';
       const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
@@ -122,7 +109,7 @@ export class LMStudioProvider extends BaseAIProvider {
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
@@ -132,7 +119,7 @@ export class LMStudioProvider extends BaseAIProvider {
       return { success: false, error: '未设置默认模型' };
     }
 
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const baseUrl = config.baseURL || 'http://localhost:1234';

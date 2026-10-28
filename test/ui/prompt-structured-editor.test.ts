@@ -19,92 +19,27 @@ describe('structured prompt editor wiring', () => {
 
   it('syncs content only after IME composition and drops transient variable names', () => {
     const editor = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
-    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
-    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
+    const state = readRendererFile('composables/prompt/usePromptEditor.ts')
 
     expect(editor).toContain('update.view.composing')
     expect(editor).toContain('compositionend')
-    expect(regular).toContain('{ retainUnused }')
-    expect(inspector).toContain('.variable-inspector > :deep(.n-card-header + .n-card-content)')
-    expect(inspector).toContain('.inspector-layout > :deep(.variable-directory)')
+    expect(state).toContain('{ retainUnused }')
+    expect(state).toContain('retainedNames.has(variable.name) || isVariableConfigured(variable)')
   })
 
-  it('uses the shared fill canvas in the workspace and shortcut launcher', () => {
-    const workspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
-    const launcher = readRendererFile('components/shortcuts/PromptLauncher.vue')
-    const canvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
+  it('renders variable names as V5 chips in the borderless editor used by the prompt page', () => {
+    const editor = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
+    const page = readRendererFile('components/prompts/PromptPage.vue')
 
-    expect(workspace).toContain('<PromptFillCanvas')
-    expect(launcher).toContain('<PromptFillCanvas')
-    expect(canvas).toContain("viewMode === 'fill'")
-    expect(canvas).toContain('prompt.isJinjaTemplate')
-    expect(canvas).toContain(':first-occurrence="segment.firstOccurrence"')
-    expect(canvas).toContain('validateAndFocus')
-  })
-
-  it('shares one variable inspector across regular and Jinja editors', () => {
-    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
-    const jinja = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
-    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
-
-    expect(regular).toContain('<VariableInspector')
-    expect(jinja).toContain('<VariableInspector')
-    expect(jinja).toContain('source-only')
-    expect(jinja).toContain('<QuickOptimizationActions')
-    expect(jinja).toContain('#toolbar-prefix')
-    expect(jinja).toContain('#toolbar-extra')
-    expect(inspector).toContain('typeTextarea')
-    expect(inspector).toContain('typeNumber')
-    expect(inspector).toContain('typeBoolean')
-    expect(inspector).toContain('unusedVariables')
-  })
-
-  it('aligns the use workspace with the embedded editor geometry', () => {
-    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
-    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
-    const structuredEditor = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
-
-    expect(useWorkspace).toMatch(/\.use-workspace\s*\{[^}]*padding:\s*var\(--content-padding\) var\(--content-padding\) 0/s)
-    expect(useWorkspace).toMatch(/\.use-action-bar\s*\{[^}]*height:\s*58px/s)
-    expect(fillCanvas).toContain('padding: var(--content-padding)')
-    expect(fillCanvas).not.toContain('clamp(20px, 4vw, 48px)')
-    expect(fillCanvas).not.toContain('max-width: 900px')
-    expect(fillCanvas).toMatch(/\.fill-toolbar\s*\{[^}]*min-height:\s*46px/s)
-    expect(structuredEditor).toMatch(/\.structured-editor-toolbar\s*\{[^}]*min-height:\s*46px/s)
-  })
-
-  it('keeps full-height prompt panels inside their parent boxes', () => {
-    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
-    const structured = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
-    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
-    const fillCanvas = readRendererFile('components/prompt-management/PromptFillCanvas.vue')
-    const useWorkspace = readRendererFile('components/prompt-management/PromptUseWorkspace.vue')
-    const jinja = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
-
-    for (const source of [regular, structured, inspector, fillCanvas, useWorkspace, jinja]) {
-      expect(source).toContain('box-sizing: border-box')
-    }
-    expect(regular).toContain('padding-bottom: var(--content-padding)')
-    expect(regular).toContain(':show-variables-button="compactInspector"')
-    expect(regular).not.toContain('class="drawer-trigger"')
-    expect(jinja).toMatch(/\.jinja-editor-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 320px/s)
-    expect(jinja).toContain('padding-bottom: var(--content-padding)')
-    expect(jinja).toContain(':show-variables-button="compactInspector"')
-    expect(jinja).toContain('ResizeObserver')
-    expect(structured).toContain("'request-open-variables': []")
-    expect(structured).toContain('<slot name="toolbar-prefix" />')
-    expect(structured).toContain('<slot name="toolbar-extra" />')
-    expect(structured).toContain('container: structured-editor / inline-size')
-    expect(structured).toContain('@container structured-editor (max-width: 620px)')
-    expect(useWorkspace).toContain('@click="openHistory"')
-    expect(useWorkspace).toContain('historyPromptId')
+    expect(editor).toContain("button.className = `ui-var ui-var--name${this.selected ? ' ui-var--active' : ''}`")
+    expect(editor).toContain('<div v-if="!bare" class="structured-editor-toolbar ui-toolbar">')
+    expect(page).toContain('<StructuredPromptEditor v-else-if="bodyEditable" ref="editorRef" bare')
+    expect(page).toContain('@select-variable="selectDefinition"')
   })
 
   it('lets every existing variable be inserted at the editor cursor (issue 373)', () => {
     const structured = readRendererFile('components/prompt-management/StructuredPromptEditor.vue')
-    const inspector = readRendererFile('components/prompt-management/VariableInspector.vue')
-    const regular = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
-    const jinja = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
+    const page = readRendererFile('components/prompts/PromptPage.vue')
 
     // Toolbar: existing variables first, then a create entry.
     expect(structured).toContain('<NDropdown v-if="insertableVariableNames.length"')
@@ -117,14 +52,7 @@ describe('structured prompt editor wiring', () => {
     expect(structured).toContain('hasUserCursor || editorView.hasFocus')
     expect(structured).toContain("emit('variable-inserted', name)")
 
-    // Inspector: every row (in use or unused) has an insert action, separate from selecting.
-    expect(inspector.match(/class="variable-insert-button"/g)).toHaveLength(2)
-    expect(inspector).not.toContain('v-if="isUnused(selected.name)"')
-    expect(inspector.match(/class="variable-directory-item" @mousedown\.prevent/g)).toHaveLength(2)
-
-    for (const editor of [regular, jinja]) {
-      expect(editor).toContain('@variable-inserted=')
-      expect(editor).toContain('@after-leave="restoreEditorFocusAfterDrawer"')
-    }
+    // 「新建变量」按钮把占位符插到光标处
+    expect(page).toMatch(/const addVariableAtCursor = async \(\) => \{[\s\S]*?editorRef\.value\?\.insertVariable/)
   })
 })

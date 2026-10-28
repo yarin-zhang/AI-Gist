@@ -4,13 +4,20 @@ import type { ExportResult, ImportResult } from '@shared/types/data-management';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
 import type {
   CloudSyncConflict,
+  CloudSyncConflictPreview,
+  CloudSyncConflictReason,
+  CloudSyncConflictSide,
   CloudSyncDataSet,
   CloudSyncMergeOptions,
+  CloudSyncMergeResult,
   CloudSyncMergeSummary,
   CloudSyncSnapshot
 } from '@shared/cloud-sync-engine';
 import {
   applyCloudSyncTombstones,
+  createCloudSyncCategoryNameLookup,
+  createCloudSyncConflictPreview,
+  getCloudSyncConflictId,
   createCloudSyncSemanticChecksum,
   createCloudSyncSemanticSignature,
   createCloudSyncSnapshot,
@@ -96,7 +103,7 @@ const SYNC_STORE_NAMES: DataStoreName[] = [
   'syncTombstones'
 ];
 
-export type CloudSyncAction = 'uploaded' | 'downloaded' | 'merged' | 'noop';
+export type CloudSyncAction = 'uploaded' | 'downloaded' | 'merged' | 'noop' | 'conflict-pending';
 export type CloudSyncRunReason =
   | 'startup'
   | 'local-change'
@@ -110,7 +117,51 @@ export type CloudSyncRunReason =
   | 'resume'
   | 'config-change'
   | 'retry';
-export type CloudSyncLifecycleStatus = 'idle' | 'scheduled' | 'syncing' | 'success' | 'error' | 'paused';
+export type CloudSyncLifecycleStatus = 'idle' | 'scheduled' | 'syncing' | 'success' | 'error' | 'paused' | 'conflict';
+
+/**
+ * 冲突处理方式：local / remote 只作用于冲突项（不冲突的改动照常合并）；
+ * smart 是自动合并（冲突项取更新的版本）；manual 按 resolutions 逐项决定。
+ */
+export type CloudSyncConflictStrategy = 'local' | 'remote' | 'smart' | 'manual';
+
+export interface CloudSyncConflictDecision {
+  strategy: CloudSyncConflictStrategy;
+  /** manual 时每个冲突项保留哪一方，键见 getCloudSyncConflictId */
+  resolutions?: Record<string, CloudSyncConflictSide>;
+}
+
+export interface CloudSyncConflictItem {
+  id: string;
+  collection: string;
+  key: string;
+  reason: CloudSyncConflictReason;
+  label: string;
+  localUpdatedAt?: string;
+  remoteUpdatedAt?: string;
+  localDeleted: boolean;
+  remoteDeleted: boolean;
+  /** 本机这一边的关键内容（标题、正文开头、分类等）；已删除时没有 */
+  localPreview?: CloudSyncConflictPreview;
+  /** 云端这一边的关键内容；已删除时没有 */
+  remotePreview?: CloudSyncConflictPreview;
+}
+
+export interface CloudSyncCollectionCounts {
+  prompts: number;
+  categories: number;
+  aiConfigs: number;
+}
+
+/** 等待用户处理的冲突：处理之前不改本机、不上传 */
+export interface CloudSyncPendingConflict {
+  storageId: string;
+  detectedAt: string;
+  items: CloudSyncConflictItem[];
+  summary: CloudSyncMergeSummary;
+  localCounts: CloudSyncCollectionCounts;
+  remoteCounts: CloudSyncCollectionCounts;
+}
 
 export interface CloudSyncResult {
   success: boolean;
@@ -128,6 +179,7 @@ export interface CloudSyncResult {
   businessKeyMerges?: CloudSyncBusinessKeyMerge[];
   relationRepairs?: CloudSyncRelationRepair[];
   v2MirrorStatus?: 'skipped' | 'published' | 'already-current' | 'rebase-required' | 'failed';
+  pendingConflict?: CloudSyncPendingConflict;
 }
 
 export type CloudSyncErrorCode =
@@ -170,6 +222,8 @@ export interface CloudSyncOptions extends CloudSyncMergeOptions {
   forceRetry?: boolean;
   /** Internal escape hatch used only after the user resolves a restore decision. */
   allowSuspended?: boolean;
+  /** 用户在冲突弹窗里选定的处理方式；没有时按服务的 conflictMode 决定是否暂停 */
+  conflictDecision?: CloudSyncConflictDecision;
 }
 
 export interface CloudSyncRestoreSuspension {
@@ -220,6 +274,11 @@ export interface CloudSyncStatus {
   error?: string;
   pendingChanges?: boolean;
   lastLocalChangeAt?: string;
+  pendingConflict?: CloudSyncPendingConflict;
+  /** 设置里的「启用自动同步」开关 */
+  autoSyncEnabled?: boolean;
+  /** 是否有已启用的云端存储；还没查过存储列表时为 undefined */
+  hasEnabledStorage?: boolean;
 }
 
 export interface CloudSyncFlushResult {
@@ -286,6 +345,11 @@ export interface CloudSyncServiceDeps {
   subscribeToDataChanges?: (listener: (change: DataChangeEventPayload) => void) => () => void;
   v2Coordinator?: CloudSyncV2Coordinator;
   localBackupService?: Pick<typeof localBackupService, 'create'>;
+  /**
+   * ask：两边都改过的记录先暂停同步，等用户在冲突弹窗里选择；
+   * auto：按更新时间自动合并（单测与旧行为）。应用实例使用 ask。
+   */
+  conflictMode?: 'auto' | 'ask';
 }
 
 type CloudSyncStatusListener = (status: CloudSyncStatus) => void;
@@ -302,6 +366,8 @@ export class CloudSyncService {
   private readonly subscribeToDataChanges: (listener: (change: DataChangeEventPayload) => void) => () => void;
   private readonly v2Coordinator: CloudSyncV2Coordinator;
   private readonly localBackupService: Pick<typeof localBackupService, 'create'>;
+  private readonly conflictMode: 'auto' | 'ask';
+  private readonly pendingConflicts = new Map<string, CloudSyncPendingConflict>();
   private readonly runningSyncs = new Map<string, Promise<CloudSyncResult>>();
   private readonly syncGenerations = new Map<string, number>();
   private readonly activeScheduledRuns = new Set<Promise<void>>();
@@ -346,6 +412,7 @@ export class CloudSyncService {
     this.createDeviceId = deps.createDeviceId || generateUUID;
     this.subscribeToDataChanges = deps.subscribeToDataChanges || (listener => onDataChange(SYNC_STORE_NAMES, listener));
     this.localBackupService = deps.localBackupService || localBackupService;
+    this.conflictMode = deps.conflictMode || 'auto';
     this.v2Coordinator = deps.v2Coordinator || new CloudSyncV2Coordinator({
       database: this.database,
       storageFactory: storageId => this.getCloudSyncV2StorageAdapter(storageId),
@@ -358,7 +425,7 @@ export class CloudSyncService {
 
   static getInstance(): CloudSyncService {
     if (!CloudSyncService.instance) {
-      CloudSyncService.instance = new CloudSyncService();
+      CloudSyncService.instance = new CloudSyncService({ conflictMode: 'ask' });
     }
     return CloudSyncService.instance;
   }
@@ -400,6 +467,22 @@ export class CloudSyncService {
 
     const syncPromise = this.performSync(storageId, options, 0, generation, generateUUID())
       .then(async result => {
+        // 有冲突待处理：本机和云端都没动，本机的待同步改动继续保留
+        if (result.action === 'conflict-pending') {
+          if (this.runningSyncs.get(storageId) === syncPromise) {
+            this.updateStatus({
+              status: 'conflict',
+              pending: false,
+              storageId,
+              reason: options.reason || 'manual',
+              lastResult: result,
+              pendingConflict: result.pendingConflict,
+              error: undefined,
+              nextSyncAt: undefined
+            });
+          }
+          return result;
+        }
         if (result.success && result.uploadedRemote && result.remoteRevision) {
           try {
             const v2Result = await this.v2Coordinator.mirrorSuccessfulV1Sync({
@@ -446,6 +529,7 @@ export class CloudSyncService {
           pending: false,
           storageId,
           reason: options.reason || 'manual',
+          ...(result.success && this.status.pendingConflict?.storageId === storageId ? { pendingConflict: undefined } : {}),
           lastSyncAt: result.success ? new Date().toISOString() : this.status.lastSyncAt,
           failureCount: result.success ? 0 : this.failureCount,
           lastResult: result,
@@ -481,6 +565,57 @@ export class CloudSyncService {
     return syncPromise;
   }
 
+  /** 当前等待处理的冲突（没有时返回 undefined） */
+  getPendingConflict(storageId?: string): CloudSyncPendingConflict | undefined {
+    if (storageId) return this.pendingConflicts.get(storageId);
+    return this.status.pendingConflict || this.pendingConflicts.values().next().value;
+  }
+
+  /**
+   * 按用户在冲突弹窗里的选择重新同步。期间云端如果又出现新的冲突，
+   * manual 策略下没选过的项会让同步再次暂停，弹窗刷新列表。
+   */
+  resolveConflicts(
+    storageId: string,
+    decision: CloudSyncConflictDecision,
+    options: CloudSyncOptions = {}
+  ): Promise<CloudSyncResult> {
+    return this.syncNow(storageId, {
+      ...(this.autoSyncOptions || {}),
+      ...options,
+      reason: 'manual',
+      forceRetry: true,
+      conflictDecision: decision
+    });
+  }
+
+  private mergeWithConflictDecision(
+    localData: CloudSyncDataSet,
+    remoteData: CloudSyncDataSet,
+    baseData: CloudSyncDataSet,
+    options: CloudSyncOptions
+  ): CloudSyncMergeResult<CloudSyncDataSet> {
+    const mergeOptions: CloudSyncMergeOptions = { prefer: options.prefer || 'newer' };
+    const preview = mergeCloudSyncData(localData, remoteData, baseData, mergeOptions);
+    const decision = options.conflictDecision;
+    if (!preview.hasConflicts || !decision || decision.strategy === 'smart') {
+      return preview;
+    }
+
+    const resolutions: Record<string, CloudSyncConflictSide> = decision.strategy === 'manual'
+      ? { ...(decision.resolutions || {}) }
+      : Object.fromEntries(preview.conflicts.map(conflict => [getCloudSyncConflictId(conflict), decision.strategy as CloudSyncConflictSide]));
+    return mergeCloudSyncData(localData, remoteData, baseData, { ...mergeOptions, resolutions });
+  }
+
+  private hasUnresolvedConflicts(conflicts: CloudSyncConflict[], decision?: CloudSyncConflictDecision): boolean {
+    if (conflicts.length === 0) return false;
+    if (!decision) return this.conflictMode === 'ask';
+    if (decision.strategy !== 'manual') return false;
+    const resolutions = decision.resolutions || {};
+    return conflicts.some(conflict => !resolutions[getCloudSyncConflictId(conflict)]);
+  }
+
   private queueAutoSyncAfterRunning(storageId: string, reason: CloudSyncRunReason): void {
     if (reason === 'manual') {
       return;
@@ -514,6 +649,7 @@ export class CloudSyncService {
     const enabled = options.enabled !== false;
     this.stopAutoSync();
     this.autoSyncEnabled = enabled;
+    this.updateStatus({ autoSyncEnabled: enabled });
 
     if (!enabled) {
       return;
@@ -566,6 +702,7 @@ export class CloudSyncService {
     );
 
     this.autoSyncEnabled = enabled;
+    this.updateStatus({ autoSyncEnabled: enabled });
     if (enabled) {
       await this.startAutoSyncFromSettings(this.autoSyncOptions || {});
     } else {
@@ -910,10 +1047,88 @@ export class CloudSyncService {
     });
   }
 
+  /**
+   * 重新确认有没有已启用的云端存储，结果记在状态的 hasEnabledStorage 里。
+   * 状态栏和设置页据此显示「未开启同步」；存储被删除或停用后，它留下的失败、冲突、
+   * 下次检查时间和上次同步结果都不再作数，一并清掉 (#425)。
+   * 调用方手里已经有最新的存储列表时直接传进来，省一次读取。
+   */
+  async refreshStorageAvailability(configs?: CloudStorageConfig[]): Promise<boolean> {
+    let list = configs;
+    if (!list) {
+      try {
+        list = await this.getConfigClient().getStorageConfigs();
+      } catch (error) {
+        console.warn('读取云端存储配置失败:', error);
+        return this.status.hasEnabledStorage !== false;
+      }
+    }
+
+    const enabledIds = new Set(list.filter(config => config.enabled).map(config => config.id));
+    const hasEnabledStorage = enabledIds.size > 0;
+    const update: Partial<CloudSyncStatus> = { hasEnabledStorage };
+    for (const storageId of [...this.pendingConflicts.keys()]) {
+      if (!enabledIds.has(storageId)) this.pendingConflicts.delete(storageId);
+    }
+    for (const storageId of [...this.blockedStorageFailures.keys()]) {
+      if (!enabledIds.has(storageId)) this.blockedStorageFailures.delete(storageId);
+    }
+
+    const statusStorageGone = !!this.status.storageId && !enabledIds.has(this.status.storageId);
+    if (!hasEnabledStorage || statusStorageGone) {
+      if (this.status.storageId) this.clearRetryTimerForStorage(this.status.storageId);
+      this.failureCount = 0;
+      Object.assign(update, {
+        status: 'idle',
+        pending: false,
+        storageId: undefined,
+        nextSyncAt: undefined,
+        error: undefined,
+        lastResult: undefined,
+        pendingConflict: undefined,
+        failureCount: 0
+      } satisfies Partial<CloudSyncStatus>);
+    }
+    if (!hasEnabledStorage) {
+      // 一个存储都没有：不再安排检查，也不显示上次同步时间
+      this.clearScheduledTimer();
+      this.clearRetryTimer();
+      update.lastSyncAt = undefined;
+    }
+    this.updateStatus(update);
+    return hasEnabledStorage;
+  }
+
+  /**
+   * 存储配置（地址、账号、密码等）改过之后，之前记下的失败已经说明不了什么：
+   * 清掉这个存储的确定性失败记录，状态卡片也不再停在旧的错误上，下一次同步会真正连接云端。
+   */
+  resetStorageFailureState(storageId: string): void {
+    this.deterministicFailureGuards.delete(storageId);
+    this.blockedStorageFailures.delete(storageId);
+    if (this.status.status !== 'error' || this.status.storageId !== storageId || this.runningSyncs.has(storageId)) {
+      return;
+    }
+    this.clearRetryTimerForStorage(storageId);
+    this.failureCount = 0;
+    this.updateStatus({
+      status: 'idle',
+      pending: false,
+      error: undefined,
+      lastResult: undefined,
+      failureCount: 0,
+      nextSyncAt: undefined
+    });
+  }
+
   scheduleSync(
     reason: CloudSyncRunReason = 'manual',
     options: { storageId?: string; delayMs?: number } = {}
   ): void {
+    if (reason === 'config-change' && options.storageId) {
+      this.resetStorageFailureState(options.storageId);
+    }
+
     if (!this.autoSyncOptions) {
       return;
     }
@@ -1129,9 +1344,24 @@ export class CloudSyncService {
       const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
       const baseData = this.getBaseData(localState);
       phase = 'merge';
-      const mergeResult = mergeCloudSyncData(localData, remoteData, baseData, {
-        prefer: options.prefer || 'newer'
-      });
+      const mergeResult = this.mergeWithConflictDecision(localData, remoteData, baseData, options);
+      if (this.hasUnresolvedConflicts(mergeResult.conflicts, options.conflictDecision)) {
+        // 发布前暂停：本机数据和云端都不改，等用户在冲突弹窗里选择处理方式
+        const pendingConflict = createCloudSyncPendingConflict(storageId, mergeResult, localData, remoteData, now);
+        this.pendingConflicts.set(storageId, pendingConflict);
+        return {
+          success: true,
+          action: 'conflict-pending',
+          localRevision: localState?.lastKnownRevision,
+          remoteRevision: remoteSnapshot.revision,
+          appliedLocal: false,
+          uploadedRemote: false,
+          conflicts: mergeResult.conflicts,
+          summary: mergeResult.summary,
+          pendingConflict
+        };
+      }
+      this.pendingConflicts.delete(storageId);
       const mergedWithDeletesApplied = pruneCloudSyncTombstonedPromptChildren(
         applyCloudSyncTombstones(mergeResult.data),
         baseData
@@ -1299,7 +1529,15 @@ export class CloudSyncService {
         errorCode: diagnostic.code,
         diagnostic
       };
-      if (localChecksum && diagnostic.retryClass !== 'transient' && diagnostic.retryClass !== 'remote-changed') {
+      // 守卫按「本机数据 + 云端 revision」判断失败会不会重复；认证和路径错误取决于账号、密码和服务器上的目录，
+      // 这两样都不在守卫的判断条件里，记下来只会在用户改好之后继续返回旧的失败
+      if (
+        localChecksum &&
+        diagnostic.retryClass !== 'transient' &&
+        diagnostic.retryClass !== 'remote-changed' &&
+        diagnostic.code !== 'REMOTE_AUTH' &&
+        diagnostic.code !== 'REMOTE_PATH'
+      ) {
         this.deterministicFailureGuards.set(storageId, {
           localChecksum,
           remoteRevision,
@@ -2193,6 +2431,7 @@ export class CloudSyncService {
     const failures: { storageId: string; result: CloudSyncResult }[] = [];
     let lastResult: CloudSyncResult | undefined;
 
+    let conflictResult: { storageId: string; result: CloudSyncResult } | undefined;
     for (const targetStorageId of storageIds) {
       const result = await this.syncNow(targetStorageId, {
         ...this.autoSyncOptions,
@@ -2200,6 +2439,7 @@ export class CloudSyncService {
       });
       lastResult = result;
       if (!result.success) failures.push({ storageId: targetStorageId, result });
+      else if (result.action === 'conflict-pending' && !conflictResult) conflictResult = { storageId: targetStorageId, result };
     }
 
     if (failures.length > 0) {
@@ -2231,12 +2471,32 @@ export class CloudSyncService {
       return;
     }
 
+    // 冲突待处理：继续定时检查，但本机改动不算已同步，状态保持「有冲突」
+    if (conflictResult) {
+      this.clearRetryTimer();
+      this.updateStatus({
+        status: 'conflict',
+        pending: false,
+        storageId: conflictResult.storageId,
+        reason,
+        lastResult: conflictResult.result,
+        pendingConflict: conflictResult.result.pendingConflict,
+        error: undefined,
+        nextSyncAt: undefined
+      });
+      return;
+    }
+
     this.clearRetryTimer();
     this.failureCount = 0;
     if (!storageId && !storageIdsOverride && pendingVersion > 0) {
       this.clearPendingChange(pendingVersion);
     } else if (retryCoveredPendingVersion !== undefined) {
       this.clearPendingChange(retryCoveredPendingVersion);
+    } else if (pendingVersion > 0 && await this.coversAllEnabledStorages(storageIds)) {
+      // 只同步了指定的存储（例如刚添加存储后的首次同步），但它就是全部已启用的存储：
+      // 本地改动已经上传，不能继续显示「有本地变更等待同步」(#425)
+      this.clearPendingChange(pendingVersion);
     }
     if (this.blockedStorageFailures.size > 0) {
       const [blockedStorageId, blockedResult] = this.blockedStorageFailures.entries().next().value as [string, CloudSyncResult];
@@ -2257,6 +2517,7 @@ export class CloudSyncService {
       pending: false,
       storageId: storageIds[storageIds.length - 1],
       reason,
+      pendingConflict: undefined,
       lastResult,
       lastSyncAt: new Date().toISOString(),
       failureCount: 0,
@@ -2304,6 +2565,15 @@ export class CloudSyncService {
         .filter(id => !this.restoreSuspensions.has(id));
     } catch (error) {
       throw new Error(`获取自动同步存储配置失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async coversAllEnabledStorages(syncedStorageIds: string[]): Promise<boolean> {
+    try {
+      const enabledStorageIds = await this.resolveAllEnabledStorageIds();
+      return enabledStorageIds.length > 0 && enabledStorageIds.every(id => syncedStorageIds.includes(id));
+    } catch {
+      return false;
     }
   }
 
@@ -2757,6 +3027,65 @@ function normalizeConflictLogEntry(value: unknown): CloudSyncConflictLogEntry | 
   };
 }
 
+function toIsoTime(value: unknown): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value as string | number | Date);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function isPresentRecord(record: any): boolean {
+  return !!record && record._deleted !== true && record.isDeleted !== true;
+}
+
+function getConflictRecordLabel(record: any, fallback: string): string {
+  const label = record?.title || record?.name || record?.key || record?.uuid;
+  return typeof label === 'string' && label.trim() ? label.trim() : fallback;
+}
+
+function countSyncCollections(data: CloudSyncDataSet): CloudSyncCollectionCounts {
+  const count = (records?: any[]) => (records || []).filter(isPresentRecord).length;
+  return {
+    prompts: count(data.prompts),
+    categories: count(data.categories),
+    aiConfigs: count(data.aiConfigs)
+  };
+}
+
+/**
+ * 把合并结果里的冲突整理成弹窗要展示的轻量信息：两边各带一份截断后的预览
+ * （标题、正文开头、分类等），不带图片、密钥等大字段或敏感字段
+ */
+export function createCloudSyncPendingConflict(
+  storageId: string,
+  mergeResult: Pick<CloudSyncMergeResult<CloudSyncDataSet>, 'conflicts' | 'summary'>,
+  localData: CloudSyncDataSet,
+  remoteData: CloudSyncDataSet,
+  detectedAt: string
+): CloudSyncPendingConflict {
+  const localCategoryName = createCloudSyncCategoryNameLookup(localData);
+  const remoteCategoryName = createCloudSyncCategoryNameLookup(remoteData);
+  return {
+    storageId,
+    detectedAt,
+    items: mergeResult.conflicts.map(conflict => ({
+      id: getCloudSyncConflictId(conflict),
+      collection: conflict.collection,
+      key: conflict.key,
+      reason: conflict.reason,
+      label: getConflictRecordLabel(conflict.local || conflict.remote || conflict.base, conflict.key),
+      localUpdatedAt: toIsoTime(conflict.local?.updatedAt || conflict.local?.createdAt),
+      remoteUpdatedAt: toIsoTime(conflict.remote?.updatedAt || conflict.remote?.createdAt),
+      localDeleted: !isPresentRecord(conflict.local),
+      remoteDeleted: !isPresentRecord(conflict.remote),
+      localPreview: createCloudSyncConflictPreview(conflict.collection, conflict.local, { categoryNameOf: localCategoryName }),
+      remotePreview: createCloudSyncConflictPreview(conflict.collection, conflict.remote, { categoryNameOf: remoteCategoryName })
+    })),
+    summary: { ...mergeResult.summary },
+    localCounts: countSyncCollections(localData),
+    remoteCounts: countSyncCollections(remoteData)
+  };
+}
+
 function getBrowserStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | undefined {
   return typeof window !== 'undefined' ? window.localStorage : undefined;
 }
@@ -2827,6 +3156,7 @@ function translateSyncMessage(key: string): string {
 }
 
 const SYNC_MESSAGE_FALLBACKS: Record<string, string> = {
+  'dataSync.syncResult.conflictPending': '本机和云端有改动冲突，请选择处理方式',
   'dataSync.syncResult.uploaded': '同步完成，已上传本机数据',
   'dataSync.syncResult.downloaded': '同步完成，已更新本机数据',
   'dataSync.syncResult.merged': '同步完成，已合并本机和云端数据',
@@ -2834,11 +3164,33 @@ const SYNC_MESSAGE_FALLBACKS: Record<string, string> = {
 };
 
 export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): string {
+  if (action === 'conflict-pending') return translateSyncMessage('dataSync.syncResult.conflictPending');
   const key = action === 'uploaded' || action === 'downloaded' || action === 'merged'
     ? action
     : 'upToDate';
   return translateSyncMessage(`dataSync.syncResult.${key}`);
 }
+
+/** 诊断标题、说明、建议操作和可复制的报告都会直接给用户看，必须跟随界面语言 */
+const tr = (key: string, named?: Record<string, unknown>) =>
+  (i18n.global.t as (key: string, named?: Record<string, unknown>) => string)(key, named ?? {});
+
+/** 每类诊断在语言包里有 title / message / step1…stepN，这里记录各有几条建议操作 */
+const CLOUD_SYNC_DIAGNOSIS_STEPS = {
+  generic: 2,
+  dataContract: 3,
+  localQuota: 3,
+  localApply: 3,
+  restoreDecision: 3,
+  cancelled: 2,
+  instability: 3,
+  auth: 3,
+  network: 3,
+  path: 3,
+  database: 3,
+  transient: 3
+} as const;
+type CloudSyncDiagnosisKind = keyof typeof CLOUD_SYNC_DIAGNOSIS_STEPS;
 
 export function getCloudSyncErrorDiagnosis(
   error?: string | CloudSyncResult | CloudSyncStructuredDiagnostic,
@@ -2850,116 +3202,53 @@ export function getCloudSyncErrorDiagnosis(
       ? error
       : structuredDiagnostic?.message || ('error' in (error || {}) ? (error as CloudSyncResult).error : undefined)
   );
-  let title = '同步遇到问题';
-  let message = '同步失败，请稍后重试；如果反复出现，请复制错误详情反馈。';
+  let kind: CloudSyncDiagnosisKind = 'generic';
   let canAutoRetry = false;
   let canUserFix = false;
-  let suggestedActions = [
-    '再次点击立即同步',
-    '复制错误详情并反馈'
-  ];
 
   if (structuredDiagnostic?.code === 'DATA_CONTRACT_INVALID') {
-    title = '同步数据关系需要处理';
-    message = '检测到无法安全确定的记录关系。本机数据保持不变，详情中列出了集合和记录标识。';
+    kind = 'dataContract';
     canUserFix = true;
-    suggestedActions = [
-      '查看详情中的集合、记录标识和关联类型',
-      '先导出本地安全备份，再修复对应记录',
-      '修复后重新同步'
-    ];
   } else if (structuredDiagnostic?.code === 'LOCAL_APPLY_QUOTA') {
-    title = '本地存储空间不足';
-    message = '数据库事务因存储配额不足而中止，原有数据未被部分覆盖。';
+    kind = 'localQuota';
     canUserFix = true;
-    suggestedActions = [
-      '释放设备磁盘或应用存储空间',
-      '关闭其他占用大量空间的页面后重试',
-      '复制详情反馈存储配额信息'
-    ];
   } else if (structuredDiagnostic?.code === 'LOCAL_APPLY_FAILED') {
-    title = '本地数据库事务未能提交';
-    message = '同步数据未写入，本机旧数据保持完整。详情中包含失败集合、记录键和数据库错误。';
+    kind = 'localApply';
     canUserFix = structuredDiagnostic.retryClass === 'user-action';
-    suggestedActions = [
-      '查看详情中的失败阶段、集合和记录键',
-      '重启应用后再试一次',
-      '如果错误指纹未变化，请复制详情反馈'
-    ];
   } else if (structuredDiagnostic?.code === 'RESTORE_DECISION_REQUIRED' || rawError.includes('恢复后的云端处理方式')) {
-    title = '恢复后的云端同步已暂停';
-    message = '请先选择用恢复数据覆盖云端，或与云端最新数据重新合并。';
+    kind = 'restoreDecision';
     canUserFix = true;
-    suggestedActions = [
-      '返回数据同步页面处理恢复决策',
-      '确认是否需要保留云端恢复后的新增数据',
-      '完成选择后再继续同步'
-    ];
   } else if (structuredDiagnostic?.code === 'SYNC_CANCELLED' || isCloudSyncCancelledMessage(rawError)) {
-    title = '同步已被新的操作接管';
-    message = '有新的同步请求覆盖了这一次操作，这是正常的调度行为，应用会自动继续，无需手动处理。';
+    kind = 'cancelled';
     canAutoRetry = true;
-    suggestedActions = [
-      '无需处理，等待应用自动完成后续同步',
-      '如长时间未显示"云同步正常"，可手动点击立即同步'
-    ];
   } else if (isCloudSyncInstabilityError(rawError)) {
-    title = '云端同步状态暂时不一致';
-    message = '应用会保留本机数据并自动重试；如果持续出现，请查看详情复制诊断信息。';
+    kind = 'instability';
     canAutoRetry = true;
-    suggestedActions = [
-      '等待下一次自动同步或稍后手动重试',
-      '确认同一个云同步目录没有被其他工具或旧版本应用改写',
-      '复制错误详情并反馈'
-    ];
   } else if (isCloudSyncAuthError(rawError)) {
-    title = '云存储认证失败';
-    message = '存储服务拒绝了访问，请检查 WebDAV 用户名、密码或授权状态。';
+    kind = 'auth';
     canUserFix = true;
-    suggestedActions = [
-      '重新输入 WebDAV 用户名和密码',
-      '确认账号仍有访问同步目录的权限',
-      '保存配置后重新测试连接'
-    ];
   } else if (isCloudSyncNetworkError(rawError)) {
-    title = '无法连接到云存储';
-    message = '当前网络或云存储服务暂时不可用，应用会按同步周期自动重试。';
+    kind = 'network';
     canAutoRetry = true;
     canUserFix = true;
-    suggestedActions = [
-      '检查网络连接和 WebDAV 服务器地址',
-      '确认代理、证书或服务器状态正常',
-      '稍后重试同步'
-    ];
   } else if (isCloudSyncPathError(rawError)) {
-    title = '云端同步目录不可用';
-    message = '同步目录无法读取或不存在，请检查 WebDAV/iCloud 路径配置。';
+    kind = 'path';
     canUserFix = true;
-    suggestedActions = [
-      '检查云存储目录路径是否存在',
-      '确认应用拥有读取和写入权限',
-      '保存配置后重新同步'
-    ];
   } else if (isCloudSyncDatabaseError(rawError)) {
-    title = '本地数据读写失败';
-    message = '读取或写入本地数据库失败，请重启应用后重试；若仍失败请复制错误详情反馈。';
-    suggestedActions = [
-      '重启应用后重新同步',
-      '确认本机磁盘空间充足',
-      '复制错误详情并反馈'
-    ];
+    kind = 'database';
   } else if (structuredDiagnostic?.retryClass === 'transient' || structuredDiagnostic?.retryClass === 'remote-changed') {
     // 兜底：结构化诊断已判定为可自动恢复的临时状况，但文案未命中以上任何具体分类。
     // 仍然应当以"警告并自动重试"的口吻呈现，而不是让用户误以为需要自己处理。
-    title = '同步遇到临时状况';
-    message = '这通常是网络波动或云端数据短暂变化导致的，应用会自动重试，暂时无需处理。';
+    kind = 'transient';
     canAutoRetry = true;
-    suggestedActions = [
-      '等待应用自动重试',
-      '如果持续较长时间未恢复，可手动点击立即同步',
-      '仍未恢复时，请复制错误详情反馈'
-    ];
   }
+
+  const title = tr(`dataSync.diagnosis.${kind}.title`);
+  const message = tr(`dataSync.diagnosis.${kind}.message`);
+  const suggestedActions = Array.from(
+    { length: CLOUD_SYNC_DIAGNOSIS_STEPS[kind] },
+    (_, index) => tr(`dataSync.diagnosis.${kind}.step${index + 1}`)
+  );
 
   return {
     title,
@@ -2982,9 +3271,50 @@ export function getFriendlyCloudSyncError(error?: string): string {
   return getCloudSyncErrorDiagnosis(error).message;
 }
 
+export interface CloudStorageConnectionDiagnosis {
+  title: string;
+  message: string;
+  /** 服务器原样返回的技术信息（已脱敏），放在说明下面供反馈用 */
+  detail?: string;
+}
+
+/**
+ * 「测试连接」失败时的提示。和同步失败共用认证 / 网络 / 路径的判断，
+ * 但网络问题拆得更细：用户正在填表，要告诉他是地址拼错、端口不对还是服务器没响应。
+ */
+export function getCloudStorageConnectionDiagnosis(error?: string): CloudStorageConnectionDiagnosis {
+  const detail = error?.trim() ? redactCloudSyncDiagnosticText(error.trim()) : undefined;
+  const raw = detail || '';
+  let kind = 'generic';
+
+  if (/invalid url|ERR_INVALID_URL|only absolute urls|unsupported protocol/i.test(raw)) {
+    kind = 'invalidUrl';
+  } else if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|UnknownHostException|could not resolve/i.test(raw)) {
+    kind = 'hostNotFound';
+  } else if (/ECONNREFUSED|connection refused|failed to connect/i.test(raw)) {
+    kind = 'refused';
+  } else if (/certificate|CERT_|self[- ]signed|EPROTO/i.test(raw) || /\b(?:SSL|TLS)\b/.test(raw)) {
+    kind = 'tls';
+  } else if (/ETIMEDOUT|timeout|timed out|socket hang up|ECONNRESET|socket disconnected|aborted|超时/i.test(raw)) {
+    kind = 'timeout';
+  } else if (/\b(?:401|403)\b|Unauthorized|Forbidden/i.test(raw)) {
+    kind = 'auth';
+  } else if (/\b(?:404|405|501)\b|Not Found|Method Not Allowed/i.test(raw)) {
+    kind = 'path';
+  } else if (/\b5\d\d\b/.test(raw)) {
+    kind = 'server';
+  }
+
+  return {
+    title: tr(`dataSync.connectionDiagnosis.${kind}.title`),
+    message: tr(`dataSync.connectionDiagnosis.${kind}.message`),
+    detail
+  };
+}
+
 function normalizeCloudSyncError(error?: string): string {
   if (!error || !error.trim()) {
-    return '未知错误';
+    return tr('dataSync.diagnosis.unknownError');
   }
 
   return redactCloudSyncDiagnosticText(error.trim());
@@ -3097,30 +3427,33 @@ function createCloudSyncErrorReport(
   diagnosis: Omit<CloudSyncErrorDiagnosis, 'rawError' | 'copyText'>,
   structuredDiagnostic?: CloudSyncStructuredDiagnostic
 ): string {
+  const label = (key: string, value: unknown) => `${tr(`dataSync.diagnosisReport.${key}`)}: ${value}`;
+  const yesNo = (value: boolean) => tr(value ? 'dataSync.diagnosisReport.yes' : 'dataSync.diagnosisReport.no');
+  const unknown = tr('dataSync.diagnosisReport.unknown');
   const lines = [
-    'AI-Gist 云同步错误诊断',
-    `时间: ${context.timestamp || new Date().toISOString()}`,
-    `平台: ${PlatformDetector.getPlatform()}`,
-    `标题: ${diagnosis.title}`,
-    `说明: ${diagnosis.message}`,
-    `自动重试: ${diagnosis.canAutoRetry ? '是' : '否'}`,
-    `用户可处理: ${diagnosis.canUserFix ? '是' : '否'}`
+    tr('dataSync.diagnosisReport.heading'),
+    label('time', context.timestamp || new Date().toISOString()),
+    label('platform', PlatformDetector.getPlatform()),
+    label('title', diagnosis.title),
+    label('message', diagnosis.message),
+    label('autoRetry', yesNo(diagnosis.canAutoRetry)),
+    label('userFixable', yesNo(diagnosis.canUserFix))
   ];
 
   if (context.storageId) {
-    lines.push(`存储配置 ID: ${context.storageId}`);
+    lines.push(label('storageId', context.storageId));
   }
 
   if (context.reason) {
-    lines.push(`触发原因: ${context.reason}`);
+    lines.push(label('reason', context.reason));
   }
 
   if (context.status) {
-    lines.push(`同步状态: ${context.status}`);
+    lines.push(label('status', context.status));
   }
 
   if (typeof context.failureCount === 'number') {
-    lines.push(`连续失败次数: ${context.failureCount}`);
+    lines.push(label('failureCount', context.failureCount));
   }
 
   if (typeof navigator !== 'undefined' && navigator.userAgent) {
@@ -3129,37 +3462,38 @@ function createCloudSyncErrorReport(
 
   if (structuredDiagnostic) {
     lines.push(
-      `操作 ID: ${structuredDiagnostic.operationId}`,
-      `错误代码: ${structuredDiagnostic.code}`,
-      `失败阶段: ${structuredDiagnostic.phase}`,
-      `重试类型: ${structuredDiagnostic.retryClass}`,
-      `错误指纹: ${structuredDiagnostic.fingerprint}`
+      label('operationId', structuredDiagnostic.operationId),
+      label('errorCode', structuredDiagnostic.code),
+      label('phase', structuredDiagnostic.phase),
+      label('retryClass', structuredDiagnostic.retryClass),
+      label('fingerprint', structuredDiagnostic.fingerprint)
     );
-    if (structuredDiagnostic.localRevision) lines.push(`本地基线 revision: ${structuredDiagnostic.localRevision}`);
-    if (structuredDiagnostic.remoteRevision) lines.push(`远端 revision: ${structuredDiagnostic.remoteRevision}`);
-    if (structuredDiagnostic.targetRevision) lines.push(`目标 revision: ${structuredDiagnostic.targetRevision}`);
+    if (structuredDiagnostic.localRevision) lines.push(label('localRevision', structuredDiagnostic.localRevision));
+    if (structuredDiagnostic.remoteRevision) lines.push(label('remoteRevision', structuredDiagnostic.remoteRevision));
+    if (structuredDiagnostic.targetRevision) lines.push(label('targetRevision', structuredDiagnostic.targetRevision));
 
+    // 字段名（code=、collection= 等）是给开发者看的标识，保持英文不翻译
     for (const [index, failure] of (structuredDiagnostic.failures || []).entries()) {
       lines.push(
-        `失败记录 ${index + 1}: code=${failure.code}, phase=${failure.phase}, ` +
-        `collection=${failure.collection || '未知'}, recordKey=${redactCloudSyncDiagnosticIdentity(failure.recordKey)}, ` +
-        `constraint=${failure.constraint || '未知'}, errorName=${failure.errorName || '未知'}`
+        `${tr('dataSync.diagnosisReport.failureRecord', { index: index + 1 })}: code=${failure.code}, phase=${failure.phase}, ` +
+        `collection=${failure.collection || unknown}, recordKey=${failure.recordKey ? redactCloudSyncDiagnosticIdentity(failure.recordKey) : unknown}, ` +
+        `constraint=${failure.constraint || unknown}, errorName=${failure.errorName || unknown}`
       );
     }
     for (const [index, issue] of (structuredDiagnostic.contractIssues || []).entries()) {
       lines.push(
-        `关系问题 ${index + 1}: code=${issue.code}, collection=${issue.collection}, ` +
-        `record=${redactCloudSyncDiagnosticIdentity(issue.recordIdentity)}, relation=${issue.relation}`
+        `${tr('dataSync.diagnosisReport.contractIssue', { index: index + 1 })}: code=${issue.code}, collection=${issue.collection}, ` +
+        `record=${issue.recordIdentity ? redactCloudSyncDiagnosticIdentity(issue.recordIdentity) : unknown}, relation=${issue.relation}`
       );
     }
   }
 
   lines.push(
     '',
-    '建议操作:',
+    `${tr('dataSync.diagnosisReport.suggestedActions')}:`,
     ...diagnosis.suggestedActions.map(action => `- ${action}`),
     '',
-    '原始错误:',
+    `${tr('dataSync.diagnosisReport.rawError')}:`,
     rawError
   );
 

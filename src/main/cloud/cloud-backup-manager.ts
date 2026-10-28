@@ -19,7 +19,8 @@ import {
   CloudRestoreResult,
   CloudFileInfo,
   CloudFileWriteOptions,
-  CloudStorageProvider
+  CloudStorageProvider,
+  CloudConnectionCheckResult
 } from '@shared/types/cloud-backup';
 import {
   CLOUD_SYNC_MANIFEST_BACKUP_FILE,
@@ -181,8 +182,7 @@ export class CloudBackupManager {
         this.validateICloudPath(config);
         const cleanConfig = this.createCleanConfig(config);
         const provider = this.createProvider(cleanConfig);
-        const isConnected = await provider.testConnection();
-        return { success: isConnected };
+        return await this.checkProviderConnection(provider);
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.TEST_STORAGE_CONNECTION_FAILED, error);
         return { 
@@ -677,11 +677,12 @@ export class CloudBackupManager {
    * @param config 配置对象
    */
   private async testAndSaveConfig(config: CloudStorageConfig): Promise<void> {
-    const provider = this.createProvider(config);
-    const isConnected = await provider.testConnection();
+    const result = await this.checkProviderConnection(this.createProvider(config));
     
-    if (!isConnected) {
-      throw new Error(CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED);
+    if (!result.success) {
+      throw new Error(result.error
+        ? `${CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED}: ${result.error}`
+        : CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED);
     }
 
     this.storageConfigs.set(config.id, config);
@@ -1316,6 +1317,17 @@ export class CloudBackupManager {
    * @param config 存储配置
    * @returns 存储提供者实例
    */
+  /**
+   * 测试连接。能带回失败原因的存储（WebDAV）把服务器的原话一起返回，
+   * 设置页据此说明是密码不对、地址写错还是网络的问题
+   */
+  private async checkProviderConnection(provider: CloudStorageProvider): Promise<CloudConnectionCheckResult> {
+    if (typeof provider.checkConnection === 'function') {
+      return provider.checkConnection();
+    }
+    return { success: await provider.testConnection() };
+  }
+
   private createProvider(config: CloudStorageConfig) {
     switch (config.type) {
       case 'webdav':

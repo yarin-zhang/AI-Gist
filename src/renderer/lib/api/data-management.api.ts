@@ -5,9 +5,141 @@
 
 import { PlatformDetector } from '@shared/platform';
 import {
+  BACKUP_PAYLOAD_SCHEMA_VERSION,
   createBackupPayload,
-  unwrapBackupData
+  isBackupPayload,
+  parseBackupPayload
 } from '@shared/backup-integrity';
+import i18n from '@renderer/i18n';
+import { parsePromptTemplate } from '@renderer/lib/utils/prompt-template';
+
+// 导入、导出的结果会直接显示在设置页上，必须跟随界面语言 (#442)
+const tr = (key: string, named?: Record<string, unknown>) =>
+  (i18n.global.t as (key: string, named?: Record<string, unknown>) => string)(key, named ?? {});
+
+export interface CSVExportOptions {
+  /** 只用来把提示词的分类 ID 换成分类名，不会单独导出成一段 */
+  categories?: { id?: number | string; name?: string }[];
+}
+
+// Excel 靠 BOM 判断 UTF-8，没有它中文会乱码
+const CSV_BOM = '﻿';
+const CSV_LINE_BREAK = '\r\n';
+const CSV_SECTION_TITLES = { categories: 'Categories', prompts: 'Prompts', aiConfigs: 'AIConfigs' } as const;
+type CSVSection = keyof typeof CSV_SECTION_TITLES;
+
+/** RFC 4180：每个字段都加引号，字段里的引号写两遍，换行和逗号原样留在引号里 */
+const escapeCSVField = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const toCSVDate = (value: unknown): string => {
+  if (value === undefined || value === null || value === '') return '';
+  const date = value instanceof Date ? value : new Date(value as string | number);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
+};
+
+const toCSVList = (value: unknown): string => {
+  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean).join(', ');
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+/** 把 CSV 文本拆成记录；引号里的逗号、换行和成对的引号按 RFC 4180 还原 */
+const parseCSVRecords = (content: string): string[][] => {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let field = '';
+  let quoted = false;
+  const text = content.startsWith(CSV_BOM) ? content.slice(1) : content;
+
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (quoted) {
+      if (char === '"' && text[index + 1] === '"') {
+        field += '"';
+        index++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ',') {
+      record.push(field);
+      field = '';
+    } else if (char === '\r' || char === '\n') {
+      if (char === '\r' && text[index + 1] === '\n') index++;
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = '';
+    } else {
+      field += char;
+    }
+  }
+  if (field || record.length) {
+    record.push(field);
+    records.push(record);
+  }
+  return records;
+};
+
+export interface FullBackupImportSummary {
+  prompts: number;
+  categories: number;
+  aiConfigs: number;
+}
+
+export interface FullBackupImportOptions {
+  approve?: (summary: FullBackupImportSummary) => Promise<boolean>;
+  beforeReplace?: () => Promise<unknown>;
+}
+
+/**
+ * 导入失败的原因：界面据此告诉用户是文件坏了、不是 AI Gist 的备份，还是版本太新。
+ * 除 importFailed 外都发生在替换数据之前，本机数据没有被动过。
+ */
+export type FullBackupImportErrorCode =
+  | 'cancelled'
+  | 'readFailed'
+  | 'invalidJson'
+  | 'notBackup'
+  | 'unsupportedVersion'
+  | 'corrupted'
+  | 'backupFailed'
+  | 'importFailed';
+
+// 和数据库恢复时认可的数据表保持一致（database-manager.service 的 RESTORABLE_DATA_FIELDS）
+const RESTORABLE_BACKUP_FIELDS = [
+  'categories',
+  'prompts',
+  'promptVariables',
+  'promptHistories',
+  'aiConfigs',
+  'quickOptimizationConfigs',
+  'aiHistory',
+  'settings',
+  'syncTombstones'
+];
+
+/** 至少有一张可恢复的数据表，并且出现的数据表都是数组：随便一个 JSON 不能当成备份导入 */
+const isRestorableBackupData = (data: unknown): boolean => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const present = RESTORABLE_BACKUP_FIELDS.filter(field => field in (data as Record<string, unknown>));
+  return present.length > 0 && present.every(field => {
+    const value = (data as Record<string, unknown>)[field];
+    return value === undefined || Array.isArray(value);
+  });
+};
+
+const errorMessageOf = (error: unknown) => (error instanceof Error ? error.message : String(error ?? ''));
+
+const countOf = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+
+const summarizeBackupData = (data: any): FullBackupImportSummary => ({
+  prompts: countOf(data?.prompts),
+  categories: countOf(data?.categories),
+  aiConfigs: countOf(data?.aiConfigs),
+});
 
 export class DataManagementAPI {
   private static webImportFiles = new Map<string, File>();
@@ -40,18 +172,26 @@ export class DataManagementAPI {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = format === 'json' ? '.json,application/json' : '.csv,text/csv';
+      let settled = false;
+      const finish = (token: string | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(token);
+      };
 
       input.onchange = () => {
         const file = input.files?.[0];
         if (!file) {
-          resolve(null);
+          finish(null);
           return;
         }
 
         const token = `web-import:${this.createBackupId()}`;
         this.webImportFiles.set(token, file);
-        resolve(token);
+        finish(token);
       };
+      // 在文件选择框里点了取消：只监听 change 的话这个 Promise 永远不结束，导入按钮会一直转圈 (#441)
+      input.addEventListener('cancel', () => finish(null));
 
       input.click();
     });
@@ -151,14 +291,19 @@ export class DataManagementAPI {
   /**
    * 导出数据到文件
    */
-  static async exportDataToFile(data: any, filePath: string, format: 'json' | 'csv' = 'json'): Promise<boolean> {
+  static async exportDataToFile(
+    data: any,
+    filePath: string,
+    format: 'json' | 'csv' = 'json',
+    options: CSVExportOptions = {}
+  ): Promise<boolean> {
     try {
       let content: string;
-      
+
       if (format === 'json') {
         content = JSON.stringify(data, null, 2);
       } else {
-        content = this.convertToCSV(data);
+        content = this.convertToCSV(data, options);
       }
       
       return await this.writeFile(filePath, content);
@@ -188,76 +333,92 @@ export class DataManagementAPI {
   }
 
   /**
-   * 将数据转换为 CSV 格式
+   * 将数据转换为 CSV 格式（RFC 4180，带 UTF-8 BOM）。
+   * 只有一类数据时就是一张普通表格；同时导出几类时，每段前加一行段名、段之间空一行。
    */
-  private static convertToCSV(data: any): string {
+  private static convertToCSV(data: any, options: CSVExportOptions = {}): string {
+    const categoryNames = new Map<string, string>();
+    for (const category of options.categories || data.categories || []) {
+      if (category?.id !== undefined && category?.id !== null) categoryNames.set(String(category.id), category.name || '');
+    }
+
+    const tables: Record<CSVSection, { headers: string[]; rows: (item: any) => unknown[] }> = {
+      categories: {
+        headers: ['ID', 'Name', 'Description', 'CreatedAt', 'UpdatedAt'],
+        rows: category => [category.id, category.name, category.description, toCSVDate(category.createdAt), toCSVDate(category.updatedAt)]
+      },
+      prompts: {
+        headers: ['ID', 'Title', 'Description', 'Content', 'Category', 'Tags', 'Variables', 'CreatedAt', 'UpdatedAt'],
+        rows: prompt => [
+          prompt.id,
+          prompt.title,
+          prompt.description,
+          prompt.content,
+          // 未分类留空，找不到对应分类时也不写 undefined
+          prompt.category?.name ?? (prompt.categoryId !== undefined && prompt.categoryId !== null
+            ? categoryNames.get(String(prompt.categoryId)) ?? ''
+            : ''),
+          toCSVList(prompt.tags),
+          parsePromptTemplate(prompt.content || '').variableNames.join(', '),
+          toCSVDate(prompt.createdAt),
+          toCSVDate(prompt.updatedAt)
+        ]
+      },
+      aiConfigs: {
+        headers: ['ID', 'Name', 'Provider', 'ApiKey', 'DefaultModel', 'CreatedAt'],
+        rows: config => [config.id, config.name, config.type ?? config.provider, config.apiKey, config.defaultModel, toCSVDate(config.createdAt)]
+      }
+    };
+
+    const sections = (Object.keys(tables) as CSVSection[]).filter(section => Array.isArray(data?.[section]));
     const lines: string[] = [];
-    
-    if (data.categories && data.categories.length > 0) {
-      lines.push('Categories');
-      lines.push('ID,Name,Description,CreatedAt');
-      data.categories.forEach((cat: any) => {
-        lines.push(`${cat.id},${cat.name},${cat.description},${cat.createdAt}`);
-      });
-      lines.push('');
-    }
-    
-    if (data.prompts && data.prompts.length > 0) {
-      lines.push('Prompts');
-      lines.push('ID,Title,Content,CategoryId,CreatedAt');
-      data.prompts.forEach((prompt: any) => {
-        lines.push(`${prompt.id},${prompt.title},${prompt.content},${prompt.categoryId},${prompt.createdAt}`);
-      });
-      lines.push('');
-    }
-    
-    if (data.aiConfigs && data.aiConfigs.length > 0) {
-      lines.push('AIConfigs');
-      lines.push('ID,Name,Provider,ApiKey,DefaultModel,CreatedAt');
-      data.aiConfigs.forEach((config: any) => {
-        lines.push(`${config.id},${config.name},${config.provider},${config.apiKey},${config.defaultModel},${config.createdAt}`);
-      });
-      lines.push('');
-    }
-    
-    return lines.join('\n');
+    sections.forEach((section, index) => {
+      if (sections.length > 1) {
+        if (index > 0) lines.push('');
+        lines.push(escapeCSVField(CSV_SECTION_TITLES[section]));
+      }
+      const table = tables[section];
+      lines.push(table.headers.map(escapeCSVField).join(','));
+      for (const item of data[section]) lines.push(table.rows(item).map(escapeCSVField).join(','));
+    });
+
+    return CSV_BOM + lines.join(CSV_LINE_BREAK) + CSV_LINE_BREAK;
   }
 
   /**
-   * 解析 CSV 格式数据
+   * 解析 CSV 格式数据：兼容单表和带段名的多段文件
    */
   private static parseCSV(content: string): any {
-    // 简单的 CSV 解析实现
-    const lines = content.split('\n').filter(line => line.trim());
     const result: any = { categories: [], prompts: [], aiConfigs: [] };
-    
-    let currentSection = '';
+    const sectionByTitle = new Map(
+      (Object.entries(CSV_SECTION_TITLES) as [CSVSection, string][]).map(([section, title]) => [title, section])
+    );
+
+    let currentSection: CSVSection | '' = '';
     let headers: string[] = [];
-    
-    for (const line of lines) {
-      if (line === 'Categories') {
-        currentSection = 'categories';
+
+    for (const record of parseCSVRecords(content)) {
+      if (record.every(field => !field.trim())) continue;
+      if (record.length === 1 && sectionByTitle.has(record[0])) {
+        currentSection = sectionByTitle.get(record[0])!;
         headers = [];
-      } else if (line === 'Prompts') {
-        currentSection = 'prompts';
-        headers = [];
-      } else if (line === 'AIConfigs') {
-        currentSection = 'aiConfigs';
-        headers = [];
-      } else if (line.includes(',')) {
-        if (headers.length === 0) {
-          headers = line.split(',');
-        } else {
-          const values = line.split(',');
-          const item: any = {};
-          headers.forEach((header, index) => {
-            item[header] = values[index] || '';
-          });
-          result[currentSection].push(item);
-        }
+        continue;
       }
+      if (headers.length === 0) {
+        headers = record;
+        // 单表文件没有段名，按表头认出是哪一类
+        if (!currentSection) {
+          currentSection = headers.includes('Title') ? 'prompts' : headers.includes('Provider') ? 'aiConfigs' : 'categories';
+        }
+        continue;
+      }
+      const item: any = {};
+      headers.forEach((header, index) => {
+        item[header] = record[index] ?? '';
+      });
+      result[currentSection || 'prompts'].push(item);
     }
-    
+
     return result;
   }
 
@@ -275,7 +436,7 @@ export class DataManagementAPI {
       const filePath = await this.selectExportPath(defaultName);
       
       if (!filePath) {
-        return { success: false, message: '未选择导出路径' };
+        return { success: false, cancelled: true, message: tr('dataBackup.exportCancelled') };
       }
       
       const backupPayload = createBackupPayload({
@@ -291,60 +452,106 @@ export class DataManagementAPI {
       
       return {
         success,
-        message: success ? '完整备份导出成功' : '完整备份导出失败',
+        message: success ? tr('settingsMessages.fullBackupExportSuccess') : tr('settingsMessages.fullBackupExportFailed'),
         filePath: success ? filePath : null
       };
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : '完整备份导出失败',
+        message: error instanceof Error ? error.message : tr('settingsMessages.fullBackupExportFailed'),
         error: error
       };
     }
   }
 
   /**
-   * 完整备份导入
+   * 判断读到的 JSON 能不能当完整备份导入：带校验信息的备份先核对格式版本和校验码，
+   * 旧版本导出的裸数据直接检查数据表。返回的错误码决定给用户看哪一句说明。
    */
-  static async importFullBackup(): Promise<any> {
+  private static readFullBackupData(value: unknown):
+    | { ok: true; data: any }
+    | { ok: false; errorCode: FullBackupImportErrorCode; params?: Record<string, unknown>; error?: unknown } {
+    let data: unknown = value;
+    if (isBackupPayload(value)) {
+      const version = (value as { schemaVersion?: unknown }).schemaVersion;
+      if (version !== undefined && version !== BACKUP_PAYLOAD_SCHEMA_VERSION) {
+        return { ok: false, errorCode: 'unsupportedVersion', params: { version: String(version) } };
+      }
+      try {
+        data = parseBackupPayload(value).data;
+      } catch (error) {
+        return { ok: false, errorCode: 'corrupted', error };
+      }
+    }
+    return isRestorableBackupData(data) ? { ok: true, data } : { ok: false, errorCode: 'notBackup' };
+  }
+
+  /**
+   * 完整备份导入。导入会用文件内容替换本机全部数据：
+   * `approve` 拿到文件里的条目数，返回 false 就取消；`beforeReplace` 在替换前执行（用来做导入前备份），抛错则不导入。
+   */
+  static async importFullBackup(options: FullBackupImportOptions = {}): Promise<any> {
+    // 每种失败都说清楚原因，并告诉用户本机数据有没有被动过 (#442)
+    const fail = (errorCode: FullBackupImportErrorCode, params: Record<string, unknown> = {}, error?: unknown) => ({
+      success: false,
+      errorCode,
+      message: tr(`dataBackup.importErrors.${errorCode}`, params),
+      error
+    });
+
     try {
       // 1. 选择导入文件
       const filePath = await this.selectImportFile('json');
       if (!filePath) {
-        return { success: false, message: '未选择导入文件' };
-      }
-      
-      // 2. 读取并解析数据
-      const imported = await this.importDataFromFile(filePath, 'json');
-      if (!imported) {
-        return { success: false, message: '文件读取失败' };
+        return { success: false, cancelled: true, errorCode: 'cancelled', message: tr('dataBackup.importErrors.cancelled') };
       }
 
-      let data: any;
+      // 2. 读取并解析数据：读不出来、不是 JSON、不是备份、版本太新、校验不通过分开说
+      let content: string | null;
       try {
-        data = unwrapBackupData(imported);
+        content = await this.readFile(filePath);
       } catch (error) {
+        return fail('readFailed', {}, error);
+      }
+      if (!content) return fail('readFailed');
+
+      let imported: unknown;
+      try {
+        imported = JSON.parse(content);
+      } catch (error) {
+        return fail('invalidJson', {}, error);
+      }
+
+      const parsed = this.readFullBackupData(imported);
+      if (!parsed.ok) return fail(parsed.errorCode, parsed.params, parsed.error);
+      const data = parsed.data;
+
+      // 3. 确认后再替换，替换前留一份当前数据；备份做不成就不导入
+      if (options.approve && !(await options.approve(summarizeBackupData(data)))) {
+        return { success: false, cancelled: true, errorCode: 'cancelled', message: tr('dataBackup.importErrors.cancelled') };
+      }
+      try {
+        await options.beforeReplace?.();
+      } catch (error) {
+        return fail('backupFailed', { error: errorMessageOf(error) }, error);
+      }
+
+      // 4. 导入到数据库（整体替换是原子的，失败时本机数据保持原样）
+      const result = await this.importDataToDatabase(data);
+      if (!result.success) {
         return {
-          success: false,
-          message: error instanceof Error ? error.message : '备份文件校验失败',
-          error
+          ...fail('importFailed', { error: result.error || tr('dataSync.diagnosis.unknownError') }),
+          imported: result.imported
         };
       }
-      
-      // 3. 导入到数据库
-      const result = await this.importDataToDatabase(data);
-      
+
       return {
-        success: result.success,
-        message: result.success ? '完整备份导入成功' : '完整备份导入失败',
+        success: true,
+        message: tr('settingsMessages.fullBackupImportSuccess'),
         imported: result.imported
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : '完整备份导入失败',
-        error: error
-      };
+      return fail('importFailed', { error: errorMessageOf(error) }, error);
     }
   }
 

@@ -1,32 +1,43 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlertTriangle, CircleCheck, Cloud, CloudOff, Copy, Refresh, Settings, X } from '@vicons/tabler';
+import { Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
   getCloudSyncResultMessage
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
-import { formatDateTime } from '~/lib/utils/date';
+import { formatFriendlyDate, formatRelativeTime } from '~/lib/utils/date';
+import {
+  createDataSyncStatusInput,
+  getDataSyncErrorSource,
+  resolveDataSyncStatusKind
+} from '~/lib/utils/data-sync-status';
+import { useSyncConflict } from '~/composables/useSyncConflict';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const syncConflict = useSyncConflict();
 const status = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const tooltipVisible = ref(false);
 const detailPanelVisible = ref(false);
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle');
+const now = ref(Date.now());
+const rootRef = ref<HTMLElement | null>(null);
+const buttonRef = ref<HTMLButtonElement | null>(null);
 let unsubscribe: (() => void) | null = null;
 let copyStateTimer: ReturnType<typeof setTimeout> | null = null;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
 
 const emit = defineEmits<{
   activate: [];
 }>();
 
 const rawErrorText = computed(() => status.value.error || status.value.lastResult?.error || '');
+// 和设置页、备份列表一样用跟随界面语言的友好时间（今天 14:28 / Today 14:28）
+const formatSyncTime = (value: string) => formatFriendlyDate(value, locale.value, { withTime: true });
 
-const hasErrorDetail = computed(() => status.value.status === 'error' && !!rawErrorText.value);
-
-const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(rawErrorText.value, {
+const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(getDataSyncErrorSource(status.value), {
   storageId: status.value.storageId,
   reason: status.value.reason,
   status: status.value.status,
@@ -34,74 +45,100 @@ const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(rawErrorText.va
   timestamp: status.value.updatedAt
 }));
 
+// 和设置页的状态卡片用同一套判断（resolveDataSyncStatusKind），两处不会再一个说
+// 「已同步」、一个说「等待同步」；没有启用的存储时固定显示「未开启同步」(#425)
+const statusKind = computed(() => resolveDataSyncStatusKind(createDataSyncStatusInput(status.value, {
+  canAutoRetryError: errorDiagnosis.value.canAutoRetry
+})));
+
+const hasErrorDetail = computed(() =>
+  (statusKind.value === 'error' || statusKind.value === 'retryScheduled') && !!rawErrorText.value
+);
+
+const conflictCount = computed(() => status.value.pendingConflict?.items.length || 0);
+
 // 网络波动、同步任务被更新的世代取代等"可以自动恢复"的状况，不应该用刺眼的
 // 错误红色呈现——它们会自动重试，用户通常无需介入。只有诊断判定为不可自动
 // 重试的情况，才是真正需要用户查看并处理的错误。
-const isAttentionWorthy = computed(() => hasErrorDetail.value && errorDiagnosis.value.canAutoRetry);
-
 const visualState = computed(() => {
-  if (status.value.status === 'syncing') return 'syncing';
-  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return 'scheduled';
-  if (status.value.status === 'error' && isAttentionWorthy.value) return 'attention';
-  if (status.value.status === 'error') return 'error';
-  if (status.value.status === 'scheduled' && status.value.pendingChanges) return 'scheduled';
-  if (status.value.lastResult?.success || status.value.lastSyncAt) return 'success';
-  if (status.value.status === 'scheduled') return 'scheduled';
-  return 'idle';
+  switch (statusKind.value) {
+    case 'notConfigured': return 'off';
+    // 失败后安排了重试：和单纯「等待下次同步」分开，状态栏要看得出刚才没同步成功
+    case 'retryScheduled': return 'retrying';
+    case 'error': return errorDiagnosis.value.canAutoRetry ? 'attention' : 'error';
+    case 'conflict': return 'conflict';
+    case 'paused': return 'paused';
+    case 'syncing': return 'syncing';
+    case 'pending': return 'scheduled';
+    case 'current': return 'success';
+    default: return 'idle';
+  }
 });
 
-const statusIcon = computed(() => {
-  if (visualState.value === 'syncing') return Refresh;
-  // A scheduled check or automatic retry is still a healthy cloud-sync state.
-  // Keep the cloud glyph so a long wait does not look like a stuck timer.
-  if (visualState.value === 'scheduled') return Cloud;
-  if (visualState.value === 'attention') return Cloud;
-  if (visualState.value === 'error') return AlertTriangle;
-  if (visualState.value === 'success') return CircleCheck;
-  return CloudOff;
+// 状态栏只放一个状态点和一句短文字：已同步为绿、进行中或等待为橙、需要处理为红，没开同步不着色
+const dotClass = computed(() => {
+  if (visualState.value === 'success') return 'ui-dot--success';
+  if (visualState.value === 'error') return 'ui-dot--error';
+  if (visualState.value === 'idle' || visualState.value === 'off') return '';
+  return 'ui-dot--warning';
 });
 
-const primaryText = computed(() => {
-  if (status.value.status === 'syncing') return t('dataSync.statusSyncing');
-  if (status.value.status === 'error' && status.value.pending && status.value.nextSyncAt) return t('dataSync.statusRetryScheduled');
-  if (status.value.status === 'error') return errorDiagnosis.value.title;
+const shortText = computed(() => {
+  if (visualState.value === 'off') return t('dataSync.indicatorSyncOff');
+  if (visualState.value === 'paused') return t('dataSync.statusPaused');
+  if (visualState.value === 'syncing') return t('dataSync.indicatorShortSyncing');
+  if (visualState.value === 'conflict') return t('syncConflict.shortStatus', { count: conflictCount.value });
+  if (visualState.value === 'error' || visualState.value === 'attention') return t('dataSync.indicatorShortError');
+  if (visualState.value === 'retrying') return t('dataSync.indicatorShortRetrying');
   if (visualState.value === 'scheduled') return t('dataSync.indicatorWaitingNextSync');
+  if (visualState.value === 'success' && status.value.lastSyncAt) {
+    return t('dataSync.indicatorShortSynced', {
+      time: formatRelativeTime(status.value.lastSyncAt, locale.value, new Date(now.value))
+    });
+  }
   if (visualState.value === 'success') return t('dataSync.indicatorSyncNormal');
   return t('dataSync.indicatorIdle');
 });
 
-const detailText = computed(() => {
-  if (status.value.status === 'error') {
-    return errorDiagnosis.value.message;
+const primaryText = computed(() => {
+  switch (statusKind.value) {
+    case 'notConfigured': return t('dataSync.indicatorSyncOff');
+    case 'paused': return t('dataSync.statusPaused');
+    case 'syncing': return t('dataSync.statusSyncing');
+    case 'conflict': return t('syncConflict.statusTitle', { count: conflictCount.value });
+    case 'retryScheduled': return t('dataSync.statusRetryScheduled');
+    case 'error': return errorDiagnosis.value.title;
+    case 'pending': return t('dataSync.indicatorWaitingNextSync');
+    case 'current': return t('dataSync.indicatorSyncNormal');
+    default: return t('dataSync.indicatorIdle');
   }
-
-  if (visualState.value === 'success' && status.value.lastResult?.success) {
-    return getCloudSyncResultMessage(status.value.lastResult.action);
-  }
-
-  if (visualState.value === 'success') {
-    return t('dataSync.indicatorSyncedDetail');
-  }
-
-  if (visualState.value === 'scheduled') {
-    return t('dataSync.indicatorScheduledDetail');
-  }
-
-  if (status.value.status === 'syncing') {
-    return t('dataSync.statusSyncingDescription');
-  }
-
-  return t('dataSync.indicatorIdleDetail');
 });
 
+const detailText = computed(() => {
+  switch (statusKind.value) {
+    case 'notConfigured': return t('dataSync.indicatorSyncOffDetail');
+    case 'paused': return t('dataSync.statusPausedDescription');
+    case 'conflict': return t('syncConflict.statusDescription');
+    case 'retryScheduled':
+    case 'error': return errorDiagnosis.value.message;
+    case 'current': return status.value.lastResult?.success
+      ? getCloudSyncResultMessage(status.value.lastResult.action)
+      : t('dataSync.indicatorSyncedDetail');
+    case 'pending': return t('dataSync.indicatorScheduledDetail');
+    case 'syncing': return t('dataSync.statusSyncingDescription');
+    default: return t('dataSync.indicatorIdleDetail');
+  }
+});
+
+// 只有真的在等下一次检查（有本地变更、或失败后安排了重试）时才报下次检查时间
 const nextSyncText = computed(() => {
-  if (!status.value.nextSyncAt) return '';
-  return t('dataSync.indicatorNextCheckAt', { time: formatDateTime(status.value.nextSyncAt) });
+  if (!status.value.nextSyncAt || (statusKind.value !== 'pending' && statusKind.value !== 'retryScheduled')) return '';
+  return t('dataSync.indicatorNextCheckAt', { time: formatSyncTime(status.value.nextSyncAt) });
 });
 
 const lastSyncText = computed(() => {
-  if (!status.value.lastSyncAt) return '';
-  return t('dataSync.lastSyncAt', { time: formatDateTime(status.value.lastSyncAt) });
+  if (!status.value.lastSyncAt || statusKind.value === 'notConfigured') return '';
+  return t('dataSync.lastSyncAt', { time: formatSyncTime(status.value.lastSyncAt) });
 });
 
 const ariaLabel = computed(() => {
@@ -118,8 +155,15 @@ const hideTooltip = () => {
 };
 
 const handleActivate = () => {
+  // 有冲突待处理：直接打开冲突弹窗
+  if (status.value.status === 'conflict') {
+    tooltipVisible.value = false;
+    syncConflict.open(status.value.storageId);
+    return;
+  }
+
   if (hasErrorDetail.value) {
-    detailPanelVisible.value = true;
+    detailPanelVisible.value = !detailPanelVisible.value;
     tooltipVisible.value = false;
     return;
   }
@@ -127,9 +171,37 @@ const handleActivate = () => {
   emit('activate');
 };
 
-const closeDetailPanel = () => {
+const closeDetailPanel = (options: { restoreFocus?: boolean } = {}) => {
+  if (!detailPanelVisible.value) return;
   detailPanelVisible.value = false;
+  if (!options.restoreFocus) return;
+  // 用键盘关掉浮层后焦点回到状态栏按钮；这次聚焦不再弹出悬停提示
+  void nextTick(() => {
+    buttonRef.value?.focus();
+    tooltipVisible.value = false;
+  });
 };
+
+// 错误详情浮层是非模态的：Esc 和点浮层外面都能关掉，不必去找右上角的小 × (#420)
+const handleDocumentKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return;
+  closeDetailPanel({ restoreFocus: true });
+};
+
+const handleDocumentPointerDown = (event: PointerEvent) => {
+  if (rootRef.value?.contains(event.target as Node)) return;
+  closeDetailPanel();
+};
+
+watch(detailPanelVisible, visible => {
+  if (visible) {
+    document.addEventListener('keydown', handleDocumentKeydown);
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true);
+  } else {
+    document.removeEventListener('keydown', handleDocumentKeydown);
+    document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
+  }
+});
 
 const openSettings = () => {
   closeDetailPanel();
@@ -143,8 +215,10 @@ const retrySyncNow = async () => {
   }
 
   closeDetailPanel();
+  // 用户点「重试」通常是刚处理过外部问题（例如改了密码），必须真正连接一次，不能返回上次记下的失败
   await cloudSyncService.syncNow(storageId, {
-    reason: 'manual'
+    reason: 'manual',
+    forceRetry: true
   });
 };
 
@@ -172,42 +246,52 @@ const setCopyState = (nextState: 'idle' | 'copied' | 'failed') => {
 };
 
 onMounted(() => {
+  clockTimer = setInterval(() => {
+    now.value = Date.now();
+  }, 30_000);
   unsubscribe = cloudSyncService.onStatusChange(nextStatus => {
     status.value = nextStatus;
     if (nextStatus.status !== 'error') {
       detailPanelVisible.value = false;
     }
   });
+  // 状态栏是同步状态的常驻入口，启动时先确认有没有启用的存储
+  void cloudSyncService.refreshStorageAvailability();
 });
 
 onUnmounted(() => {
   if (copyStateTimer) {
     clearTimeout(copyStateTimer);
   }
+  if (clockTimer) {
+    clearInterval(clockTimer);
+  }
+  document.removeEventListener('keydown', handleDocumentKeydown);
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
   unsubscribe?.();
 });
 </script>
 
 <template>
   <div
+    ref="rootRef"
     class="cloud-sync-indicator"
     @mouseenter="showTooltip"
     @mouseleave="hideTooltip"
   >
     <button
+      ref="buttonRef"
       class="cloud-sync-button"
       :class="`is-${visualState}`"
       type="button"
       :aria-label="ariaLabel"
+      :aria-expanded="hasErrorDetail ? detailPanelVisible : undefined"
       @click="handleActivate"
       @focus="showTooltip"
       @blur="hideTooltip"
     >
-      <component
-        :is="statusIcon"
-        class="cloud-sync-icon"
-        :class="{ 'is-spinning': visualState === 'syncing' }"
-      />
+      <span class="ui-dot" :class="dotClass" aria-hidden="true" />
+      <span>{{ shortText }}</span>
     </button>
 
     <div
@@ -235,7 +319,8 @@ onUnmounted(() => {
           <strong>{{ errorDiagnosis.title }}</strong>
           <span>{{ errorDiagnosis.message }}</span>
         </div>
-        <button class="cloud-sync-panel-icon-button" type="button" :aria-label="t('common.close')" @click="closeDetailPanel">
+        <button class="cloud-sync-panel-icon-button" type="button" :aria-label="t('common.close')"
+          @click="closeDetailPanel({ restoreFocus: true })">
           <X />
         </button>
       </div>
@@ -244,7 +329,11 @@ onUnmounted(() => {
         <li v-for="action in errorDiagnosis.suggestedActions" :key="action">{{ action }}</li>
       </ul>
 
-      <pre class="cloud-sync-raw-error">{{ rawErrorText }}</pre>
+      <!-- 原始报错（带存储配置 ID 等）只在反馈问题时有用：默认折叠，「复制详情」复制完整诊断 -->
+      <details class="cloud-sync-tech">
+        <summary>{{ t('dataSync.technicalDetails') }}</summary>
+        <pre class="cloud-sync-raw-error">{{ rawErrorText }}</pre>
+      </details>
 
       <div class="cloud-sync-detail-actions">
         <button class="cloud-sync-panel-button" type="button" @click="copyErrorDetails">
@@ -281,63 +370,34 @@ onUnmounted(() => {
 }
 
 .cloud-sync-button {
-  display: grid;
-  width: 24px;
-  height: 22px;
-  box-sizing: border-box;
-  flex: 0 0 24px;
-  place-items: center;
-  padding: 0;
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  margin-left: -6px;
   color: var(--content-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
   line-height: 1;
+  white-space: nowrap;
   appearance: none;
-  background: var(--surface-primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
   cursor: pointer;
-  transition: color 160ms ease, background-color 160ms ease;
 }
 
 .cloud-sync-button:hover,
 .cloud-sync-button:focus-visible {
-  border-color: var(--border-default);
-  background: var(--surface-secondary);
+  color: var(--content-primary);
+  background: var(--surface-tertiary);
   outline: none;
-}
-
-.cloud-sync-button.is-success {
-  color: var(--accent-success);
-}
-
-.cloud-sync-button.is-scheduled {
-  color: var(--accent-info);
-}
-
-.cloud-sync-button.is-syncing {
-  color: var(--accent-warning);
-}
-
-.cloud-sync-button.is-error {
-  color: var(--accent-error);
-}
-
-.cloud-sync-button.is-attention {
-  color: var(--accent-warning);
-}
-
-.cloud-sync-icon {
-  display: block;
-  width: 15px;
-  height: 15px;
-}
-
-.cloud-sync-icon.is-spinning {
-  animation: cloud-sync-spin 900ms linear infinite;
 }
 
 .cloud-sync-tooltip {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 8px);
   display: flex;
   width: max-content;
@@ -363,7 +423,7 @@ onUnmounted(() => {
 
 .cloud-sync-detail-panel {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 8px);
   display: flex;
   width: min(380px, calc(100vw - 24px));
@@ -439,13 +499,32 @@ onUnmounted(() => {
   color: var(--content-secondary);
 }
 
+.cloud-sync-tech {
+  color: var(--content-tertiary);
+}
+
+.cloud-sync-tech summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.cloud-sync-tech summary:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.cloud-sync-tech[open] summary {
+  margin-bottom: 6px;
+}
+
 .cloud-sync-raw-error {
   min-height: 70px;
   max-height: 160px;
   margin: 0;
   padding: 9px;
   color: var(--content-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
@@ -494,14 +573,6 @@ onUnmounted(() => {
   height: 14px;
 }
 
-@keyframes cloud-sync-spin {
-  from {
-    transform: rotate(0deg);
-  }
 
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 </style>

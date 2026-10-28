@@ -57,6 +57,8 @@ export class QuickOptimizationApiClient {
        * @returns Promise<QuickOptimizationConfig[]> 已启用的快速优化提示词配置列表
        */
       query: async (): Promise<QuickOptimizationConfig[]> => {
+        // AI 面板加载动作时顺带完成首次预置；预置失败不影响读取
+        await this.quickOptimizationService.ensureDefaultConfigs().catch(error => console.warn('预置默认快速优化失败:', error));
         return this.quickOptimizationService.getEnabledQuickOptimizationConfigs();
       }
     },
@@ -179,9 +181,9 @@ export class QuickOptimizationApiClient {
     initializeDefaults: {
       /**
        * 初始化默认的快速优化提示词配置
-       * @returns Promise<void> 初始化完成
+       * @returns Promise<number> 新添加的配置数量
        */
-      mutate: async (): Promise<void> => {
+      mutate: async (): Promise<number> => {
         return this.quickOptimizationService.initializeDefaultConfigs();
       }
     },

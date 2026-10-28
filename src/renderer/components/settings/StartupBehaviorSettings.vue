@@ -1,58 +1,38 @@
 <template>
-    <NCard size="small">
-        <NFlex vertical :size="16">
-            <NFlex justify="space-between" align="center" :size="16">
-                <div>
-                    <NText>{{ t('startup.minimized') }}</NText>
-                    <NText depth="3" class="setting-description">{{ t('startup.minimizedTip') }}</NText>
-                </div>
-                <NSwitch v-model:value="props.modelValue.startMinimized" @update:value="handleUpdate" />
-            </NFlex>
-
-            <NDivider />
-
-            <NFlex justify="space-between" align="center" :size="16">
-                <div>
-                    <NText>{{ t('startup.autoStart') }}</NText>
-                    <NText depth="3" class="setting-description">{{ t('startup.autoStartTip') }}</NText>
-                </div>
-                <NSwitch v-model:value="props.modelValue.autoLaunch" @update:value="handleUpdate" />
-            </NFlex>
-        </NFlex>
-    </NCard>
+    <UiPanel body="rows">
+        <UiSettingRow :title="t('startup.autoStart')" :description="t('startup.autoStartTip')">
+            <NSwitch :value="modelValue.autoLaunch" :aria-label="t('startup.autoStart')"
+                @update:value="value => handleUpdate({ autoLaunch: value })" />
+        </UiSettingRow>
+        <UiSettingRow :title="t('startup.minimized')" :description="t('startup.minimizedTip')">
+            <NSwitch :value="modelValue.startMinimized" :aria-label="t('startup.minimized')"
+                @update:value="value => handleUpdate({ startMinimized: value })" />
+        </UiSettingRow>
+    </UiPanel>
 </template>
 
 <script setup lang="ts">
-import { NCard, NFlex, NSwitch, NText, NDivider } from "naive-ui";
+import { NSwitch } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
+import UiPanel from '@/components/ui/UiPanel.vue'
+import UiSettingRow from '@/components/ui/UiSettingRow.vue'
 
 interface StartupBehaviorSettings {
-    startMinimized: boolean;
-    autoLaunch: boolean;
+    startMinimized: boolean
+    autoLaunch: boolean
 }
 
 const props = defineProps<{
-    modelValue: StartupBehaviorSettings;
-}>();
+    modelValue: StartupBehaviorSettings
+}>()
 
 const emit = defineEmits<{
-    "update:modelValue": [value: StartupBehaviorSettings];
-}>();
+    'update:modelValue': [value: StartupBehaviorSettings]
+}>()
 
 const { t } = useI18n()
 
-const handleUpdate = () => {
-    emit("update:modelValue", {
-        startMinimized: props.modelValue.startMinimized,
-        autoLaunch: props.modelValue.autoLaunch
-    });
-};
-</script>
-
-<style scoped>
-.setting-description {
-    display: block;
-    margin-top: 4px;
-    font-size: 12px;
+const handleUpdate = (patch: Partial<StartupBehaviorSettings>) => {
+    emit('update:modelValue', { ...props.modelValue, ...patch })
 }
-</style>
+</script>

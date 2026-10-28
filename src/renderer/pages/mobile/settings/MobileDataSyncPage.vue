@@ -1,136 +1,140 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')" default-href="/tabs/settings"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ t('dataSync.title') }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar :title="t('dataSync.title')" fallback="/tabs/settings" />
 
-    <ion-content :fullscreen="true">
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('cloudBackup.syncStatus') }}</ion-label>
-        </ion-list-header>
+    <ion-content class="m-page-content">
+      <div class="m-body sync-body">
+        <!-- 状态卡：标题和颜色与桌面端共用 resolveDataSyncStatusKind 的判断 -->
+        <div class="m-card sync-hero">
+          <span class="sync-hero__icon" :class="`sync-hero__icon--${syncView.tone}`" aria-hidden="true">
+            <ion-icon :icon="syncView.icon" />
+          </span>
+          <span class="sync-hero__title">{{ syncView.title }}</span>
+          <span class="sync-hero__sub">{{ heroSubtitle }}</span>
+          <span v-if="lastSyncCaption" class="sync-hero__caption">{{ lastSyncCaption }}</span>
 
-        <ion-item :button="Boolean(syncStatus.error)" :detail="false" @click="handleStatusClick">
-          <ion-icon :icon="statusIcon" :color="statusColor" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ statusLabel }}</h3>
-            <p v-if="syncStatus.lastSyncAt">
-              {{ t('dataSync.lastSyncAt', { time: formatDateTime(syncStatus.lastSyncAt) }) }}
-            </p>
-            <p v-if="syncStatus.pendingChanges">{{ t('dataSync.pendingChanges') }}</p>
-            <p v-if="syncStatus.error" class="status-error">{{ syncStatus.error }}</p>
-          </ion-label>
-          <ion-note v-if="syncStatus.error" slot="end">{{ t('dataSync.viewErrorDetails') }}</ion-note>
-        </ion-item>
-      </ion-list>
-
-      <!-- 本地恢复后云端同步会暂停，必须由用户决定合并还是覆盖 -->
-      <ion-list v-if="restoreSuspensions.length > 0">
-        <ion-list-header>
-          <ion-label>{{ t('cloudBackup.restoreDecisionTitle') }}</ion-label>
-        </ion-list-header>
-
-        <template v-for="suspension in restoreSuspensions" :key="suspension.storageId">
-          <ion-item lines="none" class="suspension-item">
-            <ion-label class="ion-text-wrap">
-              <h3>{{ getStorageName(suspension.storageId) }}</h3>
-              <p>{{ t('cloudBackup.restoreDecisionDescription') }}</p>
-            </ion-label>
-          </ion-item>
-          <div class="stacked-actions">
-            <ion-button
-              expand="block"
-              fill="outline"
-              :disabled="busy.restoreDecision"
-              @click="resolveRestoreDecision(suspension.storageId, 'merge')"
-            >
-              {{ t('cloudBackup.mergeWithCloud') }}
-            </ion-button>
-            <ion-button
-              expand="block"
-              fill="outline"
-              color="danger"
-              :disabled="busy.restoreDecision"
-              @click="confirmRestoreOverwrite(suspension.storageId)"
-            >
-              {{ t('cloudBackup.overwriteCloud') }}
-            </ion-button>
-          </div>
-        </template>
-      </ion-list>
-
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('dataSync.storageConfiguration') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item
-          v-for="config in storageConfigs"
-          :key="config.id"
-          button
-          detail
-          @click="openStorage(config.id)"
-        >
-          <ion-icon :icon="serverOutline" slot="start"></ion-icon>
-          <ion-label class="ion-text-wrap">
-            <h3>{{ config.name }}</h3>
-            <p>{{ getConfigDescription(config) }}</p>
-          </ion-label>
-          <ion-badge :color="config.enabled ? 'success' : 'medium'" slot="end">
-            {{ config.enabled ? t('dataSync.enabled') : t('dataSync.disabled') }}
-          </ion-badge>
-        </ion-item>
-
-        <ion-item v-if="storageConfigs.length === 0" lines="none">
-          <ion-note class="section-note">{{ t('dataSync.noStorageConfig') }}</ion-note>
-        </ion-item>
-
-        <ion-item button detail @click="openStorage('new')">
-          <ion-icon :icon="addCircleOutline" slot="start" color="primary"></ion-icon>
-          <ion-label color="primary">{{ t('mobileSettings.sync.addStorage') }}</ion-label>
-        </ion-item>
-
-        <ion-item lines="none">
-          <ion-note class="section-note">{{ t('mobileSettings.sync.storageSectionDescription') }}</ion-note>
-        </ion-item>
-      </ion-list>
-
-      <ion-list>
-        <ion-list-header>
-          <ion-label>{{ t('mobileSettings.sync.autoSyncSection') }}</ion-label>
-        </ion-list-header>
-
-        <ion-item>
-          <ion-toggle :checked="autoSyncEnabled" @ionChange="handleAutoSyncToggle">
-            {{ t('dataSync.enableAutoSync') }}
-          </ion-toggle>
-        </ion-item>
-
-        <ion-item>
-          <ion-select
-            :label="t('dataSync.syncInterval')"
-            :value="syncIntervalMinutes"
-            interface="action-sheet"
-            :disabled="!autoSyncEnabled"
-            @ionChange="handleSyncIntervalChange"
+          <button v-if="syncView.kind === 'conflict'" type="button" class="m-cta sync-hero__cta" @click="openConflictSheet">
+            <ion-icon :icon="gitMergeOutline" aria-hidden="true" />{{ t('mobileSettings.sync.resolveConflicts') }}
+          </button>
+          <button v-else-if="storageConfigs.length === 0" type="button" class="m-cta sync-hero__cta" @click="openStorage('new')">
+            <ion-icon :icon="addOutline" aria-hidden="true" />{{ t('mobileSettings.sync.addStorage') }}
+          </button>
+          <button
+            v-else-if="primaryStorage && !isRestorePaused"
+            type="button"
+            class="m-cta sync-hero__cta"
+            :disabled="isSyncing"
+            @click="syncNow(primaryStorage.id)"
           >
-            <ion-select-option v-for="option in intervalOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </ion-select-option>
-          </ion-select>
-        </ion-item>
+            <ion-spinner v-if="isSyncing" name="crescent" aria-hidden="true" />
+            <ion-icon v-else :icon="syncOutline" aria-hidden="true" />
+            {{ isSyncing ? t('dataSync.statusSyncing') : t('dataSync.syncNow') }}
+          </button>
 
-        <!-- 同步不保留历史版本这件事容易被误解，挪到页面底部作为收尾提示 -->
-        <ion-item lines="none">
-          <ion-note class="section-note">{{ t('mobileSettings.sync.historyHint') }}</ion-note>
-        </ion-item>
-      </ion-list>
+          <button v-if="canViewErrorDetails" type="button" class="sync-hero__link" @click="showCurrentError">
+            {{ t('dataSync.viewErrorDetails') }}
+          </button>
+        </div>
+
+        <!-- 本地恢复后云端同步会暂停，必须由用户决定合并还是覆盖 -->
+        <section v-if="restoreSuspensions.length > 0" class="m-section">
+          <span class="m-gt">{{ t('cloudBackup.restoreDecisionTitle') }}</span>
+          <div class="sync-decisions">
+            <div v-for="suspension in restoreSuspensions" :key="suspension.storageId" class="m-card sync-decision">
+              <div class="sync-decision__head">
+                <span class="m-tile m-tile--warning" aria-hidden="true"><ion-icon :icon="pauseCircleOutline" /></span>
+                <span class="sync-decision__text">
+                  <span class="sync-decision__name">{{ getStorageName(suspension.storageId) }}</span>
+                  <span class="sync-decision__desc">{{ t('cloudBackup.restoreDecisionDescription') }}</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                class="m-cta m-cta-2 sync-decision__merge"
+                :disabled="busy.restoreDecision"
+                @click="resolveRestoreDecision(suspension.storageId, 'merge')"
+              >
+                <ion-icon :icon="gitMergeOutline" aria-hidden="true" />{{ t('cloudBackup.mergeWithCloud') }}
+              </button>
+              <button
+                type="button"
+                class="m-danger"
+                :disabled="busy.restoreDecision"
+                @click="confirmRestoreOverwrite(suspension.storageId)"
+              >
+                {{ t('cloudBackup.overwriteCloud') }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <MobileGroup :title="t('dataSync.storageConfiguration')" :footer="t('mobileSettings.sync.storageSectionDescription')">
+          <template #action>
+            <button type="button" class="sync-add-link" @click="openStorage('new')">{{ t('mobileSettings.sync.add') }}</button>
+          </template>
+          <MobileRow
+            v-for="config in storageConfigs"
+            :key="config.id"
+            class="sync-row-tall"
+            :title="config.name"
+            :sub="getConfigDescription(config)"
+            :icon="serverOutline"
+            :tone="config.enabled ? 'blue' : 'grey'"
+            show-chevron
+            @click="openStorage(config.id)"
+          >
+            <template #end>
+              <span class="m-pill" :class="{ 'm-pill-ok': config.enabled }">
+                {{ config.enabled ? t('dataSync.enabled') : t('dataSync.disabled') }}
+              </span>
+            </template>
+          </MobileRow>
+          <MobileRow
+            v-if="storageConfigs.length === 0"
+            class="sync-row-tall"
+            :title="t('mobileSettings.sync.addStorage')"
+            :sub="t('dataSync.noStorageConfig')"
+            :icon="addOutline"
+            tone="soft"
+            show-chevron
+            @click="openStorage('new')"
+          />
+        </MobileGroup>
+
+        <!-- 同步不保留历史版本这件事容易被误解，放在页面底部作为收尾提示 -->
+        <MobileGroup :title="t('mobileSettings.sync.autoSyncSection')" :footer="t('mobileSettings.sync.historyHint')">
+          <MobileRow
+            static
+            class="sync-row-tall"
+            :title="t('dataSync.enableAutoSync')"
+            :sub="t('mobileSettings.sync.autoSyncSub')"
+            :icon="flashOutline"
+            tone="green"
+          >
+            <template #end>
+              <ion-toggle
+                :checked="autoSyncEnabled"
+                :aria-label="t('dataSync.enableAutoSync')"
+                @ionChange="handleAutoSyncToggle"
+              />
+            </template>
+          </MobileRow>
+          <MobileRow
+            :class="{ 'is-disabled': !autoSyncEnabled }"
+            :title="t('dataSync.syncInterval')"
+            :icon="timerOutline"
+            tone="violet"
+            :value="formatIntervalMinutes(syncIntervalMinutes)"
+            show-chevron
+            :aria-disabled="!autoSyncEnabled"
+            @click="pickSyncInterval"
+          />
+        </MobileGroup>
+      </div>
     </ion-content>
+
+    <SyncConflictSheet :is-open="conflictSheetOpen" :storage-id="conflictStorageId || undefined"
+      @close="conflictSheetOpen = false" />
   </ion-page>
 </template>
 
@@ -140,38 +144,30 @@ import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonBackButton,
   IonContent,
-  IonList,
-  IonListHeader,
-  IonItem,
-  IonLabel,
   IonIcon,
-  IonNote,
-  IonBadge,
-  IonButton,
+  IonSpinner,
   IonToggle,
-  IonSelect,
-  IonSelectOption,
   onIonViewWillEnter
 } from '@ionic/vue'
 import {
-  serverOutline,
-  addCircleOutline,
-  checkmarkCircleOutline,
-  syncCircleOutline,
-  alertCircleOutline,
+  addOutline,
+  flashOutline,
+  gitMergeOutline,
   pauseCircleOutline,
-  timeOutline
+  serverOutline,
+  syncOutline,
+  timerOutline
 } from 'ionicons/icons'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import MobileRow from '~/components/mobile/ui/MobileRow.vue'
+import SyncConflictSheet from '~/components/mobile/settings/SyncConflictSheet.vue'
 import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import {
   cloudSyncService,
+  getCloudSyncResultMessage,
   MAX_CLOUD_SYNC_INTERVAL_MINUTES,
   MIN_CLOUD_SYNC_INTERVAL_MINUTES,
   type CloudSyncRestoreSuspension,
@@ -180,8 +176,12 @@ import {
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
 import {
   confirmAction,
-  formatDateTime,
+  consumeConflictSheetRequest,
+  describeSyncStatus,
+  formatIntervalMinutes,
+  formatRelative,
   getDeviceLabel,
+  pickOption,
   presentSyncErrorDetails,
   showToast,
   withLoading
@@ -196,65 +196,127 @@ const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus())
 const restoreSuspensions = ref<CloudSyncRestoreSuspension[]>(cloudSyncService.getRestoreSuspensions())
 const autoSyncEnabled = ref(true)
 const syncIntervalMinutes = ref(MIN_CLOUD_SYNC_INTERVAL_MINUTES)
-const busy = reactive({ restoreDecision: false })
+const busy = reactive({ sync: false, restoreDecision: false })
+// 相对时间（「2 分钟前」）在每次进入页面和状态变化时刷新
+const now = ref(new Date())
 let unsubscribeSyncStatus: (() => void) | null = null
 
 // 移动端用固定档位代替自由输入的分钟数，省掉一个额外的「保存」按钮。
 const INTERVAL_PRESETS = [5, 10, 15, 30, 60, 120, 360, 720, 1440]
   .filter(minutes => minutes >= MIN_CLOUD_SYNC_INTERVAL_MINUTES && minutes <= MAX_CLOUD_SYNC_INTERVAL_MINUTES)
 
-const formatInterval = (minutes: number) => {
-  if (minutes < 60) return t('dataBackup.backupEveryMinutes', { count: minutes })
-  if (minutes < 1440) return t('dataBackup.backupEveryHours', { count: minutes / 60 })
-  if (minutes === 1440) return t('dataBackup.backupEveryDay')
-  return t('dataBackup.backupEveryDays', { count: minutes / 1440 })
-}
-
 const intervalOptions = computed(() => {
   const values = INTERVAL_PRESETS.includes(syncIntervalMinutes.value)
     ? INTERVAL_PRESETS
     : [...INTERVAL_PRESETS, syncIntervalMinutes.value].sort((a, b) => a - b)
-  return values.map(value => ({ value, label: formatInterval(value) }))
+  return values.map(value => ({ value, label: formatIntervalMinutes(value) }))
 })
 
-const isPaused = computed(() => restoreSuspensions.value.length > 0)
+const isRestorePaused = computed(() => restoreSuspensions.value.length > 0)
+const isSyncing = computed(() => busy.sync || syncStatus.value.status === 'syncing')
 
-const statusLabel = computed(() => {
-  if (storageConfigs.value.length === 0) return t('dataSync.statusNotConfigured')
-  if (isPaused.value) return t('cloudBackup.syncStatusValues.paused')
-  return t(`cloudBackup.syncStatusValues.${syncStatus.value.status}`)
+const syncView = computed(() => describeSyncStatus({
+  status: syncStatus.value,
+  autoSyncEnabled: autoSyncEnabled.value,
+  storageCount: storageConfigs.value.length,
+  restoreSuspensionCount: restoreSuspensions.value.length
+}))
+
+// 「立即同步」用当前同步中的存储，没有时用第一个已启用的存储（与桌面端一致）
+const primaryStorage = computed(() =>
+  storageConfigs.value.find(config => config.id === syncStatus.value.storageId && config.enabled)
+  || storageConfigs.value.find(config => config.enabled))
+
+const heroSubtitle = computed(() => {
+  const view = syncView.value
+  const lastSyncAt = syncStatus.value.lastSyncAt
+  if (view.kind === 'current' && lastSyncAt) return `${formatRelative(lastSyncAt, now.value)} · ${view.description}`
+  return view.description
 })
 
-const statusColor = computed(() => {
-  if (storageConfigs.value.length === 0) return 'medium'
-  if (isPaused.value || syncStatus.value.status === 'error') return 'warning'
-  if (syncStatus.value.status === 'success') return 'success'
-  if (syncStatus.value.status === 'syncing' || syncStatus.value.status === 'scheduled') return 'primary'
-  return 'medium'
+const lastSyncCaption = computed(() => {
+  const kind = syncView.value.kind
+  const lastSyncAt = syncStatus.value.lastSyncAt
+  if (!lastSyncAt || kind === 'current' || kind === 'notConfigured') return ''
+  return t('dataSync.lastSyncAt', { time: formatRelative(lastSyncAt, now.value) })
 })
 
-const statusIcon = computed(() => {
-  if (isPaused.value) return pauseCircleOutline
-  if (syncStatus.value.status === 'error') return alertCircleOutline
-  if (syncStatus.value.status === 'success') return checkmarkCircleOutline
-  if (syncStatus.value.status === 'syncing') return syncCircleOutline
-  return timeOutline
-})
+// 失败和「已安排重试」都可以看完整诊断、复制并手动重试
+const canViewErrorDetails = computed(() =>
+  (syncView.value.kind === 'error' || syncView.value.kind === 'retryScheduled')
+  && Boolean(syncStatus.value.lastResult || syncStatus.value.error))
 
 const getStorageName = (storageId: string) =>
   storageConfigs.value.find(config => config.id === storageId)?.name || storageId
 
-const getConfigDescription = (config: CloudStorageConfig) =>
-  config.type === 'webdav' ? (config as any).url : t('cloudBackup.mobileICloudUnsupported')
+const getConfigDescription = (config: CloudStorageConfig) => {
+  if (config.type !== 'webdav') return t('cloudBackup.mobileICloudUnsupported')
+  const url = String((config as { url?: string }).url || '')
+  try {
+    return `WebDAV · ${new URL(url).host}`
+  } catch {
+    return url ? `WebDAV · ${url}` : 'WebDAV'
+  }
+}
 
 const openStorage = (id: string) => {
   void router.push(`/mobile/settings/data-sync/storage/${id}`)
 }
 
-const handleStatusClick = () => {
-  if (!syncStatus.value.error) return
-  void presentSyncErrorDetails(syncStatus.value.error, {
-    storageId: storageConfigs.value.find(config => config.enabled)?.id
+/**
+ * 冲突处理面板（SyncConflictSheet）的开关：当前冲突来自 syncStatus.pendingConflict，
+ * 处理后服务会推送新的同步状态。
+ */
+const conflictSheetOpen = ref(false)
+const conflictStorageId = computed(() =>
+  syncStatus.value.pendingConflict?.storageId || syncStatus.value.storageId || primaryStorage.value?.id || '')
+const openConflictSheet = () => {
+  if (!conflictStorageId.value) return
+  conflictSheetOpen.value = true
+}
+
+// 这里的入口（「立即同步」、错误详情里的「重试」）都是用户亲手点的：他多半刚处理过外部问题
+// （比如改对了密码），总是真正连接一次，不返回上次记下的失败（与桌面端一致）
+const syncNow = async (storageId: string) => {
+  if (busy.sync) return
+  busy.sync = true
+  const retry = () => { void syncNow(storageId) }
+
+  try {
+    const result = await cloudSyncService.syncNow(storageId, {
+      platform,
+      deviceName: getDeviceLabel(),
+      reason: 'manual',
+      forceRetry: true
+    })
+
+    if (result.success && result.action === 'conflict-pending') {
+      // 两边都改过同样的数据：本机和云端都没动，等用户选择
+      await showToast(getCloudSyncResultMessage(result.action), 'warning')
+      openConflictSheet()
+    } else if (result.success) {
+      await showToast([
+        getCloudSyncResultMessage(result.action, result.conflicts.length),
+        ...(result.warnings || [])
+      ].join('; '))
+    } else {
+      await presentSyncErrorDetails(result, { storageId, onRetry: retry })
+    }
+  } catch (error) {
+    await presentSyncErrorDetails(
+      error instanceof Error ? error.message : String(error),
+      { storageId, onRetry: retry }
+    )
+  } finally {
+    busy.sync = false
+  }
+}
+
+const showCurrentError = () => {
+  const storageId = syncStatus.value.storageId || primaryStorage.value?.id
+  void presentSyncErrorDetails(syncStatus.value.lastResult || syncStatus.value.error, {
+    storageId,
+    onRetry: storageId ? () => { void syncNow(storageId) } : undefined
   })
 }
 
@@ -277,9 +339,17 @@ const handleAutoSyncToggle = async (event: CustomEvent<{ checked: boolean }>) =>
   await showToast(t(autoSyncEnabled.value ? 'dataSync.autoSyncEnabled' : 'dataSync.autoSyncDisabled'))
 }
 
-const handleSyncIntervalChange = async (event: CustomEvent<{ value: number }>) => {
+const pickSyncInterval = async () => {
+  if (!autoSyncEnabled.value) return
+  const value = await pickOption({
+    header: t('dataSync.syncInterval'),
+    current: syncIntervalMinutes.value,
+    items: intervalOptions.value
+  })
+  if (value === undefined || value === syncIntervalMinutes.value) return
+
   try {
-    syncIntervalMinutes.value = await cloudSyncService.setAutoSyncIntervalMinutes(event.detail.value)
+    syncIntervalMinutes.value = await cloudSyncService.setAutoSyncIntervalMinutes(value)
     await showToast(t('dataSync.syncIntervalSaved', { minutes: syncIntervalMinutes.value }))
   } catch (error) {
     console.error('保存云端检查间隔失败:', error)
@@ -299,6 +369,11 @@ const resolveRestoreDecision = async (storageId: string, decision: 'merge' | 'ov
       return
     }
     restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
+    if (result.action === 'conflict-pending') {
+      await showToast(getCloudSyncResultMessage(result.action), 'warning')
+      openConflictSheet()
+      return
+    }
     await showToast(t(decision === 'merge'
       ? 'cloudBackup.mergeWithCloudSuccess'
       : 'cloudBackup.overwriteCloudSuccess'))
@@ -322,44 +397,171 @@ onMounted(() => {
   unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => {
     syncStatus.value = status
     restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
+    now.value = new Date()
   })
 })
 
 onIonViewWillEnter(async () => {
+  now.value = new Date()
   await Promise.all([loadStorageConfigs(), loadAutoSyncSettings()])
   restoreSuspensions.value = cloudSyncService.getRestoreSuspensions()
+  syncStatus.value = cloudSyncService.getStatus()
+  // 设置首页状态卡上点了「处理冲突」，进来后直接打开面板
+  if (consumeConflictSheetRequest() && syncStatus.value.status === 'conflict') openConflictSheet()
 })
 
 onUnmounted(() => unsubscribeSyncStatus?.())
 </script>
 
 <style scoped>
-/* ion-list-header 与字号阶梯的统一样式见 assets/styles/mobile.css */
-
-/* Ionic 默认给 slot="start" 的图标留了 32px，设置列表里显得过空 */
-ion-item ion-icon[slot='start'] {
-  margin-inline-end: 16px;
+.m-body.sync-body {
+  padding-top: 4px;
 }
 
-.section-note {
-  padding: 4px 0 8px;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  white-space: normal;
+.m-card.sync-hero {
+  align-items: center;
+  gap: 6px;
+  padding: 24px 18px 18px;
+  text-align: center;
 }
 
-.status-error {
-  color: var(--ion-color-danger);
+.sync-hero__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 8px;
+  border-radius: 36px;
+  font-size: 32px;
 }
 
-.suspension-item {
-  --background: color-mix(in srgb, var(--accent-warning) 10%, var(--surface-primary));
+.sync-hero__icon--success {
+  background: var(--accent-success-bg);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-success-bg) 50%, var(--surface-primary));
+  color: var(--accent-success);
 }
 
-.stacked-actions {
+.sync-hero__icon--info {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-soft) 50%, var(--surface-primary));
+  color: var(--accent-primary);
+}
+
+.sync-hero__icon--warning {
+  background: var(--accent-warning-bg);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-warning-bg) 50%, var(--surface-primary));
+  color: var(--accent-warning);
+}
+
+.sync-hero__icon--error {
+  background: var(--accent-error-bg);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-error-bg) 50%, var(--surface-primary));
+  color: var(--accent-error);
+}
+
+.sync-hero__title {
+  color: var(--content-primary);
+  font-size: var(--m-font-block);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.sync-hero__sub {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+  line-height: 1.5;
+}
+
+.sync-hero__caption {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+}
+
+.sync-hero__cta {
+  margin-top: 12px;
+}
+
+.sync-hero__cta ion-icon {
+  font-size: 18px;
+}
+
+.sync-hero__cta ion-spinner {
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.sync-hero__link {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sync-decisions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 16px 12px;
+  gap: 12px;
+}
+
+.m-card.sync-decision {
+  gap: 10px;
+  padding: 16px 16px 6px;
+}
+
+.sync-decision__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sync-decision__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sync-decision__name {
+  font-size: var(--m-font-body);
+  font-weight: 600;
+}
+
+.sync-decision__desc {
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  line-height: 1.5;
+}
+
+.sync-decision__merge {
+  margin-top: 4px;
+}
+
+.sync-decision .m-danger:disabled,
+.sync-decision__merge:disabled {
+  opacity: 0.5;
+}
+
+.sync-add-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -14px 0;
+}
+
+.m-row.sync-row-tall {
+  min-height: 64px;
+}
+
+.is-disabled {
+  opacity: 0.45;
 }
 </style>

@@ -1,209 +1,83 @@
 <template>
-    <div class="network-proxy-settings">
-        <NCard size="small">
-            <NFlex vertical :size="16">
-                <section class="proxy-section">
-                    <NText strong>{{ t('networkProxy.proxyMode') }}</NText>
-                    <NRadioGroup v-model:value="proxyConfig.mode" @update:value="handleModeChange">
-                        <NFlex vertical :size="12">
-                            <NRadio value="direct">
-                                <div>
-                                    <div>{{ t('networkProxy.directMode') }}</div>
-                                    <NText depth="3" class="setting-description">{{ t('networkProxy.directModeDesc') }}</NText>
-                                </div>
-                            </NRadio>
-                            <NRadio value="system">
-                                <div>
-                                    <div>{{ t('networkProxy.systemMode') }}</div>
-                                    <NText depth="3" class="setting-description">{{ t('networkProxy.systemModeDesc') }}</NText>
-                                </div>
-                            </NRadio>
-                            <NRadio value="manual">
-                                <div>
-                                    <div>{{ t('networkProxy.manualMode') }}</div>
-                                    <NText depth="3" class="setting-description">{{ t('networkProxy.manualModeDesc') }}</NText>
-                                </div>
-                            </NRadio>
-                        </NFlex>
-                    </NRadioGroup>
-                </section>
+    <div class="proxy-settings">
+        <UiPanel :title="t('networkProxy.proxyMode')">
+            <div class="proxy-settings__mode">
+                <UiChoiceCards :model-value="proxyConfig.mode" :options="modeOptions" :columns="3"
+                    :label="t('networkProxy.proxyMode')" @update:model-value="handleModeChange" />
+                <NForm v-if="proxyConfig.mode === 'manual'" ref="formRef" :model="proxyConfig.manualConfig" :rules="formRules"
+                    label-placement="top" class="proxy-settings__form">
+                    <NFormItem :label="t('networkProxy.httpProxy')" path="httpProxy">
+                        <NInput v-model:value="proxyConfig.manualConfig.httpProxy" class="proxy-settings__mono" placeholder="127.0.0.1:7890" />
+                    </NFormItem>
+                    <NFormItem :label="t('networkProxy.httpsProxy')" path="httpsProxy">
+                        <NInput v-model:value="proxyConfig.manualConfig.httpsProxy" class="proxy-settings__mono" placeholder="127.0.0.1:7890" />
+                    </NFormItem>
+                    <NFormItem :label="t('networkProxy.noProxy')" path="noProxy" class="proxy-settings__wide">
+                        <div class="proxy-settings__field">
+                            <NInput v-model:value="proxyConfig.manualConfig.noProxy" class="proxy-settings__mono" placeholder="localhost,127.0.0.1" />
+                            <span class="ui-help">{{ t('networkProxy.noProxyDesc') }}</span>
+                        </div>
+                    </NFormItem>
+                </NForm>
+            </div>
+        </UiPanel>
 
-                <template v-if="proxyConfig.mode === 'manual'">
-                    <NDivider />
-                    <section class="proxy-section">
-                    <NText strong>{{ t('networkProxy.manualConfig') }}</NText>
+        <UiPanel :title="t('networkProxy.testConnection')" :description="t('networkProxy.testConnectionDesc')">
+            <template #actions>
+                <NButton size="tiny" :loading="loading.test" :disabled="isTesting" @click="testConnection">
+                    {{ t('networkProxy.testConnection') }}
+                </NButton>
+            </template>
+            <div class="proxy-settings__results">
+                <UiAlert v-if="isTesting">{{ t('networkProxy.testingDescription') }}</UiAlert>
+                <UiAlert v-else-if="testResult" :tone="testResult.overall.success ? 'success' : 'error'">
+                    {{ testResult.overall.success
+                        ? (averageResponseTime ? t('networkProxy.connectionOkWithTime', { ms: averageResponseTime }) : t('networkProxy.connectionSuccess'))
+                        : t('networkProxy.connectionFailed') }}
+                </UiAlert>
+                <p v-else class="ui-help">{{ t('networkProxy.notTestedYet') }}</p>
+                <ul v-if="testResults.length" class="proxy-sites">
+                    <li v-for="result in testResults" :key="result.name" class="proxy-site">
+                        <span class="ui-dot" :class="result.success ? 'ui-dot--success' : result.error ? 'ui-dot--error' : 'ui-dot--warning'" />
+                        <span class="proxy-site__text">
+                            <span class="proxy-site__name">{{ result.name }}</span>
+                            <span class="proxy-site__url">{{ result.description }} · {{ result.url }}</span>
+                        </span>
+                        <span v-if="result.success && result.responseTime" class="proxy-site__meta">{{ result.responseTime }} ms</span>
+                        <span v-else-if="result.error" class="proxy-site__meta proxy-site__meta--error">{{ result.error }}</span>
+                        <span v-else-if="isTesting" class="proxy-site__meta">{{ t('networkProxy.testing') }}</span>
+                    </li>
+                </ul>
+            </div>
+        </UiPanel>
 
-                    <NForm ref="formRef" :model="proxyConfig.manualConfig" :rules="formRules">
-                        <NFormItem :label="t('networkProxy.httpProxy')" path="httpProxy">
-                            <NInput 
-                                v-model:value="proxyConfig.manualConfig.httpProxy" 
-                                :placeholder="'127.0.0.1:7890'" />
-                        </NFormItem>
-
-                        <NFormItem :label="t('networkProxy.httpsProxy')" path="httpsProxy">
-                            <NInput 
-                                v-model:value="proxyConfig.manualConfig.httpsProxy" 
-                                :placeholder="'127.0.0.1:7890'" />
-                        </NFormItem>
-
-                        <NFormItem :label="t('networkProxy.noProxy')" path="noProxy">
-                            <NInput 
-                                v-model:value="proxyConfig.manualConfig.noProxy" 
-                                :placeholder="'localhost,127.0.0.1'" />
-                            <NText depth="3" class="setting-description">
-                                {{ t('networkProxy.noProxyDesc') }}
-                            </NText>
-                        </NFormItem>
-                    </NForm>
-                    </section>
-                </template>
-
-                <template v-if="proxyConfig.mode === 'system'">
-                    <NDivider />
-                    <section class="proxy-section">
-                        <NFlex align="center" justify="space-between" :size="12">
-                            <NText strong>{{ t('networkProxy.systemProxyInfo') }}</NText>
-                            <NButton 
-                                size="small" 
-                                @click="refreshSystemProxyInfo" 
-                                :loading="loading.refresh"
-                                quaternary>
-                                <template #icon>
-                                    <NIcon><Refresh /></NIcon>
-                                </template>
-                                {{ t('common.refresh') }}
-                            </NButton>
-                        </NFlex>
-
-                    <NFlex vertical :size="8">
-                        <NFlex align="center" :size="8">
-                            <NText>{{ t('networkProxy.currentProxy') }}</NText>
-                            <NTag :type="systemProxyInfo.hasProxy ? 'success' : 'warning'" size="small">
-                                {{ systemProxyInfo.hasProxy
-                                    ? t('networkProxy.proxyDetected')
-                                    : t('networkProxy.noProxyDetected') }}
-                            </NTag>
-                        </NFlex>
-                        
-                        <NFlex v-if="systemProxyInfo.proxyAddress" align="center" :size="8">
-                            <NText>{{ t('networkProxy.proxyAddress') }}</NText>
-                            <NText depth="3">{{ systemProxyInfo.proxyAddress }}</NText>
-                        </NFlex>
-                        
-                        <NFlex v-if="systemProxyInfo.lastRefreshTime" align="center" :size="8">
-                            <NText>{{ t('networkProxy.lastRefresh') }}</NText>
-                            <NText depth="3">{{ systemProxyInfo.lastRefreshTime }}</NText>
-                        </NFlex>
-                    </NFlex>
-                    </section>
-                </template>
-
-                <NDivider />
-
-                <section class="proxy-section">
-                    <div>
-                        <NText strong>{{ t('networkProxy.testConnection') }}</NText>
-                        <NText depth="3" class="setting-description">{{ t('networkProxy.testConnectionDesc') }}</NText>
-                    </div>
-
-                    <NFlex :size="12">
-                        <NButton 
-                            @click="testConnection" 
-                            :loading="loading.test"
-                            :disabled="isTesting"
-                            type="primary">
-                            <template #icon>
-                                <NIcon>
-                                    <Wifi />
-                                </NIcon>
-                            </template>
-                            {{ isTesting ? t('networkProxy.testing') : t('networkProxy.testConnection') }}
-                        </NButton>
-                    </NFlex>
-
-                    <NAlert v-if="isTesting" type="info" show-icon>
-                        <template #icon>
-                            <NIcon>
-                                <Wifi />
-                            </NIcon>
-                        </template>
-                        {{ t('networkProxy.testingDescription') }}
-                    </NAlert>
-
-                    <NAlert v-if="testResult && !isTesting" :type="testResult.overall.success ? 'success' : 'error'" show-icon>
-                        <template #icon>
-                            <NIcon v-if="testResult.overall.success">
-                                <Check />
-                            </NIcon>
-                            <NIcon v-else>
-                                <AlertCircle />
-                            </NIcon>
-                        </template>
-                        {{ testResult.overall.success ? t('networkProxy.connectionSuccess') : t('networkProxy.connectionFailed') }}
-                    </NAlert>
-
-                    <NFlex v-if="testResults.length > 0" vertical :size="12">
-                        <NText strong style="font-size: 14px;">{{ t('networkProxy.connectionTest') }}</NText>
-                        <NFlex vertical :size="8">
-                            <NFlex v-for="result in testResults" :key="result.name" 
-                                align="center" justify="space-between" :size="12" class="test-result-row">
-                                <NFlex align="center" :size="8">
-                                    <NIcon v-if="result.success" color="var(--accent-success)" size="16">
-                                        <Check />
-                                    </NIcon>
-                                    <NIcon v-else color="var(--accent-error)" size="16">
-                                        <AlertCircle />
-                                    </NIcon>
-                                    <NFlex vertical :size="4">
-                                        <NText strong>{{ result.name }}</NText>
-                                        <NText depth="3" style="font-size: 12px;">{{ result.description }} ({{ result.url }})</NText>
-                                    </NFlex>
-                                </NFlex>
-                                <NFlex align="center" :size="8">
-                                    <NText v-if="result.success && result.responseTime" depth="3" style="font-size: 12px;">
-                                        {{ result.responseTime }}ms
-                                    </NText>
-                                    <NText v-if="!result.success && result.error" depth="3" style="font-size: 12px; color: var(--accent-error);">
-                                        {{ result.error }}
-                                    </NText>
-                                    <NText v-if="isTesting && !result.success && !result.error" depth="3" style="font-size: 12px; color: var(--accent-warning);">
-                                        {{ t('networkProxy.testing') }}
-                                    </NText>
-                                </NFlex>
-                            </NFlex>
-                        </NFlex>
-                    </NFlex>
-                </section>
-            </NFlex>
-        </NCard>
+        <UiPanel v-if="proxyConfig.mode === 'system'" :title="t('networkProxy.systemProxyInfo')" body="rows">
+            <template #actions>
+                <NButton quaternary size="tiny" :loading="loading.refresh" @click="refreshSystemProxyInfo">{{ t('common.refresh') }}</NButton>
+            </template>
+            <UiSettingRow :title="t('networkProxy.currentProxy')">
+                <span class="ui-tag" :class="systemProxyInfo.hasProxy ? 'ui-tag--success' : 'ui-tag--warning'">
+                    {{ systemProxyInfo.hasProxy ? t('networkProxy.proxyDetected') : t('networkProxy.noProxyDetected') }}
+                </span>
+            </UiSettingRow>
+            <UiSettingRow v-if="systemProxyInfo.proxyAddress" :title="t('networkProxy.proxyAddress')">
+                <span class="ui-mono proxy-settings__value">{{ systemProxyInfo.proxyAddress }}</span>
+            </UiSettingRow>
+            <UiSettingRow v-if="systemProxyInfo.lastRefreshTime" :title="t('networkProxy.lastRefresh')">
+                <span class="proxy-settings__value">{{ systemProxyInfo.lastRefreshTime }}</span>
+            </UiSettingRow>
+        </UiPanel>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import {
-    NCard,
-    NFlex,
-    NText,
-    NRadioGroup,
-    NRadio,
-    NForm,
-    NFormItem,
-    NInput,
-    NButton,
-    NIcon,
-    NAlert,
-    NDivider,
-    NTag,
-    FormRules
-} from 'naive-ui';
-import {
-    Wifi,
-    Check,
-    AlertCircle,
-    Refresh
-} from '@vicons/tabler';
+import { NButton, NForm, NFormItem, NInput, type FormRules } from 'naive-ui';
+import UiAlert from '@/components/ui/UiAlert.vue';
+import UiChoiceCards from '@/components/ui/UiChoiceCards.vue';
+import UiPanel from '@/components/ui/UiPanel.vue';
+import UiSettingRow from '@/components/ui/UiSettingRow.vue';
 
 const { t } = useI18n();
 
@@ -274,6 +148,18 @@ const isTesting = ref(false);
 const loading = reactive({
     test: false,
     refresh: false
+});
+
+const modeOptions = computed(() => [
+    { value: 'direct' as const, label: t('networkProxy.directMode'), description: t('networkProxy.directModeDesc') },
+    { value: 'system' as const, label: t('networkProxy.systemMode'), description: t('networkProxy.systemModeDesc') },
+    { value: 'manual' as const, label: t('networkProxy.manualMode'), description: t('networkProxy.manualModeDesc') },
+]);
+
+// 成功站点的平均响应时间，显示在测试结果里
+const averageResponseTime = computed(() => {
+    const times = testResults.value.filter(result => result.success && result.responseTime).map(result => result.responseTime!);
+    return times.length ? Math.round(times.reduce((sum, value) => sum + value, 0) / times.length) : 0;
 });
 
 // 表单规则
@@ -461,33 +347,102 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.network-proxy-settings {
-    width: 100%;
-}
-
-.proxy-section {
+.proxy-settings {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.setting-description {
-    display: block;
-    margin-top: 4px;
-    font-size: 12px;
+.proxy-settings__mode {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.test-result-row {
-    padding: 10px 12px;
-    border-radius: var(--radius-control);
-    background: var(--surface-secondary);
-    word-break: break-word;
+.proxy-settings__form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+}
+
+.proxy-settings__wide {
+    grid-column: 1 / -1;
+}
+
+.proxy-settings__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.proxy-settings__mono :deep(input) {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+}
+
+.proxy-settings__results {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.proxy-settings__value {
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.proxy-sites {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.proxy-site {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.proxy-site__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.proxy-site__name {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.proxy-site__url {
+    overflow: hidden;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.proxy-site__meta {
+    flex: none;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.proxy-site__meta--error {
+    max-width: 50%;
+    color: var(--accent-error);
+    overflow-wrap: anywhere;
 }
 
 @media (max-width: 640px) {
-    .test-result-row {
-        align-items: flex-start !important;
-        flex-direction: column;
+    .proxy-settings__form {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 </style>

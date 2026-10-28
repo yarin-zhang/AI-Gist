@@ -1,10 +1,11 @@
-import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
+import { AIConfig, AIGenerationRequest, AIGenerationResult, AIModelListResult } from '@shared/types/ai';
 import {
   getConfiguredBaseURL,
   getDefaultModels as getProviderDefaultModels,
   getTestModelPriority
 } from '@shared/ai-provider-metadata';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
+import { resolveTestPrompt } from '@shared/ai-default-prompts';
 
 /**
  * 智谱AI提供商
@@ -60,19 +61,19 @@ export class ZhipuAIProvider extends BaseAIProvider {
   /**
    * 获取可用模型列表
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModels(config: AIConfig): Promise<AIModelListResult> {
     console.log(`智谱AI 未提供可用的远端模型列表接口，使用默认列表 - baseURL: ${config.baseURL}`);
-    return this.getDefaultModels();
+    return { models: this.getDefaultModels(), modelSource: 'default' };
   }
 
   /**
    * 测试特定模型
    */
-  async testModel(config: AIConfig, model: string): Promise<AIModelTestResult> {
+  async testModel(config: AIConfig, model: string, prompt?: string): Promise<AIModelTestResult> {
     console.log(`测试智谱AI模型: ${model}`);
     
     try {
-      const testPrompt = '请用一句话简单介绍一下你自己。';
+      const testPrompt = resolveTestPrompt(prompt);
       const response = await this.makeZhipuRequest(config, model, testPrompt);
       
       console.log(`智谱AI模型 ${model} 测试成功`);
@@ -96,13 +97,13 @@ export class ZhipuAIProvider extends BaseAIProvider {
   /**
    * 智能测试
    */
-  async intelligentTest(config: AIConfig): Promise<AIIntelligentTestResult> {
+  async intelligentTest(config: AIConfig, prompt?: string): Promise<AIIntelligentTestResult> {
     if (!config.enabled) {
       return { success: false, error: '配置已禁用' };
     }
 
     const model = config.defaultModel || config.customModel || this.getDefaultModel();
-    const testPrompt = '请用一句话简单介绍一下你自己。';
+    const testPrompt = resolveTestPrompt(prompt);
 
     try {
       const response = await this.makeZhipuRequest(config, model, testPrompt);

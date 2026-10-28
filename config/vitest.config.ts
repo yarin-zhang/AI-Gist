@@ -1,10 +1,14 @@
 import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 // 本文件位于 config/，所有路径都以仓库根目录为基准
 const repoRoot = resolve(__dirname, '..')
 
 export default defineConfig({
+  // 组件测试直接挂载 .vue 单文件组件
+  plugins: [vue()],
+
   test: {
     // 测试环境配置
     environment: 'jsdom',

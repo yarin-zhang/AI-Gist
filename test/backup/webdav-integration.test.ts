@@ -878,6 +878,56 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       errorSpy.mockRestore()
     })
 
+    it('测试连接失败时带回服务器的原因，不带本地中文前缀，也不泄露密码（#417）', async () => {
+      const provider = new WebDAVProvider({
+        id: 'desktop-bad-reason',
+        name: 'Bad Desktop WebDAV',
+        type: 'webdav',
+        enabled: true,
+        url: server.baseUrl,
+        username: USERNAME,
+        password: 'wrong-secret-pass',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+
+      const result = await provider.checkConnection()
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/401|Unauthorized/)
+      expect(result.error).not.toMatch(/创建目录失败|写入文件失败|读取文件失败/)
+      expect(result.error).not.toContain('wrong-secret-pass')
+
+      const good = new WebDAVProvider({
+        id: 'desktop-good-reason', name: 'Good', type: 'webdav', enabled: true, url: server.baseUrl,
+        username: USERNAME, password: PASSWORD, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      })
+      await expect(good.checkConnection()).resolves.toEqual({ success: true })
+    })
+
+    it('连不上时带回网络层原因，并隐去地址里的账号密码（#417）', async () => {
+      const closed = (await import('http')).createServer()
+      await new Promise<void>(resolve => closed.listen(0, '127.0.0.1', () => resolve()))
+      const port = (closed.address() as AddressInfo).port
+      await new Promise<void>(resolve => closed.close(() => resolve()))
+
+      const unreachable = (url: string) => new WebDAVProvider({
+        id: 'desktop-unreachable', name: 'Unreachable', type: 'webdav', enabled: true, url,
+        username: 'alice', password: 'hunter2-secret',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      })
+      const refused = await unreachable(`http://127.0.0.1:${port}/dav`).checkConnection()
+      expect(refused.success).toBe(false)
+      expect(refused.error).toMatch(/ECONNREFUSED|fetch failed|connect/i)
+      expect(refused.error).not.toContain('hunter2-secret')
+
+      // 地址里带了账号密码时，报错原文会带上地址：交给界面前去掉
+      const embedded = await unreachable(`http://alice:hunter2-secret@127.0.0.1:${port}/dav`).checkConnection()
+      expect(embedded.success).toBe(false)
+      expect(embedded.error).toBeTruthy()
+      expect(embedded.error).not.toContain('hunter2-secret')
+      expect(embedded.error).not.toContain('alice:')
+    })
+
     it('按 WebDAV 协议创建目录、上传、列出、读取和删除备份文件', async () => {
       const provider = new WebDAVProvider({
         id: 'desktop-flow',

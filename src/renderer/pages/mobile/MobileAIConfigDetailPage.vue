@@ -1,215 +1,222 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button :text="t('common.back')"></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ config?.name }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="showActionMenu">
-            <ion-icon slot="icon-only" :icon="ellipsisVertical"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <MobileNavBar fallback="/tabs/ai-config">
+      <template #end>
+        <button type="button" class="m-btn detail-nav__edit" :disabled="!config" @click="handleEdit">
+          {{ t('common.edit') }}
+        </button>
+      </template>
+    </MobileNavBar>
 
-    <ion-content :fullscreen="true">
+    <ion-content class="m-page-content">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
       <!-- 加载状态 -->
-      <div v-if="loading" class="loading-container">
-        <ion-spinner></ion-spinner>
+      <div v-if="loading" class="detail-state">
+        <ion-spinner name="crescent" />
       </div>
 
-      <!-- 配置详情 -->
-      <div v-else-if="config" class="detail-container">
-        <!-- 状态卡片 -->
-        <div class="detail-section">
-          <div class="section-title">{{ t('aiConfig.preferredStatus') }}</div>
-          <div class="section-content">
-            <ion-list lines="none">
-              <ion-item lines="none">
-                <ion-label>{{ t('aiConfig.enabled') }}</ion-label>
-                <ion-toggle
-                  slot="end"
-                  :checked="config.enabled"
-                  @ionChange="handleToggleEnabled"
-                ></ion-toggle>
-              </ion-item>
-              <ion-item lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.globalPreferred') }}</h3>
-                  <p>{{ t('aiConfig.multipleConfigsWarning') }}</p>
-                </ion-label>
-                <ion-button
-                  slot="end"
-                  :fill="config.isPreferred ? 'solid' : 'outline'"
-                  :color="config.isPreferred ? 'primary' : 'medium'"
-                  @click="handleTogglePreferred"
-                  :disabled="!config.enabled"
-                >
-                  {{ config.isPreferred ? t('aiConfig.alreadyPreferred') : t('aiConfig.setAsPreferred') }}
-                </ion-button>
-              </ion-item>
-            </ion-list>
-          </div>
-        </div>
-
-        <!-- 基本信息 -->
-        <div class="detail-section">
-          <div class="section-title">{{ t('aiConfig.basicConfig') }}</div>
-          <div class="section-content">
-            <ion-list lines="none">
-              <ion-item lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.serviceType') }}</h3>
-                  <p>{{ getServiceTypeName(config.type) }}</p>
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="config.baseURL" lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.baseURL') }}</h3>
-                  <p class="url-text">{{ config.baseURL }}</p>
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="config.apiKey" lines="none">
-                <ion-label>
-                  <h3>API Key</h3>
-                  <p class="masked-text">{{ maskApiKey(config.apiKey) }}</p>
-                </ion-label>
-              </ion-item>
-              <ion-item lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.createdAt') }}</h3>
-                  <p>{{ formatDate(config.createdAt) }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </div>
-        </div>
-
-        <!-- 模型配置 -->
-        <div class="detail-section">
-          <div class="section-title">{{ t('aiConfig.modelConfig') }}</div>
-          <div class="section-content">
-            <ion-list lines="none">
-              <ion-item lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.modelList') }}</h3>
-                  <div class="models-chips">
-                    <ion-chip
-                      v-for="model in config.models"
-                      :key="model"
-                      :color="model === config.defaultModel ? 'primary' : 'medium'"
-                      @click="handleSelectModel(model)"
-                      class="clickable-chip"
-                    >
-                      <ion-label>{{ model }}</ion-label>
-                    </ion-chip>
-                  </div>
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="config.defaultModel" lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.defaultModel') }}</h3>
-                  <p>{{ config.defaultModel }}</p>
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="config.customModel" lines="none">
-                <ion-label>
-                  <h3>{{ t('aiConfig.customModel') }}</h3>
-                  <p>{{ config.customModel }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </div>
-        </div>
-
-        <!-- 系统提示词 -->
-        <div class="detail-section">
-          <div class="section-title-with-action">
-            <div class="section-title">{{ t('aiConfig.systemPrompt') }}</div>
-            <ion-button fill="clear" size="small" @click="handleEditSystemPrompt">
-              <ion-icon slot="icon-only" :icon="createOutline"></ion-icon>
-            </ion-button>
-          </div>
-          <div class="section-content">
-            <div class="system-prompt-content">
-              {{ config.systemPrompt || t('aiConfig.systemPromptDefault') }}
+      <div v-else-if="config" class="m-body detail-body">
+        <!-- 头部：服务商方块 + 名称 + 状态标记 -->
+        <div class="detail-head">
+          <ProviderTile :visual="visual" size="md" :variant="config.enabled ? 'soft' : 'muted'" />
+          <div class="detail-head__text">
+            <h1 class="detail-head__name">{{ config.name }}</h1>
+            <span class="detail-head__provider">{{ providerLabel }}</span>
+            <div class="detail-head__pills">
+              <span class="m-pill" :class="statusPill.tone">
+                <span v-if="statusPill.dot" class="detail-dot" :class="`detail-dot--${statusPill.dot}`" aria-hidden="true" />
+                {{ statusPill.label }}
+              </span>
+              <span v-if="config.isPreferred" class="m-pill m-pill-blue">
+                <ion-icon :icon="star" aria-hidden="true" />
+                {{ t('aiConfig.globalPreferred') }}
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <ion-button expand="block" @click="handleTestConnection" :disabled="testingConnection">
-            <ion-spinner v-if="testingConnection" slot="start"></ion-spinner>
-            <ion-icon v-else slot="start" :icon="flashOutline"></ion-icon>
-            {{ t('aiConfig.connectionTest') }}
-          </ion-button>
+        <!-- Ollama、LM Studio、Azure 只能在桌面版使用：说明原因，移动端的 AI 功能不会选到它 -->
+        <p v-if="desktopOnly" class="m-note detail-note">
+          <ion-icon :icon="desktopOutline" aria-hidden="true" />
+          <span>{{ t('mobileModels.desktopOnlyConfigNote') }}</span>
+        </p>
 
-          <ion-button expand="block" @click="handleIntelligentTest" :disabled="testingIntelligent">
-            <ion-spinner v-if="testingIntelligent" slot="start"></ion-spinner>
-            <ion-icon v-else slot="start" :icon="sparklesOutline"></ion-icon>
+        <!-- 启用 / 全局首选 -->
+        <MobileGroup>
+          <MobileRow static :title="t('aiConfig.enabled')" :icon="powerOutline" tone="green">
+            <template #end>
+              <ion-toggle :checked="config.enabled" :aria-label="t('aiConfig.enabled')"
+                @ionChange="handleToggleEnabled" />
+            </template>
+          </MobileRow>
+          <MobileRow static :title="t('aiConfig.setAsPreferred')" :icon="star" tone="blue">
+            <template #end>
+              <ion-toggle :checked="!!config.isPreferred" :disabled="!config.enabled"
+                :aria-label="t('aiConfig.setAsPreferred')" @ionChange="handleTogglePreferred" />
+            </template>
+          </MobileRow>
+        </MobileGroup>
+
+        <!-- 连接 -->
+        <MobileGroup :title="t('aiConfig.workspace.connectionSection')" :footer="createdAtText">
+          <MobileRow :title="t('aiConfig.defaultModel')" :icon="cubeOutline" tone="blue" :show-chevron="true"
+            @click="showModelPicker = true">
+            <template #end>
+              <span class="detail-mono">{{ currentModel || t('aiConfig.workspace.noDefaultModel') }}</span>
+            </template>
+          </MobileRow>
+          <MobileRow static :title="t('aiConfig.baseURL')" :icon="linkOutline" tone="teal"
+            :value="config.baseURL || t('aiConfig.workspace.officialEndpoint')" />
+          <MobileRow static :title="t('mobileModels.apiKey')" :icon="keyOutline" tone="pink">
+            <template #end>
+              <span :class="{ 'detail-mono': config.apiKey }">{{ apiKeyText }}</span>
+            </template>
+          </MobileRow>
+          <MobileRow :title="t('aiConfig.systemPrompt')" :icon="documentTextOutline" tone="violet"
+            :value="config.systemPrompt ? t('aiConfig.systemPromptCustomized') : t('aiConfig.systemPromptDefault')"
+            :show-chevron="true" @click="handleEditSystemPrompt" />
+        </MobileGroup>
+
+        <!-- 测试 -->
+        <div class="detail-actions">
+          <button type="button" class="m-cta m-cta-2 detail-actions__btn" :disabled="testingConnection"
+            @click="handleTestConnection">
+            <ion-spinner v-if="testingConnection" name="crescent" />
+            <ion-icon v-else :icon="flashOutline" aria-hidden="true" />
+            {{ t('aiConfig.testConnection') }}
+          </button>
+          <button type="button" class="m-cta m-cta-2 detail-actions__btn" :disabled="testingIntelligent"
+            @click="handleIntelligentTest">
+            <ion-spinner v-if="testingIntelligent" name="crescent" />
+            <ion-icon v-else :icon="paperPlaneOutline" aria-hidden="true" />
             {{ t('aiConfig.requestTest') }}
-          </ion-button>
+          </button>
         </div>
+
+        <!-- 测试失败：原因和处理办法，原始信息收在详情里 -->
+        <div v-if="testFailure" class="m-card detail-failure">
+          <MobileAIErrorNote :error="testFailure" />
+        </div>
+
+        <!-- 请求测试结果：发出的提示词和 AI 回复 -->
+        <div v-if="requestResult" class="m-card detail-reply">
+          <div class="detail-reply__meta">
+            <span class="m-tile m-tile--success" aria-hidden="true"><ion-icon :icon="checkmark" /></span>
+            <span>{{ t('models.replyMeta', { ms: requestResult.elapsed }) }}</span>
+          </div>
+          <p class="detail-reply__text">{{ requestResult.response }}</p>
+          <p v-if="requestResult.inputPrompt" class="detail-reply__prompt">
+            <strong>{{ t('models.requestPromptLabel') }}</strong>
+            <span>{{ requestResult.inputPrompt }}</span>
+          </p>
+        </div>
+
+        <button type="button" class="m-danger" @click="handleDelete">{{ t('mobileModels.deleteConfig') }}</button>
       </div>
     </ion-content>
+
+    <ModelPickerSheet :open="showModelPicker" :models="modelOptions" :selected="currentModel"
+      @close="showModelPicker = false" @select="handleSelectModel" @edit="handleEditFromPicker" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
-  IonButtons,
-  IonButton,
-  IonBackButton,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonToggle,
-  IonChip,
   IonIcon,
   IonSpinner,
+  IonToggle,
   IonRefresher,
   IonRefresherContent,
-  alertController,
-  actionSheetController,
   onIonViewWillEnter
 } from '@ionic/vue'
 import {
-  createOutline,
+  checkmark,
+  cubeOutline,
+  desktopOutline,
+  documentTextOutline,
   flashOutline,
-  sparklesOutline,
-  trashOutline,
-  ellipsisVertical
+  keyOutline,
+  linkOutline,
+  paperPlaneOutline,
+  powerOutline,
+  star
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+import { formatFriendlyDate } from '~/lib/utils/date'
 import type { AIConfig } from '@shared/types'
+import MobileNavBar from '~/components/mobile/ui/MobileNavBar.vue'
+import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
+import MobileRow from '~/components/mobile/ui/MobileRow.vue'
+import ProviderTile from '~/components/mobile/models/ProviderTile.vue'
+import ModelPickerSheet from '~/components/mobile/models/ModelPickerSheet.vue'
+import { useMobileProviderCatalog, isLocalProvider } from '~/components/mobile/models/provider-catalog'
+import { connectionBadgeView, statusForConfig, testSavedConfigConnection } from '~/components/mobile/models/connection-status'
+import MobileAIErrorNote from '~/components/mobile/prompt/MobileAIErrorNote.vue'
+import {
+  describeMobileAIError,
+  describeMobileAIFailure,
+  isMobileSupportedProvider,
+  type MobileAIErrorView
+} from '~/components/mobile/prompt/mobile-ai'
+import { useConfigActions } from '~/components/mobile/models/useConfigActions'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const { visualForConfig, getConfigDisplayLabel } = useMobileProviderCatalog()
+const actions = useConfigActions()
 
 // 状态
 const config = ref<AIConfig | null>(null)
 const loading = ref(true)
-const testingConnection = ref(false)
 const testingIntelligent = ref(false)
+const showModelPicker = ref(false)
+const requestResult = ref<{ inputPrompt?: string; response?: string; elapsed: number } | null>(null)
+// 最近一次测试连接 / 请求测试失败的原因
+const testFailure = ref<MobileAIErrorView | null>(null)
 let initialLoadPromise: Promise<void> | null = null
+
+const visual = computed(() => visualForConfig(config.value!))
+const providerLabel = computed(() => config.value ? getConfigDisplayLabel(config.value) : '')
+const connectionStatus = computed(() => config.value ? statusForConfig(config.value) : undefined)
+const testingConnection = computed(() => connectionStatus.value?.state === 'testing')
+const desktopOnly = computed(() => Boolean(config.value && !isMobileSupportedProvider(config.value.type)))
+
+// 头部状态：和模型列表、首选卡片同一套判断，测试成功时带上耗时
+const statusPill = computed(() => connectionBadgeView(config.value!, t, { withElapsed: true }))
+
+const currentModel = computed(() => config.value?.defaultModel || config.value?.customModel || '')
+
+// 可选模型：已保存的模型列表，再加上手动填写的自定义模型
+const modelOptions = computed(() => {
+  const models = [...(config.value?.models || [])]
+  const custom = config.value?.customModel?.trim()
+  if (custom && !models.includes(custom)) models.push(custom)
+  return models
+})
+
+const apiKeyText = computed(() => {
+  const apiKey = config.value?.apiKey
+  if (apiKey) return maskApiKey(apiKey)
+  return config.value && isLocalProvider(config.value.type)
+    ? t('aiConfig.workspace.notRequired')
+    : t('aiConfig.workspace.notConfigured')
+})
+
+// 和其他页面一样用友好的日期格式，并跟随界面语言
+const createdAtText = computed(() => config.value?.createdAt
+  ? `${t('aiConfig.createdAt')} ${formatFriendlyDate(config.value.createdAt, locale.value, { withTime: true, capitalize: false })}`
+  : '')
 
 // 加载配置详情
 const loadConfig = async (options: { showLoading?: boolean } = {}) => {
@@ -242,62 +249,36 @@ const handleRefresh = async (event: any) => {
   event.target.complete()
 }
 
-// 切换启用状态
+// 切换启用状态（禁用首选配置前会先确认，取消时把开关拨回去）
 const handleToggleEnabled = async (event: any) => {
   if (!config.value) return
-
   const enabled = event.detail.checked
-
-  try {
-    await api.aiConfigs.update.mutate({
-      id: config.value.id!,
-      data: {
-        ...config.value,
-        enabled,
-        isPreferred: enabled ? config.value.isPreferred : false
-      }
-    })
-
-    config.value.enabled = enabled
-    if (!enabled && config.value.isPreferred) {
-      await api.aiConfigs.clearPreferred.mutate()
-      config.value.isPreferred = false
-    }
-    const message = enabled
-      ? t('aiConfig.configEnabled')
-      : t('aiConfig.configDisabled')
-    showToast(message)
-  } catch (error) {
-    console.error('更新配置失败:', error)
+  const changed = await actions.setEnabled(config.value, enabled)
+  if (!changed) {
     event.target.checked = !enabled
-    showToast(t('aiConfig.updateFailed'), 'danger')
   }
 }
 
 // 切换首选状态
-const handleTogglePreferred = async () => {
+const handleTogglePreferred = async (event: any) => {
   if (!config.value) return
+  const preferred = event.detail.checked
+  if (preferred === Boolean(config.value.isPreferred)) return
 
-  try {
-    if (config.value.isPreferred) {
-      // 取消首选
-      await api.aiConfigs.clearPreferred.mutate()
-      config.value.isPreferred = false
-      showToast(t('aiConfig.preferredCleared'))
-    } else {
-      // 设置为首选
-      await api.aiConfigs.setPreferred.mutate(config.value.id!)
-      config.value.isPreferred = true
-      showToast(t('aiConfig.setAsPreferredSuccess', { name: config.value.name }))
-    }
-  } catch (error) {
-    console.error('更新首选状态失败:', error)
-    showToast(t('aiConfig.setFailed'), 'danger')
+  const changed = preferred
+    ? await actions.setPreferred(config.value)
+    : await actions.clearPreferred()
+  if (changed && !preferred) {
+    config.value.isPreferred = false
+  }
+  if (!changed) {
+    event.target.checked = !preferred
   }
 }
 
-// 选择模型
+// 选择默认模型
 const handleSelectModel = async (model: string) => {
+  showModelPicker.value = false
   if (!config.value || model === config.value.defaultModel) return
 
   try {
@@ -319,7 +300,14 @@ const handleSelectModel = async (model: string) => {
 
 // 编辑配置
 const handleEdit = () => {
-  router.push(`/ai-config/edit/${config.value?.id}`)
+  if (!config.value) return
+  router.push(`/ai-config/edit/${config.value.id}`)
+}
+
+// 模型面板里没有模型时，直接去编辑页获取
+const handleEditFromPicker = () => {
+  showModelPicker.value = false
+  handleEdit()
 }
 
 // 编辑系统提示词
@@ -327,54 +315,52 @@ const handleEditSystemPrompt = () => {
   router.push(`/ai-config/${config.value?.id}/system-prompt`)
 }
 
-// 测试连接
+// 失败说明：有错误信息时按类别给出原因，没有时只说哪项测试失败了
+const failureView = (fallback: string, error?: unknown): MobileAIErrorView => (error
+  ? describeMobileAIError(error, t)
+  : { kind: 'generic', summary: fallback, detail: '' })
+
+// 测试连接：结果和耗时显示在头部状态里
 const handleTestConnection = async () => {
   if (!config.value) return
-
-  testingConnection.value = true
-
-  try {
-    const result = await api.aiConfigs.test.mutate({
-      type: config.value.type,
-      baseURL: config.value.baseURL,
-      apiKey: config.value.apiKey
-    })
-
-    if (result.success) {
-      showToast(t('aiConfig.connectionTestSuccess'))
-    } else {
-      showToast(result.error || t('aiConfig.connectionTestFailed'), 'danger')
-    }
-  } catch (error) {
-    console.error('测试连接失败:', error)
-    showToast(t('aiConfig.testFailed'), 'danger')
-  } finally {
-    testingConnection.value = false
+  testFailure.value = null
+  const status = await testSavedConfigConnection(config.value)
+  if (status.state === 'ok') {
+    showToast(t('aiConfig.connectionTestSuccess'))
+  } else {
+    testFailure.value = failureView(t('aiConfig.connectionTestFailed'), status.error)
+    showToast(describeMobileAIFailure(t('mobileModels.connectionFailedShort'), status.error || '', t), 'danger')
   }
 }
 
-// 智能测试
+// 请求测试：发一条真实请求，在页面上展示回复和耗时
 const handleIntelligentTest = async () => {
   if (!config.value) return
 
   testingIntelligent.value = true
+  requestResult.value = null
+  testFailure.value = null
+  const started = performance.now()
 
   try {
-    const result = await api.aiConfigs.intelligentTest.mutate(config.value.id!)
+    // 测试提示词跟随界面语言，和桌面端的请求测试是同一句
+    const result = await api.aiConfigs.intelligentTest.mutate(config.value.id!, t('models.requestTestDefaultPrompt'))
 
     if (result.success) {
-      const alert = await alertController.create({
-        header: t('aiConfig.testSuccessTitle'),
-        message: `${t('aiConfig.inputPrompt')} ${result.inputPrompt}\n\n${t('aiConfig.aiResponse')} ${result.response}`,
-        buttons: [t('common.ok')]
-      })
-      await alert.present()
+      requestResult.value = {
+        inputPrompt: result.inputPrompt,
+        response: result.response,
+        elapsed: Math.round(performance.now() - started)
+      }
+      showToast(t('aiConfig.testSuccessTitle'))
     } else {
-      showToast(result.error || t('aiConfig.intelligentTestFailed'), 'danger')
+      testFailure.value = failureView(t('mobileModels.requestTestFailed'), result.error)
+      showToast(describeMobileAIFailure(t('mobileModels.requestTestFailed'), result.error || '', t), 'danger')
     }
   } catch (error) {
     console.error('智能测试失败:', error)
-    showToast(t('aiConfig.intelligentTestFailed'), 'danger')
+    testFailure.value = describeMobileAIError(error, t)
+    showToast(describeMobileAIFailure(t('mobileModels.requestTestFailed'), error, t), 'danger')
   } finally {
     testingIntelligent.value = false
   }
@@ -383,108 +369,20 @@ const handleIntelligentTest = async () => {
 // 删除配置
 const handleDelete = async () => {
   if (!config.value) return
-
-  const alert = await alertController.create({
-    header: t('common.confirm'),
-    message: t('aiConfig.deleteConfirm', { name: config.value.name }),
-    buttons: [
-      {
-        text: t('common.cancel'),
-        role: 'cancel'
-      },
-      {
-        text: t('common.delete'),
-        role: 'destructive',
-        handler: async () => {
-          try {
-            await api.aiConfigs.delete.mutate(config.value!.id!)
-            showToast(t('aiConfig.configDeleteSuccess'))
-            router.back()
-          } catch (error) {
-            console.error('删除配置失败:', error)
-            showToast(t('aiConfig.deleteFailed'), 'danger')
-          }
-        }
-      }
-    ]
-  })
-
-  await alert.present()
-}
-
-// 获取服务类型名称
-const getServiceTypeName = (type: string): string => {
-  const names: Record<string, string> = {
-    openai: 'OpenAI',
-    ollama: 'Ollama',
-    anthropic: 'Anthropic Claude',
-    google: 'Google Gemini AI',
-    azure: 'Azure OpenAI',
-    lmstudio: 'LM Studio',
-    deepseek: 'DeepSeek',
-    mistral: 'Mistral AI',
-    siliconflow: '硅基流动',
-    tencent: '腾讯云',
-    aliyun: '阿里云',
-    zhipu: '智谱 AI',
-    openrouter: 'OpenRouter'
+  if (await actions.deleteConfig(config.value)) {
+    router.back()
   }
-  return names[type] || type
 }
 
-// 遮罩 API Key
+// 遮罩 API Key：只露出最后 4 位
 const maskApiKey = (apiKey: string): string => {
-  if (apiKey.length <= 8) return '********'
-  return apiKey.substring(0, 4) + '****' + apiKey.substring(apiKey.length - 4)
-}
-
-// 格式化日期
-const formatDate = (date: Date | string): string => {
-  const d = new Date(date)
-  return d.toLocaleString()
+  if (apiKey.length <= 8) return '••••••••'
+  return `••••${apiKey.substring(apiKey.length - 4)}`
 }
 
 // 显示提示
 const showToast = async (message: string, color: string = 'success') => {
   await presentMobileToast(message, color)
-}
-
-// 显示操作菜单
-const showActionMenu = async () => {
-  if (!config.value) return
-
-  const buttons = [
-    {
-      text: t('common.edit'),
-      icon: createOutline,
-      handler: () => {
-        handleEdit()
-      }
-    }
-  ]
-
-  if (!config.value.isPreferred) {
-    buttons.push({
-      text: t('common.delete'),
-      icon: trashOutline,
-      role: 'destructive',
-      handler: () => {
-        handleDelete()
-      }
-    })
-  }
-
-  buttons.push({
-    text: t('common.cancel'),
-    role: 'cancel'
-  })
-
-  const actionSheet = await actionSheetController.create({
-    header: t('common.actions'),
-    buttons
-  })
-
-  await actionSheet.present()
 }
 
 // 初始化
@@ -498,108 +396,175 @@ onMounted(() => {
 // 页面进入时刷新
 onIonViewWillEnter(() => {
   if (initialLoadPromise) return
+  // 可能刚改过地址或凭据，上一次的失败说明不再适用
+  testFailure.value = null
   loadConfig({ showLoading: !config.value })
 })
 </script>
 
 <style scoped>
-.loading-container {
+.detail-nav__edit {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.detail-nav__edit:disabled {
+  opacity: 0.45;
+}
+
+.detail-state {
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  height: 200px;
+  min-height: 200px;
 }
 
-.detail-container {
-  padding: 16px;
+.detail-body {
+  gap: 18px;
+  padding-top: 4px;
 }
 
-.detail-section {
-  margin-bottom: 24px;
-}
-
-.section-title {
-  color: var(--ion-text-color);
-  margin-bottom: 12px;
-  padding: 0 4px;
-}
-
-.section-title-with-action {
+.detail-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 14px;
   padding: 0 4px;
 }
 
-.section-title-with-action .section-title {
-  margin-bottom: 0;
-  padding: 0;
+.detail-head__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.section-content {
-  background: var(--surface-secondary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
+.detail-head__name {
+  margin: 0;
   overflow: hidden;
+  color: var(--content-primary);
+  font-size: var(--m-font-block);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-ion-list {
-  background: transparent;
-  padding: 0;
+.detail-head__provider {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
 }
 
-ion-item {
-  --background: transparent;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --inner-padding-end: 0;
-}
-
-.url-text {
-  word-break: break-all;
-  font-family: monospace;
-  font-size: var(--mobile-font-size-footnote);
-}
-
-.masked-text {
-  font-family: monospace;
-}
-
-.models-chips {
+.detail-head__pills {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.detail-head__pills ion-icon {
+  font-size: 12px;
+}
+
+.detail-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.detail-dot--ok {
+  background: var(--indicator-success);
+}
+
+.detail-dot--err {
+  background: var(--indicator-error);
+}
+
+.detail-dot--warn {
+  background: var(--indicator-warning);
+}
+
+.detail-note {
+  margin-top: -6px;
+}
+
+.detail-failure {
+  padding: 14px 16px;
+}
+
+.detail-mono {
+  font-family: var(--font-family-mono);
+  font-size: var(--m-font-caption);
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.detail-actions__btn {
+  flex: 1;
+  height: 48px;
+  min-width: 0;
+  font-size: var(--m-font-sub);
+}
+
+.detail-actions__btn ion-icon {
+  flex: none;
+  font-size: 18px;
+}
+
+.detail-actions__btn ion-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.detail-reply {
   gap: 8px;
-  margin-top: 8px;
+  padding: 14px 16px;
 }
 
-ion-chip {
-  margin: 0;
+.detail-reply__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  font-weight: 600;
 }
 
-.system-prompt-content {
-  white-space: pre-wrap;
-  font-family: monospace;
-  font-size: var(--mobile-font-size-footnote);
-  line-height: var(--mobile-line-height-normal);
-  color: var(--ion-text-color);
-  padding: 16px;
-  max-height: 200px;
-  overflow-y: auto;
+.detail-reply__meta .m-tile {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 14px;
 }
 
-.action-buttons {
+.detail-reply__prompt {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 2px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+  line-height: 1.6;
 }
 
-.clickable-chip {
-  cursor: pointer;
+.detail-reply__prompt strong {
+  font-weight: 600;
 }
 
-.clickable-chip:hover {
-  opacity: 0.8;
+.detail-reply__text {
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  color: var(--content-primary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

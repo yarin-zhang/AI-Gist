@@ -4,42 +4,38 @@ import { describe, expect, it } from 'vitest'
 const readRendererFile = (path: string) => readFileSync(`src/renderer/${path}`, 'utf8')
 
 describe('quick optimization UX', () => {
-  it('keeps enabled optimization actions directly available in both prompt editors', () => {
-    const actions = readRendererFile('components/prompt-management/QuickOptimizationActions.vue')
-    const regularEditor = readRendererFile('components/prompt-management/RegularPromptEditor.vue')
-    const jinjaEditor = readRendererFile('components/prompt-management/JinjaPromptEditor.vue')
+  it('offers every enabled optimization as a one-click chip in the AI panel', () => {
+    const panel = readRendererFile('components/prompts/PromptAIPanel.vue')
+    const session = readRendererFile('composables/prompt/usePromptAISession.ts')
+    const page = readRendererFile('components/prompts/PromptPage.vue')
 
-    expect(actions).toContain('v-for="config in quickOptimizationConfigs"')
-    expect(actions).toContain('@click="runOptimization(config.id)"')
-    expect(actions).toContain('<NCollapseTransition :show="expanded && showManualInput && !isStreaming">')
-    expect(actions).not.toContain('showOptimization')
-    expect(regularEditor).toContain('<QuickOptimizationActions')
-    expect(jinjaEditor).toContain('<QuickOptimizationActions')
+    expect(panel).toContain('v-for="config in quickConfigs"')
+    expect(panel).toContain('@click="session.optimize(config)"')
+    expect(panel).toContain("@click=\"emit('open-optimization-config')\"")
+    expect(session).toContain("request.config.prompt.replace('{{content}}', content)")
+    expect(page).toContain('api.quickOptimizationConfigs.getEnabled.query()')
   })
 
-  it('collapses the quick optimization panel by default behind a single clickable entry', () => {
-    const actions = readRendererFile('components/prompt-management/QuickOptimizationActions.vue')
+  it('shows optimization results as a suggestion to adopt or discard instead of overwriting the body', () => {
+    const session = readRendererFile('composables/prompt/usePromptAISession.ts')
+    const page = readRendererFile('components/prompts/PromptPage.vue')
 
-    // The whole preset/actions body is collapsed by default and only expands on click.
-    expect(actions).toContain("const expanded = ref(false)")
-    expect(actions).toContain('<button type="button" class="quick-optimization-summary"')
-    expect(actions).toContain('@click="toggleExpanded"')
-    expect(actions).toContain(':aria-expanded="expanded"')
-    expect(actions).toContain('<NCollapseTransition :show="expanded">')
-
-    // Collapsing also tidies up any open manual-adjustment input so state doesn't linger hidden.
-    expect(actions).toContain('if (!expanded.value) cancelManualAdjustment()')
+    expect(session).toContain('suggestion.value = { label, original, proposed, streaming: true }')
+    expect(session).not.toContain('content.value =')
+    expect(page).toContain('<UiDiffText :segments="suggestionDiff" />')
+    expect(page).toContain('@click="adoptSuggestion"')
+    expect(page).toContain("pendingChangeDescription = t('promptHistory.adoptedAI', { label: adopted.label })")
   })
 
   it('supports cursor insertion, guidance, and a rich example in the configuration workspace', () => {
     const modal = readRendererFile('components/ai/QuickOptimizationConfigModal.vue')
     const locale = readRendererFile('i18n/locales/zh-CN.json')
 
-    expect(modal).toContain('class="optimization-guide ui-toolbar"')
+    expect(modal).toContain("t('quickOptimization.workspace.limitHelp')")
     expect(modal).toContain('@click="createExampleDraft"')
     expect(modal).toContain('@mousedown.prevent @click="insertContentVariable"')
     expect(modal).toContain('textarea?.setSelectionRange?.(cursor, cursor)')
-    expect(locale).toContain('把高频提示词调整变成一键动作')
+    expect(modal).toContain("t('quickOptimization.workspace.templateHelp')")
     expect(locale).toContain('只输出优化后的完整提示词，不解释修改过程')
   })
 })

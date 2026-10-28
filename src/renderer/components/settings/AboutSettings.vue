@@ -1,177 +1,82 @@
 <template>
-    <NCard size="small">
-        <NFlex vertical :size="16">
-            <!-- 应用信息 -->
-            <NFlex vertical :size="16" align="center">
-                <div style="text-align: center;">
-                    <NAvatar
-                        size="large"
-                        :src="appIcon"
-                        color="transparent"
-                        :bordered="false"
-                        style="width: 64px; height: 64px; margin-bottom: 12px;"
-                    />
-                    <div>
-                        <NText strong style="font-size: 20px; display: block; margin-bottom: 6px;">
-                            {{ t('about.appName') }}
-                        </NText>
-                        <NText depth="3" style="font-size: 14px; display: block;">
-                            {{ t('about.appDescription') }}
-                        </NText>
-                    </div>
+    <div class="about">
+        <header class="about__head">
+            <img :src="appIcon" :alt="t('about.appName')" class="about__logo" />
+            <div class="about__titles">
+                <h1 class="ui-title-page">{{ t('about.appName') }}</h1>
+                <p class="about__description">{{ t('about.appDescription') }}</p>
+            </div>
+        </header>
+
+        <UiPanel :title="t('about.versionInfo')" body="rows">
+            <template v-if="capabilities.electronUpdates" #actions>
+                <NButton size="tiny" :loading="checking" @click="handleCheckForUpdates">{{ t('about.checkForUpdates') }}</NButton>
+            </template>
+            <UiSettingRow :title="t('about.currentVersion')">
+                <span class="ui-mono about__version">{{ currentVersion }}</span>
+            </UiSettingRow>
+            <UiSettingRow v-if="latestVersion" :title="t('about.latestVersion')">
+                <span class="about__inline">
+                    <span class="ui-mono about__version">{{ latestVersion }}</span>
+                    <span v-if="hasUpdate" class="ui-tag ui-tag--warning">{{ t('about.hasUpdate') }}</span>
+                    <span v-else class="ui-tag ui-tag--success">{{ t('about.isLatest') }}</span>
+                </span>
+            </UiSettingRow>
+            <UiSettingRow v-if="publishedAt" :title="t('about.publishedAt')">
+                <span class="about__secondary">{{ publishedAt }}</span>
+            </UiSettingRow>
+            <div v-if="(hasUpdate && releaseNotes) || checkError" class="about__notices">
+                <div v-if="hasUpdate && releaseNotes" class="ui-alert about__update">
+                    <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><InfoCircle /></NIcon>
+                    <span class="about__update-text">{{ t('about.newVersionDesc', { version: latestVersion }) }}</span>
+                    <NButton quaternary size="tiny" @click="showReleaseNotes = !showReleaseNotes">
+                        {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
+                    </NButton>
+                    <NButton type="primary" size="tiny" @click="handleOpenDownloadPage">{{ t('about.downloadNewVersion') }}</NButton>
                 </div>
-            </NFlex>
+                <div v-if="hasUpdate && releaseNotes && showReleaseNotes" class="ui-muted-box">{{ releaseNotes }}</div>
+                <UiAlert v-if="checkError" tone="error">{{ checkError }}</UiAlert>
+            </div>
+        </UiPanel>
 
-            <NDivider />
+        <UiPanel :title="t('about.projectInfo')" body="rows">
+            <UiSettingRow :title="t('about.developer')"><span>{{ t('about.developerName') }}</span></UiSettingRow>
+            <UiSettingRow :title="t('about.github')">
+                <NButton text type="primary" @click="openGitHub">{{ t('about.githubRepo') }}</NButton>
+            </UiSettingRow>
+            <UiSettingRow :title="t('about.license')"><span>{{ t('about.licenseType') }}</span></UiSettingRow>
+        </UiPanel>
 
-            <!-- 版本信息 -->
-            <NFlex vertical :size="12">
-                <NFlex justify="space-between" align="center" :size="12" wrap>
-                    <NText strong style="font-size: 16px;">{{ t('about.versionInfo') }}</NText>
-                    <NButton
-                        v-if="capabilities.electronUpdates"
-                        @click="handleCheckForUpdates"
-                        :loading="checking"
-                        secondary
-                        type="primary"
-                    >
-                        <template #icon>
-                            <NIcon><Refresh /></NIcon>
-                        </template>
-                        {{ t('about.checkForUpdates') }}
-                    </NButton>
-                </NFlex>
-                <NFlex vertical :size="8">
-                    <NFlex justify="space-between">
-                        <NText depth="2">{{ t('about.currentVersion') }}</NText>
-                        <NText>{{ currentVersion }}</NText>
-                    </NFlex>
-                    <NFlex justify="space-between" v-if="latestVersion">
-                        <NText depth="2">{{ t('about.latestVersion') }}</NText>
-                        <NFlex align="center" :size="8">
-                            <NText>{{ latestVersion }}</NText>
-                            <NTag v-if="hasUpdate" type="warning" size="small">
-                                {{ t('about.hasUpdate') }}
-                            </NTag>
-                            <NTag v-else type="success" size="small">
-                                {{ t('about.isLatest') }}
-                            </NTag>
-                        </NFlex>
-                    </NFlex>
-                    <NFlex justify="space-between" v-if="publishedAt">
-                        <NText depth="2">{{ t('about.publishedAt') }}</NText>
-                        <NText>{{ publishedAt }}</NText>
-                    </NFlex>
-                </NFlex>
-
-                <!-- 更新信息 -->
-                <div v-if="hasUpdate && releaseNotes">
-                    <NAlert type="info" :title="t('about.newVersionAvailable')" style="margin-bottom: 12px;">
-                        <NFlex vertical :size="8">
-                            <NText>
-                                {{ t('about.newVersionDesc', { version: latestVersion }) }}
-                            </NText>
-                            <NFlex :size="8">
-                                <NButton @click="handleOpenDownloadPage" type="primary" size="small">
-                                    {{ t('about.downloadNewVersion') }}
-                                </NButton>
-                                <NButton @click="showReleaseNotes = !showReleaseNotes" quaternary size="small">
-                                    {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
-                                </NButton>
-                            </NFlex>
-                        </NFlex>
-                    </NAlert>
-
-                    <!-- 更新说明 -->
-                    <NCollapse v-if="showReleaseNotes" style="margin-top: 12px;">
-                        <NCollapseItem :title="t('about.releaseNotes')" name="release-notes">
-                            <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">
-                                {{ releaseNotes }}
-                            </div>
-                        </NCollapseItem>
-                    </NCollapse>
-                </div>
-
-                <!-- 检查失败提示 -->
-                <NAlert v-if="checkError" type="error" :title="checkError" closable @close="checkError = ''" />
-            </NFlex>
-
-            <NDivider />
-
-            <!-- 项目信息 -->
-            <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px;">{{ t('about.projectInfo') }}</NText>
-                <NFlex vertical :size="8">
-                    <NFlex justify="space-between">
-                        <NText depth="2">{{ t('about.developer') }}</NText>
-                        <NText>{{ t('about.developerName') }}</NText>
-                    </NFlex>
-                    <NFlex justify="space-between">
-                        <NText depth="2">{{ t('about.github') }}</NText>
-                        <NButton text type="primary" @click="openGitHub" style="padding: 0; font-size: 14px;">
-                            {{ t('about.githubRepo') }}
-                        </NButton>
-                    </NFlex>
-                    <NFlex justify="space-between">
-                        <NText depth="2">{{ t('about.license') }}</NText>
-                        <NText>{{ t('about.licenseType') }}</NText>
-                    </NFlex>
-                </NFlex>
-            </NFlex>
-
-            <!-- 反馈与支持 -->
-            <NFlex vertical :size="12">
-                <NText strong style="font-size: 16px;">{{ t('about.feedbackSupport') }}</NText>
-                <NFlex :size="12" wrap>
-                    <NButton @click="openIssues" secondary>
-                        <template #icon>
-                            <NIcon>
-                                <Bug />
-                            </NIcon>
-                        </template>
-                        {{ t('about.reportIssue') }}
-                    </NButton>
-                    <NButton @click="openFeatureRequest" secondary>
-                        <template #icon>
-                            <NIcon>
-                                <Bulb />
-                            </NIcon>
-                        </template>
-                        {{ t('about.featureRequest') }}
-                    </NButton>
-                </NFlex>
-            </NFlex>
-        </NFlex>
-    </NCard>
+        <UiPanel :title="t('about.feedbackSupport')">
+            <div class="about__feedback">
+                <NButton @click="openIssues">
+                    <template #icon><NIcon><Bug /></NIcon></template>{{ t('about.reportIssue') }}
+                </NButton>
+                <NButton @click="openFeatureRequest">
+                    <template #icon><NIcon><Bulb /></NIcon></template>{{ t('about.featureRequest') }}
+                </NButton>
+            </div>
+            <!-- 目前只有 GitHub 这一个反馈渠道：先说清楚要账号，免得点进去才发现要登录 -->
+            <p class="ui-help about__feedback-note">{{ t('about.feedbackNeedsGithub') }}</p>
+        </UiPanel>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import {
-    NCard,
-    NFlex,
-    NText,
-    NButton,
-    NIcon,
-    NTag,
-    NAlert,
-    NCollapse,
-    NCollapseItem,
-    NDivider,
-    NAvatar,
-    useMessage
-} from 'naive-ui';
-import { Refresh, Bug, Bulb, MessageCircle } from '@vicons/tabler';
+import { NButton, NIcon, useMessage } from 'naive-ui';
+import { Bug, Bulb, InfoCircle } from '@vicons/tabler';
+import UiAlert from '@/components/ui/UiAlert.vue';
+import UiPanel from '@/components/ui/UiPanel.vue';
+import UiSettingRow from '@/components/ui/UiSettingRow.vue';
+import appIcon from '~/assets/images/logo.png';
 import { useUpdate } from '~/composables/useUpdate';
 import { openExternalUrl } from '~/lib/platform/shell';
 import { PlatformDetector } from '@shared/platform';
 
 const { t } = useI18n();
 const capabilities = PlatformDetector.getCapabilities();
-
-// 应用图标
-const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href;
 
 // 使用更新服务
 const {
@@ -199,12 +104,12 @@ const handleCheckForUpdates = async () => {
     const result = await checkForUpdates();
     if (result.success) {
         if (result.data?.hasUpdate) {
-            message.success(`发现新版本 ${result.data.latestVersion}！`);
+            message.success(t('about.updateFound', { version: result.data.latestVersion }));
         } else {
-            message.info('当前已是最新版本');
+            message.info(t('about.alreadyLatest'));
         }
     } else {
-        message.error(result.error || '检查更新失败');
+        message.error(result.error || t('about.checkFailed'));
     }
 };
 
@@ -214,7 +119,7 @@ const handleOpenDownloadPage = async () => {
 
     const result = await openDownloadPage(downloadUrl.value);
     if (!result.success) {
-        message.error(result.error || '打开下载页面失败');
+        message.error(result.error || t('about.openDownloadFailed'));
     }
 };
 
@@ -222,7 +127,7 @@ const handleOpenDownloadPage = async () => {
 const openGitHub = async () => {
     const result = await openExternalUrl('https://github.com/yarin-zhang/AI-Gist');
     if (!result.success) {
-        message.error('打开 GitHub 失败');
+        message.error(t('about.openPageFailed'));
     }
 };
 
@@ -230,7 +135,7 @@ const openGitHub = async () => {
 const openIssues = async () => {
     const result = await openExternalUrl('https://github.com/yarin-zhang/AI-Gist/issues');
     if (!result.success) {
-        message.error('打开页面失败');
+        message.error(t('about.openPageFailed'));
     }
 };
 
@@ -238,7 +143,7 @@ const openIssues = async () => {
 const openFeatureRequest = async () => {
     const result = await openExternalUrl('https://github.com/yarin-zhang/AI-Gist/issues/new?template=feature_request.md');
     if (!result.success) {
-        message.error('打开页面失败');
+        message.error(t('about.openPageFailed'));
     }
 };
 
@@ -248,11 +153,82 @@ onMounted(async () => {
 
     // 监听更新通知
     window.electronAPI?.app?.onUpdateAvailable?.((info: any) => {
-        message.info(`发现新版本 ${info.latestVersion}！`);
+        message.info(t('about.updateFound', { version: info.latestVersion }));
     });
 });
 </script>
 
 <style scoped>
-/* 自定义样式 */
+.about {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.about__head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.about__logo {
+    display: block;
+    flex: none;
+    width: 56px;
+    height: 56px;
+    border-radius: 13px;
+}
+
+.about__titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.about__description {
+    margin: 0;
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.about__version {
+    font-size: var(--font-size-base);
+}
+
+.about__inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.about__secondary {
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.about__notices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 0 16px;
+}
+
+.about__update {
+    align-items: center;
+}
+
+.about__update-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.about__feedback {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.about__feedback-note {
+    margin: 8px 0 0;
+}
 </style>

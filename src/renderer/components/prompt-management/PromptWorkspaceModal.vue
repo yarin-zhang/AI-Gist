@@ -1,62 +1,60 @@
 <template>
-    <NModal :show="show" :mask-closable="false" :close-on-esc="false" display-directive="show">
+    <!-- Esc 和点遮罩都只发出请求，由外层先收起页面里的浮层、做未保存确认，再决定关不关 -->
+    <NModal :show="show" :mask-closable="false" :close-on-esc="false" @esc="handleEsc"
+        @mask-click="$emit('request-close')">
         <div class="prompt-workspace-modal" role="dialog" aria-modal="true">
-            <PromptWorkspace ref="workspaceRef" :prompt="prompt" :categories="categories" :mode="mode"
-                :draft="draft" closable @close="$emit('request-close')"
-                @request-mode="$emit('request-mode', $event)" @update:draft="$emit('update:draft', $event)"
-                @updated="$emit('updated', $event)" @saved="$emit('saved', $event)"
-                @toggle-favorite="$emit('toggle-favorite')" @delete="$emit('delete')"
-                @create="$emit('create')" @cancel-edit="$emit('cancel-edit')"
-                @open-quick-optimization-config="$emit('open-quick-optimization-config')" />
+            <slot />
         </div>
     </NModal>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
 import { NModal } from 'naive-ui'
-import type { Category, PromptWithRelations } from '@shared/types/database'
-import PromptWorkspace, { type PromptWorkspaceMode } from './PromptWorkspace.vue'
+import { hasOpenFloatingLayer, isEscapeConsumed } from '@/lib/utils/escape-layers'
 
-defineProps<{
+// 卡片、表格、文件夹视图里打开提示词时的弹窗外壳，内容是完整的提示词页
+const props = defineProps<{
     show: boolean
-    prompt: PromptWithRelations | null
-    categories: Category[]
-    mode: PromptWorkspaceMode
-    draft: Record<string, any>
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
     'request-close': []
-    'request-mode': [mode: PromptWorkspaceMode]
-    'update:draft': [value: Record<string, any>]
-    updated: [prompt?: PromptWithRelations]
-    saved: [prompt?: PromptWithRelations]
-    'toggle-favorite': []
-    delete: []
-    create: []
-    'cancel-edit': []
-    'open-quick-optimization-config': []
+    /** 这次 Esc 没有被下拉、气泡或输入框用掉，交给外层：先收起页面里的面板，没有可收起的再关弹窗 */
+    esc: []
 }>()
 
-const workspaceRef = ref<InstanceType<typeof PromptWorkspace>>()
+// Naive 的 @esc 不带事件对象，下拉也会在同一次按键里先把自己收起，所以在捕获阶段先记下按键当时的状态
+let pendingEscape: { event: KeyboardEvent, layerOpen: boolean } | null = null
 
-defineExpose({
-    get hasUnsavedChanges() {
-        return Boolean(workspaceRef.value?.hasUnsavedChanges)
-    },
-    discardChanges: () => workspaceRef.value?.discardChanges?.(),
-    refreshQuickOptimizationConfigs: () => workspaceRef.value?.refreshQuickOptimizationConfigs?.(),
-})
+const recordEscape = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') pendingEscape = { event, layerOpen: hasOpenFloatingLayer() }
+}
+
+const handleEsc = () => {
+    const pending = pendingEscape
+    pendingEscape = null
+    if (pending && (pending.layerOpen || isEscapeConsumed(pending.event))) return
+    emit('esc')
+}
+
+watch(() => props.show, show => {
+    if (show) window.addEventListener('keydown', recordEscape, true)
+    else window.removeEventListener('keydown', recordEscape, true)
+}, { immediate: true })
+
+onBeforeUnmount(() => window.removeEventListener('keydown', recordEscape, true))
 </script>
 
 <style scoped>
 .prompt-workspace-modal {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
+    display: flex;
+    width: min(1320px, calc(100vw - 48px));
+    height: calc(100vh - 48px);
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    /* clip 而不是 hidden：hidden 的容器仍能被程序滚动，获得焦点的控件会把整页内容推偏 */
+    overflow: clip;
     border: 1px solid var(--border-default);
     border-radius: var(--radius-modal);
     background: var(--surface-primary);

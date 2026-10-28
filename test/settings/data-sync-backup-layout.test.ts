@@ -15,7 +15,7 @@ const expectInOrder = (source: string, snippets: string[]) => {
 describe('settings sync and backup information architecture', () => {
   it('makes data sync the first and default settings section', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
-    expect(source).toContain("normalizeSettingKey(props.targetSection) || 'cloud-backup'");
+    expect(source).toContain("splitTargetSection(props.targetSection).section || 'cloud-backup'");
     expectInOrder(source, [
       "label: t('settings.sections.cloudBackup')",
       "label: t('settings.sections.dataManagement')",
@@ -24,50 +24,29 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('@navigate-section="handleMenuSelect"');
   });
 
-  it('uses concise grouped navigation and a compact narrow-window selector', () => {
+  it('uses the V5 232px navigation with four groups and a compact selector', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
-    expectInOrder(source, [
-      'class="settings-command-bar"',
-      "{{ t('settings.title') }}",
-      'class="settings-workspace"',
-      'class="settings-navigation"',
-      '<NMenu',
-    ]);
+    const nav = readWorkspaceFile('src/renderer/components/settings/SettingsNav.vue');
+    expect(source).toContain('<SettingsNav class="settings-page__nav" :groups="navGroups"');
     expectInOrder(source, [
       "label: t('settings.groups.data')",
       "label: t('settings.groups.preferences')",
       "label: t('settings.groups.system')",
       "label: t('settings.groups.other')",
     ]);
-    expect(source).toContain('class="settings-compact-navigation"');
+    expect(source).toContain("items: pick('cloud-backup', 'data-management')");
+    expect(source).toContain("items: pick('general', 'startup-behavior', 'close-behavior', 'shortcuts')");
+    expect(source).toContain("items: pick('network-proxy', 'cli-bridge')");
+    expect(source).toContain('class="settings-page__compact"');
     expect(source).toContain(':options="compactMenuOptions"');
-    expect(source).toContain(':root-indent="8"');
-    expect(source).toContain(':indent="16"');
-    expect(source).toContain("{{ t('settings.subtitle') }}");
-    expect(source).not.toContain("{{ t('settings.autoSave') }}");
-    expect(source).not.toContain("t('settings.resetToDefault')");
-    expect(source).not.toContain('const resetSettings');
-    expect(source).not.toContain('<NAlert :show-icon="false">');
+    expect(nav).toMatch(/\.settings-nav\s*\{[^}]*width:\s*var\(--nav-width\)/s);
+    expect(nav).toMatch(/\.settings-nav__item\.is-active\s*\{[^}]*background:\s*var\(--accent-soft\)[^}]*color:\s*var\(--accent-soft-text\)/s);
   });
 
-  it('combines appearance and language under general settings and keeps native features in the system group', () => {
+  it('keeps platform capabilities in charge of which sections appear', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
-
     expect(source).toContain('<template v-if="activeSettingKey === \'general\'">');
-    expectInOrder(source, [
-      '<AppearanceSettings',
-      '<LanguageSettings />',
-    ]);
-    expectInOrder(source, [
-      "label: t('settings.sections.general')",
-      "label: t('settings.sections.startup')",
-      "label: t('settings.sections.close')",
-      "label: t('settings.sections.shortcuts')",
-      "label: t('settings.sections.networkProxy')",
-      "label: t('settings.sections.cliBridge')",
-    ]);
-    expect(source).toContain("children: pick('general')");
-    expect(source).toContain("children: pick('startup-behavior', 'close-behavior', 'shortcuts', 'network-proxy', 'cli-bridge')");
+    expectInOrder(source, ['<AppearanceSettings', '<LanguageSettings />']);
     expect(source).toContain('visible: capabilities.startup');
     expect(source).toContain('visible: capabilities.tray');
     expect(source).toContain('visible: capabilities.globalShortcuts');
@@ -75,39 +54,32 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('visible: capabilities.cliBridge');
   });
 
-  it('gives the settings navigation and content independent scroll areas', () => {
+  it('lays settings content out at reading width with its own scroll area', () => {
     const source = readWorkspaceFile('src/renderer/pages/SettingsPage.vue');
     const style = source.slice(source.indexOf('<style scoped>'));
-
-    expect(style).toMatch(/\.settings-page\s*\{[^}]*height:\s*calc\(100vh - 24px\);[^}]*overflow:\s*hidden;/s);
-    expect(style).toMatch(/\.settings-command-bar\s*\{[^}]*flex:\s*0 0 60px/s);
-    expect(style).toMatch(/\.settings-workspace\s*\{[^}]*height:\s*0;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s);
-    expect(source).toContain('<NScrollbar class="settings-navigation-scrollbar" trigger="hover">');
-    expect(style).toMatch(/\.settings-navigation\s*\{[^}]*overflow:\s*hidden;/s);
-    expect(style).toMatch(/\.settings-navigation-scrollbar\s*\{[^}]*height:\s*100%;/s);
-    expect(style).toMatch(/\.settings-detail\s*\{[^}]*overflow:\s*hidden;/s);
-    expect(style).toMatch(/\.settings-section-header\s*\{[^}]*flex:\s*0 0 auto/s);
-    expect(source).toContain('<NScrollbar class="settings-content-scrollbar" trigger="hover">');
-    expect(style).toMatch(/\.settings-content-scrollbar\s*\{[^}]*height:\s*0;[^}]*min-height:\s*0;/s);
-    expect(style).not.toContain('position: sticky');
-    expect(source).not.toContain('handleNavigationScroll');
-    expect(source).not.toContain('isNavigationScrolling');
+    expect(source).toContain('<NScrollbar class="settings-page__scroll" trigger="hover">');
+    expect(style).toMatch(/\.settings-page\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden;/s);
+    expect(style).toMatch(/\.settings-content\s*\{[^}]*max-width:\s*var\(--reading-width\)/s);
+    expect(source).toContain('<UiPageHeader v-if="showPageHeader"');
   });
 
-  it('removes duplicate summaries from simple preference panels', () => {
+  it('builds simple preference sections from panels and setting rows', () => {
     const language = readWorkspaceFile('src/renderer/components/settings/LanguageSettings.vue');
     const closeBehavior = readWorkspaceFile('src/renderer/components/settings/CloseBehaviorSettings.vue');
     const startup = readWorkspaceFile('src/renderer/components/settings/StartupBehaviorSettings.vue');
+    const appearance = readWorkspaceFile('src/renderer/components/settings/AppearanceSettings.vue');
 
-    expect(language).not.toContain("t('language.description')");
+    expect(language).toContain('<UiSettingRow');
+    expect(closeBehavior).toContain('<UiChoiceCards');
     expect(closeBehavior).not.toContain("t('closeBehavior.currentSetting')");
     expect(startup).toContain('<NSwitch');
+    expect(appearance).toContain('class="theme-cards" role="radiogroup"');
   });
 
-  it('keeps the sync page focused on status, storage, and collapsed advanced sync settings', () => {
+  it('keeps the sync page focused on status, storage and advanced sync settings', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    expect(source).toContain('class="ui-panel sync-status"');
     expect(source).toContain("t('dataSync.storageConfiguration')");
-    expect(source).toContain('<NCollapse>');
     expect(source).toContain("t('dataSync.advancedSettings')");
     expect(source).not.toContain('automaticBackupService');
     expect(source).not.toContain('getCloudBackupList');
@@ -116,47 +88,24 @@ describe('settings sync and backup information architecture', () => {
     expect(source).not.toContain('deleteCloudBackup');
   });
 
-  it('keeps storage card and form actions in the required order', () => {
+  it('keeps destructive storage actions behind the more menu with confirmation', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
-    const cardStart = source.indexOf('<NCard size="small" :title="config.name">');
-    const cardEnd = source.indexOf('</NCard>', cardStart);
-    const card = source.slice(cardStart, cardEnd);
-
-    // Delete is a destructive, rarely-used action: it moves into the card's "…" menu
-    // (header-extra) instead of sitting next to the frequently-used buttons, so a stray
-    // click can't trigger it. Edit and Test Connection stay grouped on the left of the
-    // action row, while Sync Now — the most frequently used action — is promoted to a
-    // prominent primary button on the right.
-    const headerExtraStart = card.indexOf('<template #header-extra>');
-    const actionStart = card.indexOf('<template #action>');
-    expect(headerExtraStart).toBeGreaterThan(-1);
-    expect(actionStart).toBeGreaterThan(headerExtraStart);
-
-    const headerExtra = card.slice(headerExtraStart, actionStart);
-    expect(headerExtra).toContain('<NDropdown');
-    expect(headerExtra).toContain(':options="storageActionOptions"');
-    expect(headerExtra).toContain('@select="key => handleStorageAction(key, config)"');
-    expect(headerExtra).toContain('<DotsVertical');
-    expect(headerExtra).toContain(":aria-label=\"t('dataSync.storageActions')\"");
-
-    const cardActions = card.slice(actionStart);
-    expectInOrder(cardActions, [
-      '@click="editConfig(config)"',
+    expectInOrder(source, [
       '@click="testSavedConnection(config)"',
-      '@click="syncCloudData(config.id)"',
+      '@click="editConfig(config)"',
+      ':options="storageActionOptions(config)"',
     ]);
-    expect(cardActions).not.toContain('@positive-click="deleteConfig(config.id)"');
-    expect(cardActions).toMatch(/<NButton type="primary" size="small" @click="syncCloudData\(config\.id\)"/);
-
-    // The confirmation dialog that used to live in the inline NPopconfirm is preserved,
-    // just triggered from the dropdown selection instead of a directly visible button.
+    expect(source).toContain("@select=\"key => handleStorageAction(key, config)\"");
+    expect(source).toContain(":aria-label=\"t('dataSync.storageActions')\"");
     expect(source).toContain('const handleStorageAction = (key: string, config: CloudStorageConfig) => {');
     expect(source).toContain("if (key !== 'delete') return;");
-    expect(source).toMatch(/dialog\.error\(\{[\s\S]*?content:\s*t\('dataSync\.confirmDeleteConfig'\)/);
+    // 删除存储只是断开连接：标题带存储名，正文说明本机和云端数据都不会被删 (#446)
+    expect(source).toMatch(/dialog\.warning\(\{[\s\S]*?title:\s*t\('dataSync\.deleteConfigTitle', \{ name: config\.name \}\)[\s\S]*?content:\s*t\('dataSync\.confirmDeleteConfig'\)/);
     expect(source).toContain('onPositiveClick: () => deleteConfig(config.id),');
 
-    const modalFooter = source.slice(source.indexOf('<NFlex justify="space-between" align="center">', source.indexOf('<NModal')));
-    expectInOrder(modalFooter, [
+    const modalStart = source.indexOf('<UiModal :show="showConfigModal"');
+    const modal = source.slice(modalStart, source.indexOf('</UiModal>', modalStart));
+    expectInOrder(modal.slice(modal.indexOf('<template #footer>')), [
       '@click="showConfigModal = false"',
       '@click="testDraftConnection"',
       '@click="saveConfig"',
@@ -170,23 +119,21 @@ describe('settings sync and backup information architecture', () => {
     expect(source).toContain('normalizeCloudStorageConfigForConnectionTest(config)');
   });
 
-  it('shows local backup first and creates a lazy cloud tab for every storage configuration', () => {
+  it('shows local backup first and switches to each cloud storage with a segment', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataManagementSettings.vue');
     expectInOrder(source, [
-      '<NTabPane name="local"',
-      '<NTabPane v-for="config in storageConfigs"',
+      "{ value: 'local', label: t('dataBackup.localLocation') }",
+      '...storageConfigs.value.map(config => ({',
     ]);
-    expect(source).toContain('display-directive="show:lazy"');
-    expect(source).toContain('<CloudBackupLocationPane :config="config" />');
-    expect(source).toContain("t('dataBackup.automaticBackupSettings')");
+    expect(source).toContain('<CloudBackupLocationPane v-else-if="activeStorage" ref="cloudPaneRef" :config="activeStorage" />');
+    expect(source).toContain("t('dataBackup.automaticBackupTitle')");
     expect(source).toContain('<NSelect v-model:value="autoBackupIntervalSelection"');
     expect(source).toContain('AUTOMATIC_BACKUP_INTERVAL_PRESETS');
-    expect(source).toContain("autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL");
+    expect(source).toContain('autoBackupIntervalSelection === CUSTOM_AUTO_BACKUP_INTERVAL');
     expect(source).toContain("t('dataBackup.automaticBackupLifecycleDescription')");
 
     const cloudPane = readWorkspaceFile('src/renderer/components/settings/CloudBackupLocationPane.vue');
-    expect(cloudPane).toContain('@click="createCloudBackup"');
-    expect(cloudPane).toContain("t('dataBackup.createCloudBackup')");
+    expect(cloudPane).toContain('defineExpose({ loading, createCloudBackup, refreshCloudBackupList })');
     expect(cloudPane).toContain("backupType: 'manual'");
     expect(cloudPane).toContain("trigger: 'manual'");
     expect(cloudPane).not.toContain('automaticBackupService');
@@ -194,7 +141,7 @@ describe('settings sync and backup information architecture', () => {
 
   it('renders retryable cloud errors as a scheduled warning while preserving error details', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
-    expect(source).toContain('const hasScheduledRetry = computed');
+    expect(source).toContain("case 'retryScheduled': return t('dataSync.statusRetryScheduled');");
     expect(source).toContain("t('dataSync.statusRetryScheduled')");
     expect(source).toContain('syncStatus.value.nextSyncAt');
     expect(source).toContain('@click="showCurrentSyncError"');
@@ -211,15 +158,18 @@ describe('settings sync and backup information architecture', () => {
     // whether pendingChanges matters. Pin the wiring so both are forced through the
     // same resolveDataSyncStatusKind() result and neither one re-inlines its own
     // pendingChanges/status branching.
-    expect(source).toContain(
-      "import { resolveDataSyncAlertType, resolveDataSyncStatusKind } from '@/lib/utils/data-sync-status';",
-    );
-    expect(source).toContain('const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind({');
-    // pendingChanges must be passed through unconditionally -- not gated behind a
-    // `syncStatus.value.status === 'scheduled' &&` check, which is exactly the
-    // asymmetry that caused the reported bug.
-    expect(source).toMatch(/pendingChanges:\s*!!syncStatus\.value\.pendingChanges,/);
+    // #425: the card and the status-bar indicator must also build that input the same way,
+    // so both go through createDataSyncStatusInput() instead of mapping the service status
+    // by hand (they used to disagree about pendingChanges after the first sync).
+    expect(source).toContain('const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind(createDataSyncStatusInput(syncStatus.value, {');
+    expect(source).toContain('hasStorageConfigs: hasEnabledStorage.value,');
     expect(source).not.toMatch(/status\s*===\s*'scheduled'\s*&&\s*syncStatus\.value\.pendingChanges/);
+    const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
+    expect(indicator).toContain('resolveDataSyncStatusKind(createDataSyncStatusInput(status.value, {');
+    const util = readWorkspaceFile('src/renderer/lib/utils/data-sync-status.ts');
+    // pendingChanges must be passed through unconditionally -- not gated behind a
+    // `status === 'scheduled' &&` check, which is exactly the asymmetry that caused the reported bug.
+    expect(util).toMatch(/pendingChanges:\s*!!snapshot\.pendingChanges,/);
 
     const statusAlertTypeStart = source.indexOf('const statusAlertType = computed');
     const statusAlertTypeEnd = source.indexOf(');', statusAlertTypeStart);
@@ -235,25 +185,52 @@ describe('settings sync and backup information architecture', () => {
     expect(statusTitleBody).not.toContain('syncStatus.value.pendingChanges');
   });
 
-  it('formats sync timestamps as yyyy-MM-dd HH:mm:ss using the shared date util', () => {
+  it('formats sync timestamps with the localized friendly date shared with the backup list (#464)', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
-    expect(source).toContain("import { formatDateTime } from '@/lib/utils/date';");
-    expect(source).toContain("t('dataSync.lastSyncAt', { time: formatDateTime(syncStatus.lastSyncAt) })");
-    expect(source).toContain('time: formatDateTime(syncStatus.value.nextSyncAt!)');
+    expect(source).toContain("import { formatFriendlyDate } from '@/lib/utils/date';");
+    expect(source).toContain('formatFriendlyDate(value, locale.value, { withTime: true })');
+    expect(source).toContain("t('dataSync.lastSyncAt', { time: formatSyncTime(syncStatus.lastSyncAt) })");
+    expect(source).toContain('time: formatSyncTime(syncStatus.value.nextSyncAt!)');
+    expect(source).not.toContain('formatDateTime(');
     expect(source).not.toContain('toLocaleString()');
 
-    const util = readWorkspaceFile('src/renderer/lib/utils/date.ts');
-    expect(util).toMatch(/`\$\{year\}-\$\{month\}-\$\{day\} \$\{hours\}:\$\{minutes\}:\$\{seconds\}`/);
+    const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
+    expect(indicator).toContain("import { formatFriendlyDate, formatRelativeTime } from '~/lib/utils/date';");
+    expect(indicator).not.toContain('formatDateTime(');
+    expect(indicator).not.toContain('Intl.DateTimeFormat');
+  });
+
+  it('only mentions the retry once and keeps diagnostics folded (#464)', () => {
+    const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
+    const retryStart = source.indexOf("case 'retryScheduled': return t('dataSync.statusRetryScheduledDescription'");
+    // 说明里本来就写着「会自动重试」，状态卡片只取原因（标题），不再把说明和重试时间拼在一起
+    expect(source.slice(retryStart, retryStart + 200)).toContain('error: syncStatusDiagnosis.value.title');
+    expect(source).toMatch(/<details class="sync-error__tech">\s*<summary>\{\{ t\('dataSync\.technicalDetails'\) \}\}<\/summary>/);
 
     const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
-    expect(indicator).toContain("import { formatDateTime } from '~/lib/utils/date';");
-    expect(indicator).not.toContain('Intl.DateTimeFormat');
+    expect(indicator).toContain("case 'retryScheduled': return 'retrying';");
+    expect(indicator).toContain("t('dataSync.indicatorShortRetrying')");
+    expect(indicator).toMatch(/<details class="cloud-sync-tech">[\s\S]*?<pre class="cloud-sync-raw-error">/);
+
+    // 检查间隔超出范围时就地说明，不靠 NInputNumber 的 min / max 悄悄改值
+    const intervalStart = source.indexOf('class="sync-interval"');
+    expect(source.slice(intervalStart, intervalStart + 600)).not.toContain(':min="MIN_CLOUD_SYNC_INTERVAL_MINUTES"');
+    expect(source).toContain("t('dataSync.syncIntervalTooShort', { min: MIN_CLOUD_SYNC_INTERVAL_MINUTES })");
+    expect(source).toContain('syncIntervalError.value = checked.error;');
+
+    for (const locale of ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT']) {
+      const messages = JSON.parse(readWorkspaceFile(`src/renderer/i18n/locales/${locale}.json`));
+      const template: string = messages.dataSync.statusRetryScheduledDescription;
+      expect(template, locale).not.toMatch(/[。.]\s*[；;]|[；;]\s*$/);
+      expect(messages.dataSync.syncIntervalDescription, locale).toContain('{min}');
+      expect(messages.dataSync.syncIntervalDescription, locale).toContain('{hours}');
+    }
   });
 
   it('routes the cloud sync status indicator strings through i18n', () => {
     const indicator = readWorkspaceFile('src/renderer/components/common/CloudSyncStatusIndicator.vue');
     expect(indicator).toContain("import { useI18n } from 'vue-i18n';");
-    expect(indicator).toContain("const { t } = useI18n();");
+    expect(indicator).toContain("const { t, locale } = useI18n();");
     expect(indicator).toContain("t('dataSync.indicatorSyncNormal')");
     expect(indicator).toContain("t('dataSync.indicatorIdle')");
     expect(indicator).toContain("t('dataSync.indicatorWaitingNextSync')");
@@ -266,7 +243,7 @@ describe('settings sync and backup information architecture', () => {
     const expected = {
       'zh-CN': ['数据同步', '数据备份', '通用设置'],
       'zh-TW': ['資料同步', '資料備份', '一般設定'],
-      'en-US': ['Data Sync', 'Data Backup', 'General Settings'],
+      'en-US': ['Data sync', 'Data backup', 'General settings'],
       'ja-JP': ['データ同期', 'データバックアップ', '一般設定'],
       'it-IT': ['Sincronizzazione dati', 'Backup dei dati', 'Impostazioni generali'],
     } as const;

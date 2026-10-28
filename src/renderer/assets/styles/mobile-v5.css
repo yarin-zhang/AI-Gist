@@ -1,0 +1,723 @@
+/*
+ * V5 移动端基础样式（对应设计稿「V5 · 移动」画板与组件库的 m-* 规格）。
+ * 颜色、阴影全部取共享令牌；尺寸按 iOS 习惯：卡片圆角 16、底部面板 28、
+ * 分组行最低 54、主按钮 50、胶囊芯片 34、点按区域不小于 44。
+ * 页面只用这里的类和 components/mobile/ui 下的组件拼装，不再各写一套。
+ */
+html.ai-gist-mobile {
+  --m-gutter: 16px;
+  --m-radius-card: 16px;
+  --m-radius-sheet: 28px;
+  --m-radius-tile: 9px;
+  --m-radius-cta: 14px;
+  --m-row-height: 54px;
+  --m-font-caption: 12px;
+  --m-font-sub: 14px;
+  --m-font-body: 16px;
+  --m-font-block: 22px;
+  --m-font-title: 28px;
+  /* 底部胶囊导航占用的高度（含与屏幕底边的间距），页面底部留白用它避让 */
+  --m-tabbar-clearance: calc(64px + 30px + env(safe-area-inset-bottom, 0px));
+  /* 悬浮新建按钮（56 高，离导航 22）顶边到屏幕底边的距离，有悬浮按钮的列表底部按它留白 */
+  --m-fab-clearance: calc(var(--m-tabbar-clearance) + 22px + 56px);
+}
+
+/* ---------- 页面骨架 ---------- */
+html.ai-gist-mobile .m-page-content {
+  --background: var(--surface-body);
+}
+
+/* 顶部淡蓝晕染，只在 Tab 根页面使用 */
+html.ai-gist-mobile .m-wash {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 320px;
+  background:
+    radial-gradient(110% 75% at 0% 0%, color-mix(in srgb, var(--accent-brand) 22%, transparent) 0%, transparent 62%),
+    radial-gradient(80% 60% at 100% 0%, color-mix(in srgb, var(--accent-brand) 12%, transparent) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+html.ai-gist-mobile .m-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 0 20px;
+}
+
+html.ai-gist-mobile .m-title {
+  margin: 0;
+  color: var(--content-primary);
+  font-size: var(--m-font-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+html.ai-gist-mobile .m-subtitle {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+}
+
+html.ai-gist-mobile .m-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px var(--m-gutter) 24px;
+}
+
+html.ai-gist-mobile .m-body--tabbed {
+  padding-bottom: calc(var(--m-tabbar-clearance) + 24px);
+}
+
+/* 右下角有悬浮按钮的页面：滚到底时最后一张卡片完整露在按钮上方 */
+html.ai-gist-mobile .m-body--fab {
+  padding-bottom: calc(var(--m-fab-clearance) + 16px);
+}
+
+/* ---------- 导航栏 ---------- */
+html.ai-gist-mobile .m-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 12px;
+}
+
+html.ai-gist-mobile .m-nav-t {
+  flex: 1;
+  overflow: hidden;
+  color: var(--content-primary);
+  font-size: var(--m-font-body);
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.ai-gist-mobile .m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--m-font-body);
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-btn-c {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  color: var(--content-primary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-btn-c--plain {
+  width: 36px;
+  height: 36px;
+  background: var(--surface-tertiary);
+  box-shadow: none;
+  color: var(--accent-primary);
+}
+
+html.ai-gist-mobile .m-save {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 17px;
+  background: var(--accent-primary);
+  color: var(--content-inverse, #fff);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-save:disabled {
+  opacity: 0.45;
+}
+
+/* ---------- 卡片与分组列表 ---------- */
+html.ai-gist-mobile .m-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--m-radius-card);
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  color: var(--content-primary);
+  text-decoration: none;
+}
+
+html.ai-gist-mobile .m-section {
+  display: flex;
+  flex-direction: column;
+}
+
+html.ai-gist-mobile .m-gt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 8px;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+  font-weight: 600;
+}
+
+html.ai-gist-mobile .m-gt a,
+html.ai-gist-mobile .m-gt button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-group {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--m-radius-card);
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+}
+
+html.ai-gist-mobile .m-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--m-row-height);
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--m-font-body);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-row:active {
+  background: var(--surface-secondary);
+}
+
+html.ai-gist-mobile .m-row--static {
+  cursor: default;
+}
+
+html.ai-gist-mobile .m-row--static:active {
+  background: transparent;
+}
+
+html.ai-gist-mobile .m-row + .m-row::before,
+html.ai-gist-mobile .m-field + .m-field::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 16px;
+  height: 1px;
+  background: var(--border-subtle);
+  content: "";
+}
+
+html.ai-gist-mobile .m-group.ic .m-row + .m-row::before {
+  left: 58px;
+}
+
+html.ai-gist-mobile .m-row .two {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+html.ai-gist-mobile .m-row .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * 右侧是文字值的行（标题都是固定的短标签）：标题至少保留最长一个词的宽度，不会在单词中间拆开；
+ * 放不下时由右侧的值收缩并以省略号结尾（例如意大利语的「Impostazioni generali」）。
+ */
+html.ai-gist-mobile .m-row:has(> .end > span:not(.m-pill)) > .title {
+  min-width: min-content;
+}
+
+html.ai-gist-mobile .m-row .sub {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+}
+
+html.ai-gist-mobile .m-row > .end {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  max-width: 55%;
+  margin-left: auto;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-sub);
+}
+
+html.ai-gist-mobile .m-row > .end > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态标记是完整的短词，不参与收缩 */
+html.ai-gist-mobile .m-row > .end > .m-pill {
+  flex: none;
+}
+
+html.ai-gist-mobile .m-row .chev {
+  flex: none;
+  color: var(--border-strong);
+  font-size: 18px;
+}
+
+html.ai-gist-mobile .m-row--danger {
+  justify-content: center;
+  color: var(--accent-error);
+  font-weight: 500;
+}
+
+/* 彩色图标方块：颜色来自分类色或语义色 */
+html.ai-gist-mobile .m-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--m-radius-tile);
+  background: var(--category-blue);
+  color: #fff;
+  font-size: 17px;
+}
+
+html.ai-gist-mobile .m-tile-lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 22px;
+}
+
+html.ai-gist-mobile .m-tile--blue { background: var(--category-blue); }
+html.ai-gist-mobile .m-tile--orange { background: var(--category-orange); }
+html.ai-gist-mobile .m-tile--pink { background: var(--category-pink); }
+html.ai-gist-mobile .m-tile--violet { background: var(--category-violet); }
+html.ai-gist-mobile .m-tile--green { background: var(--category-green); }
+html.ai-gist-mobile .m-tile--teal { background: var(--category-teal); }
+html.ai-gist-mobile .m-tile--amber { background: var(--category-amber); }
+html.ai-gist-mobile .m-tile--grey { background: var(--content-tertiary); }
+html.ai-gist-mobile .m-tile--success { background: var(--accent-success-bg); color: var(--accent-success); }
+html.ai-gist-mobile .m-tile--warning { background: var(--accent-warning-bg); color: var(--accent-warning); }
+html.ai-gist-mobile .m-tile--error { background: var(--accent-error-bg); color: var(--accent-error); }
+html.ai-gist-mobile .m-tile--soft { background: var(--accent-soft); color: var(--accent-primary); }
+
+/* ---------- 表单 ---------- */
+html.ai-gist-mobile .m-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 16px;
+}
+
+html.ai-gist-mobile .m-field > span,
+html.ai-gist-mobile .m-field > label {
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+  font-weight: 500;
+}
+
+html.ai-gist-mobile .m-field input,
+html.ai-gist-mobile .m-field textarea,
+html.ai-gist-mobile .m-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--m-font-body);
+}
+
+html.ai-gist-mobile .m-field textarea {
+  resize: none;
+  line-height: 1.6;
+}
+
+html.ai-gist-mobile .m-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: var(--m-radius-card);
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  color: var(--content-tertiary);
+  font-size: 18px;
+}
+
+html.ai-gist-mobile .m-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--content-primary);
+  font: inherit;
+  font-size: var(--m-font-body);
+}
+
+html.ai-gist-mobile .m-input input::placeholder,
+html.ai-gist-mobile .m-field input::placeholder,
+html.ai-gist-mobile .m-field textarea::placeholder {
+  color: var(--content-muted);
+}
+
+/* ---------- 按钮、芯片、标记 ---------- */
+/*
+ * 主按钮经常和别的按钮排在一行、由页面自己定宽高（例如填写面板里固定 104px 的「上一个」），
+ * 所以这里用 :where 把优先级降到单个类名，让页面里的覆盖生效。
+ */
+:where(html.ai-gist-mobile) .m-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+  border: 0;
+  border-radius: var(--m-radius-cta);
+  background: var(--accent-primary);
+  color: var(--content-inverse, #fff);
+  font: inherit;
+  font-size: var(--m-font-body);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:where(html.ai-gist-mobile) .m-cta:disabled {
+  opacity: 0.5;
+}
+
+:where(html.ai-gist-mobile) .m-cta-2 {
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  color: var(--content-primary);
+}
+
+html.ai-gist-mobile .m-danger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-error);
+  font: inherit;
+  font-size: var(--m-font-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 17px;
+  background: var(--surface-primary);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--content-secondary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-chip.on {
+  background: var(--accent-primary);
+  box-shadow: none;
+  color: var(--content-inverse, #fff);
+}
+
+html.ai-gist-mobile .m-chip-lg {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 22px;
+  font-size: var(--m-font-body);
+}
+
+html.ai-gist-mobile .m-chips {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(var(--m-gutter) * -1);
+  padding: 2px var(--m-gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+html.ai-gist-mobile .m-chips::-webkit-scrollbar {
+  display: none;
+}
+
+html.ai-gist-mobile .m-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--surface-tertiary);
+  color: var(--content-secondary);
+  font-size: var(--m-font-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+html.ai-gist-mobile .m-pill-var { background: var(--variable-bg); color: var(--variable-text); }
+html.ai-gist-mobile .m-pill-ok { background: var(--accent-success-bg); color: var(--accent-success); }
+html.ai-gist-mobile .m-pill-warn { background: var(--accent-warning-bg); color: var(--accent-warning); }
+html.ai-gist-mobile .m-pill-err { background: var(--accent-error-bg); color: var(--accent-error); }
+html.ai-gist-mobile .m-pill-blue { background: var(--accent-soft); color: var(--accent-soft-text); }
+
+html.ai-gist-mobile .m-seg {
+  display: flex;
+  padding: 3px;
+  border-radius: 13px;
+  background: var(--surface-tertiary);
+}
+
+html.ai-gist-mobile .m-seg > button {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--content-secondary);
+  font: inherit;
+  font-size: var(--m-font-sub);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+html.ai-gist-mobile .m-seg > button.on {
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  color: var(--content-primary);
+  font-weight: 600;
+}
+
+html.ai-gist-mobile .m-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
+  line-height: 1.6;
+}
+
+html.ai-gist-mobile .m-note > ion-icon {
+  flex: none;
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+html.ai-gist-mobile .m-desc {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+  line-height: 1.6;
+}
+
+/* 正文里的变量标记（移动端字号更大） */
+html.ai-gist-mobile .m-var {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--variable-bg);
+  box-shadow: inset 0 0 0 1px var(--variable-border);
+  color: var(--variable-text);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+html.ai-gist-mobile .m-var small {
+  margin-right: 4px;
+  color: var(--variable-label);
+  font-size: var(--m-font-caption);
+}
+
+html.ai-gist-mobile .m-var--name {
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+}
+
+html.ai-gist-mobile .m-var--missing {
+  background: var(--surface-primary);
+  box-shadow: none;
+  outline: 1.5px dashed var(--variable-missing);
+  outline-offset: -1.5px;
+  color: var(--accent-warning);
+}
+
+html.ai-gist-mobile .m-var--active {
+  box-shadow: inset 0 0 0 1px var(--accent-primary), var(--focus-ring);
+}
+
+/* ---------- 底部面板 ----------
+ * 面板停在 0.92 / 0.85 这类断点时，ion-modal 只是把整屏高的面板往下推，超出的部分在屏幕外。
+ * 底部有操作按钮的面板要给 ion-modal 加 :expand-to-scroll="false"：Ionic 会把面板内容的高度
+ * 限制在当前断点的可见范围内，正文区滚动，底部按钮始终贴着屏幕底边（拖到全屏时也一样）。
+ */
+html.ai-gist-mobile .m-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--m-radius-sheet) var(--m-radius-sheet) 0 0;
+  background: var(--surface-primary);
+}
+
+html.ai-gist-mobile .m-grab {
+  width: 40px;
+  height: 5px;
+  margin: 8px auto 0;
+  border-radius: 3px;
+  background: var(--border-strong);
+}
+
+html.ai-gist-mobile ion-modal.m-sheet-modal {
+  --border-radius: var(--m-radius-sheet);
+  --background: var(--surface-primary);
+  --box-shadow: var(--shadow-floating);
+}
+
+/* ---------- 悬浮按钮 ---------- */
+html.ai-gist-mobile .m-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--m-tabbar-clearance) + 22px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--accent-primary);
+  box-shadow: var(--shadow-floating);
+  color: var(--content-inverse, #fff);
+  font-size: 26px;
+  cursor: pointer;
+}
+
+/* ---------- 底部胶囊导航（覆盖 ion-tab-bar） ---------- */
+html.ai-gist-mobile .m-tabbar-wrap {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--surface-body) 92%, transparent) 45%);
+  pointer-events: none;
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar {
+  --background: transparent;
+  --border: 0;
+  --color: var(--content-tertiary);
+  --color-selected: var(--accent-soft-text);
+  height: 64px;
+  padding: 6px;
+  border: 0;
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--surface-primary) 90%, transparent);
+  box-shadow: var(--shadow-floating), inset 0 0 0 1px color-mix(in srgb, var(--surface-primary) 70%, transparent);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  pointer-events: auto;
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar ion-tab-button {
+  --color: var(--content-tertiary);
+  --color-selected: var(--accent-soft-text);
+  --background: transparent;
+  --ripple-color: transparent;
+  height: 52px;
+  margin: 0;
+  border-radius: 26px;
+  font-size: var(--m-font-caption);
+  font-weight: 500;
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar ion-tab-button.tab-selected {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar ion-tab-button ion-icon {
+  margin: 0 0 2px;
+  font-size: 20px;
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar ion-tab-button.tab-selected ion-icon {
+  color: var(--accent-primary);
+}
+
+html.ai-gist-mobile ion-tab-bar.m-tabbar ion-tab-button ion-label {
+  margin: 0;
+  font-size: var(--m-font-caption);
+}

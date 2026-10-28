@@ -5,6 +5,7 @@
 
 import { ref, computed, readonly } from 'vue';
 import { openExternalUrl } from '~/lib/platform/shell';
+import i18n from '~/i18n';
 
 export interface UpdateInfo {
   currentVersion: string;
@@ -233,7 +234,7 @@ export function useUpdate() {
    * 格式化日期
    */
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
+    return new Date(dateString).toLocaleDateString(String(i18n.global.locale.value), {
       year: 'numeric',
       month: 'long',
       day: 'numeric'

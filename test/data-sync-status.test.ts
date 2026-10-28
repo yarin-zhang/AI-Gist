@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createDataSyncStatusInput,
+  getDataSyncErrorSource,
   resolveDataSyncAlertType,
   resolveDataSyncStatusKind,
   type DataSyncStatusInput,
@@ -122,11 +124,74 @@ describe('resolveDataSyncStatusKind + resolveDataSyncAlertType', () => {
     expect(resolveDataSyncAlertType('notConfigured', notConfigured.canAutoRetryError)).toBe('info')
   })
 
+  it('shows a pending conflict as a warning ahead of paused and pending states', () => {
+    const input: DataSyncStatusInput = {
+      ...baseInput,
+      hasPendingConflict: true,
+      autoSyncEnabled: false,
+      pendingChanges: true,
+    }
+    expect(resolveDataSyncStatusKind(input)).toBe('conflict')
+    expect(resolveDataSyncAlertType('conflict', false)).toBe('warning')
+    expect(resolveDataSyncStatusKind({ ...input, isError: true })).toBe('error')
+  })
+
   it('never resolves an alert type of success for any kind other than current', () => {
-    const nonCurrentKinds = ['retryScheduled', 'paused', 'syncing', 'pending', 'ready', 'notConfigured'] as const
+    const nonCurrentKinds = ['retryScheduled', 'conflict', 'paused', 'syncing', 'pending', 'ready', 'notConfigured'] as const
     for (const kind of nonCurrentKinds) {
       expect(resolveDataSyncAlertType(kind, false)).not.toBe('success')
       expect(resolveDataSyncAlertType(kind, true)).not.toBe('success')
     }
+  })
+})
+
+describe('one status source for the settings card and the status bar (#425)', () => {
+  it('shows "sync is off" without any enabled storage, ignoring pending changes, errors or an old success', () => {
+    const noStorage: DataSyncStatusInput = {
+      ...baseInput,
+      hasStorageConfigs: false,
+      pendingChanges: true,
+      hasSucceededBefore: true,
+      isError: true,
+      hasScheduledRetry: true,
+      hasPendingConflict: true,
+    }
+    expect(resolveDataSyncStatusKind(noStorage)).toBe('notConfigured')
+  })
+
+  it('maps a service status the same way for both surfaces', () => {
+    const afterFirstSync = createDataSyncStatusInput(
+      { status: 'success', pending: false, lastSyncAt: '2026-01-01T00:00:00.000Z', pendingChanges: false, hasEnabledStorage: true },
+      { canAutoRetryError: false },
+    )
+    expect(resolveDataSyncStatusKind(afterFirstSync)).toBe('current')
+
+    // 状态栏还没查过存储列表时按「有存储」处理；查过之后没有存储就是「未开启同步」
+    const unknownStorage = createDataSyncStatusInput({ status: 'scheduled', pending: true, nextSyncAt: 'x', pendingChanges: true }, { canAutoRetryError: false })
+    expect(resolveDataSyncStatusKind(unknownStorage)).toBe('pending')
+    const noStorage = createDataSyncStatusInput(
+      { status: 'scheduled', pending: true, nextSyncAt: 'x', pendingChanges: true, hasEnabledStorage: false },
+      { canAutoRetryError: false },
+    )
+    expect(resolveDataSyncStatusKind(noStorage)).toBe('notConfigured')
+
+    // 设置页手里的存储列表和开关优先
+    const fromSettingsPage = createDataSyncStatusInput(
+      { status: 'idle', hasEnabledStorage: true, autoSyncEnabled: true },
+      { canAutoRetryError: false, hasStorageConfigs: false, autoSyncEnabled: false },
+    )
+    expect(fromSettingsPage).toMatchObject({ hasStorageConfigs: false, autoSyncEnabled: false })
+
+    const retry = createDataSyncStatusInput({ status: 'error', pending: true, nextSyncAt: 'x' }, { canAutoRetryError: true })
+    expect(resolveDataSyncStatusKind(retry)).toBe('retryScheduled')
+    const paused = createDataSyncStatusInput({ status: 'idle', autoSyncEnabled: false }, { canAutoRetryError: false })
+    expect(resolveDataSyncStatusKind(paused)).toBe('paused')
+  })
+
+  it('diagnoses the latest failed result, not a stale success left over from before an auto retry', () => {
+    const failed = { success: false, error: '401 Unauthorized' }
+    expect(getDataSyncErrorSource({ error: 'x', lastResult: failed })).toBe(failed)
+    expect(getDataSyncErrorSource({ error: 'socket hang up', lastResult: { success: true } })).toBe('socket hang up')
+    expect(getDataSyncErrorSource({ lastResult: { success: true, error: undefined } })).toBeUndefined()
   })
 })

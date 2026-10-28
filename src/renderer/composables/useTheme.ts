@@ -26,6 +26,8 @@ const themeSource = ref<ThemeSource>('system')
 const themeName = ref<ThemeNameEnum>(initialTheme === 'dark' ? ThemeNameEnum.Dark : ThemeNameEnum.Light)
 
 let removeThemeListener: (() => void) | null = null
+// 每次切换主题的序号：连续快速切换时以最后一次为准，晚到的旧结果不再覆盖 (#444)
+let themeRequestSeq = 0
 
 function getShell() {
 	return PlatformDetector.isMobileShell() ? 'mobile' as const : 'desktop' as const
@@ -98,18 +100,21 @@ export function useTheme() {
 	}
 
 	const setThemeSource = async (source: ThemeSource) => {
+		const request = ++themeRequestSeq
 		try {
 			themeSource.value = source
 			if (!window.electronAPI?.theme) {
+				// 先切界面再存偏好：界面立刻跟上，也不会被更早一次还没存完的切换盖回去
 				localStorage.setItem('theme', source)
-				await preferencesClient.set({ themeSource: source })
 				applyResolvedTheme(resolveTheme(source, getSystemThemePreference()))
 				setupSystemThemeListener()
+				await preferencesClient.set({ themeSource: source })
 				return
 			}
 
 			await window.electronAPI.theme.setSource(source)
 			const themeInfo = await window.electronAPI.theme.getInfo()
+			if (request !== themeRequestSeq) return
 			themeSource.value = themeInfo.themeSource as ThemeSource
 			applyResolvedTheme(themeInfo.isDarkTheme ? 'dark' : 'light')
 			setupElectronThemeListener()

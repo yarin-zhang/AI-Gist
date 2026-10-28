@@ -1,71 +1,29 @@
+<!--
+  提示词列表的瀑布流显示方式：两列卡片，按估算高度贪心分配到较矮的一列。
+  有附图的提示词以第一张图作封面。
+-->
 <template>
-  <div class="waterfall-container">
-    <div class="waterfall-column">
-      <div
-        v-for="item in leftColumn"
-        :key="item.prompt.id"
-        class="waterfall-card"
-        @click="$emit('view', item.prompt)"
-      >
-        <div v-if="item.imageUrl" class="card-image-wrapper">
-          <img :src="item.imageUrl" class="card-image" loading="lazy" />
-        </div>
-        <div class="card-content">
-          <p class="card-title">{{ item.prompt.title || getFirstLine(item.prompt.content) }}</p>
-          <p v-if="item.prompt.description" class="card-desc">{{ item.prompt.description }}</p>
-          <div v-if="getTagList(item.prompt).length" class="card-tags">
-            <span
-              v-for="tag in getTagList(item.prompt).slice(0, 2)"
-              :key="tag"
-              class="card-tag"
-            >{{ tag }}</span>
-          </div>
-          <div class="card-footer">
-            <span v-if="item.prompt.categoryId" class="card-category">
-              {{ getCategoryName(item.prompt.categoryId) }}
+  <div class="waterfall">
+    <div v-for="(column, columnIndex) in [leftColumn, rightColumn]" :key="columnIndex" class="waterfall__column">
+      <button v-for="item in column" :key="item.prompt.id" type="button" class="m-card waterfall__card"
+        @click="emit('view', item.prompt)">
+        <img v-if="item.imageUrl" :src="item.imageUrl" class="waterfall__image" loading="lazy" alt="" />
+        <span class="waterfall__content">
+          <span class="waterfall__title-row">
+            <span class="waterfall__title">{{ promptDisplayTitle(item.prompt, t('promptLibrary.untitled'), 40) }}</span>
+            <ion-icon v-if="item.prompt.isFavorite" :icon="star" class="waterfall__star"
+              :aria-label="t('promptLibrary.favorited')" />
+          </span>
+          <span v-if="promptSnippet(item.prompt)" class="waterfall__desc">{{ promptSnippet(item.prompt) }}</span>
+          <span class="waterfall__meta">
+            <span v-if="item.variableCount" class="m-pill m-pill-var">{{ t('promptLibrary.variableCount', { count: item.variableCount }) }}</span>
+            <span class="waterfall__category">
+              <span class="waterfall__dot" :style="{ background: categoryColor(categoryOf(item.prompt)) }" aria-hidden="true" />
+              {{ categoryOf(item.prompt)?.name || t('promptLibrary.uncategorized') }}
             </span>
-            <ion-icon
-              v-if="item.prompt.isFavorite"
-              :icon="heart"
-              class="card-favorite"
-            ></ion-icon>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="waterfall-column">
-      <div
-        v-for="item in rightColumn"
-        :key="item.prompt.id"
-        class="waterfall-card"
-        @click="$emit('view', item.prompt)"
-      >
-        <div v-if="item.imageUrl" class="card-image-wrapper">
-          <img :src="item.imageUrl" class="card-image" loading="lazy" />
-        </div>
-        <div class="card-content">
-          <p class="card-title">{{ item.prompt.title || getFirstLine(item.prompt.content) }}</p>
-          <p v-if="item.prompt.description" class="card-desc">{{ item.prompt.description }}</p>
-          <div v-if="getTagList(item.prompt).length" class="card-tags">
-            <span
-              v-for="tag in getTagList(item.prompt).slice(0, 2)"
-              :key="tag"
-              class="card-tag"
-            >{{ tag }}</span>
-          </div>
-          <div class="card-footer">
-            <span v-if="item.prompt.categoryId" class="card-category">
-              {{ getCategoryName(item.prompt.categoryId) }}
-            </span>
-            <ion-icon
-              v-if="item.prompt.isFavorite"
-              :icon="heart"
-              class="card-favorite"
-            ></ion-icon>
-          </div>
-        </div>
-      </div>
+          </span>
+        </span>
+      </button>
     </div>
   </div>
 </template>
@@ -73,13 +31,17 @@
 <script setup lang="ts">
 import { computed, onUnmounted, watch } from 'vue'
 import { IonIcon } from '@ionic/vue'
-import { heart } from 'ionicons/icons'
+import { star } from 'ionicons/icons'
 import type { Prompt, Category } from '@shared/types'
-import { getTagsArray } from '~/lib/utils/tag-colors'
+import type { PromptWithRelations } from '@shared/types/database'
+import { useI18n } from '~/composables/useI18n'
+import { getActivePromptVariables } from '~/lib/utils/prompt-template'
+import { categoryColor, promptDisplayTitle, promptSnippet } from './prompt/prompt-meta'
 
 interface WaterfallItem {
   prompt: Prompt
   imageUrl: string | null
+  variableCount: number
 }
 
 const props = defineProps<{
@@ -87,61 +49,53 @@ const props = defineProps<{
   categories: Category[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   view: [prompt: Prompt]
 }>()
 
-// 生成的 object URLs，用于后续清理
+const { t } = useI18n()
+
+// 生成的 object URL，列表变化或卸载时统一回收
 const objectUrls: string[] = []
 
-const getCategoryName = (categoryId: number | undefined) => {
-  if (!categoryId) return ''
-  return props.categories.find(c => c.id === categoryId)?.name || ''
-}
-
-const getFirstLine = (content: string | undefined) => {
-  if (!content) return ''
-  const line = content.split('\n')[0].trim()
-  return line.length > 40 ? line.substring(0, 40) + '…' : line
-}
-
-const getTagList = (prompt: Prompt): string[] => {
-  return getTagsArray(prompt.tags)
-}
+const categoryById = computed(() => new Map(props.categories.map(category => [category.id, category])))
+const categoryOf = (prompt: Prompt) => (prompt.categoryId ? categoryById.value.get(prompt.categoryId) : undefined)
 
 const buildImageUrl = (prompt: Prompt): string | null => {
-  if (!prompt.imageBlobs?.length) return null
-  const url = URL.createObjectURL(prompt.imageBlobs[0])
+  const blob = prompt.imageBlobs?.find(item => item instanceof Blob && item.size > 0)
+  if (!blob) return null
+  const url = URL.createObjectURL(blob)
   objectUrls.push(url)
   return url
 }
 
-// 估算 card 高度（用于贪心列分配）
+// 估算卡片高度（用于贪心分配列）
 const estimateHeight = (prompt: Prompt): number => {
-  let h = 72 // title + footer base
-  if (prompt.imageBlobs?.length) h += 160
-  if (prompt.description) h += 36
-  if (getTagList(prompt).length) h += 26
-  return h
+  let height = 96
+  if (prompt.imageBlobs?.length) height += 160
+  if (promptSnippet(prompt)) height += 40
+  return height
 }
 
-// 贪心分配：将 prompt 分配到更短的列
 const columns = computed<{ left: WaterfallItem[]; right: WaterfallItem[] }>(() => {
   const left: WaterfallItem[] = []
   const right: WaterfallItem[] = []
-  let leftH = 0
-  let rightH = 0
+  let leftHeight = 0
+  let rightHeight = 0
 
   for (const prompt of props.prompts) {
-    const imageUrl = buildImageUrl(prompt)
-    const item: WaterfallItem = { prompt, imageUrl }
-    const h = estimateHeight(prompt)
-    if (leftH <= rightH) {
+    const item: WaterfallItem = {
+      prompt,
+      imageUrl: buildImageUrl(prompt),
+      variableCount: getActivePromptVariables(prompt as PromptWithRelations).length,
+    }
+    const height = estimateHeight(prompt)
+    if (leftHeight <= rightHeight) {
       left.push(item)
-      leftH += h
+      leftHeight += height
     } else {
       right.push(item)
-      rightH += h
+      rightHeight += height
     }
   }
 
@@ -151,132 +105,122 @@ const columns = computed<{ left: WaterfallItem[]; right: WaterfallItem[] }>(() =
 const leftColumn = computed(() => columns.value.left)
 const rightColumn = computed(() => columns.value.right)
 
-// 当 prompts 变化时，清理旧 URL 并重新生成（computed 会重建）
-watch(
-  () => props.prompts,
-  () => {
-    revokeAll()
-  },
-  { flush: 'pre' }
-)
-
 const revokeAll = () => {
   objectUrls.forEach(url => URL.revokeObjectURL(url))
   objectUrls.length = 0
 }
 
-onUnmounted(() => {
-  revokeAll()
-})
+// prompts 变化时先回收旧 URL，computed 随后重建
+watch(() => props.prompts, revokeAll, { flush: 'pre' })
+
+onUnmounted(revokeAll)
 </script>
 
 <style scoped>
-.waterfall-container {
+.waterfall {
   display: flex;
-  gap: 8px;
-  padding: 8px;
   align-items: flex-start;
+  gap: 10px;
 }
 
-.waterfall-column {
-  flex: 1;
+.waterfall__column {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
-.waterfall-card {
-  background: var(--surface-primary);
-  border-radius: 10px;
+.waterfall__card {
   overflow: hidden;
-  border: 1px solid var(--border-default);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.15s;
 }
 
-.waterfall-card:active {
-  opacity: 0.7;
+.waterfall__card:active {
+  opacity: 0.75;
 }
 
-.card-image-wrapper {
-  width: 100%;
-  line-height: 0;
-  border-radius: var(--radius-image, 8px);
-  overflow: hidden;
-}
-
-.card-image {
-  width: 100%;
-  height: auto;
+.waterfall__image {
   display: block;
+  width: 100%;
+  max-height: 240px;
   object-fit: cover;
-  border-radius: var(--radius-image, 8px);
+  background: var(--surface-secondary);
 }
 
-.card-content {
-  padding: 8px 10px 10px;
+.waterfall__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
 }
 
-.card-title {
-  font-size: var(--mobile-font-size-body);
-  font-weight: 600;
+.waterfall__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.waterfall__title {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   color: var(--content-primary);
-  margin: 0 0 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
+  font-size: var(--m-font-body);
+  font-weight: 600;
+  line-height: 1.35;
   -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: var(--mobile-line-height-normal);
+  -webkit-line-clamp: 2;
 }
 
-.card-desc {
-  font-size: var(--mobile-font-size-footnote);
+.waterfall__star {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-favorite);
+  font-size: 16px;
+}
+
+.waterfall__desc {
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--content-secondary);
-  margin: 0 0 6px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
+  font-size: var(--m-font-sub);
+  line-height: 1.45;
   -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: var(--mobile-line-height-normal);
+  -webkit-line-clamp: 3;
 }
 
-.card-tags {
+.waterfall__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-
-.card-tag {
-  font-size: var(--mobile-font-size-caption);
-  padding: 2px 6px;
-  border-radius: 10px;
-  background: var(--surface-secondary);
-  color: var(--content-secondary);
-  white-space: nowrap;
-}
-
-.card-footer {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 18px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
-.card-category {
-  font-size: var(--mobile-font-size-caption);
-  color: var(--ion-color-primary, #3880ff);
+.waterfall__category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   overflow: hidden;
+  color: var(--content-tertiary);
+  font-size: var(--m-font-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: calc(100% - 20px);
 }
 
-.card-favorite {
-  font-size: var(--mobile-icon-size-sm);
-  color: var(--ion-color-danger, #eb445a);
-  flex-shrink: 0;
+.waterfall__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 2px;
 }
 </style>

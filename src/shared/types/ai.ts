@@ -102,6 +102,20 @@ export interface AIConfigTestResult {
 }
 
 /**
+ * 「获取模型列表」的结果。
+ * - remote：models 是从服务实际拿到的列表
+ * - default：服务本身不提供模型列表接口，models 是内置的常见模型名
+ * - unavailable：没拿到（请求失败时 error 是原因，服务返回空列表时没有 error），models 为空；
+ *   内置常见模型放在 fallbackModels，由用户明确选择是否使用，不能冒充成功
+ */
+export interface AIModelListResult {
+  models: string[];
+  modelSource: 'remote' | 'default' | 'unavailable';
+  fallbackModels?: string[];
+  error?: string;
+}
+
+/**
  * AI 模型信息
  */
 export interface AIModelInfo {

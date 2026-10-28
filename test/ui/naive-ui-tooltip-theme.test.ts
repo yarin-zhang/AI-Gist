@@ -46,7 +46,7 @@ describe('Naive UI tooltip theme integration', () => {
     expect(tooltip!.style.getPropertyValue('--n-color')).toBe(palette.surface.primary);
     expect(tooltip!.style.getPropertyValue('--n-text-color')).toBe(palette.content.primary);
     expect(tooltip!.style.getPropertyValue('--n-border-radius')).toBe(tokens.component.panelRadius);
-    expect(tooltip!.style.getPropertyValue('--n-box-shadow')).toBe(tokens.elevation.popover);
+    expect(tooltip!.style.getPropertyValue('--n-box-shadow')).toBe(palette.elevation.popover);
     expect(tooltip!.querySelector('.n-popover-arrow')).not.toBeNull();
   });
 });

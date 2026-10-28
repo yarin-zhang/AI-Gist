@@ -1,79 +1,62 @@
 <script setup lang="ts">
-import { ref, h, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
-import {
-    NLayout,
-    NLayoutSider,
-    NLayoutContent,
-    NLayoutFooter,
-    NMenu,
-    MenuOption,
-    NIcon,
-    NFlex,
-    NText,
-    NButton
-} from 'naive-ui'
-import {
-    ChevronLeft,
-    ChevronRight
-} from '@vicons/tabler'
-import {
-    AIConfigNavigationIcon,
-    PromptNavigationIcon,
-    SettingsNavigationIcon,
-} from '@/theme/navigation-icons'
+import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { PlatformDetector } from '@shared/platform'
 
 import SettingsPage from './SettingsPage.vue'
-import PromptManagementPage from './PromptManagementPage.vue'
-import AIConfigPage from './AIConfigPage.vue'
-import StatusBar from '~/components/common/StatusBar.vue'
+import PromptsPage from './PromptsPage.vue'
+import ModelsPage from './ModelsPage.vue'
+import AppRail from '~/components/layout/AppRail.vue'
+import AppStatusBar from '~/components/layout/AppStatusBar.vue'
+import SyncConflictModal from '~/components/sync/SyncConflictModal.vue'
+import type { AppView } from '~/components/layout/types'
+import { useLauncherShortcut } from '~/composables/useLauncherShortcut'
 
-const { t } = useI18n()
-const currentView = ref('prompts')
+const currentView = ref<AppView>('prompts')
 const settingsTargetSection = ref<string>()
-const appIcon = new URL('../assets/images/logo.png', import.meta.url).href
+const capabilities = PlatformDetector.getCapabilities()
+const launcher = useLauncherShortcut()
 
 // 组件引用
-const aiConfigPageRef = ref()
+const modelsPageRef = ref()
 const promptManagementPageRef = ref()
 
-// 菜单选项
-const menuOptions: MenuOption[] = [
-    {
-        label: t('mainPage.menu.prompts'),
-        key: 'prompts',
-        icon: () => h(NIcon, null, { default: () => h(PromptNavigationIcon) })
-    },
-    {
-        label: t('mainPage.menu.aiConfig'),
-        key: 'ai-config',
-        icon: () => h(NIcon, null, { default: () => h(AIConfigNavigationIcon) })
-    },
-    {
-        label: t('mainPage.menu.settings'),
-        key: 'settings',
-        icon: () => h(NIcon, null, { default: () => h(SettingsNavigationIcon) })
-    }
-]
+// 提示词页切走时会被卸载，未保存的草稿和修改会跟着丢掉，所以离开前先让它确认
+const canLeave = async (target: AppView) => {
+    if (currentView.value !== 'prompts' || target === 'prompts') return true
+    return (await promptManagementPageRef.value?.confirmLeave?.()) ?? true
+}
 
-const handleMenuSelect = (key: string) => {
-    currentView.value = key
+// 从提示词引导页去连接模型时为 true：保存好配置后回到提示词页，引导页里写的描述还在，可以直接生成
+const returnToPromptsAfterModelSaved = ref(false)
+
+const handleNavigate = async (view: AppView) => {
+    if (!(await canLeave(view))) return
+    currentView.value = view
+    returnToPromptsAfterModelSaved.value = false
     // 如果不是通过特定方式打开设置页面，重置目标区域
-    if (key !== 'settings') {
-        settingsTargetSection.value = undefined;
+    if (view !== 'settings') {
+        settingsTargetSection.value = undefined
     }
 }
 
-const handleNavigateToAIConfig = async () => {
-    currentView.value = 'ai-config'
+const handleNavigateToAIConfig = async (options?: { returnToPrompts?: boolean }) => {
+    if (!(await canLeave('models'))) return
+    currentView.value = 'models'
+    returnToPromptsAfterModelSaved.value = Boolean(options?.returnToPrompts)
     // 等待组件渲染完成后自动打开添加配置弹窗
     await nextTick()
-    if (aiConfigPageRef.value?.openAddConfigModal) {
-        aiConfigPageRef.value.openAddConfigModal()
-    }
+    modelsPageRef.value?.openAddConfigModal?.()
+}
+
+const handleModelConfigSaved = () => {
+    if (!returnToPromptsAfterModelSaved.value) return
+    returnToPromptsAfterModelSaved.value = false
+    currentView.value = 'prompts'
 }
 
 const handleOpenSettings = async (targetSection?: string) => {
+    if (!(await canLeave('settings'))) return
+    returnToPromptsAfterModelSaved.value = false
     // 先清空旧目标，确保在设置页内切换后重复点击同一入口仍会触发定位。
     settingsTargetSection.value = undefined;
     currentView.value = 'settings'
@@ -83,11 +66,13 @@ const handleOpenSettings = async (targetSection?: string) => {
     }
 };
 
-const collapseRef = ref(true)
-
-// 只在 Electron 环境下发送消息
-if (window.electronAPI?.sendMessage) {
-    window.electronAPI.sendMessage('Hello from App.vue!')
+// 启动器快捷键没设置或不可用时，主导航的启动器按钮把用户带到快捷键设置
+const handleOpenLauncher = async () => {
+    if (launcher.status.value === 'ready') {
+        await launcher.openLauncher()
+        return
+    }
+    await handleOpenSettings('shortcuts')
 }
 
 let removeShortcutNavigation: (() => void) | undefined
@@ -108,110 +93,49 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
 </script>
 
 <template>
-    <div class="main-page-shell">
-        <div class="main-layout">
-            <NLayout has-sider class="main-layout-body">
-                <NLayoutSider bordered collapse-mode="width" :collapsed-width="56"
-                    :collapsed="collapseRef" :width="240" :native-scrollbar="false"
-                    content-style="height: 100%;">
-                    <div class="main-sider-content">
-                        <NFlex v-if="!collapseRef" align="center" :size="10" class="main-sider-brand">
-                            <img :src="appIcon" class="main-sider-brand-logo" alt="" />
-                            <NText strong>{{ t('mainPage.title') }}</NText>
-                        </NFlex>
-                        <NMenu :options="menuOptions" :value="currentView" @update:value="handleMenuSelect"
-                            :collapsed="collapseRef" :collapsed-width="56" :collapsed-icon-size="20"
-                            class="main-sider-menu" />
-                        <div class="main-sider-toggle">
-                            <NButton quaternary circle size="small" @click="collapseRef = !collapseRef">
-                                <template #icon>
-                                    <NIcon size="16"><ChevronRight v-if="collapseRef" /><ChevronLeft v-else /></NIcon>
-                                </template>
-                            </NButton>
-                        </div>
-                    </div>
-                </NLayoutSider>
-
-                <NLayout>
-                    <NLayoutContent content-style="overflow-y: auto; height: 100%;">
-                        <PromptManagementPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
-                            @navigate-to-ai-config="handleNavigateToAIConfig" />
-                        <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
-                        <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />
-                    </NLayoutContent>
-                </NLayout>
-            </NLayout>
-            <NLayoutFooter bordered class="main-layout-footer">
-                <StatusBar @open-settings="handleOpenSettings" />
-            </NLayoutFooter>
+    <div class="app-shell">
+        <div class="app-shell__body">
+            <AppRail
+                :active="currentView"
+                :show-launcher="capabilities.globalShortcuts && launcher.available"
+                :launcher-shortcut="launcher.label.value"
+                @navigate="handleNavigate"
+                @open-launcher="handleOpenLauncher"
+            />
+            <main class="app-shell__content">
+                <PromptsPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
+                    @navigate-to-ai-config="handleNavigateToAIConfig" @open-settings="handleOpenSettings" />
+                <ModelsPage v-else-if="currentView === 'models'" ref="modelsPageRef" @config-saved="handleModelConfigSaved" />
+                <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />
+            </main>
         </div>
+        <AppStatusBar @open-settings="handleOpenSettings" />
+        <SyncConflictModal />
     </div>
 </template>
 
 <style scoped>
-.main-page-shell,
-.main-layout {
+.app-shell {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100vh;
     min-height: 0;
+    overflow: hidden;
+    background: var(--surface-primary);
 }
 
-.main-layout {
+.app-shell__body {
     display: flex;
-    flex-direction: column;
-}
-
-.main-layout-body {
     flex: 1;
     min-height: 0;
 }
 
-.main-layout-footer {
-    height: 24px;
-    flex: 0 0 24px;
-    padding: 0;
-}
-
-.main-sider-content {
-    height: 100%;
+.app-shell__content {
+    flex: 1;
+    min-width: 0;
     min-height: 0;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) 48px;
-    background: var(--surface-sidebar);
-}
-
-.main-sider-brand {
-    grid-row: 1;
-    min-height: 58px;
-    padding: 0 16px;
     overflow: hidden;
-    border-bottom: 1px solid var(--border-default);
-    font-size: var(--n-font-size, 14px);
-}
-
-.main-sider-brand-logo {
-    display: block;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    object-fit: contain;
-    border-radius: var(--radius-image);
-}
-
-.main-sider-menu {
-    grid-row: 2;
-    min-height: 0;
-    padding-top: var(--spacing-sm);
-    overflow-y: auto;
-}
-
-.main-sider-toggle {
-    grid-row: 3;
-    height: 48px;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface-sidebar);
+    background: var(--surface-primary);
 }
 </style>

@@ -1,99 +1,73 @@
 <template>
-    <NFlex vertical :size="16">
-        <NFlex justify="space-between" align="center" :size="12" wrap>
-            <div>
-                <NText depth="2">{{ config.name }}</NText>
-                <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-                    {{ t('dataBackup.cloudLocationDescription') }}
-                </NText>
-            </div>
-            <NFlex :size="12">
-                <NButton type="primary" @click="createCloudBackup" :loading="loading.create">
-                    <template #icon><NIcon><Upload /></NIcon></template>
-                    {{ t('dataBackup.createCloudBackup') }}
-                </NButton>
-                <NButton @click="refreshCloudBackupList" :loading="loading.refresh">
-                    <template #icon><NIcon><Refresh /></NIcon></template>
-                    {{ t('dataBackup.refreshBackupList') }}
-                </NButton>
-            </NFlex>
-        </NFlex>
-
-        <NGrid v-if="paginatedBackups.length > 0" cols="6" item-responsive :x-gap="12" :y-gap="12">
-            <NGridItem v-for="backup in paginatedBackups" :key="backup.id"
-                span="6 600:5 900:4 1200:3 1500:2 1800:1">
-                <NCard size="small" :title="backup.name">
-                    <NFlex vertical :size="8">
-                        <NText strong>{{ backup.description || t('dataBackup.cloudBackup') }}</NText>
-                        <NFlex align="center" :size="8">
-                            <NTag type="info" size="small">{{ formatDate(backup.createdAt) }}</NTag>
-                            <NTag type="success" size="small">{{ formatSize(backup.size) }}</NTag>
-                        </NFlex>
-                    </NFlex>
-                    <template #action>
-                        <NFlex justify="space-between" align="center" style="width: 100%;">
-                            <NPopconfirm @positive-click="restoreCloudBackup(backup.id)"
-                                :negative-text="t('common.cancel')" :positive-text="t('dataBackup.confirmRestore')"
-                                placement="top" :show-icon="false">
-                                <template #trigger>
-                                    <NButton type="primary" size="small" :loading="loading.restore"
-                                        :disabled="loading.restore">
-                                        <template #icon><NIcon><Recharging /></NIcon></template>
-                                        {{ t('dataBackup.restore') }}
-                                    </NButton>
-                                </template>
-                                <div style="max-width: 300px;">{{ t('dataBackup.restoreWarning') }}</div>
-                            </NPopconfirm>
-                            <NPopconfirm @positive-click="deleteCloudBackup(backup.id)"
-                                :negative-text="t('common.cancel')" :positive-text="t('common.confirm')">
-                                <template #trigger>
-                                    <NButton type="error" secondary size="small">
-                                        <template #icon><NIcon><Trash /></NIcon></template>
-                                        {{ t('common.delete') }}
-                                    </NButton>
-                                </template>
-                                {{ t('dataBackup.confirmDeleteCloudBackup') }}
-                            </NPopconfirm>
-                        </NFlex>
-                    </template>
-                </NCard>
-            </NGridItem>
-        </NGrid>
-
-        <NEmpty v-else-if="!loading.refresh" :description="t('dataBackup.noCloudBackups')" />
-
-        <div v-if="totalPages > 1" class="pagination-container">
-            <NPagination v-model:page="currentPage" v-model:page-size="pageSize"
-                :item-count="cloudBackups.length" show-size-picker show-quick-jumper
-                :page-sizes="[6, 12, 18]" />
+    <div class="cloud-backups">
+        <p class="cloud-backups__hint">{{ t('dataBackup.cloudLocationDescription') }}</p>
+        <!-- 读取失败不能显示成「暂无云端备份」，否则用户会以为备份没了：说明原因并给出重试 (#445) -->
+        <div v-if="listError" class="ui-alert ui-alert--error cloud-backups__error" role="alert">
+            <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><AlertCircle /></NIcon>
+            <span class="cloud-backups__error-text">
+                <strong>{{ t('dataBackup.loadCloudBackupsFailedTitle') }}</strong>
+                {{ t('dataBackup.loadCloudBackupsFailedReason', { title: listError.title, message: listError.message }) }}
+            </span>
+            <NButton size="tiny" :loading="loading.refresh" @click="refreshCloudBackupList">{{ t('common.retry') }}</NButton>
         </div>
-    </NFlex>
+        <div v-else-if="cloudBackups.length" class="cloud-backups__list" :class="{ 'is-scrollable': showAll }">
+            <div v-for="backup in visibleBackups" :key="backup.id" class="cloud-backup">
+                <div class="cloud-backup__info">
+                    <span class="cloud-backup__title">{{ formatDate(backup.createdAt) }}</span>
+                    <!-- 创建时写进去的说明自带一个日期（「手动云端备份 - 2026-10-27 14:37:32」），和标题重复：副标题按类型现算 -->
+                    <span class="cloud-backup__meta">{{ getBackupTypeLabel(backup) }} · {{ formatSize(backup.size) }}</span>
+                </div>
+                <span class="cloud-backup__actions">
+                    <NPopconfirm :negative-text="t('common.cancel')" :positive-text="t('dataBackup.confirmRestore')" :show-icon="false"
+                        @positive-click="restoreCloudBackup(backup.id)">
+                        <template #trigger>
+                            <NButton :loading="loading.restore" :disabled="loading.restore">{{ t('dataBackup.restore') }}</NButton>
+                        </template>
+                        <div class="cloud-backup__confirm">{{ t('dataBackup.restoreWarning') }}</div>
+                    </NPopconfirm>
+                    <NPopconfirm :negative-text="t('common.cancel')" :positive-text="t('common.confirm')"
+                        @positive-click="deleteCloudBackup(backup.id)">
+                        <template #trigger>
+                            <NButton quaternary type="error" class="cloud-backup__icon" :aria-label="t('common.delete')">
+                                <template #icon><NIcon :size="14"><Trash /></NIcon></template>
+                            </NButton>
+                        </template>
+                        <div class="cloud-backup__confirm">{{ t('dataBackup.confirmDeleteCloudBackupAt', { time: formatDate(backup.createdAt) }) }}</div>
+                    </NPopconfirm>
+                </span>
+            </div>
+        </div>
+        <p v-else-if="listLoaded" class="cloud-backups__empty">{{ t('dataBackup.noCloudBackups') }}</p>
+        <p v-else class="cloud-backups__empty">{{ t('dataBackup.loadingCloudBackups') }}</p>
+        <NButton v-if="!listError && cloudBackups.length > PREVIEW_COUNT" quaternary size="tiny" class="cloud-backups__toggle" @click="showAll = !showAll">
+            {{ showAll ? t('dataManagement.collapseBackupList') : t('dataManagement.showMoreBackups', { count: cloudBackups.length - PREVIEW_COUNT }) }}
+        </NButton>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import {
-    NButton, NCard, NEmpty, NFlex, NGrid, NGridItem, NIcon, NPagination,
-    NPopconfirm, NTag, NText, useMessage,
-} from 'naive-ui';
-import { Recharging, Refresh, Trash, Upload } from '@vicons/tabler';
+import { NButton, NIcon, NPopconfirm, useMessage } from 'naive-ui';
+import { AlertCircle, Trash } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
-import { formatDateTime } from '@/lib/utils/date';
+import { getCloudStorageConnectionDiagnosis } from '@/lib/services/cloud-sync.service';
+import type { CloudStorageConnectionDiagnosis } from '@/lib/services/cloud-sync.service';
+import { formatDateTime, formatFriendlyDate } from '@/lib/utils/date';
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup';
 
 const props = defineProps<{ config: CloudStorageConfig }>();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const message = useMessage();
 const cloudBackups = ref<CloudBackupInfo[]>([]);
-const currentPage = ref(1);
-const pageSize = ref(6);
+// 和本机备份一样只先显示最近几条，其余收进「展开全部」
+const PREVIEW_COUNT = 3;
+const showAll = ref(false);
 const loading = reactive({ refresh: false, create: false, restore: false });
-const totalPages = computed(() => Math.ceil(cloudBackups.value.length / pageSize.value));
-const paginatedBackups = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value;
-    return cloudBackups.value.slice(start, start + pageSize.value);
-});
+// 当前存储的列表有没有成功读过一次；读之前显示「正在读取」，不显示成空列表
+const listLoaded = ref(false);
+const listError = ref<CloudStorageConnectionDiagnosis | null>(null);
+const visibleBackups = computed(() => showAll.value ? cloudBackups.value : cloudBackups.value.slice(0, PREVIEW_COUNT));
 
 // 静默加载列表：挂载、切换存储和创建/删除后使用，不让「刷新备份列表」按钮闪成加载态 (#389)。
 let pendingListLoad: { storageId: string; promise: Promise<void> } | null = null;
@@ -106,12 +80,16 @@ const loadCloudBackupList = () => {
             // 等待期间切换了存储位置时，丢弃旧位置的结果
             if (storageId !== props.config.id) return;
             cloudBackups.value = backups;
-            if (currentPage.value > totalPages.value) currentPage.value = Math.max(totalPages.value, 1);
+            listError.value = null;
+            listLoaded.value = true;
         } catch (error) {
             console.error('刷新云端备份列表失败:', error);
-            message.error(t('dataBackup.loadCloudBackupsFailed'));
+            if (storageId !== props.config.id) return;
+            // 把服务器返回的技术错误翻成用户看得懂的原因（密码不对、找不到服务器……）
+            listError.value = getCloudStorageConnectionDiagnosis(error instanceof Error ? error.message : String(error));
         } finally {
-            if (pendingListLoad?.promise === promise) pendingListLoad = null;
+            // 同一存储同时只会有一次加载，切换存储后不动新存储的加载记录
+            if (pendingListLoad?.storageId === storageId) pendingListLoad = null;
         }
     })();
     pendingListLoad = { storageId, promise };
@@ -169,7 +147,11 @@ const deleteCloudBackup = async (backupId: string) => {
     }
 };
 
-const formatDate = (value: string) => formatDateTime(value);
+const formatDate = (value: string) => formatFriendlyDate(value, locale.value, { withTime: true });
+// 和移动端一样按备份类型现算，不用创建时写进文件的说明（那是创建那一刻的界面语言，还带着重复的日期）
+const getBackupTypeLabel = (backup: CloudBackupInfo) => backup.backupType === 'automatic'
+    ? t('mobileSettings.backup.automaticCloudBackup')
+    : t('mobileSettings.backup.manualCloudBackup');
 const formatSize = (size: number) => {
     if (!size || Number.isNaN(size) || size <= 0) return '0 B';
     if (size < 1024) return `${size} B`;
@@ -178,19 +160,98 @@ const formatSize = (size: number) => {
 };
 
 watch(() => props.config.id, () => {
-    currentPage.value = 1;
+    showAll.value = false;
+    // 换了存储就不再显示上一个存储的列表或错误
+    cloudBackups.value = [];
+    listLoaded.value = false;
+    listError.value = null;
     void loadCloudBackupList();
 });
-watch(pageSize, () => { currentPage.value = 1; });
 onMounted(loadCloudBackupList);
+
+defineExpose({ loading, createCloudBackup, refreshCloudBackupList });
 </script>
 
 <style scoped>
-.pagination-container {
+.cloud-backups {
     display: flex;
-    justify-content: center;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-default);
+    flex-direction: column;
+}
+
+.cloud-backups__hint {
+    margin: 0 0 4px;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+}
+
+.cloud-backups__list.is-scrollable {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.cloud-backup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.cloud-backup__info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.cloud-backup__title {
+    font-size: var(--font-size-base);
+}
+
+.cloud-backup__meta {
+    overflow: hidden;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cloud-backup__actions {
+    display: flex;
+    flex: none;
+    gap: 4px;
+}
+
+.cloud-backup__icon {
+    width: 28px;
+    padding: 0;
+}
+
+.cloud-backup__confirm {
+    max-width: 300px;
+}
+
+.cloud-backups__error {
+    align-items: center;
+    margin: 4px 0 8px;
+}
+
+.cloud-backups__error-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.cloud-backups__empty {
+    margin: 0;
+    padding: 16px 0;
+    color: var(--content-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.cloud-backups__toggle {
+    align-self: flex-start;
+    margin: 4px 0;
 }
 </style>
