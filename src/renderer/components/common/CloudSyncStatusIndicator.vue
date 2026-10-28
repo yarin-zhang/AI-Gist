@@ -9,6 +9,7 @@ import {
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
 import { formatFriendlyDate, formatRelativeTime } from '~/lib/utils/date';
+import { joinSentences } from '~/lib/utils/join-sentences';
 import {
   createDataSyncStatusInput,
   getDataSyncErrorSource,
@@ -141,9 +142,12 @@ const lastSyncText = computed(() => {
   return t('dataSync.lastSyncAt', { time: formatSyncTime(status.value.lastSyncAt) });
 });
 
+// 状态、说明、操作三句话接起来读；句末已经有标点的不再补「. 」
 const ariaLabel = computed(() => {
   const action = hasErrorDetail.value ? t('dataSync.indicatorAriaViewError') : t('dataSync.indicatorAriaOpenSettings');
-  return [primaryText.value, detailText.value, action].filter(Boolean).join('. ');
+  return [primaryText.value, detailText.value, action]
+    .filter(Boolean)
+    .reduce((label, sentence) => joinSentences(label, sentence, String(locale.value)));
 });
 
 const showTooltip = () => {

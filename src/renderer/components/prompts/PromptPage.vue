@@ -213,7 +213,8 @@
           <div class="prompt-page__side-scroll">
             <VariableDefinitionList v-if="showDefinitions" v-model:expanded-name="expandedVariable"
               :variables="editor.activeVariables.value" :unused="editor.unusedVariables.value" :occurrences="occurrences"
-              :jinja="form.isJinjaTemplate" @update="updateDefinition" @remove="editor.removeVariable" />
+              :inline-defaults="inlineDefaults" :jinja="form.isJinjaTemplate" @update="updateDefinition"
+              @remove="editor.removeVariable" />
             <VariableFieldList v-else ref="fieldListRef" :variables="variables" :values="values"
               :multiline-names="multilineNames" :sources="valueSources" :reveal-missing="revealedMissing"
               :active-name="activeVariable" :jinja="form.isJinjaTemplate" @update:values="updateValues"
@@ -249,7 +250,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NImage, NSpin, NTooltip, useDialog, useMessage, type DropdownOption } from 'naive-ui'
+import { NButton, NIcon, NImage, NSpin, NTooltip, useDialog, useMessage, type DropdownOption, type MessageReactive } from 'naive-ui'
 import { History, InfoCircle, LayoutSidebarRightCollapse, Lock, PlayerPlay, Stars, X } from '@vicons/tabler'
 import type { AIGenerationHistory, QuickOptimizationConfig } from '@shared/types/ai'
 import type { AISummaryResult } from '@/lib/utils/ai-summary'
@@ -431,9 +432,12 @@ const variableCount = computed(() => variables.value.length)
 const variableNames = computed(() => variables.value.map(variable => variable.name))
 const editorVariables = computed(() => [...editor.activeVariables.value, ...editor.unusedVariables.value])
 const multilineNames = computed(() => (form.value.isJinjaTemplate ? new Set<string>() : findMultilineVariableNames(form.value.content)))
+const parsedContent = computed(() => parsePromptTemplate(form.value.content))
 const occurrences = computed(() => Object.fromEntries(
-  [...parsePromptTemplate(form.value.content).occurrences.entries()].map(([name, list]) => [name, list.length]),
+  [...parsedContent.value.occurrences.entries()].map(([name, list]) => [name, list.length]),
 ))
+// 正文里 `{{名称:默认值}}` 写的默认值，Jinja 模板没有这种写法
+const inlineDefaults = computed(() => (form.value.isJinjaTemplate ? {} : Object.fromEntries(parsedContent.value.inlineDefaults)))
 const values = computed(() => props.draft)
 const lastUsedValues = ref<Record<string, any>>({})
 
@@ -441,7 +445,11 @@ const valueSources = computed(() => {
   const sources: Record<string, 'last' | 'default'> = {}
   variables.value.forEach(variable => {
     const value = values.value[variable.name]
-    if (isEmptyPromptValue(value)) return
+    // 空着的字段复制时用默认值，旁边同样标「默认值」
+    if (isEmptyPromptValue(value)) {
+      if (!isEmptyPromptValue(variable.defaultValue)) sources[variable.name] = 'default'
+      return
+    }
     if (!isEmptyPromptValue(lastUsedValues.value[variable.name]) && String(lastUsedValues.value[variable.name]) === String(value)) {
       sources[variable.name] = 'last'
     } else if (variable.defaultValue && String(variable.defaultValue) === String(value)) {
@@ -604,15 +612,22 @@ const copyText = async (text: string, successKey = 'promptPage.copied') => {
   }
 }
 
+// 连按复制时「还有 N 个必填变量未填写」只留最新一条，不一条条叠上去
+let missingWarning: MessageReactive | null = null
+
 const copyPrompt = async () => {
   if (isNew.value || !form.value.content.trim()) return
   if (missing.value.length) {
     revealedMissing.value = new Set([...revealedMissing.value, ...missing.value])
     if (headerEditing.value) setMode('fill')
     await focusVariable(missing.value[0])
-    message.warning(t('promptWorkspace.completeRequiredCount', { count: missing.value.length }, missing.value.length))
+    missingWarning?.destroy()
+    missingWarning = message.warning(t('promptWorkspace.completeRequiredCount', { count: missing.value.length }, missing.value.length), {
+      onAfterLeave: () => { missingWarning = null },
+    })
     return
   }
+  missingWarning?.destroy()
   if (rendered.value.error) {
     message.error(t('promptWorkspace.renderFailedWithError', { error: rendered.value.error }))
     return

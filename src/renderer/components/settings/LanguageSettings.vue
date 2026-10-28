@@ -1,6 +1,6 @@
 <template>
     <UiPanel :title="t('language.panelTitle')" body="rows">
-        <UiSettingRow :title="t('language.interfaceLanguage')" :description="t('language.interfaceLanguageDescription')">
+        <UiSettingRow :title="t('language.interfaceLanguage')">
             <NSelect v-model:value="currentLocale" class="language-select" :options="languageOptions"
                 :placeholder="t('language.selectLanguage')" @update:value="switchLocale" />
         </UiSettingRow>

@@ -189,7 +189,7 @@ describe('settings sync and backup information architecture', () => {
     const source = readWorkspaceFile('src/renderer/components/settings/DataSyncSettings.vue');
     expect(source).toContain("import { formatFriendlyDate } from '@/lib/utils/date';");
     expect(source).toContain('formatFriendlyDate(value, locale.value, { withTime: true })');
-    expect(source).toContain("t('dataSync.lastSyncAt', { time: formatSyncTime(syncStatus.lastSyncAt) })");
+    expect(source).toContain("t('dataSync.lastSyncAt', { time: formatSyncTime(syncStatus.value.lastSyncAt) })");
     expect(source).toContain('time: formatSyncTime(syncStatus.value.nextSyncAt!)');
     expect(source).not.toContain('formatDateTime(');
     expect(source).not.toContain('toLocaleString()');

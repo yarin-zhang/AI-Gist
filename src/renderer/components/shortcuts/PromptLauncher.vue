@@ -55,7 +55,6 @@
         <div v-else-if="selectedCommand" class="launcher__command">
           <NIcon :size="24" class="launcher__command-icon"><component :is="selectedCommand.icon" /></NIcon>
           <span class="launcher__command-title">{{ selectedCommand.label }}</span>
-          <span class="launcher__hint">{{ selectedCommand.description }}</span>
         </div>
       </section>
     </div>
@@ -104,7 +103,7 @@ import ShortcutBindingModal from './ShortcutBindingModal.vue';
 
 type PromptResult = { kind: 'prompt'; key: string; label: string; prompt: PromptWithRelations };
 type CommandResult = {
-  kind: 'command'; key: string; label: string; description: string; icon: Component;
+  kind: 'command'; key: string; label: string; icon: Component;
   target: 'home' | 'new-prompt' | 'shortcuts';
 };
 type LauncherResult = PromptResult | CommandResult;
@@ -135,9 +134,9 @@ const defaultActionLabel = computed(() => defaultAction.value === 'paste' ? t('s
 const pasteHint = displayShortcutHint('⌘↵', 'Ctrl ↵');
 
 const commands = computed<CommandResult[]>(() => [
-  { kind: 'command', key: 'command:new', label: t('shortcuts.commandNewPrompt'), description: t('shortcuts.commandNewPromptDesc'), icon: markRaw(FilePlus), target: 'new-prompt' },
-  { kind: 'command', key: 'command:home', label: t('shortcuts.commandOpenApp'), description: t('shortcuts.commandOpenAppDesc'), icon: markRaw(Home), target: 'home' },
-  { kind: 'command', key: 'command:settings', label: t('shortcuts.commandManage'), description: t('shortcuts.commandManageDesc'), icon: markRaw(Keyboard), target: 'shortcuts' },
+  { kind: 'command', key: 'command:new', label: t('shortcuts.commandNewPrompt'), icon: markRaw(FilePlus), target: 'new-prompt' },
+  { kind: 'command', key: 'command:home', label: t('shortcuts.commandOpenApp'), icon: markRaw(Home), target: 'home' },
+  { kind: 'command', key: 'command:settings', label: t('shortcuts.commandManage'), icon: markRaw(Keyboard), target: 'shortcuts' },
 ]);
 
 
@@ -173,7 +172,7 @@ const results = computed<LauncherResult[]>(() => {
     .sort((a, b) => b.score - a.score)
     .slice(0, 12)
     .map(({ prompt }): PromptResult => ({ kind: 'prompt', key: `prompt:${prompt.uuid}`, label: prompt.title, prompt }));
-  const commandResults = commands.value.filter(command => !needle || `${command.label} ${command.description}`.toLowerCase().includes(needle));
+  const commandResults = commands.value.filter(command => !needle || command.label.toLowerCase().includes(needle));
   return [...promptResults, ...commandResults];
 });
 

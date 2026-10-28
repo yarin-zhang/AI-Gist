@@ -95,7 +95,7 @@ const previewStyle = {
   '--preview-light-accent': lightVars['accent-brand'],
   '--preview-dark-bg': darkVars['surface-body'],
   '--preview-dark-line': darkVars['border-default'],
-  '--preview-dark-accent': darkVars['accent-text']
+  '--preview-dark-accent': darkVars['accent-brand']
 }
 
 const handleLanguageChange = (code: SupportedLocale) => {

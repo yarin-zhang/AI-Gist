@@ -65,9 +65,9 @@
                 @update:value="value => patch(variable, { defaultValue: value || '' })" />
               <!-- 数字类型只收数字：输入框不接受字母，失焦时还原成上一次有效的值 -->
               <NInputNumber v-else-if="normalizedType(variable) === 'number'" size="small" clearable :show-button="false"
-                :value="numberDefault(variable)" :placeholder="t('promptPage.none')"
+                :value="numberDefault(variable)" :placeholder="defaultPlaceholder(variable)"
                 @update:value="value => patch(variable, { defaultValue: value === null ? '' : String(value) })" />
-              <NInput v-else size="small" :value="variable.defaultValue || ''" :placeholder="t('promptPage.none')"
+              <NInput v-else size="small" :value="variable.defaultValue || ''" :placeholder="defaultPlaceholder(variable)"
                 @update:value="value => patch(variable, { defaultValue: value })" />
             </div>
             <!-- 开关总有一个值（是或否），「必填」对它没有意义 -->
@@ -127,11 +127,14 @@ const props = withDefaults(defineProps<{
   occurrences?: Record<string, number>
   expandedName?: string
   jinja?: boolean
+  /** 正文里 `{{名称:默认值}}` 写的默认值：这里没填默认值时生效，作为占位提示显示 */
+  inlineDefaults?: Record<string, string>
 }>(), {
   unused: () => [],
   occurrences: () => ({}),
   expandedName: '',
   jinja: false,
+  inlineDefaults: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -223,9 +226,12 @@ const typeLabel = (variable: EditablePromptVariable) => (
 
 const isBoolean = (variable: EditablePromptVariable) => !props.jinja && normalizedType(variable) === 'boolean'
 
+// 这里没填默认值时，正文里写的默认值生效
+const defaultPlaceholder = (variable: EditablePromptVariable) => props.inlineDefaults[variable.name] || t('promptPage.none')
+
 // 开关的默认值存的是 true / false，显示成「是 / 否」
 const defaultLabel = (variable: EditablePromptVariable) => {
-  if (!isBoolean(variable)) return variable.defaultValue
+  if (!isBoolean(variable)) return variable.defaultValue || props.inlineDefaults[variable.name]
   if (variable.defaultValue === 'true') return t('promptPage.yes')
   return variable.defaultValue === 'false' ? t('promptPage.no') : ''
 }

@@ -37,13 +37,13 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const modeOptions = computed(() => [
-    { value: 'ask' as const, label: t('closeBehavior.ask'), description: t('closeBehavior.askTip') },
+    { value: 'ask' as const, label: t('closeBehavior.ask') },
     { value: 'fixed' as const, label: t('closeBehavior.fixed'), description: t('closeBehavior.fixedTip') },
 ])
 
 const actionOptions = computed(() => [
     { value: 'minimize' as const, label: t('closeBehavior.minimize'), description: t('closeBehavior.minimizeDesc') },
-    { value: 'quit' as const, label: t('closeBehavior.quit'), description: t('closeBehavior.quitDesc') },
+    { value: 'quit' as const, label: t('closeBehavior.quit') },
 ])
 
 const handleUpdate = (patch: Partial<CloseBehaviorSettings>) => {

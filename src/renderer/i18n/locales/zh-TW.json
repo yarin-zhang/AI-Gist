@@ -28,8 +28,7 @@
     "checkFailed": "檢查更新失敗",
     "openDownloadFailed": "開啟下載頁面失敗",
     "openPageFailed": "開啟頁面失敗",
-    "updateFound": "發現新版本 {version}",
-    "feedbackNeedsGithub": "兩個入口都會開啟 GitHub，提交問題或建議需要登入 GitHub 帳號。"
+    "updateFound": "發現新版本 {version}"
   },
   "aiConfig": {
     "addConfig": "新增模型設定",
@@ -238,15 +237,13 @@
   },
   "closeBehavior": {
     "ask": "每次詢問",
-    "askTip": "彈出對話框讓你選擇",
     "closeAction": "關閉動作",
     "closeBehaviorMode": "關閉行為模式",
     "fixed": "固定行為",
     "fixedTip": "直接執行下面選定的動作",
     "minimize": "最小化到系統匣",
     "minimizeDesc": "背景繼續執行，啟動器和同步保持可用",
-    "quit": "結束應用程式",
-    "quitDesc": "完全結束程式"
+    "quit": "結束應用程式"
   },
   "cloudBackup": {
     "backupDirectoryCreated": "此位置尚未建立雲端備份目錄，請手動建立雲端備份。",
@@ -489,7 +486,7 @@
     "saveFailed": "儲存設定失敗",
     "serverUrl": "伺服器位址",
     "serverUrlRequired": "請輸入伺服器位址",
-    "statusAutomaticDescription": "資料變更會自動同步，不需要手動管理版本。",
+    "statusAutomaticDescription": "變更會自動同步",
     "statusCurrent": "資料已是最新",
     "statusNotConfigured": "尚未設定資料同步",
     "statusNotConfiguredDescription": "新增雲端儲存後，應用程式會自動保持各裝置資料最新。",
@@ -567,9 +564,8 @@
       },
       "cancelled": {
         "title": "同步已由新的操作接手",
-        "message": "有新的同步請求取代了這一次操作，這是正常的排程行為，應用程式會自動繼續，無需手動處理。",
-        "step1": "無需處理，等待應用程式自動完成後續同步",
-        "step2": "如長時間未顯示「雲端同步正常」，可手動點選「立即同步」"
+        "message": "已由新的同步請求取代，會自動繼續。",
+        "step1": "長時間沒有恢復正常時，點選「立即同步」"
       },
       "instability": {
         "title": "雲端同步狀態暫時不一致",
@@ -685,7 +681,7 @@
     },
     "serverUrlInvalid": "位址需要以 http:// 或 https:// 開頭",
     "indicatorSyncOff": "未開啟同步",
-    "indicatorSyncOffDetail": "還沒有啟用的雲端儲存，資料只儲存在本機。點選前往資料同步，新增儲存後會在多台裝置之間自動同步。",
+    "indicatorSyncOffDetail": "還沒有啟用的雲端儲存，資料只儲存在本機。",
     "statusAllStoragesDisabledDescription": "已新增的儲存都已停用。啟用一個儲存後，應用程式會自動保持各裝置資料最新。",
     "deleteConfigTitle": "刪除儲存「{name}」？",
     "deleteConfigPositive": "刪除儲存",
@@ -708,8 +704,7 @@
   "language": {
     "selectLanguage": "選擇語言",
     "interfaceLanguage": "介面語言",
-    "panelTitle": "語言",
-    "interfaceLanguageDescription": "選單、提示和日期都會以所選語言顯示"
+    "panelTitle": "語言"
   },
   "mainPage": {
     "menu": {
@@ -811,13 +806,12 @@
     "connectionSuccess": "連線成功",
     "currentProxy": "目前代理",
     "directMode": "直接連線",
-    "directModeDesc": "不另外設定代理，使用系統預設的網路連線",
+    "directModeDesc": "不經過任何代理",
     "httpProxy": "HTTP 代理",
     "httpsProxy": "HTTPS 代理",
     "invalidAddress": "請輸入正確的代理位址，例如 127.0.0.1:7890",
     "lastRefresh": "上次重新整理",
     "manualMode": "手動設定",
-    "manualModeDesc": "手動設定代理伺服器位址",
     "noProxy": "不使用代理的位址",
     "noProxyDesc": "以逗號分隔的位址清單，例如：localhost,127.0.0.1",
     "noProxyDetected": "未偵測到系統代理",
@@ -825,10 +819,8 @@
     "proxyDetected": "偵測到系統代理",
     "proxyMode": "代理模式",
     "systemMode": "系統代理",
-    "systemModeDesc": "使用系統的代理設定",
     "systemProxyInfo": "系統代理資訊",
     "testConnection": "測試連線",
-    "testConnectionDesc": "測試目前的代理設定是否正常運作",
     "testing": "測試中...",
     "testingDescription": "正在測試網路連線…",
     "connectionOkWithTime": "連線正常 · 平均回應 {ms} ms",
@@ -838,7 +830,6 @@
     "addVariable": "新增變數",
     "createVariable": "建立變數「{name}」",
     "defaultVariableName": "變數{index}",
-    "descriptionHint": "協助使用者理解應該填寫什麼",
     "insert": "插入",
     "insertAtCursor": "插入到目前游標位置",
     "insertVariable": "插入變數",
@@ -848,7 +839,7 @@
     "unclosedVariable": "偵測到 {count} 處未閉合的變數語法",
     "variableCount": "{count} 個變數",
     "variableNameDuplicate": "變數名稱不能重複",
-    "variableNameInvalid": "名稱不能包含大括號或換行",
+    "variableNameInvalid": "名稱不能包含大括號、冒號或換行",
     "variableNameRequired": "請輸入變數名稱",
     "variableTokenLabel": "變數 {name}，共出現 {count} 次",
     "variables": "變數",
@@ -1159,15 +1150,11 @@
     "actions": "操作",
     "assignFromPromptHint": "在提示詞的「更多」選單裡設定",
     "assignPromptBinding": "設定提示詞快速鍵",
-    "assignPromptBindingDesc": "按下這個全域快速鍵即可呼叫提示詞。",
     "autoPasteUnavailable": "自動貼上目前不可用",
     "behavior": "呼叫行為",
     "commandManage": "管理快速鍵",
-    "commandManageDesc": "開啟快速鍵設定",
     "commandNewPrompt": "新增提示詞",
-    "commandNewPromptDesc": "開啟提示詞編輯器",
     "commandOpenApp": "開啟 AI Gist",
-    "commandOpenAppDesc": "顯示主視窗",
     "conflict": "快速鍵衝突",
     "copyAndPaste": "複製並貼上",
     "defaultAction": "啟動器預設動作",
@@ -1181,7 +1168,7 @@
     "launcherCommandDesc": "在任何應用程式中搜尋提示詞",
     "launcherPlaceholder": "搜尋提示詞、標籤、分類或指令…",
     "launcherStatusDisabled": "快速鍵 {shortcut} 目前已停用，點選前往設定。",
-    "launcherStatusHint": "按下 {shortcut} 後，即可快速呼叫提示詞。",
+    "launcherStatusHint": "開啟啟動器（{shortcut}）",
     "launcherStatusNotSet": "設定並啟用快速鍵後，即可快速呼叫提示詞。",
     "launcherStatusUnavailable": "快速鍵 {shortcut} 目前無法使用，點選前往設定。",
     "missingPrompt": "找不到提示詞",
@@ -1213,8 +1200,7 @@
   "startup": {
     "autoStart": "開機自動啟動",
     "autoStartTip": "系統啟動時自動執行，啟動器隨時可用",
-    "minimized": "啟動時最小化到系統匣",
-    "minimizedTip": "啟動時不顯示主視窗"
+    "minimized": "啟動時最小化到系統匣"
   },
   "promptAI": {
     "adopt": "採納",
@@ -1340,7 +1326,7 @@
     "clearFilters": "清除篩選",
     "create": "新增提示詞",
     "draftMeta": "新增 · 尚未儲存",
-    "emptyHint": "提示詞會出現在這裡",
+    "emptyHint": "還沒有提示詞",
     "favorited": "已收藏",
     "label": "提示詞清單",
     "manageCategories": "管理分類",
@@ -1633,9 +1619,7 @@
     "filterCustom": "自訂",
     "emptyTitle": "還沒有連接 AI 服務",
     "moreActions": "更多操作",
-    "connectionPanelDesc": "服務位址、憑證和連線測試",
     "modelsPanel": "模型",
-    "modelsPanelDesc": "已儲存的模型和預設模型",
     "requestTestDesc": "送出一個實際請求，確認模型能正常回應",
     "behaviorPanelDesc": "AI 幫你產生提示詞時遵循的指令",
     "requestTestDefaultPrompt": "用一句話介紹你自己",

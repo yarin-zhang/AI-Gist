@@ -28,8 +28,7 @@
     "checkFailed": "检查更新失败",
     "openDownloadFailed": "打开下载页面失败",
     "openPageFailed": "打开页面失败",
-    "updateFound": "发现新版本 {version}",
-    "feedbackNeedsGithub": "两个入口都会打开 GitHub，提交问题或建议需要登录 GitHub 账号。"
+    "updateFound": "发现新版本 {version}"
   },
   "aiConfig": {
     "addConfig": "添加配置",
@@ -238,15 +237,13 @@
   },
   "closeBehavior": {
     "ask": "每次询问",
-    "askTip": "弹出对话框让你选择",
     "closeAction": "关闭动作",
     "closeBehaviorMode": "关闭行为模式",
     "fixed": "固定行为",
     "fixedTip": "直接执行下面选定的动作",
     "minimize": "最小化到托盘",
     "minimizeDesc": "后台继续运行，启动器和同步保持可用",
-    "quit": "退出应用",
-    "quitDesc": "完全退出程序"
+    "quit": "退出应用"
   },
   "cloudBackup": {
     "backupDirectoryCreated": "此位置还没有云端备份目录，请手动创建云端备份。",
@@ -489,7 +486,7 @@
     "saveFailed": "保存存储配置失败",
     "serverUrl": "服务器地址",
     "serverUrlRequired": "请输入服务器地址",
-    "statusAutomaticDescription": "数据变更会自动同步，无需手动管理版本。",
+    "statusAutomaticDescription": "改动会自动同步",
     "statusCurrent": "数据已是最新",
     "statusNotConfigured": "尚未配置数据同步",
     "statusNotConfiguredDescription": "添加一个云端存储后，应用会自动保持各设备数据最新。",
@@ -567,9 +564,8 @@
       },
       "cancelled": {
         "title": "同步已被新的操作接管",
-        "message": "有新的同步请求覆盖了这一次操作，这是正常的调度行为，应用会自动继续，无需手动处理。",
-        "step1": "无需处理，等待应用自动完成后续同步",
-        "step2": "如长时间未显示「云同步正常」，可手动点击「立即同步」"
+        "message": "被新的同步请求取代，会自动继续。",
+        "step1": "长时间没有恢复正常时，点「立即同步」"
       },
       "instability": {
         "title": "云端同步状态暂时不一致",
@@ -685,7 +681,7 @@
     },
     "serverUrlInvalid": "地址需要以 http:// 或 https:// 开头",
     "indicatorSyncOff": "未开启同步",
-    "indicatorSyncOffDetail": "还没有启用的云端存储，数据只保存在本机。点击前往数据同步，添加存储后会在多台设备之间自动同步。",
+    "indicatorSyncOffDetail": "还没有启用的云端存储，数据只保存在本机。",
     "statusAllStoragesDisabledDescription": "已添加的存储都已停用。启用一个存储后，应用会自动保持各设备数据最新。",
     "deleteConfigTitle": "删除存储「{name}」？",
     "deleteConfigPositive": "删除存储",
@@ -708,8 +704,7 @@
   "language": {
     "selectLanguage": "选择语言",
     "interfaceLanguage": "界面语言",
-    "panelTitle": "语言",
-    "interfaceLanguageDescription": "菜单、提示和日期都会用所选语言显示"
+    "panelTitle": "语言"
   },
   "mainPage": {
     "menu": {
@@ -811,13 +806,12 @@
     "connectionSuccess": "连接成功",
     "currentProxy": "当前代理",
     "directMode": "直连模式",
-    "directModeDesc": "不配置额外代理，使用系统默认网络连接",
+    "directModeDesc": "不经过任何代理",
     "httpProxy": "HTTP 代理",
     "httpsProxy": "HTTPS 代理",
     "invalidAddress": "请输入正确的代理地址，如 127.0.0.1:7890",
     "lastRefresh": "最后刷新",
     "manualMode": "手动配置",
-    "manualModeDesc": "手动设置代理服务器地址",
     "noProxy": "不使用代理的地址",
     "noProxyDesc": "用逗号分隔的地址列表，如：localhost,127.0.0.1",
     "noProxyDetected": "未检测到系统代理",
@@ -825,10 +819,8 @@
     "proxyDetected": "检测到系统代理",
     "proxyMode": "代理模式",
     "systemMode": "系统代理",
-    "systemModeDesc": "使用系统设置的代理配置",
     "systemProxyInfo": "系统代理信息",
     "testConnection": "测试连接",
-    "testConnectionDesc": "测试当前代理配置是否正常工作",
     "testing": "测试中...",
     "testingDescription": "正在测试网络连接...",
     "connectionOkWithTime": "连接正常 · 平均响应 {ms} ms",
@@ -838,7 +830,6 @@
     "addVariable": "新建变量",
     "createVariable": "创建变量「{name}」",
     "defaultVariableName": "变量{index}",
-    "descriptionHint": "帮助使用者理解应该填写什么",
     "insert": "插入",
     "insertAtCursor": "插入到当前光标位置",
     "insertVariable": "插入变量",
@@ -848,7 +839,7 @@
     "unclosedVariable": "检测到 {count} 处未闭合的变量语法",
     "variableCount": "{count} 个变量",
     "variableNameDuplicate": "变量名称不能重复",
-    "variableNameInvalid": "名称不能包含花括号或换行",
+    "variableNameInvalid": "名称不能包含花括号、冒号或换行",
     "variableNameRequired": "请输入变量名称",
     "variableTokenLabel": "变量 {name}，共出现 {count} 次",
     "variables": "变量",
@@ -1159,15 +1150,11 @@
     "actions": "操作",
     "assignFromPromptHint": "在提示词的「更多」菜单里设置",
     "assignPromptBinding": "设置提示词快捷键",
-    "assignPromptBindingDesc": "直接按下该组合键即可调用此提示词",
     "autoPasteUnavailable": "自动粘贴当前不可用",
     "behavior": "调用行为",
     "commandManage": "管理快捷键",
-    "commandManageDesc": "打开快捷键设置",
     "commandNewPrompt": "新建提示词",
-    "commandNewPromptDesc": "打开新建提示词编辑器",
     "commandOpenApp": "打开 AI Gist",
-    "commandOpenAppDesc": "显示提示词管理主窗口",
     "conflict": "快捷键冲突",
     "copyAndPaste": "复制并粘贴",
     "defaultAction": "启动器默认动作",
@@ -1181,7 +1168,7 @@
     "launcherCommandDesc": "在任意应用中搜索并调用提示词",
     "launcherPlaceholder": "搜索提示词、标签、分类或命令…",
     "launcherStatusDisabled": "快捷键 {shortcut} 当前已禁用，点击前往设置。",
-    "launcherStatusHint": "按下 {shortcut} 后，即可快速调用提示词。",
+    "launcherStatusHint": "打开启动器（{shortcut}）",
     "launcherStatusNotSet": "设置并启用快捷键后，即可快速调用提示词。",
     "launcherStatusUnavailable": "快捷键 {shortcut} 当前不可用，点击前往设置。",
     "missingPrompt": "找不到提示词",
@@ -1213,8 +1200,7 @@
   "startup": {
     "autoStart": "开机自动启动",
     "autoStartTip": "系统启动时自动运行，启动器随时可用",
-    "minimized": "启动时最小化到托盘",
-    "minimizedTip": "启动时不显示主窗口"
+    "minimized": "启动时最小化到托盘"
   },
   "promptAI": {
     "adopt": "采纳",
@@ -1340,7 +1326,7 @@
     "clearFilters": "清除筛选",
     "create": "新建提示词",
     "draftMeta": "新建 · 尚未保存",
-    "emptyHint": "提示词会出现在这里",
+    "emptyHint": "还没有提示词",
     "favorited": "已收藏",
     "label": "提示词列表",
     "manageCategories": "管理分类",
@@ -1633,9 +1619,7 @@
     "filterCustom": "自定义",
     "emptyTitle": "还没有连接 AI 服务",
     "moreActions": "更多操作",
-    "connectionPanelDesc": "服务地址、凭据和连接测试",
     "modelsPanel": "模型",
-    "modelsPanelDesc": "已保存的模型和默认模型",
     "requestTestDesc": "发一条真实请求，确认模型能正常响应",
     "behaviorPanelDesc": "AI 帮你生成提示词时遵循的指令",
     "requestTestDefaultPrompt": "用一句话介绍你自己",

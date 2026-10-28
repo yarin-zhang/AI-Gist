@@ -57,7 +57,8 @@ const segments = computed<BodySegment[]>(() => {
   return parsePromptTemplate(content).segments.map(segment => {
     if (segment.kind === 'text') return { kind: 'text', text: segment.text }
     const variable = byName.get(segment.name)
-    const raw = props.values[segment.name]
+    // 和复制结果一致：填写值为空时用默认值
+    const raw = isEmptyPromptValue(props.values[segment.name]) ? variable?.defaultValue : props.values[segment.name]
     const empty = isEmptyPromptValue(raw)
     return {
       kind: 'variable',

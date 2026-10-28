@@ -28,8 +28,7 @@
     "checkFailed": "Impossibile verificare gli aggiornamenti",
     "openDownloadFailed": "Impossibile aprire la pagina di download",
     "openPageFailed": "Impossibile aprire la pagina",
-    "updateFound": "È disponibile la versione {version}",
-    "feedbackNeedsGithub": "Entrambi aprono GitHub: per inviare un problema o un suggerimento ti serve un account GitHub."
+    "updateFound": "È disponibile la versione {version}"
   },
   "aiConfig": {
     "addConfig": "Aggiungi configurazione",
@@ -238,15 +237,13 @@
   },
   "closeBehavior": {
     "ask": "Chiedi ogni volta",
-    "askTip": "Mostra una finestra per farti scegliere",
     "closeAction": "Azione alla chiusura",
     "closeBehaviorMode": "Comportamento alla chiusura",
     "fixed": "Comportamento fisso",
     "fixedTip": "Esegui sempre l'azione scelta qui sotto",
     "minimize": "Riduci nell'area di notifica",
     "minimizeDesc": "Continua in background: launcher e sincronizzazione restano disponibili",
-    "quit": "Esci dall'applicazione",
-    "quitDesc": "Chiude completamente l'app"
+    "quit": "Esci dall'applicazione"
   },
   "cloudBackup": {
     "backupDirectoryCreated": "In questa posizione non esiste ancora alcuna directory di backup su cloud. Crea un backup cloud manuale per iniziare.",
@@ -489,7 +486,7 @@
     "saveFailed": "Impossibile salvare la configurazione di archiviazione",
     "serverUrl": "URL del server",
     "serverUrlRequired": "Inserisci l'URL del server",
-    "statusAutomaticDescription": "Le modifiche vengono sincronizzate automaticamente, pertanto non è necessario gestire manualmente le versioni.",
+    "statusAutomaticDescription": "Le modifiche si sincronizzano da sole",
     "statusCurrent": "I dati sono aggiornati",
     "statusNotConfigured": "Sincronizzazione dati non configurata",
     "statusNotConfiguredDescription": "Aggiungi un archivio cloud per mantenere aggiornati automaticamente i dati su tutti i dispositivi.",
@@ -567,9 +564,8 @@
       },
       "cancelled": {
         "title": "Una sincronizzazione più recente ha preso il controllo",
-        "message": "Una richiesta di sincronizzazione più recente ha sostituito questa. È normale: l'app prosegue da sola e non serve fare nulla.",
-        "step1": "Non serve fare nulla: attendi che l'app completi la sincronizzazione",
-        "step2": "Se per molto tempo non compare «Sincronizzazione cloud funzionante», fai clic su «Sincronizza ora»"
+        "message": "Sostituita da una richiesta di sincronizzazione più recente, prosegue da sola.",
+        "step1": "Se non si risolve per molto tempo, fai clic su «Sincronizza ora»"
       },
       "instability": {
         "title": "Lo stato della sincronizzazione cloud è temporaneamente incoerente",
@@ -685,7 +681,7 @@
     },
     "serverUrlInvalid": "L'URL deve iniziare con http:// o https://",
     "indicatorSyncOff": "Sincronizzazione disattivata",
-    "indicatorSyncOffDetail": "Nessuna archiviazione cloud attiva: i dati restano solo su questo dispositivo. Fai clic per aprire Sincronizzazione dati e aggiungere un archivio da sincronizzare tra dispositivi.",
+    "indicatorSyncOffDetail": "Nessuna archiviazione cloud attiva: i dati restano solo su questo dispositivo.",
     "statusAllStoragesDisabledDescription": "Tutti gli archivi aggiunti sono disattivati. Attivane uno per mantenere aggiornati automaticamente i dati su tutti i dispositivi.",
     "deleteConfigTitle": "Rimuovere l’archivio «{name}»?",
     "deleteConfigPositive": "Rimuovi archivio",
@@ -708,8 +704,7 @@
   "language": {
     "selectLanguage": "Seleziona lingua",
     "interfaceLanguage": "Lingua dell'interfaccia",
-    "panelTitle": "Lingua",
-    "interfaceLanguageDescription": "Menu, messaggi e date usano la lingua selezionata"
+    "panelTitle": "Lingua"
   },
   "mainPage": {
     "menu": {
@@ -811,13 +806,12 @@
     "connectionSuccess": "Connessione riuscita",
     "currentProxy": "Proxy attuale",
     "directMode": "Connessione diretta",
-    "directModeDesc": "Nessun proxy aggiuntivo: usa la connessione di rete predefinita del sistema",
+    "directModeDesc": "Senza alcun proxy",
     "httpProxy": "Proxy HTTP",
     "httpsProxy": "Proxy HTTPS",
     "invalidAddress": "Inserisci un indirizzo proxy valido, ad esempio 127.0.0.1:7890",
     "lastRefresh": "Ultimo aggiornamento",
     "manualMode": "Configurazione manuale",
-    "manualModeDesc": "Imposta manualmente l'indirizzo del server proxy",
     "noProxy": "Indirizzi esclusi dal proxy",
     "noProxyDesc": "Elenco indirizzi separati da virgole, ad esempio: localhost,127.0.0.1",
     "noProxyDetected": "Nessun proxy di sistema rilevato",
@@ -825,10 +819,8 @@
     "proxyDetected": "Proxy di sistema rilevato",
     "proxyMode": "Modalità proxy",
     "systemMode": "Proxy di sistema",
-    "systemModeDesc": "Utilizza le impostazioni proxy del sistema",
     "systemProxyInfo": "Informazioni sul proxy di sistema",
     "testConnection": "Verifica connessione",
-    "testConnectionDesc": "Verifica se la configurazione corrente del proxy funziona correttamente",
     "testing": "Test in corso…",
     "testingDescription": "Test della connessione di rete in corso…",
     "connectionOkWithTime": "Connessione riuscita · risposta media {ms} ms",
@@ -838,7 +830,6 @@
     "addVariable": "Nuova variabile",
     "createVariable": "Crea la variabile «{name}»",
     "defaultVariableName": "Variabile {index}",
-    "descriptionHint": "Aiuta gli utenti a capire cosa inserire",
     "insert": "Inserisci",
     "insertAtCursor": "Inserisci nella posizione del cursore",
     "insertVariable": "Inserisci variabile",
@@ -848,7 +839,7 @@
     "unclosedVariable": "Trovato {count} segnaposto variabile non chiuso | Trovati {count} segnaposto variabile non chiusi",
     "variableCount": "{count} variabile | {count} variabili",
     "variableNameDuplicate": "I nomi delle variabili devono essere univoci",
-    "variableNameInvalid": "I nomi non possono contenere parentesi graffe o a capo",
+    "variableNameInvalid": "I nomi non possono contenere parentesi graffe, due punti o a capo",
     "variableNameRequired": "Inserisci il nome della variabile",
     "variableTokenLabel": "Variabile {name}, usata {count} volta | Variabile {name}, usata {count} volte",
     "variables": "Variabili",
@@ -1159,15 +1150,11 @@
     "actions": "Azioni",
     "assignFromPromptHint": "Impostale dal menu «Altro» di un prompt",
     "assignPromptBinding": "Assegna scorciatoia al prompt",
-    "assignPromptBindingDesc": "Premi questa combinazione per richiamare direttamente il prompt.",
     "autoPasteUnavailable": "Incolla automatico non disponibile",
     "behavior": "Comportamento al richiamo",
     "commandManage": "Gestisci scorciatoie",
-    "commandManageDesc": "Apri le impostazioni delle scorciatoie",
     "commandNewPrompt": "Nuovo prompt",
-    "commandNewPromptDesc": "Apri l'editor per un nuovo prompt",
     "commandOpenApp": "Apri AI Gist",
-    "commandOpenAppDesc": "Mostra la finestra di gestione dei prompt",
     "conflict": "Conflitto",
     "copyAndPaste": "Copia e incolla",
     "defaultAction": "Azione predefinita del launcher",
@@ -1181,7 +1168,7 @@
     "launcherCommandDesc": "Cerca e richiama prompt da qualsiasi applicazione",
     "launcherPlaceholder": "Cerca prompt, tag, categorie o comandi…",
     "launcherStatusDisabled": "La scorciatoia {shortcut} è disattivata. Fai clic per aprire le impostazioni.",
-    "launcherStatusHint": "Premi {shortcut} per richiamare rapidamente i prompt.",
+    "launcherStatusHint": "Apri il launcher ({shortcut})",
     "launcherStatusNotSet": "Imposta e abilita una scorciatoia per richiamare rapidamente i prompt.",
     "launcherStatusUnavailable": "La scorciatoia {shortcut} non è disponibile. Fai clic per aprire le impostazioni.",
     "missingPrompt": "Prompt non trovato",
@@ -1213,8 +1200,7 @@
   "startup": {
     "autoStart": "Avvio automatico all'accensione",
     "autoStartTip": "Si avvia con il sistema, così il launcher è sempre pronto",
-    "minimized": "Riduci nell'area di notifica all'avvio",
-    "minimizedTip": "Non mostrare la finestra principale all'avvio"
+    "minimized": "Riduci nell'area di notifica all'avvio"
   },
   "promptAI": {
     "adopt": "Accetta",
@@ -1340,7 +1326,7 @@
     "clearFilters": "Cancella filtri",
     "create": "Nuovo prompt",
     "draftMeta": "Nuovo · non salvato",
-    "emptyHint": "I tuoi prompt appariranno qui",
+    "emptyHint": "Ancora nessun prompt",
     "favorited": "Nei preferiti",
     "label": "Elenco prompt",
     "manageCategories": "Gestisci categorie",
@@ -1633,9 +1619,7 @@
     "filterCustom": "Personalizzati",
     "emptyTitle": "Nessun servizio AI collegato",
     "moreActions": "Altre azioni",
-    "connectionPanelDesc": "Endpoint, credenziali e test di connessione",
     "modelsPanel": "Modelli",
-    "modelsPanelDesc": "Modelli salvati e modello predefinito",
     "requestTestDesc": "Invia una richiesta reale per verificare che il modello risponda",
     "behaviorPanelDesc": "Istruzioni che l'AI segue quando scrive prompt per te",
     "requestTestDefaultPrompt": "Presentati in una frase",

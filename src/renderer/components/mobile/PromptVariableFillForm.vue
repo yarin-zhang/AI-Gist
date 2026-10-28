@@ -181,8 +181,8 @@ const kindOf = (variable: EditablePromptVariable) => {
   return kind
 }
 
-// 与桌面端的兜底规则保持一致：没有单独配置 placeholder 时，用变量名兜底。
-const placeholderFor = (variable: EditablePromptVariable) => variable.placeholder || variable.name
+// 与桌面端的兜底规则保持一致：没有单独配置 placeholder 时，先显示默认值（清空后复制用的就是它），再用变量名兜底。
+const placeholderFor = (variable: EditablePromptVariable) => variable.placeholder || variable.defaultValue || variable.name
 const stringValue = (variable: EditablePromptVariable) => {
   const value = props.modelValue[variable.name]
   return value === undefined || value === null ? '' : String(value)

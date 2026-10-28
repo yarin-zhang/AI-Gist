@@ -4,7 +4,6 @@
     <div class="binding">
       <div class="binding__intro">
         <span class="binding__title">{{ promptTitle }}</span>
-        <span class="binding__description">{{ t('shortcuts.assignPromptBindingDesc') }}</span>
       </div>
       <button type="button" class="binding__capture" :class="{ 'is-error': error, 'is-capturing': capturing }"
         :aria-label="t('shortcuts.pressShortcut')" @click="capturing = true">
@@ -174,11 +173,6 @@ onBeforeUnmount(() => {
 .binding__title {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
-}
-
-.binding__description {
-  color: var(--content-secondary);
-  font-size: var(--font-size-sm);
 }
 
 .binding__capture {

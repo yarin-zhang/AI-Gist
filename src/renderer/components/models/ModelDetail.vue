@@ -29,7 +29,7 @@
     </header>
 
     <div class="model-detail__grid">
-      <UiPanel :title="t('aiConfig.workspace.connectionSection')" :description="t('models.connectionPanelDesc')">
+      <UiPanel :title="t('aiConfig.workspace.connectionSection')">
         <template #actions>
           <NButton v-if="testingConnection" size="tiny" @click="emit('cancel-connection-test')">{{ t('models.cancelTest') }}</NButton>
           <NButton v-else size="tiny" :disabled="!config.enabled" @click="emit('test-connection')">
@@ -62,7 +62,7 @@
         </div>
       </UiPanel>
 
-      <UiPanel :title="t('models.modelsPanel')" :description="t('models.modelsPanelDesc')">
+      <UiPanel :title="t('models.modelsPanel')">
         <template #actions>
           <span class="model-detail__count">{{ t('aiConfig.workspace.modelCount', { count: modelOptions.length }, modelOptions.length) }}</span>
         </template>

@@ -3182,7 +3182,7 @@ const CLOUD_SYNC_DIAGNOSIS_STEPS = {
   localQuota: 3,
   localApply: 3,
   restoreDecision: 3,
-  cancelled: 2,
+  cancelled: 1,
   instability: 3,
   auth: 3,
   network: 3,

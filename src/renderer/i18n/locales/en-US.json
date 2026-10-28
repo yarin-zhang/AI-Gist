@@ -28,8 +28,7 @@
     "checkFailed": "Couldn't check for updates",
     "openDownloadFailed": "Couldn't open the download page",
     "openPageFailed": "Couldn't open the page",
-    "updateFound": "Version {version} is available",
-    "feedbackNeedsGithub": "Both open GitHub. You need a GitHub account to submit an issue or a suggestion."
+    "updateFound": "Version {version} is available"
   },
   "aiConfig": {
     "addConfig": "Add configuration",
@@ -238,15 +237,13 @@
   },
   "closeBehavior": {
     "ask": "Ask each time",
-    "askTip": "Shows a dialog so you can choose",
     "closeAction": "Close action",
     "closeBehaviorMode": "Close behavior",
     "fixed": "Fixed behavior",
     "fixedTip": "Always do the action chosen below",
     "minimize": "Minimize to tray",
     "minimizeDesc": "Keeps running in the background with the launcher and sync available",
-    "quit": "Quit app",
-    "quitDesc": "Quits the app completely"
+    "quit": "Quit app"
   },
   "cloudBackup": {
     "backupDirectoryCreated": "No cloud backup directory exists in this location yet. Create a manual cloud backup to get started.",
@@ -489,7 +486,7 @@
     "saveFailed": "Couldn't save the storage configuration",
     "serverUrl": "Server URL",
     "serverUrlRequired": "Enter the server URL",
-    "statusAutomaticDescription": "Changes sync automatically; there are no versions to manage.",
+    "statusAutomaticDescription": "Changes sync automatically",
     "statusCurrent": "Data is up to date",
     "statusNotConfigured": "Data sync is not configured",
     "statusNotConfiguredDescription": "Add cloud storage to keep data up to date across devices automatically.",
@@ -567,9 +564,8 @@
       },
       "cancelled": {
         "title": "A newer sync took over",
-        "message": "A newer sync request replaced this one. This is normal; the app continues automatically and nothing needs to be done.",
-        "step1": "No action needed; wait for the app to finish syncing",
-        "step2": "If “Cloud sync is healthy” doesn’t appear for a long time, click “Sync now”"
+        "message": "A newer sync request replaced this one and will continue automatically.",
+        "step1": "If it doesn’t recover for a long time, click “Sync now”"
       },
       "instability": {
         "title": "Cloud sync state is temporarily inconsistent",
@@ -685,7 +681,7 @@
     },
     "serverUrlInvalid": "The URL must start with http:// or https://",
     "indicatorSyncOff": "Sync is off",
-    "indicatorSyncOffDetail": "No cloud storage is enabled, so your data stays on this device only. Click to open Data sync and add storage to sync across devices.",
+    "indicatorSyncOffDetail": "No cloud storage is enabled, so your data stays on this device only.",
     "statusAllStoragesDisabledDescription": "All added storage is disabled. Enable one to keep data up to date across devices automatically.",
     "deleteConfigTitle": "Remove storage “{name}”?",
     "deleteConfigPositive": "Remove storage",
@@ -708,8 +704,7 @@
   "language": {
     "selectLanguage": "Select language",
     "interfaceLanguage": "Interface language",
-    "panelTitle": "Language",
-    "interfaceLanguageDescription": "Menus, messages and dates use the selected language"
+    "panelTitle": "Language"
   },
   "mainPage": {
     "menu": {
@@ -811,13 +806,12 @@
     "connectionSuccess": "Connected",
     "currentProxy": "Current proxy",
     "directMode": "Direct connection",
-    "directModeDesc": "Don't use an extra proxy; use the system's default network connection",
+    "directModeDesc": "Bypasses all proxies",
     "httpProxy": "HTTP proxy",
     "httpsProxy": "HTTPS proxy",
     "invalidAddress": "Enter a valid proxy address, such as 127.0.0.1:7890",
     "lastRefresh": "Last refresh",
     "manualMode": "Manual configuration",
-    "manualModeDesc": "Set the proxy server address manually",
     "noProxy": "Bypass proxy for",
     "noProxyDesc": "Comma-separated addresses, e.g. localhost,127.0.0.1",
     "noProxyDetected": "No system proxy detected",
@@ -825,10 +819,8 @@
     "proxyDetected": "System proxy detected",
     "proxyMode": "Proxy mode",
     "systemMode": "System proxy",
-    "systemModeDesc": "Use the proxy configured in system settings",
     "systemProxyInfo": "System proxy information",
     "testConnection": "Test connection",
-    "testConnectionDesc": "Check whether the current proxy configuration works",
     "testing": "Testing…",
     "testingDescription": "Testing the network connection…",
     "connectionOkWithTime": "Connected · {ms} ms average response",
@@ -838,7 +830,6 @@
     "addVariable": "New variable",
     "createVariable": "Create variable “{name}”",
     "defaultVariableName": "Variable {index}",
-    "descriptionHint": "Help people understand what to enter",
     "insert": "Insert",
     "insertAtCursor": "Insert at cursor",
     "insertVariable": "Insert variable",
@@ -848,7 +839,7 @@
     "unclosedVariable": "Found {count} unclosed variable placeholder | Found {count} unclosed variable placeholders",
     "variableCount": "{count} variable | {count} variables",
     "variableNameDuplicate": "Variable names must be unique",
-    "variableNameInvalid": "Names cannot contain braces or line breaks",
+    "variableNameInvalid": "Names cannot contain braces, colons or line breaks",
     "variableNameRequired": "Enter a variable name",
     "variableTokenLabel": "Variable {name}, used {count} time | Variable {name}, used {count} times",
     "variables": "Variables",
@@ -1159,15 +1150,11 @@
     "actions": "Actions",
     "assignFromPromptHint": "Set these from a prompt's “More” menu",
     "assignPromptBinding": "Assign prompt shortcut",
-    "assignPromptBindingDesc": "Press this key combination to open the prompt directly.",
     "autoPasteUnavailable": "Auto-paste is unavailable",
     "behavior": "Invocation behavior",
     "commandManage": "Manage shortcuts",
-    "commandManageDesc": "Open shortcut settings",
     "commandNewPrompt": "New prompt",
-    "commandNewPromptDesc": "Open the editor for a new prompt",
     "commandOpenApp": "Open AI Gist",
-    "commandOpenAppDesc": "Show the prompt management window",
     "conflict": "Conflict",
     "copyAndPaste": "Copy and paste",
     "defaultAction": "Launcher default action",
@@ -1181,7 +1168,7 @@
     "launcherCommandDesc": "Search and use prompts from any app",
     "launcherPlaceholder": "Search prompts, tags, categories, or commands…",
     "launcherStatusDisabled": "The {shortcut} shortcut is disabled. Click to open settings.",
-    "launcherStatusHint": "Press {shortcut} to quickly invoke prompts.",
+    "launcherStatusHint": "Open the launcher ({shortcut})",
     "launcherStatusNotSet": "Set and enable a shortcut to quickly invoke prompts.",
     "launcherStatusUnavailable": "The {shortcut} shortcut is unavailable. Click to open settings.",
     "missingPrompt": "Prompt not found",
@@ -1213,8 +1200,7 @@
   "startup": {
     "autoStart": "Launch at startup",
     "autoStartTip": "Runs when your computer starts so the launcher is always ready",
-    "minimized": "Minimize to tray at startup",
-    "minimizedTip": "Don't show the main window at startup"
+    "minimized": "Minimize to tray at startup"
   },
   "promptAI": {
     "adopt": "Adopt",
@@ -1340,7 +1326,7 @@
     "clearFilters": "Clear filters",
     "create": "New prompt",
     "draftMeta": "New · not saved",
-    "emptyHint": "Your prompts will appear here",
+    "emptyHint": "No prompts yet",
     "favorited": "Favorited",
     "label": "Prompt list",
     "manageCategories": "Manage categories",
@@ -1633,9 +1619,7 @@
     "filterCustom": "Custom",
     "emptyTitle": "No AI service connected yet",
     "moreActions": "More actions",
-    "connectionPanelDesc": "Endpoint, credentials and connection test",
     "modelsPanel": "Models",
-    "modelsPanelDesc": "Saved models and the default model",
     "requestTestDesc": "Send a real request to check the model responds",
     "behaviorPanelDesc": "Instructions the AI follows when it writes prompts for you",
     "requestTestDefaultPrompt": "Introduce yourself in one sentence",

@@ -19,6 +19,8 @@ import {
   removeVariableOccurrences,
   renderPrompt,
   replaceVariableName,
+  unwrapVariableOccurrences,
+  validateVariableName,
 } from '../src/renderer/lib/utils/prompt-template'
 
 const prompt = (overrides: Partial<PromptWithRelations> = {}): PromptWithRelations => ({
@@ -228,5 +230,56 @@ describe('final result with unfilled variables (#381)', () => {
   it('leaves Jinja output to the template engine', () => {
     const jinja = prompt({ isJinjaTemplate: true, content: 'Hello {{ name }}' })
     expect(buildPromptResultSegments(jinja, { name: '' })).toEqual([{ kind: 'text', text: 'Hello ' }])
+  })
+})
+
+describe('默认值：正文里的 {{名称:默认值}} 和空值回落（#482）', () => {
+  it('按第一个冒号拆出变量名和默认值，全角冒号也算，同名变量合并成一个', () => {
+    const parsed = parsePromptTemplate('分支 {{主分支:main}}，前缀 {{前缀：thoxvi}}，时间 {{时间:9:00}}，再用 {{主分支}}')
+    expect(parsed.variableNames).toEqual(['主分支', '前缀', '时间'])
+    expect(Object.fromEntries(parsed.inlineDefaults)).toEqual({ 主分支: 'main', 前缀: 'thoxvi', 时间: '9:00' })
+    expect(parsed.occurrences.get('主分支')?.length).toBe(2)
+  })
+
+  it('冒号前面是空的不算默认值写法', () => {
+    expect(parsePromptTemplate('{{:x}}').variableNames).toEqual([':x'])
+  })
+
+  it('填写时用正文里的默认值兜底，变量设置里填了默认值的以设置为准', () => {
+    const p = prompt({
+      content: '{{主分支:main}} {{数量:6}}',
+      variables: [{ ...createVariable('数量'), defaultValue: '8' }],
+    })
+    const variables = getActivePromptVariables(p)
+    expect(variables.map(variable => [variable.name, variable.defaultValue])).toEqual([['主分支', 'main'], ['数量', '8']])
+    expect(renderPrompt(p, createPromptDraft(variables)).content).toBe('main 8')
+  })
+
+  it('正文里的默认值不写回变量设置', () => {
+    const { active } = reconcilePromptVariables('{{主分支:main}}', [])
+    expect(active[0].defaultValue).toBe('')
+  })
+
+  it('有默认值的必填变量空着也不算未填，复制时用默认值', () => {
+    const p = prompt({ content: '{{主分支:main}} {{名字}}' })
+    const variables = getActivePromptVariables(p)
+    expect(getMissingPromptVariables(variables, { 主分支: '', 名字: '' })).toEqual(['名字'])
+    expect(renderPrompt(p, { 主分支: '  ', 名字: 'Ada' }).content).toBe('main Ada')
+  })
+
+  it('上次留空或清空过的字段重新填上默认值，填过的值不动', () => {
+    const variables = [{ ...createVariable('a'), defaultValue: 'A' }, { ...createVariable('b'), defaultValue: 'B' }, createVariable('c')]
+    expect(createPromptDraft(variables, { a: '', b: 'mine', c: '' })).toEqual({ a: 'A', b: 'mine', c: '' })
+  })
+
+  it('改名保留默认值，删除变量时正文换成默认值', () => {
+    expect(replaceVariableName('{{旧:main}} {{旧}}', '旧', '新')).toBe('{{新:main}} {{新}}')
+    expect(replaceVariableName('{{旧：值}}', '旧', '新')).toBe('{{新：值}}')
+    expect(unwrapVariableOccurrences('用 {{分支:main}} 和 {{分支}}', '分支')).toBe('用 main 和 分支')
+  })
+
+  it('变量名里不能有冒号', () => {
+    expect(validateVariableName('主分支:main', [])).toBe('invalid')
+    expect(validateVariableName('主分支：main', [])).toBe('invalid')
   })
 })

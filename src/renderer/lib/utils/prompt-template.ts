@@ -29,6 +29,10 @@ export interface PromptVariableSegment {
   kind: 'variable'
   raw: string
   name: string
+  /** 写成 `{{名称:默认值}}` 时冒号后面的默认值；没写冒号时为 undefined */
+  defaultValue?: string
+  /** 名称和默认值之间用的冒号（半角或全角），改名时原样保留 */
+  defaultSeparator?: string
   start: number
   end: number
   occurrence: number
@@ -48,6 +52,8 @@ export interface ParsedPromptTemplate {
   segments: PromptTemplateSegment[]
   variableNames: string[]
   occurrences: Map<string, PromptVariableSegment[]>
+  /** 每个变量在正文里写的第一个非空默认值（`{{名称:默认值}}`） */
+  inlineDefaults: Map<string, string>
   diagnostics: PromptTemplateDiagnostic[]
 }
 
@@ -58,10 +64,25 @@ export interface ReconciledPromptVariables {
 }
 
 const PLACEHOLDER_PATTERN = /\{\{\s*([^{}\r\n]+?)\s*\}\}/g
+const DEFAULT_SEPARATOR_PATTERN = /[:：]/
+
+/**
+ * 占位符里的文字拆成变量名和默认值：`{{主分支:main}}` 是变量「主分支」、默认值「main」，
+ * 只按第一个冒号拆（默认值里可以再有冒号，例如 `{{时间:9:00}}`），半角、全角冒号都算。
+ * 冒号前面是空的（`{{:x}}`）不算默认值写法，整段仍是变量名。
+ */
+function splitPlaceholder(inner: string): { name: string; defaultValue?: string; defaultSeparator?: string } {
+  const match = DEFAULT_SEPARATOR_PATTERN.exec(inner)
+  if (!match) return { name: inner }
+  const name = inner.slice(0, match.index).trim()
+  if (!name) return { name: inner }
+  return { name, defaultValue: inner.slice(match.index + 1).trim(), defaultSeparator: match[0] }
+}
 
 export function parsePromptTemplate(content = ''): ParsedPromptTemplate {
   const segments: PromptTemplateSegment[] = []
   const occurrences = new Map<string, PromptVariableSegment[]>()
+  const inlineDefaults = new Map<string, string>()
   const variableNames: string[] = []
   let cursor = 0
   let match: RegExpExecArray | null
@@ -70,7 +91,7 @@ export function parsePromptTemplate(content = ''): ParsedPromptTemplate {
   while ((match = PLACEHOLDER_PATTERN.exec(content))) {
     const start = match.index
     const end = start + match[0].length
-    const name = match[1].trim()
+    const { name, defaultValue, defaultSeparator } = splitPlaceholder(match[1].trim())
     if (!name) continue
 
     if (start > cursor) {
@@ -82,6 +103,7 @@ export function parsePromptTemplate(content = ''): ParsedPromptTemplate {
       kind: 'variable',
       raw: match[0],
       name,
+      ...(defaultSeparator ? { defaultValue, defaultSeparator } : {}),
       start,
       end,
       occurrence: nameOccurrences.length,
@@ -90,6 +112,7 @@ export function parsePromptTemplate(content = ''): ParsedPromptTemplate {
     nameOccurrences.push(segment)
     occurrences.set(name, nameOccurrences)
     if (segment.firstOccurrence) variableNames.push(name)
+    if (defaultValue && !inlineDefaults.has(name)) inlineDefaults.set(name, defaultValue)
     segments.push(segment)
     cursor = end
   }
@@ -102,6 +125,7 @@ export function parsePromptTemplate(content = ''): ParsedPromptTemplate {
     segments,
     variableNames,
     occurrences,
+    inlineDefaults,
     diagnostics: findUnclosedVariables(content, segments),
   }
 }
@@ -244,9 +268,16 @@ export interface ReconcileOptions {
 export function reconcilePromptVariables(
   content: string,
   variables: EditablePromptVariable[] = [],
+  options: ReconcileOptions = {}
+): ReconciledPromptVariables {
+  return reconcileParsedVariables(parsePromptTemplate(content), variables, options)
+}
+
+function reconcileParsedVariables(
+  parsed: ParsedPromptTemplate,
+  variables: EditablePromptVariable[] = [],
   { retainUnused = () => true }: ReconcileOptions = {}
 ): ReconciledPromptVariables {
-  const parsed = parsePromptTemplate(content)
   const existing = new Map(variables.filter(variable => variable.name).map(variable => [variable.name, variable]))
   const active = parsed.variableNames.map(name => cloneVariable(existing.get(name) || createVariable(name)))
   const activeNames = new Set(parsed.variableNames)
@@ -260,17 +291,20 @@ export function reconcilePromptVariables(
 export function validateVariableName(name: string, variables: EditablePromptVariable[], currentName?: string): string | null {
   const normalized = name.trim()
   if (!normalized) return 'required'
-  if (/[{}\r\n]/.test(normalized)) return 'invalid'
+  // 冒号用来在正文里写默认值（`{{名称:默认值}}`），不能出现在名称里
+  if (/[{}:：\r\n]/.test(normalized)) return 'invalid'
   if (variables.some(variable => variable.name !== currentName && variable.name === normalized)) return 'duplicate'
   return null
 }
 
+/** 改名时保留正文里写的默认值：`{{旧名:main}}` 变成 `{{新名:main}}` */
 export function replaceVariableName(content: string, previousName: string, nextName: string): string {
-  return parsePromptTemplate(content).segments.map(segment => (
-    segment.kind === 'variable' && segment.name === previousName
-      ? `{{${nextName}}}`
-      : content.slice(segment.start, segment.end)
-  )).join('')
+  return parsePromptTemplate(content).segments.map(segment => {
+    if (segment.kind !== 'variable' || segment.name !== previousName) return content.slice(segment.start, segment.end)
+    return segment.defaultSeparator
+      ? `{{${nextName}${segment.defaultSeparator}${segment.defaultValue}}}`
+      : `{{${nextName}}}`
+  }).join('')
 }
 
 export function removeVariableOccurrences(content: string, name: string): string {
@@ -280,14 +314,16 @@ export function removeVariableOccurrences(content: string, name: string): string
     .join('')
 }
 
-/** 删除变量定义时，正文里的 `{{name}}` 变回普通文字 name，句子不会缺一块 */
+/**
+ * 删除变量定义时，正文里的 `{{name}}` 变回普通文字 name，句子不会缺一块；
+ * 写了默认值的（`{{name:默认值}}`）换成默认值，读起来和填好时一样
+ */
 export function unwrapVariableOccurrences(content: string, name: string): string {
   return parsePromptTemplate(content).segments
-    .map(segment => (
-      segment.kind === 'variable' && segment.name === name
-        ? name
-        : content.slice(segment.start, segment.end)
-    ))
+    .map(segment => {
+      if (segment.kind !== 'variable' || segment.name !== name) return content.slice(segment.start, segment.end)
+      return segment.defaultValue || name
+    })
     .join('')
 }
 
@@ -297,17 +333,28 @@ export function getActivePromptVariables(prompt: PromptWithRelations): EditableP
     return jinjaService.extractVariables(prompt.content || '').map(createVariable)
   }
 
-  return reconcilePromptVariables(prompt.content || '', prompt.variables || []).active
+  // 变量设置里没填默认值的，用正文里 `{{名称:默认值}}` 写的默认值兜底。只在使用时补上，
+  // 不写回变量设置，以后改了正文里的默认值也不会被旧值盖住
+  const parsed = parsePromptTemplate(prompt.content || '')
+  return reconcileParsedVariables(parsed, prompt.variables || []).active.map(variable => {
+    const inline = parsed.inlineDefaults.get(variable.name)
+    return inline && isEmptyPromptValue(variable.defaultValue) ? { ...variable, defaultValue: inline } : variable
+  })
 }
 
+/**
+ * 填写值的初始状态：没有值的字段填上默认值。上次填写时留空、或点了「清空填写值」的字段，
+ * 有默认值时同样换成默认值，不会空着被当成未填的必填项
+ */
 export function createPromptDraft(
   variables: EditablePromptVariable[],
   current: Record<string, any> = {}
 ): Record<string, any> {
   const next = { ...current }
   variables.forEach(variable => {
-    if (next[variable.name] !== undefined) return
-    next[variable.name] = normalizeVariableType(variable.type) === 'boolean'
+    const isBoolean = normalizeVariableType(variable.type) === 'boolean'
+    if (next[variable.name] !== undefined && (isBoolean || !isEmptyPromptValue(next[variable.name]) || isEmptyPromptValue(variable.defaultValue))) return
+    next[variable.name] = isBoolean
       ? variable.defaultValue === 'true'
       : variable.defaultValue ?? ''
   })
@@ -348,13 +395,15 @@ export function getMissingPromptVariables(
   variables: EditablePromptVariable[],
   values: Record<string, any>
 ): string[] {
+  // 字段空着但有默认值的，渲染时用默认值，不算未填
   return variables
-    .filter(variable => variable.required && isEmptyPromptValue(values[variable.name]))
+    .filter(variable => variable.required && isEmptyPromptValue(values[variable.name]) && isEmptyPromptValue(variable.defaultValue))
     .map(variable => variable.name)
 }
 
+/** 实际写进结果的值：填写值为空时用默认值 */
 function renderVariableValue(variable: EditablePromptVariable | undefined, value: any): string {
-  return String(value ?? variable?.defaultValue ?? '')
+  return String(isEmptyPromptValue(value) ? variable?.defaultValue ?? '' : value)
 }
 
 /** 渲染后会变成空白的变量（值和默认值都为空），按模板中首次出现的顺序返回。 */
@@ -439,6 +488,10 @@ export function parseJinjaVariableValue(type: string, value: any): any {
 function buildJinjaContext(values: Record<string, any>, variables: EditablePromptVariable[]): Record<string, any> {
   const context = { ...values }
   variables.forEach(variable => {
+    // 和普通模板一致：填写值为空时用默认值
+    if (isEmptyPromptValue(context[variable.name]) && !isEmptyPromptValue(variable.defaultValue)) {
+      context[variable.name] = variable.defaultValue
+    }
     const type = String(variable.type)
     if ((type === 'list' || type === 'dict') && variable.name in context) {
       context[variable.name] = parseJinjaVariableValue(type, context[variable.name])

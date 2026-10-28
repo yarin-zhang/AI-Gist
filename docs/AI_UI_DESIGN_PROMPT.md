@@ -151,6 +151,10 @@ One concept has one name everywhere, in every locale. Reuse an existing message 
 - Quote names as 「…」 in Chinese and Japanese, “…” in English and «…» in Italian. Count prompts with 个 / 個 in Chinese and 件 in Japanese.
 - Messages with a count use vue-i18n plural forms in English and Italian (`"{count} prompt | {count} prompts"`) and are called as `t(key, { count }, count)`.
 - A delete confirmation asks in the title (“Delete “{name}”?”, “Delete {count} prompts?”) and states the consequence in the body.
+- Helper text, descriptions and hints carry only what a user needs to decide: a consequence, a limit, or something that cannot be undone. Leave them out when the title or option label already says it.
+  - Never restate the label in other words (“Manual” → “Set the proxy server manually”), explain an obvious result (“Both entries open GitHub”, “Menus and dates use the selected language”) or narrate the click (“Click here to…”, 「即可」「点击前往」).
+  - A row, card or panel without such information has no description at all; never fill the slot with filler.
+  - An accessible name joins its parts once, without repeating the same instruction or doubling punctuation (「。. 」).
 
 ## Mobile (Ionic)
 

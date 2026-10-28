@@ -4,7 +4,7 @@
             <NSwitch :value="modelValue.autoLaunch" :aria-label="t('startup.autoStart')"
                 @update:value="value => handleUpdate({ autoLaunch: value })" />
         </UiSettingRow>
-        <UiSettingRow :title="t('startup.minimized')" :description="t('startup.minimizedTip')">
+        <UiSettingRow :title="t('startup.minimized')">
             <NSwitch :value="modelValue.startMinimized" :aria-label="t('startup.minimized')"
                 @update:value="value => handleUpdate({ startMinimized: value })" />
         </UiSettingRow>

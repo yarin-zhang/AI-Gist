@@ -5,9 +5,7 @@
             <span class="sync-status__icon" aria-hidden="true"><NIcon :size="20"><component :is="statusIcon" /></NIcon></span>
             <div class="sync-status__text">
                 <span class="sync-status__title">{{ statusTitle }}</span>
-                <span class="sync-status__description">
-                    {{ statusDescription }}<template v-if="syncStatus.lastSyncAt && dataSyncStatusKind !== 'notConfigured'"> · {{ t('dataSync.lastSyncAt', { time: formatSyncTime(syncStatus.lastSyncAt) }) }}</template>
-                </span>
+                <span v-if="statusLine" class="sync-status__description">{{ statusLine }}</span>
                 <span v-if="syncStatus.pendingChanges && dataSyncStatusKind !== 'notConfigured'" class="sync-status__description">{{ t('dataSync.pendingChanges') }}</span>
             </div>
             <!-- 窄窗口或长文案（意大利语等）时按钮整体换到第二行，不把左边的说明挤成一列 -->
@@ -340,9 +338,17 @@ const statusDescription = computed(() => {
         case 'conflict': return t('syncConflict.statusDescription');
         case 'paused': return t('dataSync.statusPausedDescription');
         case 'syncing': return t('dataSync.statusSyncingDescription');
-        default: return t('dataSync.statusAutomaticDescription');
+        // 正常状态标题已经说清楚了，只补上次同步时间
+        default: return '';
     }
 });
+
+const statusLine = computed(() => [
+    statusDescription.value,
+    syncStatus.value.lastSyncAt && dataSyncStatusKind.value !== 'notConfigured'
+        ? t('dataSync.lastSyncAt', { time: formatSyncTime(syncStatus.value.lastSyncAt) })
+        : '',
+].filter(Boolean).join(' · '));
 
 // 没开同步时不用「刷新」图标，免得看起来像正在排队同步
 const statusIcon = computed(() => dataSyncStatusKind.value === 'notConfigured' ? CloudOff : ({

@@ -22,7 +22,7 @@
             </div>
         </UiPanel>
 
-        <UiPanel :title="t('networkProxy.testConnection')" :description="t('networkProxy.testConnectionDesc')">
+        <UiPanel :title="t('networkProxy.testConnection')">
             <template #actions>
                 <NButton size="tiny" :loading="loading.test" :disabled="isTesting" @click="testConnection">
                     {{ t('networkProxy.testConnection') }}
@@ -152,8 +152,8 @@ const loading = reactive({
 
 const modeOptions = computed(() => [
     { value: 'direct' as const, label: t('networkProxy.directMode'), description: t('networkProxy.directModeDesc') },
-    { value: 'system' as const, label: t('networkProxy.systemMode'), description: t('networkProxy.systemModeDesc') },
-    { value: 'manual' as const, label: t('networkProxy.manualMode'), description: t('networkProxy.manualModeDesc') },
+    { value: 'system' as const, label: t('networkProxy.systemMode') },
+    { value: 'manual' as const, label: t('networkProxy.manualMode') },
 ]);
 
 // 成功站点的平均响应时间，显示在测试结果里

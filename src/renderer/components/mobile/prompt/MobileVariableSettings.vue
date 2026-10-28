@@ -147,7 +147,7 @@
           <span class="m-gt">{{ t('promptPage.description') }}</span>
           <div class="m-group">
             <label class="m-field">
-              <textarea :value="current.description || ''" rows="2" :placeholder="t('promptEditor.descriptionHint')"
+              <textarea :value="current.description || ''" rows="2" :placeholder="t('promptPage.variableDescriptionPlaceholder')"
                 :aria-label="t('promptPage.description')"
                 @input="patch({ description: ($event.target as HTMLTextAreaElement).value })"></textarea>
             </label>

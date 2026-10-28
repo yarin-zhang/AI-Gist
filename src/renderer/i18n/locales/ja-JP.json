@@ -28,8 +28,7 @@
     "checkFailed": "更新の確認に失敗しました",
     "openDownloadFailed": "ダウンロードページを開けませんでした",
     "openPageFailed": "ページを開けませんでした",
-    "updateFound": "新しいバージョン {version} があります",
-    "feedbackNeedsGithub": "どちらも GitHub が開きます。問題や提案を投稿するには GitHub アカウントが必要です。"
+    "updateFound": "新しいバージョン {version} があります"
   },
   "aiConfig": {
     "addConfig": "モデル設定を追加",
@@ -238,15 +237,13 @@
   },
   "closeBehavior": {
     "ask": "毎回確認",
-    "askTip": "毎回ダイアログで選択します",
     "closeAction": "閉じる動作",
     "closeBehaviorMode": "閉じる動作モード",
     "fixed": "固定動作",
     "fixedTip": "下で選んだ動作をそのまま実行します",
     "minimize": "トレイに最小化",
     "minimizeDesc": "バックグラウンドで動作を続け、ランチャーと同期も引き続き使えます",
-    "quit": "アプリケーションを終了",
-    "quitDesc": "アプリを完全に終了します"
+    "quit": "アプリケーションを終了"
   },
   "cloudBackup": {
     "backupDirectoryCreated": "この保存先にはクラウドバックアップ用フォルダーがまだありません。手動でクラウドバックアップを作成してください。",
@@ -489,7 +486,7 @@
     "saveFailed": "ストレージ設定の保存に失敗しました",
     "serverUrl": "サーバー URL",
     "serverUrlRequired": "サーバー URL を入力してください",
-    "statusAutomaticDescription": "データの変更は自動的に同期されるため、バージョンを手動で管理する必要はありません。",
+    "statusAutomaticDescription": "変更は自動で同期されます",
     "statusCurrent": "データは最新です",
     "statusNotConfigured": "データ同期が未設定です",
     "statusNotConfiguredDescription": "クラウドストレージを追加すると、デバイス間のデータが自動的に最新に保たれます。",
@@ -567,9 +564,8 @@
       },
       "cancelled": {
         "title": "新しい同期に引き継がれました",
-        "message": "新しい同期リクエストがこの処理を置き換えました。通常の動作で、アプリが自動的に続行するため操作は不要です。",
-        "step1": "操作は不要です。アプリが同期を終えるまでお待ちください",
-        "step2": "長時間「クラウド同期は正常です」と表示されない場合は、「今すぐ同期」をクリックする"
+        "message": "新しい同期リクエストに置き換えられました。自動的に続行します。",
+        "step1": "長時間回復しない場合は「今すぐ同期」をクリックする"
       },
       "instability": {
         "title": "クラウド同期の状態が一時的に一致していません",
@@ -685,7 +681,7 @@
     },
     "serverUrlInvalid": "URL は http:// または https:// で始めてください",
     "indicatorSyncOff": "同期はオフ",
-    "indicatorSyncOffDetail": "有効なクラウドストレージがないため、データはこのデバイスにだけ保存されています。クリックしてデータ同期を開き、ストレージを追加するとデバイス間で自動同期されます。",
+    "indicatorSyncOffDetail": "有効なクラウドストレージがないため、データはこのデバイスにだけ保存されています。",
     "statusAllStoragesDisabledDescription": "追加したストレージはすべて無効です。いずれかを有効にすると、デバイス間のデータが自動的に最新に保たれます。",
     "deleteConfigTitle": "ストレージ「{name}」を削除しますか？",
     "deleteConfigPositive": "ストレージを削除",
@@ -708,8 +704,7 @@
   "language": {
     "selectLanguage": "言語を選択",
     "interfaceLanguage": "表示言語",
-    "panelTitle": "言語",
-    "interfaceLanguageDescription": "メニュー、メッセージ、日付を選んだ言語で表示します"
+    "panelTitle": "言語"
   },
   "mainPage": {
     "menu": {
@@ -811,13 +806,12 @@
     "connectionSuccess": "接続成功",
     "currentProxy": "現在のプロキシ",
     "directMode": "直接接続",
-    "directModeDesc": "追加のプロキシを使わず、システムの既定のネットワーク接続を使用します",
+    "directModeDesc": "プロキシを一切使用しません",
     "httpProxy": "HTTP プロキシ",
     "httpsProxy": "HTTPS プロキシ",
     "invalidAddress": "127.0.0.1:7890 のような正しいプロキシアドレスを入力してください",
     "lastRefresh": "最終更新",
     "manualMode": "手動設定",
-    "manualModeDesc": "プロキシサーバーのアドレスを手動で設定",
     "noProxy": "プロキシを使用しないアドレス",
     "noProxyDesc": "カンマ区切りのアドレス一覧（例：localhost,127.0.0.1）",
     "noProxyDetected": "システムプロキシは検出されませんでした",
@@ -825,10 +819,8 @@
     "proxyDetected": "システムプロキシを検出しました",
     "proxyMode": "プロキシモード",
     "systemMode": "システムプロキシ",
-    "systemModeDesc": "システムのプロキシ設定を使用",
     "systemProxyInfo": "システムプロキシ情報",
     "testConnection": "接続テスト",
-    "testConnectionDesc": "現在のプロキシ設定が正しく動作するかをテストします",
     "testing": "テスト中...",
     "testingDescription": "ネットワーク接続をテストしています...",
     "connectionOkWithTime": "接続正常 · 平均応答 {ms} ms",
@@ -838,7 +830,6 @@
     "addVariable": "新しい変数",
     "createVariable": "変数「{name}」を作成",
     "defaultVariableName": "変数{index}",
-    "descriptionHint": "何を入力すればよいかの説明",
     "insert": "挿入",
     "insertAtCursor": "現在のカーソル位置に挿入",
     "insertVariable": "変数を挿入",
@@ -848,7 +839,7 @@
     "unclosedVariable": "閉じられていない変数構文が {count} 件あります",
     "variableCount": "変数 {count} 件",
     "variableNameDuplicate": "変数名は重複できません",
-    "variableNameInvalid": "名前に波括弧や改行は使用できません",
+    "variableNameInvalid": "名前に波括弧、コロン、改行は使用できません",
     "variableNameRequired": "変数名を入力してください",
     "variableTokenLabel": "変数 {name}、{count} 回使用",
     "variables": "変数",
@@ -1159,15 +1150,11 @@
     "actions": "アクション",
     "assignFromPromptHint": "プロンプトの「その他」メニューで設定します",
     "assignPromptBinding": "プロンプトのショートカットを設定",
-    "assignPromptBindingDesc": "このキーの組み合わせを押すと、このプロンプトを直接呼び出せます。",
     "autoPasteUnavailable": "自動貼り付けは利用できません",
     "behavior": "呼び出し動作",
     "commandManage": "ショートカットを管理",
-    "commandManageDesc": "ショートカット設定を開く",
     "commandNewPrompt": "新規プロンプト",
-    "commandNewPromptDesc": "新規プロンプトのエディターを開く",
     "commandOpenApp": "AI Gist を開く",
-    "commandOpenAppDesc": "プロンプト管理のメインウィンドウを表示",
     "conflict": "競合",
     "copyAndPaste": "コピーして貼り付け",
     "defaultAction": "ランチャーの既定のアクション",
@@ -1181,7 +1168,7 @@
     "launcherCommandDesc": "どのアプリからでもプロンプトを検索して呼び出せます",
     "launcherPlaceholder": "プロンプト、タグ、カテゴリ、コマンドを検索…",
     "launcherStatusDisabled": "ショートカット {shortcut} は現在無効です。クリックすると設定を開きます。",
-    "launcherStatusHint": "{shortcut} を押すと、プロンプトをすぐに呼び出せます。",
+    "launcherStatusHint": "ランチャーを開く（{shortcut}）",
     "launcherStatusNotSet": "ショートカットを設定して有効にすると、プロンプトをすぐに呼び出せます。",
     "launcherStatusUnavailable": "ショートカット {shortcut} は現在使用できません。クリックすると設定を開きます。",
     "missingPrompt": "プロンプトが見つかりません",
@@ -1213,8 +1200,7 @@
   "startup": {
     "autoStart": "自動起動",
     "autoStartTip": "システム起動時に自動で実行し、ランチャーをいつでも使えるようにします",
-    "minimized": "起動時にトレイに最小化",
-    "minimizedTip": "起動時にメインウィンドウを表示しません"
+    "minimized": "起動時にトレイに最小化"
   },
   "promptAI": {
     "adopt": "採用",
@@ -1340,7 +1326,7 @@
     "clearFilters": "絞り込みを解除",
     "create": "新しいプロンプト",
     "draftMeta": "新規 · 未保存",
-    "emptyHint": "プロンプトはここに表示されます",
+    "emptyHint": "プロンプトはまだありません",
     "favorited": "お気に入り",
     "label": "プロンプト一覧",
     "manageCategories": "カテゴリを管理",
@@ -1633,9 +1619,7 @@
     "filterCustom": "カスタム",
     "emptyTitle": "AI サービスがまだ接続されていません",
     "moreActions": "その他の操作",
-    "connectionPanelDesc": "エンドポイント、認証情報、接続テスト",
     "modelsPanel": "モデル",
-    "modelsPanelDesc": "保存済みのモデルと既定のモデル",
     "requestTestDesc": "実際にリクエストを送り、モデルが応答するか確認します",
     "behaviorPanelDesc": "AI がプロンプトを生成するときに従う指示",
     "requestTestDefaultPrompt": "一文で自己紹介してください",

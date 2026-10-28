@@ -167,12 +167,15 @@ class VariableWidget extends WidgetType {
     readonly name: string,
     readonly occurrenceCount: number,
     readonly selected: boolean,
+    /** 正文里 `{{名称:默认值}}` 写的默认值，变量块里跟在名称后面显示 */
+    readonly defaultValue = '',
   ) { super() }
 
   eq(other: VariableWidget) {
     return other.name === this.name
       && other.occurrenceCount === this.occurrenceCount
       && other.selected === this.selected
+      && other.defaultValue === this.defaultValue
   }
 
   toDOM() {
@@ -199,6 +202,12 @@ class VariableWidget extends WidgetType {
     const label = document.createElement('span')
     label.textContent = this.name
     button.append(braces, label)
+    if (this.defaultValue) {
+      const fallback = document.createElement('span')
+      fallback.className = 'prompt-variable-token-default'
+      fallback.textContent = `= ${this.defaultValue}`
+      button.append(fallback)
+    }
     if (this.occurrenceCount > 1) {
       const count = document.createElement('span')
       count.className = 'prompt-variable-token-count'
@@ -242,7 +251,7 @@ const buildDecorations = (
     const renderAsToken = visual && segment.start !== editingStart
     const decoration = renderAsToken
       ? Decoration.replace({
-        widget: new VariableWidget(segment.name, occurrenceCount, selected === segment.name),
+        widget: new VariableWidget(segment.name, occurrenceCount, selected === segment.name, segment.defaultValue || ''),
       })
       : Decoration.mark({
         class: `prompt-variable-source${selected === segment.name ? ' selected' : ''}`,
@@ -514,6 +523,7 @@ defineExpose({
 .structured-editor-host :deep(.prompt-variable-token.selected) { background: var(--surface-tertiary); font-weight: var(--font-weight-medium); }
 .structured-editor-host :deep(.prompt-variable-token:focus-visible) { outline: 2px solid var(--interactive-focus); outline-offset: 1px; }
 .structured-editor-host :deep(.prompt-variable-token-icon) { color: var(--accent-primary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+.structured-editor-host :deep(.prompt-variable-token-default) { max-width: 160px; overflow: hidden; color: var(--content-tertiary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .structured-editor-host :deep(.prompt-variable-token-count) { min-width: 17px; padding: 0 4px; border-radius: var(--radius-control); color: var(--content-secondary); background: var(--surface-tertiary); font-size: 12px; line-height: 17px; text-align: center; }
 .structured-editor-host :deep(.prompt-variable-source) { border-radius: 2px; color: var(--accent-primary); background: var(--interactive-focus); }
 .structured-editor-host :deep(.prompt-variable-source.selected) { background: var(--interactive-active); font-weight: var(--font-weight-medium); }

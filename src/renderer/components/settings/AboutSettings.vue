@@ -56,8 +56,6 @@
                     <template #icon><NIcon><Bulb /></NIcon></template>{{ t('about.featureRequest') }}
                 </NButton>
             </div>
-            <!-- 目前只有 GitHub 这一个反馈渠道：先说清楚要账号，免得点进去才发现要登录 -->
-            <p class="ui-help about__feedback-note">{{ t('about.feedbackNeedsGithub') }}</p>
         </UiPanel>
     </div>
 </template>
@@ -226,9 +224,5 @@ onMounted(async () => {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-}
-
-.about__feedback-note {
-    margin: 8px 0 0;
 }
 </style>

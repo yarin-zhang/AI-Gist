@@ -89,7 +89,8 @@ const segments = computed(() => parsed.value.segments)
 const multilineStarts = computed(() => findMultilineVariableStarts(props.prompt.content || '', parsed.value.segments))
 
 const options = (name: string) => (byName.value.get(name)?.options || []).filter(Boolean)
-const placeholder = (name: string) => byName.value.get(name)?.placeholder || ''
+// 清空的字段复制时用默认值，占位文字里直接显示出来
+const placeholder = (name: string) => byName.value.get(name)?.placeholder || byName.value.get(name)?.defaultValue || ''
 const stringValue = (name: string) => {
   const value = props.values[name]
   return value === undefined || value === null ? '' : String(value)
@@ -102,6 +103,7 @@ const displayValue = (name: string) => {
   return stringValue(name) || name
 }
 const isMissing = (name: string) => props.revealMissing.has(name) && isEmptyPromptValue(props.values[name])
+  && isEmptyPromptValue(byName.value.get(name)?.defaultValue)
 const isChoiceKind = (kind: FieldKind) => kind === 'choices' || kind === 'boolean'
 
 const kindOf = (segment: PromptVariableSegment): FieldKind => {

@@ -24,11 +24,11 @@
       <NSelect v-else-if="kind(variable) === 'select'" :value="stringValue(variable) || null" clearable
         :input-props="{ id: fieldId(variable) }"
         :options="options(variable).map(option => ({ label: option, value: option }))"
-        :placeholder="variable.placeholder || t('promptPage.selectPlaceholder')"
+        :placeholder="variable.placeholder || variable.defaultValue || t('promptPage.selectPlaceholder')"
         @update:value="value => update(variable, value ?? '')" @focus="emit('focus', variable.name)"
         @blur="event => handleBlur(variable, event)" />
       <NInputNumber v-else-if="kind(variable) === 'number'" :value="numberValue(variable)" clearable
-        :input-props="{ id: fieldId(variable) }" :placeholder="variable.placeholder || ''"
+        :input-props="{ id: fieldId(variable) }" :placeholder="variable.placeholder || variable.defaultValue || ''"
         @update:value="value => update(variable, value ?? '')" @focus="emit('focus', variable.name)"
         @blur="event => handleBlur(variable, event)" />
       <div v-else-if="kind(variable) === 'boolean'" class="field__switch">
@@ -39,10 +39,10 @@
       <NInput v-else-if="kind(variable) === 'textarea'" type="textarea" :value="stringValue(variable)"
         :autosize="{ minRows: 3, maxRows: 7 }" :input-props="{ id: fieldId(variable) }"
         :class="{ 'field__mono': isJinjaCode(variable) }"
-        :placeholder="variable.placeholder || ''" @update:value="value => update(variable, value)"
+        :placeholder="variable.placeholder || variable.defaultValue || ''" @update:value="value => update(variable, value)"
         @focus="emit('focus', variable.name)" @blur="event => handleBlur(variable, event)" />
       <NInput v-else :value="stringValue(variable)" :input-props="{ id: fieldId(variable), onPaste: (event: ClipboardEvent) => handlePaste(event, variable) }"
-        :placeholder="variable.placeholder || ''" @update:value="value => update(variable, value)"
+        :placeholder="variable.placeholder || variable.defaultValue || ''" @update:value="value => update(variable, value)"
         @focus="emit('focus', variable.name)" @blur="event => handleBlur(variable, event)" />
 
       <!-- Jinja 的 list / dict 变量：说明怎么填，渲染时换成数组 / 对象（与移动端一致） -->
@@ -123,8 +123,10 @@ const kind = (variable: EditablePromptVariable) => {
   return 'text'
 }
 
+// 空着但有默认值的字段复制时用默认值，不算未填
 const isMissing = (variable: EditablePromptVariable) => (
-  variable.required && props.revealMissing.has(variable.name) && isEmptyPromptValue(props.values[variable.name])
+  variable.required && props.revealMissing.has(variable.name)
+    && isEmptyPromptValue(props.values[variable.name]) && isEmptyPromptValue(variable.defaultValue)
 )
 
 const metaText = (variable: EditablePromptVariable) => {

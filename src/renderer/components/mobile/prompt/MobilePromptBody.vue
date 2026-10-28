@@ -27,7 +27,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import { parsePromptTemplate, type EditablePromptVariable } from '~/lib/utils/prompt-template'
+import { isEmptyPromptValue, parsePromptTemplate, type EditablePromptVariable } from '~/lib/utils/prompt-template'
 
 type BodySegment =
   | { kind: 'text'; text: string }
@@ -54,7 +54,8 @@ const { t } = useI18n()
 const MAX_VALUE_LENGTH = 120
 
 const displayValue = (variable: EditablePromptVariable | undefined, value: unknown) => {
-  const text = String(value ?? variable?.defaultValue ?? '')
+  // 和复制结果一致：填写值为空时用默认值
+  const text = String(isEmptyPromptValue(value) ? variable?.defaultValue ?? '' : value)
   if (!text.trim()) return ''
   return text.length > MAX_VALUE_LENGTH ? `${text.slice(0, MAX_VALUE_LENGTH)}…` : text
 }

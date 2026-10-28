@@ -9,6 +9,7 @@
  * 在 alert 的 message 里写 HTML 只会把标签原样显示给用户。
  */
 import { actionSheetController, alertController, loadingController } from '@ionic/vue'
+import { joinSentences as joinSentencesIn } from '~/lib/utils/join-sentences'
 import { Capacitor } from '@capacitor/core'
 import {
   alertCircleOutline,
@@ -224,16 +225,11 @@ export const formatRelative = (value?: string | null, now = new Date()) =>
   value ? formatRelativeTime(value, currentLocale(), now) : ''
 
 /**
- * 两句说明接在一起：第一句没有句末标点时补上；中文、日文句号后不加空格，其他语言加一个空格。
+ * 两句说明接在一起（规则见 lib/utils/join-sentences.ts），默认按当前界面语言。
  * （桌面端共用的 statusRetryScheduledDescription 用「；」连接，诊断说明本身已带句号，会出现「。；」）
  */
-export const joinSentences = (first: string, second: string, locale = currentLocale()) => {
-  const cjk = /^(zh|ja)/.test(locale)
-  const lead = first.trim()
-  if (!lead) return second
-  const ended = /[。．.!！?？]$/.test(lead) ? lead : `${lead}${cjk ? '。' : '.'}`
-  return `${ended}${cjk ? '' : ' '}${second}`
-}
+export const joinSentences = (first: string, second: string, locale = currentLocale()) =>
+  joinSentencesIn(first, second, locale)
 
 export type MobileSyncStatusKind = DataSyncStatusKind | 'restorePaused'
 export type MobileSyncTone = 'success' | 'info' | 'warning' | 'error'
