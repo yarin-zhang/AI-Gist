@@ -878,7 +878,8 @@ onMounted(async () => {
 }
 
 .gen-footer {
-  padding: 8px var(--m-gutter) calc(env(safe-area-inset-bottom, 0px) + 12px);
+  /* 固定在底部，不在 ion-content 的滚动层里：横屏刘海那一侧、iPhone Duo 的竖条那一侧要单独让开 */
+  padding: 8px var(--m-inset-right) calc(env(safe-area-inset-bottom, 0px) + 12px) var(--m-inset-left);
   background: transparent;
 }
 

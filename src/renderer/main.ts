@@ -157,7 +157,7 @@ async function startApp() {
     if (PlatformDetector.isMobileShell()) {
       console.log('📱 [Main] 检测到移动壳环境，开始加载 Ionic')
       const { setupIonic } = await import('./setup-ionic');
-      setupIonic(app);
+      await setupIonic(app);
 
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);
@@ -234,7 +234,7 @@ async function startApp() {
     if (PlatformDetector.isMobileShell()) {
       // console.log('📱 [Main] 检测到移动壳环境，开始加载 Ionic')
       const { setupIonic } = await import('./setup-ionic');
-      setupIonic(app);
+      await setupIonic(app);
 
       const mobileRouter = await import('./router/mobile');
       app.use(mobileRouter.default);

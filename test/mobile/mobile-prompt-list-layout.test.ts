@@ -8,17 +8,19 @@ const waterfall = read('src/renderer/components/mobile/MobileWaterfallView.vue')
 const filterSheet = read('src/renderer/components/mobile/prompt/MobilePromptFilterSheet.vue')
 
 describe('移动端提示词首页（V5-M-List / V5-M-ListRows）', () => {
-  it('默认双列，标题栏右侧是搜索、切换显示方式和筛选三个圆按钮，不再显示条数副标题', () => {
+  it('默认双列，标题栏右侧是切换显示方式和筛选两个圆按钮，不再显示条数副标题', () => {
     expect(promptPage).toContain("return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'waterfall'")
-    expect(promptPage).toContain('@click="toggleSearch"')
+    expect(promptPage).not.toContain('toggleSearch')
     expect(promptPage).toContain("@click=\"viewMode = viewMode === 'waterfall' ? 'list' : 'waterfall'\"")
     expect(promptPage).toContain('@click="openFilterSheet"')
     expect(promptPage).not.toContain('mobilePrompt.usedToday')
     expect(promptPage).not.toContain(':subtitle=')
   })
 
-  it('搜索框点放大镜才展开，「取消」清空并收起', () => {
+  it('搜索框由底部导航的搜索按钮展开（从别的 Tab 点过来时等页面进入后再展开），「取消」清空并收起', () => {
     expect(promptPage).toContain('<div v-if="searchOpen" class="search-row">')
+    expect(promptPage).toMatch(/const openRequestedSearch = \(\) => \{\s*if \(!takePromptSearchRequest\(\)\) return\s*searchOpen\.value = true/)
+    expect(promptPage).toMatch(/onIonViewDidEnter\(async \(\) => \{\s*openRequestedSearch\(\)/)
     expect(promptPage).toMatch(/const closeSearch = \(\) => \{\s*searchOpen\.value = false/)
   })
 
@@ -42,10 +44,11 @@ describe('移动端提示词首页（V5-M-List / V5-M-ListRows）', () => {
     expect(waterfall).toContain('usePromptCovers(() => props.prompts)')
   })
 
-  it('底部是「AI 生成」胶囊和圆形新建按钮，不再有 AI 入口卡片和悬浮按钮', () => {
-    expect(promptPage).toMatch(/class="m-ai" @click="navigateToAIGenerator"/)
-    expect(promptPage).toMatch(/class="m-add"[^>]*@click="handleCreate"/)
-    expect(promptPage).not.toMatch(/ai-entry|class="m-fab"|m-wash/)
+  it('「AI 生成」和新建在底部导航的附件栏里，页面自己不再有入口卡片、悬浮按钮或操作条', () => {
+    const shell = read('src/renderer/pages/MobileMainPage.vue')
+    expect(shell).toContain("handler: () => router.push('/ai-generator')")
+    expect(shell).toContain("handler: () => router.push('/prompt/create')")
+    expect(promptPage).not.toMatch(/ai-entry|class="m-fab"|class="m-acts"|m-wash/)
   })
 
   it('保留下拉刷新、无限加载和左滑编辑删除', () => {

@@ -1,6 +1,6 @@
 /**
  * 移动端细节（Gitea issue #477）：
- * 1. 首页列表底部给操作条（AI 生成 + 新建）留出空间；
+ * 1. 首页列表底部给底部导航和附件栏（AI 生成 + 新建）留出空间；
  * 2. 使用页图片预览居中、有关闭按钮、能下滑关闭；
  * 3. 没填标题时自动标题去掉 {{变量}} 语法，卡片摘要不再重复标题；
  * 4. AI 生成页手动保存后留在对话里；
@@ -13,17 +13,17 @@ import { autoPromptTitle, plainTemplateText, promptSnippet } from '~/components/
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-describe('列表底部避让操作条', () => {
+describe('列表底部避让附件栏', () => {
   const css = read('src/renderer/assets/styles/mobile-v5.css')
   const promptPage = read('src/renderer/pages/mobile/MobilePromptPage.vue')
 
-  it('首页列表底部留白包含操作条和渐隐区的高度', () => {
-    expect(css).toMatch(/--m-acts-clearance:\s*calc\(var\(--m-tabbar-clearance\) \+ 52px \+ 64px\)/)
-    expect(css).toMatch(/\.m-body--acts\s*\{\s*padding-bottom:\s*var\(--m-acts-clearance\)/)
-    // 操作条贴在导航上方，渐隐区和留白用的是同一组尺寸
-    expect(css).toMatch(/\.m-acts\s*\{[^}]*bottom:\s*var\(--m-tabbar-clearance\)/)
-    expect(css).toMatch(/\.m-fade\s*\{[^}]*height:\s*var\(--m-acts-clearance\)/)
-    expect(promptPage).toContain('class="m-body m-body--tabbed m-body--acts list-body"')
+  it('首页列表底部留白包含底部导航和附件栏的高度', () => {
+    expect(css).toMatch(/--m-tabbar-clearance:\s*calc\(var\(--m-nav-bottom\) \+ var\(--m-nav-row\)\)/)
+    expect(css).toMatch(/--m-accessory-clearance:\s*calc\(var\(--m-tabbar-clearance\) \+ var\(--m-nav-gap\) \+ var\(--m-nav-accessory\)\)/)
+    expect(css).toMatch(/\.m-body--accessory\s*\{\s*padding-bottom:\s*calc\(var\(--m-accessory-clearance\) \+ 16px\)/)
+    // 附件栏的位置和留白用的是同一组尺寸
+    expect(css).toMatch(/\.mobile-tab-accessory \{[^}]*bottom:\s*calc\(var\(--m-nav-bottom\) \+ var\(--m-nav-row\) \+ var\(--m-nav-gap\)\)[^}]*height:\s*var\(--m-nav-accessory\)/)
+    expect(promptPage).toContain('class="m-body m-body--tabbed m-body--accessory list-body"')
   })
 })
 

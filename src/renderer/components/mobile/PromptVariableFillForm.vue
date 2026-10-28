@@ -308,7 +308,8 @@ defineExpose({ validateAndFocus, resetValidation, focusVariable })
 <style scoped>
 .fill-panel {
   gap: 16px;
-  padding: 10px var(--m-gutter) calc(env(safe-area-inset-bottom, 0px) + 16px);
+  /* 固定在底部，不在 ion-content 的滚动层里：横屏刘海那一侧、iPhone Duo 的竖条那一侧要单独让开 */
+  padding: 10px var(--m-inset-right) calc(env(safe-area-inset-bottom, 0px) + 16px) var(--m-inset-left);
   box-shadow: var(--shadow-floating);
 }
 

@@ -20,7 +20,7 @@ const ownSources = [
 
 describe('mobile models tab root (V5-M-Models)', () => {
   it('uses the tab-root skeleton and clears the floating tab bar', () => {
-    expect(listPage).toContain('<ion-content class="m-page-content" :fullscreen="true">')
+    expect(listPage).toContain('<ion-content class="m-page-content" :fullscreen="true" :scroll-events="true">')
     expect(listPage).not.toContain('m-wash')
     expect(listPage).toContain('<MobileLargeTitle')
     expect(listPage).toMatch(/class="m-body m-body--tabbed/)

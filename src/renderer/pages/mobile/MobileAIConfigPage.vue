@@ -1,6 +1,6 @@
 <template>
   <ion-page>
-    <ion-content class="m-page-content" :fullscreen="true">
+    <ion-content class="m-page-content" :fullscreen="true" :scroll-events="true">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>

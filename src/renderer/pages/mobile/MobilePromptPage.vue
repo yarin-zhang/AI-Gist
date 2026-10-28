@@ -1,16 +1,12 @@
 <template>
   <ion-page>
-    <ion-content ref="ionContentRef" class="m-page-content" :fullscreen="true">
+    <ion-content ref="ionContentRef" class="m-page-content" :fullscreen="true" :scroll-events="true">
       <!-- 下拉刷新 -->
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
       <MobileLargeTitle :title="t('mobileNav.prompts')">
-        <button type="button" class="m-btn-c" :aria-label="t('promptLibrary.search')" :aria-expanded="searchOpen"
-          @click="toggleSearch">
-          <ion-icon :icon="searchOutline" />
-        </button>
         <button type="button" class="m-btn-c"
           :aria-label="viewMode === 'waterfall' ? t('mobilePrompt.switchToList') : t('mobilePrompt.switchToGrid')"
           @click="viewMode = viewMode === 'waterfall' ? 'list' : 'waterfall'">
@@ -23,7 +19,7 @@
         </button>
       </MobileLargeTitle>
 
-      <!-- 搜索框：点放大镜展开，「取消」清空并收起 -->
+      <!-- 搜索框：点底部导航右侧的搜索圆按钮展开（MobileMainPage.vue），「取消」清空并收起 -->
       <div v-if="searchOpen" class="search-row">
         <label class="m-input search-row__field">
           <ion-icon :icon="searchOutline" aria-hidden="true" />
@@ -57,7 +53,7 @@
         </button>
       </nav>
 
-      <div class="m-body m-body--tabbed m-body--acts list-body" :class="{ 'list-body--grid': viewMode === 'waterfall' }">
+      <div class="m-body m-body--tabbed m-body--accessory list-body" :class="{ 'list-body--grid': viewMode === 'waterfall' }">
         <!-- 标签筛选在筛选面板里选，这里显示出来，可以直接移除 -->
         <div v-if="selectedTag" class="m-chips tag-chips">
           <button type="button" class="m-chip on" @click="selectedTag = null">
@@ -140,17 +136,8 @@
       </div>
     </ion-content>
 
-    <!-- 底部操作条：AI 生成 + 新建，内容滚到它后面时淡出 -->
+    <!-- 内容滚到附件栏和底部导航后面时淡一点；「AI 生成」和新建在底部导航的附件栏里 -->
     <div class="m-fade" aria-hidden="true" />
-    <div class="m-acts">
-      <button type="button" class="m-ai" @click="navigateToAIGenerator">
-        <ion-icon :icon="sparkles" aria-hidden="true" />
-        <span>{{ t('promptManagement.aiGenerate') }}</span>
-      </button>
-      <button type="button" class="m-add" :aria-label="t('promptLibrary.create')" @click="handleCreate">
-        <ion-icon :icon="add" />
-      </button>
-    </div>
 
     <MobilePromptFilterSheet
       :open="showFilterModal"
@@ -190,7 +177,6 @@ import {
   onIonViewDidEnter
 } from '@ionic/vue'
 import {
-  add,
   closeCircle,
   createOutline,
   gridOutline,
@@ -198,7 +184,6 @@ import {
   optionsOutline,
   pricetagOutline,
   searchOutline,
-  sparkles,
   star,
   trashOutline
 } from 'ionicons/icons'
@@ -223,6 +208,7 @@ import {
   type MobilePromptSort
 } from '~/components/mobile/prompt/prompt-meta'
 import { usePromptCovers } from '~/components/mobile/prompt/usePromptCovers'
+import { hasPendingPromptSearch, takePromptSearchRequest } from '~/lib/mobile/prompt-search-request'
 
 const DEFAULT_SORT: MobilePromptSort = 'updatedAt'
 const VIEW_MODE_KEY = 'mobilePromptViewMode'
@@ -419,15 +405,18 @@ const focusSearch = async () => {
   searchInputRef.value?.focus()
 }
 
-// 放大镜：没展开就展开并聚焦；已经展开、还没输入时收起
-const toggleSearch = () => {
-  if (searchOpen.value && !searchText.value) {
-    searchOpen.value = false
-    return
-  }
+// 底部导航的搜索按钮在 Tab 外壳上（MobileMainPage.vue）。当前就在这个页面时立刻展开；
+// 从别的 Tab 点过来时要等页面进入完成（onIonViewDidEnter）再展开，切换动画途中
+// focus 不生效，搜索框会展开但不聚焦
+const openRequestedSearch = () => {
+  if (!takePromptSearchRequest()) return
   searchOpen.value = true
   void focusSearch()
 }
+
+watch(hasPendingPromptSearch, pending => {
+  if (pending && isPageActive) openRequestedSearch()
+})
 
 // 「取消」：清空搜索词并收起
 const closeSearch = () => {
@@ -514,12 +503,6 @@ const handleEdit = (prompt: Prompt) => {
 const handleCreate = () => {
   lastNavIntent = 'mutation'
   router.push('/prompt/create')
-}
-
-// 导航到AI生成器
-const navigateToAIGenerator = () => {
-  lastNavIntent = 'mutation'
-  router.push('/ai-generator')
 }
 
 // 删除提示词
@@ -630,6 +613,7 @@ onIonViewWillEnter(() => {
 
 // 进入页面后恢复滚动位置（仅查看详情返回时）
 onIonViewDidEnter(async () => {
+  openRequestedSearch()
   if (!didReloadOnEnter && savedScrollTop > 0) {
     await ionContentRef.value?.$el?.scrollToPoint?.(0, savedScrollTop, 0)
   }

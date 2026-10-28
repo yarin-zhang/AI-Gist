@@ -55,6 +55,20 @@ body.ai-gist-mobile {
 html.ai-gist-mobile ion-content {
   --background: var(--surface-body);
   --padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  /*
+   * 左右安全区：Ionic 只让 ion-item / ion-toolbar 这类组件把 --ion-safe-area-left/right
+   * 加进自己的 padding，页面里自绘的卡片、大标题、空状态不会，横屏时会钻到刘海
+   * 下面，iPhone Duo 上会被右侧的系统竖条盖住。统一在滚动层补上 inset，再把内部的
+   * Ionic 安全区变量清零，避免 ion-item 叠加第二次（与 vertical-bars.css 的做法一致，
+   * 出现竖条时它的规则优先级更高，会接管这里）。
+   */
+  --ion-safe-area-left: 0px;
+  --ion-safe-area-right: 0px;
+}
+
+html.ai-gist-mobile ion-content::part(scroll) {
+  padding-left: calc(var(--padding-start, 0px) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--padding-end, 0px) + env(safe-area-inset-right, 0px));
 }
 
 html.ai-gist-mobile ion-toolbar {
