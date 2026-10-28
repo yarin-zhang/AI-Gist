@@ -2,13 +2,7 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <!-- 默认状态：左上角的搜索图标，点击后原地展开为搜索框 -->
-        <ion-buttons v-if="!isSearchActive" slot="start">
-          <ion-button :aria-label="t('promptManagement.searchPrompt')" @click="openSearch">
-            <ion-icon :icon="searchOutline" slot="icon-only"></ion-icon>
-          </ion-button>
-        </ion-buttons>
-
+        <!-- 搜索入口在底栏右侧的搜索圆按钮（MobileMainPage.vue），点击后在这里展开搜索框 -->
         <ion-title v-if="!isSearchActive" :style="{ opacity: headerProgress }">{{ t('mainPage.menu.prompts') }}</ion-title>
 
         <!--
@@ -296,8 +290,7 @@ import {
   trashOutline,
   sparklesOutline,
   listOutline,
-  gridOutline,
-  searchOutline
+  gridOutline
 } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigStatus } from '~/composables/useAIConfigStatus'
@@ -311,6 +304,7 @@ import MobileWaterfallView from '~/components/mobile/MobileWaterfallView.vue'
 import EmptyPromptsIllustration from '~/components/mobile/illustrations/EmptyPromptsIllustration.vue'
 import NoSearchResultsIllustration from '~/components/mobile/illustrations/NoSearchResultsIllustration.vue'
 import { useCollapsingHeader } from '~/composables/useCollapsingHeader'
+import { hasPendingPromptSearch, takePromptSearchRequest } from '~/lib/mobile/prompt-search-request'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -452,6 +446,21 @@ const openSearch = async () => {
   await nextTick()
   await searchbarRef.value?.$el?.setFocus?.()
 }
+
+// 底栏的搜索按钮在 Tab 外壳上（MobileMainPage.vue）。当前就在这个页面时立刻展开；
+// 从别的 Tab 点过来时要等页面进入完成（onIonViewDidEnter）再展开，切换动画途中
+// setFocus 不生效，搜索框会展开但不聚焦。
+const openRequestedSearch = () => {
+  if (takePromptSearchRequest()) {
+    void openSearch()
+  }
+}
+
+watch(hasPendingPromptSearch, (pending) => {
+  if (pending && isPageActive) {
+    openRequestedSearch()
+  }
+})
 
 // 收起搜索框：由 ion-searchbar 内置的取消按钮（show-cancel-button="always"）触发。
 // 取消按钮本身会清空输入，但它的清空逻辑内部有一个 64ms 的 setTimeout（见 @ionic/core
@@ -664,6 +673,7 @@ onIonViewWillEnter(() => {
 
 // 进入页面后恢复滚动位置（仅查看详情返回时）
 onIonViewDidEnter(async () => {
+  openRequestedSearch()
   if (!didReloadOnEnter && savedScrollTop > 0) {
     await ionContentRef.value?.$el?.scrollToPoint?.(0, savedScrollTop, 0)
   }

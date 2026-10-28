@@ -12,7 +12,21 @@
  * 检测是异步的，等不了。这里沿用 @rdlabo/ionic-theme-ios27 区分 iOS 26 / 27 的
  * WebKit 特性检测：text-wrap: pretty 随 iOS 26 加入，overflow-anchor 随 iOS 27 加入。
  */
+import { readonly, ref } from 'vue'
+
 export const NATIVE_TAB_BAR_CLASS = 'ai-gist-native-tabs'
+
+const verticalBarsActive = ref(false)
+
+/**
+ * 系统是否把底栏放进了侧边竖条（iPhone Duo 合上、或展开横放）。由 ios-native-ui.ts
+ * 按 Foldable 上报的竖条位置更新，页面据此把底部操作按钮也交给竖条。
+ */
+export const isVerticalBarsActive = readonly(verticalBarsActive)
+
+export function setVerticalBarsActive(active: boolean): void {
+  verticalBarsActive.value = active
+}
 
 interface CSSFeatureSupport {
   supports(conditionText: string): boolean

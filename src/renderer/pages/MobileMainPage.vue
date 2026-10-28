@@ -4,57 +4,71 @@
       <ion-router-outlet></ion-router-outlet>
 
       <!--
-        AI 入口条和标签栏是悬浮于内容之上的两片独立玻璃层（见 assets/styles/mobile.css
-        的 .mobile-floating-nav 分区），而不是贴死在屏幕底部的实体栏。
+        底部导航照设计稿 V5 的 C-MTabBar 画：附件栏、标签栏和搜索圆按钮，对应 iOS 26
+        TabView 的 tabViewBottomAccessory、标签栏和搜索角色的独立按钮。三者都悬浮在
+        内容之上（见 assets/styles/mobile.css 的「底部导航」分区）；附件栏左右卡在
+        两侧 inset 上，下面一行的标签栏 + 搜索按钮也从左 inset 排到右 inset，两行等宽。
 
         标签栏必须是 ion-tabs 的直接子元素并自带 slot="bottom"：iOS 26+ 上
         @rdlabo/capacitor-native-ui 以它为锚点投影出系统底栏（slot 决定贴底还是贴顶），
         iPhone Duo 的侧边竖条样式也只认 `ion-tabs > ion-tab-bar`。
-        tab-bar-position-center 只给原生投影用，让系统底栏在网页占位里居中，网页本身
-        没有对应样式。网页底栏（Android、Web、旧版 iOS）向下滚动时会收起为纯图标的
-        小型胶囊；系统底栏不跟着收起，见 isNativeTabBar。收起状态用 data 属性而不是
-        动态 class：IonTabBar 会把 class 透传到 ion-tab-bar 上，Vue 更新 class 时整体
-        覆写 className，会把 Stencil 自己加的 hydrated / ios 等 class 一起抹掉。
+        tab-bar-position-start 只给原生投影用，让系统底栏贴着网页占位的左边，右边留给
+        搜索按钮。网页底栏（Android、Web、旧版 iOS）向下滚动时三者一起变矮，标签文字
+        隐藏；系统底栏不收起，见 isNativeTabBar。收起状态用 data 属性而不是动态
+        class：IonTabBar 会把 class 透传到 ion-tab-bar 上，Vue 更新 class 时整体覆写
+        className，会把 Stencil 自己加的 hydrated / ios 等 class 一起抹掉。
 
-        入口条只在「AI 提示词」Tab 上出现，是「新建提示词」+「AI 生成提示词」的
-        长条+圆形两按钮（见 Gitea issue #7），谁占长条主位由是否已配置 AI 决定，
-        逻辑见 lib/mobile/floating-prompt-actions.ts。「AI 配置」「设置」这两个
-        Tab 不再重复渲染独立的「AI 生成」按钮（Gitea issue #59）：这两个页面
-        语境下点它既不能新建提示词，也没有直达价值。入口条的 bottom 跟着标签栏
-        当前高度走，标签栏收起时它同步下沉，不会悬空。
+        附件栏只在「AI 提示词」Tab 上出现，左边长按钮、右边「+」圆按钮（见 Gitea
+        issue #7），谁占左边由是否已配置 AI 决定，逻辑见
+        lib/mobile/floating-prompt-actions.ts。「AI 配置」「设置」这两个 Tab 不显示
+        附件栏（Gitea issue #59）：这两个页面语境下点它既不能新建提示词，也没有直达
+        价值。搜索按钮在所有 Tab 上都有，点了回到提示词页并展开搜索框。
+
+        iOS 26+ 上它们都交给系统渲染：附件栏整体由 ios-native-ui.ts 里的
+        prompt-accessory 扩展画成 SwiftUI Liquid Glass 胶囊，搜索按钮和附件栏里的两个
+        按钮标了 data-native-ui="button"，投影成系统玻璃按钮。网页元素留在原处提供
+        位置、文字、图标和点击处理。系统底栏进入 iPhone Duo 侧边竖条时这三个按钮改为
+        placement="rail"，跟标签栏一起放进竖条；没有原生竖条时插件会把 rail 按钮留在
+        网页原位，所以平时必须是 element。
       -->
       <div
         v-if="isPromptsTab"
         slot="bottom"
-        class="mobile-floating-nav"
-        :class="{ 'mobile-floating-nav--minimized': isNavMinimized }"
+        class="mobile-tab-accessory"
+        data-prompt-accessory
+        :data-nav-minimized="isNavMinimized ? 'true' : undefined"
       >
-        <div class="mobile-prompt-actions">
-          <button
-            type="button"
-            class="mobile-ai-entry"
-            :aria-label="promptActionMeta[promptFloatingActions.primary].label"
-            @click="promptActionMeta[promptFloatingActions.primary].handler"
-          >
-            <ion-icon :icon="promptActionMeta[promptFloatingActions.primary].icon"></ion-icon>
-            <span class="mobile-ai-entry__label">{{ promptActionMeta[promptFloatingActions.primary].label }}</span>
-          </button>
-          <button
-            type="button"
-            class="mobile-prompt-actions__secondary"
-            :aria-label="promptActionMeta[promptFloatingActions.secondary].label"
-            @click="promptActionMeta[promptFloatingActions.secondary].handler"
-          >
-            <ion-icon :icon="promptActionMeta[promptFloatingActions.secondary].icon"></ion-icon>
-          </button>
-        </div>
+        <button
+          type="button"
+          class="mobile-tab-accessory__primary"
+          data-accessory-action="primary"
+          data-native-ui="button"
+          :data-native-ui-placement="nativeActionPlacement"
+          :aria-label="promptActionMeta[promptFloatingActions.primary].label"
+          @click="promptActionMeta[promptFloatingActions.primary].handler"
+        >
+          <ion-icon :icon="promptActionMeta[promptFloatingActions.primary].icon"></ion-icon>
+          <span class="mobile-tab-accessory__label">{{ promptActionMeta[promptFloatingActions.primary].label }}</span>
+        </button>
+        <span class="mobile-tab-accessory__separator" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="mobile-tab-accessory__secondary"
+          data-accessory-action="secondary"
+          data-native-ui="button"
+          :data-native-ui-placement="nativeActionPlacement"
+          :aria-label="promptActionMeta[promptFloatingActions.secondary].label"
+          @click="promptActionMeta[promptFloatingActions.secondary].handler"
+        >
+          <ion-icon :icon="promptActionMeta[promptFloatingActions.secondary].icon"></ion-icon>
+        </button>
       </div>
 
       <ion-tab-bar
         id="mobile-tab-bar"
         slot="bottom"
-        class="tab-bar-position-center"
-        :data-nav-minimized="isNavMinimized && !isNativeTabBar ? 'true' : undefined"
+        class="tab-bar-position-start"
+        :data-nav-minimized="isNavMinimized ? 'true' : undefined"
       >
         <ion-tab-button tab="prompts" href="/tabs/prompts">
           <ion-icon :icon="listOutline" />
@@ -71,6 +85,19 @@
           <ion-label>{{ t('mainPage.menu.settings') }}</ion-label>
         </ion-tab-button>
       </ion-tab-bar>
+
+      <button
+        type="button"
+        slot="bottom"
+        class="mobile-tab-search"
+        data-native-ui="button"
+        :data-native-ui-placement="nativeActionPlacement"
+        :data-nav-minimized="isNavMinimized ? 'true' : undefined"
+        :aria-label="t('promptManagement.searchPrompt')"
+        @click="openPromptSearch"
+      >
+        <ion-icon :icon="search"></ion-icon>
+      </button>
     </ion-tabs>
 
     <!-- 全局 AI 入口：以模态表单打开已有的 /ai-generator 页面，无需离开当前 Tab -->
@@ -97,7 +124,7 @@ import {
   IonRouterOutlet,
   IonModal
 } from '@ionic/vue'
-import { add, listOutline, sparklesOutline, sparkles, settingsOutline } from 'ionicons/icons'
+import { add, listOutline, search, sparklesOutline, sparkles, settingsOutline } from 'ionicons/icons'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigStatus } from '~/composables/useAIConfigStatus'
@@ -107,7 +134,8 @@ import {
   type PromptFloatingActionKind
 } from '~/lib/mobile/floating-prompt-actions'
 import { shouldResetFloatingNav } from '~/lib/mobile/floating-nav-reset'
-import { isNativeTabBarEnabled } from '~/lib/mobile/native-tab-bar'
+import { isNativeTabBarEnabled, isVerticalBarsActive } from '~/lib/mobile/native-tab-bar'
+import { requestPromptSearch } from '~/lib/mobile/prompt-search-request'
 import MobileAIGeneratorPage from './mobile/MobileAIGeneratorPage.vue'
 
 const { t } = useI18n()
@@ -120,9 +148,8 @@ const openAIGenerator = () => {
 }
 
 // ------------------------------------------------------------------
-// 提示词操作区：两态两按钮布局（Gitea issue #7）
-// 只在提示词 Tab 上生效；「AI 配置」「设置」两个 Tab 不渲染任何浮动入口按钮
-// （Gitea issue #59）。
+// 附件栏：左边长按钮 + 右边圆按钮（Gitea issue #7）
+// 只在提示词 Tab 上生效；「AI 配置」「设置」两个 Tab 不显示附件栏（Gitea issue #59）。
 // ------------------------------------------------------------------
 const isPromptsTab = computed(() => route.path === '/tabs/prompts')
 
@@ -157,14 +184,25 @@ const promptActionMeta = computed<Record<PromptFloatingActionKind, PromptActionM
   }
 }))
 
+// 只有 Native UI 在运行时才有人读这个属性，见模板里的注释
+const nativeActionPlacement = computed(() => (isVerticalBarsActive.value ? 'rail' : 'element'))
+
+// 搜索框属于提示词页；从别的 Tab 点过来时先切回去，页面挂载后再取走这次请求
+const openPromptSearch = () => {
+  requestPromptSearch()
+  if (!isPromptsTab.value) {
+    router.push('/tabs/prompts')
+  }
+}
+
 // ------------------------------------------------------------------
 // 滚动收起/展开浮动导航
 // 各 Tab 根页面的 <ion-content scroll-events> 会派发 ionScroll 事件；该事件默认
 // bubbles + composed，因此在这里用一个全局监听即可覆盖所有 Tab，无需逐页接线。
 //
-// iOS 26+ 的标签栏由系统渲染，只收起上方的入口条：独立的 UITabBar 本身没有滚动
-// 收起，而网页占位一旦做尺寸过渡，Native UI 就会在动画期间退回网页渲染，底栏会
-// 在系统样式和网页样式之间闪烁。启动后不会再变，读一次即可。
+// iOS 26+ 的标签栏、附件栏和搜索按钮都由系统渲染，不监听滚动、也不收起：独立的
+// UITabBar 本身没有滚动收起，而网页源元素一旦做尺寸过渡，Native UI 就会在动画期间
+// 退回网页渲染，底栏和按钮会在系统样式和网页样式之间闪烁。启动后不会再变，读一次即可。
 // ------------------------------------------------------------------
 const isNativeTabBar = isNativeTabBarEnabled()
 const isNavMinimized = ref(false)
@@ -188,7 +226,9 @@ const handleIonScroll = (event: Event) => {
 }
 
 onMounted(() => {
-  document.addEventListener('ionScroll', handleIonScroll as EventListener)
+  if (!isNativeTabBar) {
+    document.addEventListener('ionScroll', handleIonScroll as EventListener)
+  }
   refreshAIConfigStatus()
 })
 

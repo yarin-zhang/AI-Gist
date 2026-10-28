@@ -11,15 +11,15 @@ html.ai-gist-mobile {
   --mobile-elevated-shadow: var(--shadow-popover);
 
   /*
-   * 浮动导航：AI 入口条 + 标签栏，作为悬浮于内容之上的两片独立玻璃层，
+   * 底部导航：附件栏 + 标签栏 + 搜索圆按钮，作为悬浮于内容之上的几片独立玻璃层，
    * 而不是像素级贴底的实体栏。数值只在移动端本地使用，不进入设计系统 token，
    * 颜色/阴影仍然全部复用 design-tokens 里的 surface / border / shadow 变量。
    *
    * gutter 复用页面统一的 --mobile-page-gutter（16px），而不是刻意收紧到接近 0：
    * issue #6 第一次修复曾经把它收紧成 8px/6px、试图用「贴边」掩盖屏幕圆角处的
    * 空隙，被明确指出修反了方向——iOS 26 默认的悬浮标签栏本来就应该在左右两侧
-   * 留出呼吸间距（连同上方悬浮的「新建提示词」入口条一起，两者共用同一个
-   * .mobile-floating-nav 的 padding，天然对齐，不需要分别调）。
+   * 留出呼吸间距（附件栏、标签栏和搜索按钮都卡在同一对 inset 上，天然对齐，
+   * 不需要分别调）。
    *
    * 真正的根因不是 gutter 太大，而是选中态的高亮色块只是一颗独立内缩的小药丸：
    * 它自己的小圆角和胶囊容器自身的大圆角是两条不同半径的弧线，中间会夹出一块
@@ -59,20 +59,19 @@ html.ai-gist-mobile {
    * 的上限既永远不会截断现有 label，又保证收起动画的时长观感不变。
    */
   --mobile-nav-tablabel-max-width: 128px;
-  --mobile-nav-shelf-height: 46px;
-  --mobile-nav-shelf-width-minimized: 46px;
+  /* 附件栏高度取设计稿 C-MTabBar 的 48px */
+  --mobile-nav-accessory-height: 48px;
   --mobile-nav-tabbar-height-minimized: 44px;
-  --mobile-nav-tabbar-width-minimized: 220px;
-  /* 标签栏外框高度（内容高度 + 上下各 1px 边框），入口条据此悬停在标签栏上方 */
+  /* 标签栏外框高度（内容高度 + 上下各 1px 边框）：搜索圆按钮与它等高，附件栏据此悬停在上方 */
   --mobile-nav-tabbar-outer-height: calc(var(--mobile-tabbar-content-height) + 2px);
   --mobile-nav-surface: color-mix(in srgb, var(--surface-primary) 72%, transparent);
   --mobile-nav-border: color-mix(in srgb, var(--border-default) 65%, transparent);
   --mobile-nav-blur: 22px;
   --mobile-nav-shadow: var(--shadow-overlay);
-  /* 轻微回弹的 spring 近似曲线，用于滚动收起/展开与入口条尺寸变化 */
+  /* 轻微回弹的 spring 近似曲线，用于滚动收起/展开 */
   --mobile-nav-transition: 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
   --mobile-nav-clearance: calc(
-    var(--mobile-nav-shelf-height) + var(--mobile-nav-item-gap) +
+    var(--mobile-nav-accessory-height) + var(--mobile-nav-item-gap) +
     var(--mobile-tabbar-content-height) + var(--mobile-nav-bottom-offset) * 2
   );
 
@@ -121,7 +120,7 @@ html.ai-gist-mobile {
 /*
  * iOS 26+ 的标签栏交给系统渲染（见 lib/mobile/native-tab-bar.ts）。系统 UITabBar
  * 的 Liquid Glass 胶囊高 62pt，Native UI 把它贴着网页占位的底边对齐，所以占位也要
- * 一样高：否则系统胶囊会向上多出 8pt，压住上方的入口条。
+ * 一样高：否则系统胶囊会向上多出 8pt，压住上方的附件栏。
  */
 html.ai-gist-mobile.ai-gist-native-tabs {
   --mobile-tabbar-content-height: 60px;
@@ -413,116 +412,110 @@ html.ai-gist-mobile ion-segment-button ion-label {
 }
 
 /* ------------------------------------------------------------------ *
- * 浮动导航：AI 入口条 + 底部标签栏
+ * 底部导航：附件栏 + 标签栏 + 搜索圆按钮（设计稿 V5 的 C-MTabBar）
  *
- * 两者都是 <ion-tabs> 的 slot="bottom" 直接子元素（详见 MobileMainPage.vue），
- * 因此都被移出正常文档流（position: fixed），不再占用 flex 布局中的独立高度，
- * 而是作为悬浮在内容之上的两片独立玻璃层——这样内容可以在它们身后滚动、
- * 透过背板的模糊/半透明背景显现，而不是被推挤到一段专属的空白条带上方。
+ * 对应 iOS 26 TabView 的三件套：tabViewBottomAccessory 附件栏、标签栏和搜索角色
+ * 的独立圆按钮。三者都是 <ion-tabs> 的 slot="bottom" 直接子元素（详见
+ * MobileMainPage.vue），position: fixed 悬浮在内容之上，内容在它们身后滚动。
  *
- * 标签栏不能再包在入口条的容器里（iOS 原生投影和 iPhone Duo 竖条都要求它是
- * ion-tabs 的直接子元素），所以两者各自定位：标签栏贴底，入口条的 bottom 等于
- * 标签栏的 bottom + 外框高度 + 间距，标签栏收起时入口条跟着同步下沉。
+ * 宽度对齐：附件栏左右卡在两侧 inset 上；下面一行是标签栏 + 间距 + 搜索圆按钮，
+ * 同样从左 inset 排到右 inset，所以两行严格等宽。标签栏不能包在别的容器里（iOS
+ * 原生投影和 iPhone Duo 竖条都要求它是 ion-tabs 的直接子元素），所以三者各自
+ * 定位：标签栏和搜索按钮贴底，附件栏的 bottom = 标签栏 bottom + 外框高度 + 间距。
  * ------------------------------------------------------------------ */
 
-html.ai-gist-mobile .mobile-floating-nav {
+html.ai-gist-mobile .mobile-tab-accessory {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--mobile-nav-inset-left);
+  right: var(--mobile-nav-inset-right);
   bottom: calc(
     env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset) +
     var(--mobile-nav-tabbar-outer-height) + var(--mobile-nav-item-gap)
   );
   z-index: 10;
-  display: flex;
-  flex-direction: column;
-  /* 默认贴右对齐：AI 入口条收起时贴右悬浮 */
-  align-items: flex-end;
-  padding: 0 var(--mobile-nav-inset-right) 0 var(--mobile-nav-inset-left);
-  pointer-events: none;
-  transition: bottom var(--mobile-nav-transition);
-}
-
-/* 网页标签栏收起成小胶囊时入口条跟着下沉；系统标签栏不收起，入口条位置不变 */
-html.ai-gist-mobile:not(.ai-gist-native-tabs) .mobile-floating-nav--minimized {
-  --mobile-nav-tabbar-outer-height: calc(var(--mobile-nav-tabbar-height-minimized) + 2px);
-}
-
-/*
- * iPhone Duo 竖条（ion-app.ios-theme-vertical-bars 由 setVerticalBarsLayout 加上）：
- * 标签栏被系统挪到侧边，底部不再有标签栏，入口条落回底部，并在竖条那一侧让出
- * 竖条宽度 + gutter。两个 resolved 变量由 vertical-bars.css 按竖条所在边给出。
- */
-html.ai-gist-mobile ion-app.ios-theme-vertical-bars .mobile-floating-nav {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
-  padding-left: calc(var(--ios-theme-vertical-bars-safe-area-left-resolved, 0px) + var(--mobile-nav-gutter));
-  padding-right: calc(var(--ios-theme-vertical-bars-safe-area-right-resolved, 0px) + var(--mobile-nav-gutter));
-}
-
-html.ai-gist-mobile .mobile-ai-entry {
-  pointer-events: auto;
-  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: var(--mobile-nav-shelf-height);
-  padding-inline: 20px;
+  height: var(--mobile-nav-accessory-height);
+  padding: 0 4px 0 18px;
   border: 1px solid var(--mobile-nav-border);
   border-radius: var(--mobile-nav-radius);
-  background: color-mix(in srgb, var(--accent-primary) 16%, var(--mobile-nav-surface));
+  background: var(--mobile-nav-surface);
   backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(1.5);
   box-shadow: var(--mobile-nav-shadow);
-  color: var(--accent-primary);
-  font-size: var(--mobile-font-size-body);
-  font-weight: 600;
-  -webkit-tap-highlight-color: transparent;
-  transition: width var(--mobile-nav-transition), padding var(--mobile-nav-transition),
-    gap var(--mobile-nav-transition);
+  transition: bottom var(--mobile-nav-transition);
 }
 
-html.ai-gist-mobile .mobile-ai-entry ion-icon {
-  font-size: var(--mobile-icon-size);
-  flex-shrink: 0;
-}
-
-html.ai-gist-mobile .mobile-ai-entry__label {
-  white-space: nowrap;
-  overflow: hidden;
-  max-width: 160px;
-  opacity: 1;
-  transition: opacity var(--mobile-nav-transition), max-width var(--mobile-nav-transition);
-}
-
-/*
- * 提示词 Tab 专属：长条 + 圆形两按钮布局（Gitea issue #7）。
- * 长条主按钮直接复用 .mobile-ai-entry 本身——展开态/收起态的宽度、内边距、
- * 过渡规则完全不用重写，这里只把它的宽度从「100%」改成「让出圆形按钮的位置」；
- * 圆形按钮尺寸固定，展开、收起两种状态下都是同一个纯图标圆按钮，不需要单独
- * 的收起过渡。justify-content: flex-end 保证收起后两个圆形贴右悬浮，与原来
- * 单按钮收起时贴右的位置保持一致。
- */
-html.ai-gist-mobile .mobile-prompt-actions {
-  width: 100%;
+html.ai-gist-mobile .mobile-tab-accessory__primary {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--mobile-nav-item-gap);
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-primary);
+  font: inherit;
+  font-size: var(--mobile-font-size-body);
+  font-weight: 600;
+  text-align: start;
+  -webkit-tap-highlight-color: transparent;
 }
 
-html.ai-gist-mobile .mobile-prompt-actions .mobile-ai-entry {
-  width: calc(100% - var(--mobile-nav-shelf-width-minimized) - var(--mobile-nav-item-gap));
+html.ai-gist-mobile .mobile-tab-accessory__primary ion-icon {
+  flex-shrink: 0;
+  font-size: var(--mobile-icon-size);
 }
 
-html.ai-gist-mobile .mobile-prompt-actions__secondary {
-  pointer-events: auto;
-  flex: 0 0 var(--mobile-nav-shelf-width-minimized);
-  width: var(--mobile-nav-shelf-width-minimized);
-  height: var(--mobile-nav-shelf-height);
+html.ai-gist-mobile .mobile-tab-accessory__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.ai-gist-mobile .mobile-tab-accessory__separator {
+  flex: none;
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--mobile-nav-border);
+}
+
+html.ai-gist-mobile .mobile-tab-accessory__secondary {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--content-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.ai-gist-mobile .mobile-tab-accessory__secondary ion-icon {
+  font-size: var(--mobile-icon-size-lg);
+}
+
+/* 搜索圆按钮：和标签栏外框等高，贴在同一行最右侧 */
+html.ai-gist-mobile .mobile-tab-search {
+  position: fixed;
+  right: var(--mobile-nav-inset-right);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+  z-index: 10;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mobile-nav-tabbar-outer-height);
+  height: var(--mobile-nav-tabbar-outer-height);
+  padding: 0;
   border: 1px solid var(--mobile-nav-border);
   border-radius: var(--mobile-nav-radius);
   background: var(--mobile-nav-surface);
@@ -531,33 +524,64 @@ html.ai-gist-mobile .mobile-prompt-actions__secondary {
   box-shadow: var(--mobile-nav-shadow);
   color: var(--content-primary);
   -webkit-tap-highlight-color: transparent;
+  transition: width var(--mobile-nav-transition), height var(--mobile-nav-transition);
 }
 
-html.ai-gist-mobile .mobile-prompt-actions__secondary ion-icon {
-  font-size: var(--mobile-icon-size);
-  flex-shrink: 0;
+html.ai-gist-mobile .mobile-tab-search ion-icon {
+  font-size: 22px;
+}
+
+/*
+ * iPhone Duo 竖条（ion-app.ios-theme-vertical-bars 由 setVerticalBarsLayout 加上）：
+ * 标签栏被系统挪到侧边，底部不再有标签栏，附件栏和搜索按钮落回底部同一行，并在
+ * 竖条那一侧让出竖条宽度 + gutter。两个 resolved 变量由 vertical-bars.css 按竖条
+ * 所在边给出。系统竖条可用时这几个按钮都投影进竖条，这里只是网页兜底的位置。
+ */
+html.ai-gist-mobile ion-app.ios-theme-vertical-bars .mobile-tab-accessory {
+  left: calc(var(--ios-theme-vertical-bars-safe-area-left-resolved, 0px) + var(--mobile-nav-gutter));
+  right: calc(
+    var(--ios-theme-vertical-bars-safe-area-right-resolved, 0px) + var(--mobile-nav-gutter) +
+    var(--mobile-nav-tabbar-outer-height) + var(--mobile-nav-item-gap)
+  );
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
+}
+
+html.ai-gist-mobile ion-app.ios-theme-vertical-bars .mobile-tab-search {
+  right: calc(var(--ios-theme-vertical-bars-safe-area-right-resolved, 0px) + var(--mobile-nav-gutter));
+}
+
+/* 附件栏里的按钮投影进系统竖条后，留在原处的只剩空胶囊和分隔线，一起去掉 */
+html.ai-gist-mobile .mobile-tab-accessory:has(> [data-native-ui-projected]) {
+  border-color: transparent;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+html.ai-gist-mobile .mobile-tab-accessory:has(> [data-native-ui-projected]) .mobile-tab-accessory__separator {
+  visibility: hidden;
 }
 
 html.ai-gist-mobile ion-tab-bar {
   position: fixed;
   /*
-   * 常量对齐：left/right 卡在两侧 inset 上，margin auto 让它在两者之间水平居中，
-   * 收起/展开只有 width 在变，居中关系不变。iOS 原生投影会把测得的系统胶囊宽度
-   * 以 !important 写回 width，同样靠这里的 margin auto 保持居中。
+   * 左边卡在 inset 上，右边让出搜索圆按钮和间距。iOS 原生投影按
+   * tab-bar-position-start 贴着左边，测得的系统胶囊宽度会以 !important 写回 width。
    */
   left: var(--mobile-nav-inset-left);
-  right: var(--mobile-nav-inset-right);
   bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-bottom-offset));
   z-index: 10;
-  margin: 0 auto;
+  margin: 0;
   /*
    * 这里是 content-box（见下方 height 注释），width 只计算内容宽度，自身的
-   * padding + 1px border 会在这之外各再多占 padding+1px，所以要从两侧 inset 之间的
-   * 宽度里再减掉这部分，标签栏的可视外框才正好卡在 inset 上，和上方入口条
-   * （没有 padding/border，天然贴合 inset）两侧边距严格一致。
+   * padding + 1px border 会在这之外各再多占 padding+1px，所以要从可用宽度里再减掉
+   * 这部分，标签栏的可视外框才正好落在左 inset 和搜索按钮之间，整行和上方附件栏
+   * 两侧边距严格一致。
    */
   width: calc(
     100% - var(--mobile-nav-inset-left) - var(--mobile-nav-inset-right) -
+    var(--mobile-nav-tabbar-outer-height) - var(--mobile-nav-item-gap) -
     (var(--mobile-nav-tabbar-padding-inline) * 2) - 2px
   );
   --background: var(--mobile-nav-surface);
@@ -655,31 +679,12 @@ html.ai-gist-mobile ion-tab-button ion-label {
 }
 
 /*
- * 滚动向下时收起：标签栏收缩为纯图标、居中的小型胶囊（margin auto 居中是常量，
- * 从未切换，收缩时会自动保持居中）；AI 入口条同样收缩为一个圆形图标按钮，
- * 贴右悬浮（父容器 align-items: flex-end 同样是常量）。
- * 两个状态之间只有 width / opacity 等连续属性在变化，因此过渡是平滑的。
- *
- * 标签栏的收起态挂在 ion-tab-bar 自己的 [data-nav-minimized] 上（原因见
- * MobileMainPage.vue），iOS 系统标签栏从不带这个属性；入口条的收起态仍然是
- * 容器上的 .mobile-floating-nav--minimized。
- *
- * 下面 `.mobile-floating-nav--minimized .mobile-ai-entry(__label)` 是后代选择器，
- * 不要求直接子元素，因此提示词 Tab 两按钮布局里嵌套了一层 `.mobile-prompt-actions`
- * 的长条主按钮同样会命中——收起后它会和圆形次按钮一起变成两个贴右悬浮的小圆点，
- * 不需要再为这个布局单独写一份收起规则。
- *
- * 但嵌套场景下光靠后代选择器不够：`.mobile-floating-nav--minimized .mobile-ai-entry`
- * 和上面展开态的 `.mobile-prompt-actions .mobile-ai-entry`（第 418 行）specificity
- * 完全相等（都是 3 个 class + 1 个 type），收起态目前能生效纯粹依赖它在源码里
- * 排在后面——一旦有人调整这两块规则的先后顺序，收起动画会静默失效且不会被
- * lint/test 捕获。所以额外补一条更具体的 `.mobile-floating-nav--minimized
- * .mobile-prompt-actions .mobile-ai-entry`（4 个 class），让嵌套场景下的收起态
- * 选择器 specificity 严格高于展开态规则，不再依赖书写顺序；独立单按钮场景
- * （其余两个 Tab）继续走原来的后代选择器。
+ * 滚动向下时收起（只有网页底栏）：标签栏变矮、文字隐藏，搜索按钮跟着缩成同样高度
+ * 的圆，附件栏随标签栏外框高度一起下沉。宽度不变，附件栏和下面一行始终等宽。
+ * 三者的收起态都挂在各自的 [data-nav-minimized] 上（原因见 MobileMainPage.vue），
+ * iOS 系统底栏模式下不监听滚动，从不带这个属性。
  */
 html.ai-gist-mobile ion-tab-bar[data-nav-minimized] {
-  width: var(--mobile-nav-tabbar-width-minimized);
   height: var(--mobile-nav-tabbar-height-minimized);
 }
 
@@ -690,33 +695,28 @@ html.ai-gist-mobile ion-tab-bar[data-nav-minimized] ion-tab-button ion-label {
   margin: 0;
 }
 
-html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-prompt-actions .mobile-ai-entry,
-html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry {
-  width: var(--mobile-nav-shelf-width-minimized);
-  padding-inline: 0;
-  gap: 0;
-}
-
-html.ai-gist-mobile .mobile-floating-nav--minimized .mobile-ai-entry__label {
-  opacity: 0;
-  max-width: 0;
+html.ai-gist-mobile .mobile-tab-search[data-nav-minimized],
+html.ai-gist-mobile .mobile-tab-accessory[data-nav-minimized] {
+  --mobile-nav-tabbar-outer-height: calc(var(--mobile-nav-tabbar-height-minimized) + 2px);
 }
 
 /*
- * 系统标签栏：网页占位只负责提供位置、文字和选中态，不能有任何过渡——Native UI
- * 一旦检测到 ion-tab-bar 在做 CSS 过渡，就会在动画期间退回网页渲染。插件把测得的
- * 系统胶囊宽度写回 width 时也不应该触发过渡。
+ * 系统底栏模式：网页源元素只负责提供位置、文字、图标和选中态，不能有任何过渡——
+ * Native UI 一旦检测到源元素或它的容器在做 CSS 过渡，就会在动画期间退回网页渲染。
+ * 插件把测得的系统胶囊宽度写回 width、iPhone Duo 竖条出现时附件栏改变位置，都不应该
+ * 触发过渡。
  */
 html.ai-gist-mobile.ai-gist-native-tabs ion-tab-bar,
 html.ai-gist-mobile.ai-gist-native-tabs ion-tab-button,
-html.ai-gist-mobile.ai-gist-native-tabs ion-tab-button ion-label {
+html.ai-gist-mobile.ai-gist-native-tabs ion-tab-button ion-label,
+html.ai-gist-mobile.ai-gist-native-tabs .mobile-tab-accessory,
+html.ai-gist-mobile.ai-gist-native-tabs .mobile-tab-search {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.ai-gist-mobile .mobile-floating-nav,
-  html.ai-gist-mobile .mobile-ai-entry,
-  html.ai-gist-mobile .mobile-ai-entry__label,
+  html.ai-gist-mobile .mobile-tab-accessory,
+  html.ai-gist-mobile .mobile-tab-search,
   html.ai-gist-mobile ion-tab-bar,
   html.ai-gist-mobile ion-tab-button,
   html.ai-gist-mobile ion-tab-button ion-label {

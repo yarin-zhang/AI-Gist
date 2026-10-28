@@ -7,7 +7,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // 原生 UI 扩展必须在网页启动 Native UI 之前注册，见 PromptAccessory.swift
+        do {
+            try PromptAccessory.register()
+        } catch {
+            print("[NativeUI] 附件栏注册失败，继续使用网页附件栏：\(error)")
+        }
         return true
     }
 
