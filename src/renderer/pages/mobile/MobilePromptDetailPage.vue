@@ -605,7 +605,12 @@ onUnmounted(() => {
   gap: 12px;
   background: var(--ion-background-color);
   border-top: 1px solid var(--border-default);
-  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  /*
+   * [slot=fixed] 不在 ion-content 的滚动层里，mobile.css 给滚动层补的左右安全区
+   * 管不到这里：横屏的刘海一侧、iPhone Duo 右侧的系统竖条都要单独让开。
+   */
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px)
+    max(16px, env(safe-area-inset-left, 0px));
 }
 
 ion-chip {

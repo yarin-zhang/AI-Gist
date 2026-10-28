@@ -1118,6 +1118,7 @@
     "regularModeEnabled": "常规模式已启用",
     "required": "必填",
     "rollback": "回滚",
+    "rollbackConfirmation": "确定要回滚到这个版本吗？编辑区的当前内容会被替换，保存后才会生效。",
     "rollbackFailed": "回滚失败",
     "rollbackToVersion": "回滚到此版本",
     "rolledBackToVersion": "已回滚到版本 {version}",

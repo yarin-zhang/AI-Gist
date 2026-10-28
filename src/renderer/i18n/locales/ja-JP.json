@@ -1118,6 +1118,7 @@
     "regularModeEnabled": "通常のモードが有効になっています",
     "required": "必須",
     "rollback": "ロールバック",
+    "rollbackConfirmation": "このバージョンにロールバックしますか？編集中の内容は置き換えられ、保存すると反映されます。",
     "rollbackFailed": "ロールバックに失敗しました",
     "rollbackToVersion": "このバージョンにロールバック",
     "rolledBackToVersion": "バージョン{version}にロールバックしました",
