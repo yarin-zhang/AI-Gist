@@ -52,10 +52,12 @@ import {
   describeCloudSyncCategoryMerges,
   reconcileCloudSyncDataContract,
   pruneCloudSyncTombstonedPromptChildren,
+  findCloudSyncUncategorizedPrompts,
   type CloudSyncBusinessKeyMerge,
   type CloudSyncCategoryMergeNotice,
   type CloudSyncContractIssue,
-  type CloudSyncRelationRepair
+  type CloudSyncRelationRepair,
+  type CloudSyncUncategorizedPrompt
 } from '@shared/cloud-sync-contract';
 import {
   createCloudSyncJoinPreview,
@@ -70,7 +72,7 @@ import { DatabaseServiceManager } from './database-manager.service';
 import { AppSettingsService } from './app-settings.service';
 import { mobileCloudBackupService } from './mobile-cloud-backup.service';
 import { webCloudBackupService } from './web-cloud-backup.service';
-import { localBackupService } from './local-backup.service';
+import { LOCAL_SAFETY_BACKUP_TRIGGERS, localBackupService } from './local-backup.service';
 import type { DataChangeEventPayload, DataStoreName } from './data-change-events';
 import { onDataChange } from './data-change-events';
 import {
@@ -199,6 +201,10 @@ export interface CloudSyncResult {
   error?: string;
   errorCode?: CloudSyncErrorCode;
   diagnostic?: CloudSyncStructuredDiagnostic;
+  /**
+   * 排查用的内部说明（基线保存失败、后台校验跳过等），只写日志，不直接显示给用户。
+   * 要告诉用户的事放在下面的结构化字段里，由 getCloudSyncResultNotices 生成跟随语言的文案。
+   */
   warnings?: string[];
   businessKeyMerges?: CloudSyncBusinessKeyMerge[];
   /** 同名分类合并时字段不一样的那几组，同步结果提示里告诉用户保留了哪一边 (#490) */
@@ -208,6 +214,10 @@ export interface CloudSyncResult {
   pendingConflict?: CloudSyncPendingConflict;
   /** 本机删除过、因另一台设备保留或修改得更晚而在这次同步后恢复的记录，由同步状态提示告诉用户 (#489) */
   restoredAfterLocalDelete?: CloudSyncRestoredRecord[];
+  /** 所在分类在合并后已经不存在、移到了「未分类」的提示词，用户可以再给它们选分类 */
+  uncategorizedPrompts?: CloudSyncUncategorizedPrompt[];
+  /** 覆盖云端前，云端原来的数据已存成本机备份，用户需要时可以从「数据备份」恢复 */
+  safetyBackupCreated?: boolean;
 }
 
 export type CloudSyncErrorCode =
@@ -339,6 +349,8 @@ export interface CloudSyncErrorDiagnosis {
   rawError: string;
   canAutoRetry: boolean;
   canUserFix: boolean;
+  /** 应用会自己恢复、用户也做不了什么，且还没有连续失败多次：界面上不当成失败显示 */
+  quiet: boolean;
   suggestedActions: string[];
   copyText: string;
 }
@@ -885,10 +897,10 @@ export class CloudSyncService {
 
       if (remoteSnapshot) {
         await this.localBackupService.create({
-          description: `覆盖云端前的本地安全备份 - ${new Date().toLocaleString()}`,
+          description: translateSyncMessage('dataBackup.safetyBackupCloudOverwrite'),
           data: remoteSnapshot.data,
           backupType: 'manual',
-          trigger: 'pre-restore-cloud-overwrite',
+          trigger: LOCAL_SAFETY_BACKUP_TRIGGERS.cloudOverwrite,
           deviceId
         });
         safetyBackupCreated = true;
@@ -945,12 +957,10 @@ export class CloudSyncService {
           conflicts: 0
         },
         warnings: mergeWarnings(
-          mergeWarnings(
-            safetyBackupCreated ? ['已在本机创建覆盖云端前的安全备份'] : [],
-            localChangedDuringPublish ? '发布期间检测到新的本机编辑，已保留并等待下一次同步' : undefined
-          ),
+          localChangedDuringPublish ? ['发布期间检测到新的本机编辑，已保留并等待下一次同步'] : undefined,
           stateWarning
-        )
+        ),
+        ...(safetyBackupCreated ? { safetyBackupCreated } : {})
       };
       this.failureCount = 0;
       this.updateStatus({
@@ -1459,18 +1469,18 @@ export class CloudSyncService {
       const restoredAfterLocalDelete = mergedEqualsLocal
         ? []
         : findCloudSyncRecordsRestoredOverLocalDeletes(localData, mergedData);
-      // 同名分类另有 categoryMerges 逐个说明；默认快速优化动作归并成一份是预期行为，不用提示 (#490)
-      const otherBusinessKeyMerges = contractResult.merges
-        .filter(merge => merge.collection !== 'categories' && merge.collection !== 'quickOptimizationConfigs');
+      // 同名分类另有 categoryMerges 逐个说明。模型配置、生成记录的标识是创建时随机生成的，
+      // 两边标识相同只会是同一条记录的两份副本，归并成一份用户不用知道；默认快速优化动作同理 (#490)
       const categoryMerges = describeCloudSyncCategoryMerges(contractResult.merges, mergedData, localData, remoteData);
-      const contractWarnings = [
-        ...(otherBusinessKeyMerges.length > 0
-          ? [`已自动归并 ${otherBusinessKeyMerges.length} 组业务唯一键冲突`]
-          : []),
-        ...(contractResult.repairs.length > 0
-          ? [`已自动修复 ${contractResult.repairs.length} 条失效的可选关联；相关提示词已保留为未分类`]
-          : [])
-      ];
+      // 提示词所在的分类已经被删：提示词保留在「未分类」，告诉用户哪几条，方便重新选分类。
+      // 其余修复（上级分类、生成记录的分类）在界面上看不出变化，不打扰用户
+      const uncategorizedPrompts = findCloudSyncUncategorizedPrompts(contractResult.repairs, mergedData);
+      if (contractResult.merges.length > 0 || contractResult.repairs.length > 0) {
+        console.info('[cloud-sync] 合并时自动整理了数据：', {
+          businessKeyMerges: contractResult.merges.length,
+          relationRepairs: contractResult.repairs.length
+        });
+      }
 
       if (mergedEqualsLocal && mergedEqualsRemote) {
         if (manifestRepairMetadata) {
@@ -1514,7 +1524,7 @@ export class CloudSyncService {
           uploadedRemote: !!manifestRepairMetadata,
           conflicts: mergeResult.conflicts,
           summary: mergeResult.summary,
-          warnings: mergeWarnings(contractWarnings, stateWarning),
+          warnings: stateWarning ? [stateWarning] : undefined,
           businessKeyMerges: contractResult.merges,
           categoryMerges,
           relationRepairs: contractResult.repairs
@@ -1598,11 +1608,12 @@ export class CloudSyncService {
         uploadedRemote,
         conflicts: mergeResult.conflicts,
         summary: mergeResult.summary,
-        warnings: mergeWarnings(contractWarnings, stateWarning),
+        warnings: stateWarning ? [stateWarning] : undefined,
         businessKeyMerges: contractResult.merges,
         categoryMerges,
         relationRepairs: contractResult.repairs,
-        ...(appliedLocal && restoredAfterLocalDelete.length > 0 ? { restoredAfterLocalDelete } : {})
+        ...(appliedLocal && restoredAfterLocalDelete.length > 0 ? { restoredAfterLocalDelete } : {}),
+        ...(appliedLocal && uncategorizedPrompts.length > 0 ? { uncategorizedPrompts } : {})
       };
     } catch (error) {
       const diagnostic = createCloudSyncStructuredDiagnostic(error, {
@@ -3332,7 +3343,9 @@ const SYNC_MESSAGE_FALLBACKS: Record<string, string> = {
   'dataSync.syncResult.uploaded': '同步完成，已上传本机数据',
   'dataSync.syncResult.downloaded': '同步完成，已更新本机数据',
   'dataSync.syncResult.merged': '同步完成，已合并本机和云端数据',
-  'dataSync.syncResult.upToDate': '同步完成，数据已是最新'
+  'dataSync.syncResult.upToDate': '同步完成，数据已是最新',
+  'dataSync.syncResult.safetyBackupCreated': '覆盖前的云端数据已存为本机备份，需要时可以在「数据备份」里恢复',
+  'dataBackup.safetyBackupCloudOverwrite': '覆盖云端前的云端数据'
 };
 
 export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): string {
@@ -3361,6 +3374,28 @@ export function getCloudSyncRestoredMessage(records: CloudSyncRestoredRecord[] |
     `「${name}」等 ${total} 项在另一台设备上被修改，已恢复`);
 }
 
+/**
+ * 所在分类已被删除、合并后移到「未分类」的提示词：告诉用户是哪几条，方便重新选分类。
+ * 写法和 getCloudSyncRestoredMessage 一样，没有这类提示词时返回空字符串。
+ */
+export function getCloudSyncUncategorizedMessage(records: { label: string }[] | undefined): string {
+  if (!records || records.length === 0) return '';
+  const name = records[0].label;
+  if (records.length === 1) {
+    return translateSyncCountMessage('dataSync.syncResult.uncategorizedOne', { name }, 1,
+      `「${name}」所在的分类已被删除，已移到「未分类」`);
+  }
+  const count = records.length - 1;
+  const total = records.length;
+  return translateSyncCountMessage('dataSync.syncResult.uncategorizedMany', { name, count, total }, count,
+    `「${name}」等 ${total} 个提示词所在的分类已被删除，已移到「未分类」`);
+}
+
+/** 覆盖云端前把云端原来的数据存成了本机备份：告诉用户需要时去哪里找回 */
+export function getCloudSyncSafetyBackupMessage(result: Pick<CloudSyncResult, 'safetyBackupCreated'> | undefined): string {
+  return result?.safetyBackupCreated ? translateSyncMessage('dataSync.syncResult.safetyBackupCreated') : '';
+}
+
 function translateSyncCountMessage(
   key: string,
   named: Record<string, unknown>,
@@ -3382,10 +3417,10 @@ const tr = (key: string, named?: Record<string, unknown>) =>
 /** 每类诊断在语言包里有 title / message / step1…stepN，这里记录各有几条建议操作 */
 const CLOUD_SYNC_DIAGNOSIS_STEPS = {
   generic: 2,
-  dataContract: 3,
-  localQuota: 3,
-  localApply: 3,
-  restoreDecision: 3,
+  dataContract: 2,
+  localQuota: 2,
+  localApply: 2,
+  restoreDecision: 2,
   cancelled: 1,
   instability: 3,
   auth: 3,
@@ -3395,6 +3430,13 @@ const CLOUD_SYNC_DIAGNOSIS_STEPS = {
   transient: 3
 } as const;
 type CloudSyncDiagnosisKind = keyof typeof CLOUD_SYNC_DIAGNOSIS_STEPS;
+
+/**
+ * 应用自己会恢复、用户也做不了什么的情况：同步被新的同步接替、临时状况、云端同步文件刚好在变。
+ * 连续失败次数还少时不当成失败给用户看，状态显示成等待下次同步；一直不好才说出来。
+ */
+const QUIET_CLOUD_SYNC_DIAGNOSIS_KINDS = new Set<CloudSyncDiagnosisKind>(['cancelled', 'transient', 'instability']);
+const QUIET_CLOUD_SYNC_FAILURE_LIMIT = 3;
 
 export function getCloudSyncErrorDiagnosis(
   error?: string | CloudSyncResult | CloudSyncStructuredDiagnostic,
@@ -3411,8 +3453,8 @@ export function getCloudSyncErrorDiagnosis(
   let canUserFix = false;
 
   if (structuredDiagnostic?.code === 'DATA_CONTRACT_INVALID') {
+    // 数据关联没法自动确认：界面上没有能修的地方，用户只能把详情反馈给我们
     kind = 'dataContract';
-    canUserFix = true;
   } else if (structuredDiagnostic?.code === 'LOCAL_APPLY_QUOTA') {
     kind = 'localQuota';
     canUserFix = true;
@@ -3453,6 +3495,8 @@ export function getCloudSyncErrorDiagnosis(
     { length: CLOUD_SYNC_DIAGNOSIS_STEPS[kind] },
     (_, index) => tr(`dataSync.diagnosis.${kind}.step${index + 1}`)
   );
+  const quiet = QUIET_CLOUD_SYNC_DIAGNOSIS_KINDS.has(kind) &&
+    (context.failureCount ?? 0) < QUIET_CLOUD_SYNC_FAILURE_LIMIT;
 
   return {
     title,
@@ -3460,6 +3504,7 @@ export function getCloudSyncErrorDiagnosis(
     rawError,
     canAutoRetry,
     canUserFix,
+    quiet,
     suggestedActions,
     copyText: createCloudSyncErrorReport(rawError, context, {
       title,
@@ -3628,7 +3673,7 @@ function isCloudSyncDatabaseError(error: string): boolean {
 function createCloudSyncErrorReport(
   rawError: string,
   context: CloudSyncErrorDiagnosisContext,
-  diagnosis: Omit<CloudSyncErrorDiagnosis, 'rawError' | 'copyText'>,
+  diagnosis: Omit<CloudSyncErrorDiagnosis, 'rawError' | 'copyText' | 'quiet'>,
   structuredDiagnostic?: CloudSyncStructuredDiagnostic
 ): string {
   const label = (key: string, value: unknown) => `${tr(`dataSync.diagnosisReport.${key}`)}: ${value}`;

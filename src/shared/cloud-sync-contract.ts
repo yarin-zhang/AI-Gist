@@ -730,6 +730,35 @@ export function describeCloudSyncCategoryMerges(
   return notices.sort((left, right) => compareText(left.name, right.name));
 }
 
+/** 合并后移到「未分类」的一条提示词 */
+export interface CloudSyncUncategorizedPrompt {
+  key: string;
+  label: string;
+}
+
+/**
+ * 所在分类已经不存在、合并时去掉了分类的提示词，按标题排序，用来告诉用户是哪几条。
+ * 其余几种修复（上级分类、生成记录的分类）在界面上看不出变化，不在这里列出。
+ */
+export function findCloudSyncUncategorizedPrompts(
+  repairs: CloudSyncRelationRepair[],
+  mergedData: CloudSyncContractData
+): CloudSyncUncategorizedPrompt[] {
+  const repaired = new Set(repairs
+    .filter(repair => repair.collection === 'prompts' && repair.relation === 'category')
+    .map(repair => repair.recordIdentity));
+  if (repaired.size === 0) return [];
+
+  return getCollectionRecords(mergedData, 'prompts')
+    .map(record => ({ record, key: safeRecordIdentity('prompts', record) }))
+    .filter(({ key }) => repaired.has(key))
+    .map(({ record, key }) => {
+      const title = typeof record?.title === 'string' ? record.title.trim() : '';
+      return { key, label: title || normalizeIdentityValue(record?.uuid) || key };
+    })
+    .sort((left, right) => compareText(left.label, right.label));
+}
+
 function compareCanonicalCandidates(left: any, right: any, businessKeyField: string): number {
   const createdAtOrder = normalizeTimestamp(left?.createdAt) - normalizeTimestamp(right?.createdAt);
   if (createdAtOrder !== 0) {

@@ -271,6 +271,7 @@ const formatBackupTypeLabel = (backup: { backupType?: string; trigger?: string }
   if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.restore) return t('dataBackup.safetyBackupRestore');
   if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.clear) return t('dataBackup.safetyBackupClear');
   if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.import) return t('dataBackup.safetyBackupImport');
+  if (backup.trigger === LOCAL_SAFETY_BACKUP_TRIGGERS.cloudOverwrite) return t('dataBackup.safetyBackupCloudOverwrite');
   return backup.backupType === 'automatic'
     ? t('dataManagement.backupTypeAutomatic')
     : t('dataManagement.backupTypeManual');

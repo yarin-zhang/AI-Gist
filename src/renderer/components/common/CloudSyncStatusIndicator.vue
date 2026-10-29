@@ -6,25 +6,26 @@ import { Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
-  getCloudSyncRestoredMessage,
   getCloudSyncResultMessage
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
 import { formatFriendlyDate, formatRelativeTime } from '~/lib/utils/date';
 import { joinSentences } from '~/lib/utils/join-sentences';
+import { getCloudSyncRecordChangeMessages } from '~/lib/utils/cloud-sync-merge-notices';
 import {
   createDataSyncStatusInput,
   getDataSyncErrorSource,
   resolveDataSyncStatusKind
 } from '~/lib/utils/data-sync-status';
 import { useSyncConflict } from '~/composables/useSyncConflict';
-import { useCloudSyncRestoredNotice } from '~/composables/useCloudSyncRestoredNotice';
+import { useCloudSyncResultNotices } from '~/composables/useCloudSyncResultNotices';
 
 const { t, locale } = useI18n();
 const message = useMessage();
 const syncConflict = useSyncConflict();
-// 本机删除过的记录在另一台设备上被修改、同步后恢复了：弹一条提示，状态说明里也留着 (#489)
-useCloudSyncRestoredNotice(text => message.info(text));
+// 同步后用户该知道的变化（本机删除的记录恢复了、提示词移到了「未分类」等）：每条弹一次提示；
+// 具体哪些提示词变了，状态说明里也留着，直到下一次同步 (#489)
+useCloudSyncResultNotices(messages => messages.forEach(text => message.info(text)));
 const status = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const tooltipVisible = ref(false);
 const detailPanelVisible = ref(false);
@@ -55,7 +56,8 @@ const errorDiagnosis = computed(() => getCloudSyncErrorDiagnosis(getDataSyncErro
 // 和设置页的状态卡片用同一套判断（resolveDataSyncStatusKind），两处不会再一个说
 // 「已同步」、一个说「等待同步」；没有启用的存储时固定显示「未开启同步」(#425)
 const statusKind = computed(() => resolveDataSyncStatusKind(createDataSyncStatusInput(status.value, {
-  canAutoRetryError: errorDiagnosis.value.canAutoRetry
+  canAutoRetryError: errorDiagnosis.value.canAutoRetry,
+  quietError: errorDiagnosis.value.quiet
 })));
 
 const hasErrorDetail = computed(() =>
@@ -131,7 +133,7 @@ const detailText = computed(() => {
     case 'current': return status.value.lastResult?.success
       ? [
         getCloudSyncResultMessage(status.value.lastResult.action),
-        getCloudSyncRestoredMessage(status.value.lastResult.restoredAfterLocalDelete)
+        ...getCloudSyncRecordChangeMessages(status.value.lastResult)
       ].filter(Boolean).reduce((text, sentence) => joinSentences(text, sentence, String(locale.value)))
       : t('dataSync.indicatorSyncedDetail');
     case 'pending': return t('dataSync.indicatorScheduledDetail');

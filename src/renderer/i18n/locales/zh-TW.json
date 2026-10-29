@@ -251,16 +251,16 @@
     "creatingBackup": "正在建立備份...",
     "mergeWithCloud": "與雲端重新合併",
     "mergeWithCloudSuccess": "已與雲端重新合併",
-    "mobileICloudUnsupported": "行動端 iCloud 目前不具備真正的跨裝置同步能力，請使用 WebDAV",
+    "mobileICloudUnsupported": "手機上暫時不能用 iCloud 同步，請改用 WebDAV",
     "noStorageSelected": "未選擇儲存設定",
     "overwriteCloud": "用還原資料覆蓋雲端",
-    "overwriteCloudSuccess": "還原資料已安全發佈到雲端",
-    "overwriteCloudWarning": "將先建立還原前雲端安全備份，再用目前還原資料取代雲端資料庫。確認期間若雲端有變更，操作會安全中止。",
-    "restoreDecisionDescription": "本機還原已完成，雲端同步保持暫停，等待選擇覆蓋雲端或重新合併",
+    "overwriteCloudSuccess": "雲端已換成還原的資料",
+    "overwriteCloudWarning": "會先把雲端現有的資料在本機備份一份，再用還原的資料取代雲端，其他裝置同步後也會跟著變。",
+    "restoreDecisionDescription": "已從備份還原。請選擇用還原的資料覆寫雲端，或和雲端的資料合併；選好之前不會同步。",
     "restoreDecisionTitle": "還原後的雲端處理",
     "restoringBackup": "正在還原備份…",
     "syncStatusValues": {
-      "paused": "還原後已暫停"
+      "paused": "等你選擇"
     },
     "syncing": "正在同步",
     "webdavInfo": "WebDAV 支援堅果雲、Nextcloud 等服務"
@@ -346,6 +346,7 @@
     "safetyBackupRestore": "還原前自動備份",
     "safetyBackupClear": "清空前自動備份",
     "safetyBackupImport": "匯入前自動備份",
+    "safetyBackupCloudOverwrite": "覆蓋雲端前的雲端資料",
     "importConfirmTitle": "要用這份備份取代本機資料嗎？",
     "importConfirmContent": "備份檔案裡有：提示詞 {prompts} 個，分類 {categories} 個，模型設定 {aiConfigs} 個。匯入會取代本機現有的全部提示詞、分類和模型設定。匯入前會先自動備份目前的資料，需要時可以在「備份版本」裡還原。",
     "importConfirmPositive": "取代並匯入",
@@ -469,7 +470,8 @@
     "indicatorIdle": "雲端同步待機",
     "indicatorIdleDetail": "啟用雲端儲存後會自動顯示同步狀態",
     "indicatorNextCheckAt": "下次檢查 {time}",
-    "indicatorScheduledDetail": "應用程式會在同步週期到達後檢查雲端變化",
+    "indicatorScheduledDetail": "稍後會自動同步",
+    "syncWillRetrySoon": "這次沒同步完，稍後會自動再同步一次",
     "indicatorSyncNormal": "雲端同步正常",
     "indicatorSyncedDetail": "本機與雲端資料已同步",
     "indicatorViewFullError": "點選以查看完整錯誤詳情",
@@ -516,7 +518,10 @@
       "uploaded": "已上傳",
       "conflictPending": "本機和雲端有修改衝突，請選擇處理方式",
       "restoredOne": "「{name}」在另一台裝置上被修改，已恢復",
-      "restoredMany": "「{name}」等 {total} 項在另一台裝置上被修改，已恢復"
+      "restoredMany": "「{name}」等 {total} 項在另一台裝置上被修改，已恢復",
+      "uncategorizedOne": "「{name}」所在的分類已被刪除，已移到「未分類」",
+      "uncategorizedMany": "「{name}」等 {total} 個提示詞所在的分類已被刪除，已移到「未分類」",
+      "safetyBackupCreated": "覆蓋前的雲端資料已存為本機備份，需要時可以在「資料備份」裡還原"
     },
     "testConnection": "測試連線",
     "title": "資料同步",
@@ -537,44 +542,40 @@
         "step2": "複製錯誤詳情並回報"
       },
       "dataContract": {
-        "title": "同步資料關聯需要處理",
-        "message": "偵測到無法安全確定的紀錄關聯。本機資料保持不變，詳情中列出了集合和紀錄識別碼。",
-        "step1": "查看詳情中的集合、紀錄識別碼和關聯類型",
-        "step2": "先匯出本機安全備份，再修復對應紀錄",
-        "step3": "修復後重新同步"
+        "title": "這次同步沒有完成",
+        "message": "有幾筆資料之間的關聯沒辦法自動確認。為了不弄亂資料，這次沒有同步，本機和雲端都沒有變動。",
+        "step1": "複製詳情回報給我們，我們來處理",
+        "step2": "需要的話，先在「資料備份」裡備份一份本機資料"
       },
       "localQuota": {
-        "title": "本機儲存空間不足",
-        "message": "資料庫交易因儲存配額不足而中止，原有資料未被部分覆寫。",
-        "step1": "釋放裝置磁碟或應用程式儲存空間",
-        "step2": "關閉其他佔用大量空間的頁面後重試",
-        "step3": "複製詳情回報儲存配額資訊"
+        "title": "裝置儲存空間不足",
+        "message": "裝置儲存空間不夠，這次同步的資料沒有寫入，本機原有的資料沒有變化。",
+        "step1": "清出一些裝置儲存空間",
+        "step2": "清理後點選「立即同步」再試一次"
       },
       "localApply": {
-        "title": "本機資料庫交易未能提交",
-        "message": "同步資料未寫入，本機舊資料保持完整。詳情中包含失敗集合、紀錄鍵和資料庫錯誤。",
-        "step1": "查看詳情中的失敗階段、集合和紀錄鍵",
-        "step2": "重新啟動應用程式後再試一次",
-        "step3": "如果錯誤指紋未變化，請複製詳情回報"
+        "title": "同步的資料沒能寫入本機",
+        "message": "本機原有的資料沒有變化。重新啟動 AI Gist 後再同步一次，通常就能恢復。",
+        "step1": "重新啟動 AI Gist 後點選「立即同步」",
+        "step2": "如果一直這樣，複製詳情回報給我們"
       },
       "restoreDecision": {
-        "title": "還原後的雲端同步已暫停",
-        "message": "請先選擇用還原的資料覆寫雲端，或與雲端最新資料重新合併。",
-        "step1": "返回資料同步頁面處理還原決定",
-        "step2": "確認是否需要保留雲端在還原後新增的資料",
-        "step3": "完成選擇後再繼續同步"
+        "title": "還原備份後，同步在等你選擇",
+        "message": "選好怎麼處理雲端的資料後才會繼續同步：用還原的資料覆寫雲端，或者和雲端的資料合併。",
+        "step1": "在「資料同步」裡選擇覆寫雲端或合併",
+        "step2": "選好之前，本機和雲端的資料都不會變"
       },
       "cancelled": {
-        "title": "同步已由新的操作接手",
-        "message": "已由新的同步請求取代，會自動繼續。",
-        "step1": "長時間沒有恢復正常時，點選「立即同步」"
+        "title": "同步一直沒有完成",
+        "message": "同步連續幾次被新的同步打斷，應用程式會繼續自動同步。",
+        "step1": "如果一直這樣，點選「立即同步」再試一次"
       },
       "instability": {
-        "title": "雲端同步狀態暫時不一致",
-        "message": "應用程式會保留本機資料並自動重試；如果持續出現，請查看詳情複製診斷資訊。",
-        "step1": "等待下一次自動同步或稍後手動重試",
-        "step2": "確認同一個雲端同步目錄沒有被其他工具或舊版應用程式改寫",
-        "step3": "複製錯誤詳情並回報"
+        "title": "雲端的同步檔案一直在變",
+        "message": "同步時雲端的同步檔案連續幾次被改動，應用程式會繼續自動重試，本機資料不受影響。",
+        "step1": "確認沒有其他程式或舊版 AI Gist 在改同一個同步資料夾",
+        "step2": "點選「立即同步」再試一次",
+        "step3": "如果一直這樣，複製詳情回報給我們"
       },
       "auth": {
         "title": "雲端儲存驗證失敗",
@@ -605,11 +606,11 @@
         "step3": "複製錯誤詳情並回報"
       },
       "transient": {
-        "title": "同步遇到暫時狀況",
-        "message": "這通常是網路不穩或雲端資料短暫變化造成的，應用程式會自動重試，暫時無需處理。",
-        "step1": "等待應用程式自動重試",
-        "step2": "如果持續較長時間未恢復，可手動點選「立即同步」",
-        "step3": "仍未恢復時，請複製錯誤詳情回報"
+        "title": "同步一直沒有完成",
+        "message": "已經連續幾次沒同步成功，應用程式會繼續自動重試，本機資料不受影響。",
+        "step1": "檢查網路是否穩定",
+        "step2": "點選「立即同步」再試一次",
+        "step3": "如果一直這樣，複製詳情回報給我們"
       },
       "unknownError": "未知錯誤"
     },
@@ -830,8 +831,7 @@
       "autoSyncSub": "修改後自動上傳",
       "showPassword": "顯示密碼",
       "hidePassword": "隱藏密碼",
-      "retryAt": "下次重試：{time}",
-      "errorDetailLabel": "錯誤訊息"
+      "retryAt": "下次重試：{time}"
     },
     "failedWith": "{context}：{reason}"
   },

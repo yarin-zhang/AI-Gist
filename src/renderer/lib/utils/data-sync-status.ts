@@ -76,16 +76,23 @@ export interface DataSyncStatusSnapshot {
  */
 export function createDataSyncStatusInput(
     snapshot: DataSyncStatusSnapshot,
-    context: { canAutoRetryError: boolean; hasStorageConfigs?: boolean; autoSyncEnabled?: boolean },
+    context: {
+        canAutoRetryError: boolean;
+        /** 失败是应用自己会恢复、用户做不了什么的那类（诊断的 quiet）：显示成等待下次同步，不报失败 */
+        quietError?: boolean;
+        hasStorageConfigs?: boolean;
+        autoSyncEnabled?: boolean;
+    },
 ): DataSyncStatusInput {
-    const isError = snapshot.status === 'error';
+    const failed = snapshot.status === 'error';
+    const isError = failed && !context.quietError;
     return {
         hasScheduledRetry: isError && !!snapshot.pending && !!snapshot.nextSyncAt,
         isError,
         canAutoRetryError: context.canAutoRetryError,
         autoSyncEnabled: context.autoSyncEnabled ?? snapshot.autoSyncEnabled ?? true,
         isSyncing: snapshot.status === 'syncing',
-        pendingChanges: !!snapshot.pendingChanges,
+        pendingChanges: !!snapshot.pendingChanges || (failed && !isError),
         hasSucceededBefore: !!(snapshot.lastSyncAt || snapshot.lastResult?.success),
         // 还没查过存储列表时按「有存储」处理，避免启动瞬间闪一下「未开启同步」
         hasStorageConfigs: context.hasStorageConfigs ?? snapshot.hasEnabledStorage ?? true,

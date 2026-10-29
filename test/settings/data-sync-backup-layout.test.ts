@@ -169,7 +169,8 @@ describe('settings sync and backup information architecture', () => {
     const util = readWorkspaceFile('src/renderer/lib/utils/data-sync-status.ts');
     // pendingChanges must be passed through unconditionally -- not gated behind a
     // `status === 'scheduled' &&` check, which is exactly the asymmetry that caused the reported bug.
-    expect(util).toMatch(/pendingChanges:\s*!!snapshot\.pendingChanges,/);
+    // 应用自己会恢复的失败（quietError）也算在等下一次同步
+    expect(util).toMatch(/pendingChanges:\s*!!snapshot\.pendingChanges \|\| \(failed && !isError\),/);
 
     const statusAlertTypeStart = source.indexOf('const statusAlertType = computed');
     const statusAlertTypeEnd = source.indexOf(');', statusAlertTypeStart);

@@ -32,10 +32,10 @@ import {
 } from '~/lib/utils/data-sync-status'
 import {
   getCloudSyncErrorDiagnosis,
-  getCloudSyncRestoredMessage,
   type CloudSyncResult,
   type CloudSyncStatus
 } from '~/lib/services/cloud-sync.service'
+import { getCloudSyncRecordChangeMessages } from '~/lib/utils/cloud-sync-merge-notices'
 import { localBackupService } from '~/lib/services/local-backup.service'
 import type { MobileTileTone } from '~/components/mobile/ui/types'
 import i18n from '~/i18n'
@@ -97,7 +97,12 @@ export const getDeviceLabel = () => getPlatformDeviceName()
  */
 export const presentSyncErrorDetails = async (
   error: string | CloudSyncResult | undefined,
-  options: { storageId?: string; onRetry?: () => void } = {}
+  options: {
+    storageId?: string
+    onRetry?: () => void
+    /** 手动同步失败时传 true：应用自己会恢复的情况（诊断的 quiet）只提示稍后会再同步，不弹详情 */
+    quietWhenRecoverable?: boolean
+  } = {}
 ) => {
   const diagnosis = getCloudSyncErrorDiagnosis(error, {
     storageId: options.storageId,
@@ -105,6 +110,11 @@ export const presentSyncErrorDetails = async (
     status: 'error',
     timestamp: new Date().toISOString()
   })
+
+  if (options.quietWhenRecoverable && diagnosis.quiet) {
+    await showToast(translate('dataSync.syncWillRetrySoon'))
+    return
+  }
 
   // 会自动重试的临时状况（网络波动、同步任务被更新的世代取代等）用警告色提示，
   // 避免让用户误以为遇到了需要自己处理的严重错误。
@@ -127,15 +137,11 @@ export const presentSyncErrorDetails = async (
   }
   buttons.push({ text: translate('common.close'), role: 'cancel' })
 
-  // 除了通用说明和建议，把这次的实际错误也列出来（与说明相同时不重复）
-  const rawError = diagnosis.rawError.trim()
+  // 只放说明和建议；原始错误是写给开发者看的，放在「复制」出来的详情里，反馈问题时用
   const alert = await alertController.create({
     header: diagnosis.title,
     message: [
       diagnosis.message,
-      ...(rawError && rawError !== diagnosis.message.trim()
-        ? ['', `${translate('mobileSettings.sync.errorDetailLabel')}:`, rawError]
-        : []),
       '',
       `${translate('dataSync.suggestedActions')}:`,
       ...diagnosis.suggestedActions.map(action => `· ${action}`)
@@ -286,14 +292,17 @@ export const describeSyncStatus = (input: {
     failureCount: status.failureCount,
     timestamp: status.updatedAt
   })
-  const hasScheduledRetry = status.status === 'error' && status.pending && !!status.nextSyncAt
+  // 应用自己会恢复、用户做不了什么的失败（诊断的 quiet），显示成等待下次同步，不报失败
+  const failed = status.status === 'error'
+  const isError = failed && !diagnosis.quiet
+  const hasScheduledRetry = isError && status.pending && !!status.nextSyncAt
   const kind = resolveDataSyncStatusKind({
     hasScheduledRetry,
-    isError: status.status === 'error',
+    isError,
     canAutoRetryError: diagnosis.canAutoRetry,
     autoSyncEnabled: input.autoSyncEnabled,
     isSyncing: status.status === 'syncing',
-    pendingChanges: !!status.pendingChanges,
+    pendingChanges: !!status.pendingChanges || (failed && !isError),
     hasSucceededBefore: !!(status.lastSyncAt || status.lastResult?.success),
     hasStorageConfigs: input.storageCount > 0,
     hasPendingConflict: status.status === 'conflict'
@@ -320,9 +329,9 @@ export const describeSyncStatus = (input: {
     case 'pending':
       return view(kind, tone, cloudUploadOutline, translate('dataSync.statusPending'), translate('dataSync.pendingChanges'))
     case 'current':
-      // 刚恢复了本机删除过的记录时，状态卡上说明一下，直到下一次同步 (#489)
+      // 刚恢复了本机删除过的记录、或有提示词移到了「未分类」时，状态卡上说明一下，直到下一次同步 (#489)
       return view(kind, tone, cloudDoneOutline, translate('dataSync.statusCurrent'),
-        (status.lastResult?.success && getCloudSyncRestoredMessage(status.lastResult.restoredAfterLocalDelete))
+        getCloudSyncRecordChangeMessages(status.lastResult).reduce((text, sentence) => joinSentences(text, sentence), '')
           || translate('mobileSettings.sync.noPendingChanges'))
     case 'ready':
       return view(kind, tone, cloudOutline, translate('dataSync.statusReady'), translate('dataSync.statusAutomaticDescription'))

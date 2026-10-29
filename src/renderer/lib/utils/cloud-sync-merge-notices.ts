@@ -5,6 +5,12 @@
 import type { CloudSyncCategoryMergeNotice } from '@shared/cloud-sync-contract';
 import type { CloudSyncJoinPreview } from '@shared/cloud-sync-join-preview';
 import i18n from '../../i18n';
+import {
+  getCloudSyncRestoredMessage,
+  getCloudSyncSafetyBackupMessage,
+  getCloudSyncUncategorizedMessage,
+  type CloudSyncResult
+} from '../services/cloud-sync.service';
 
 type Translate = (key: string, named?: Record<string, unknown>, plural?: number) => string;
 
@@ -61,6 +67,32 @@ export function getCloudSyncCategoryMergeMessages(result: { categoryMerges?: Clo
   const rest = notices.length - shown.length;
   if (rest > 0) messages.push(t('dataSync.categoryMergedMore', { count: rest }, rest));
   return messages;
+}
+
+/**
+ * 同步后哪些具体的提示词变了（本机删掉的被恢复、分类被删后移到「未分类」）：
+ * 同步状态卡片上一直显示到下一次同步
+ */
+export function getCloudSyncRecordChangeMessages(result: CloudSyncResult | undefined): string[] {
+  if (!result?.success) return [];
+  return [
+    getCloudSyncRestoredMessage(result.restoredAfterLocalDelete),
+    getCloudSyncUncategorizedMessage(result.uncategorizedPrompts)
+  ].filter(Boolean);
+}
+
+/**
+ * 一次成功同步后要提醒用户的全部内容。只放用户看了能自己处理的事：哪些提示词恢复了或换到了「未分类」、
+ * 同名分类保留了哪一边、覆盖云端前的数据备份在哪里。同一条记录的重复副本归并、基线保存失败这类
+ * 用户处理不了的情况由应用自己处理，只写日志（CloudSyncResult.warnings），不出现在这里。
+ */
+export function getCloudSyncResultNotices(result: CloudSyncResult | undefined): string[] {
+  if (!result?.success) return [];
+  return [
+    ...getCloudSyncRecordChangeMessages(result),
+    ...getCloudSyncCategoryMergeMessages(result),
+    getCloudSyncSafetyBackupMessage(result)
+  ].filter(Boolean);
 }
 
 /** 确认框里「同名分类会合并为一个：「写作」和「生活」」这一句；没有同名分类时返回空字符串 */

@@ -251,16 +251,16 @@
     "creatingBackup": "Creating backup…",
     "mergeWithCloud": "Merge with cloud again",
     "mergeWithCloudSuccess": "Merged with cloud again",
-    "mobileICloudUnsupported": "iCloud on mobile doesn't support true cross-device sync yet. Use WebDAV instead.",
+    "mobileICloudUnsupported": "iCloud sync isn't available on phones yet. Use WebDAV instead.",
     "noStorageSelected": "No storage configuration selected",
     "overwriteCloud": "Overwrite cloud with restored data",
-    "overwriteCloudSuccess": "The restored data is now in the cloud",
-    "overwriteCloudWarning": "A safety backup of the cloud library is created first, then it's replaced with the restored data. If the cloud changes while you confirm, the operation stops safely.",
-    "restoreDecisionDescription": "Local restore is complete. Cloud sync remains paused until you overwrite or merge with the cloud library.",
+    "overwriteCloudSuccess": "The cloud data was replaced with the restored data",
+    "overwriteCloudWarning": "The current cloud data is backed up on this device first, then replaced with the restored data. Your other devices will change too after they sync.",
+    "restoreDecisionDescription": "Restored from a backup. Choose whether to replace the cloud data with the restored data or merge the two. Nothing syncs until you choose.",
     "restoreDecisionTitle": "Cloud handling after restore",
     "restoringBackup": "Restoring backup…",
     "syncStatusValues": {
-      "paused": "Paused after restore"
+      "paused": "Waiting for your choice"
     },
     "syncing": "Syncing",
     "webdavInfo": "WebDAV works with services such as Jianguoyun (Nutstore) and Nextcloud"
@@ -346,6 +346,7 @@
     "safetyBackupRestore": "Backup before restore",
     "safetyBackupClear": "Backup before clearing",
     "safetyBackupImport": "Backup before import",
+    "safetyBackupCloudOverwrite": "Cloud data before overwrite",
     "importConfirmTitle": "Replace the data on this device with this backup?",
     "importConfirmContent": "The backup contains prompts: {prompts}, categories: {categories}, model configurations: {aiConfigs}. Importing replaces all prompts, categories and model configurations on this device. Your current data is backed up first, so you can restore it from “Backup versions” if needed.",
     "importConfirmPositive": "Replace and import",
@@ -469,7 +470,8 @@
     "indicatorIdle": "Cloud sync idle",
     "indicatorIdleDetail": "Sync status appears automatically once cloud storage is enabled",
     "indicatorNextCheckAt": "Next check: {time}",
-    "indicatorScheduledDetail": "The app will check for cloud changes once the sync interval is reached",
+    "indicatorScheduledDetail": "Will sync automatically shortly",
+    "syncWillRetrySoon": "Sync didn't finish this time. It will try again automatically shortly.",
     "indicatorSyncNormal": "Cloud sync is healthy",
     "indicatorSyncedDetail": "This device and the cloud are in sync",
     "indicatorViewFullError": "View the full error details",
@@ -516,7 +518,10 @@
       "uploaded": "Sync complete — local data was uploaded",
       "conflictPending": "Changes on this device and in the cloud conflict. Choose how to resolve them.",
       "restoredOne": "“{name}” was changed on another device and has been restored",
-      "restoredMany": "“{name}” and {count} other item were changed on another device and have been restored | “{name}” and {count} other items were changed on another device and have been restored"
+      "restoredMany": "“{name}” and {count} other item were changed on another device and have been restored | “{name}” and {count} other items were changed on another device and have been restored",
+      "uncategorizedOne": "“{name}” was moved to “Uncategorized” because its category was deleted",
+      "uncategorizedMany": "“{name}” and {count} other prompt were moved to “Uncategorized” because their category was deleted | “{name}” and {count} other prompts were moved to “Uncategorized” because their categories were deleted",
+      "safetyBackupCreated": "The cloud data was saved as a local backup before it was overwritten. You can restore it from Data backup if you need it."
     },
     "testConnection": "Test connection",
     "title": "Data sync",
@@ -537,44 +542,40 @@
         "step2": "Copy the error details and report the problem"
       },
       "dataContract": {
-        "title": "Sync data relationships need attention",
-        "message": "Some record relationships could not be resolved safely. Data on this device was left unchanged; the details list the affected collections and record IDs.",
-        "step1": "Check the collections, record IDs and relation types in the details",
-        "step2": "Export a local backup first, then fix the affected records",
-        "step3": "Sync again after fixing them"
+        "title": "Sync didn't finish",
+        "message": "Some items are linked in a way the app couldn't confirm automatically. To keep your data intact, nothing was synced, and nothing changed on this device or in the cloud.",
+        "step1": "Copy the details and send them to us so we can fix it",
+        "step2": "If you like, back up this device's data in Data backup first"
       },
       "localQuota": {
-        "title": "Not enough local storage",
-        "message": "The database transaction stopped because the storage quota ran out. Existing data was not partially overwritten.",
-        "step1": "Free up disk or app storage on this device",
-        "step2": "Close other pages that use a lot of storage, then try again",
-        "step3": "Copy the details to report the storage quota information"
+        "title": "Not enough storage space",
+        "message": "There isn't enough space on this device, so the synced data wasn't saved. Your existing data hasn't changed.",
+        "step1": "Free up some storage space on this device",
+        "step2": "Then click “Sync now” to try again"
       },
       "localApply": {
-        "title": "The local database transaction was not committed",
-        "message": "The synced data was not written and the existing data on this device is intact. The details include the failed collection, record key and database error.",
-        "step1": "Check the failed phase, collection and record key in the details",
-        "step2": "Restart the app and try again",
-        "step3": "If the error fingerprint does not change, copy the details and report the problem"
+        "title": "Couldn't save synced data on this device",
+        "message": "Your existing data hasn't changed. Restarting AI Gist and syncing again usually fixes this.",
+        "step1": "Restart AI Gist, then click “Sync now”",
+        "step2": "If it keeps happening, copy the details and send them to us"
       },
       "restoreDecision": {
-        "title": "Cloud sync is paused after a restore",
-        "message": "Choose whether to overwrite the cloud with the restored data or merge it with the latest cloud data.",
-        "step1": "Go back to Data sync and make the restore decision",
-        "step2": "Decide whether to keep data added to the cloud after the restore",
-        "step3": "Continue syncing after you choose"
+        "title": "Sync is waiting for your choice after a restore",
+        "message": "Sync continues once you choose what to do with the cloud data: replace it with the restored data, or merge the two.",
+        "step1": "In Data sync, choose to replace the cloud data or merge",
+        "step2": "Until you choose, nothing changes on this device or in the cloud"
       },
       "cancelled": {
-        "title": "A newer sync took over",
-        "message": "A newer sync request replaced this one and will continue automatically.",
-        "step1": "If it doesn’t recover for a long time, click “Sync now”"
+        "title": "Sync keeps getting interrupted",
+        "message": "A newer sync interrupted this one several times in a row. The app will keep syncing automatically.",
+        "step1": "If this keeps happening, click “Sync now” to try again"
       },
       "instability": {
-        "title": "Cloud sync state is temporarily inconsistent",
-        "message": "The app keeps the data on this device and retries automatically. If this keeps happening, open the details and copy the diagnostics.",
-        "step1": "Wait for the next automatic sync or retry later",
-        "step2": "Make sure no other tool or older app version is writing to the same sync folder",
-        "step3": "Copy the error details and report the problem"
+        "title": "The cloud sync file keeps changing",
+        "message": "The sync file in the cloud changed during sync several times in a row. The app will keep retrying automatically, and the data on this device isn't affected.",
+        "step1": "Make sure no other app or older version of AI Gist is changing the same sync folder",
+        "step2": "Click “Sync now” to try again",
+        "step3": "If it keeps happening, copy the details and send them to us"
       },
       "auth": {
         "title": "Cloud storage sign-in failed",
@@ -605,11 +606,11 @@
         "step3": "Copy the error details and report the problem"
       },
       "transient": {
-        "title": "Sync hit a temporary issue",
-        "message": "This is usually caused by an unstable network or a brief change in the cloud data. The app retries automatically; nothing needs to be done for now.",
-        "step1": "Wait for the app to retry automatically",
-        "step2": "If it doesn’t recover for a long time, click “Sync now”",
-        "step3": "If it still doesn't recover, copy the error details and report the problem"
+        "title": "Sync hasn't been able to finish",
+        "message": "Sync didn't succeed several times in a row. The app will keep retrying automatically, and the data on this device isn't affected.",
+        "step1": "Check that your network connection is stable",
+        "step2": "Click “Sync now” to try again",
+        "step3": "If it keeps happening, copy the details and send them to us"
       },
       "unknownError": "Unknown error"
     },
@@ -830,8 +831,7 @@
       "autoSyncSub": "Upload changes automatically",
       "showPassword": "Show password",
       "hidePassword": "Hide password",
-      "retryAt": "Next retry: {time}.",
-      "errorDetailLabel": "Error message"
+      "retryAt": "Next retry: {time}."
     },
     "failedWith": "{context}: {reason}"
   },

@@ -173,7 +173,6 @@ import {
   type CloudSyncRestoreSuspension,
   type CloudSyncStatus
 } from '~/lib/services/cloud-sync.service'
-import { getCloudSyncCategoryMergeMessages } from '~/lib/utils/cloud-sync-merge-notices'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
 import {
   confirmAction,
@@ -296,19 +295,15 @@ const syncNow = async (storageId: string) => {
       await showToast(getCloudSyncResultMessage(result.action), 'warning')
       openConflictSheet()
     } else if (result.success) {
-      await showToast([
-        getCloudSyncResultMessage(result.action, result.conflicts.length),
-        ...(result.warnings || []),
-        // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
-        ...getCloudSyncCategoryMergeMessages(result)
-      ].join('; '))
+      // 恢复了哪些记录、同名分类保留了哪一边等，由主页面的 useCloudSyncResultNotices 在顶部统一提醒
+      await showToast(getCloudSyncResultMessage(result.action, result.conflicts.length))
     } else {
-      await presentSyncErrorDetails(result, { storageId, onRetry: retry })
+      await presentSyncErrorDetails(result, { storageId, onRetry: retry, quietWhenRecoverable: true })
     }
   } catch (error) {
     await presentSyncErrorDetails(
       error instanceof Error ? error.message : String(error),
-      { storageId, onRetry: retry }
+      { storageId, onRetry: retry, quietWhenRecoverable: true }
     )
   } finally {
     busy.sync = false

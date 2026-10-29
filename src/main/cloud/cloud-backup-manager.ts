@@ -79,6 +79,14 @@ import {
 import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 
 /**
+ * 保存存储配置前连不上存储。界面按 errorCode 用「测试连接」同一套说明告诉用户怎么改，
+ * message 只放服务器原样返回的内容，供技术详情和日志使用。
+ */
+class StorageConnectionError extends Error {
+  readonly code = 'CONNECTION_FAILED' as const;
+}
+
+/**
  * 常量定义
  */
 const CONSTANTS = {
@@ -268,9 +276,10 @@ export class CloudBackupManager {
         return { success: true, config: newConfig };
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.ADD_STORAGE_CONFIG_FAILED, error);
-        return { 
-          success: false, 
-          error: this.getErrorMessage(error) 
+        return {
+          success: false,
+          error: this.getErrorMessage(error),
+          ...(error instanceof StorageConnectionError ? { errorCode: error.code } : {})
         };
       }
     });
@@ -288,9 +297,10 @@ export class CloudBackupManager {
         return { success: true, config: updatedConfig };
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.UPDATE_STORAGE_CONFIG_FAILED, error);
-        return { 
-          success: false, 
-          error: this.getErrorMessage(error) 
+        return {
+          success: false,
+          error: this.getErrorMessage(error),
+          ...(error instanceof StorageConnectionError ? { errorCode: error.code } : {})
         };
       }
     });
@@ -741,9 +751,7 @@ export class CloudBackupManager {
     const result = await this.checkProviderConnection(this.createProvider(config));
     
     if (!result.success) {
-      throw new Error(result.error
-        ? `${CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED}: ${result.error}`
-        : CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED);
+      throw new StorageConnectionError(result.error || CONSTANTS.ERROR_MESSAGES.CONNECTION_TEST_FAILED);
     }
 
     this.storageConfigs.set(config.id, config);

@@ -130,8 +130,8 @@ export default interface ElectronApi {
   cloud: {
     checkICloudAvailability: () => Promise<{ available: boolean; reason?: string }>
     getStorageConfigs: () => Promise<CloudStorageConfig[]>
-    addStorageConfig: (config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
-    updateStorageConfig: (id: string, config: Partial<CloudStorageConfig>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
+    addStorageConfig: (config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string; errorCode?: 'CONNECTION_FAILED' }>
+    updateStorageConfig: (id: string, config: Partial<CloudStorageConfig>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string; errorCode?: 'CONNECTION_FAILED' }>
     deleteStorageConfig: (id: string) => Promise<{ success: boolean; error?: string }>
     testStorageConnection: (config: CloudStorageConfig) => Promise<{ success: boolean; error?: string }>
     getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>

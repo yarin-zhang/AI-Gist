@@ -143,7 +143,8 @@ describe('加入同步和分类合并的提示文案 (#490)', () => {
       expect(source).toMatch(/joining \? \{ \.\.\.(data|payload), enabled: false \}/)
       expect(source).toMatch(/previewStorageJoin\(storageId\)/)
       expect(source).toMatch(/updateStorageConfig\(storageId, \{ enabled: true \}\)/)
-      expect(source).toContain('getCloudSyncCategoryMergeMessages(result)')
+      // 合并后的提醒由 useCloudSyncResultNotices 统一显示，这里不再直接显示同步结果里的内部说明
+      expect(source).not.toContain('result.warnings')
     }
   })
 })
