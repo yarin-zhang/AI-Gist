@@ -1,19 +1,32 @@
 <template>
+  <!-- 应用选择后同步还在跑：不能关、不能再改选择，只显示进度 -->
   <ion-modal :is-open="isOpen" class="m-sheet-modal" :breakpoints="[0, 0.92]" :initial-breakpoint="0.92"
-    @didDismiss="emit('close')">
+    :can-dismiss="!applying" @didDismiss="emit('close')">
     <div class="m-sheet conflict-sheet">
       <div class="m-grab" aria-hidden="true" />
       <div class="conflict-sheet__bar">
-        <button type="button" class="m-btn" @click="emit('close')">{{ t('common.cancel') }}</button>
+        <button type="button" class="m-btn" :disabled="applying" @click="emit('close')">{{ t('common.cancel') }}</button>
         <h2 class="conflict-sheet__title">{{ t('syncConflict.title') }}</h2>
         <button type="button" class="m-save" :disabled="!pending || applying || (strategy === 'manual' && missingCount > 0)"
-          @click="apply">{{ t('syncConflict.apply') }}</button>
+          @click="apply">
+          <ion-spinner v-if="applying" name="crescent" class="conflict-sheet__spinner" aria-hidden="true" />
+          <span>{{ t('syncConflict.apply') }}</span>
+        </button>
       </div>
 
-      <div v-if="pending" class="m-body conflict-sheet__body">
+      <div v-if="applying" class="conflict-sheet__progress" role="status" aria-live="polite">
+        <span>{{ t(progress.labelKey) }}</span>
+        <span class="conflict-sheet__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+          :aria-valuenow="progress.percent" :aria-valuetext="t(progress.labelKey)">
+          <span class="conflict-sheet__progress-bar" :style="{ width: `${progress.percent}%` }" />
+        </span>
+      </div>
+
+      <div v-if="pending" class="m-body conflict-sheet__body" :class="{ 'is-busy': applying }" :inert="applying || undefined">
         <p class="m-desc">{{ t('syncConflict.description') }}</p>
         <!-- 新增 / 修改 / 删除只数不冲突、会直接合并的改动，删除标记本身不算新增 (#489) -->
         <div class="conflict-sheet__stats">
+          <span v-if="pending.items.length" class="m-pill m-pill-warn">{{ t('syncConflict.bothChanged', { count: pending.items.length }) }}</span>
           <span v-if="pending.summary.added" class="m-pill m-pill-ok">{{ t('syncConflict.added', { count: pending.summary.added }, pending.summary.added) }}</span>
           <span v-if="pending.summary.updated" class="m-pill m-pill-warn">{{ t('syncConflict.updated', { count: pending.summary.updated }, pending.summary.updated) }}</span>
           <span v-if="pending.summary.deleted" class="m-pill">{{ t('syncConflict.deleted', { count: pending.summary.deleted }, pending.summary.deleted) }}</span>
@@ -75,7 +88,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { IonIcon, IonModal } from '@ionic/vue'
+import { IonIcon, IonModal, IonSpinner } from '@ionic/vue'
 import { checkmark, informationCircleOutline } from 'ionicons/icons'
 import type { CloudSyncConflictSide } from '@shared/cloud-sync-engine'
 import { useI18n } from '~/composables/useI18n'
@@ -88,6 +101,7 @@ import {
   type CloudSyncPendingConflict
 } from '~/lib/services/cloud-sync.service'
 import { describeConflictVersionTimes } from '~/lib/utils/sync-conflict-versions'
+import { describeSyncProgress } from '~/lib/utils/sync-progress'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
 
 const SIDES = ['local', 'remote'] as const
@@ -107,6 +121,10 @@ const pending = ref<CloudSyncPendingConflict | undefined>()
 const strategy = ref<CloudSyncConflictStrategy>('smart')
 const resolutions = ref<Record<string, CloudSyncConflictSide>>({})
 const applying = ref(false)
+const syncPhase = ref(cloudSyncService.getStatus().syncPhase)
+const progress = computed(() => describeSyncProgress(syncPhase.value))
+// 这次同步已经出结果：之后排队的自动同步不再推动进度条，免得关面板前又跳回第一步
+let progressSettled = false
 let unsubscribe: (() => void) | null = null
 
 const refreshPending = () => {
@@ -162,13 +180,16 @@ const chooseAll = (side: CloudSyncConflictSide) => {
 }
 
 const apply = async () => {
-  if (!pending.value) return
+  if (!pending.value || applying.value) return
   applying.value = true
+  syncPhase.value = undefined
+  progressSettled = false
   try {
     const result = await cloudSyncService.resolveConflicts(pending.value.storageId, {
       strategy: strategy.value,
       resolutions: strategy.value === 'manual' ? resolutions.value : undefined
     })
+    progressSettled = true
     if (result.action === 'conflict-pending') {
       refreshPending()
       await presentMobileToast(t('syncConflict.changedMeanwhile'), 'warning')
@@ -187,7 +208,9 @@ const apply = async () => {
 }
 
 onMounted(() => {
-  unsubscribe = cloudSyncService.onStatusChange(() => {
+  unsubscribe = cloudSyncService.onStatusChange(status => {
+    // 同步结束时状态里的步骤会清空：保留最后一步，不退回第一步
+    if (!progressSettled && status.syncPhase) syncPhase.value = status.syncPhase
     if (props.isOpen && !applying.value) refreshPending()
   })
 })
@@ -298,5 +321,42 @@ onUnmounted(() => unsubscribe?.())
 .conflict-sheet__missing {
   padding-top: 8px;
   color: var(--accent-warning);
+}
+
+.conflict-sheet__spinner {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  color: currentColor;
+}
+
+.conflict-sheet__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 20px 4px;
+  color: var(--content-secondary);
+  font-size: var(--m-font-sub);
+}
+
+.conflict-sheet__progress-track {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-tertiary);
+}
+
+.conflict-sheet__progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+.conflict-sheet__body.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
 }
 </style>

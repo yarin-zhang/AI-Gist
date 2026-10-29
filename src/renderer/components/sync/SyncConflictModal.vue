@@ -1,7 +1,8 @@
 <template>
   <UiModal :show="visible" width="var(--overlay-width-wizard)" :title="t('syncConflict.title')" :close-label="t('common.close')"
-    @close="close">
-    <div v-if="pending" class="conflict">
+    @close="closeUnlessApplying">
+    <!-- 应用选择后同步还在跑：不能关、不能再改选择，只显示进度 -->
+    <div v-if="pending" class="conflict" :class="{ 'is-busy': applying }" :inert="applying || undefined">
       <div class="ui-alert ui-alert--warning">
         <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><AlertTriangle /></NIcon>
         <div class="conflict__alert">
@@ -102,12 +103,19 @@
     <div v-else class="conflict__resolved">{{ t('syncConflict.nothingPending') }}</div>
 
     <template #footer-start>
-      <span v-if="pending && strategy === 'manual' && missingCount" class="conflict__missing">
+      <span v-if="applying" class="conflict__progress" role="status" aria-live="polite">
+        <span class="conflict__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+          :aria-valuenow="progress.percent" :aria-valuetext="t(progress.labelKey)">
+          <span class="conflict__progress-bar" :style="{ width: `${progress.percent}%` }" />
+        </span>
+        <span>{{ t(progress.labelKey) }}</span>
+      </span>
+      <span v-else-if="pending && strategy === 'manual' && missingCount" class="conflict__missing">
         {{ t('syncConflict.missingChoices', { count: missingCount }) }}
       </span>
     </template>
     <template #footer>
-      <NButton @click="close">{{ t('common.cancel') }}</NButton>
+      <NButton :disabled="applying" @click="close">{{ t('common.cancel') }}</NButton>
       <NButton type="primary" :loading="applying" :disabled="!pending || (strategy === 'manual' && missingCount > 0)" @click="apply">
         {{ t('syncConflict.apply') }}
       </NButton>
@@ -139,6 +147,7 @@ import {
   type CloudSyncPendingConflict
 } from '@/lib/services/cloud-sync.service'
 import { describeConflictVersionTimes } from '@/lib/utils/sync-conflict-versions'
+import { describeSyncProgress } from '@/lib/utils/sync-progress'
 
 const SIDES = ['local', 'remote'] as const
 
@@ -151,7 +160,15 @@ const strategy = ref<CloudSyncConflictStrategy>('smart')
 const resolutions = ref<Record<string, CloudSyncConflictSide>>({})
 const expanded = ref<Record<string, boolean>>({})
 const applying = ref(false)
+const syncPhase = ref(cloudSyncService.getStatus().syncPhase)
+const progress = computed(() => describeSyncProgress(syncPhase.value))
+// 这次同步已经出结果：之后排队的自动同步不再推动进度条，免得关弹窗前又跳回第一步
+let progressSettled = false
 let unsubscribe: (() => void) | null = null
+
+const closeUnlessApplying = () => {
+  if (!applying.value) close()
+}
 
 const refreshPending = () => {
   pending.value = cloudSyncService.getPendingConflict(storageId.value)
@@ -259,13 +276,16 @@ const chooseAll = (side: CloudSyncConflictSide) => {
 }
 
 const apply = async () => {
-  if (!pending.value) return
+  if (!pending.value || applying.value) return
   applying.value = true
+  syncPhase.value = undefined
+  progressSettled = false
   try {
     const result = await cloudSyncService.resolveConflicts(pending.value.storageId, {
       strategy: strategy.value,
       resolutions: strategy.value === 'manual' ? resolutions.value : undefined,
     })
+    progressSettled = true
     if (result.action === 'conflict-pending') {
       // 等待期间云端又有新的改动，列表已刷新，请用户再确认一次
       refreshPending()
@@ -284,7 +304,9 @@ const apply = async () => {
 }
 
 onMounted(() => {
-  unsubscribe = cloudSyncService.onStatusChange(() => {
+  unsubscribe = cloudSyncService.onStatusChange(status => {
+    // 同步结束时状态里的步骤会清空：保留最后一步，不退回第一步
+    if (!progressSettled && status.syncPhase) syncPhase.value = status.syncPhase
     if (visible.value && !applying.value) refreshPending()
   })
 })
@@ -511,6 +533,36 @@ onUnmounted(() => unsubscribe?.())
 
 .conflict__missing {
   color: var(--accent-warning);
+}
+
+.conflict.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.conflict__progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--content-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.conflict__progress-track {
+  display: block;
+  overflow: hidden;
+  width: 160px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-tertiary);
+}
+
+.conflict__progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
 }
 
 .conflict__resolved {

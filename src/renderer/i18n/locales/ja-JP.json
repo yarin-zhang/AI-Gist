@@ -1831,7 +1831,14 @@
     "countCategories": "カテゴリ {count} 件",
     "countAiConfigs": "モデル設定 {count} 件",
     "newer": "新しい方",
-    "deletedAtTime": "{time} に削除"
+    "deletedAtTime": "{time} に削除",
+    "progress": {
+      "export": "この端末のデータを準備中…",
+      "readRemote": "クラウドのデータを読み込み中…",
+      "merge": "統合中…",
+      "applyLocal": "この端末に保存中…",
+      "writeRemote": "クラウドにアップロード中…"
+    }
   },
   "appInit": {
     "loading": "AI Gist を開いています…",

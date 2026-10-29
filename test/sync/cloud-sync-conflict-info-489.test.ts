@@ -179,15 +179,8 @@ describe('deleted on one device, kept on the other (#489)', () => {
     const pending = pendingOnB.pendingConflict!
     // 删除标记不再被算成「云端新增 1 条」，两个冲突项也不再重复计入修改 / 删除
     expect(pending.summary).toMatchObject({ added: 0, updated: 0, deleted: 0, conflicts: 2 })
-    expect(pending.items).toHaveLength(2)
-    const deletedItem = pending.items.find(item => item.key === 'uuid:p4')!
-    expect(deletedItem).toMatchObject({
-      reason: 'delete_vs_update',
-      localDeleted: false,
-      remoteDeleted: true,
-      localUpdatedAt: '2026-01-02T00:00:01.500Z',
-      remoteDeletedAt: '2026-01-02T00:00:00.000Z'
-    })
+    // 只有两边都改了标题的「提示词 02」要用户选；「一边删、一边改」按较新的操作自动处理，不列出来
+    expect(pending.items.map(item => [item.key, item.reason])).toEqual([['uuid:p2', 'both_modified']])
 
     const resolved = await deviceB.service.resolveConflicts('cfg-1', { strategy: 'smart' }, { deviceName: 'MacBook B' })
     expect(resolved.success).toBe(true)

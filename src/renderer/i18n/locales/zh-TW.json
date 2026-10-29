@@ -1831,7 +1831,14 @@
     "countCategories": "{count} 個分類",
     "countAiConfigs": "{count} 個模型設定",
     "newer": "較新",
-    "deletedAtTime": "刪除於 {time}"
+    "deletedAtTime": "刪除於 {time}",
+    "progress": {
+      "export": "正在整理本機資料…",
+      "readRemote": "正在讀取雲端資料…",
+      "merge": "正在合併…",
+      "applyLocal": "正在寫入本機…",
+      "writeRemote": "正在上傳到雲端…"
+    }
   },
   "appInit": {
     "loading": "正在開啟 AI Gist…",
