@@ -86,8 +86,9 @@ export interface CloudStorageProvider {
   // 读取文件
   readFile(path: string): Promise<Buffer>;
 
-  // 读取文件并带回这次响应的 ETag（可选，用于之后的条件写，省掉写入前再读一遍）
-  readFileWithInfo?(path: string): Promise<CloudFileReadResult>;
+  // 读取文件并带回这次响应的 ETag（可选，用于之后的条件写，省掉写入前再读一遍）；
+  // 传了 ifNoneMatch 时是条件读取，文件没变就不下载正文 (#487)
+  readFileWithInfo?(path: string, options?: CloudFileReadOptions): Promise<CloudFileReadResult>;
   
   // 写入文件
   writeFile(path: string, data: Buffer, options?: CloudFileWriteOptions): Promise<void | CloudFileWriteResult>;
@@ -125,9 +126,24 @@ export interface CloudFileWriteOptions {
   skipDirectoryCheck?: boolean;
 }
 
+export interface CloudFileReadOptions {
+  /** 上次读到 / 写入时记下的 ETag，作为 If-None-Match 发给服务器 (#487) */
+  ifNoneMatch?: string;
+}
+
 export interface CloudFileReadResult {
   data: Buffer;
   etag?: string;
+  /**
+   * 服务器回了 304：文件和 ifNoneMatch 对应的版本一样，这次没有下载正文，data 是空的，
+   * 调用方要用自己缓存的那份 (#487)
+   */
+  notModified?: boolean;
+  /**
+   * 带了 If-None-Match，服务器却回 200 且 ETag 和发过去的一样：这台服务器不认条件读取，
+   * 调用方之后改用 PROPFIND 比对 ETag 再决定要不要下载 (#487)
+   */
+  conditionIgnored?: boolean;
 }
 
 export interface CloudFileWriteResult {

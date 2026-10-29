@@ -89,9 +89,25 @@ export interface MobileWebDAVCapabilityReport {
   warning?: string
 }
 
+/** WebDAV 同步 manifest 的本地缓存：只在 ETag 证明云端还是这一份时使用 (#487) */
+interface WebDAVSyncManifestCacheEntry {
+  /** 缓存对应的存储地址和账号；配置改了就不再匹配 */
+  location: string
+  etag: string
+  /** 存 JSON 文本，每次用时重新解析，调用方改了返回的对象也不会污染缓存 */
+  json: string
+}
+
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
   private readonly webDAVCapabilityReports = new Map<string, MobileWebDAVCapabilityReport>()
+  /**
+   * 每个 WebDAV 存储最近一次从主文件读到、或本机刚写入的 manifest 和对应 ETag (#487)。
+   * 下次检查带 If-None-Match（或 PROPFIND 比对 ETag），云端没变就直接用这份，不再整份下载
+   */
+  private readonly webDAVSyncManifestCache = new Map<string, WebDAVSyncManifestCacheEntry>()
+  /** GET 不认 If-None-Match（没变也回 200）的存储：改用 PROPFIND 比对 ETag，变了再 GET (#487) */
+  private readonly webDAVStoragesIgnoringConditionalRead = new Set<string>()
 
   private constructor() {
     // Singleton service.
@@ -240,6 +256,7 @@ export class MobileCloudBackupService {
         key: STORAGE_KEYS.CONFIGS,
         value: JSON.stringify(configs)
       })
+      this.forgetWebDAVSyncManifestCache(id)
 
       return { success: true, config: updatedConfig }
     } catch (error) {
@@ -266,6 +283,7 @@ export class MobileCloudBackupService {
         key: STORAGE_KEYS.CONFIGS,
         value: JSON.stringify(filtered)
       })
+      this.forgetWebDAVSyncManifestCache(id)
 
       return { success: true }
     } catch (error) {
@@ -485,6 +503,14 @@ export class MobileCloudBackupService {
     }
 
     throw new Error('不支持的存储类型')
+  }
+
+  /**
+   * 下一次检查这个存储时，云端没变的话能否不下载整份 manifest：
+   * 手里要有带 ETag 的缓存，才能用条件读取或 PROPFIND 比对确认没变 (#487)
+   */
+  canCheckSyncManifestCheaply(storageId: string): boolean {
+    return this.webDAVSyncManifestCache.has(storageId)
   }
 
   /**
@@ -916,12 +942,67 @@ export class MobileCloudBackupService {
   }
 
   private async getWebDAVSyncManifest(config: any): Promise<CloudSyncManifest> {
-    return readCloudSyncManifestWithFallback({
-      readPrimary: () => this.readWebDAVSyncManifestFile(config, getCloudSyncManifestPath()),
+    let primaryRead = false
+    const manifest = await readCloudSyncManifestWithFallback({
+      readPrimary: async () => {
+        const result = await this.readWebDAVPrimarySyncManifest(config, 'check')
+        primaryRead = true
+        return result.manifest
+      },
       readBackup: () => this.readWebDAVSyncManifestFile(config, getCloudSyncManifestBackupPath()),
       isNotFoundError: error => this.isNotFoundError(error),
       describeError: error => this.formatErrorMessage(error)
     })
+    if (!primaryRead) {
+      // 用的是备份副本，或者主文件、备份都不存在：云端主文件现在是什么样不清楚，缓存不能再拿来比对
+      this.webDAVSyncManifestCache.delete(config.id)
+    }
+    return manifest
+  }
+
+  /**
+   * 读主文件。手里有缓存时先确认云端变没变 (#487)：
+   * 默认带 If-None-Match 做条件 GET，304 就用缓存；服务器不认条件 GET 时，检查用 PROPFIND 比对 ETag，
+   * 一样就用缓存。写入前的读取要拿 GET 响应里的 ETag 做 If-Match，所以这种服务器上照旧整份 GET。
+   * 返回的 etag 可以直接用于 If-Match
+   */
+  private async readWebDAVPrimarySyncManifest(
+    config: any,
+    purpose: 'check' | 'write'
+  ): Promise<{ manifest: CloudSyncManifest; etag?: string }> {
+    const primaryPath = getCloudSyncManifestPath()
+    const location = this.getWebDAVSyncManifestCacheLocation(config)
+    const cached = this.getWebDAVSyncManifestCache(config.id, location)
+    const ignoresConditionalRead = this.webDAVStoragesIgnoringConditionalRead.has(config.id)
+
+    if (cached && ignoresConditionalRead && purpose === 'check') {
+      const etag = await this.statWebDAVFileEtag(config, primaryPath)
+      if (etag && this.isSameEtag(etag, cached.etag)) {
+        return { manifest: assertValidCloudSyncManifest(JSON.parse(cached.json)) }
+      }
+      // 缓存配 PROPFIND 的 ETag，之后比对的也是它；ETag 先于正文拿到，中间云端又变了的话
+      // 下次比对不上会再下载一次，不会把旧内容当成新的
+      const result = await this.readWebDAVSyncManifestFileWithMeta(config, primaryPath)
+      this.rememberWebDAVSyncManifest(config.id, location, etag, result.manifest)
+      return result
+    }
+
+    if (cached && !ignoresConditionalRead) {
+      const result = await this.readWebDAVSyncManifestFileWithMeta(config, primaryPath, cached.etag)
+      if (result.notModified) {
+        return { manifest: assertValidCloudSyncManifest(JSON.parse(cached.json)), etag: cached.etag }
+      }
+      if (result.conditionIgnored) {
+        // 这次已经整份下载了，内容照常用；之后检查改用 PROPFIND 比对，省掉没变时的下载
+        this.webDAVStoragesIgnoringConditionalRead.add(config.id)
+      }
+      this.rememberWebDAVSyncManifest(config.id, location, result.etag, result.manifest)
+      return { manifest: result.manifest, etag: result.etag }
+    }
+
+    const result = await this.readWebDAVSyncManifestFileWithMeta(config, primaryPath)
+    this.rememberWebDAVSyncManifest(config.id, location, result.etag, result.manifest)
+    return result
   }
 
   private async readWebDAVSyncManifestFile(config: any, cloudPath: string): Promise<CloudSyncManifest> {
@@ -931,13 +1012,37 @@ export class MobileCloudBackupService {
   private async readWebDAVSyncManifestFileWithMeta(
     config: any,
     cloudPath: string
-  ): Promise<{ manifest: CloudSyncManifest; etag?: string }> {
+  ): Promise<{ manifest: CloudSyncManifest; etag?: string }>
+  private async readWebDAVSyncManifestFileWithMeta(
+    config: any,
+    cloudPath: string,
+    ifNoneMatch: string
+  ): Promise<
+    { notModified: true } |
+    { notModified?: false; manifest: CloudSyncManifest; etag?: string; conditionIgnored: boolean }
+  >
+  private async readWebDAVSyncManifestFileWithMeta(
+    config: any,
+    cloudPath: string,
+    ifNoneMatch?: string
+  ): Promise<
+    { notModified: true } |
+    { notModified?: false; manifest: CloudSyncManifest; etag?: string; conditionIgnored?: boolean }
+  > {
     const response = await this.requestWebDAV(
       config,
       this.buildWebDAVUrlFromCloudPath(config, cloudPath),
       'GET',
-      { responseType: 'json' }
+      {
+        responseType: 'json',
+        ...(ifNoneMatch ? { headers: { 'If-None-Match': ifNoneMatch } } : {})
+      }
     )
+
+    // 304：和 If-None-Match 对应的那份一样，正文是空的，调用方用自己的缓存 (#487)
+    if (ifNoneMatch && response.status === 304) {
+      return { notModified: true }
+    }
 
     if (response.status === 404) {
       throw new Error(`云同步 manifest 不存在（HTTP ${response.status}）`)
@@ -948,10 +1053,70 @@ export class MobileCloudBackupService {
     }
 
     const data = response.data
+    const etag = this.getResponseHeader(response, 'etag')
     return {
       manifest: assertValidCloudSyncManifest(data),
-      etag: this.getResponseHeader(response, 'etag')
+      etag,
+      ...(ifNoneMatch
+        // 200 带回来的 ETag 和发过去的一样：文件没变，服务器只是不认 If-None-Match
+        ? { conditionIgnored: !!etag && this.isSameEtag(etag, ifNoneMatch) }
+        : {})
     }
+  }
+
+  /** PROPFIND（Depth 0）只取文件的 ETag；拿不到就返回 undefined，交给后面的 GET 给出准确结果 */
+  private async statWebDAVFileEtag(config: any, cloudPath: string): Promise<string | undefined> {
+    const response = await this.requestWebDAV(config, this.buildWebDAVUrlFromCloudPath(config, cloudPath), 'PROPFIND', {
+      headers: {
+        Depth: '0',
+        'Content-Type': 'application/xml; charset=utf-8'
+      },
+      body: this.getWebDAVPropfindBody()
+    })
+    if (response.status !== 207) {
+      return undefined
+    }
+    const doc = new DOMParser().parseFromString(String(response.data || ''), 'text/xml')
+    return doc.getElementsByTagNameNS('*', 'getetag')[0]?.textContent?.trim() || undefined
+  }
+
+  private getWebDAVSyncManifestCacheLocation(config: any): string {
+    return JSON.stringify([String(config.url || ''), String(config.username || '')])
+  }
+
+  private getWebDAVSyncManifestCache(storageId: string, location: string): WebDAVSyncManifestCacheEntry | undefined {
+    const cached = this.webDAVSyncManifestCache.get(storageId)
+    if (cached && cached.location !== location) {
+      // 地址或账号变了：旧缓存对应的是另一个文件
+      this.webDAVSyncManifestCache.delete(storageId)
+      return undefined
+    }
+    return cached
+  }
+
+  /** 没有 ETag 就无法确认云端是否还是这一份，干脆不缓存 */
+  private rememberWebDAVSyncManifest(
+    storageId: string,
+    location: string,
+    etag: string | undefined,
+    manifest: CloudSyncManifest
+  ): void {
+    if (!etag?.trim()) {
+      this.webDAVSyncManifestCache.delete(storageId)
+      return
+    }
+    this.webDAVSyncManifestCache.set(storageId, { location, etag, json: JSON.stringify(manifest) })
+  }
+
+  private forgetWebDAVSyncManifestCache(storageId: string): void {
+    this.webDAVSyncManifestCache.delete(storageId)
+    this.webDAVStoragesIgnoringConditionalRead.delete(storageId)
+  }
+
+  /** GET 响应头和 PROPFIND 里的 ETag 写法可能一个带引号一个不带，比较前去掉引号和弱标记 */
+  private isSameEtag(left: string, right: string): boolean {
+    const normalize = (etag: string) => etag.trim().replace(/^W\//i, '').replace(/^"(.*)"$/, '$1')
+    return normalize(left) === normalize(right)
   }
 
   private async saveWebDAVSyncManifest(
@@ -965,12 +1130,13 @@ export class MobileCloudBackupService {
     const backupPath = getCloudSyncManifestBackupPath()
 
     if (options.expectedRevision === undefined) {
-      await this.writeWebDAVSyncManifestFile(config, primaryPath, manifest)
+      await this.writeWebDAVPrimarySyncManifest(config, manifest)
       await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
       return
     }
 
-    const primaryState = await this.tryReadWebDAVSyncManifestFileWithMeta(config, primaryPath)
+    // 有缓存时这次读取也是条件读取：云端没变就不必为了核对 revision 再整份下载一次 (#487)
+    const primaryState = await this.tryReadWebDAVPrimarySyncManifestForWrite(config)
     let currentManifest = primaryState?.manifest
 
     if (!currentManifest) {
@@ -986,11 +1152,44 @@ export class MobileCloudBackupService {
     currentManifest = currentManifest || assertValidCloudSyncManifest({})
     this.assertExpectedCloudSyncRevision(currentManifest, options.expectedRevision)
 
-    await this.writeWebDAVSyncManifestFile(config, primaryPath, manifest, {
+    await this.writeWebDAVPrimarySyncManifest(config, manifest, {
       ifMatch: primaryState?.etag,
       ifNoneMatch: !primaryState && !currentManifest.latestSnapshot
     })
     await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
+  }
+
+  private async tryReadWebDAVPrimarySyncManifestForWrite(
+    config: any
+  ): Promise<{ manifest: CloudSyncManifest; etag?: string } | null> {
+    try {
+      return await this.readWebDAVPrimarySyncManifest(config, 'write')
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        this.webDAVSyncManifestCache.delete(config.id)
+        return null
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 写主文件。PUT 响应带 ETag 时（按 HTTP 规范，这只会是刚写入那份内容的 ETag），连同刚写的内容一起缓存，
+   * 本机下一次检查不必把自己刚上传的 manifest 再下载回来；没有 ETag 或写入失败时清掉缓存 (#487)
+   */
+  private async writeWebDAVPrimarySyncManifest(
+    config: any,
+    manifest: CloudSyncManifest,
+    options: { ifMatch?: string; ifNoneMatch?: boolean } = {}
+  ): Promise<void> {
+    const location = this.getWebDAVSyncManifestCacheLocation(config)
+    try {
+      const written = await this.writeWebDAVSyncManifestFile(config, getCloudSyncManifestPath(), manifest, options)
+      this.rememberWebDAVSyncManifest(config.id, location, written.etag, manifest)
+    } catch (error) {
+      this.webDAVSyncManifestCache.delete(config.id)
+      throw error
+    }
   }
 
   private async writeWebDAVSyncManifestFile(
@@ -998,7 +1197,7 @@ export class MobileCloudBackupService {
     cloudPath: string,
     manifest: CloudSyncManifest,
     options: { ifMatch?: string; ifNoneMatch?: boolean } = {}
-  ): Promise<void> {
+  ): Promise<{ etag?: string }> {
     const conditionalHeaders: Record<string, string> = {}
     if (options.ifMatch) {
       conditionalHeaders['If-Match'] = this.normalizeIfMatchHeaderValue(options.ifMatch)
@@ -1027,6 +1226,8 @@ export class MobileCloudBackupService {
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`保存云同步 manifest 失败（HTTP ${response.status}）`)
     }
+
+    return { etag: this.getResponseHeader(response, 'etag') }
   }
 
   private normalizeIfMatchHeaderValue(etag: string): string {
@@ -1134,20 +1335,6 @@ export class MobileCloudBackupService {
     }
 
     return this.parseWebDAVResponse(xmlData, baseUrl)
-  }
-
-  private async tryReadWebDAVSyncManifestFileWithMeta(
-    config: any,
-    cloudPath: string
-  ): Promise<{ manifest: CloudSyncManifest; etag?: string } | null> {
-    try {
-      return await this.readWebDAVSyncManifestFileWithMeta(config, cloudPath)
-    } catch (error) {
-      if (this.isNotFoundError(error)) {
-        return null
-      }
-      throw error
-    }
   }
 
   /**

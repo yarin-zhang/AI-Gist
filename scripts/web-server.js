@@ -11,6 +11,8 @@ const MAX_BODY_BYTES = 25 * 1024 * 1024;
 const CLOUD_BACKUP_DIR = 'AI-Gist-Backup';
 const CLOUD_SYNC_MANIFEST_FILE = 'sync-manifest.json';
 const CLOUD_SYNC_MANIFEST_BACKUP_FILE = 'sync-manifest.backup.json';
+/** get-sync-manifest 条件读取的返回结构标记，前端据此区分新旧版后端 (#487) */
+const CLOUD_SYNC_MANIFEST_READ_KIND = 'ai-gist-cloud-sync-manifest-read';
 const CLOUD_SYNC_DIR = 'sync';
 const CLOUD_SYNC_SNAPSHOTS_DIR = 'snapshots';
 const CLOUD_SYNC_SNAPSHOT_FILE_EXTENSION = '.json';
@@ -779,7 +781,68 @@ async function deleteWebDAVBackup({ config, cloudPath }) {
   return { ok: true };
 }
 
-async function getWebDAVSyncManifest({ config }) {
+async function getWebDAVSyncManifest({ config, conditional, ifNoneMatch }) {
+  // 旧版前端不带 conditional，照旧直接返回 manifest
+  if (conditional === true) {
+    return readWebDAVSyncManifestConditionally(config, ifNoneMatch);
+  }
+  return readWebDAVSyncManifestWithFallback(config);
+}
+
+/**
+ * 浏览器带着上次拿到的 ETag 来问 manifest 变没变 (#487)。
+ * 主文件带 If-None-Match 读：服务器回 304，或者不认条件请求但回来的 ETag 和浏览器手里的一样，
+ * 都只告诉浏览器「没变」，不把整份 manifest 再传一遍。
+ * 主文件读不到或内容无效时按原逻辑读（含备份副本），不带 ETag，浏览器随之清掉缓存
+ */
+async function readWebDAVSyncManifestConditionally(config, ifNoneMatch) {
+  const knownEtag = typeof ifNoneMatch === 'string' &&
+    ifNoneMatch.trim() &&
+    ifNoneMatch.length <= 512 &&
+    !/[\0\r\n]/.test(ifNoneMatch)
+    ? ifNoneMatch.trim()
+    : undefined;
+  const client = await createWebDAVClient(config);
+  const manifestPath = normalizeRemotePath(CLOUD_BACKUP_DIR, CLOUD_SYNC_MANIFEST_FILE);
+
+  let response = null;
+  try {
+    response = await client.getFileContents(manifestPath, {
+      format: 'text',
+      details: true,
+      ...(knownEtag ? { headers: { 'If-None-Match': knownEtag } } : {})
+    });
+  } catch {
+    response = null;
+  }
+
+  if (response) {
+    const etag = typeof response.headers?.etag === 'string' ? response.headers.etag : undefined;
+    // webdav 库把 304 当成功、正文为空，必须看状态码
+    if (knownEtag && (response.status === 304 || etagMatches(etag, knownEtag))) {
+      return { kind: CLOUD_SYNC_MANIFEST_READ_KIND, notModified: true, etag: etag || knownEtag };
+    }
+    try {
+      const text = typeof response.data === 'string' ? response.data : String(response.data);
+      return {
+        kind: CLOUD_SYNC_MANIFEST_READ_KIND,
+        notModified: false,
+        manifest: assertValidCloudSyncManifest(JSON.parse(text)),
+        etag
+      };
+    } catch {
+      // 主文件内容无效：下面按原逻辑读备份副本
+    }
+  }
+
+  return {
+    kind: CLOUD_SYNC_MANIFEST_READ_KIND,
+    notModified: false,
+    manifest: await readWebDAVSyncManifestWithFallback(config)
+  };
+}
+
+async function readWebDAVSyncManifestWithFallback(config) {
   const client = await createWebDAVClient(config);
   const manifestPath = normalizeRemotePath(CLOUD_BACKUP_DIR, CLOUD_SYNC_MANIFEST_FILE);
   const backupPath = normalizeRemotePath(CLOUD_BACKUP_DIR, CLOUD_SYNC_MANIFEST_BACKUP_FILE);

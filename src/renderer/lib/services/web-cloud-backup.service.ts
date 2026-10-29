@@ -59,8 +59,32 @@ interface CloudSyncV2StatResponse extends CloudSyncV2StoredObjectInfo {
   isDirectory?: boolean;
 }
 
+/** Web 后端 get-sync-manifest 条件读取的返回结构；旧版后端直接返回 manifest (#487) */
+const CLOUD_SYNC_MANIFEST_READ_KIND = 'ai-gist-cloud-sync-manifest-read';
+
+interface CloudSyncManifestConditionalReadResponse {
+  kind: typeof CLOUD_SYNC_MANIFEST_READ_KIND;
+  notModified: boolean;
+  manifest?: unknown;
+  etag?: string;
+}
+
+/** 同步 manifest 的本地缓存：只在 ETag 证明云端还是这一份时使用 (#487) */
+interface WebSyncManifestCacheEntry {
+  /** 缓存对应的存储地址和账号；配置改了就不再匹配 */
+  location: string;
+  etag: string;
+  /** 存 JSON 文本，每次用时重新解析，调用方改了返回的对象也不会污染缓存 */
+  json: string;
+}
+
 export class WebCloudBackupService {
   private static instance: WebCloudBackupService;
+  /**
+   * 每个存储最近一次从主文件读到的 manifest 和对应 ETag (#487)。
+   * 下次检查把 ETag 交给 Web 后端做条件读取，云端没变时后端只回「没变」，不再把整份 manifest 传给浏览器
+   */
+  private readonly syncManifestCache = new Map<string, WebSyncManifestCacheEntry>();
 
   static getInstance(): WebCloudBackupService {
     if (!WebCloudBackupService.instance) {
@@ -138,12 +162,14 @@ export class WebCloudBackupService {
     } as CloudStorageConfig;
     configs[index] = nextConfig;
     this.saveStorageConfigs(configs);
+    this.syncManifestCache.delete(id);
     return { success: true, config: nextConfig };
   }
 
   async deleteStorageConfig(id: string): Promise<{ success: boolean; error?: string }> {
     const configs = await this.getStorageConfigs();
     this.saveStorageConfigs(configs.filter(config => config.id !== id));
+    this.syncManifestCache.delete(id);
     return { success: true };
   }
 
@@ -287,14 +313,68 @@ export class WebCloudBackupService {
   async getCloudSyncManifest(storageId: string): Promise<CloudSyncManifest> {
     try {
       const config = await this.getWebDAVConfig(storageId);
-      const manifest = await this.request<CloudSyncManifest>('/api/cloud/webdav/get-sync-manifest', { config });
+      const location = JSON.stringify([config.url, config.username || '']);
+      const cached = this.syncManifestCache.get(storageId);
+      const usableCache = cached?.location === location ? cached : undefined;
+      const response = await this.request<unknown>('/api/cloud/webdav/get-sync-manifest', {
+        config,
+        conditional: true,
+        ...(usableCache ? { ifNoneMatch: usableCache.etag } : {})
+      });
+
+      if (this.isConditionalManifestRead(response)) {
+        if (response.notModified && usableCache) {
+          return assertValidCloudSyncManifest(JSON.parse(usableCache.json));
+        }
+        if (!response.notModified) {
+          const manifest = assertValidCloudSyncManifest(response.manifest);
+          this.rememberSyncManifest(storageId, location, response.etag, manifest);
+          return manifest;
+        }
+      }
+
+      // 旧版后端不认条件读取，直接返回了 manifest；或者回了「没变」本机却没有对应缓存，按普通读取再取一次
+      this.syncManifestCache.delete(storageId);
+      const manifest = this.isConditionalManifestRead(response)
+        ? await this.request<unknown>('/api/cloud/webdav/get-sync-manifest', { config })
+        : response;
       return assertValidCloudSyncManifest(manifest);
     } catch (error) {
+      this.syncManifestCache.delete(storageId);
       if (this.isNotFoundError(error)) {
         return createEmptyCloudSyncManifest();
       }
       throw error;
     }
+  }
+
+  /**
+   * 下一次检查这个存储时，云端没变的话能否不把整份 manifest 传给浏览器：
+   * 手里要有带 ETag 的缓存，Web 后端才能用它做条件读取 (#487)
+   */
+  canCheckSyncManifestCheaply(storageId: string): boolean {
+    return this.syncManifestCache.has(storageId);
+  }
+
+  private isConditionalManifestRead(value: unknown): value is CloudSyncManifestConditionalReadResponse {
+    return !!value &&
+      typeof value === 'object' &&
+      (value as { kind?: unknown }).kind === CLOUD_SYNC_MANIFEST_READ_KIND &&
+      typeof (value as { notModified?: unknown }).notModified === 'boolean';
+  }
+
+  /** 没有 ETag（读到的是备份副本，或服务器不给 ETag）就无法确认云端是否还是这一份，干脆不缓存 */
+  private rememberSyncManifest(
+    storageId: string,
+    location: string,
+    etag: string | undefined,
+    manifest: CloudSyncManifest
+  ): void {
+    if (!etag?.trim()) {
+      this.syncManifestCache.delete(storageId);
+      return;
+    }
+    this.syncManifestCache.set(storageId, { location, etag, json: JSON.stringify(manifest) });
   }
 
   async saveCloudSyncManifest(

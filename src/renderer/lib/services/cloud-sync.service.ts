@@ -84,6 +84,11 @@ const DEFAULT_AUTO_SYNC_DEBOUNCE_MS = 5000;
 const DEFAULT_REMOTE_POLL_INTERVAL_MS = DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES * 60 * 1000;
 const DEFAULT_AUTO_SYNC_RETRY_MS = DEFAULT_REMOTE_POLL_INTERVAL_MS;
 const DEFAULT_STARTUP_SYNC_DELAY_MS = 10000;
+/**
+ * 窗口重新获得焦点、从后台回来、恢复联网时的检查，在云端没变也不必整份下载 manifest 时的最短间隔 (#487)。
+ * 做不到的存储仍按完整检查间隔节流，避免频繁整份下载
+ */
+const CHEAP_REMOTE_CHECK_MIN_INTERVAL_MS = 60 * 1000;
 const MAX_AUTO_SYNC_RETRY_MS = 60 * 60 * 1000;
 const MAX_REMOTE_RECHECK_ATTEMPTS = 5;
 const REMOTE_RECHECK_RETRY_STEP_MS = 200;
@@ -236,6 +241,11 @@ export interface CloudSyncRestoreSuspension {
 
 export interface CloudSyncCloudClient {
   getCloudSyncManifest(storageId: string): Promise<CloudSyncManifest>;
+  /**
+   * 刚读过 manifest 之后调用：下一次检查这个存储时，云端没变的话能否不下载整份 manifest
+   * （条件读取或 PROPFIND 比对 ETag）。没有实现按「不能」处理 (#487)
+   */
+  canCheckManifestCheaply?(storageId: string): boolean;
   saveCloudSyncManifest(
     storageId: string,
     manifest: CloudSyncManifest,
@@ -383,6 +393,11 @@ export class CloudSyncService {
     remoteRevision?: string;
     result: CloudSyncResult;
   }>();
+  /**
+   * 每个存储最近一次检查后，下次检查在云端没变时能否不下载整份 manifest (#487)。
+   * 查过的存储全都能做到时，焦点 / 唤醒触发的检查才放宽到最短 1 分钟一次
+   */
+  private readonly cheapRemoteCheckStorages = new Map<string, boolean>();
   private syncAllAfterRetry = false;
   private readonly statusListeners = new Set<CloudSyncStatusListener>();
   private autoSyncOptions: CloudSyncAutoOptions | null = null;
@@ -1111,6 +1126,8 @@ export class CloudSyncService {
   resetStorageFailureState(storageId: string): void {
     this.deterministicFailureGuards.delete(storageId);
     this.blockedStorageFailures.delete(storageId);
+    // 配置改了，存储层的 manifest 缓存也已作废，等下一次检查重新确认
+    this.cheapRemoteCheckStorages.delete(storageId);
     if (this.status.status !== 'error' || this.status.storageId !== storageId || this.runningSyncs.has(storageId)) {
       return;
     }
@@ -1679,7 +1696,9 @@ export class CloudSyncService {
     generation: number
   ): Promise<{ manifest: CloudSyncManifest; result?: CloudSyncResult }> {
     try {
-      const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+      const cloudClient = this.getCloudClient();
+      const manifest = await cloudClient.getCloudSyncManifest(storageId);
+      this.cheapRemoteCheckStorages.set(storageId, cloudClient.canCheckManifestCheaply?.(storageId) === true);
       this.assertCurrentSyncGeneration(storageId, generation);
       if (manifest.latestSnapshot) {
         return { manifest };
@@ -2203,6 +2222,7 @@ export class CloudSyncService {
     if (PlatformDetector.isElectron()) {
       return {
         getCloudSyncManifest: storageId => CloudBackupAPI.getCloudSyncManifest(storageId),
+        canCheckManifestCheaply: storageId => CloudBackupAPI.canCheckSyncManifestCheaply(storageId),
         saveCloudSyncManifest: (storageId, manifest, options) =>
           CloudBackupAPI.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => CloudBackupAPI.listCloudSyncSnapshots(storageId),
@@ -2213,6 +2233,7 @@ export class CloudSyncService {
     if (PlatformDetector.isWeb()) {
       return {
         getCloudSyncManifest: storageId => webCloudBackupService.getCloudSyncManifest(storageId),
+        canCheckManifestCheaply: storageId => webCloudBackupService.canCheckSyncManifestCheaply(storageId),
         saveCloudSyncManifest: (storageId, manifest, options) =>
           webCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => webCloudBackupService.listCloudSyncSnapshots(storageId),
@@ -2222,6 +2243,7 @@ export class CloudSyncService {
 
     return {
       getCloudSyncManifest: storageId => mobileCloudBackupService.getCloudSyncManifest(storageId),
+      canCheckManifestCheaply: storageId => mobileCloudBackupService.canCheckSyncManifestCheaply(storageId),
       saveCloudSyncManifest: (storageId, manifest, options) =>
         mobileCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
       listCloudSyncSnapshots: storageId => mobileCloudBackupService.listCloudSyncSnapshots(storageId),
@@ -2773,7 +2795,20 @@ export class CloudSyncService {
       return 0;
     }
 
-    return Math.max(0, lastAttemptTime + intervalMs - Date.now());
+    // 云端没变时检查只要一次条件请求（几百字节），焦点 / 唤醒 / 恢复联网时不必等满整个检查间隔，
+    // 另一台设备的改动切回来就能看到；做不到的存储仍按完整间隔，避免频繁整份下载 (#487)
+    const throttleIntervalMs = this.canRelaxForegroundCheckThrottle(reason)
+      ? Math.min(intervalMs, CHEAP_REMOTE_CHECK_MIN_INTERVAL_MS)
+      : intervalMs;
+    return Math.max(0, lastAttemptTime + throttleIntervalMs - Date.now());
+  }
+
+  private canRelaxForegroundCheckThrottle(reason: CloudSyncRunReason): boolean {
+    if (reason !== 'focus' && reason !== 'resume' && reason !== 'online') {
+      return false;
+    }
+    const checks = [...this.cheapRemoteCheckStorages.values()];
+    return checks.length > 0 && checks.every(Boolean);
   }
 
   private getNextRetryDelayMs(): number {

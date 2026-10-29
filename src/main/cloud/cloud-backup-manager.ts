@@ -117,6 +117,23 @@ const CONSTANTS = {
   }
 } as const;
 
+/** 同步 manifest 的本地缓存：只在 ETag 证明云端还是这一份时使用 (#487) */
+interface SyncManifestReadCacheEntry {
+  /** 缓存对应的存储位置（类型、地址、账号、manifest 路径）；配置改了地址或账号就不再匹配 */
+  location: string;
+  etag: string;
+  content: Buffer;
+}
+
+/** 主文件这一次是怎么读到的 */
+interface PrimarySyncManifestRead {
+  manifest: CloudSyncManifest;
+  /** 这次 GET 响应里的 ETag，用于之后的条件写；从缓存返回时没有 */
+  readEtag?: string;
+  /** 这次下载的原文和要和它一起缓存的 ETag；从缓存返回时没有 */
+  downloaded?: { content: Buffer; etag?: string };
+}
+
 /**
  * 云端备份管理器
  * 负责管理云端存储配置、备份创建、恢复和删除等操作
@@ -133,6 +150,14 @@ export class CloudBackupManager {
   private verifiedSyncDirectories = new Set<string>();
   /** GET 响应里的 ETag 拿去条件写会被拒绝的存储（服务器两处 ETag 写法不一致），只用写后查到的 ETag */
   private storagesRejectingReadEtags = new Set<string>();
+  /**
+   * 每个存储最近一次从主文件读到、或者本机刚写入的 manifest 原文和对应的 ETag (#487)。
+   * 下次检查带 If-None-Match（或 PROPFIND 比对 ETag），云端没变就直接用这份，不再整份下载。
+   * 只缓存主文件：读到备份副本、ETag 缺失、存储地址变化或配置被修改 / 删除时都会清掉
+   */
+  private syncManifestReadCache = new Map<string, SyncManifestReadCacheEntry>();
+  /** GET 不认 If-None-Match（没变也回 200）的存储：改用 PROPFIND 比对 ETag，变了再 GET (#487) */
+  private storagesIgnoringConditionalRead = new Set<string>();
   private dataManagementService: DataManagementService;
   /** 解不开的 WebDAV 加密密码（钥匙串暂时不可用等），保存配置时原样写回，见 storage-config-secrets.ts */
   private undecryptablePasswords = new Map<string, string>();
@@ -259,6 +284,7 @@ export class CloudBackupManager {
         await this.testAndSaveConfig(updatedConfig);
         this.forgetSyncWriteState(id);
         this.storagesRejectingReadEtags.delete(id);
+        this.storagesIgnoringConditionalRead.delete(id);
         return { success: true, config: updatedConfig };
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.UPDATE_STORAGE_CONFIG_FAILED, error);
@@ -276,6 +302,7 @@ export class CloudBackupManager {
         this.storageConfigs.delete(id);
         this.forgetSyncWriteState(id);
         this.storagesRejectingReadEtags.delete(id);
+        this.storagesIgnoringConditionalRead.delete(id);
         await this.saveConfigs();
         return { success: true };
       } catch (error) {
@@ -459,9 +486,12 @@ export class CloudBackupManager {
   private setupSyncManifestHandlers(): void {
     ipcMain.handle('cloud:get-sync-manifest', async (_, storageId: string) => {
       try {
+        const manifest = await this.readCloudSyncManifest(storageId);
         return {
           success: true,
-          manifest: await this.readCloudSyncManifest(storageId)
+          manifest,
+          // 渲染进程据此决定焦点 / 唤醒时能不能更频繁地检查 (#487)
+          cheapCheckAvailable: this.canCheckSyncManifestCheaply(storageId)
         };
       } catch (error) {
         return {
@@ -940,6 +970,8 @@ export class CloudBackupManager {
 
   /**
    * 读取云同步 manifest。首次同步时 manifest 不存在，返回空 manifest。
+   *
+   * 本机有上次读到 / 写入的那份 manifest 和它的 ETag 时，先确认云端变没变，没变就不再整份下载 (#487)
    */
   private async readCloudSyncManifest(storageId: string): Promise<CloudSyncManifest> {
     await this.loadConfigs();
@@ -947,21 +979,36 @@ export class CloudBackupManager {
     const provider = this.createProvider(config);
     const manifestPath = this.getSyncManifestCloudPath(config);
     const backupPath = this.getSyncManifestBackupCloudPath(config);
-    let primaryEtag: string | undefined;
+    const cacheLocation = this.getSyncManifestCacheLocation(config, manifestPath);
+    let primary: PrimarySyncManifestRead | undefined;
 
     const manifest = await readCloudSyncManifestWithFallback({
       readPrimary: async () => {
-        const result = await this.readCloudSyncManifestFileWithInfo(provider, manifestPath);
-        primaryEtag = result.etag;
-        return result.manifest;
+        primary = await this.readPrimaryCloudSyncManifest(storageId, provider, manifestPath, cacheLocation);
+        return primary.manifest;
       },
       readBackup: () => this.readCloudSyncManifestFile(provider, backupPath),
       isNotFoundError: error => this.isNotFoundError(error),
       describeError: error => this.formatErrorMessage(error)
     });
 
+    // readPrimary 成功时才会赋值；没有值说明用的是备份副本，或者主文件、备份都不存在
+    const primaryRead = primary as PrimarySyncManifestRead | undefined;
+    if (!primaryRead) {
+      // 主文件读不到或已损坏，云端主文件现在是什么样不清楚，缓存不能再拿来和它比对
+      this.syncManifestReadCache.delete(storageId);
+    } else if (primaryRead.downloaded) {
+      this.rememberSyncManifestContent(
+        storageId,
+        cacheLocation,
+        primaryRead.downloaded.etag,
+        primaryRead.downloaded.content
+      );
+    }
+
     // 只有主文件读成功时 ETag 才对应这份 manifest；从备份副本读到的不能用来条件写主文件。
-    // 不用这次读到的 ETag 时，本机上次写入记下的 ETag 只要 revision 还对得上就继续留着
+    // 不用这次读到的 ETag 时（包括云端没变、直接用了缓存），本机上次记下的 ETag 只要 revision 还对得上就继续留着
+    const primaryEtag = primaryRead?.readEtag;
     const revision = getCloudSyncManifestRevision(manifest);
     if (primaryEtag && config.type === 'webdav' && !this.storagesRejectingReadEtags.has(storageId)) {
       this.syncManifestEtags.set(storageId, { revision, etag: primaryEtag, source: 'read' });
@@ -969,6 +1016,62 @@ export class CloudBackupManager {
       this.syncManifestEtags.delete(storageId);
     }
     return manifest;
+  }
+
+  /**
+   * 读主文件。手里有这份 manifest 的缓存时先确认云端变没变 (#487)：
+   * 默认带 If-None-Match 做条件 GET，304 就用缓存；
+   * 服务器不认条件 GET 时先 PROPFIND 比对 ETag，一样就用缓存，不一样再整份 GET
+   */
+  private async readPrimaryCloudSyncManifest(
+    storageId: string,
+    provider: CloudStorageProvider,
+    manifestPath: string,
+    cacheLocation: string | null
+  ): Promise<PrimarySyncManifestRead> {
+    const cached = this.getSyncManifestReadCache(storageId, cacheLocation);
+    if (!cached || !provider.readFileWithInfo) {
+      return this.downloadPrimaryCloudSyncManifest(provider, manifestPath);
+    }
+
+    if (this.storagesIgnoringConditionalRead.has(storageId)) {
+      const info = await this.getCloudFileInfo(provider, manifestPath);
+      if (info?.etag && this.isSameEtag(info.etag, cached.etag)) {
+        return { manifest: this.parseCloudSyncManifestContent(cached.content, manifestPath) };
+      }
+
+      // 缓存配 PROPFIND 的 ETag：之后比对的也是它。ETag 先于正文拿到，两次请求之间云端又变了的话，
+      // 缓存里是新内容配旧 ETag，下次比对不上会再下载一次，不会把旧内容当成新的
+      const downloaded = await this.downloadPrimaryCloudSyncManifest(provider, manifestPath);
+      return {
+        ...downloaded,
+        downloaded: downloaded.downloaded && { content: downloaded.downloaded.content, etag: info?.etag }
+      };
+    }
+
+    const result = await provider.readFileWithInfo(manifestPath, { ifNoneMatch: cached.etag });
+    if (result.notModified) {
+      return { manifest: this.parseCloudSyncManifestContent(cached.content, manifestPath) };
+    }
+    if (result.conditionIgnored) {
+      // 这次已经整份下载了，内容照常用；之后这个存储改用 PROPFIND 比对，省掉没变时的下载
+      this.storagesIgnoringConditionalRead.add(storageId);
+    }
+
+    const content = Buffer.from(result.data);
+    return {
+      manifest: this.parseCloudSyncManifestContent(content, manifestPath),
+      readEtag: result.etag,
+      downloaded: { content, etag: result.etag }
+    };
+  }
+
+  private async downloadPrimaryCloudSyncManifest(
+    provider: CloudStorageProvider,
+    manifestPath: string
+  ): Promise<PrimarySyncManifestRead> {
+    const { manifest, etag, content } = await this.readCloudSyncManifestFileWithInfo(provider, manifestPath);
+    return { manifest, readEtag: etag, downloaded: { content, etag } };
   }
 
   private async readCloudSyncManifestFile(
@@ -981,18 +1084,82 @@ export class CloudBackupManager {
   private async readCloudSyncManifestFileWithInfo(
     provider: CloudStorageProvider,
     cloudPath: string
-  ): Promise<{ manifest: CloudSyncManifest; etag?: string }> {
+  ): Promise<{ manifest: CloudSyncManifest; etag?: string; content: Buffer }> {
     const { data, etag } = provider.readFileWithInfo
       ? await provider.readFileWithInfo(cloudPath)
       : { data: await provider.readFile(cloudPath), etag: undefined };
+    const content = Buffer.from(data);
+    return {
+      manifest: this.parseCloudSyncManifestContent(content, cloudPath),
+      etag,
+      content
+    };
+  }
+
+  private parseCloudSyncManifestContent(content: Buffer, cloudPath: string): CloudSyncManifest {
     try {
-      return {
-        manifest: assertValidCloudSyncManifest(JSON.parse(Buffer.from(data).toString('utf-8'))),
-        etag
-      };
+      return assertValidCloudSyncManifest(JSON.parse(content.toString('utf-8')));
     } catch (error) {
       throw new Error(`云同步 manifest 内容无效（${cloudPath}）: ${this.formatErrorMessage(error)}`);
     }
+  }
+
+  /**
+   * 缓存对应的存储位置。只有 WebDAV 需要缓存：iCloud 读的是本机同步目录里的文件，不走网络
+   */
+  private getSyncManifestCacheLocation(config: CloudStorageConfig, manifestPath: string): string | null {
+    if (config.type !== 'webdav') {
+      return null;
+    }
+    const webdavConfig = config as WebDAVConfig;
+    return JSON.stringify([config.type, webdavConfig.url, webdavConfig.username || '', manifestPath]);
+  }
+
+  private getSyncManifestReadCache(
+    storageId: string,
+    cacheLocation: string | null
+  ): SyncManifestReadCacheEntry | undefined {
+    const cached = this.syncManifestReadCache.get(storageId);
+    if (!cached) {
+      return undefined;
+    }
+    // 存储地址或账号变了（包括没经过「编辑存储」直接改了配置文件），旧缓存对应的是另一个文件
+    if (!cacheLocation || cached.location !== cacheLocation) {
+      this.syncManifestReadCache.delete(storageId);
+      return undefined;
+    }
+    return cached;
+  }
+
+  /** 记下主文件的原文和 ETag；没有 ETag 就无法确认云端是否还是这一份，干脆不缓存 */
+  private rememberSyncManifestContent(
+    storageId: string,
+    cacheLocation: string | null,
+    etag: string | undefined,
+    content: Buffer
+  ): void {
+    if (!cacheLocation || !etag?.trim()) {
+      this.syncManifestReadCache.delete(storageId);
+      return;
+    }
+    this.syncManifestReadCache.set(storageId, { location: cacheLocation, etag, content });
+  }
+
+  /**
+   * 下一次检查这个存储时，云端没变的话能不能不下载整份 manifest：
+   * WebDAV 要手里有带 ETag 的缓存；iCloud 读的是本机文件，本来就不走网络
+   */
+  private canCheckSyncManifestCheaply(storageId: string): boolean {
+    if (this.storageConfigs.get(storageId)?.type === 'icloud') {
+      return true;
+    }
+    return this.syncManifestReadCache.has(storageId);
+  }
+
+  /** GET 响应头和 PROPFIND 里的 ETag 写法可能一个带引号一个不带，比较前去掉引号和弱标记 */
+  private isSameEtag(left: string, right: string): boolean {
+    const normalize = (etag: string) => etag.trim().replace(/^W\//i, '').replace(/^"(.*)"$/, '$1');
+    return normalize(left) === normalize(right);
   }
 
   /**
@@ -1018,13 +1185,14 @@ export class CloudBackupManager {
     });
     const revision = getCloudSyncManifestRevision(normalizedManifest);
     const content = Buffer.from(JSON.stringify(normalizedManifest), 'utf-8');
+    const cacheLocation = this.getSyncManifestCacheLocation(config, manifestPath);
     // WebDAVProvider 写后都会校验（至少查一次文件信息），渲染进程不必再读回
     const verified = config.type === 'webdav';
 
     if (options.expectedRevision === undefined) {
       await this.ensureSyncDirectories(storageId, config, provider);
       const written = await provider.writeFile(manifestPath, content, this.createSyncWriteOptions(storageId));
-      this.rememberWrittenSyncManifest(storageId, revision, written);
+      this.rememberWrittenSyncManifest(storageId, revision, written, cacheLocation, content);
       await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
       return { verified };
     }
@@ -1039,7 +1207,7 @@ export class CloudBackupManager {
           ...this.createSyncWriteOptions(storageId),
           ifMatch: cached.etag
         });
-        this.rememberWrittenSyncManifest(storageId, revision, written);
+        this.rememberWrittenSyncManifest(storageId, revision, written, cacheLocation, content);
         await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
         return { verified };
       } catch (error) {
@@ -1085,7 +1253,7 @@ export class CloudBackupManager {
       throw error;
     }
 
-    this.rememberWrittenSyncManifest(storageId, revision, written);
+    this.rememberWrittenSyncManifest(storageId, revision, written, cacheLocation, content);
     await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
     return { verified };
   }
@@ -1124,21 +1292,30 @@ export class CloudBackupManager {
     };
   }
 
+  /**
+   * 主文件写成功后记下写后 ETag；刚写的内容也一起缓存，本机下一次检查用它做条件读取，
+   * 自己刚上传的 manifest 不必再下载回来 (#487)
+   */
   private rememberWrittenSyncManifest(
     storageId: string,
     revision: string | null,
-    written: void | CloudFileWriteResult
+    written: void | CloudFileWriteResult,
+    cacheLocation: string | null,
+    content: Buffer
   ): void {
     if (written?.etag) {
       this.syncManifestEtags.set(storageId, { revision, etag: written.etag, source: 'write' });
     } else {
       this.syncManifestEtags.delete(storageId);
     }
+    this.rememberSyncManifestContent(storageId, cacheLocation, written?.etag, content);
   }
 
+  /** 存储配置变了、或者写入失败后云端状态不明时调用：记下的 ETag、目录确认和 manifest 缓存都作废 */
   private forgetSyncWriteState(storageId: string): void {
     this.syncManifestEtags.delete(storageId);
     this.verifiedSyncDirectories.delete(storageId);
+    this.syncManifestReadCache.delete(storageId);
   }
 
   private isMissingParentDirectoryError(error: unknown): boolean {
