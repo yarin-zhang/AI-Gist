@@ -58,6 +58,7 @@ import {
   createBackupPayload,
   parseBackupPayload
 } from '@shared/backup-integrity'
+import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials'
 import type {
   CloudSyncV2ObjectStorageAdapter,
   CloudSyncV2ObjectWriteOptions,
@@ -1613,7 +1614,8 @@ export class MobileCloudBackupService {
         name: backupName,
         description: normalizedOptions?.description || '移动端云端备份',
         createdAt: timestamp,
-        data,
+        // 云端备份不带模型配置的 API Key，和云同步一致 (#491)
+        data: stripCredentialsFromDataSet(data),
         backupType: normalizedOptions?.backupType,
         trigger: normalizedOptions?.trigger,
         deviceId: normalizedOptions?.deviceId,
