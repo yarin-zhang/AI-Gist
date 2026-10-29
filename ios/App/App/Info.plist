@@ -14,6 +14,11 @@
 		<string>ja</string>
 		<string>it</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>CFBundleDisplayName</key>
 	<string>AI Gist</string>
 	<key>CFBundleExecutable</key>

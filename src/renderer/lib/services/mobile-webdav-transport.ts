@@ -75,10 +75,12 @@ export class MobileWebDAVTransport {
   }
 
   private async requestWithCapacitorHttp(input: MobileWebDAVRequest): Promise<MobileWebDAVResponse> {
+    const method = input.method.toUpperCase()
     const headers = {
       ...(input.username !== undefined
         ? { Authorization: createBasicAuthorization(input.username, input.password || '') }
         : {}),
+      ...(method === 'GET' || method === 'HEAD' ? NO_HTTP_CACHE_HEADERS : {}),
       ...(input.headers || {})
     }
     const request: Record<string, unknown> = {
@@ -110,6 +112,14 @@ export class MobileWebDAVTransport {
     }
   }
 }
+
+/**
+ * iOS 的 CapacitorHttp 走 URLSession.shared，会按响应里的 Last-Modified 自己缓存 GET。
+ * 群晖（Apache）这类不发 Cache-Control 的服务器上，同步文件很久没改过时，缓存能用上几个小时：
+ * 别的设备上传之后这台手机读到的还是旧内容，同步一直「已是最新」或者反复冲突。
+ * 每次读都要到服务器确认；条件读取（If-None-Match）照常由服务器回 304。
+ */
+const NO_HTTP_CACHE_HEADERS = { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }
 
 function createBasicAuthorization(username: string, password: string): string {
   return `Basic ${encodeBase64(new TextEncoder().encode(`${username}:${password}`))}`
