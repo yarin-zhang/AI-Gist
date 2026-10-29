@@ -16,6 +16,7 @@ import type {
 } from '@shared/cloud-sync-engine';
 import {
   applyCloudSyncTombstones,
+  cloudSyncConflictNeedsUserDecision,
   createCloudSyncCategoryNameLookup,
   createCloudSyncConflictPreview,
   findCloudSyncRecordsRestoredOverLocalDeletes,
@@ -64,7 +65,6 @@ import {
   createSyncedCloudSyncJoinPreview,
   type CloudSyncJoinPreview
 } from '@shared/cloud-sync-join-preview';
-import { dataSetContainsCredentials, stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import { generateUUID } from '../utils/uuid';
 import i18n from '../../i18n';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
@@ -292,10 +292,6 @@ export interface CloudSyncCloudClient {
 
 export interface CloudSyncDatabaseClient {
   exportAllDataForSync(): Promise<ExportResult>;
-  /**
-   * 用同步结果整库替换本机数据。同步数据不带模型配置的 API Key (#491)，实现必须保留本机已有的凭据：
-   * 写入的配置没有凭据时按 uuid / configId 用本机原有的补上（DatabaseServiceManager 默认如此）。
-   */
   replaceAllData(data: CloudSyncDataSet, options?: { preserveSyncMetadata?: boolean }): Promise<ImportResult>;
   getLocalSyncMetadata?<T = any>(key: string): Promise<T | null>;
   setLocalSyncMetadata?<T = any>(key: string, value: T): Promise<void>;
@@ -328,7 +324,11 @@ export interface CloudSyncStatus {
   hasEnabledStorage?: boolean;
   /** 本机从备份恢复后，还有存储在等用户选择覆盖云端还是与云端合并；选好之前不会同步 */
   restoreDecisionPending?: boolean;
+  /** 正在同步时走到了哪一步，给冲突弹窗之类等着结果的界面显示进度 */
+  syncPhase?: CloudSyncProgressPhase;
 }
+
+export type CloudSyncProgressPhase = 'export' | 'read-remote' | 'merge' | 'apply-local' | 'write-remote';
 
 export interface CloudSyncFlushResult {
   success: boolean;
@@ -521,7 +521,8 @@ export class CloudSyncService {
       reason: options.reason || 'manual',
       lastAttemptAt: attemptAt,
       error: undefined,
-      nextSyncAt: undefined
+      nextSyncAt: undefined,
+      syncPhase: 'export'
     });
 
     const syncPromise = this.performSync(storageId, options, 0, generation, generateUUID())
@@ -634,11 +635,15 @@ export class CloudSyncService {
    * 按用户在冲突弹窗里的选择重新同步。期间云端如果又出现新的冲突，
    * manual 策略下没选过的项会让同步再次暂停，弹窗刷新列表。
    */
-  resolveConflicts(
+  async resolveConflicts(
     storageId: string,
     decision: CloudSyncConflictDecision,
     options: CloudSyncOptions = {}
   ): Promise<CloudSyncResult> {
+    // 自动同步可能正在跑：等它结束再按用户的选择同步。直接拿它的结果会把用户的选择丢掉，弹窗只能原地不动
+    for (let running = this.runningSyncs.get(storageId); running; running = this.runningSyncs.get(storageId)) {
+      await running.catch(() => undefined);
+    }
     return this.syncNow(storageId, {
       ...(this.autoSyncOptions || {}),
       ...options,
@@ -661,18 +666,29 @@ export class CloudSyncService {
       return preview;
     }
 
+    // 「全用本机 / 全用云端」只作用于弹窗里列出的、需要用户选的冲突；其余冲突照常按较新的为准
     const resolutions: Record<string, CloudSyncConflictSide> = decision.strategy === 'manual'
       ? { ...(decision.resolutions || {}) }
-      : Object.fromEntries(preview.conflicts.map(conflict => [getCloudSyncConflictId(conflict), decision.strategy as CloudSyncConflictSide]));
+      : Object.fromEntries(preview.conflicts
+        .filter(conflict => cloudSyncConflictNeedsUserDecision(conflict))
+        .map(conflict => [getCloudSyncConflictId(conflict), decision.strategy as CloudSyncConflictSide]));
     return mergeCloudSyncData(localData, remoteData, baseData, { ...mergeOptions, resolutions });
   }
 
+  /** 只有需要用户选的冲突才让同步停下来，其余冲突已经按较新的为准合并好了 */
   private hasUnresolvedConflicts(conflicts: CloudSyncConflict[], decision?: CloudSyncConflictDecision): boolean {
-    if (conflicts.length === 0) return false;
+    const needDecision = conflicts.filter(conflict => cloudSyncConflictNeedsUserDecision(conflict));
+    if (needDecision.length === 0) return false;
     if (!decision) return this.conflictMode === 'ask';
     if (decision.strategy !== 'manual') return false;
     const resolutions = decision.resolutions || {};
-    return conflicts.some(conflict => !resolutions[getCloudSyncConflictId(conflict)]);
+    return needDecision.some(conflict => !resolutions[getCloudSyncConflictId(conflict)]);
+  }
+
+  /** 同步走到下一步时告诉界面，只在这个存储正在同步时更新 */
+  private reportSyncPhase(storageId: string, phase: CloudSyncProgressPhase): void {
+    if (this.status.status !== 'syncing' || this.status.storageId !== storageId || this.status.syncPhase === phase) return;
+    this.updateStatus({ syncPhase: phase });
   }
 
   private queueAutoSyncAfterRunning(storageId: string, reason: CloudSyncRunReason): void {
@@ -897,7 +913,7 @@ export class CloudSyncService {
       const remoteSnapshot = manifest.latestSnapshot;
       if (remoteSnapshot) this.assertValidRemoteSnapshot(remoteSnapshot);
       const remoteData = remoteSnapshot
-        ? this.getRemoteMergeData(remoteSnapshot)
+        ? applyCloudSyncTombstones(remoteSnapshot.data)
         : normalizeCloudSyncDataSet({});
       let safetyBackupCreated = false;
 
@@ -1368,6 +1384,7 @@ export class CloudSyncService {
       const localChangeVersionAtExport = this.pendingChangeVersion;
       this.assertCurrentSyncGeneration(storageId, generation);
       phase = 'read-remote';
+      this.reportSyncPhase(storageId, phase);
       const manifestResult = await this.getManifestOrRecoverCorruption(
         storageId,
         localData,
@@ -1411,6 +1428,7 @@ export class CloudSyncService {
         targetRevision = snapshot.revision;
         try {
           phase = 'write-remote';
+          this.reportSyncPhase(storageId, phase);
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -1447,9 +1465,10 @@ export class CloudSyncService {
         };
       }
 
-      const remoteData = this.getRemoteMergeData(remoteSnapshot);
+      const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
       const baseData = this.getBaseData(localState);
       phase = 'merge';
+      this.reportSyncPhase(storageId, phase);
       const mergeResult = this.mergeWithConflictDecision(localData, remoteData, baseData, options);
       if (this.hasUnresolvedConflicts(mergeResult.conflicts, options.conflictDecision)) {
         // 发布前暂停：本机数据和云端都不改，等用户在冲突弹窗里选择处理方式
@@ -1480,9 +1499,7 @@ export class CloudSyncService {
       }
       const mergedData = contractResult.data;
       const mergedEqualsLocal = dataSetsEqual(localData, mergedData);
-      // 旧版本上传的云端快照带着明文 API Key：内容相同也要重新上传一份不含凭据的，把云端的明文覆盖掉 (#491)
-      const mergedEqualsRemote = !dataSetContainsCredentials(remoteSnapshot.data) &&
-        dataSetsEqual(remoteData, mergedData);
+      const mergedEqualsRemote = dataSetsEqual(remoteData, mergedData);
       // 本机删除过、这次合并又带回来的记录：写回本机后要告诉用户，不能悄悄恢复 (#489)
       const restoredAfterLocalDelete = mergedEqualsLocal
         ? []
@@ -1567,6 +1584,7 @@ export class CloudSyncService {
           return await this.retryAfterLocalChanged(storageId, options, attempt, generation, operationId);
         }
         phase = 'apply-local';
+        this.reportSyncPhase(storageId, phase);
         this.assertCurrentSyncGeneration(storageId, generation);
         await this.replaceLocalDataForSync(mergedData, localData);
         this.assertCurrentSyncGeneration(storageId, generation);
@@ -1583,6 +1601,7 @@ export class CloudSyncService {
       if (latestManifestForUpload) {
         try {
           phase = 'write-remote';
+          this.reportSyncPhase(storageId, phase);
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -1682,24 +1701,13 @@ export class CloudSyncService {
       throw new Error(`本机同步数据导出不完整，已取消本次云同步: ${validation.reason || '未知原因'}`);
     }
 
-    // 模型配置的 API Key 只留在本机：数据库导出时已经去掉，这里再兜一次底，任何导出实现都不会把凭据带进快照 (#491)
-    return stripCredentialsFromDataSet(normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data)));
-  }
-
-  /**
-   * 参与合并的云端数据。旧版本上传的快照可能带着明文 API Key，合并前去掉：
-   * 凭据不参与比较，两边只差 API Key 不算修改也不算冲突，也不会被写进本机或再上传 (#491)
-   */
-  private getRemoteMergeData(snapshot: CloudSyncSnapshot): CloudSyncDataSet {
-    return stripCredentialsFromDataSet(applyCloudSyncTombstones(snapshot.data));
+    return normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data));
   }
 
   private async replaceLocalDataForSync(nextData: CloudSyncDataSet, rollbackData: CloudSyncDataSet): Promise<void> {
     this.applyingRemoteDataDepth++;
     try {
       // 保留同步基线：写入本机之后上传还可能失败或因并发重试，下一次合并仍要用旧基线 (#484)
-      // 合并结果里的模型配置不带 API Key：replaceAllData 默认在同一个事务里按 uuid / configId
-      // 用本机原有的凭据补上（preserveLocalCredentials），不会把本机的 API Key 清空 (#491)
       const importResult = await this.database.replaceAllData(nextData, { preserveSyncMetadata: true });
       if (!importResult.success) {
         throw new CloudSyncLocalApplyError(importResult);
@@ -1722,7 +1730,6 @@ export class CloudSyncService {
 
   private async rollbackLocalDataAfterFailedSync(rollbackData: CloudSyncDataSet): Promise<unknown | null> {
     try {
-      // 回滚用的本机导出同样不带凭据，replaceAllData 按同样的规则补回本机原有的 API Key (#491)
       const rollbackResult = await this.database.replaceAllData(rollbackData, { preserveSyncMetadata: true });
       if (!rollbackResult.success) {
         return new Error(rollbackResult.error || rollbackResult.message || '同步失败后恢复本机数据失败');
@@ -2284,8 +2291,7 @@ export class CloudSyncService {
 
   private getBaseData(localState: CloudSyncLocalState | null): CloudSyncDataSet {
     if (localState?.baseSnapshot) {
-      // 旧版本留下的基线可能带着 API Key，和本机、云端一样去掉后再比较 (#491)
-      return stripCredentialsFromDataSet(applyCloudSyncTombstones(localState.baseSnapshot.data));
+      return applyCloudSyncTombstones(localState.baseSnapshot.data);
     }
 
     return {};
@@ -2952,6 +2958,8 @@ export class CloudSyncService {
   private updateStatus(update: Partial<CloudSyncStatus>): void {
     this.status = {
       ...this.status,
+      // 同步结束（或换成别的状态）时进度跟着清掉
+      ...(update.status && update.status !== 'syncing' ? { syncPhase: undefined } : {}),
       ...update,
       updatedAt: new Date().toISOString()
     };
@@ -3259,7 +3267,8 @@ export function createCloudSyncPendingConflict(
   return {
     storageId,
     detectedAt,
-    items: mergeResult.conflicts.map(conflict => {
+    // 只列需要用户选的冲突；其余冲突已按较新的为准合并，不拿来打扰用户
+    items: mergeResult.conflicts.filter(conflict => cloudSyncConflictNeedsUserDecision(conflict)).map(conflict => {
       const localDeleted = !isPresentRecord(conflict.local);
       const remoteDeleted = !isPresentRecord(conflict.remote);
       return {

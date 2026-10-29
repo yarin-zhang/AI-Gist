@@ -210,7 +210,7 @@ describe('云存储配置文件里的 WebDAV 密码', () => {
     expect(readFile()).not.toContain('nas-password')
   })
 
-  it('云端备份上传前去掉模型配置的 API Key', async () => {
+  it('云端备份带着模型配置的 API Key，换设备恢复后能直接用', async () => {
     fs.mkdirSync(path.dirname(configPath), { recursive: true })
     writeRecords([webdavConfig()])
     const written: string[] = []
@@ -234,9 +234,12 @@ describe('云存储配置文件里的 WebDAV 密码', () => {
 
     expect(result.success, JSON.stringify(result)).toBe(true)
     expect(written).toHaveLength(1)
-    expect(written[0]).not.toContain('sk-cloud-backup')
-    expect(written[0]).not.toContain('secret-cloud-backup')
-    expect(JSON.parse(written[0]).data.aiConfigs[0]).toMatchObject({ uuid: 'ai-1', name: 'OpenAI' })
+    expect(JSON.parse(written[0]).data.aiConfigs[0]).toMatchObject({
+      uuid: 'ai-1',
+      name: 'OpenAI',
+      apiKey: 'sk-cloud-backup',
+      secretKey: 'secret-cloud-backup'
+    })
   })
 })
 

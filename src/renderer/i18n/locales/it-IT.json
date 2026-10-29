@@ -300,7 +300,7 @@
     "backupEveryHours": "Ogni ora | Ogni {count} ore",
     "backupEveryMinutes": "Ogni minuto | Ogni {count} minuti",
     "cloudBackup": "Backup su cloud",
-    "cloudLocationDescription": "Un backup completo viene caricato solo quando fai clic su «Crea backup nel cloud», senza le chiavi API delle configurazioni dei modelli. I backup automatici restano sempre su questo dispositivo; i backup nel cloud non vengono caricati né ruotati automaticamente.",
+    "cloudLocationDescription": "Un backup completo viene caricato solo quando fai clic su «Crea backup nel cloud». I backup automatici restano sempre su questo dispositivo; i backup nel cloud non vengono caricati né ruotati automaticamente.",
     "configureCloudStorage": "Vai a Sincronizzazione dati",
     "confirmDeleteCloudBackup": "Vuoi eliminare questo backup nel cloud?",
     "confirmRestore": "Ripristina",
@@ -1757,9 +1757,7 @@
     "systemPromptDefaultLanguageNote": "Il prompt predefinito integrato è scritto in cinese e viene inviato al modello così com'è. Per dare istruzioni in un'altra lingua, sostituiscilo con una tua versione.",
     "switchProviderTitle": "Passare a «{name}»?",
     "switchProviderMessage": "La chiave API, l'indirizzo e l'elenco dei modelli inseriti verranno cancellati e dovrai compilarli di nuovo per il nuovo provider.",
-    "switchProvider": "Cambia",
-    "credentialMissingTag": "Senza chiave API",
-    "credentialNotSynced": "Le chiavi API non vengono sincronizzate. Inserisci la chiave su questo dispositivo per usare questa configurazione."
+    "switchProvider": "Cambia"
   },
   "mobileNav": {
     "label": "Navigazione principale",
@@ -1837,7 +1835,14 @@
     "countCategories": "{count} categoria | {count} categorie",
     "countAiConfigs": "{count} configurazione del modello | {count} configurazioni dei modelli",
     "newer": "Più recente",
-    "deletedAtTime": "Eliminato {time}"
+    "deletedAtTime": "Eliminato {time}",
+    "progress": {
+      "export": "Preparazione dei dati su questo dispositivo…",
+      "readRemote": "Lettura dei dati nel cloud…",
+      "merge": "Unione in corso…",
+      "applyLocal": "Salvataggio su questo dispositivo…",
+      "writeRemote": "Caricamento nel cloud…"
+    }
   },
   "appInit": {
     "loading": "Apertura di AI Gist…",

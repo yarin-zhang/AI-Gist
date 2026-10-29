@@ -300,7 +300,7 @@
     "backupEveryHours": "{count} 時間ごと",
     "backupEveryMinutes": "{count} 分ごと",
     "cloudBackup": "クラウドバックアップ",
-    "cloudLocationDescription": "「クラウドバックアップを作成」をクリックしたときにのみ完全バックアップをアップロードします（モデル設定の API キーは含みません）。自動バックアップは常にこの端末に保存され、クラウドへの自動アップロードやローテーションは行いません。",
+    "cloudLocationDescription": "「クラウドバックアップを作成」をクリックしたときにのみ完全バックアップをアップロードします。自動バックアップは常にこの端末に保存され、クラウドへの自動アップロードやローテーションは行いません。",
     "configureCloudStorage": "データ同期を設定",
     "confirmDeleteCloudBackup": "このクラウドバックアップを削除しますか？",
     "confirmRestore": "復元",
@@ -1757,9 +1757,7 @@
     "systemPromptDefaultLanguageNote": "内蔵の既定プロンプトは中国語で書かれており、そのままモデルに送信されます。別の言語で指示したい場合は、独自の内容に書き換えてください。",
     "switchProviderTitle": "「{name}」に切り替えますか？",
     "switchProviderMessage": "入力済みの API キー、アドレス、モデル一覧はクリアされ、新しいプロバイダーに合わせて入力し直す必要があります。",
-    "switchProvider": "切り替え",
-    "credentialMissingTag": "API キー未設定",
-    "credentialNotSynced": "API キーは同期されません。この設定を使うには、このデバイスで API キーを入力してください。"
+    "switchProvider": "切り替え"
   },
   "mobileNav": {
     "label": "メインナビゲーション",
@@ -1837,7 +1835,14 @@
     "countCategories": "カテゴリ {count} 件",
     "countAiConfigs": "モデル設定 {count} 件",
     "newer": "新しい方",
-    "deletedAtTime": "{time} に削除"
+    "deletedAtTime": "{time} に削除",
+    "progress": {
+      "export": "この端末のデータを準備中…",
+      "readRemote": "クラウドのデータを読み込み中…",
+      "merge": "統合中…",
+      "applyLocal": "この端末に保存中…",
+      "writeRemote": "クラウドにアップロード中…"
+    }
   },
   "appInit": {
     "loading": "AI Gist を開いています…",

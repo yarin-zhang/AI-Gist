@@ -76,7 +76,6 @@ import {
   createBackupPayload,
   parseBackupPayload
 } from '@shared/backup-integrity';
-import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 
 /**
  * 保存存储配置前连不上存储。界面按 errorCode 用「测试连接」同一套说明告诉用户怎么改，
@@ -413,8 +412,7 @@ export class CloudBackupManager {
           name: backupName,
           description: normalizedOptions?.description || '云端备份',
           createdAt: timestamp,
-          // 云端备份和同步快照放在同一个云端目录里，同样不带模型配置的 API Key (#491)
-          data: stripCredentialsFromDataSet(backupDataToWrite),
+          data: backupDataToWrite,
           backupType: normalizedOptions?.backupType,
           trigger: normalizedOptions?.trigger,
           deviceId: normalizedOptions?.deviceId,

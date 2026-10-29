@@ -71,6 +71,8 @@ export interface CloudSyncConflict {
   local?: any;
   remote?: any;
   base?: any;
+  /** 两边都改了、改得不一样的字段（both_modified 时才有） */
+  fields?: string[];
 }
 
 /**
@@ -174,6 +176,24 @@ const REQUIRED_SNAPSHOT_COLLECTIONS = [
 const USAGE_ONLY_FIELDS: Record<string, string[]> = {
   prompts: ['useCount', 'lastUsedAt', 'updatedAt']
 };
+
+/**
+ * 需要用户来选的冲突：同一条提示词或分类在两台设备上都改了，而且改的是用户自己写的同一处内容。
+ * 其余冲突（只有一边改过、没有基线的两份副本、一边删一边改、删除标记、设置、收藏和排序这类状态）
+ * 都按「较新的为准」自动处理，不让同步停下来。
+ */
+const USER_DECISION_FIELDS: Record<string, ReadonlySet<string>> = {
+  prompts: new Set(['title', 'content', 'description', 'categoryId', 'categoryUuid', 'imageBlobs']),
+  categories: new Set(['name', 'description', 'parentId'])
+};
+
+export function cloudSyncConflictNeedsUserDecision(
+  conflict: Pick<CloudSyncConflict, 'collection' | 'reason' | 'fields'>
+): boolean {
+  if (conflict.reason !== 'both_modified') return false;
+  const fields = USER_DECISION_FIELDS[conflict.collection];
+  return !!fields && (conflict.fields || []).some(field => fields.has(field));
+}
 
 const IDENTITY_FIELDS: Record<string, string[]> = {
   categories: ['uuid', 'id'],
@@ -508,9 +528,17 @@ export function findCloudSyncRecordsRestoredOverLocalDeletes(
 
 /** 记录的标题或名称，没有时用 fallback */
 export function getCloudSyncRecordLabel(record: any, fallback: string): string {
-  const label = record?.title || record?.name || record?.key || record?.uuid;
-  return typeof label === 'string' && label.trim() ? label.trim() : fallback;
+  // 没有标题的提示词用正文第一行，不显示 uuid
+  const firstLine = typeof record?.content === 'string'
+    ? record.content.split('\n').map((line: string) => line.trim()).find(Boolean)
+    : undefined;
+  const label = record?.title || record?.name || firstLine || record?.key || record?.uuid;
+  if (typeof label !== 'string' || !label.trim()) return fallback;
+  const text = label.trim();
+  return text.length > RECORD_LABEL_LENGTH ? `${text.slice(0, RECORD_LABEL_LENGTH)}…` : text;
 }
+
+const RECORD_LABEL_LENGTH = 60;
 
 /**
  * 冲突弹窗里每一边展示的关键内容，用来让用户看清两边差在哪里 (#447)。
@@ -768,8 +796,8 @@ function mergeWithoutBase(
       return;
     }
 
-    // 内容一样、只差使用统计：没有基线算不出各自用了几次，次数取较大的一方，不算冲突
-    if (recordsEqualIgnoringUsage(collection, localRecord, remoteRecord, relationContexts.local, relationContexts.remote)) {
+    // 内容一样、只差使用统计或修改时间：没有基线算不出各自用了几次，次数取较大的一方、时间取较新的，不算冲突
+    if (recordsEqualIgnoringMetadata(collection, localRecord, remoteRecord, relationContexts.local, relationContexts.remote)) {
       const merged = mergeUsageOnlyRecords(collection, localRecord, remoteRecord);
       records.push(merged);
       if (recordsEqual(collection, merged, localRecord, relationContexts.local, relationContexts.local)) {
@@ -980,7 +1008,8 @@ function mergeWithBase(
       resolution: decided === 'local' ? 'keep-local' : 'take-remote',
       local: localRecord,
       remote: remoteRecord,
-      base: baseRecord
+      base: baseRecord,
+      fields: mergedRecord.conflictFields
     });
     return;
   }
@@ -995,7 +1024,8 @@ function mergeWithBase(
       resolution: mergedRecord.resolution,
       local: localRecord,
       remote: remoteRecord,
-      base: baseRecord
+      base: baseRecord,
+      fields: mergedRecord.conflictFields
     });
     return;
   }
@@ -1026,6 +1056,7 @@ function addConflict(
 ): void {
   conflicts.push({
     ...conflict,
+    fields: conflict.fields ? [...conflict.fields] : undefined,
     local: conflict.local === undefined ? undefined : cloneValue(conflict.local),
     remote: conflict.remote === undefined ? undefined : cloneValue(conflict.remote),
     base: conflict.base === undefined ? undefined : cloneValue(conflict.base)
@@ -1066,10 +1097,10 @@ function mergeChangedRecordFields(
     base: CloudSyncRelationContext;
   },
   options: CloudSyncMergeOptions
-): { record: any; hasFieldConflict: boolean; resolution: CloudSyncResolution } {
+): { record: any; hasFieldConflict: boolean; conflictFields: string[]; resolution: CloudSyncResolution } {
   const chosen = chooseRecord(localRecord, remoteRecord, options);
   const merged: Record<string, any> = {};
-  let hasFieldConflict = false;
+  const conflictFields: string[] = [];
   const keys = new Set([
     ...Object.keys(baseRecord || {}),
     ...Object.keys(localRecord || {}),
@@ -1126,13 +1157,14 @@ function mergeChangedRecordFields(
       continue;
     }
 
-    hasFieldConflict = true;
+    conflictFields.push(field);
     merged[field] = cloneValue(chosen.record?.[field]);
   }
 
   return {
     record: merged,
-    hasFieldConflict,
+    hasFieldConflict: conflictFields.length > 0,
+    conflictFields,
     resolution: chosen.resolution
   };
 }
@@ -1236,10 +1268,34 @@ function recordsEqualIgnoringUsage(
   );
 }
 
-/** 没有基线时合并只差使用统计的两份记录：次数取较大的一方，时间取较新的一方 */
+/** 去掉使用统计和修改时间后两份记录是否一样：没有基线时，只差这些不算冲突 */
+function recordsEqualIgnoringMetadata(
+  collection: string,
+  left: any,
+  right: any,
+  leftRelationContext?: CloudSyncRelationContext,
+  rightRelationContext?: CloudSyncRelationContext
+): boolean {
+  const strip = (record: any) => {
+    const copy = withoutUsageFields(collection, record);
+    if (!copy || typeof copy !== 'object') return copy;
+    const result = { ...copy };
+    for (const field of Object.keys(result)) {
+      if (isMergeTimestampField(field)) delete result[field];
+    }
+    return result;
+  };
+  return recordsEqual(collection, strip(left), strip(right), leftRelationContext, rightRelationContext);
+}
+
+/** 没有基线时合并只差使用统计或修改时间的两份记录：次数取较大的一方，时间取较新的一方 */
 function mergeUsageOnlyRecords(collection: string, localRecord: any, remoteRecord: any): any {
   const merged = cloneValue(localRecord);
-  for (const field of USAGE_ONLY_FIELDS[collection] || []) {
+  const fields = new Set([
+    ...(USAGE_ONLY_FIELDS[collection] || []),
+    ...[...Object.keys(localRecord || {}), ...Object.keys(remoteRecord || {})].filter(isMergeTimestampField)
+  ]);
+  for (const field of fields) {
     const localValue = localRecord?.[field];
     const remoteValue = remoteRecord?.[field];
     const value = isUsageCounterField(collection, field)
