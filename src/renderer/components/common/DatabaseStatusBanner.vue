@@ -2,12 +2,17 @@
   <div v-if="databaseError && !isHidden" class="database-status-banner error">
     <div class="content">
       <div class="icon">
-        <div class="error-icon">⚠️</div>
+        <NIcon :size="16" class="error-icon" aria-hidden="true"><AlertTriangle /></NIcon>
       </div>
       <div class="text">
         <div class="error-message">
-          <div>{{ t('databaseStatus.connectionError') }}</div>
-          <div class="error-detail">{{ databaseError }}</div>
+          <div class="error-title">{{ t('databaseStatus.connectionError') }}</div>
+          <div class="error-detail">{{ describeDatabaseError(databaseError, t) }}</div>
+          <!-- 原始报错只在反馈问题时有用：默认折叠 -->
+          <details v-if="databaseError.detail" class="error-tech">
+            <summary>{{ t('databaseStatus.detailLabel') }}</summary>
+            <span class="error-tech__raw">{{ databaseError.detail }}</span>
+          </details>
         </div>
       </div>
       <div class="actions">
@@ -24,8 +29,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { NIcon } from 'naive-ui'
+import { AlertTriangle } from '@vicons/tabler'
 import { useDatabase } from '~/composables/useDatabase'
 import { useI18n } from 'vue-i18n'
+import { describeDatabaseError } from '~/lib/utils/database-error'
 
 const { isDatabaseReady, databaseError, waitForDatabase, clearError } = useDatabase()
 const { t } = useI18n()
@@ -91,7 +99,7 @@ const retry = async () => {
 }
 
 .error-icon {
-  font-size: 20px;
+  color: var(--accent-error);
 }
 
 .text {
@@ -105,13 +113,45 @@ const retry = async () => {
 }
 
 .error-message {
-  font-size: 14px;
+  font-size: var(--font-size-base);
+}
+
+.error-title {
+  font-weight: var(--font-weight-medium);
 }
 
 .error-detail {
-  font-size: 12px;
-  opacity: 0.8;
   margin-top: 2px;
+  color: var(--content-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.error-tech {
+  margin-top: 4px;
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.error-tech summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.error-tech summary:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.error-tech__raw {
+  display: block;
+  max-height: 120px;
+  margin-top: 4px;
+  overflow: auto;
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .actions {

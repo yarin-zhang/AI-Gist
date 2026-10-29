@@ -10,6 +10,7 @@ import {
   cliBridgeManager,
 } from './electron';
 import { quitFlushCoordinator } from './electron/quit-flush-coordinator';
+import { initMainLocale } from './electron/main-locale';
 import { ShortcutManager } from './electron/shortcut-manager';
 import {
   dataManagementService
@@ -83,6 +84,8 @@ app.whenReady().then(async () => {
 
   // 应用偏好设置（在创建窗口之前）
   preferencesManager.applyAllSettings();
+  // 托盘、系统对话框沿用上次界面的语言；渲染进程加载后会再上报一次
+  initMainLocale(preferencesManager.getPreferences().uiLocale);
   // 初始化主题管理器
   themeManager.initialize();  // 初始化新的服务（在 IPC 处理器之前）
   

@@ -2,6 +2,7 @@ import os from 'os';
 import { ipcMain } from 'electron';
 import { shell } from 'electron';
 import { preferencesManager } from './preferences-manager';
+import { setUiLocale } from './main-locale';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
 import { ShortcutManager } from './shortcut-manager';
@@ -11,6 +12,7 @@ import { dataManagementService, fsService } from '../data';
 import { NetworkProxyManager } from './network-proxy';
 import { openShellPath } from './shell-operation-result';
 import { cliBridgeManager } from './cli-bridge-manager';
+import type { ProxyTestSiteResult } from '@shared/types/network-proxy';
 import type { PromptShortcutBinding, ShortcutCommandId, ShortcutExecutionRequest, UserPreferences, SystemTheme, AIConfig, AIGenerationRequest } from '@shared/types';
 
 /**
@@ -60,6 +62,14 @@ class IpcHandlers {
     // 重置用户偏好设置
     ipcMain.handle('reset-user-preferences', (): UserPreferences => {
       return preferencesManager.resetPreferences();
+    });
+
+    // 渲染进程上报当前界面语言，托盘、系统对话框和通知跟着切换
+    ipcMain.handle('preferences:set-ui-locale', (_, locale: unknown): boolean => {
+      if (!setUiLocale(locale)) return false;
+      // 保存下来，下次启动在渲染进程加载前托盘就用对语言
+      preferencesManager.updatePreferences({ uiLocale: locale as UserPreferences['uiLocale'] });
+      return true;
     });
   }
 
@@ -364,7 +374,7 @@ class IpcHandlers {
         return await ShortcutManager.getInstance().checkPermissionsAndRegister();
       } catch (error) {
         console.error('检查快捷键权限失败:', error);
-        return { hasPermission: false, message: '检查权限时发生错误' };
+        return { hasPermission: false };
       }
     });
 
@@ -413,14 +423,7 @@ class IpcHandlers {
     ipcMain.handle('proxy:test-connection-real-time', async (event, proxyConfig?: any) => {
       console.log('收到测试连接请求，代理配置:', proxyConfig);
       
-      const results: {
-        name: string;
-        url: string;
-        description: string;
-        success: boolean;
-        responseTime?: number;
-        error?: string;
-      }[] = [];
+      const results: ProxyTestSiteResult[] = [];
       
       const testResult = await NetworkProxyManager.testProxyConnectionRealTime((result) => {
         results.push(result);
@@ -472,6 +475,7 @@ class IpcHandlers {
     ipcMain.removeHandler('get-user-preferences');
     ipcMain.removeHandler('set-user-preferences');
     ipcMain.removeHandler('reset-user-preferences');
+    ipcMain.removeHandler('preferences:set-ui-locale');
     // 清理窗口处理器
     ipcMain.removeHandler('show-window');
     ipcMain.removeHandler('hide-to-tray');

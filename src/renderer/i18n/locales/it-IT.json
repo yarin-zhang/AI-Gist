@@ -731,10 +731,19 @@
     "deviceNameWeb": "AI Gist sul web"
   },
   "databaseStatus": {
-    "connectionError": "Errore di connessione al database",
+    "connectionError": "Impossibile caricare i dati",
     "hide": "Nascondi",
     "retry": "Riprova",
-    "retrying": "Nuovo tentativo..."
+    "retrying": "Nuovo tentativo...",
+    "retryHint": "Fai clic su «Riprova». Se non basta, riavvia AI Gist.",
+    "upgradeBlockedHint": "AI Gist è ancora aperto in un'altra finestra o scheda del browser. Chiudila, poi fai clic su «Riprova».",
+    "detailLabel": "Dettagli tecnici"
+  },
+  "icloudAvailability": {
+    "driveOff": "iCloud Drive non è attivo su questo Mac. Accedi con il tuo Account Apple in Impostazioni di Sistema, attiva iCloud Drive e riapri questa pagina.",
+    "windowsMissing": "iCloud Drive non trovato. Installa iCloud per Windows, attiva iCloud Drive e riavvia AI Gist.",
+    "unsupported": "iCloud Drive non è disponibile su questo sistema. Usa WebDAV.",
+    "checkFailed": "Impossibile verificare iCloud Drive. Riapri questa pagina per riprovare; se continua, riavvia AI Gist."
   },
   "language": {
     "selectLanguage": "Seleziona lingua",
@@ -858,7 +867,32 @@
     "testing": "Test in corso…",
     "testingDescription": "Test della connessione di rete in corso…",
     "connectionOkWithTime": "Connessione riuscita · risposta media {ms} ms",
-    "notTestedYet": "Non ancora testato. Il test visita alcuni siti comuni uno dopo l'altro."
+    "notTestedYet": "Non ancora testato. Il test visita alcuni siti comuni uno dopo l'altro.",
+    "connectionFailedProxy": "Connessione non riuscita: impossibile raggiungere il server proxy. Controlla indirizzo e porta del proxy e assicurati che l'app proxy sia in esecuzione.",
+    "sites": {
+      "baidu": {
+        "name": "Baidu",
+        "description": "Sito della Cina continentale"
+      },
+      "github": {
+        "name": "GitHub",
+        "description": "Hosting di codice"
+      },
+      "google": {
+        "name": "Google",
+        "description": "Motore di ricerca"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "description": "Servizio AI"
+      }
+    },
+    "siteErrors": {
+      "timeout": "Tempo scaduto",
+      "proxyRefused": "Proxy non raggiungibile",
+      "unreachable": "Non raggiungibile",
+      "httpError": "Il sito ha risposto {status}"
+    }
   },
   "promptEditor": {
     "addVariable": "Nuova variabile",
@@ -1184,7 +1218,6 @@
     "actions": "Azioni",
     "assignFromPromptHint": "Impostale dal menu «Altro» di un prompt",
     "assignPromptBinding": "Assegna scorciatoia al prompt",
-    "autoPasteUnavailable": "Incolla automatico non disponibile",
     "behavior": "Comportamento al richiamo",
     "commandManage": "Gestisci scorciatoie",
     "commandNewPrompt": "Nuovo prompt",
@@ -1197,7 +1230,7 @@
     "editPromptBinding": "Modifica scorciatoia del prompt",
     "globalCommands": "Comandi globali",
     "inputShortcut": "Inserisci scorciatoia",
-    "invalidTarget": "Prompt mancante",
+    "invalidTarget": "Prompt eliminato",
     "launcherCommand": "Launcher dei prompt",
     "launcherCommandDesc": "Cerca e richiama prompt da qualsiasi applicazione",
     "launcherPlaceholder": "Cerca prompt, tag, categorie o comandi…",
@@ -1209,12 +1242,12 @@
     "navigate": "Naviga",
     "noLauncherResults": "Nessun prompt o comando corrispondente",
     "noPromptBindings": "Nessuna scorciatoia assegnata ai prompt",
-    "notRegistered": "Non registrato",
+    "notRegistered": "Non attiva",
     "notSet": "Non impostato",
-    "pasteFallbackHint": "Se la piattaforma o i permessi non lo consentono, il testo viene copiato negli appunti.",
+    "pasteFallbackHint": "Se l'incolla automatico non è disponibile, il testo viene copiato negli appunti.",
     "pressShortcut": "Premi la combinazione di tasti desiderata",
     "promptBindings": "Scorciatoie dei prompt",
-    "registered": "Registrato",
+    "registered": "Attiva",
     "requestPermission": "Richiedi il permesso",
     "resetSuccess": "Scorciatoie ripristinate ai valori predefiniti",
     "resetToDefault": "Ripristina predefiniti",
@@ -1229,7 +1262,20 @@
     "bindingStatus": "Stato",
     "editBindingFor": "Modifica la scorciatoia di «{name}»",
     "enableBinding": "Abilita la scorciatoia di «{name}»",
-    "removeBindingFor": "Rimuovi la scorciatoia di «{name}»"
+    "removeBindingFor": "Rimuovi la scorciatoia di «{name}»",
+    "errors": {
+      "empty": "Premi prima una combinazione di tasti.",
+      "modifierRequired": "Includi un tasto modificatore (Ctrl, Alt, Maiusc o ⌘). F1–F24 si possono usare da soli.",
+      "reservedKey": "Esc, Invio e Tab non si possono usare da soli. Aggiungi un tasto modificatore.",
+      "duplicate": "Questa combinazione è già usata da un'altra scorciatoia di AI Gist. Scegline un'altra.",
+      "inUse": "Questa combinazione è già usata da un'altra app o dal sistema. Scegline un'altra.",
+      "saveFailed": "Impossibile salvare la scorciatoia. Riprova."
+    },
+    "pasteUnavailable": {
+      "accessibility": "L'incolla automatico richiede l'accesso Accessibilità. Finché non lo consenti, il testo viene solo copiato negli appunti.",
+      "xdotool": "Installa xdotool per attivare l'incolla automatico. Fino ad allora il testo viene solo copiato negli appunti.",
+      "copyOnly": "L'incolla automatico non è disponibile su questo computer. Il testo viene copiato negli appunti."
+    }
   },
   "startup": {
     "autoStart": "Avvio automatico all'accensione",
@@ -1640,7 +1686,8 @@
     "editShortcut": "Modifica scorciatoia",
     "nextVariable": "Variabile successiva",
     "detail": "Dettagli",
-    "run": "Esegui"
+    "run": "Esegui",
+    "runFailed": "Impossibile eseguire. Riprova."
   },
   "models": {
     "title": "Modelli",
@@ -1793,7 +1840,7 @@
   },
   "appInit": {
     "loading": "Apertura di AI Gist…",
-    "failedTitle": "Impossibile aprire il database",
+    "failedTitle": "Impossibile caricare i dati",
     "continue": "Continua comunque (alcune funzioni non disponibili)"
   },
   "mobileModels": {

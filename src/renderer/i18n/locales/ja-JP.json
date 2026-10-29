@@ -731,10 +731,19 @@
     "deviceNameWeb": "Web 版 AI Gist"
   },
   "databaseStatus": {
-    "connectionError": "データベースの接続エラー",
+    "connectionError": "データを読み込めませんでした",
     "hide": "非表示",
     "retry": "再試行",
-    "retrying": "再試行中..."
+    "retrying": "再試行中...",
+    "retryHint": "「再試行」をクリックしてください。解決しない場合は AI Gist を再起動してください。",
+    "upgradeBlockedHint": "AI Gist が別のウィンドウまたはブラウザのタブで開いています。閉じてから「再試行」をクリックしてください。",
+    "detailLabel": "技術的な詳細"
+  },
+  "icloudAvailability": {
+    "driveOff": "この Mac では iCloud Drive がオフになっています。システム設定で Apple アカウントにサインインして iCloud Drive をオンにしてから、このページを開き直してください。",
+    "windowsMissing": "iCloud Drive が見つかりません。Windows 用 iCloud をインストールして iCloud Drive をオンにしてから、AI Gist を再起動してください。",
+    "unsupported": "このシステムでは iCloud Drive を使えません。WebDAV を使ってください。",
+    "checkFailed": "iCloud Drive を確認できませんでした。このページを開き直してもう一度お試しください。繰り返す場合は AI Gist を再起動してください。"
   },
   "language": {
     "selectLanguage": "言語を選択",
@@ -858,7 +867,32 @@
     "testing": "テスト中...",
     "testingDescription": "ネットワーク接続をテストしています...",
     "connectionOkWithTime": "接続正常 · 平均応答 {ms} ms",
-    "notTestedYet": "まだテストしていません。テストでは一般的なサイトに順にアクセスします。"
+    "notTestedYet": "まだテストしていません。テストでは一般的なサイトに順にアクセスします。",
+    "connectionFailedProxy": "接続失敗：プロキシサーバーに接続できません。プロキシのアドレスとポートを確認し、プロキシソフトが起動していることを確かめてください。",
+    "sites": {
+      "baidu": {
+        "name": "Baidu",
+        "description": "中国本土のサイト"
+      },
+      "github": {
+        "name": "GitHub",
+        "description": "コードホスティング"
+      },
+      "google": {
+        "name": "Google",
+        "description": "検索エンジン"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "description": "AI サービス"
+      }
+    },
+    "siteErrors": {
+      "timeout": "タイムアウト",
+      "proxyRefused": "プロキシに接続できません",
+      "unreachable": "アクセスできません",
+      "httpError": "サイトが {status} を返しました"
+    }
   },
   "promptEditor": {
     "addVariable": "新しい変数",
@@ -1184,7 +1218,6 @@
     "actions": "アクション",
     "assignFromPromptHint": "プロンプトの「その他」メニューで設定します",
     "assignPromptBinding": "プロンプトのショートカットを設定",
-    "autoPasteUnavailable": "自動貼り付けは利用できません",
     "behavior": "呼び出し動作",
     "commandManage": "ショートカットを管理",
     "commandNewPrompt": "新規プロンプト",
@@ -1197,7 +1230,7 @@
     "editPromptBinding": "プロンプトのショートカットを編集",
     "globalCommands": "グローバルコマンド",
     "inputShortcut": "ショートカットキーを入力",
-    "invalidTarget": "プロンプトが見つかりません",
+    "invalidTarget": "プロンプト削除済み",
     "launcherCommand": "プロンプトランチャー",
     "launcherCommandDesc": "どのアプリからでもプロンプトを検索して呼び出せます",
     "launcherPlaceholder": "プロンプト、タグ、カテゴリ、コマンドを検索…",
@@ -1209,12 +1242,12 @@
     "navigate": "選択",
     "noLauncherResults": "一致するプロンプトやコマンドがありません",
     "noPromptBindings": "プロンプトにはまだショートカットが割り当てられていません",
-    "notRegistered": "登録されていません",
+    "notRegistered": "未適用",
     "notSet": "未設定",
-    "pasteFallbackHint": "プラットフォームや権限の制約で使えない場合は、自動的にクリップボードへのコピーに切り替えます。",
+    "pasteFallbackHint": "自動で貼り付けできないときは、クリップボードへのコピーに切り替わります。",
     "pressShortcut": "使いたいキーの組み合わせを押してください",
     "promptBindings": "プロンプト専用ショートカット",
-    "registered": "登録済み",
+    "registered": "有効",
     "requestPermission": "権限を要求",
     "resetSuccess": "ショートカット設定を既定に戻しました",
     "resetToDefault": "既定に戻す",
@@ -1229,7 +1262,20 @@
     "bindingStatus": "状態",
     "editBindingFor": "「{name}」のショートカットを編集",
     "enableBinding": "「{name}」のショートカットを有効にする",
-    "removeBindingFor": "「{name}」のショートカットを削除"
+    "removeBindingFor": "「{name}」のショートカットを削除",
+    "errors": {
+      "empty": "先にショートカットキーを押してください。",
+      "modifierRequired": "修飾キー（Ctrl・Alt・Shift・⌘）を含めてください。F1〜F24 は単独でも使えます。",
+      "reservedKey": "Esc・Enter・Tab は単独では使えません。修飾キーを組み合わせてください。",
+      "duplicate": "この組み合わせは AI Gist の別のショートカットで使われています。別の組み合わせを選んでください。",
+      "inUse": "この組み合わせは他のアプリまたはシステムで使われています。別の組み合わせを選んでください。",
+      "saveFailed": "ショートカットを保存できませんでした。もう一度お試しください。"
+    },
+    "pasteUnavailable": {
+      "accessibility": "自動貼り付けにはアクセシビリティの権限が必要です。許可するまではクリップボードへのコピーのみになります。",
+      "xdotool": "xdotool をインストールすると自動貼り付けが使えます。それまではクリップボードへのコピーのみになります。",
+      "copyOnly": "このコンピュータでは自動貼り付けを使えません。クリップボードへのコピーのみになります。"
+    }
   },
   "startup": {
     "autoStart": "自動起動",
@@ -1640,7 +1686,8 @@
     "editShortcut": "ショートカットを変更",
     "nextVariable": "次の変数",
     "detail": "詳細",
-    "run": "実行"
+    "run": "実行",
+    "runFailed": "実行できませんでした。もう一度お試しください。"
   },
   "models": {
     "title": "モデル",
@@ -1793,7 +1840,7 @@
   },
   "appInit": {
     "loading": "AI Gist を開いています…",
-    "failedTitle": "データベースを開けませんでした",
+    "failedTitle": "データを読み込めませんでした",
     "continue": "このまま続ける（一部の機能は使えません）"
   },
   "mobileModels": {

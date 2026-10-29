@@ -30,21 +30,17 @@
             </template>
             <div class="proxy-settings__results">
                 <UiAlert v-if="isTesting">{{ t('networkProxy.testingDescription') }}</UiAlert>
-                <UiAlert v-else-if="testResult" :tone="testResult.overall.success ? 'success' : 'error'">
-                    {{ testResult.overall.success
-                        ? (averageResponseTime ? t('networkProxy.connectionOkWithTime', { ms: averageResponseTime }) : t('networkProxy.connectionSuccess'))
-                        : t('networkProxy.connectionFailed') }}
-                </UiAlert>
+                <UiAlert v-else-if="testResult" :tone="testResult.overall.success ? 'success' : 'error'">{{ testSummary }}</UiAlert>
                 <p v-else class="ui-help">{{ t('networkProxy.notTestedYet') }}</p>
                 <ul v-if="testResults.length" class="proxy-sites">
-                    <li v-for="result in testResults" :key="result.name" class="proxy-site">
-                        <span class="ui-dot" :class="result.success ? 'ui-dot--success' : result.error ? 'ui-dot--error' : 'ui-dot--warning'" />
+                    <li v-for="result in testResults" :key="result.id" class="proxy-site">
+                        <span class="ui-dot" :class="result.success ? 'ui-dot--success' : result.errorCode ? 'ui-dot--error' : 'ui-dot--warning'" />
                         <span class="proxy-site__text">
-                            <span class="proxy-site__name">{{ result.name }}</span>
-                            <span class="proxy-site__url">{{ result.description }} · {{ result.url }}</span>
+                            <span class="proxy-site__name">{{ proxySiteLabel(result.id, t).name }}</span>
+                            <span class="proxy-site__url">{{ proxySiteLabel(result.id, t).description }} · {{ result.url }}</span>
                         </span>
                         <span v-if="result.success && result.responseTime" class="proxy-site__meta">{{ result.responseTime }} ms</span>
-                        <span v-else-if="result.error" class="proxy-site__meta proxy-site__meta--error">{{ result.error }}</span>
+                        <span v-else-if="result.errorCode" class="proxy-site__meta proxy-site__meta--error">{{ describeProxyTestError(result, t) }}</span>
                         <span v-else-if="isTesting" class="proxy-site__meta">{{ t('networkProxy.testing') }}</span>
                     </li>
                 </ul>
@@ -78,6 +74,8 @@ import UiAlert from '@/components/ui/UiAlert.vue';
 import UiChoiceCards from '@/components/ui/UiChoiceCards.vue';
 import UiPanel from '@/components/ui/UiPanel.vue';
 import UiSettingRow from '@/components/ui/UiSettingRow.vue';
+import type { ProxyTestOverall, ProxyTestSiteResult } from '@shared/types/network-proxy';
+import { describeProxyTestError, proxySiteLabel } from '@/lib/utils/proxy-test-messages';
 
 const { t } = useI18n();
 
@@ -128,22 +126,8 @@ const systemProxyInfo = ref<{
 }>({
     hasProxy: false
 });
-const testResult = ref<{
-    overall: {
-        success: boolean;
-        totalSites: number;
-        successSites: number;
-        failedSites: number;
-    };
-} | null>(null);
-const testResults = ref<Array<{
-    name: string;
-    url: string;
-    description: string;
-    success: boolean;
-    responseTime?: number;
-    error?: string;
-}>>([]);
+const testResult = ref<{ overall: ProxyTestOverall } | null>(null);
+const testResults = ref<ProxyTestSiteResult[]>([]);
 const isTesting = ref(false);
 const loading = reactive({
     test: false,
@@ -160,6 +144,19 @@ const modeOptions = computed(() => [
 const averageResponseTime = computed(() => {
     const times = testResults.value.filter(result => result.success && result.responseTime).map(result => result.responseTime!);
     return times.length ? Math.round(times.reduce((sum, value) => sum + value, 0) / times.length) : 0;
+});
+
+// 测试结论；有站点连不上代理服务器时，告诉用户去检查代理地址和代理软件
+const testSummary = computed(() => {
+    if (!testResult.value) return '';
+    if (testResult.value.overall.success) {
+        return averageResponseTime.value
+            ? t('networkProxy.connectionOkWithTime', { ms: averageResponseTime.value })
+            : t('networkProxy.connectionSuccess');
+    }
+    return testResults.value.some(result => result.errorCode === 'proxy-refused')
+        ? t('networkProxy.connectionFailedProxy')
+        : t('networkProxy.connectionFailed');
 });
 
 // 表单规则
@@ -254,7 +251,7 @@ const testConnection = async () => {
         // 设置进度监听器
         cleanupProgressListener = window.electronAPI.proxy.onTestProgress((result) => {
             // 查找是否已存在该网站的结果
-            const existingIndex = testResults.value.findIndex(r => r.name === result.name);
+            const existingIndex = testResults.value.findIndex(r => r.id === result.id);
             if (existingIndex >= 0) {
                 // 更新现有结果
                 testResults.value[existingIndex] = result;

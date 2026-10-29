@@ -5,6 +5,7 @@ import path from 'path';
 
 // 本地模块导入
 import { ShortcutPreferences, UserPreferences } from '@shared/types';
+import { isSupportedLocale } from '@shared/locale';
 import { themeManager } from './theme-manager';
 
 /**
@@ -177,6 +178,7 @@ class PreferencesManager {
       // 新属性
       theme: loadedPrefs.theme ?? this.defaultPreferences.theme,
       language: loadedPrefs.language ?? this.defaultPreferences.language,
+      ...(isSupportedLocale(loadedPrefs.uiLocale) ? { uiLocale: loadedPrefs.uiLocale } : {}),
       autoStartup: loadedPrefs.autoStartup ?? this.defaultPreferences.autoStartup,
       minimizeToTray: loadedPrefs.minimizeToTray ?? this.defaultPreferences.minimizeToTray,
       showNotifications: loadedPrefs.showNotifications ?? this.defaultPreferences.showNotifications,

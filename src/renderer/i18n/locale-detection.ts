@@ -1,48 +1,16 @@
 import type { SupportedLocale } from '@shared/types/preferences'
+import { isSupportedLocale, pickSupportedLocale, SUPPORTED_LOCALES } from '@shared/locale'
 
-export const SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'it-IT'] as const
+export { isSupportedLocale, SUPPORTED_LOCALES }
 
 export const LOCALE_STORAGE_KEY = 'locale'
 /** 标记 locale 是用户显式选择的，而不是自动探测的结果 */
 export const LOCALE_SOURCE_STORAGE_KEY = 'locale-source'
 
-/** 判定为繁体中文的子标签 */
-const TRADITIONAL_CHINESE_SUBTAGS = ['hant', 'tw', 'hk', 'mo']
-
-export function isSupportedLocale(value: unknown): value is SupportedLocale {
-  return typeof value === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(value)
-}
-
-/**
- * 把 BCP 47 语言标签（zh-Hans-CN、zh-Hant-TW、ja、en-GB…）映射到应用支持的语言。
- * 不认识的语言返回 null，由调用方继续尝试下一个候选。
- */
-function matchLocale(tag: string): SupportedLocale | null {
-  const subtags = tag.toLowerCase().split(/[-_]/)
-  const language = subtags[0]
-
-  if (language === 'zh') {
-    // zh-Hant / zh-TW / zh-HK / zh-MO 以及 zh-Hant-HK 这类组合都算繁体
-    return subtags.slice(1).some(subtag => TRADITIONAL_CHINESE_SUBTAGS.includes(subtag))
-      ? 'zh-TW'
-      : 'zh-CN'
-  }
-  if (language === 'ja') return 'ja-JP'
-  if (language === 'en') return 'en-US'
-  if (language === 'it') return 'it-IT'
-  return null
-}
-
 /** 按系统语言偏好顺序探测语言，全部不支持时回退到英文 */
 export function detectPreferredLocale(): SupportedLocale {
   const candidates = navigator.languages?.length ? navigator.languages : [navigator.language]
-
-  for (const candidate of candidates) {
-    const matched = matchLocale(candidate ?? '')
-    if (matched) return matched
-  }
-
-  return 'en-US'
+  return pickSupportedLocale(candidates)
 }
 
 /**

@@ -43,13 +43,26 @@ export interface ShortcutRegistrationStatus {
   id: string;
   accelerator: string;
   state: ShortcutRegistrationState;
+  /** 诊断信息（错误码或 Electron 原始报错），只用于排查，不显示给用户 */
   message?: string;
 }
+
+/**
+ * 自动粘贴不可用的原因，由渲染进程翻译：
+ * - accessibility-permission：macOS 还没授予辅助功能权限，用户可以去授权
+ * - xdotool-missing：Linux 没装 xdotool，用户可以安装
+ * - wayland / unsupported-platform：这台电脑上做不到，只会复制到剪贴板
+ */
+export type PasteUnavailableReason =
+  | 'accessibility-permission'
+  | 'xdotool-missing'
+  | 'wayland'
+  | 'unsupported-platform';
 
 export interface PasteCapability {
   supported: boolean;
   permissionGranted: boolean;
-  reason?: string;
+  reason?: PasteUnavailableReason;
 }
 
 export interface ShortcutInvocation {
@@ -98,6 +111,12 @@ export interface ShortcutConfig {
 export interface UserPreferences {
   theme: 'system' | 'light' | 'dark';
   language: SupportedLocale;
+  /**
+   * 渲染进程上报的当前界面语言，桌面端主进程据此决定托盘、系统对话框和通知的语言。
+   * language 字段的默认值 zh-CN 早已写进所有旧配置文件，分不清是用户选的还是默认值，
+   * 所以单独用这个字段；没上报过时主进程按系统语言选。
+   */
+  uiLocale?: SupportedLocale;
   autoStartup: boolean;
   minimizeToTray: boolean;
   showNotifications: boolean;

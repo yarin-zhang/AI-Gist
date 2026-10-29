@@ -1,9 +1,10 @@
-import { ref, onMounted, readonly } from 'vue'
+import { ref, readonly } from 'vue'
 import { databaseService } from '../lib/db'
+import { classifyDatabaseError, type DatabaseErrorState } from '../lib/utils/database-error'
 
-// 全局数据库状态
+// 全局数据库状态：只有数据库本身打不开时才有值，界面据此显示「数据没能加载」
 const isDatabaseReady = ref(false)
-const databaseError = ref<string | null>(null)
+const databaseError = ref<DatabaseErrorState | null>(null)
 
 /**
  * 数据库状态管理 composable
@@ -27,8 +28,7 @@ export function useDatabase() {
       isDatabaseReady.value = true
       return true
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '数据库初始化失败'
-      databaseError.value = errorMessage
+      databaseError.value = classifyDatabaseError(error)
       console.error('数据库初始化失败:', error)
       return false
     } finally {
@@ -37,22 +37,24 @@ export function useDatabase() {
   }
 
   /**
-   * 安全执行数据库操作
+   * 安全执行数据库操作：数据库没打开时跳过，操作失败时返回 fallback。
+   *
+   * 单次操作失败（读写某条数据出错）不代表数据库坏了，不能把它升级成全局的「数据没能加载」；
+   * 失败只写日志，由调用方根据返回值处理。
    */
   const safeDbOperation = async <T>(
     operation: () => Promise<T>,
     fallback?: T
   ): Promise<T | undefined> => {
+    const ready = await waitForDatabase()
+    if (!ready) {
+      console.warn('数据库未就绪，跳过操作')
+      return fallback
+    }
     try {
-      const ready = await waitForDatabase()
-      if (!ready) {
-        console.warn('数据库未就绪，跳过操作')
-        return fallback
-      }
       return await operation()
     } catch (error) {
       console.error('数据库操作失败:', error)
-      databaseError.value = error instanceof Error ? error.message : '操作失败'
       return fallback
     }
   }
@@ -83,7 +85,7 @@ export async function initDatabaseState() {
     isDatabaseReady.value = true
     console.log('数据库状态初始化成功')
   } catch (error) {
-    databaseError.value = error instanceof Error ? error.message : '数据库初始化失败'
+    databaseError.value = classifyDatabaseError(error)
     console.error('数据库状态初始化失败:', error)
   }
 }

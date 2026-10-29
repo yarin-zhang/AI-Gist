@@ -1,4 +1,20 @@
 import { session, net } from 'electron';
+import type {
+  ProxyTestErrorCode,
+  ProxyTestOverall,
+  ProxyTestSiteId,
+  ProxyTestSiteResult,
+} from '@shared/types/network-proxy';
+
+/**
+ * 把 Chromium 的网络错误（net::ERR_PROXY_CONNECTION_FAILED 这类）归到用户看得懂的几类，
+ * 原始报错只写日志。
+ */
+export function classifyProxyTestError(message: string): ProxyTestErrorCode {
+  if (/ERR_(?:CONNECTION_)?TIMED_OUT/.test(message)) return 'timeout';
+  if (/ERR_(?:PROXY|TUNNEL|SOCKS|MANDATORY_PROXY|PAC_)/.test(message)) return 'proxy-refused';
+  return 'unreachable';
+}
 
 /**
  * 网络代理管理器
@@ -18,27 +34,11 @@ export class NetworkProxyManager {
   /**
    * 测试网站配置
    */
-  static readonly TEST_SITES = [
-    {
-      name: '百度',
-      url: 'https://www.baidu.com',
-      description: '国内网站'
-    },
-    {
-      name: 'GitHub',
-      url: 'https://github.com',
-      description: '海外代码托管平台'
-    },
-    {
-      name: 'Google',
-      url: 'https://www.google.com',
-      description: '海外搜索引擎'
-    },
-    {
-      name: 'OpenAI',
-      url: 'https://api.openai.com/v1/models',
-      description: '海外 AI 服务'
-    }
+  static readonly TEST_SITES: readonly { id: ProxyTestSiteId; url: string }[] = [
+    { id: 'baidu', url: 'https://www.baidu.com' },
+    { id: 'github', url: 'https://github.com' },
+    { id: 'google', url: 'https://www.google.com' },
+    { id: 'openai', url: 'https://api.openai.com/v1/models' }
   ];
 
   /**
@@ -348,14 +348,7 @@ export class NetworkProxyManager {
    * 测试代理连接（实时版本）
    */
   static async testProxyConnectionRealTime(
-    onProgress: (result: {
-      name: string;
-      url: string;
-      description: string;
-      success: boolean;
-      responseTime?: number;
-      error?: string;
-    }) => void,
+    onProgress: (result: ProxyTestSiteResult) => void,
     proxyConfig?: {
       mode: 'direct' | 'system' | 'manual';
       manualConfig?: {
@@ -364,14 +357,7 @@ export class NetworkProxyManager {
         noProxy?: string;
       };
     }
-  ): Promise<{
-    overall: {
-      success: boolean;
-      totalSites: number;
-      successSites: number;
-      failedSites: number;
-    };
-  }> {
+  ): Promise<{ overall: ProxyTestOverall }> {
     try {
       console.log('开始测试代理连接...');
       
@@ -393,45 +379,26 @@ export class NetworkProxyManager {
       let failedCount = 0;
       
       for (const site of this.TEST_SITES) {
+        const startTime = Date.now();
+        let result: Omit<ProxyTestSiteResult, 'id' | 'url' | 'responseTime'>;
         try {
-          console.log(`测试连接: ${site.name} (${site.url})`);
-          const startTime = Date.now();
-          
+          console.log(`测试连接: ${site.id} (${site.url})`);
           // 使用 Electron 的 net 模块进行连接测试
-          const result = await this.testSiteWithNet(site.url);
-          const responseTime = Date.now() - startTime;
-          
-          if (result.success) {
-            console.log(`✅ ${site.name} 连接成功，响应时间: ${responseTime}ms`);
-            successCount++;
-            onProgress({
-              name: site.name,
-              url: site.url,
-              description: site.description,
-              success: true,
-              responseTime
-            });
-          } else {
-            console.log(`❌ ${site.name} 连接失败: ${result.error}`);
-            failedCount++;
-            onProgress({
-              name: site.name,
-              url: site.url,
-              description: site.description,
-              success: false,
-              error: result.error
-            });
-          }
+          result = await this.testSiteWithNet(site.url);
         } catch (error) {
-          console.error(`${site.name} 连接测试失败:`, error);
+          console.error(`${site.id} 连接测试失败:`, error);
+          result = { success: false, errorCode: 'unreachable' };
+        }
+
+        if (result.success) {
+          const responseTime = Date.now() - startTime;
+          console.log(`✅ ${site.id} 连接成功，响应时间: ${responseTime}ms`);
+          successCount++;
+          onProgress({ id: site.id, url: site.url, success: true, responseTime });
+        } else {
+          console.log(`❌ ${site.id} 连接失败: ${result.errorCode}${result.statusCode ? ` (${result.statusCode})` : ''}`);
           failedCount++;
-          onProgress({
-            name: site.name,
-            url: site.url,
-            description: site.description,
-            success: false,
-            error: error instanceof Error ? error.message : '未知错误'
-          });
+          onProgress({ id: site.id, url: site.url, ...result });
         }
       }
       
@@ -463,11 +430,15 @@ export class NetworkProxyManager {
   /**
    * 使用 Electron net 模块测试单个网站连接
    */
-  private static async testSiteWithNet(url: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  private static async testSiteWithNet(url: string): Promise<Pick<ProxyTestSiteResult, 'success' | 'errorCode' | 'statusCode'>> {
     return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result: Pick<ProxyTestSiteResult, 'success' | 'errorCode' | 'statusCode'>) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+
       try {
         const urlObj = new URL(url);
         
@@ -490,11 +461,8 @@ export class NetworkProxyManager {
 
         // 设置超时
         const timeout = setTimeout(() => {
+          finish({ success: false, errorCode: 'timeout' });
           request.abort();
-          resolve({
-            success: false,
-            error: '连接超时'
-          });
         }, 5000);
 
         request.on('response', (response) => {
@@ -505,41 +473,27 @@ export class NetworkProxyManager {
             response.statusCode >= 200 && response.statusCode < 400 ||
             (isApiEndpoint && (response.statusCode === 401 || response.statusCode === 403))
           )) {
-            resolve({
-              success: true
-            });
+            finish({ success: true });
           } else {
-            resolve({
-              success: false,
-              error: `HTTP ${response.statusCode}`
-            });
+            finish({ success: false, errorCode: 'http-error', statusCode: response.statusCode });
           }
         });
 
         request.on('error', (error) => {
           clearTimeout(timeout);
           console.error(`网络请求错误 (${url}):`, error);
-          resolve({
-            success: false,
-            error: error.message || '网络错误'
-          });
+          finish({ success: false, errorCode: classifyProxyTestError(error?.message || '') });
         });
 
         request.on('abort', () => {
           clearTimeout(timeout);
-          resolve({
-            success: false,
-            error: '连接被中断'
-          });
+          finish({ success: false, errorCode: 'unreachable' });
         });
 
         request.end();
       } catch (error) {
         console.error(`URL 解析错误 (${url}):`, error);
-        resolve({
-          success: false,
-          error: error instanceof Error ? error.message : 'URL 解析错误'
-        });
+        finish({ success: false, errorCode: 'unreachable' });
       }
     });
   }

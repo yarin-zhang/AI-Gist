@@ -13,6 +13,25 @@ describe('shortcut-first UX wiring', () => {
     expect(settings).not.toContain('selectedPromptId');
   });
 
+  it('never shows raw main-process error text in shortcut and launcher UI', () => {
+    const files = [
+      'src/renderer/components/settings/ShortcutSettings.vue',
+      'src/renderer/components/shortcuts/ShortcutBindingModal.vue',
+      'src/renderer/components/shortcuts/PromptLauncher.vue',
+    ];
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      // IPC 抛回来的 message 带 "Error invoking remote method …" 前缀和主进程写死的中文
+      expect(source, file).not.toMatch(/caught instanceof Error \? caught\.message/);
+      expect(source, file).not.toMatch(/pasteCapability\.reason \}\}/);
+    }
+    const settings = readFileSync('src/renderer/components/settings/ShortcutSettings.vue', 'utf8');
+    expect(settings).toContain('describeShortcutError(caught, t)');
+    expect(settings).toContain('describePasteUnavailable(state.pasteCapability.reason, t)');
+    expect(readFileSync('src/renderer/components/shortcuts/ShortcutBindingModal.vue', 'utf8')).toContain('describeShortcutError(caught, t)');
+    expect(readFileSync('src/renderer/components/shortcuts/PromptLauncher.vue', 'utf8')).toContain("t('launcher.runFailed')");
+  });
+
   it('links the status-bar launcher entry to the launcher and shortcut settings', () => {
     const statusBar = readFileSync('src/renderer/components/layout/AppStatusBar.vue', 'utf8');
     const launcher = readFileSync('src/renderer/composables/useLauncherShortcut.ts', 'utf8');

@@ -4,16 +4,12 @@ import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
 // 本地模块导入
 import { getAppIconPath, getMacTrayIconPath } from './utils';
 import { ShortcutManager } from './shortcut-manager';
+import { getMainStrings, onMainLocaleChange } from './main-locale';
 
 /**
  * 常量定义
  */
 const CONSTANTS = {
-  TOOLTIP_TEXT: 'AI-Gist - AI 提示词管理工具',
-  MENU_LABELS: {
-    SHOW_WINDOW: '显示主窗口',
-    QUIT: '退出'
-  },
   LOG_MESSAGES: {
     TRAY_CREATED: '系统托盘创建成功',
     TRAY_CREATE_ERROR: '创建系统托盘失败:',
@@ -33,6 +29,7 @@ class TrayManager {
   private mainWindow: BrowserWindow | null = null;
   private onQuitCallback?: () => void;
   private showWindowCallback?: () => void;
+  private stopLocaleListener?: () => void;
 
   // ==================== 窗口管理方法 ====================
   
@@ -76,6 +73,9 @@ class TrayManager {
       this.tray = new Tray(icon);
       this.setupTrayMenu();
       this.setupTrayEvents();
+      // 用户在应用里换了语言，托盘提示和菜单跟着换
+      this.stopLocaleListener?.();
+      this.stopLocaleListener = onMainLocaleChange(() => this.setupTrayMenu());
 
       console.log(CONSTANTS.LOG_MESSAGES.TRAY_CREATED);
       return true;
@@ -89,6 +89,8 @@ class TrayManager {
    * 销毁托盘
    */
   destroy(): void {
+    this.stopLocaleListener?.();
+    this.stopLocaleListener = undefined;
     if (this.tray) {
       this.tray.destroy();
       this.tray = null;
@@ -168,19 +170,20 @@ class TrayManager {
    * macOS 上点击图标直接打开搜索框，不需要右键菜单
    */
   private setupTrayMenu(): void {
-    if (!this.tray) return;
+    if (!this.tray || this.tray.isDestroyed()) return;
 
-    this.tray.setToolTip(CONSTANTS.TOOLTIP_TEXT);
+    const strings = getMainStrings().tray;
+    this.tray.setToolTip(strings.tooltip);
     if (process.platform === 'darwin') return;
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: CONSTANTS.MENU_LABELS.SHOW_WINDOW,
+        label: strings.showWindow,
         click: () => this.showMainWindow()
       },
       { type: 'separator' },
       {
-        label: CONSTANTS.MENU_LABELS.QUIT,
+        label: strings.quit,
         click: () => this.quitApplication()
       }
     ]);

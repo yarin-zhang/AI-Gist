@@ -4,7 +4,8 @@ import type {
   ICloudConfig, 
   CloudBackupInfo,
   CloudBackupCreateOptions,
-  CloudBackupDeleteTarget
+  CloudBackupDeleteTarget,
+  ICloudAvailability
 } from '@shared/types/cloud-backup';
 import type {
   CloudSyncManifest,
@@ -28,6 +29,8 @@ import { PlatformDetector } from '@shared/platform';
 import { mobileCloudBackupService } from '../services/mobile-cloud-backup.service';
 import { webCloudBackupService } from '../services/web-cloud-backup.service';
 import { DatabaseServiceManager } from '../services/database-manager.service';
+import i18n from '@renderer/i18n';
+import { localizeICloudAvailability } from '@renderer/lib/utils/icloud-availability';
 
 const getCloudBackupClient = () => {
   if (PlatformDetector.isElectron()) {
@@ -52,10 +55,7 @@ export class CloudBackupAPI {
   /**
    * 检测 iCloud 可用性
    */
-  static async checkICloudAvailability(): Promise<{
-    available: boolean;
-    reason?: string;
-  }> {
+  static async checkICloudAvailability(): Promise<ICloudAvailability> {
     const client = getCloudBackupClient();
     if (client) {
       return await client.isICloudAvailable();
@@ -64,7 +64,9 @@ export class CloudBackupAPI {
     if (!this.isElectronAvailable()) {
       throw new Error('Electron API not available');
     }
-    return await window.electronAPI.cloud.checkICloudAvailability();
+    // 主进程只返回原因码，按当前界面语言翻译成用户能照着做的话
+    const result = await window.electronAPI.cloud.checkICloudAvailability();
+    return localizeICloudAvailability(result, key => (i18n.global.t as (key: string) => string)(key));
   }
 
   /**

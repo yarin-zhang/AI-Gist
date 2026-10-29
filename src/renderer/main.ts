@@ -12,6 +12,7 @@ import '@fontsource/jetbrains-mono/500.css'
 import './assets/scss/index.scss'
 import { setupMobileDebug } from './utils/mobile-debug'
 import { installWebRuntimeBridge } from './lib/platform/web-runtime-bridge'
+import { startUiLocaleSync } from './lib/platform/ui-locale-sync'
 import { applyDocumentTheme, getSystemThemePreference, resolveTheme, type ThemeSource } from './theme/runtime'
 
 installWebRuntimeBridge()
@@ -72,6 +73,7 @@ async function startApp() {
     // 立即设置初始主题和语言
     setInitialTheme()
     initLocale()
+    if (!isLauncherSurface) startUiLocaleSync()
     
     await initDatabase();
     console.log('IndexedDB initialized successfully');

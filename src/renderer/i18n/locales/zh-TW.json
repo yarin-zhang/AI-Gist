@@ -731,10 +731,19 @@
     "deviceNameWeb": "網頁版 AI Gist"
   },
   "databaseStatus": {
-    "connectionError": "資料庫連線異常",
+    "connectionError": "無法載入資料",
     "hide": "隱藏",
     "retry": "重試",
-    "retrying": "重試中..."
+    "retrying": "重試中...",
+    "retryHint": "點「重試」；還是不行就重新啟動 AI Gist。",
+    "upgradeBlockedHint": "AI Gist 還在其他視窗或瀏覽器分頁中開著。關閉它們後點「重試」。",
+    "detailLabel": "技術詳情"
+  },
+  "icloudAvailability": {
+    "driveOff": "這台 Mac 沒有開啟 iCloud Drive。在系統設定中登入 Apple 帳號並開啟 iCloud Drive，然後重新開啟此頁面。",
+    "windowsMissing": "找不到 iCloud Drive。安裝 Windows 版 iCloud 並開啟 iCloud Drive，然後重新啟動 AI Gist。",
+    "unsupported": "這個系統上沒有 iCloud Drive，請改用 WebDAV。",
+    "checkFailed": "無法檢測 iCloud Drive。重新開啟此頁面再試；如果一直如此，請重新啟動 AI Gist。"
   },
   "language": {
     "selectLanguage": "選擇語言",
@@ -858,7 +867,32 @@
     "testing": "測試中...",
     "testingDescription": "正在測試網路連線…",
     "connectionOkWithTime": "連線正常 · 平均回應 {ms} ms",
-    "notTestedYet": "還沒有測試。測試會依序存取幾個常用網站。"
+    "notTestedYet": "還沒有測試。測試會依序存取幾個常用網站。",
+    "connectionFailedProxy": "連線失敗：連不上代理伺服器。檢查代理位址和連接埠，並確認代理軟體正在執行。",
+    "sites": {
+      "baidu": {
+        "name": "百度",
+        "description": "中國大陸網站"
+      },
+      "github": {
+        "name": "GitHub",
+        "description": "程式碼託管平台"
+      },
+      "google": {
+        "name": "Google",
+        "description": "搜尋引擎"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "description": "AI 服務"
+      }
+    },
+    "siteErrors": {
+      "timeout": "連線逾時",
+      "proxyRefused": "連不上代理",
+      "unreachable": "無法連線",
+      "httpError": "網站回應 {status}"
+    }
   },
   "promptEditor": {
     "addVariable": "新增變數",
@@ -1184,7 +1218,6 @@
     "actions": "操作",
     "assignFromPromptHint": "在提示詞的「更多」選單裡設定",
     "assignPromptBinding": "設定提示詞快速鍵",
-    "autoPasteUnavailable": "自動貼上目前不可用",
     "behavior": "呼叫行為",
     "commandManage": "管理快速鍵",
     "commandNewPrompt": "新增提示詞",
@@ -1197,7 +1230,7 @@
     "editPromptBinding": "編輯提示詞快速鍵",
     "globalCommands": "全域指令",
     "inputShortcut": "輸入快速鍵",
-    "invalidTarget": "提示詞已失效",
+    "invalidTarget": "提示詞已刪除",
     "launcherCommand": "提示詞啟動器",
     "launcherCommandDesc": "在任何應用程式中搜尋提示詞",
     "launcherPlaceholder": "搜尋提示詞、標籤、分類或指令…",
@@ -1209,12 +1242,12 @@
     "navigate": "選擇",
     "noLauncherResults": "沒有符合的結果",
     "noPromptBindings": "尚未指定提示詞快速鍵",
-    "notRegistered": "未註冊",
+    "notRegistered": "未生效",
     "notSet": "未設定",
-    "pasteFallbackHint": "無法自動貼上時會改為複製。",
+    "pasteFallbackHint": "無法自動貼上時，會改為複製到剪貼簿。",
     "pressShortcut": "請按下想要的快速鍵組合",
     "promptBindings": "提示詞直達鍵",
-    "registered": "已註冊",
+    "registered": "已生效",
     "requestPermission": "請求權限",
     "resetSuccess": "快速鍵設定已還原為預設值",
     "resetToDefault": "還原預設值",
@@ -1229,7 +1262,20 @@
     "bindingStatus": "狀態",
     "editBindingFor": "編輯「{name}」的快速鍵",
     "enableBinding": "啟用「{name}」的快速鍵",
-    "removeBindingFor": "刪除「{name}」的快速鍵"
+    "removeBindingFor": "刪除「{name}」的快速鍵",
+    "errors": {
+      "empty": "先按下要使用的快速鍵。",
+      "modifierRequired": "快速鍵需要包含修飾鍵（Ctrl、Alt、Shift 或 ⌘），F1–F24 可以單獨使用。",
+      "reservedKey": "Esc、Enter、Tab 不能單獨作為快速鍵，加上修飾鍵再試。",
+      "duplicate": "AI Gist 裡已有其他快速鍵使用這個組合，換一個試試。",
+      "inUse": "這個組合已被其他應用程式或系統佔用，換一個試試。",
+      "saveFailed": "無法儲存快速鍵，請再試一次。"
+    },
+    "pasteUnavailable": {
+      "accessibility": "自動貼上需要輔助使用權限。授權前只會複製到剪貼簿。",
+      "xdotool": "安裝 xdotool 後可以自動貼上，在此之前只會複製到剪貼簿。",
+      "copyOnly": "這台電腦不支援自動貼上，只會複製到剪貼簿。"
+    }
   },
   "startup": {
     "autoStart": "開機自動啟動",
@@ -1640,7 +1686,8 @@
     "editShortcut": "修改快速鍵",
     "nextVariable": "下一個變數",
     "detail": "詳情",
-    "run": "執行"
+    "run": "執行",
+    "runFailed": "無法執行，請再試一次。"
   },
   "models": {
     "title": "模型",
@@ -1793,7 +1840,7 @@
   },
   "appInit": {
     "loading": "正在開啟 AI Gist…",
-    "failedTitle": "資料庫沒有開啟",
+    "failedTitle": "無法載入資料",
     "continue": "先繼續使用（部分功能無法使用）"
   },
   "mobileModels": {

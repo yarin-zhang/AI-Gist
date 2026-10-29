@@ -731,10 +731,19 @@
     "deviceNameWeb": "AI Gist on the web"
   },
   "databaseStatus": {
-    "connectionError": "Database connection error",
+    "connectionError": "Couldn't load your data",
     "hide": "Hide",
     "retry": "Retry",
-    "retrying": "Retrying…"
+    "retrying": "Retrying…",
+    "retryHint": "Click “Retry”. If that doesn't help, restart AI Gist.",
+    "upgradeBlockedHint": "AI Gist is still open in another window or browser tab. Close it, then click “Retry”.",
+    "detailLabel": "Technical details"
+  },
+  "icloudAvailability": {
+    "driveOff": "iCloud Drive is off on this Mac. Sign in to your Apple Account in System Settings, turn on iCloud Drive, then reopen this page.",
+    "windowsMissing": "iCloud Drive wasn't found. Install iCloud for Windows, turn on iCloud Drive, then restart AI Gist.",
+    "unsupported": "iCloud Drive isn't available on this system. Use WebDAV instead.",
+    "checkFailed": "Couldn't check iCloud Drive. Reopen this page to try again, or restart AI Gist if it keeps happening."
   },
   "language": {
     "selectLanguage": "Select language",
@@ -858,7 +867,32 @@
     "testing": "Testing…",
     "testingDescription": "Testing the network connection…",
     "connectionOkWithTime": "Connected · {ms} ms average response",
-    "notTestedYet": "Not tested yet. The test visits a few common sites in turn."
+    "notTestedYet": "Not tested yet. The test visits a few common sites in turn.",
+    "connectionFailedProxy": "Connection failed: couldn't reach the proxy server. Check the proxy address and port, and make sure your proxy app is running.",
+    "sites": {
+      "baidu": {
+        "name": "Baidu",
+        "description": "Website in mainland China"
+      },
+      "github": {
+        "name": "GitHub",
+        "description": "Code hosting"
+      },
+      "google": {
+        "name": "Google",
+        "description": "Search engine"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "description": "AI service"
+      }
+    },
+    "siteErrors": {
+      "timeout": "Timed out",
+      "proxyRefused": "Proxy unreachable",
+      "unreachable": "Unreachable",
+      "httpError": "Site returned {status}"
+    }
   },
   "promptEditor": {
     "addVariable": "New variable",
@@ -1184,7 +1218,6 @@
     "actions": "Actions",
     "assignFromPromptHint": "Set these from a prompt's “More” menu",
     "assignPromptBinding": "Assign prompt shortcut",
-    "autoPasteUnavailable": "Auto-paste is unavailable",
     "behavior": "Invocation behavior",
     "commandManage": "Manage shortcuts",
     "commandNewPrompt": "New prompt",
@@ -1197,7 +1230,7 @@
     "editPromptBinding": "Edit prompt shortcut",
     "globalCommands": "Global commands",
     "inputShortcut": "Enter shortcut",
-    "invalidTarget": "Prompt no longer exists",
+    "invalidTarget": "Prompt deleted",
     "launcherCommand": "Prompt launcher",
     "launcherCommandDesc": "Search and use prompts from any app",
     "launcherPlaceholder": "Search prompts, tags, categories, or commands…",
@@ -1209,12 +1242,12 @@
     "navigate": "Navigate",
     "noLauncherResults": "No matching prompts or commands",
     "noPromptBindings": "No prompt shortcuts assigned yet",
-    "notRegistered": "Not registered",
+    "notRegistered": "Not active",
     "notSet": "Not set",
-    "pasteFallbackHint": "If the platform or permissions don't allow auto-paste, the text is copied to the clipboard instead.",
+    "pasteFallbackHint": "If auto-paste isn't available, the text is copied to the clipboard instead.",
     "pressShortcut": "Press the key combination you want",
     "promptBindings": "Prompt shortcuts",
-    "registered": "Registered",
+    "registered": "Active",
     "requestPermission": "Request permission",
     "resetSuccess": "Shortcuts restored to defaults",
     "resetToDefault": "Restore defaults",
@@ -1229,7 +1262,20 @@
     "bindingStatus": "Status",
     "editBindingFor": "Edit the shortcut for “{name}”",
     "enableBinding": "Enable the shortcut for “{name}”",
-    "removeBindingFor": "Remove the shortcut for “{name}”"
+    "removeBindingFor": "Remove the shortcut for “{name}”",
+    "errors": {
+      "empty": "Press a key combination first.",
+      "modifierRequired": "Include a modifier key (Ctrl, Alt, Shift or ⌘). F1–F24 can be used alone.",
+      "reservedKey": "Esc, Enter and Tab can't be used alone. Add a modifier key.",
+      "duplicate": "Another AI Gist shortcut already uses this combination. Choose a different one.",
+      "inUse": "Another app or the system is already using this combination. Choose a different one.",
+      "saveFailed": "Couldn't save the shortcut. Try again."
+    },
+    "pasteUnavailable": {
+      "accessibility": "Auto-paste needs Accessibility access. Until you allow it, text is only copied to the clipboard.",
+      "xdotool": "Install xdotool to turn on auto-paste. Until then, text is only copied to the clipboard.",
+      "copyOnly": "Auto-paste isn't available on this computer. Text is copied to the clipboard instead."
+    }
   },
   "startup": {
     "autoStart": "Launch at startup",
@@ -1640,7 +1686,8 @@
     "editShortcut": "Change shortcut",
     "nextVariable": "Next variable",
     "detail": "Details",
-    "run": "Run"
+    "run": "Run",
+    "runFailed": "Couldn't run it. Try again."
   },
   "models": {
     "title": "Models",
@@ -1793,7 +1840,7 @@
   },
   "appInit": {
     "loading": "Opening AI Gist…",
-    "failedTitle": "The database could not be opened",
+    "failedTitle": "Couldn't load your data",
     "continue": "Continue anyway (some features unavailable)"
   },
   "mobileModels": {
