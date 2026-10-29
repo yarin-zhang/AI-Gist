@@ -185,6 +185,80 @@ describe('iOS 连群晖 WebDAV', () => {
   })
 })
 
+describe('群晖压缩响应时 GET 的 ETag 带 -gzip，条件写只认原来的写法', () => {
+  /** 群晖 Apache（mod_deflate）：GET 的 ETag 是 "x-gzip"，PROPFIND 和 If-Match 用的是 "x" */
+  function installGzipEtagServer() {
+    let body = ''
+    let version = 0
+    const etag = () => `"v${version}"`
+    const puts: string[] = []
+    httpRequest.mockImplementation(async (request: any) => {
+      const path = new URL(request.url).pathname
+      const isPrimary = path.endsWith('/sync-manifest.json')
+      switch (request.method) {
+        case 'MKCOL':
+          return { status: 405, data: '', headers: {} }
+        case 'GET':
+          if (!isPrimary) return { status: 404, data: '', headers: {} }
+          return body
+            ? { status: 200, data: JSON.parse(body), headers: { etag: `"v${version}-gzip"` } }
+            : { status: 404, data: '', headers: {} }
+        case 'PROPFIND':
+          return { status: 207, data: `<D:multistatus xmlns:D="DAV:"><D:response><D:href>${path}</D:href><D:propstat><D:prop><D:getetag>${etag()}</D:getetag></D:prop></D:propstat></D:response></D:multistatus>`, headers: {} }
+        case 'PUT': {
+          if (!isPrimary) return { status: 204, data: '', headers: {} }
+          const ifMatch = request.headers?.['If-Match']
+          puts.push(ifMatch ? `If-Match ${ifMatch}` : 'unconditional')
+          if (ifMatch && ifMatch !== etag()) return { status: 412, data: '', headers: {} }
+          body = request.data
+          version += 1
+          return { status: 204, data: '', headers: {} }
+        }
+        default:
+          return { status: 500, data: '', headers: {} }
+      }
+    })
+    return {
+      puts,
+      /** 另一台设备直接改了云端 */
+      writeElsewhere(manifest: CloudSyncManifest) {
+        body = JSON.stringify(manifest)
+        version += 1
+      }
+    }
+  }
+
+  it('第一次被 412 拒后，确认云端没变，改用 PROPFIND 的 ETag 写成功；之后直接用它', async () => {
+    const server = installGzipEtagServer()
+    const service = new (MobileCloudBackupService as any)() as MobileCloudBackupService
+    await service.saveCloudSyncManifest(config.id, manifestAt('rev-1', '第一版'))
+
+    expect(await service.saveCloudSyncManifest(config.id, manifestAt('rev-2', '手机改过'), { expectedRevision: 'rev-1' }))
+      .toMatchObject({ success: true })
+    expect(await service.saveCloudSyncManifest(config.id, manifestAt('rev-3', '手机又改'), { expectedRevision: 'rev-2' }))
+      .toMatchObject({ success: true })
+
+    expect(server.puts).toEqual([
+      'unconditional',
+      'If-Match "v1-gzip"',
+      'If-Match "v1"',
+      'If-Match "v2"'
+    ])
+    expect(getCloudSyncManifestRevision(await service.getCloudSyncManifest(config.id))).toBe('rev-3')
+  })
+
+  it('云端真被别的设备改了时仍然报冲突，不会覆盖', async () => {
+    const server = installGzipEtagServer()
+    const service = new (MobileCloudBackupService as any)() as MobileCloudBackupService
+    await service.saveCloudSyncManifest(config.id, manifestAt('rev-1', '第一版'))
+    server.writeElsewhere(manifestAt('rev-other', '另一台设备写的'))
+
+    await expect(service.saveCloudSyncManifest(config.id, manifestAt('rev-2', '手机改过'), { expectedRevision: 'rev-1' }))
+      .resolves.toMatchObject({ success: false, conflict: true })
+    expect(getCloudSyncManifestRevision(await service.getCloudSyncManifest(config.id))).toBe('rev-other')
+  })
+})
+
 describe('iOS 的网络错误按原因说明，不再都是「请检查地址、用户名和密码」', () => {
   const t = (key: string) => String(i18n.global.t(key))
 
