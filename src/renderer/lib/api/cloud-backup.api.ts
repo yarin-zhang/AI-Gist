@@ -183,6 +183,8 @@ export class CloudBackupAPI {
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
+    /** 失败发生在本机读写数据时，不是连不上存储 */
+    localFailure?: boolean;
   }> {
     const normalizedOptions = typeof options === 'string' ? { description: options } : options;
     if (PlatformDetector.isWeb()) {
@@ -197,7 +199,8 @@ export class CloudBackupAPI {
           return {
             success: false,
             message: '云端备份创建失败',
-            error: exportResult.error || exportResult.message || '导出本地数据失败'
+            error: exportResult.error || exportResult.message || '导出本地数据失败',
+            localFailure: true
           };
         }
         backupData = exportResult.data;
@@ -219,6 +222,8 @@ export class CloudBackupAPI {
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
+    /** 失败发生在本机读写数据时，不是连不上存储 */
+    localFailure?: boolean;
   }> {
     const client = getCloudBackupClient();
     // 移动端走 dataRestoreService，那里会先做保护性备份；Web 和桌面直接覆盖本机数据，要在这里先备份
@@ -230,7 +235,8 @@ export class CloudBackupAPI {
         return {
           success: false,
           message: '云端备份恢复失败',
-          error: `恢复前没能备份当前数据，已取消恢复：${error instanceof Error ? error.message : String(error)}`
+          error: `恢复前没能备份当前数据，已取消恢复：${error instanceof Error ? error.message : String(error)}`,
+          localFailure: true
         };
       }
     }
@@ -262,11 +268,16 @@ export class CloudBackupAPI {
         source: 'cloud-backup',
         backupId
       });
+      if (!restored.success) {
+        // 底层原因只进日志；对外先给恢复服务写好的说明（例如「恢复前没能备份当前数据…」）
+        console.warn('恢复云端备份没有完成:', restored.error || restored.message);
+      }
       return {
         success: restored.success,
         message: restored.success ? '云端备份恢复成功' : '云端备份恢复失败',
         backupInfo: downloaded.backupInfo,
-        error: restored.success ? undefined : (restored.error || restored.message)
+        error: restored.success ? undefined : (restored.message || restored.error),
+        ...(restored.success ? {} : { localFailure: true })
       };
     }
 

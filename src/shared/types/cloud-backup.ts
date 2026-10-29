@@ -156,6 +156,11 @@ export interface CloudBackupResult {
   message: string;
   backupInfo?: CloudBackupInfo;
   error?: string;
+  /**
+   * 失败发生在本机（读取或写入本机数据），不是连不上云端存储。
+   * 界面据此不给「检查密码、地址」这类连接方面的建议。
+   */
+  localFailure?: boolean;
 }
 
 export interface CloudRestoreResult {
@@ -164,4 +169,6 @@ export interface CloudRestoreResult {
   backupInfo?: CloudBackupInfo;
   error?: string;
   data?: any; // 恢复的备份数据（移动端使用）
+  /** 同 CloudBackupResult.localFailure */
+  localFailure?: boolean;
 } 

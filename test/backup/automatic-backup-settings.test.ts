@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  AUTOMATIC_BACKUP_FAILURE_NOTICE_THRESHOLD,
   AutomaticBackupService,
   createAutomaticBackupSemanticChecksum,
   DEFAULT_AUTO_BACKUP_INTERVAL_MINUTES,
   DEFAULT_AUTO_BACKUP_RETENTION,
   normalizeAutomaticBackupInterval,
-  normalizeAutomaticBackupRetention
+  normalizeAutomaticBackupRetention,
+  shouldNotifyAutomaticBackupFailure
 } from '~/lib/services/automatic-backup.service'
 
 function createService(overrides: {
@@ -136,7 +138,45 @@ describe('automatic backup settings', () => {
       expect.stringContaining('本机')
     )
     expect(backupService.pruneAutomatic).toHaveBeenCalledWith(5)
-    expect(result).toEqual({ retention: 5, deletedCount: 15, deferredCount: 0, warnings: [] })
+    expect(result).toEqual({ retention: 5, deletedCount: 15 })
+  })
+
+  it('keeps the new retention when old backups cannot be pruned and retries silently on the next backup', async () => {
+    const { service, backupService } = createService()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    backupService.pruneAutomatic.mockRejectedValueOnce(new Error('EBUSY: resource busy or locked'))
+
+    const result = await service.setRetention(5)
+
+    // 设置已经保存：只告诉界面删了几个，不把底层原因交给界面
+    expect(result).toEqual({ retention: 5, deletedCount: 0 })
+    expect(service.getStatus().error).toBeUndefined()
+    expect(service.getStatus().consecutiveFailures ?? 0).toBe(0)
+    expect(warn).toHaveBeenCalled()
+
+    // 下一次自动备份带着同样的保留份数，会再清理一次
+    await service.runNow('interval')
+    expect(backupService.create).toHaveBeenCalledWith(expect.objectContaining({ retention: 5 }))
+  })
+
+  it('only asks for attention after automatic backups fail repeatedly', async () => {
+    const { service, backupService, backup } = createService({ createError: new Error('local disk full') })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    await service.runNow('interval')
+    expect(service.getStatus().consecutiveFailures).toBe(1)
+    expect(shouldNotifyAutomaticBackupFailure(service.getStatus())).toBe(false)
+
+    await service.runNow('interval')
+    expect(service.getStatus().consecutiveFailures).toBe(AUTOMATIC_BACKUP_FAILURE_NOTICE_THRESHOLD)
+    expect(shouldNotifyAutomaticBackupFailure(service.getStatus())).toBe(true)
+
+    // 成功一次就不再提示
+    backupService.create.mockResolvedValueOnce({ action: 'created', backup, deletedCount: 0 })
+    await service.runNow('interval')
+    expect(service.getStatus().consecutiveFailures).toBe(0)
+    expect(shouldNotifyAutomaticBackupFailure(service.getStatus())).toBe(false)
+    service.stop()
   })
 
   it('flushes changed data to a local backup when the app enters the background', async () => {

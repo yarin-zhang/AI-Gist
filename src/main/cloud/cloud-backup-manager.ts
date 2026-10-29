@@ -355,11 +355,14 @@ export class CloudBackupManager {
 
     // 创建云端备份
     ipcMain.handle('cloud:create-backup', async (_, storageId: string, options?: string | CloudBackupCreateOptions): Promise<CloudBackupResult> => {
+      // 读本机数据时失败要和连不上存储分开：前者用户处理不了，界面不能让他去查密码和地址
+      let localFailure = false;
       try {
         const config = this.getStorageConfig(storageId);
         // 直接通过数据库服务导出数据，然后创建备份
         const mainWindow = BrowserWindow.getAllWindows()[0];
         if (!mainWindow) {
+          localFailure = true;
           throw new Error('没有找到主窗口，无法访问数据库');
         }
         
@@ -384,6 +387,7 @@ export class CloudBackupManager {
             })()
           `);
           if (!exportResult.success) {
+            localFailure = true;
             throw new Error(`获取数据失败: ${exportResult.error}`);
           }
           backupDataToWrite = exportResult.data;
@@ -421,17 +425,21 @@ export class CloudBackupManager {
           success: false,
           message: '创建云端备份失败',
           error: this.getErrorMessage(error),
+          ...(localFailure ? { localFailure } : {}),
         };
       }
     });
 
     // 从云端恢复备份
     ipcMain.handle('cloud:restore-backup', async (_, storageId: string, backupId: string): Promise<CloudRestoreResult> => {
+      let localFailure = false;
       try {
         const config = this.getStorageConfig(storageId);
         const provider = this.createProvider(config);
         const backupFile = await this.findBackupFile(provider, config, backupId);
         const backupInfo = await this.readBackupData(provider, backupFile);
+        // 备份已经下载下来，之后的失败都发生在写入本机数据时
+        localFailure = true;
         await this.restoreBackupData(backupInfo);
         
         return {
@@ -449,6 +457,7 @@ export class CloudBackupManager {
           success: false,
           message: '恢复云端备份失败',
           error: this.getErrorMessage(error),
+          ...(localFailure ? { localFailure } : {}),
         };
       }
     });

@@ -1,4 +1,4 @@
-import { isBackupPayload, parseBackupPayload, unwrapBackupData } from '@shared/backup-integrity'
+import { unwrapBackupData } from '@shared/backup-integrity'
 import type { ImportResult } from '@shared/types/data-management'
 import { DatabaseServiceManager } from './database-manager.service'
 import { cloudSyncService, type CloudSyncRestoreSuspension } from './cloud-sync.service'
@@ -58,13 +58,6 @@ export class DataRestoreService {
       .filter(([key]) => key !== 'total')
       .reduce((sum, [, value]) => sum + value, 0)
     return { data, preview }
-  }
-
-  parseFileContent(content: string): { payload: unknown; data: any; preview: RestorePreview } {
-    const parsed = JSON.parse(content)
-    const payload = isBackupPayload(parsed) ? parseBackupPayload(parsed).payload : parsed
-    const prepared = this.prepare(payload)
-    return { payload, ...prepared }
   }
 
   async restore(input: unknown, options: {

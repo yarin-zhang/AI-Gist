@@ -200,7 +200,10 @@ export class WebCloudBackupService {
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
+    localFailure?: boolean;
   }> {
+    // 读本机数据失败和连不上存储分开报，界面只对后者给出连接方面的建议
+    let localFailure = false;
     try {
       const normalizedOptions = typeof options === 'string' ? { description: options } : options;
       const config = await this.getWebDAVConfig(storageId);
@@ -208,6 +211,7 @@ export class WebCloudBackupService {
       if (!backupDataToWrite) {
         const exportResult = await databaseService.exportAllDataForBackup();
         if (!exportResult.success || !exportResult.data) {
+          localFailure = true;
           throw new Error(exportResult.error || exportResult.message || '导出本地数据失败');
         }
         backupDataToWrite = exportResult.data;
@@ -245,7 +249,8 @@ export class WebCloudBackupService {
       return {
         success: false,
         message: '云端备份创建失败',
-        error: this.formatError(error)
+        error: this.formatError(error),
+        ...(localFailure ? { localFailure } : {})
       };
     }
   }
@@ -255,7 +260,9 @@ export class WebCloudBackupService {
     message: string;
     backupInfo?: CloudBackupInfo;
     error?: string;
+    localFailure?: boolean;
   }> {
+    let localFailure = false;
     try {
       const config = await this.getWebDAVConfig(storageId);
       const backupInfo = await this.findBackupInfo(storageId, backupId);
@@ -269,6 +276,8 @@ export class WebCloudBackupService {
       }
 
       const parsedBackup = parseBackupPayload(backupData);
+      // 备份已经下载下来，之后的失败都发生在写入本机数据时
+      localFailure = true;
       const importResult = await databaseService.replaceAllData(parsedBackup.data);
       if (!importResult.success) {
         throw new Error(importResult.error || importResult.message || '写入本地数据失败');
@@ -283,7 +292,8 @@ export class WebCloudBackupService {
       return {
         success: false,
         message: '云端备份恢复失败',
-        error: this.formatError(error)
+        error: this.formatError(error),
+        ...(localFailure ? { localFailure } : {})
       };
     }
   }

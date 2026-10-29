@@ -57,6 +57,23 @@ export interface LocalBackupCreateResult {
   deletedCount: number;
 }
 
+/**
+ * 恢复本机备份没有完成，而且本机数据没有被改动（在替换之前就停下了，或者整体替换失败后已回滚）。
+ * message 只给日志看，界面显示自己的提示语。
+ */
+export class LocalBackupRestoreError extends Error {
+  readonly localDataUnchanged = true;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'LocalBackupRestoreError';
+  }
+}
+
+/** 恢复失败时能否告诉用户「本机数据没有变化」 */
+export const isLocalDataUnchangedAfterFailedRestore = (error: unknown): boolean =>
+  !!error && typeof error === 'object' && (error as { localDataUnchanged?: unknown }).localDataUnchanged === true;
+
 export interface LocalBackupServiceDeps {
   database?: { exportAllDataForBackup(): Promise<ExportResult> };
   repository?: LocalBackupRepository;
@@ -174,13 +191,18 @@ export class LocalBackupService {
 
   async restore(backupId: string): Promise<boolean> {
     const backup = (await this.list()).find(item => item.id === backupId);
-    if (!backup?.payload) throw new Error('备份不存在或内容不可读');
+    if (!backup?.payload) throw new LocalBackupRestoreError('备份不存在或内容不可读');
     const { dataRestoreService } = await import('./data-restore.service');
     const result = await dataRestoreService.restore(backup.payload, {
       source: 'local-file',
       backupId
     });
-    if (!result.success) throw new Error(result.error || result.message || '恢复失败');
+    if (!result.success) {
+      // 底层原因（哪张表、哪条记录写不进去）只进日志；错误本身带恢复服务写好的说明
+      console.warn('恢复本地备份没有完成:', result.error || result.message);
+      // 恢复服务的失败都发生在替换之前，或者是原子替换失败后回滚，本机数据没有变化
+      throw new LocalBackupRestoreError(result.message || result.error || '恢复失败');
+    }
     return true;
   }
 

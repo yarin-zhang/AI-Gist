@@ -53,6 +53,7 @@ import { AlertCircle, Trash } from '@vicons/tabler';
 import { CloudBackupAPI } from '@/lib/api/cloud-backup.api';
 import { getCloudStorageConnectionDiagnosis } from '@/lib/services/cloud-sync.service';
 import type { CloudStorageConnectionDiagnosis } from '@/lib/services/cloud-sync.service';
+import { describeCloudBackupFailure } from '@/lib/utils/cloud-backup-feedback';
 import { formatDateTime, formatFriendlyDate } from '@/lib/utils/date';
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup';
 
@@ -104,6 +105,10 @@ const refreshCloudBackupList = async () => {
     } finally { loading.refresh = false; }
 };
 
+// 服务层返回的 message / error 是写给日志的中文原文：成功一律显示界面语言的提示，
+// 失败只在连不上存储时说出原因（用户能自己处理），其余原因只写日志
+const showFailure = (text: string) => message.error(text, { duration: 6000, closable: true });
+
 const createCloudBackup = async () => {
     if (loading.create) return;
     loading.create = true;
@@ -113,12 +118,17 @@ const createCloudBackup = async () => {
             backupType: 'manual',
             trigger: 'manual',
         });
-        if (!result.success) return message.error(result.error || t('dataBackup.createCloudBackupFailed'));
-        message.success(result.message || t('dataBackup.createCloudBackupSuccess'));
+        if (!result.success) {
+            console.warn('创建云端备份失败:', result.error || result.message);
+            showFailure(describeCloudBackupFailure(t('dataBackup.createCloudBackupFailed'), result.error,
+                { localFailure: result.localFailure, detailed: true }));
+            return;
+        }
+        message.success(t('dataBackup.createCloudBackupSuccess'));
         await loadCloudBackupList();
     } catch (error) {
         console.error('创建云端备份失败:', error);
-        message.error(error instanceof Error ? error.message : t('dataBackup.createCloudBackupFailed'));
+        showFailure(describeCloudBackupFailure(t('dataBackup.createCloudBackupFailed'), error, { detailed: true }));
     } finally { loading.create = false; }
 };
 
@@ -126,24 +136,37 @@ const restoreCloudBackup = async (backupId: string) => {
     loading.restore = true;
     try {
         const result = await CloudBackupAPI.restoreCloudBackup(props.config.id, backupId);
-        if (!result.success) return message.error(result.error || t('dataBackup.restoreFailed'));
-        message.success(result.message || t('dataBackup.restoreSuccess'));
+        if (!result.success) {
+            console.warn('恢复云端备份失败:', result.error || result.message);
+            // 恢复在替换本机数据之前失败，或者替换本身失败后整体回滚：本机数据都没有变
+            showFailure(describeCloudBackupFailure(t('dataBackup.restoreFailed'), result.error, {
+                localFailure: result.localFailure,
+                otherwise: t('dataBackup.restoreFailedUnchanged'),
+                detailed: true,
+            }));
+            return;
+        }
+        message.success(t('dataBackup.restoreSuccess'));
         window.location.reload();
     } catch (error) {
         console.error('恢复云端备份失败:', error);
-        message.error(error instanceof Error ? error.message : t('dataBackup.restoreFailed'));
+        showFailure(describeCloudBackupFailure(t('dataBackup.restoreFailed'), error, { detailed: true }));
     } finally { loading.restore = false; }
 };
 
 const deleteCloudBackup = async (backupId: string) => {
     try {
         const result = await CloudBackupAPI.deleteCloudBackup(props.config.id, backupId);
-        if (!result.success) return message.error(result.error || t('dataBackup.deleteFailed'));
-        message.success(result.message || t('dataBackup.deleteSuccess'));
+        if (!result.success) {
+            console.warn('删除云端备份失败:', result.error || result.message);
+            showFailure(describeCloudBackupFailure(t('dataBackup.deleteFailed'), result.error, { detailed: true }));
+            return;
+        }
+        message.success(t('dataBackup.deleteSuccess'));
         await loadCloudBackupList();
     } catch (error) {
         console.error('删除云端备份失败:', error);
-        message.error(t('dataBackup.deleteFailed'));
+        showFailure(describeCloudBackupFailure(t('dataBackup.deleteFailed'), error, { detailed: true }));
     }
 };
 
