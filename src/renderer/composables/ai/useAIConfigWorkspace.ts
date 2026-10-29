@@ -36,7 +36,8 @@ export function useAIConfigWorkspace() {
 
     const configs = ref<AIConfig[]>([])
     const loading = ref(true)
-    const loadError = ref('')
+    /** 读取配置失败：页面给「重试」，数据库的原始报错只记在控制台 */
+    const loadError = ref(false)
     const selectedConfigId = ref<number | null>(null)
     const searchText = ref('')
     const activeFilter = ref<ConfigFilter>('all')
@@ -78,7 +79,7 @@ export function useAIConfigWorkspace() {
 
     const loadConfigs = async () => {
         loading.value = true
-        loadError.value = ''
+        loadError.value = false
         try {
             const result = await databaseService.aiConfig.getAllAIConfigs()
             configs.value = result
@@ -91,8 +92,8 @@ export function useAIConfigWorkspace() {
             selectedConfigId.value = selected?.id || null
             result.forEach(ensureRequestDefaults)
         } catch (error) {
-            console.error(error)
-            loadError.value = (error as Error).message
+            console.error('读取模型配置失败:', error)
+            loadError.value = true
         } finally {
             loading.value = false
         }
@@ -125,7 +126,8 @@ export function useAIConfigWorkspace() {
             await databaseService.aiConfig.updateAIConfig(config.id, { enabled, ...(enabled ? {} : { isPreferred: false }) })
             await loadConfigs()
         } catch (error) {
-            message.error(t('aiConfig.updateFailed') + (error as Error).message)
+            console.error('切换模型配置启用状态失败:', error)
+            message.error(t('aiConfig.updateFailed'))
         } finally {
             togglingConfigId.value = null
         }
@@ -138,7 +140,8 @@ export function useAIConfigWorkspace() {
             else await databaseService.aiConfig.setPreferredAIConfig(config.id)
             await loadConfigs()
         } catch (error) {
-            message.error(t('aiConfig.setFailed') + (error as Error).message)
+            console.error('设置首选模型配置失败:', error)
+            message.error(t('aiConfig.setFailed'))
         }
     }
 
@@ -151,7 +154,8 @@ export function useAIConfigWorkspace() {
             requestTestModels[config.id] = model
             await loadConfigs()
         } catch (error) {
-            message.error(t('aiConfig.updateFailed') + (error as Error).message)
+            console.error('更新默认模型失败:', error)
+            message.error(t('aiConfig.updateFailed'))
         }
     }
 
@@ -183,11 +187,13 @@ export function useAIConfigWorkspace() {
             await loadConfigs()
             message.success(t('aiConfig.configDeleteSuccess'))
         } catch (error) {
-            message.error(t('aiConfig.deleteFailed') + (error as Error).message)
+            console.error('删除模型配置失败:', error)
+            message.error(t('aiConfig.deleteFailed'))
         }
     }
 
-    const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error ?? '')) || t('common.unknownError')
+    // 没有报错原文时留空：AIErrorNotice 会直接说该检查什么，而不是显示「未知错误」
+    const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error ?? ''))
     const withoutId = (set: Set<number>, id: number) => new Set([...set].filter(item => item !== id))
 
     const testConnection = async (config: AIConfig) => {
@@ -201,7 +207,7 @@ export function useAIConfigWorkspace() {
             if (connectionRuns[id] !== run) return
             connectionResults[id] = result.success
                 ? { success: true, testedAt: new Date() }
-                : { success: false, error: result.error || t('common.unknownError'), testedAt: new Date() }
+                : { success: false, error: result.error || '', testedAt: new Date() }
         } catch (error) {
             if (connectionRuns[id] !== run) return
             connectionResults[id] = { success: false, error: errorText(error), testedAt: new Date() }
@@ -246,7 +252,7 @@ export function useAIConfigWorkspace() {
             if (!isCurrent()) return
             requestResults[id] = result.generatedPrompt
                 ? { success: true, response: result.generatedPrompt, elapsed: Math.round(performance.now() - started) }
-                : { success: false, error: t('common.unknownError') }
+                : { success: false, error: t('promptGenerate.emptyResult') }
         } catch (error) {
             // 停止时 stopRequestTest 已经写好了结果
             if (!isCurrent()) return
@@ -286,7 +292,8 @@ export function useAIConfigWorkspace() {
             message.success(t('aiConfig.systemPromptUpdateSuccess'))
             return true
         } catch (error) {
-            message.error(t('aiConfig.saveFailed') + (error as Error).message)
+            console.error('保存系统提示词失败:', error)
+            message.error(t('aiConfig.saveFailed'))
             return false
         }
     }

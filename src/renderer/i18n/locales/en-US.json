@@ -25,7 +25,7 @@
     "versionInfo": "Version information",
     "viewReleaseNotes": "View release notes",
     "alreadyLatest": "You're on the latest version",
-    "checkFailed": "Couldn't check for updates",
+    "checkFailed": "Couldn't reach the update server. Check your connection and try again.",
     "openDownloadFailed": "Couldn't open the download page",
     "openPageFailed": "Couldn't open the page",
     "updateFound": "Version {version} is available"
@@ -37,7 +37,7 @@
     "availableModels": "Available models",
     "baseURL": "Base URL",
     "cancelPreferred": "Remove as preferred",
-    "clearFailed": "Couldn't clear: ",
+    "clearFailed": "Couldn't clear the preferred configuration. Try again.",
     "configAddSuccess": "Configuration added",
     "configDeleteSuccess": "Configuration deleted",
     "configDisabled": "Configuration disabled",
@@ -48,14 +48,14 @@
     "configUpdateSuccess": "Configuration updated",
     "connectionSuccessNoModels": "Connected, but couldn't get the model list",
     "connectionTest": "Connection test",
-    "connectionTestFailed": "Connection test failed: ",
+    "connectionTestFailed": "Connection test failed",
     "connectionTestSuccess": "Connection test passed",
     "createdAt": "Created",
-    "customEndpoint": "Custom endpoint (optional):",
+    "customEndpoint": "Custom service address (optional)",
     "defaultModel": "Default model",
     "delete": "Delete",
     "deleteConfirm": "Delete configuration “{name}”?",
-    "deleteFailed": "Couldn't delete: ",
+    "deleteFailed": "Couldn't delete. Try again.",
     "edit": "Edit",
     "editConfig": "Edit configuration",
     "enabled": "Enabled",
@@ -81,7 +81,7 @@
     "pleaseSelectDefaultModel": "Select a default model",
     "requestTest": "Test request",
     "resetToDefault": "Restore default",
-    "saveFailed": "Couldn't save: ",
+    "saveFailed": "Couldn't save. Try again.",
     "selectDefaultModel": "Select default model",
     "selectModelToTest": "Select the model to test",
     "serviceDescriptions": {
@@ -102,7 +102,7 @@
     "serviceType": "Service type",
     "setAsPreferred": "Set as preferred",
     "setAsPreferredSuccess": "“{name}” is now the preferred configuration",
-    "setFailed": "Couldn't update the setting: ",
+    "setFailed": "Couldn't change the preferred configuration. Try again.",
     "systemPrompt": "System prompt",
     "systemPromptCustomized": "Customized",
     "systemPromptDefault": "Default",
@@ -112,15 +112,15 @@
     "testFailed": "Test failed",
     "testSelectedModel": "Test the selected model",
     "testSuccessTitle": "Test passed",
-    "updateFailed": "Couldn't update: ",
-    "useOfficialEndpoint": "Leave blank to use the official endpoint",
+    "updateFailed": "Couldn't update. Try again.",
+    "useOfficialEndpoint": "Leave blank to use the official address",
     "usingDefaultModels": "Connection successful. Using {count} built-in default model | Connection successful. Using {count} built-in default models",
     "viewDocumentation": "View documentation",
     "workspace": {
       "allConfigs": "All configurations",
       "apiKeyPlaceholder": "Enter API key",
       "chooseProvider": "Choose an AI provider",
-      "chooseProviderDesc": "Choose the service type first; the connection fields will adapt automatically.",
+      "chooseProviderDesc": "Choose the service type first. The next step shows what to fill in.",
       "claudeCompatible": "Claude compatible",
       "configCount": "{count} configuration | {count} configurations",
       "configureConnection": "Configure and verify the connection",
@@ -144,7 +144,7 @@
       "defaultPromptInUse": "The built-in default system prompt is currently in use.",
       "defaultSystemPrompt": "You are a professional AI prompt engineer. Your task is to turn the user's request into a high-quality, well-structured AI prompt.\n\nRequirements:\n1. The prompt is clear, specific and easy to understand\n2. It includes the necessary context and constraints\n3. It uses an appropriate format and structure\n4. It guides the AI toward the expected output\n\nOutput only the generated prompt, without any extra explanation or commentary.",
       "disableAnyway": "Disable anyway",
-      "disablePreferredMessage": "Disabling it removes it as preferred, and AI features switch to another enabled configuration.",
+      "disablePreferredMessage": "Once disabled, it's no longer preferred and AI features use another enabled configuration.",
       "disablePreferredTitle": "Disable the preferred configuration?",
       "discardChanges": "Discard changes",
       "fallbackDescription": "AI features use this model for now. To keep it that way, click “Set as preferred”.",
@@ -163,7 +163,7 @@
       "noModelsReturned": "The service returned no models. Retry or add model names manually.",
       "notConfigured": "Not configured",
       "notRequired": "Not required",
-      "officialEndpoint": "Use official endpoint",
+      "officialEndpoint": "Use official address",
       "openAICompatible": "OpenAI compatible",
       "providerStep": "Choose provider",
       "replaceModelsMessage": "Fetching again replaces the current model list while preserving the selected default model.",
@@ -206,7 +206,7 @@
     "noHistory": "No generation history",
     "requirement": "Requirement",
     "requirementPlaceholder": "Describe the prompt you want to generate, e.g., writing assistant, code review, translation tool, etc.",
-    "saveFailed": "Couldn't save",
+    "saveFailed": "Couldn't save. Try again.",
     "saveSuccess": "Prompt saved",
     "selectModel": "Select model",
     "stop": "Stop",
@@ -281,7 +281,6 @@
     "refresh": "Refresh",
     "retry": "Retry",
     "save": "Save",
-    "unknownError": "Unknown error",
     "warning": "Warning"
   },
   "dataBackup": {
@@ -870,7 +869,7 @@
     "occurrenceCount": "Used {count} time in the prompt | Used {count} times in the prompt",
     "selectNeedsOption": "An “Options” variable needs at least one option",
     "source": "Source",
-    "unclosedVariable": "Found {count} unclosed variable placeholder | Found {count} unclosed variable placeholders",
+    "unclosedVariable": "{count} variable is missing its closing {'}}'} | {count} variables are missing their closing {'}}'}",
     "variableCount": "{count} variable | {count} variables",
     "variableNameDuplicate": "Variable names must be unique",
     "variableNameInvalid": "Names cannot contain braces, colons or line breaks",
@@ -990,7 +989,7 @@
     "discardChanges": "Discard changes",
     "fillVariables": "Fill variables",
     "noUseHistory": "No usage history yet",
-    "renderFailed": "Couldn't render the template",
+    "renderFailed": "The template has a syntax error. Check that {'{{'} {'}}'} and {'{%'} {'%}'} come in pairs.",
     "requiredValue": "This variable is required",
     "runWithAIHint": "Choose a model only when needed and view its response without changing the prompt",
     "selectModelFirst": "Select an available AI model first",
@@ -1002,7 +1001,7 @@
     "unsavedChanges": "Unsaved changes",
     "unsavedChangesMessage": "Your edits haven't been saved. If you discard them, they can't be recovered.",
     "valuesRestored": "Values from this use were restored",
-    "renderFailedWithError": "Couldn't render the template: {error}"
+    "renderFailedAtLine": "Line {line} of the template has a syntax error. Check that {'{{'} {'}}'} and {'{%'} {'%}'} come in pairs."
   },
   "quickOptimization": {
     "configName": "Name",
@@ -1036,7 +1035,7 @@
       "nameRequired": "Enter a configuration name",
       "noDescription": "No description",
       "operationFailed": "Operation failed. Try again.",
-      "saveFailed": "Couldn't save: {error}",
+      "saveFailed": "Couldn't save. Try again.",
       "selectConfig": "Select an optimization action to edit",
       "templateHelp": "Use {'{{'}content{'}}'} for the prompt content currently selected by the user.",
       "templateRequired": "Enter a prompt template",
@@ -1324,7 +1323,8 @@
     "replaceMessage": "The body has text you wrote. The AI result will replace the whole body.",
     "replaceConfirm": "Replace",
     "autoSaveNeedsTitle": "Couldn't generate a title, so it wasn't saved automatically. Add a title, then save.",
-    "generatedVersion": "Generated with AI: {description}"
+    "generatedVersion": "Generated with AI: {description}",
+    "failedWith": "Couldn't generate the prompt: {reason}"
   },
   "promptHistory": {
     "addedLines": "+{count} line | +{count} lines",
@@ -1899,7 +1899,8 @@
     },
     "generic": {
       "title": "The request failed",
-      "message": "The AI service returned an error. Check the model configuration and try again; the technical details show the exact reason."
+      "message": "The AI service returned an error. Check the model configuration and try again; the technical details show the exact reason.",
+      "messageNoDetail": "The service didn't say why. Check the address, API key and network, then try again."
     }
   },
   "mobileAI": {

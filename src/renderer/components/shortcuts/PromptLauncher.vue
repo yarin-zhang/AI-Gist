@@ -93,8 +93,8 @@ import { apiClientManager } from '@/lib/api';
 import { displayAccelerator, displayShortcutHint } from '@/lib/utils/accelerator';
 import { clampLauncherSelection, moveLauncherSelection } from '@/lib/utils/launcher-navigation';
 import {
-  createPromptDraft, getActivePromptVariables, getMissingPromptVariables, getUnfilledPromptVariables,
-  isEmptyPromptValue, renderPrompt,
+  createPromptDraft, describeTemplateError, getActivePromptVariables, getMissingPromptVariables,
+  getUnfilledPromptVariables, isEmptyPromptValue, renderPrompt,
 } from '@/lib/utils/prompt-template';
 import { getLastUsedValues, recordPromptUsage } from '@/lib/utils/prompt-usage';
 import VariableFieldList from '@/components/prompts/VariableFieldList.vue';
@@ -387,7 +387,7 @@ async function executePrompt(prompt: PromptWithRelations, action: ShortcutAction
   }
   const rendered = renderPrompt(prompt, values, variables);
   if (rendered.error) {
-    executionError.value = rendered.error;
+    executionError.value = describeTemplateError(rendered.error, t);
     await window.electronAPI.shortcuts.showLauncher();
     return;
   }

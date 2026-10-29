@@ -12,10 +12,15 @@ const mocks = vi.hoisted(() => ({
   createHistory: vi.fn(),
   streamGeneration: vi.fn(),
   recordGeneration: vi.fn(),
+  messageError: vi.fn(),
 }))
 
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('naive-ui', () => ({ useMessage: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }))
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string, named?: Record<string, unknown>) => (named ? `${key}${JSON.stringify(named)}` : key) }),
+}))
+vi.mock('naive-ui', () => ({
+  useMessage: () => ({ success: vi.fn(), error: (...args: unknown[]) => mocks.messageError(...args), warning: vi.fn() }),
+}))
 vi.mock('@/lib/api', () => ({
   api: {
     prompts: {
@@ -217,12 +222,29 @@ describe('#414 generation status tells success, failure, stop and interruption a
   })
 
   it('marks a failure before any content as error', async () => {
+    mocks.messageError.mockReset()
     mocks.streamGeneration.mockRejectedValue(new Error('401 Incorrect API key'))
     const generation = usePromptGeneration()
     expect(await generation.generate('写周报', () => undefined)).toBeNull()
     expect(generation.status.value).toBe('error')
-    expect(generation.errorMessage.value).toBe('401 Incorrect API key')
+    // 面板交给 AIErrorNotice 按原因说明；提示里只有一句原因，不带服务商原文
+    expect(generation.failure.value?.error).toBeInstanceOf(Error)
+    expect(generation.errorMessage.value).toBe('')
     expect(generation.partial.value).toBe(false)
+    expect(mocks.messageError).toHaveBeenCalledWith('promptGenerate.failedWith{"reason":"aiError.auth.title"}')
+  })
+
+  it('does not put the provider error into the toast twice, even when the main process wraps it', async () => {
+    mocks.messageError.mockReset()
+    mocks.streamGeneration.mockRejectedValue(new Error(
+      'Error invoking remote method \'ai:generate-prompt-stream\': Error: 生成失败: 生成失败: 401 {"error":{"message":"Incorrect API key provided"}}',
+    ))
+    const generation = usePromptGeneration()
+    await generation.generate('写周报', () => undefined)
+    const toast = String(mocks.messageError.mock.calls[0]?.[0])
+    expect(toast).toBe('promptGenerate.failedWith{"reason":"aiError.auth.title"}')
+    expect(toast).not.toContain('生成失败')
+    expect(toast).not.toContain('Incorrect API key')
   })
 
   it('marks a failure after partial content as interrupted', async () => {
@@ -254,6 +276,8 @@ describe('#414 generation status tells success, failure, stop and interruption a
     const generation = usePromptGeneration()
     expect(await generation.generate('写周报', () => undefined)).toBeNull()
     expect(generation.status.value).toBe('error')
+    expect(generation.failure.value).toBeNull()
+    expect(generation.errorMessage.value).toBe('promptGenerate.emptyResult')
   })
 
   it('shows "generated" in the panel only for a real success', () => {
@@ -261,6 +285,12 @@ describe('#414 generation status tells success, failure, stop and interruption a
     expect(panel).not.toContain('finished')
     expect(panel).toContain(`v-else-if="status === 'success'"`)
     expect(panel).toContain("@click=\"emit('revert')\"")
+  })
+
+  it('explains a failed request with AIErrorNotice instead of printing the raw error', () => {
+    const panel = readFileSync('src/renderer/components/prompts/PromptGeneratePanel.vue', 'utf8')
+    expect(panel).toContain('<AIErrorNotice v-if="generation.failure.value" plain')
+    expect(panel).not.toMatch(/\{\{ generation\.failure/)
   })
 })
 

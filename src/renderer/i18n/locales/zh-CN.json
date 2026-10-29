@@ -25,7 +25,7 @@
     "versionInfo": "版本信息",
     "viewReleaseNotes": "查看更新说明",
     "alreadyLatest": "当前已是最新版本",
-    "checkFailed": "检查更新失败",
+    "checkFailed": "没能连接到更新服务器，检查网络后再试",
     "openDownloadFailed": "打开下载页面失败",
     "openPageFailed": "打开页面失败",
     "updateFound": "发现新版本 {version}"
@@ -37,7 +37,7 @@
     "availableModels": "可用模型",
     "baseURL": "Base URL",
     "cancelPreferred": "取消首选",
-    "clearFailed": "清除失败: ",
+    "clearFailed": "取消首选失败，请重试",
     "configAddSuccess": "配置添加成功",
     "configDeleteSuccess": "配置删除成功",
     "configDisabled": "配置已禁用",
@@ -48,14 +48,14 @@
     "configUpdateSuccess": "配置更新成功",
     "connectionSuccessNoModels": "连接成功，但未获取到模型列表",
     "connectionTest": "连接测试",
-    "connectionTestFailed": "连接测试失败: ",
+    "connectionTestFailed": "连接测试失败",
     "connectionTestSuccess": "连接测试成功",
     "createdAt": "创建时间",
-    "customEndpoint": "自定义端点（可选）：",
+    "customEndpoint": "自定义服务地址（可选）",
     "defaultModel": "默认模型",
     "delete": "删除",
     "deleteConfirm": "删除模型配置「{name}」？",
-    "deleteFailed": "删除失败: ",
+    "deleteFailed": "删除失败，请重试",
     "edit": "编辑",
     "editConfig": "编辑配置",
     "enabled": "启用",
@@ -81,7 +81,7 @@
     "pleaseSelectDefaultModel": "请选择默认模型",
     "requestTest": "请求测试",
     "resetToDefault": "恢复默认",
-    "saveFailed": "保存失败: ",
+    "saveFailed": "保存失败，请重试",
     "selectDefaultModel": "选择默认模型",
     "selectModelToTest": "选择要测试的模型",
     "serviceDescriptions": {
@@ -102,7 +102,7 @@
     "serviceType": "服务类型",
     "setAsPreferred": "设为首选",
     "setAsPreferredSuccess": "已将「{name}」设为首选",
-    "setFailed": "设置失败: ",
+    "setFailed": "更改首选失败，请重试",
     "systemPrompt": "系统提示词",
     "systemPromptCustomized": "已自定义",
     "systemPromptDefault": "使用默认",
@@ -112,15 +112,15 @@
     "testFailed": "测试失败",
     "testSelectedModel": "测试选中模型",
     "testSuccessTitle": "测试成功",
-    "updateFailed": "更新失败: ",
-    "useOfficialEndpoint": "留空使用官方端点",
+    "updateFailed": "更新失败，请重试",
+    "useOfficialEndpoint": "留空使用官方地址",
     "usingDefaultModels": "连接成功，已使用 {count} 个内置默认模型",
     "viewDocumentation": "查看文档",
     "workspace": {
       "allConfigs": "全部配置",
       "apiKeyPlaceholder": "输入 API Key",
       "chooseProvider": "选择 AI 服务商",
-      "chooseProviderDesc": "先选择服务类型，后续字段和连接方式会自动适配。",
+      "chooseProviderDesc": "先选择服务类型，下一步会显示需要填写的内容。",
       "claudeCompatible": "Claude 兼容",
       "configCount": "{count} 个配置",
       "configureConnection": "配置并验证连接",
@@ -144,7 +144,7 @@
       "defaultPromptInUse": "当前使用内置默认系统提示词。",
       "defaultSystemPrompt": "你是一个专业的 AI 提示词工程师。你的任务是根据用户的需求，生成高质量、结构化的 AI 提示词。\n\n要求：\n1. 提示词应该清晰、具体、易于理解\n2. 包含必要的上下文和约束条件\n3. 使用适当的格式和结构\n4. 确保提示词能够引导 AI 生成期望的输出\n\n请直接输出生成的提示词内容，不要添加额外的解释或说明。",
       "disableAnyway": "仍然禁用",
-      "disablePreferredMessage": "禁用后将清除显式首选设置，并回退到其他已启用配置。",
+      "disablePreferredMessage": "禁用后它不再是首选，AI 功能会改用其他已启用的配置。",
       "disablePreferredTitle": "禁用首选配置？",
       "discardChanges": "放弃修改",
       "fallbackDescription": "AI 功能会先用这个模型。想一直用它，点「设为首选」。",
@@ -163,7 +163,7 @@
       "noModelsReturned": "服务没有返回模型；可重试或手动添加模型名称。",
       "notConfigured": "未配置",
       "notRequired": "无需凭据",
-      "officialEndpoint": "使用官方端点",
+      "officialEndpoint": "使用官方地址",
       "openAICompatible": "OpenAI 兼容",
       "providerStep": "选择服务商",
       "replaceModelsMessage": "重新获取会替换当前模型列表，但会保留已选择的默认模型。",
@@ -206,7 +206,7 @@
     "noHistory": "暂无生成历史",
     "requirement": "要求",
     "requirementPlaceholder": "描述你想要生成的提示词，例如：写作助手、代码审查、翻译工具等",
-    "saveFailed": "保存失败",
+    "saveFailed": "保存失败，请重试",
     "saveSuccess": "提示词已保存",
     "selectModel": "选择模型",
     "stop": "停止",
@@ -281,7 +281,6 @@
     "refresh": "刷新",
     "retry": "重试",
     "save": "保存",
-    "unknownError": "未知错误",
     "warning": "警告"
   },
   "dataBackup": {
@@ -870,7 +869,7 @@
     "occurrenceCount": "正文中出现 {count} 次",
     "selectNeedsOption": "选择变量至少需要一个选项",
     "source": "源码",
-    "unclosedVariable": "检测到 {count} 处未闭合的变量语法",
+    "unclosedVariable": "有 {count} 个变量少了结尾的 {'}}'}",
     "variableCount": "{count} 个变量",
     "variableNameDuplicate": "变量名称不能重复",
     "variableNameInvalid": "名称不能包含花括号、冒号或换行",
@@ -990,7 +989,7 @@
     "discardChanges": "放弃更改",
     "fillVariables": "填写变量",
     "noUseHistory": "还没有使用记录",
-    "renderFailed": "模板渲染失败",
+    "renderFailed": "模板有语法错误，检查 {'{{'} {'}}'} 和 {'{%'} {'%}'} 是否成对",
     "requiredValue": "请填写必填变量",
     "runWithAIHint": "按需选择模型并直接查看响应，不影响提示词内容",
     "selectModelFirst": "请先选择可用的 AI 模型",
@@ -1002,7 +1001,7 @@
     "unsavedChanges": "有未保存的更改",
     "unsavedChangesMessage": "当前编辑内容尚未保存。放弃后无法恢复这些更改。",
     "valuesRestored": "已恢复这次使用的变量",
-    "renderFailedWithError": "模板渲染失败：{error}"
+    "renderFailedAtLine": "模板第 {line} 行有语法错误，检查 {'{{'} {'}}'} 和 {'{%'} {'%}'} 是否成对"
   },
   "quickOptimization": {
     "configName": "配置名称",
@@ -1036,7 +1035,7 @@
       "nameRequired": "请输入配置名称",
       "noDescription": "暂无说明",
       "operationFailed": "操作失败，请重试",
-      "saveFailed": "保存失败：{error}",
+      "saveFailed": "保存失败，请重试",
       "selectConfig": "选择一个优化动作进行编辑",
       "templateHelp": "使用 {'{{'}content{'}}'} 表示用户当前选中的提示词内容。",
       "templateRequired": "请输入提示词模板",
@@ -1324,7 +1323,8 @@
     "replaceMessage": "正文里有你写的内容，AI 生成的结果会替换整段正文。",
     "replaceConfirm": "替换",
     "autoSaveNeedsTitle": "没能生成标题，这次没有自动保存。填好标题后再保存。",
-    "generatedVersion": "AI 生成：{description}"
+    "generatedVersion": "AI 生成：{description}",
+    "failedWith": "生成失败：{reason}"
   },
   "promptHistory": {
     "addedLines": "+{count} 行",
@@ -1899,7 +1899,8 @@
     },
     "generic": {
       "title": "请求没有成功",
-      "message": "AI 服务返回了错误。可以检查模型配置后重试，具体原因见技术详情。"
+      "message": "AI 服务返回了错误。可以检查模型配置后重试，具体原因见技术详情。",
+      "messageNoDetail": "服务没有说明原因。检查服务地址、API Key 和网络后重试。"
     }
   },
   "mobileAI": {

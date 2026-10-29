@@ -126,20 +126,27 @@ const readStatus = (text: string): number | null => {
   return null
 }
 
-/** 去掉后端 / 主进程套的中文包装（「xx 请求失败（HTTP 401）：」「❌ 模型 x 测试失败:」），只留服务商的原话 */
+/**
+ * 去掉后端 / 主进程套的包装（Electron IPC 的「Error invoking remote method」、「xx 请求失败（HTTP 401）：」、
+ * 「❌ 模型 x 测试失败:」、一层层叠起来的「生成失败:」），只留服务商的原话
+ */
 const unwrap = (text: string): string => text
+  .replace(/^Error invoking remote method '[^']*':\s*(?:\w*Error:\s*)?/i, '')
   .replace(/^❌\s*/, '')
   .replace(/^模型\s+\S+\s+测试失败[:：]\s*/, '')
-  .replace(/^(?:生成失败|连接测试失败|模型列表请求失败|连接失败)[:：]\s*/, '')
+  .replace(/^(?:(?:生成失败|连接测试失败|模型列表请求失败|连接失败)[:：]\s*)+/, '')
   .replace(/^[^（(]{0,40}请求失败[（(]HTTP\s*\d{3}[）)][:：]?\s*/, '')
   .replace(/^Request failed with status code \d{3}[:：]?\s*/i, '')
   .trim()
+
+/** 状态码可能在包装里（「请求失败（HTTP 401）」），也可能在去掉包装后的开头（「401 Unauthorized」） */
+const readRawStatus = (raw: string): number | null => readStatus(raw) ?? readStatus(unwrap(raw))
 
 /** 把原始报错整理成一行能读的细节：解析 JSON、HTML，带上 HTTP 状态码，隐去密钥 */
 export function extractAIErrorDetail(error: unknown): string {
   const raw = toRawMessage(error).trim()
   if (!raw) return ''
-  const status = readStatus(raw)
+  const status = readRawStatus(raw)
   let text = unwrap(raw)
   if (/<(?:!doctype|html|body|head|h1|title)\b/i.test(text)) text = stripHtml(text)
   else text = readJsonMessage(text) ?? text
@@ -156,7 +163,7 @@ export function classifyAIError(error: unknown, context: AIErrorContext = {}): A
   if (error instanceof AIRequestTimeoutError) return 'timeout'
   const raw = toRawMessage(error)
   const text = `${raw} ${extractAIErrorDetail(raw)}`
-  const status = readStatus(raw)
+  const status = readRawStatus(raw)
 
   // 「每分钟配额用完」这类按时间窗口的限制算限流，不算余额不足
   if (/insufficient[_ ]?(?:quota|balance|credit|funds)|credit balance|exceeded your current quota|billing|payment required|余额|额度不足|欠费|arrearage/i.test(text) || status === 402) return 'quota'
@@ -182,11 +189,13 @@ const RETRYABLE = new Set<AIErrorKind>(['rateLimit', 'unreachable', 'localServic
  */
 export function describeAIError(error: unknown, context: AIErrorContext, t: Translate): AIErrorDiagnosis {
   const kind = classifyAIError(error, context)
+  const detail = extractAIErrorDetail(error)
   return {
     kind,
     title: t(`aiError.${kind}.title`),
-    message: t(`aiError.${kind}.message`),
-    detail: extractAIErrorDetail(error),
+    // 认不出原因、也没有原始报错可看（服务只回了「失败」）：不提「见技术详情」，直接说该检查什么
+    message: kind === 'generic' && !detail ? t('aiError.generic.messageNoDetail') : t(`aiError.${kind}.message`),
+    detail,
     retryable: RETRYABLE.has(kind),
   }
 }

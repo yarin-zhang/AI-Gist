@@ -273,8 +273,8 @@ import { createEditorForm, historyMatchesPrompt, serializeVariablesForSave } fro
 import { compareVersionFields, type VersionFieldKey } from '@/lib/utils/prompt-history-display'
 import type { DiffSegment } from '@/components/ui/types'
 import {
-  applyChangedDefaults, createPromptDraft, findMultilineVariableNames, getActivePromptVariables, getMissingPromptVariables,
-  isEmptyPromptValue, parsePromptTemplate, renderPrompt,
+  applyChangedDefaults, createPromptDraft, describeTemplateError, findMultilineVariableNames, getActivePromptVariables,
+  getMissingPromptVariables, isEmptyPromptValue, parsePromptTemplate, renderPrompt,
 } from '@/lib/utils/prompt-template'
 import {
   clearPromptUsageHistory, deletePromptUsageRecord, getLastUsedValues, readPromptUsageHistory, recordPromptUsage,
@@ -629,7 +629,7 @@ const copyPrompt = async () => {
   }
   missingWarning?.destroy()
   if (rendered.value.error) {
-    message.error(t('promptWorkspace.renderFailedWithError', { error: rendered.value.error }))
+    message.error(describeTemplateError(rendered.value.error, t))
     return
   }
   try {
@@ -794,7 +794,7 @@ const tryRun = async () => {
   if (narrow.value) sideOverlayOpen.value = true
   if (!canRun.value) {
     if (missing.value.length) await copyPrompt()
-    else if (rendered.value.error) message.error(t('promptWorkspace.renderFailedWithError', { error: rendered.value.error }))
+    else if (rendered.value.error) message.error(describeTemplateError(rendered.value.error, t))
     return
   }
   await ai.run()

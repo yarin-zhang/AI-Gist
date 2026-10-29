@@ -162,7 +162,7 @@ export class GoogleProvider extends BaseAIProvider {
       if (error.message?.includes('请求超时')) {
         throw new Error('生成超时，请检查网络连接或服务状态');
       }
-      throw new Error(`生成失败: ${error.message}`);
+      throw error;
     }
   }
 
@@ -230,7 +230,7 @@ export class GoogleProvider extends BaseAIProvider {
         }
         
         console.error('Google Gemini 请求失败:', requestError);
-        throw new Error(`生成失败: ${requestError.message}`);
+        throw requestError;
       }
 
       if (shouldStop || abortSignal?.aborted) {
@@ -243,7 +243,7 @@ export class GoogleProvider extends BaseAIProvider {
       if (error.message?.includes('请求超时')) {
         throw new Error('生成超时，请检查网络连接或服务状态');
       }
-      throw new Error(`生成失败: ${error.message}`);
+      throw error;
     }
   }
 

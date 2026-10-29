@@ -200,7 +200,7 @@ export class LMStudioProvider extends BaseAIProvider {
       if (error.message?.includes('请求超时')) {
         throw new Error('生成超时，请检查网络连接或服务状态');
       }
-      throw new Error(`生成失败: ${error.message}`);
+      throw error;
     }
   }
 
@@ -348,7 +348,7 @@ export class LMStudioProvider extends BaseAIProvider {
       if (error.message?.includes('请求超时')) {
         throw new Error('生成超时，请检查网络连接或服务状态');
       }
-      throw new Error(`生成失败: ${error.message}`);
+      throw error;
     }
   }
 

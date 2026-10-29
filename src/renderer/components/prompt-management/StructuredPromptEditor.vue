@@ -59,7 +59,7 @@
 
     <div v-if="diagnosticCount" class="editor-diagnostic" role="status">
       <NIcon size="16"><AlertTriangle /></NIcon>
-      <span>{{ t('promptEditor.unclosedVariable', { count: diagnosticCount }) }}</span>
+      <span>{{ t('promptEditor.unclosedVariable', { count: diagnosticCount }, diagnosticCount) }}</span>
     </div>
   </div>
 </template>

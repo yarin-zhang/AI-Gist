@@ -25,7 +25,7 @@
     "versionInfo": "Informazioni sulla versione",
     "viewReleaseNotes": "Mostra note di rilascio",
     "alreadyLatest": "Hai già l'ultima versione",
-    "checkFailed": "Impossibile verificare gli aggiornamenti",
+    "checkFailed": "Impossibile raggiungere il server degli aggiornamenti. Controlla la connessione e riprova.",
     "openDownloadFailed": "Impossibile aprire la pagina di download",
     "openPageFailed": "Impossibile aprire la pagina",
     "updateFound": "È disponibile la versione {version}"
@@ -37,7 +37,7 @@
     "availableModels": "Modelli disponibili",
     "baseURL": "URL di base",
     "cancelPreferred": "Rimuovi preferito",
-    "clearFailed": "Cancellazione non riuscita:",
+    "clearFailed": "Impossibile rimuovere la configurazione preferita. Riprova.",
     "configAddSuccess": "Configurazione aggiunta",
     "configDeleteSuccess": "Configurazione eliminata",
     "configDisabled": "Configurazione disabilitata",
@@ -48,14 +48,14 @@
     "configUpdateSuccess": "Configurazione aggiornata",
     "connectionSuccessNoModels": "Connessione riuscita, ma non è stato possibile ottenere l'elenco dei modelli",
     "connectionTest": "Test di connessione",
-    "connectionTestFailed": "Test di connessione non riuscito: ",
+    "connectionTestFailed": "Test di connessione non riuscito",
     "connectionTestSuccess": "Test di connessione riuscito",
     "createdAt": "Creata",
-    "customEndpoint": "Endpoint personalizzato (facoltativo):",
+    "customEndpoint": "Indirizzo del servizio personalizzato (facoltativo)",
     "defaultModel": "Modello predefinito",
     "delete": "Elimina",
     "deleteConfirm": "Vuoi eliminare la configurazione «{name}»?",
-    "deleteFailed": "Eliminazione non riuscita: ",
+    "deleteFailed": "Eliminazione non riuscita. Riprova.",
     "edit": "Modifica",
     "editConfig": "Modifica configurazione",
     "enabled": "Abilitato",
@@ -81,7 +81,7 @@
     "pleaseSelectDefaultModel": "Seleziona il modello predefinito",
     "requestTest": "Richiesta di test",
     "resetToDefault": "Ripristina predefinito",
-    "saveFailed": "Salvataggio non riuscito: ",
+    "saveFailed": "Salvataggio non riuscito. Riprova.",
     "selectDefaultModel": "Seleziona il modello predefinito",
     "selectModelToTest": "Seleziona il modello da testare",
     "serviceDescriptions": {
@@ -102,7 +102,7 @@
     "serviceType": "Tipo di servizio",
     "setAsPreferred": "Imposta come preferito",
     "setAsPreferredSuccess": "«{name}» è ora la configurazione preferita",
-    "setFailed": "Impostazione non riuscita: ",
+    "setFailed": "Impossibile cambiare la configurazione preferita. Riprova.",
     "systemPrompt": "Prompt di sistema",
     "systemPromptCustomized": "Personalizzato",
     "systemPromptDefault": "Usa predefinito",
@@ -112,15 +112,15 @@
     "testFailed": "Test non riuscito",
     "testSelectedModel": "Testa il modello selezionato",
     "testSuccessTitle": "Test riuscito",
-    "updateFailed": "Aggiornamento non riuscito: ",
-    "useOfficialEndpoint": "Lascia vuoto per utilizzare l'endpoint ufficiale",
+    "updateFailed": "Aggiornamento non riuscito. Riprova.",
+    "useOfficialEndpoint": "Lascia vuoto per usare l'indirizzo ufficiale",
     "usingDefaultModels": "Connessione riuscita. In uso {count} modello predefinito integrato | Connessione riuscita. In uso {count} modelli predefiniti integrati",
     "viewDocumentation": "Vedi documentazione",
     "workspace": {
       "allConfigs": "Tutte le configurazioni",
       "apiKeyPlaceholder": "Inserisci la chiave API",
       "chooseProvider": "Scegli un provider AI",
-      "chooseProviderDesc": "Scegli prima il tipo di servizio; i campi di connessione si adatteranno automaticamente.",
+      "chooseProviderDesc": "Scegli prima il tipo di servizio. Nel passaggio successivo vedrai cosa compilare.",
       "claudeCompatible": "Compatibile con Claude",
       "configCount": "{count} configurazione | {count} configurazioni",
       "configureConnection": "Configura e verifica la connessione",
@@ -144,7 +144,7 @@
       "defaultPromptInUse": "Il prompt di sistema predefinito integrato è attualmente in uso.",
       "defaultSystemPrompt": "Sei un esperto di prompt engineering per l'AI. Il tuo compito è trasformare la richiesta dell'utente in un prompt per l'AI di alta qualità e ben strutturato.\n\nRequisiti:\n1. Il prompt deve essere chiaro, specifico e facile da capire\n2. Deve includere il contesto e i vincoli necessari\n3. Deve usare un formato e una struttura adeguati\n4. Deve guidare l'AI verso il risultato atteso\n\nRestituisci solo il prompt generato, senza spiegazioni o commenti aggiuntivi.",
       "disableAnyway": "Disabilita comunque",
-      "disablePreferredMessage": "Se la disabiliti, non sarà più la preferita e verrà usata un'altra configurazione abilitata.",
+      "disablePreferredMessage": "Una volta disabilitata non sarà più la preferita e le funzioni AI useranno un'altra configurazione abilitata.",
       "disablePreferredTitle": "Disabilitare la configurazione preferita?",
       "discardChanges": "Scarta modifiche",
       "fallbackDescription": "Le funzioni AI usano per ora questo modello. Per usarlo sempre, fai clic su «Imposta come preferito».",
@@ -163,7 +163,7 @@
       "noModelsReturned": "Il servizio non ha restituito modelli. Riprova o aggiungi manualmente i nomi dei modelli.",
       "notConfigured": "Non configurato",
       "notRequired": "Non richiesto",
-      "officialEndpoint": "Utilizza endpoint ufficiale",
+      "officialEndpoint": "Usa l'indirizzo ufficiale",
       "openAICompatible": "Compatibile con OpenAI",
       "providerStep": "Scegli il provider",
       "replaceModelsMessage": "Un nuovo recupero sostituirà l'elenco dei modelli attuale, mantenendo il modello predefinito selezionato.",
@@ -206,7 +206,7 @@
     "noHistory": "Nessuna cronologia delle generazioni",
     "requirement": "Requisito",
     "requirementPlaceholder": "Descrivi il prompt che desideri generare, ad esempio assistente alla scrittura, revisione del codice, strumento di traduzione, ecc.",
-    "saveFailed": "Salvataggio non riuscito",
+    "saveFailed": "Salvataggio non riuscito. Riprova.",
     "saveSuccess": "Prompt salvato",
     "selectModel": "Seleziona modello",
     "stop": "Interrompi",
@@ -281,7 +281,6 @@
     "refresh": "Aggiorna",
     "retry": "Riprova",
     "save": "Salva",
-    "unknownError": "Errore sconosciuto",
     "warning": "Avviso"
   },
   "dataBackup": {
@@ -870,7 +869,7 @@
     "occurrenceCount": "Usata {count} volta nel prompt | Usata {count} volte nel prompt",
     "selectNeedsOption": "Una variabile di tipo «Opzioni» richiede almeno un'opzione",
     "source": "Sorgente",
-    "unclosedVariable": "Trovato {count} segnaposto variabile non chiuso | Trovati {count} segnaposto variabile non chiusi",
+    "unclosedVariable": "{count} variabile senza {'}}'} di chiusura | {count} variabili senza {'}}'} di chiusura",
     "variableCount": "{count} variabile | {count} variabili",
     "variableNameDuplicate": "I nomi delle variabili devono essere univoci",
     "variableNameInvalid": "I nomi non possono contenere parentesi graffe, due punti o a capo",
@@ -990,7 +989,7 @@
     "discardChanges": "Scarta modifiche",
     "fillVariables": "Compila le variabili",
     "noUseHistory": "Cronologia utilizzi ancora vuota",
-    "renderFailed": "Rendering del modello non riuscito",
+    "renderFailed": "Il modello contiene un errore di sintassi. Controlla che {'{{'} {'}}'} e {'{%'} {'%}'} siano chiusi correttamente.",
     "requiredValue": "Questa variabile è obbligatoria",
     "runWithAIHint": "Scegli un modello solo quando serve e visualizza la risposta senza modificare il prompt",
     "selectModelFirst": "Seleziona prima un modello AI disponibile",
@@ -1002,7 +1001,7 @@
     "unsavedChanges": "Modifiche non salvate",
     "unsavedChangesMessage": "Le modifiche correnti non sono state salvate. Se le scarti, non potrai annullare l'operazione.",
     "valuesRestored": "Valori di questo utilizzo ripristinati",
-    "renderFailedWithError": "Rendering del modello non riuscito: {error}"
+    "renderFailedAtLine": "La riga {line} del modello contiene un errore di sintassi. Controlla che {'{{'} {'}}'} e {'{%'} {'%}'} siano chiusi correttamente."
   },
   "quickOptimization": {
     "configName": "Nome configurazione",
@@ -1036,7 +1035,7 @@
       "nameRequired": "Inserisci un nome di configurazione",
       "noDescription": "Nessuna descrizione",
       "operationFailed": "Operazione non riuscita. Riprova.",
-      "saveFailed": "Salvataggio non riuscito: {error}",
+      "saveFailed": "Salvataggio non riuscito. Riprova.",
       "selectConfig": "Seleziona un'azione di ottimizzazione da modificare",
       "templateHelp": "Usa {'{{'}content{'}}'} per inserire il contenuto del prompt selezionato dall'utente.",
       "templateRequired": "Inserisci un modello di prompt",
@@ -1324,7 +1323,8 @@
     "replaceMessage": "Il testo contiene parti scritte da te. Il risultato dell'AI sostituirà l'intero testo.",
     "replaceConfirm": "Sostituisci",
     "autoSaveNeedsTitle": "Impossibile generare un titolo, quindi non è stato salvato automaticamente. Aggiungi un titolo e salva.",
-    "generatedVersion": "Generato con IA: {description}"
+    "generatedVersion": "Generato con IA: {description}",
+    "failedWith": "Impossibile generare il prompt: {reason}"
   },
   "promptHistory": {
     "addedLines": "+{count} riga | +{count} righe",
@@ -1899,7 +1899,8 @@
     },
     "generic": {
       "title": "Richiesta non riuscita",
-      "message": "Il servizio AI ha restituito un errore. Controlla le impostazioni del modello e riprova; i dettagli tecnici indicano il motivo esatto."
+      "message": "Il servizio AI ha restituito un errore. Controlla le impostazioni del modello e riprova; i dettagli tecnici indicano il motivo esatto.",
+      "messageNoDetail": "Il servizio non ha indicato il motivo. Controlla indirizzo, chiave API e rete, poi riprova."
     }
   },
   "mobileAI": {

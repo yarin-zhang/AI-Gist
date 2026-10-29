@@ -25,7 +25,7 @@
     "versionInfo": "バージョン情報",
     "viewReleaseNotes": "リリースノートを表示",
     "alreadyLatest": "最新バージョンです",
-    "checkFailed": "更新の確認に失敗しました",
+    "checkFailed": "更新サーバーに接続できませんでした。ネットワークを確認してから再度お試しください。",
     "openDownloadFailed": "ダウンロードページを開けませんでした",
     "openPageFailed": "ページを開けませんでした",
     "updateFound": "新しいバージョン {version} があります"
@@ -37,7 +37,7 @@
     "availableModels": "利用可能なモデル",
     "baseURL": "ベース URL",
     "cancelPreferred": "優先を解除",
-    "clearFailed": "クリアに失敗しました：",
+    "clearFailed": "優先の解除に失敗しました。もう一度お試しください。",
     "configAddSuccess": "モデル設定を追加しました",
     "configDeleteSuccess": "モデル設定を削除しました",
     "configDisabled": "モデル設定を無効にしました",
@@ -48,14 +48,14 @@
     "configUpdateSuccess": "モデル設定を更新しました",
     "connectionSuccessNoModels": "接続できましたが、モデル一覧を取得できませんでした",
     "connectionTest": "接続テスト",
-    "connectionTestFailed": "接続テストに失敗しました：",
+    "connectionTestFailed": "接続テストに失敗しました",
     "connectionTestSuccess": "接続テストに成功しました",
     "createdAt": "作成日時",
-    "customEndpoint": "カスタムエンドポイント（任意）：",
+    "customEndpoint": "カスタムのサービスアドレス（任意）",
     "defaultModel": "既定のモデル",
     "delete": "削除",
     "deleteConfirm": "モデル設定「{name}」を削除してもよろしいですか？",
-    "deleteFailed": "削除に失敗しました：",
+    "deleteFailed": "削除に失敗しました。もう一度お試しください。",
     "edit": "編集",
     "editConfig": "モデル設定を編集",
     "enabled": "有効",
@@ -81,7 +81,7 @@
     "pleaseSelectDefaultModel": "既定のモデルを選択してください",
     "requestTest": "リクエストテスト",
     "resetToDefault": "既定に戻す",
-    "saveFailed": "保存に失敗しました：",
+    "saveFailed": "保存に失敗しました。もう一度お試しください。",
     "selectDefaultModel": "既定のモデルを選択",
     "selectModelToTest": "テストするモデルを選択",
     "serviceDescriptions": {
@@ -102,7 +102,7 @@
     "serviceType": "サービスタイプ",
     "setAsPreferred": "優先に設定",
     "setAsPreferredSuccess": "「{name}」を優先に設定しました",
-    "setFailed": "設定に失敗しました：",
+    "setFailed": "優先の変更に失敗しました。もう一度お試しください。",
     "systemPrompt": "システムプロンプト",
     "systemPromptCustomized": "カスタマイズ済み",
     "systemPromptDefault": "既定を使用",
@@ -112,15 +112,15 @@
     "testFailed": "テストに失敗しました",
     "testSelectedModel": "選択したモデルをテスト",
     "testSuccessTitle": "テスト成功",
-    "updateFailed": "更新に失敗しました：",
-    "useOfficialEndpoint": "空欄の場合は公式エンドポイントを使用します",
+    "updateFailed": "更新に失敗しました。もう一度お試しください。",
+    "useOfficialEndpoint": "空欄の場合は公式のアドレスを使用します",
     "usingDefaultModels": "接続しました。組み込みの既定モデル {count} 件を使用しています",
     "viewDocumentation": "ドキュメントを見る",
     "workspace": {
       "allConfigs": "すべてのモデル設定",
       "apiKeyPlaceholder": "API キーを入力",
       "chooseProvider": "AI プロバイダーを選択",
-      "chooseProviderDesc": "サービス種別を選択すると、接続項目が自動的に調整されます。",
+      "chooseProviderDesc": "サービス種別を選択すると、次のステップで入力する項目が表示されます。",
       "claudeCompatible": "Claude 互換",
       "configCount": "{count} 件のモデル設定",
       "configureConnection": "接続を設定して検証",
@@ -144,7 +144,7 @@
       "defaultPromptInUse": "現在は組み込みの既定のシステムプロンプトを使用しています。",
       "defaultSystemPrompt": "あなたはプロの AI プロンプトエンジニアです。ユーザーの要望をもとに、質が高く構造化された AI プロンプトを作成してください。\n\n要件：\n1. 明確・具体的で、わかりやすいプロンプトにする\n2. 必要な背景情報と制約条件を含める\n3. 適切な形式と構成を使う\n4. AI が期待どおりの出力を生成できるよう導く\n\n生成したプロンプトだけを出力し、説明や補足は付けないでください。",
       "disableAnyway": "このまま無効化",
-      "disablePreferredMessage": "無効にすると優先の指定が解除され、ほかの有効なモデル設定に切り替わります。",
+      "disablePreferredMessage": "無効にすると優先ではなくなり、AI 機能はほかの有効なモデル設定を使います。",
       "disablePreferredTitle": "優先のモデル設定を無効にしますか？",
       "discardChanges": "変更を破棄",
       "fallbackDescription": "AI 機能はまずこのモデルを使います。常に使うには「優先に設定」を押してください。",
@@ -163,7 +163,7 @@
       "noModelsReturned": "サービスからモデルが返されませんでした。再試行するか、モデル名を手動で追加してください。",
       "notConfigured": "未設定",
       "notRequired": "不要",
-      "officialEndpoint": "公式エンドポイントを使用",
+      "officialEndpoint": "公式のアドレスを使用",
       "openAICompatible": "OpenAI 互換",
       "providerStep": "プロバイダー選択",
       "replaceModelsMessage": "再取得すると現在のモデル一覧が置き換わりますが、選択済みの既定のモデルは保持されます。",
@@ -206,7 +206,7 @@
     "noHistory": "生成履歴がありません",
     "requirement": "要件",
     "requirementPlaceholder": "生成したいプロンプトを説明してください。例：執筆アシスタント、コードレビュー、翻訳ツールなど",
-    "saveFailed": "保存に失敗しました",
+    "saveFailed": "保存に失敗しました。もう一度お試しください。",
     "saveSuccess": "プロンプトを保存しました",
     "selectModel": "モデルを選択",
     "stop": "停止",
@@ -281,7 +281,6 @@
     "refresh": "更新",
     "retry": "再試行",
     "save": "保存",
-    "unknownError": "不明なエラー",
     "warning": "警告"
   },
   "dataBackup": {
@@ -870,7 +869,7 @@
     "occurrenceCount": "本文で {count} 回使用",
     "selectNeedsOption": "選択変数には少なくとも 1 つの選択肢が必要です",
     "source": "ソース",
-    "unclosedVariable": "閉じられていない変数構文が {count} 件あります",
+    "unclosedVariable": "{count} 件の変数に閉じる {'}}'} がありません",
     "variableCount": "変数 {count} 件",
     "variableNameDuplicate": "変数名は重複できません",
     "variableNameInvalid": "名前に波括弧、コロン、改行は使用できません",
@@ -990,7 +989,7 @@
     "discardChanges": "変更を破棄",
     "fillVariables": "変数を入力",
     "noUseHistory": "使用履歴はまだありません",
-    "renderFailed": "テンプレートのレンダリングに失敗しました",
+    "renderFailed": "テンプレートに構文エラーがあります。{'{{'} {'}}'} と {'{%'} {'%}'} が対になっているか確認してください。",
     "requiredValue": "必須変数を入力してください",
     "runWithAIHint": "必要なときだけモデルを選択し、プロンプトを変更せずに応答を確認します",
     "selectModelFirst": "利用可能な AI モデルを選択してください",
@@ -1002,7 +1001,7 @@
     "unsavedChanges": "未保存の変更があります",
     "unsavedChangesMessage": "現在の編集内容は保存されていません。破棄すると元に戻せません。",
     "valuesRestored": "この使用時の入力値を復元しました",
-    "renderFailedWithError": "テンプレートのレンダリングに失敗しました：{error}"
+    "renderFailedAtLine": "テンプレートの {line} 行目に構文エラーがあります。{'{{'} {'}}'} と {'{%'} {'%}'} が対になっているか確認してください。"
   },
   "quickOptimization": {
     "configName": "設定名",
@@ -1036,7 +1035,7 @@
       "nameRequired": "設定名を入力してください",
       "noDescription": "説明なし",
       "operationFailed": "操作に失敗しました。もう一度お試しください。",
-      "saveFailed": "保存に失敗しました：{error}",
+      "saveFailed": "保存に失敗しました。もう一度お試しください。",
       "selectConfig": "編集する最適化アクションを選択してください",
       "templateHelp": "{'{{'}content{'}}'} はユーザーが現在選択しているプロンプト内容を表します。",
       "templateRequired": "プロンプトテンプレートを入力してください",
@@ -1324,7 +1323,8 @@
     "replaceMessage": "本文には入力した内容があります。AI の生成結果で本文全体が置き換えられます。",
     "replaceConfirm": "置き換え",
     "autoSaveNeedsTitle": "タイトルを生成できなかったため、自動保存していません。タイトルを入力してから保存してください。",
-    "generatedVersion": "AI で生成：{description}"
+    "generatedVersion": "AI で生成：{description}",
+    "failedWith": "生成に失敗しました：{reason}"
   },
   "promptHistory": {
     "addedLines": "+{count} 行",
@@ -1899,7 +1899,8 @@
     },
     "generic": {
       "title": "リクエストに失敗しました",
-      "message": "AI サービスがエラーを返しました。モデル設定を確認して再度お試しください。詳しい原因は技術的な詳細に表示されています。"
+      "message": "AI サービスがエラーを返しました。モデル設定を確認して再度お試しください。詳しい原因は技術的な詳細に表示されています。",
+      "messageNoDetail": "サービスから原因が返されませんでした。アドレス、API キー、ネットワークを確認してから再度お試しください。"
     }
   },
   "mobileAI": {

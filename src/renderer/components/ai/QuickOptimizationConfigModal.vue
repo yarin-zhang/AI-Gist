@@ -275,7 +275,10 @@ const saveDraft = async () => {
         await loadConfigs()
         emit('configs-updated')
         message.success(t(wasCreating ? 'quickOptimization.workspace.created' : 'quickOptimization.workspace.saved', { name: data.name }))
-    } catch (error) { message.error(t('quickOptimization.workspace.saveFailed', { error: (error as Error).message })) }
+    } catch (error) {
+        console.error('保存快速优化配置失败:', error)
+        message.error(t('quickOptimization.workspace.saveFailed'))
+    }
     finally { saving.value = false }
 }
 
