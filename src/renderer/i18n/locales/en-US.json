@@ -514,7 +514,9 @@
       "merged": "Sync complete — local and cloud data were merged",
       "upToDate": "Sync complete — everything is already up to date",
       "uploaded": "Sync complete — local data was uploaded",
-      "conflictPending": "Changes on this device and in the cloud conflict. Choose how to resolve them."
+      "conflictPending": "Changes on this device and in the cloud conflict. Choose how to resolve them.",
+      "restoredOne": "“{name}” was changed on another device and has been restored",
+      "restoredMany": "“{name}” and {count} other item were changed on another device and have been restored | “{name}” and {count} other items were changed on another device and have been restored"
     },
     "testConnection": "Test connection",
     "title": "Data sync",
@@ -693,7 +695,9 @@
     "syncIntervalTooShort": "The minimum is {min} minutes",
     "syncIntervalTooLong": "The maximum is {hours} hours ({max} minutes)",
     "indicatorShortRetrying": "Sync failed · Retrying later",
-    "technicalDetails": "Technical details (copy these when reporting a problem)"
+    "technicalDetails": "Technical details (copy these when reporting a problem)",
+    "deviceNameOnPlatform": "AI Gist on {platform}",
+    "deviceNameWeb": "AI Gist on the web"
   },
   "databaseStatus": {
     "connectionError": "Database connection error",
@@ -1690,9 +1694,9 @@
     "description": "Data on this device and in the cloud don’t match. Choose how to handle it before syncing continues.",
     "localCounts": "This device: {prompts}, {categories}, {aiConfigs}",
     "remoteCounts": "Cloud: {prompts}, {categories}, {aiConfigs}",
-    "added": "New in the cloud: {count}",
-    "updated": "Changed in the cloud: {count}",
-    "deleted": "Deleted: {count}",
+    "added": "{count} item was added in the cloud | {count} items were added in the cloud",
+    "updated": "{count} item was changed in the cloud | {count} items were changed in the cloud",
+    "deleted": "{count} item was deleted in the cloud | {count} items were deleted in the cloud",
     "strategyLabel": "How to resolve",
     "useLocal": "Use this device's data",
     "useLocalDesc": "Keep this device’s version of conflicting items and drop the cloud edits",
@@ -1753,7 +1757,9 @@
     },
     "countPrompts": "{count} prompt | {count} prompts",
     "countCategories": "{count} category | {count} categories",
-    "countAiConfigs": "{count} model configuration | {count} model configurations"
+    "countAiConfigs": "{count} model configuration | {count} model configurations",
+    "newer": "Newer",
+    "deletedAtTime": "Deleted {time}"
   },
   "appInit": {
     "loading": "Opening AI Gist…",

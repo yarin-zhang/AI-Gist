@@ -217,6 +217,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   app: {
     isMacAppStore: process.mas === true,
     getVersion: () => ipcRenderer.invoke('app:get-version'),
+    getDeviceName: () => ipcRenderer.invoke('app:get-device-name'),
     getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
     openDownloadPage: (url: string) => ipcRenderer.invoke('app:open-download-page', url),
     onUpdateAvailable: (callback: (updateInfo: any) => void) => {

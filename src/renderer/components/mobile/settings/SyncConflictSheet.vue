@@ -12,10 +12,11 @@
 
       <div v-if="pending" class="m-body conflict-sheet__body">
         <p class="m-desc">{{ t('syncConflict.description') }}</p>
+        <!-- 新增 / 修改 / 删除只数不冲突、会直接合并的改动，删除标记本身不算新增 (#489) -->
         <div class="conflict-sheet__stats">
-          <span v-if="pending.summary.added" class="m-pill m-pill-ok">{{ t('syncConflict.added', { count: pending.summary.added }) }}</span>
-          <span v-if="pending.summary.updated" class="m-pill m-pill-warn">{{ t('syncConflict.updated', { count: pending.summary.updated }) }}</span>
-          <span v-if="pending.summary.deleted" class="m-pill">{{ t('syncConflict.deleted', { count: pending.summary.deleted }) }}</span>
+          <span v-if="pending.summary.added" class="m-pill m-pill-ok">{{ t('syncConflict.added', { count: pending.summary.added }, pending.summary.added) }}</span>
+          <span v-if="pending.summary.updated" class="m-pill m-pill-warn">{{ t('syncConflict.updated', { count: pending.summary.updated }, pending.summary.updated) }}</span>
+          <span v-if="pending.summary.deleted" class="m-pill">{{ t('syncConflict.deleted', { count: pending.summary.deleted }, pending.summary.deleted) }}</span>
         </div>
 
         <section class="m-section">
@@ -43,14 +44,16 @@
                 <span class="conflict-sheet__item-name">{{ item.label }}</span>
                 <span class="m-pill">{{ collectionLabel(item.collection) }}</span>
               </div>
+              <!-- 两边在同一分钟内时显示到秒，并标出较新的一边 (#489) -->
               <div class="m-seg" role="radiogroup" :aria-label="item.label">
-                <button type="button" role="radio" :class="{ on: resolutions[item.id] === 'local' }"
-                  :aria-checked="resolutions[item.id] === 'local'" @click="choose(item.id, 'local')">
-                  {{ t('syncConflict.localVersion') }} · {{ versionLabel(item.localDeleted, item.localUpdatedAt) }}
-                </button>
-                <button type="button" role="radio" :class="{ on: resolutions[item.id] === 'remote' }"
-                  :aria-checked="resolutions[item.id] === 'remote'" @click="choose(item.id, 'remote')">
-                  {{ t('syncConflict.remoteVersion') }} · {{ versionLabel(item.remoteDeleted, item.remoteUpdatedAt) }}
+                <button v-for="side in SIDES" :key="side" type="button" role="radio" class="conflict-sheet__side"
+                  :class="{ on: resolutions[item.id] === side }"
+                  :aria-checked="resolutions[item.id] === side" @click="choose(item.id, side)">
+                  <span class="conflict-sheet__side-name">
+                    {{ side === 'local' ? t('syncConflict.localVersion') : t('syncConflict.remoteVersion') }}
+                    <span v-if="isNewer(item, side)" class="m-pill m-pill-blue conflict-sheet__newer">{{ t('syncConflict.newer') }}</span>
+                  </span>
+                  <span class="conflict-sheet__side-time">{{ versionLabel(item, side) }}</span>
                 </button>
               </div>
             </div>
@@ -80,11 +83,14 @@ import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
   getCloudSyncResultMessage,
+  type CloudSyncConflictItem,
   type CloudSyncConflictStrategy,
   type CloudSyncPendingConflict
 } from '~/lib/services/cloud-sync.service'
-import { formatFriendlyDate } from '~/lib/utils/date'
+import { describeConflictVersionTimes } from '~/lib/utils/sync-conflict-versions'
 import { presentMobileToast } from '~/lib/utils/mobile-toast'
+
+const SIDES = ['local', 'remote'] as const
 
 const props = defineProps<{
   isOpen: boolean
@@ -132,10 +138,20 @@ const collectionLabel = (collection: string) => (
   KNOWN_COLLECTIONS.has(collection) ? t(`syncConflict.collections.${collection}`) : collection
 )
 
-const versionLabel = (deleted: boolean, updatedAt?: string) => {
-  if (deleted) return t('syncConflict.deletedVersion')
-  return updatedAt ? formatFriendlyDate(updatedAt, locale.value, { withTime: true }) : t('syncConflict.unknownTime')
+// 每项两边的时间：同一分钟内显示到秒，并记下较新的一边（与桌面端冲突弹窗一致）
+const versionTimes = computed(() => Object.fromEntries(
+  (pending.value?.items || []).map(item => [item.id, describeConflictVersionTimes(item, String(locale.value))])
+))
+
+const versionLabel = (item: CloudSyncConflictItem, side: CloudSyncConflictSide) => {
+  const time = versionTimes.value[item.id]?.[side]
+  if (side === 'local' ? item.localDeleted : item.remoteDeleted) {
+    return time ? t('syncConflict.deletedAtTime', { time }) : t('syncConflict.deletedVersion')
+  }
+  return time || t('syncConflict.unknownTime')
 }
+
+const isNewer = (item: CloudSyncConflictItem, side: CloudSyncConflictSide) => versionTimes.value[item.id]?.newer === side
 
 const choose = (id: string, side: CloudSyncConflictSide) => {
   resolutions.value = { ...resolutions.value, [id]: side }
@@ -250,10 +266,33 @@ onUnmounted(() => unsubscribe?.())
 
 .conflict-sheet__item .m-seg > button {
   height: auto;
-  min-height: 36px;
-  padding: 4px 6px;
+  min-height: 44px;
+  padding: 6px;
   font-size: var(--m-font-caption);
   line-height: 1.3;
+}
+
+.conflict-sheet__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.conflict-sheet__side-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.conflict-sheet__newer {
+  height: 18px;
+  padding: 0 6px;
+}
+
+.conflict-sheet__side-time {
+  color: var(--content-tertiary);
 }
 
 .conflict-sheet__missing {

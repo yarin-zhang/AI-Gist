@@ -13,9 +13,23 @@ import {
 export const CLOUD_SYNC_MANIFEST_KIND = 'ai-gist-cloud-sync-manifest';
 export const CLOUD_SYNC_MANIFEST_SCHEMA_VERSION = 1;
 export const CLOUD_SYNC_MANIFEST_REPAIR_METADATA_KEY = '__cloudSyncManifestRepair';
-const MAX_CONFLICT_METADATA_STRING_LENGTH = 512;
-const MAX_CONFLICT_METADATA_ARRAY_ITEMS = 10;
-const MAX_CONFLICT_METADATA_OBJECT_KEYS = 40;
+const MAX_CONFLICT_METADATA_KEY_LENGTH = 512;
+
+/**
+ * 写进云端 manifest 和本机冲突审计日志的冲突记录：只留是哪条记录、为什么冲突、怎么处理的，
+ * 以及两边当时的修改时间。不带两边和基线的完整记录——那会让每台设备每次同步都多下载
+ * 几 KB 到几十 KB，还可能带出 API 密钥这类字段 (#489)。
+ */
+export interface CloudSyncConflictMetadata {
+  collection: string;
+  key: string;
+  reason: CloudSyncConflict['reason'];
+  resolution: CloudSyncConflict['resolution'];
+  /** 本机版本的修改时间；本机这边已删除时没有 */
+  localUpdatedAt?: string;
+  /** 云端版本的修改时间；云端这边已删除时没有 */
+  remoteUpdatedAt?: string;
+}
 
 export interface CloudSyncDeviceState {
   deviceId: string;
@@ -32,7 +46,7 @@ export interface CloudSyncManifest {
   latestSnapshot?: CloudSyncSnapshot;
   baseSnapshot?: CloudSyncSnapshot;
   devices: Record<string, CloudSyncDeviceState>;
-  conflicts: CloudSyncConflict[];
+  conflicts: CloudSyncConflictMetadata[];
   [CLOUD_SYNC_MANIFEST_REPAIR_METADATA_KEY]?: CloudSyncManifestRepairMetadata;
 }
 
@@ -252,14 +266,18 @@ export function createCloudSyncManifestRevisionConflictError(
   return new Error(`云同步 manifest 已被其他设备更新：期望 revision ${expected}，当前 revision ${current}`);
 }
 
-export function sanitizeCloudSyncConflictsForMetadata(input: unknown): CloudSyncConflict[] {
+/**
+ * 把合并结果里的冲突（或旧版本写下的、带完整记录的冲突）精简成 CloudSyncConflictMetadata。
+ * 旧格式里的 local / remote / base 只用来取修改时间，然后丢掉。
+ */
+export function sanitizeCloudSyncConflictsForMetadata(input: unknown): CloudSyncConflictMetadata[] {
   if (!Array.isArray(input)) {
     return [];
   }
 
   return input
     .map(conflict => sanitizeCloudSyncConflictForMetadata(conflict))
-    .filter((conflict): conflict is CloudSyncConflict => !!conflict);
+    .filter((conflict): conflict is CloudSyncConflictMetadata => !!conflict);
 }
 
 export function isCloudSyncManifestNotFoundError(error: unknown): boolean {
@@ -458,12 +476,12 @@ function normalizeDeviceStates(input: unknown): Record<string, CloudSyncDeviceSt
   return devices;
 }
 
-function sanitizeCloudSyncConflictForMetadata(value: unknown): CloudSyncConflict | null {
+function sanitizeCloudSyncConflictForMetadata(value: unknown): CloudSyncConflictMetadata | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
 
-  const conflict = value as Partial<CloudSyncConflict>;
+  const conflict = value as Partial<CloudSyncConflict & CloudSyncConflictMetadata>;
   if (
     typeof conflict.collection !== 'string' ||
     typeof conflict.key !== 'string' ||
@@ -473,106 +491,44 @@ function sanitizeCloudSyncConflictForMetadata(value: unknown): CloudSyncConflict
     return null;
   }
 
-  const sanitized: CloudSyncConflict = {
+  const sanitized: CloudSyncConflictMetadata = {
     collection: conflict.collection,
-    key: conflict.key,
+    key: truncateConflictMetadataKey(conflict.key),
     reason: conflict.reason,
     resolution: conflict.resolution
   };
 
-  if (conflict.local !== undefined) {
-    sanitized.local = sanitizeConflictValueForMetadata(conflict.local);
-  }
-  if (conflict.remote !== undefined) {
-    sanitized.remote = sanitizeConflictValueForMetadata(conflict.remote);
-  }
-  if (conflict.base !== undefined) {
-    sanitized.base = sanitizeConflictValueForMetadata(conflict.base);
-  }
+  // 精简后的格式直接带时间；旧格式（以及合并引擎刚产生的冲突）从两边的完整记录里取
+  const localUpdatedAt = toConflictMetadataTime(conflict.localUpdatedAt) ?? getConflictRecordTime(conflict.local);
+  const remoteUpdatedAt = toConflictMetadataTime(conflict.remoteUpdatedAt) ?? getConflictRecordTime(conflict.remote);
+  if (localUpdatedAt) sanitized.localUpdatedAt = localUpdatedAt;
+  if (remoteUpdatedAt) sanitized.remoteUpdatedAt = remoteUpdatedAt;
 
   return sanitized;
 }
 
-function sanitizeConflictValueForMetadata(value: unknown, seen = new WeakSet<object>(), fieldName?: string): any {
-  if (fieldName === 'imageBlobs') {
-    if (isOmittedImageBlobsSummary(value)) {
-      return value;
-    }
-    return summarizeOmittedImageBlobs(value);
-  }
-
-  if (value === null || value === undefined) {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    return value.length > MAX_CONFLICT_METADATA_STRING_LENGTH
-      ? `${value.slice(0, MAX_CONFLICT_METADATA_STRING_LENGTH)}...`
-      : value;
-  }
-
-  if (typeof value !== 'object') {
-    return value;
-  }
-
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
-    return {
-      omitted: true,
-      type: 'Blob',
-      size: value.size,
-      mimeType: value.type || undefined
-    };
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-
-  if (seen.has(value)) {
-    return '[Circular]';
-  }
-  seen.add(value);
-
-  if (Array.isArray(value)) {
-    const items = value
-      .slice(0, MAX_CONFLICT_METADATA_ARRAY_ITEMS)
-      .map(item => sanitizeConflictValueForMetadata(item, seen));
-    if (value.length > MAX_CONFLICT_METADATA_ARRAY_ITEMS) {
-      items.push({
-        omitted: true,
-        type: 'array-items',
-        itemCount: value.length - MAX_CONFLICT_METADATA_ARRAY_ITEMS
-      });
-    }
-    return items;
-  }
-
-  const sanitized: Record<string, any> = {};
-  const entries = Object.entries(value);
-  for (const [key, item] of entries.slice(0, MAX_CONFLICT_METADATA_OBJECT_KEYS)) {
-    sanitized[key] = sanitizeConflictValueForMetadata(item, seen, key);
-  }
-  if (entries.length > MAX_CONFLICT_METADATA_OBJECT_KEYS) {
-    sanitized.__omittedKeys = entries.length - MAX_CONFLICT_METADATA_OBJECT_KEYS;
-  }
-
-  return sanitized;
+function truncateConflictMetadataKey(key: string): string {
+  return key.length > MAX_CONFLICT_METADATA_KEY_LENGTH
+    ? `${key.slice(0, MAX_CONFLICT_METADATA_KEY_LENGTH)}...`
+    : key;
 }
 
-function summarizeOmittedImageBlobs(value: unknown): Record<string, unknown> {
-  return {
-    omitted: true,
-    type: 'imageBlobs',
-    itemCount: Array.isArray(value) ? value.length : undefined
-  };
+function getConflictRecordTime(record: unknown): string | undefined {
+  if (!record || typeof record !== 'object') {
+    return undefined;
+  }
+
+  const value = record as { updatedAt?: unknown; createdAt?: unknown };
+  return toConflictMetadataTime(value.updatedAt) ?? toConflictMetadataTime(value.createdAt);
 }
 
-function isOmittedImageBlobsSummary(value: unknown): value is Record<string, unknown> {
-  return !!value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    (value as Record<string, unknown>).omitted === true &&
-    (value as Record<string, unknown>).type === 'imageBlobs';
+function toConflictMetadataTime(value: unknown): string | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+    return undefined;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 function isCloudSyncConflictReason(value: unknown): value is CloudSyncConflict['reason'] {

@@ -58,6 +58,39 @@ describe('sync conflict UI (V5-Conflict)', () => {
     expect(syncPage).toContain("if (consumeConflictSheetRequest() && syncStatus.value.status === 'conflict') openConflictSheet()")
   })
 
+  it('writes the stats as full sentences, shows seconds and the newer side on both platforms (#489)', () => {
+    const modal = read('components/sync/SyncConflictModal.vue')
+    const sheet = read('components/mobile/settings/SyncConflictSheet.vue')
+
+    for (const source of [modal, sheet]) {
+      // 统计按单复数写成完整句子
+      expect(source).toContain("t('syncConflict.deleted', { count: pending.summary.deleted }, pending.summary.deleted)")
+      expect(source).toContain("t('syncConflict.added', { count: pending.summary.added }, pending.summary.added)")
+      // 两边时间共用同一套规则：同一分钟内到秒，标出较新的一边，删除的一边写删除时间
+      expect(source).toContain('describeConflictVersionTimes(item, String(locale.value))')
+      expect(source).toContain("t('syncConflict.newer')")
+      expect(source).toContain("t('syncConflict.deletedAtTime', { time })")
+      expect(source).not.toContain('formatFriendlyDate')
+    }
+
+    const zhCN = JSON.parse(readFileSync('src/renderer/i18n/locales/zh-CN.json', 'utf8'))
+    expect(zhCN.syncConflict.deleted).toBe('云端删除了 {count} 条')
+    expect(zhCN.syncConflict.added).toBe('云端新增了 {count} 条')
+    const enUS = JSON.parse(readFileSync('src/renderer/i18n/locales/en-US.json', 'utf8'))
+    expect(enUS.syncConflict.deleted).toContain(' | ')
+  })
+
+  it('tells the deleting device that a record came back, on desktop and mobile (#489)', () => {
+    const indicator = read('components/common/CloudSyncStatusIndicator.vue')
+    const mobileShell = read('pages/MobileMainPage.vue')
+    const mobileStatus = read('pages/mobile/settings/shared.ts')
+
+    expect(indicator).toContain('useCloudSyncRestoredNotice(text => message.info(text))')
+    expect(indicator).toContain('getCloudSyncRestoredMessage(status.value.lastResult.restoredAfterLocalDelete)')
+    expect(mobileShell).toContain('useCloudSyncRestoredNotice(text => {')
+    expect(mobileStatus).toContain('getCloudSyncRestoredMessage(status.lastResult.restoredAfterLocalDelete)')
+  })
+
   it('removes the unused legacy conflict dialog', () => {
     expect(existsSync('src/renderer/components/settings/ConflictResolutionDialog.vue')).toBe(false)
   })

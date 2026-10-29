@@ -29,17 +29,23 @@ const startOfDay = (date: Date): number => new Date(date.getFullYear(), date.get
  * 列表和元信息里的友好日期：今天 10:24、昨天 21:08、10月20日、2025年9月18日。
  * 日期部分交给 Intl 按界面语言输出，避免每种语言各写一套规则。
  * 「今天 / Today」单独显示时首字母大写；嵌在句子里（如「Updated today」）时传 capitalize: false。
+ * withSeconds 让时间精确到秒（今天 10:24:05），用在两个时间只差几秒、到分钟分不出先后的地方。
  */
 export const formatFriendlyDate = (
     value: string | number | Date,
     locale: string,
-    options: { withTime?: boolean; now?: Date; capitalize?: boolean } = {}
+    options: { withTime?: boolean; withSeconds?: boolean; now?: Date; capitalize?: boolean } = {}
 ): string => {
     const date = toDate(value);
     if (Number.isNaN(date.getTime())) return String(value);
     const now = options.now ?? new Date();
     const dayOffset = Math.round((startOfDay(date) - startOfDay(now)) / 86_400_000);
-    const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+    const time = new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(options.withSeconds ? { second: '2-digit' as const } : {}),
+        hour12: false
+    }).format(date);
 
     if (dayOffset === 0 || dayOffset === -1) {
         const day = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(dayOffset, 'day');

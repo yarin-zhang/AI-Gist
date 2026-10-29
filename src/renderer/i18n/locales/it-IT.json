@@ -514,7 +514,9 @@
       "merged": "Sincronizzazione completata: i dati locali e cloud sono stati uniti",
       "upToDate": "Sincronizzazione completata: tutto è già aggiornato",
       "uploaded": "Sincronizzazione completata: i dati locali sono stati caricati",
-      "conflictPending": "Le modifiche su questo dispositivo e nel cloud sono in conflitto. Scegli come risolverle."
+      "conflictPending": "Le modifiche su questo dispositivo e nel cloud sono in conflitto. Scegli come risolverle.",
+      "restoredOne": "«{name}» è stato modificato su un altro dispositivo ed è stato ripristinato",
+      "restoredMany": "«{name}» e {count} altro elemento sono stati modificati su un altro dispositivo e ripristinati | «{name}» e altri {count} elementi sono stati modificati su un altro dispositivo e ripristinati"
     },
     "testConnection": "Verifica connessione",
     "title": "Sincronizzazione dati",
@@ -693,7 +695,9 @@
     "syncIntervalTooShort": "Il minimo è {min} minuti",
     "syncIntervalTooLong": "Il massimo è {hours} ore ({max} minuti)",
     "indicatorShortRetrying": "Sincronizzazione non riuscita · Nuovo tentativo più tardi",
-    "technicalDetails": "Dettagli tecnici (copiali quando segnali un problema)"
+    "technicalDetails": "Dettagli tecnici (copiali quando segnali un problema)",
+    "deviceNameOnPlatform": "AI Gist su {platform}",
+    "deviceNameWeb": "AI Gist sul web"
   },
   "databaseStatus": {
     "connectionError": "Errore di connessione al database",
@@ -1690,9 +1694,9 @@
     "description": "I dati su questo dispositivo e nel cloud non coincidono. Scegli come procedere prima di continuare la sincronizzazione.",
     "localCounts": "Questo dispositivo: {prompts}, {categories}, {aiConfigs}",
     "remoteCounts": "Cloud: {prompts}, {categories}, {aiConfigs}",
-    "added": "Nuovi nel cloud: {count}",
-    "updated": "Modificati nel cloud: {count}",
-    "deleted": "Eliminati: {count}",
+    "added": "{count} elemento aggiunto nel cloud | {count} elementi aggiunti nel cloud",
+    "updated": "{count} elemento modificato nel cloud | {count} elementi modificati nel cloud",
+    "deleted": "{count} elemento eliminato nel cloud | {count} elementi eliminati nel cloud",
     "strategyLabel": "Come risolvere",
     "useLocal": "Usa i dati di questo dispositivo",
     "useLocalDesc": "Per gli elementi in conflitto mantieni la versione di questo dispositivo e scarta le modifiche nel cloud",
@@ -1753,7 +1757,9 @@
     },
     "countPrompts": "{count} prompt",
     "countCategories": "{count} categoria | {count} categorie",
-    "countAiConfigs": "{count} configurazione del modello | {count} configurazioni dei modelli"
+    "countAiConfigs": "{count} configurazione del modello | {count} configurazioni dei modelli",
+    "newer": "Più recente",
+    "deletedAtTime": "Eliminato {time}"
   },
   "appInit": {
     "loading": "Apertura di AI Gist…",

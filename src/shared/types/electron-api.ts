@@ -187,6 +187,8 @@ export default interface ElectronApi {
   app: {
     isMacAppStore: boolean
     getVersion: () => Promise<string>
+    /** 本机主机名（os.hostname()），用作云同步里的设备名；取不到时为空字符串 */
+    getDeviceName: () => Promise<string>
     getPath: (name: string) => Promise<string>
     checkUpdates: () => Promise<{ success: boolean; data?: any; error?: string }>
     openDownloadPage: (url: string) => Promise<{ success: boolean; error?: string }>
