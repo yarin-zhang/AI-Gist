@@ -208,3 +208,45 @@ describe('desktop sync manifest write path (#486)', () => {
     expect(await readCloudRevision()).toBe('rev-3')
   })
 })
+
+describe('desktop on a Synology-like server that gives weak ETags right after a write', () => {
+  let weakServer: TestWebDAVServer
+
+  beforeAll(async () => {
+    // 群晖（Apache）写入后一秒内只给弱 ETag，带它条件写一定 412；这里缩短成 300ms
+    weakServer = new TestWebDAVServer({ port: 0, weakEtagWindowMs: 300 })
+    await weakServer.start()
+  })
+
+  afterAll(async () => {
+    await weakServer.stop()
+  })
+
+  beforeEach(async () => {
+    config = {
+      id: `storage-${Math.random().toString(36).slice(2)}`,
+      name: 'test',
+      type: 'webdav',
+      enabled: true,
+      url: `${weakServer.baseUrl}/${Math.random().toString(36).slice(2)}/`,
+      username: 'testuser',
+      password: 'testpass',
+      createdAt: '2026-10-29T00:00:00.000Z',
+      updatedAt: '2026-10-29T00:00:00.000Z'
+    }
+    const setup = new WebDAVProvider({ ...config, url: `${weakServer.baseUrl}/` })
+    await setup.createDirectory(new URL(config.url).pathname)
+  })
+
+  it('waits for the strong ETag instead of being refused when writing again right after a write', async () => {
+    const device = createDevice()
+    await device.read()
+    expect(await device.save(manifestAt('rev-1', 'First'), null)).toMatchObject({ success: true })
+    expect(await device.save(manifestAt('rev-2', 'Second'), 'rev-1')).toMatchObject({ success: true })
+    expect(await device.save(manifestAt('rev-3', 'Third'), 'rev-2')).toMatchObject({ success: true })
+
+    const manifestPuts = weakServer.requests.filter(request => request.method === 'PUT' && request.path.endsWith('/sync-manifest.json'))
+    expect(manifestPuts.map(request => request.status)).toEqual([201, 204, 204])
+    expect(await readCloudRevision()).toBe('rev-3')
+  })
+})

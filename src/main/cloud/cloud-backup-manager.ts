@@ -88,6 +88,18 @@ class StorageConnectionError extends Error {
 /**
  * 常量定义
  */
+/** 弱 ETag 变强之前的重查间隔：Apache 只在写入后的一秒内给弱 ETag，最多等两秒多 */
+const WEAK_ETAG_RECHECK_DELAYS_MS = [1100, 500, 500];
+
+function isWeakEtag(etag: string): boolean {
+  return /^W\//i.test(etag.trim());
+}
+
+/** 去掉弱标记和引号，只比较版本本身 */
+function normalizeEtagValue(etag: string): string {
+  return etag.trim().replace(/^W\//i, '').replace(/^"(.*)"$/, '$1');
+}
+
 const CONSTANTS = {
   CONFIG_FILE: 'cloud-config.json',
   CONFIG_DIR: '.ai-gist',
@@ -1220,7 +1232,7 @@ export class CloudBackupManager {
       try {
         const written = await provider.writeFile(manifestPath, content, {
           ...this.createSyncWriteOptions(storageId),
-          ifMatch: cached.etag
+          ifMatch: await this.resolveWritableEtag(provider, manifestPath, cached.etag)
         });
         this.rememberWrittenSyncManifest(storageId, revision, written, cacheLocation, content);
         await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
@@ -1250,9 +1262,12 @@ export class CloudBackupManager {
       this.storagesRejectingReadEtags.add(storageId);
     }
 
+    const writableInfo = primaryInfo?.etag
+      ? { ...primaryInfo, etag: await this.resolveWritableEtag(provider, manifestPath, primaryInfo.etag) }
+      : primaryInfo;
     const writeOptions = {
       ...this.createSyncWriteOptions(storageId),
-      ...this.createManifestWriteOptions(primaryInfo, currentManifest, options.expectedRevision)
+      ...this.createManifestWriteOptions(writableInfo, currentManifest, options.expectedRevision)
     };
     let written: void | CloudFileWriteResult;
     try {
@@ -1271,6 +1286,30 @@ export class CloudBackupManager {
     this.rememberWrittenSyncManifest(storageId, revision, written, cacheLocation, content);
     await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
     return { verified };
+  }
+
+  /**
+   * 群晖（Apache）在文件写入后的一秒内只给弱 ETag（W/"…"），这时带任何 If-Match 都会被 412 拒绝，
+   * 去掉 W/ 也不行；过了这一秒，同一个版本的 ETag 就变成强的。手里是弱 ETag 时等它变强再写：
+   * 查到同一个版本的强 ETag 就用它；文件已经变了就原样返回，让条件写照常报冲突（移动端、Web 端同样处理）
+   */
+  private async resolveWritableEtag(
+    provider: CloudStorageProvider,
+    cloudPath: string,
+    etag: string | undefined
+  ): Promise<string | undefined> {
+    if (!etag || !isWeakEtag(etag) || !provider.getFileInfo) return etag;
+    for (const waitMs of WEAK_ETAG_RECHECK_DELAYS_MS) {
+      await this.sleep(waitMs);
+      const current = (await this.getCloudFileInfo(provider, cloudPath))?.etag;
+      if (!current || normalizeEtagValue(current) !== normalizeEtagValue(etag)) return etag;
+      if (!isWeakEtag(current)) return current;
+    }
+    return etag;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /** 同步目录每次运行只确认一次，之后的写入不再逐级 PROPFIND */

@@ -97,6 +97,9 @@ interface WebDAVSyncManifestCacheEntry {
   json: string
 }
 
+/** 弱 ETag 变强之前的重查间隔：Apache 只在写入后的一秒内给弱 ETag，最多等两秒多 */
+const WEAK_ETAG_RECHECK_DELAYS_MS = [1100, 500, 500]
+
 export class MobileCloudBackupService {
   private static instance: MobileCloudBackupService
   private readonly webDAVCapabilityReports = new Map<string, MobileWebDAVCapabilityReport>()
@@ -1186,6 +1189,7 @@ export class MobileCloudBackupService {
     if (primaryState && this.webDAVStoragesRejectingReadEtags.has(config.id)) {
       ifMatch = await this.statWebDAVFileEtag(config, primaryPath) || ifMatch
     }
+    ifMatch = await this.resolveWritableEtag(config, primaryPath, ifMatch)
     try {
       await this.writeWebDAVPrimarySyncManifest(config, manifest, {
         ifMatch,
@@ -1194,15 +1198,38 @@ export class MobileCloudBackupService {
     } catch (error) {
       if (!primaryState || !ifMatch || !this.isManifestPreconditionFailed(error)) throw error
       // 412：可能是云端真被别的设备改了，也可能是服务器不认这个 ETag 的写法。
-      // 重新读一遍：revision 变了就是真冲突；没变就改用 PROPFIND 查到的 ETag 再写一次
-      const statEtag = await this.statWebDAVFileEtag(config, primaryPath)
+      // 先用 PROPFIND 查当前 ETag，再读一遍正文核对 revision，读完再查一次 ETag，确认中间没被别的设备改过
+      // （GET 和 PROPFIND 的 ETag 写法可能不一样，不能直接拿来比）：revision 变了就是真冲突；没变就用 PROPFIND 的 ETag 再写一次
+      const statEtag = await this.resolveWritableEtag(config, primaryPath, await this.statWebDAVFileEtag(config, primaryPath))
       const latest = await this.readWebDAVSyncManifestFileWithMeta(config, primaryPath)
       this.assertExpectedCloudSyncRevision(latest.manifest, options.expectedRevision)
       if (!statEtag || statEtag.trim() === ifMatch.trim()) throw error
+      const confirmedEtag = await this.statWebDAVFileEtag(config, primaryPath)
+      if (!confirmedEtag || !this.isSameEtag(confirmedEtag, statEtag)) throw error
       this.webDAVStoragesRejectingReadEtags.add(config.id)
       await this.writeWebDAVPrimarySyncManifest(config, manifest, { ifMatch: statEtag })
     }
     await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
+  }
+
+  /**
+   * 群晖（Apache）在文件写入后的一秒内只给弱 ETag（W/"…"），这时带任何 If-Match 都会被 412 拒绝，
+   * 去掉 W/ 也不行；过了这一秒，同一个版本的 ETag 就变成强的。手里是弱 ETag 时等它变强再写：
+   * 用 PROPFIND 查到同一个版本的强 ETag 就用它；文件已经变了就原样返回，让条件写照常报冲突
+   */
+  private async resolveWritableEtag(config: any, cloudPath: string, etag: string | undefined): Promise<string | undefined> {
+    if (!etag || !/^W\//i.test(etag.trim())) return etag
+    for (const waitMs of WEAK_ETAG_RECHECK_DELAYS_MS) {
+      await this.sleep(waitMs)
+      const current = await this.statWebDAVFileEtag(config, cloudPath)
+      if (!current || !this.isSameEtag(current, etag)) return etag
+      if (!/^W\//i.test(current.trim())) return current
+    }
+    return etag
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 
   /** writeWebDAVSyncManifestFile 遇到 412 时抛出的错误 */

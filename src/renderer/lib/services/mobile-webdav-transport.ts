@@ -66,7 +66,7 @@ export class MobileWebDAVTransport {
 
     const data = input.responseType === 'bytes'
       ? decodeBase64(response.body || '')
-      : parseResponseData(response.body, input.responseType)
+      : parseResponseData(response.body, isSuccessStatus(response.status) ? input.responseType : 'text')
     return {
       status: response.status,
       headers: normalizeHeaders(response.headers),
@@ -104,7 +104,7 @@ export class MobileWebDAVTransport {
     const response = await CapacitorHttp.request(request as any)
     const data = input.responseType === 'bytes'
       ? await decodeCapacitorBytes(response.data)
-      : normalizeCapacitorData(response.data, input.responseType)
+      : normalizeCapacitorData(response.data, isSuccessStatus(response.status) ? input.responseType : 'text')
     return {
       status: response.status,
       headers: normalizeHeaders(response.headers),
@@ -139,6 +139,14 @@ function normalizeHeaders(headers: unknown): Record<string, string> {
         ['string', 'number', 'boolean'].includes(typeof entry[1]))
       .map(([name, value]) => [name.toLowerCase(), String(value)])
   )
+}
+
+/**
+ * 只有 2xx 的正文才按 JSON 解析：群晖等服务器的 404 / 401 带的是 HTML 错误页，
+ * 拿去解析只会抛「JSON Parse error」，调用方看不到状态码，没法当成「文件不存在」处理
+ */
+function isSuccessStatus(status: number): boolean {
+  return status >= 200 && status < 300
 }
 
 function parseResponseData(body: string, responseType?: MobileWebDAVResponseType): unknown {

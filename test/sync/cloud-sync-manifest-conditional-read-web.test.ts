@@ -132,6 +132,22 @@ describe('web sync manifest conditional read (#487)', () => {
     }
   })
 
+  it('waits for the strong ETag when the WebDAV server only gives weak ones right after a write (Synology)', async () => {
+    // 群晖（Apache）写入后一秒内只给弱 ETag，带它条件写一定 412；这里缩短成 300ms
+    const { config, createBrowser } = await setup({ weakEtagWindowMs: 300 })
+    const browser = createBrowser()
+    await browser.saveCloudSyncManifest(config.id, manifestAt('rev-1', 'First'))
+
+    expect(await browser.saveCloudSyncManifest(config.id, manifestAt('rev-2', 'Second'), { expectedRevision: 'rev-1' }))
+      .toMatchObject({ success: true })
+    expect(await browser.saveCloudSyncManifest(config.id, manifestAt('rev-3', 'Third'), { expectedRevision: 'rev-2' }))
+      .toMatchObject({ success: true })
+
+    const manifestPuts = manifestRequests().filter(request => request.method === 'PUT')
+    expect(manifestPuts.map(request => request.status)).toEqual([201, 204, 204])
+    expect(getCloudSyncManifestRevision(await browser.getCloudSyncManifest(config.id))).toBe('rev-3')
+  })
+
   it('only tells the browser "not modified" when the cloud has not changed', async () => {
     const { config, manifestResponseBytes, createBrowser } = await setup()
     const browser = createBrowser()

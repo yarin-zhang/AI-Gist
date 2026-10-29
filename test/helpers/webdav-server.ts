@@ -20,6 +20,11 @@ export interface WebDAVServerOptions {
   etagFormat?: 'quoted' | 'unquoted' | 'none'
   /** false：GET 忽略 If-None-Match，文件没变也回 200 和整份正文 */
   conditionalGet?: boolean
+  /**
+   * 像群晖的 Apache 一样：文件写入后这么多毫秒内只给弱 ETag（W/"…"），带任何 If-Match 写入都回 412；
+   * 过了这段时间同一个版本的 ETag 变成强的
+   */
+  weakEtagWindowMs?: number
 }
 
 /** 服务器收到的每个请求：方法、路径、状态码、响应正文字节数，以及条件读取带的 If-None-Match */
@@ -70,6 +75,7 @@ export class TestWebDAVServer {
   private password: string
   private etagFormat: 'quoted' | 'unquoted' | 'none'
   private conditionalGet: boolean
+  private weakEtagWindowMs: number
   readonly port: number
   /** 按顺序记录收到的请求，测试据此断言请求数和有没有下载正文 */
   readonly requests: TestWebDAVRequestLog[] = []
@@ -80,8 +86,15 @@ export class TestWebDAVServer {
     this.password = opts.password ?? 'testpass'
     this.etagFormat = opts.etagFormat ?? 'quoted'
     this.conditionalGet = opts.conditionalGet ?? true
+    this.weakEtagWindowMs = opts.weakEtagWindowMs ?? 0
     this.rootDir  = opts.rootDir  ?? fs.mkdtempSync(path.join(os.tmpdir(), 'ai-gist-webdav-'))
     this.server   = this.createServer()
+  }
+
+  /** 刚写入的文件在 weakEtagWindowMs 内给弱 ETag */
+  private currentEtag(stat: fs.Stats): string {
+    const weak = this.weakEtagWindowMs > 0 && Date.now() - stat.mtimeMs < this.weakEtagWindowMs
+    return createEtag(stat, this.etagFormat, weak)
   }
 
   // ---- 生命周期 ----
@@ -215,7 +228,7 @@ export class TestWebDAVServer {
       isDir: stat.isDirectory(),
       size:  stat.size,
       mtime: stat.mtime,
-      etag:  createEtag(stat, this.etagFormat),
+      etag:  this.currentEtag(stat),
     })
 
     // depth=1 时列出子项
@@ -230,7 +243,7 @@ export class TestWebDAVServer {
           isDir: childStat.isDirectory(),
           size:  childStat.size,
           mtime: childStat.mtime,
-          etag:  createEtag(childStat, this.etagFormat),
+          etag:  this.currentEtag(childStat),
         })
       }
     }
@@ -249,7 +262,7 @@ export class TestWebDAVServer {
     }
     if (stat.isDirectory()) { res.writeHead(403); res.end(); return }
 
-    const etag = createEtag(stat, this.etagFormat)
+    const etag = this.currentEtag(stat)
     const etagHeaders: Record<string, string> = etag ? { 'ETag': etag } : {}
     const ifNoneMatch = req.headers['if-none-match']
     if (this.conditionalGet && etag && typeof ifNoneMatch === 'string' && etagListMatches(ifNoneMatch, etag)) {
@@ -273,7 +286,9 @@ export class TestWebDAVServer {
 
     const ifMatch = req.headers['if-match']
     if (typeof ifMatch === 'string') {
-      if (!existingStat || createEtag(existingStat, this.etagFormat) !== ifMatch) {
+      const currentEtag = existingStat ? this.currentEtag(existingStat) : ''
+      // If-Match 是强比较：当前 ETag 还是弱的时候怎么写都对不上
+      if (!existingStat || currentEtag.startsWith('W/') || currentEtag !== ifMatch) {
         res.writeHead(412); res.end(); return
       }
     }
@@ -282,7 +297,7 @@ export class TestWebDAVServer {
     const body = await readBody(req)
     await fsp.writeFile(fsPath, body)
     const nextStat = await fsp.stat(fsPath)
-    const nextEtag = createEtag(nextStat, this.etagFormat)
+    const nextEtag = this.currentEtag(nextStat)
     res.writeHead(existingStat ? 204 : 201, nextEtag ? { 'ETag': nextEtag } : {}); res.end()
   }
 
@@ -314,10 +329,11 @@ export class TestWebDAVServer {
 
 // ---- 工具函数 ----
 
-function createEtag(stat: fs.Stats, format: 'quoted' | 'unquoted' | 'none'): string {
+function createEtag(stat: fs.Stats, format: 'quoted' | 'unquoted' | 'none', weak = false): string {
   if (format === 'none') return ''
   const token = `${stat.size}-${Math.floor(stat.mtimeMs)}`
-  return format === 'quoted' ? `"${token}"` : token
+  const etag = format === 'quoted' ? `"${token}"` : token
+  return weak ? `W/${etag}` : etag
 }
 
 /** If-None-Match 按弱比较：去掉 W/ 后逐字比对，写法（带不带引号）不一样就不算匹配，和严格的服务器一致 */
