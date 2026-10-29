@@ -3,6 +3,8 @@
     "appDescription": "本機優先的 AI 提示詞管理工具",
     "appName": "AI Gist",
     "checkForUpdates": "檢查更新",
+    "autoCheckUpdates": "自動檢查更新",
+    "autoCheckUpdatesTip": "有新版本時在狀態列提示",
     "currentVersion": "目前版本",
     "developer": "開發者",
     "developerName": "Yarin Zhang",
@@ -759,7 +761,9 @@
     },
     "statusBar": {
       "launcher": "{shortcut} 啟動器",
-      "cliEnabled": "本機 CLI 已開啟"
+      "cliEnabled": "本機 CLI 已開啟",
+      "updateAvailable": "新版本 {version}",
+      "updateTooltip": "{date} 發布，在 GitHub 查看更新說明"
     }
   },
   "mobileSettings": {

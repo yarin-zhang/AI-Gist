@@ -3,6 +3,8 @@
     "appDescription": "ローカルファーストの AI プロンプト管理ツール",
     "appName": "AI Gist",
     "checkForUpdates": "更新を確認",
+    "autoCheckUpdates": "自動で更新を確認",
+    "autoCheckUpdatesTip": "新しいバージョンがあるとステータスバーに表示します",
     "currentVersion": "現在のバージョン",
     "developer": "開発者",
     "developerName": "Yarin Zhang",
@@ -759,7 +761,9 @@
     },
     "statusBar": {
       "launcher": "{shortcut} ランチャー",
-      "cliEnabled": "ローカル CLI オン"
+      "cliEnabled": "ローカル CLI オン",
+      "updateAvailable": "新しいバージョン {version}",
+      "updateTooltip": "{date} 公開。GitHub でリリースノートを表示"
     }
   },
   "mobileSettings": {

@@ -25,6 +25,11 @@
             <UiSettingRow v-if="publishedAt" :title="t('about.publishedAt')">
                 <span class="about__secondary">{{ publishedAt }}</span>
             </UiSettingRow>
+            <UiSettingRow v-if="capabilities.electronUpdates" :title="t('about.autoCheckUpdates')"
+                :description="t('about.autoCheckUpdatesTip')">
+                <NSwitch :value="autoCheckUpdates" :aria-label="t('about.autoCheckUpdates')"
+                    @update:value="handleAutoCheckChange" />
+            </UiSettingRow>
             <div v-if="hasUpdate || checkFailed" class="about__notices">
                 <div v-if="hasUpdate" class="ui-alert about__update">
                     <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><InfoCircle /></NIcon>
@@ -64,7 +69,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { NButton, NIcon, useMessage } from 'naive-ui';
+import { NButton, NIcon, NSwitch, useMessage } from 'naive-ui';
 import { Bug, Bulb, InfoCircle } from '@vicons/tabler';
 import UiAlert from '@/components/ui/UiAlert.vue';
 import UiPanel from '@/components/ui/UiPanel.vue';
@@ -72,6 +77,7 @@ import UiSettingRow from '@/components/ui/UiSettingRow.vue';
 import appIcon from '~/assets/images/logo.png';
 import { useUpdate } from '~/composables/useUpdate';
 import { openExternalUrl } from '~/lib/platform/shell';
+import { preferencesClient } from '~/lib/platform/preferences';
 import { PlatformDetector } from '@shared/platform';
 
 const { t } = useI18n();
@@ -97,6 +103,27 @@ const {
 // 状态管理
 const message = useMessage();
 const showReleaseNotes = ref(false);
+const autoCheckUpdates = ref(true);
+
+// 自动检查更新的开关：状态栏每次自动检查前都会重新读这项设置，改完不用重启
+const loadAutoCheckUpdates = async () => {
+    try {
+        autoCheckUpdates.value = (await preferencesClient.get()).checkUpdates !== false;
+    } catch (error) {
+        console.error('读取自动检查更新设置失败:', error);
+    }
+};
+
+const handleAutoCheckChange = async (value: boolean) => {
+    autoCheckUpdates.value = value;
+    try {
+        await preferencesClient.set({ checkUpdates: value });
+    } catch (error) {
+        console.error('保存自动检查更新设置失败:', error);
+        autoCheckUpdates.value = !value;
+        message.error(t('settingsMessages.saveSettingsFailed'));
+    }
+};
 
 // 检查更新
 const handleCheckForUpdates = async () => {
@@ -147,6 +174,7 @@ const openFeatureRequest = async () => {
 // 组件挂载时初始化
 onMounted(async () => {
     await initVersion();
+    if (capabilities.electronUpdates) void loadAutoCheckUpdates();
 
     // 监听更新通知
     window.electronAPI?.app?.onUpdateAvailable?.((info: any) => {

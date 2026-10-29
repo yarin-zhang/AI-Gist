@@ -4,7 +4,9 @@
  */
 
 import { ref, computed, readonly } from 'vue';
+import { PlatformDetector } from '@shared/platform';
 import { openExternalUrl } from '~/lib/platform/shell';
+import { preferencesClient } from '~/lib/platform/preferences';
 import i18n from '~/i18n';
 
 export interface UpdateInfo {
@@ -37,14 +39,31 @@ export interface UpdateCheckResult {
   skipped?: boolean;
 }
 
-export function useUpdate() {
-  // 状态管理
-  const currentVersion = ref('');
-  const updateInfo = ref<UpdateInfo | null>(null);
-  const checking = ref(false);
-  /** 最近一次检查没成功，界面显示 about.checkFailed */
-  const checkFailed = ref(false);
+export interface UpdateCheckOptions {
+  /** 后台自动检查：失败只记控制台，不让关于页显示 about.checkFailed */
+  silent?: boolean;
+}
 
+/** 拿不到具体版本的 Release 地址时，打开最新版本的 Release 页 */
+export const LATEST_RELEASE_URL = 'https://github.com/yarin-zhang/AI-Gist/releases/latest';
+
+/** 启动后等数据库初始化和首次同步跑完再检查 */
+export const AUTO_CHECK_DELAY = 10 * 1000;
+/** 检查成功后，隔一天切回窗口时再查一次 */
+export const AUTO_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+/** 没连上 GitHub 或自动检查被关掉时，一小时后切回窗口再看 */
+export const AUTO_CHECK_RETRY_INTERVAL = 60 * 60 * 1000;
+
+// 检查结果放在模块里：状态栏和关于页用同一份，任何一处查到新版本，另一处都能看到
+const currentVersion = ref('');
+const updateInfo = ref<UpdateInfo | null>(null);
+const checking = ref(false);
+/** 最近一次手动检查没成功，界面显示 about.checkFailed */
+const checkFailed = ref(false);
+/** 下一次自动检查的时间，0 表示这次启动还没自动检查过 */
+let nextAutoCheckAt = 0;
+
+export function useUpdate() {
   // 私有属性
   const repoOwner = 'yarin-zhang';
   const repoName = 'AI-Gist';
@@ -129,14 +148,14 @@ export function useUpdate() {
   /**
    * 检查更新
    */
-  const checkForUpdates = async (): Promise<UpdateCheckResult> => {
+  const checkForUpdates = async (options: UpdateCheckOptions = {}): Promise<UpdateCheckResult> => {
     // 正在检查时再点一次：等上一次的结果就好，不提示
     if (checking.value) {
       return { success: false, data: null, skipped: true };
     }
 
     checking.value = true;
-    checkFailed.value = false;
+    if (!options.silent) checkFailed.value = false;
 
     try {
       const currentVersionValue = await getCurrentVersion();
@@ -160,11 +179,12 @@ export function useUpdate() {
       // 更新状态
       currentVersion.value = currentVersionValue;
       updateInfo.value = updateInfoValue;
+      checkFailed.value = false;
 
       return { success: true, data: updateInfoValue };
     } catch (error) {
       console.error('检查更新失败:', error);
-      checkFailed.value = true;
+      if (!options.silent) checkFailed.value = true;
       return { success: false, data: null };
     } finally {
       checking.value = false;
@@ -249,5 +269,48 @@ export function useUpdate() {
     getAppPath,
     initVersion,
     formatDate
+  };
+}
+
+/** 自动检查更新默认打开；读不到偏好设置时按默认处理 */
+async function isAutoCheckEnabled(): Promise<boolean> {
+  try {
+    return (await preferencesClient.get()).checkUpdates !== false;
+  } catch (error) {
+    console.error('读取自动检查更新设置失败:', error);
+    return true;
+  }
+}
+
+async function runAutoCheck(): Promise<void> {
+  // 先把下一次的时间占住，检查还没结束时切回窗口不会再发一次请求
+  nextAutoCheckAt = Date.now() + AUTO_CHECK_RETRY_INTERVAL;
+  if (!(await isAutoCheckEnabled())) return;
+
+  const result = await useUpdate().checkForUpdates({ silent: true });
+  if (result.success) nextAutoCheckAt = Date.now() + AUTO_CHECK_INTERVAL;
+}
+
+/**
+ * 在后台自动检查更新：启动后等 AUTO_CHECK_DELAY 查一次，之后窗口重新获得焦点、
+ * 并且到了下一次检查的时间才再查。GitHub 未登录的接口每个 IP 每小时只有 60 次，不能每次切回窗口都请求。
+ * Mac App Store 版由商店负责更新，Web 端和移动端没有这项能力，都不检查。
+ * 返回停止函数，组件卸载时调用。
+ */
+export function startAutoUpdateCheck(): () => void {
+  if (!PlatformDetector.getCapabilities().electronUpdates) return () => undefined;
+
+  const timer = setTimeout(() => {
+    if (nextAutoCheckAt === 0) void runAutoCheck();
+  }, AUTO_CHECK_DELAY);
+  // 启动时那次检查跑之前，窗口获得焦点不提前检查
+  const handleFocus = () => {
+    if (nextAutoCheckAt !== 0 && Date.now() >= nextAutoCheckAt) void runAutoCheck();
+  };
+  window.addEventListener('focus', handleFocus);
+
+  return () => {
+    clearTimeout(timer);
+    window.removeEventListener('focus', handleFocus);
   };
 }
