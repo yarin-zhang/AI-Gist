@@ -3,6 +3,8 @@
     "appDescription": "本地优先的 AI 提示词管理工具",
     "appName": "AI Gist",
     "checkForUpdates": "检查更新",
+    "autoCheckUpdates": "自动检查更新",
+    "autoCheckUpdatesTip": "有新版本时在状态栏提示",
     "currentVersion": "当前版本",
     "developer": "开发者",
     "developerName": "Yarin Zhang",
@@ -759,7 +761,9 @@
     },
     "statusBar": {
       "launcher": "{shortcut} 启动器",
-      "cliEnabled": "本地 CLI 已开启"
+      "cliEnabled": "本地 CLI 已开启",
+      "updateAvailable": "新版本 {version}",
+      "updateTooltip": "{date} 发布，在 GitHub 查看更新说明"
     }
   },
   "mobileSettings": {

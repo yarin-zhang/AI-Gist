@@ -3,6 +3,8 @@
     "appDescription": "Local-first AI prompt management tool",
     "appName": "AI Gist",
     "checkForUpdates": "Check for updates",
+    "autoCheckUpdates": "Check for updates automatically",
+    "autoCheckUpdatesTip": "Shows new versions in the status bar",
     "currentVersion": "Current version",
     "developer": "Developer",
     "developerName": "Yarin Zhang",
@@ -759,7 +761,9 @@
     },
     "statusBar": {
       "launcher": "{shortcut} launcher",
-      "cliEnabled": "Local CLI on"
+      "cliEnabled": "Local CLI on",
+      "updateAvailable": "New version {version}",
+      "updateTooltip": "Released {date}. View release notes on GitHub"
     }
   },
   "mobileSettings": {
