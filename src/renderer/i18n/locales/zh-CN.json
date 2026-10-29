@@ -251,16 +251,16 @@
     "creatingBackup": "正在创建备份...",
     "mergeWithCloud": "与云端重新合并",
     "mergeWithCloudSuccess": "已与云端重新合并",
-    "mobileICloudUnsupported": "移动端 iCloud 当前不具备真正的跨设备同步能力，请使用 WebDAV",
+    "mobileICloudUnsupported": "手机上暂时不能用 iCloud 同步，请改用 WebDAV",
     "noStorageSelected": "未选择存储配置",
     "overwriteCloud": "用恢复数据覆盖云端",
-    "overwriteCloudSuccess": "恢复数据已安全发布到云端",
-    "overwriteCloudWarning": "将先创建恢复前云端安全备份，再用当前恢复数据替换云端库。确认期间若云端发生变化，操作会安全中止。",
-    "restoreDecisionDescription": "本地恢复已完成，云同步保持暂停，等待选择覆盖云端或重新合并",
+    "overwriteCloudSuccess": "云端已换成恢复的数据",
+    "overwriteCloudWarning": "会先把云端现有的数据在本机备份一份，再用恢复的数据替换云端，其他设备同步后也会跟着变。",
+    "restoreDecisionDescription": "已从备份恢复。请选择用恢复的数据覆盖云端，或和云端的数据合并；选好之前不会同步。",
     "restoreDecisionTitle": "恢复后的云端处理",
     "restoringBackup": "正在恢复备份...",
     "syncStatusValues": {
-      "paused": "恢复后已暂停"
+      "paused": "等你选择"
     },
     "syncing": "正在同步",
     "webdavInfo": "WebDAV 支持坚果云、Nextcloud 等服务"
@@ -346,6 +346,7 @@
     "safetyBackupRestore": "恢复前自动备份",
     "safetyBackupClear": "清空前自动备份",
     "safetyBackupImport": "导入前自动备份",
+    "safetyBackupCloudOverwrite": "覆盖云端前的云端数据",
     "importConfirmTitle": "用这份备份替换本机数据？",
     "importConfirmContent": "备份文件里有：提示词 {prompts} 个，分类 {categories} 个，模型配置 {aiConfigs} 个。导入会替换本机现有的全部提示词、分类和模型配置。导入前会先自动备份当前数据，需要时可以在「备份版本」里恢复。",
     "importConfirmPositive": "替换并导入",
@@ -469,7 +470,8 @@
     "indicatorIdle": "云同步待机",
     "indicatorIdleDetail": "启用云存储后会自动显示同步状态",
     "indicatorNextCheckAt": "下次检查 {time}",
-    "indicatorScheduledDetail": "应用会在同步周期到达后检查云端变化",
+    "indicatorScheduledDetail": "稍后会自动同步",
+    "syncWillRetrySoon": "这次没同步完，稍后会自动再同步一次",
     "indicatorSyncNormal": "云同步正常",
     "indicatorSyncedDetail": "本机与云端数据已同步",
     "indicatorViewFullError": "点击查看完整错误详情",
@@ -516,7 +518,10 @@
       "uploaded": "已上传",
       "conflictPending": "本机和云端有改动冲突，请选择处理方式",
       "restoredOne": "「{name}」在另一台设备上被修改，已恢复",
-      "restoredMany": "「{name}」等 {total} 项在另一台设备上被修改，已恢复"
+      "restoredMany": "「{name}」等 {total} 项在另一台设备上被修改，已恢复",
+      "uncategorizedOne": "「{name}」所在的分类已被删除，已移到「未分类」",
+      "uncategorizedMany": "「{name}」等 {total} 个提示词所在的分类已被删除，已移到「未分类」",
+      "safetyBackupCreated": "覆盖前的云端数据已存为本机备份，需要时可以在「数据备份」里恢复"
     },
     "testConnection": "测试连接",
     "title": "数据同步",
@@ -537,44 +542,40 @@
         "step2": "复制错误详情并反馈"
       },
       "dataContract": {
-        "title": "同步数据关系需要处理",
-        "message": "检测到无法安全确定的记录关系。本机数据保持不变，详情中列出了集合和记录标识。",
-        "step1": "查看详情中的集合、记录标识和关联类型",
-        "step2": "先导出本地安全备份，再修复对应记录",
-        "step3": "修复后重新同步"
+        "title": "这次同步没有完成",
+        "message": "有几条数据之间的关联没法自动确认。为了不弄乱数据，这次没有同步，本机和云端都没有改动。",
+        "step1": "复制详情反馈给我们，我们来处理",
+        "step2": "需要的话，先在「数据备份」里备份一份本机数据"
       },
       "localQuota": {
-        "title": "本地存储空间不足",
-        "message": "数据库事务因存储配额不足而中止，原有数据未被部分覆盖。",
-        "step1": "释放设备磁盘或应用存储空间",
-        "step2": "关闭其他占用大量空间的页面后重试",
-        "step3": "复制详情反馈存储配额信息"
+        "title": "设备存储空间不足",
+        "message": "设备存储空间不够，这次同步的数据没有写入，本机原有的数据没有变化。",
+        "step1": "清理一些设备存储空间",
+        "step2": "清理后点「立即同步」再试一次"
       },
       "localApply": {
-        "title": "本地数据库事务未能提交",
-        "message": "同步数据未写入，本机旧数据保持完整。详情中包含失败集合、记录键和数据库错误。",
-        "step1": "查看详情中的失败阶段、集合和记录键",
-        "step2": "重启应用后再试一次",
-        "step3": "如果错误指纹未变化，请复制详情反馈"
+        "title": "同步的数据没能写入本机",
+        "message": "本机原有的数据没有变化。重启 AI Gist 后再同步一次，通常就能恢复。",
+        "step1": "重启 AI Gist 后点「立即同步」",
+        "step2": "如果一直这样，复制详情反馈给我们"
       },
       "restoreDecision": {
-        "title": "恢复后的云端同步已暂停",
-        "message": "请先选择用恢复数据覆盖云端，或与云端最新数据重新合并。",
-        "step1": "返回数据同步页面处理恢复决策",
-        "step2": "确认是否需要保留云端恢复后的新增数据",
-        "step3": "完成选择后再继续同步"
+        "title": "恢复备份后，同步在等你选择",
+        "message": "选好怎么处理云端的数据后才会继续同步：用恢复的数据覆盖云端，或者和云端的数据合并。",
+        "step1": "在「数据同步」里选择覆盖云端或合并",
+        "step2": "选好之前，本机和云端的数据都不会变"
       },
       "cancelled": {
-        "title": "同步已被新的操作接管",
-        "message": "被新的同步请求取代，会自动继续。",
-        "step1": "长时间没有恢复正常时，点「立即同步」"
+        "title": "同步一直没有完成",
+        "message": "同步连续几次被新的同步打断，应用会继续自动同步。",
+        "step1": "如果一直这样，点「立即同步」再试一次"
       },
       "instability": {
-        "title": "云端同步状态暂时不一致",
-        "message": "应用会保留本机数据并自动重试；如果持续出现，请查看详情复制诊断信息。",
-        "step1": "等待下一次自动同步或稍后手动重试",
-        "step2": "确认同一个云同步目录没有被其他工具或旧版本应用改写",
-        "step3": "复制错误详情并反馈"
+        "title": "云端的同步文件一直在变",
+        "message": "同步时云端的同步文件连续几次被改动，应用会继续自动重试，本机数据不受影响。",
+        "step1": "确认没有其他程序或旧版 AI Gist 在改同一个同步文件夹",
+        "step2": "点「立即同步」再试一次",
+        "step3": "如果一直这样，复制详情反馈给我们"
       },
       "auth": {
         "title": "云存储认证失败",
@@ -605,11 +606,11 @@
         "step3": "复制错误详情并反馈"
       },
       "transient": {
-        "title": "同步遇到临时状况",
-        "message": "这通常是网络波动或云端数据短暂变化导致的，应用会自动重试，暂时无需处理。",
-        "step1": "等待应用自动重试",
-        "step2": "如果持续较长时间未恢复，可手动点击立即同步",
-        "step3": "仍未恢复时，请复制错误详情反馈"
+        "title": "同步一直没有完成",
+        "message": "已经连续几次没同步成功，应用会继续自动重试，本机数据不受影响。",
+        "step1": "检查网络是否稳定",
+        "step2": "点「立即同步」再试一次",
+        "step3": "如果一直这样，复制详情反馈给我们"
       },
       "unknownError": "未知错误"
     },
@@ -830,8 +831,7 @@
       "autoSyncSub": "修改后自动上传",
       "showPassword": "显示密码",
       "hidePassword": "隐藏密码",
-      "retryAt": "下次重试：{time}",
-      "errorDetailLabel": "错误信息"
+      "retryAt": "下次重试：{time}"
     },
     "failedWith": "{context}：{reason}"
   },

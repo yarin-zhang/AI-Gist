@@ -115,7 +115,7 @@ describe('mobile sync and restore UI wiring', () => {
     // #416：「立即同步」和「重试」都是用户亲手点的，和桌面端一样总是真正重新连接，不返回缓存的失败
     expect(sync).toMatch(/reason: 'manual',\s*forceRetry: true/)
     expect(sync).not.toMatch(/forceRetry = false|forceRetry\s*\}/)
-    expect(sync).toContain('presentSyncErrorDetails(result, { storageId, onRetry: retry })')
+    expect(sync).toContain('presentSyncErrorDetails(result, { storageId, onRetry: retry, quietWhenRecoverable: true })')
     expect(sync).toContain("t('dataSync.viewErrorDetails')")
     // 恢复后覆盖云端是破坏性操作，必须先确认
     expect(sync).toContain('confirmRestoreOverwrite')

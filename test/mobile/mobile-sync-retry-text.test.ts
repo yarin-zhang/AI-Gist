@@ -20,9 +20,18 @@ describe('joinSentences', () => {
 })
 
 describe('同步错误详情', () => {
-  it('弹窗里除了通用建议，还列出这次的实际错误', () => {
+  it('弹窗里只有说明和建议，原始错误只在「复制」出来的详情里', () => {
     const shared = readFileSync('src/renderer/pages/mobile/settings/shared.ts', 'utf8')
-    expect(shared).toContain("translate('mobileSettings.sync.errorDetailLabel')")
-    expect(shared).toMatch(/rawError && rawError !== diagnosis\.message\.trim\(\)/)
+    expect(shared).not.toContain('errorDetailLabel')
+    expect(shared).not.toMatch(/message: \[[^\]]*rawError/)
+    expect(shared).toContain('void copyText(diagnosis.copyText)')
+  })
+
+  it('手动同步遇到应用自己会恢复的失败时只提示稍后再同步', () => {
+    const shared = readFileSync('src/renderer/pages/mobile/settings/shared.ts', 'utf8')
+    expect(shared).toMatch(/options\.quietWhenRecoverable && diagnosis\.quiet/)
+    for (const page of ['MobileDataSyncPage.vue', 'MobileStorageConfigPage.vue']) {
+      expect(readFileSync(`src/renderer/pages/mobile/settings/${page}`, 'utf8')).toContain('quietWhenRecoverable: true')
+    }
   })
 })

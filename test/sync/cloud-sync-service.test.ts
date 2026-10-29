@@ -1185,7 +1185,9 @@ describe('CloudSyncService', () => {
       timestamp: '2026-06-12T08:00:00.000Z'
     })
 
-    expect(diagnosis.title).toBe('云端同步状态暂时不一致')
+    expect(diagnosis.title).toBe('云端的同步文件一直在变')
+    // 连续失败还不到 3 次：界面上先不当成失败显示
+    expect(diagnosis.quiet).toBe(true)
     expect(diagnosis.canAutoRetry).toBe(true)
     expect(diagnosis.canUserFix).toBe(false)
     expect(diagnosis.copyText).toContain(rawError)
@@ -1318,7 +1320,8 @@ describe('CloudSyncService', () => {
       reason: 'manual'
     })
 
-    expect(diagnosis.title).toBe('同步遇到临时状况')
+    expect(diagnosis.title).toBe('同步一直没有完成')
+    expect(diagnosis.quiet).toBe(true)
     expect(diagnosis.canAutoRetry).toBe(true)
     expect(diagnosis.canUserFix).toBe(false)
   })
@@ -1913,7 +1916,10 @@ describe('CloudSyncService', () => {
 
     expect(result.success).toBe(true)
     expect(result.relationRepairs).toHaveLength(6)
-    expect(result.warnings).toContain('已自动修复 6 条失效的可选关联；相关提示词已保留为未分类')
+    // 内部修复不再以「失效的可选关联」这类说法提示，改成告诉用户哪些提示词移到了「未分类」
+    expect(result.warnings).toBeUndefined()
+    expect(result.uncategorizedPrompts?.map(prompt => prompt.label))
+      .toEqual(['Orphan 1', 'Orphan 2', 'Orphan 3', 'Orphan 4', 'Orphan 5', 'Orphan 6'])
     const restored = database.replaceAllData.mock.calls[0][0]
     expect(restored.prompts).toHaveLength(6)
     expect(restored.prompts.every(
@@ -2051,7 +2057,7 @@ describe('CloudSyncService', () => {
     expect(second.diagnostic?.fingerprint).toBe(first.diagnostic?.fingerprint)
     expect(database.replaceAllData).toHaveBeenCalledTimes(1)
     const diagnosis = getCloudSyncErrorDiagnosis(first, { storageId: 'cfg-1', reason: 'manual' })
-    expect(diagnosis.title).toBe('本地存储空间不足')
+    expect(diagnosis.title).toBe('设备存储空间不足')
     expect(diagnosis.copyText).toContain('错误代码: LOCAL_APPLY_QUOTA')
     expect(diagnosis.copyText).toContain('recordKey=uuid:prompt-1')
     expect(JSON.stringify(first.diagnostic)).not.toContain('secret-password')

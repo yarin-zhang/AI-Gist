@@ -89,6 +89,8 @@ export class CloudBackupAPI {
     success: boolean;
     config?: CloudStorageConfig;
     error?: string;
+    /** 保存前连不上存储（桌面端）：界面按「测试连接」同一套说明告诉用户怎么改 */
+    errorCode?: 'CONNECTION_FAILED';
   }> {
     const client = getCloudBackupClient();
     if (client) {
@@ -108,6 +110,7 @@ export class CloudBackupAPI {
     success: boolean;
     config?: CloudStorageConfig;
     error?: string;
+    errorCode?: 'CONNECTION_FAILED';
   }> {
     const client = getCloudBackupClient();
     if (client) {

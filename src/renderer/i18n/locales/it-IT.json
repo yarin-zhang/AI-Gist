@@ -251,16 +251,16 @@
     "creatingBackup": "Creazione del backup...",
     "mergeWithCloud": "Unisci di nuovo con il cloud",
     "mergeWithCloudSuccess": "Unione con il cloud completata",
-    "mobileICloudUnsupported": "Su mobile, iCloud non offre ancora una vera sincronizzazione tra dispositivi. Usa WebDAV.",
+    "mobileICloudUnsupported": "Sul telefono la sincronizzazione con iCloud non è ancora disponibile. Usa WebDAV.",
     "noStorageSelected": "Nessuna configurazione di archiviazione selezionata",
     "overwriteCloud": "Sovrascrivi il cloud con i dati ripristinati",
-    "overwriteCloudSuccess": "I dati ripristinati sono stati pubblicati in modo sicuro sul cloud",
-    "overwriteCloudWarning": "Prima verrà creato un backup di sicurezza della libreria cloud attuale, poi verrà sostituita con i dati ripristinati. Se il cloud cambia durante la conferma, l'operazione si interrompe in sicurezza.",
-    "restoreDecisionDescription": "Ripristino locale completato. La sincronizzazione cloud resta in pausa finché non scegli se sovrascrivere il cloud o unire di nuovo i dati.",
+    "overwriteCloudSuccess": "I dati del cloud sono stati sostituiti con quelli ripristinati",
+    "overwriteCloudWarning": "Prima i dati attuali del cloud vengono salvati in un backup su questo dispositivo, poi vengono sostituiti con quelli ripristinati. Anche gli altri dispositivi cambieranno dopo la sincronizzazione.",
+    "restoreDecisionDescription": "Ripristino da backup completato. Scegli se sostituire i dati del cloud con quelli ripristinati o unirli: finché non scegli, non viene sincronizzato nulla.",
     "restoreDecisionTitle": "Gestione del cloud dopo il ripristino",
     "restoringBackup": "Ripristino del backup...",
     "syncStatusValues": {
-      "paused": "In pausa dopo il ripristino"
+      "paused": "In attesa di una tua scelta"
     },
     "syncing": "Sincronizzazione",
     "webdavInfo": "WebDAV supporta servizi come Jianguoyun e Nextcloud"
@@ -346,6 +346,7 @@
     "safetyBackupRestore": "Backup prima del ripristino",
     "safetyBackupClear": "Backup prima della cancellazione",
     "safetyBackupImport": "Backup prima dell’importazione",
+    "safetyBackupCloudOverwrite": "Dati del cloud prima della sovrascrittura",
     "importConfirmTitle": "Sostituire i dati di questo dispositivo con questo backup?",
     "importConfirmContent": "Il backup contiene prompt: {prompts}, categorie: {categories}, configurazioni dei modelli: {aiConfigs}. L’importazione sostituisce tutti i prompt, le categorie e le configurazioni dei modelli di questo dispositivo. Prima viene fatto un backup automatico dei dati attuali, che puoi ripristinare da «Versioni di backup» se serve.",
     "importConfirmPositive": "Sostituisci e importa",
@@ -469,7 +470,8 @@
     "indicatorIdle": "Sincronizzazione cloud inattiva",
     "indicatorIdleDetail": "Lo stato della sincronizzazione appare automaticamente dopo aver attivato un archivio cloud",
     "indicatorNextCheckAt": "Prossimo controllo: {time}",
-    "indicatorScheduledDetail": "L'app controllerà le modifiche al cloud una volta raggiunto l'intervallo di sincronizzazione",
+    "indicatorScheduledDetail": "Si sincronizzerà a breve in automatico",
+    "syncWillRetrySoon": "La sincronizzazione non è terminata. Riproverà a breve in automatico.",
     "indicatorSyncNormal": "Sincronizzazione cloud funzionante",
     "indicatorSyncedDetail": "Questo dispositivo e il cloud sono sincronizzati",
     "indicatorViewFullError": "Fai clic per vedere tutti i dettagli dell'errore",
@@ -516,7 +518,10 @@
       "uploaded": "Sincronizzazione completata: i dati locali sono stati caricati",
       "conflictPending": "Le modifiche su questo dispositivo e nel cloud sono in conflitto. Scegli come risolverle.",
       "restoredOne": "«{name}» è stato modificato su un altro dispositivo ed è stato ripristinato",
-      "restoredMany": "«{name}» e {count} altro elemento sono stati modificati su un altro dispositivo e ripristinati | «{name}» e altri {count} elementi sono stati modificati su un altro dispositivo e ripristinati"
+      "restoredMany": "«{name}» e {count} altro elemento sono stati modificati su un altro dispositivo e ripristinati | «{name}» e altri {count} elementi sono stati modificati su un altro dispositivo e ripristinati",
+      "uncategorizedOne": "«{name}» è stato spostato in «Senza categoria» perché la sua categoria è stata eliminata",
+      "uncategorizedMany": "«{name}» e {count} altro prompt sono stati spostati in «Senza categoria» perché la loro categoria è stata eliminata | «{name}» e altri {count} prompt sono stati spostati in «Senza categoria» perché le loro categorie sono state eliminate",
+      "safetyBackupCreated": "Prima della sovrascrittura, i dati del cloud sono stati salvati in un backup locale. Se serve, puoi ripristinarli da Backup dei dati."
     },
     "testConnection": "Verifica connessione",
     "title": "Sincronizzazione dati",
@@ -537,44 +542,40 @@
         "step2": "Copia i dettagli dell'errore e segnala il problema"
       },
       "dataContract": {
-        "title": "Le relazioni tra i dati sincronizzati richiedono attenzione",
-        "message": "Alcune relazioni tra record non possono essere risolte in modo sicuro. I dati su questo dispositivo non sono stati modificati; i dettagli elencano le raccolte e gli ID dei record coinvolti.",
-        "step1": "Controlla nei dettagli le raccolte, gli ID dei record e i tipi di relazione",
-        "step2": "Esporta prima un backup locale, poi correggi i record coinvolti",
-        "step3": "Sincronizza di nuovo dopo la correzione"
+        "title": "Sincronizzazione non completata",
+        "message": "Non è stato possibile verificare in automatico come sono collegati alcuni dati. Per non rovinarli, questa volta non è stato sincronizzato nulla: né questo dispositivo né il cloud sono cambiati.",
+        "step1": "Copia i dettagli e inviaceli, così possiamo risolvere",
+        "step2": "Se vuoi, prima fai un backup dei dati di questo dispositivo in Backup dei dati"
       },
       "localQuota": {
-        "title": "Spazio di archiviazione locale insufficiente",
-        "message": "La transazione del database è stata interrotta perché la quota di archiviazione è esaurita. I dati esistenti non sono stati sovrascritti parzialmente.",
-        "step1": "Libera spazio su disco o nell'archivio dell'app",
-        "step2": "Chiudi le altre pagine che occupano molto spazio e riprova",
-        "step3": "Copia i dettagli per segnalare le informazioni sulla quota"
+        "title": "Spazio di archiviazione insufficiente",
+        "message": "Su questo dispositivo non c'è abbastanza spazio, quindi i dati sincronizzati non sono stati salvati. I dati esistenti non sono cambiati.",
+        "step1": "Libera un po' di spazio sul dispositivo",
+        "step2": "Poi fai clic su «Sincronizza ora» per riprovare"
       },
       "localApply": {
-        "title": "La transazione del database locale non è stata completata",
-        "message": "I dati sincronizzati non sono stati scritti e quelli già presenti sul dispositivo sono integri. I dettagli includono la raccolta, la chiave del record e l'errore del database.",
-        "step1": "Controlla nei dettagli la fase, la raccolta e la chiave del record",
-        "step2": "Riavvia l'app e riprova",
-        "step3": "Se l'impronta dell'errore non cambia, copia i dettagli e segnala il problema"
+        "title": "Impossibile salvare i dati sincronizzati su questo dispositivo",
+        "message": "I dati esistenti non sono cambiati. Di solito basta riavviare AI Gist e sincronizzare di nuovo.",
+        "step1": "Riavvia AI Gist, poi fai clic su «Sincronizza ora»",
+        "step2": "Se continua a succedere, copia i dettagli e inviaceli"
       },
       "restoreDecision": {
-        "title": "Sincronizzazione cloud in pausa dopo il ripristino",
-        "message": "Scegli se sovrascrivere il cloud con i dati ripristinati o unirli ai dati più recenti del cloud.",
-        "step1": "Torna a Sincronizzazione dati e scegli come procedere",
-        "step2": "Valuta se conservare i dati aggiunti al cloud dopo il ripristino",
-        "step3": "Riprendi la sincronizzazione dopo aver scelto"
+        "title": "Dopo il ripristino la sincronizzazione aspetta una tua scelta",
+        "message": "La sincronizzazione riprende quando scegli cosa fare con i dati del cloud: sostituirli con quelli ripristinati oppure unirli.",
+        "step1": "In Sincronizzazione dati, scegli se sostituire i dati del cloud o unirli",
+        "step2": "Finché non scegli, né questo dispositivo né il cloud cambiano"
       },
       "cancelled": {
-        "title": "Una sincronizzazione più recente ha preso il controllo",
-        "message": "Sostituita da una richiesta di sincronizzazione più recente, prosegue da sola.",
-        "step1": "Se non si risolve per molto tempo, fai clic su «Sincronizza ora»"
+        "title": "La sincronizzazione continua a interrompersi",
+        "message": "Una sincronizzazione più recente ha interrotto questa diverse volte di seguito. L'app continuerà a sincronizzare in automatico.",
+        "step1": "Se continua, fai clic su «Sincronizza ora» per riprovare"
       },
       "instability": {
-        "title": "Lo stato della sincronizzazione cloud è temporaneamente incoerente",
-        "message": "L'app conserva i dati su questo dispositivo e riprova automaticamente. Se il problema persiste, apri i dettagli e copia la diagnostica.",
-        "step1": "Attendi la prossima sincronizzazione automatica o riprova più tardi",
-        "step2": "Verifica che nessun altro strumento o versione precedente dell'app scriva nella stessa cartella di sincronizzazione",
-        "step3": "Copia i dettagli dell'errore e segnala il problema"
+        "title": "Il file di sincronizzazione nel cloud continua a cambiare",
+        "message": "Il file di sincronizzazione nel cloud è cambiato durante la sincronizzazione diverse volte di seguito. L'app continuerà a riprovare in automatico e i dati di questo dispositivo non sono interessati.",
+        "step1": "Verifica che nessun'altra app o versione precedente di AI Gist stia modificando la stessa cartella di sincronizzazione",
+        "step2": "Fai clic su «Sincronizza ora» per riprovare",
+        "step3": "Se continua, copia i dettagli e inviaceli"
       },
       "auth": {
         "title": "Autenticazione al cloud non riuscita",
@@ -605,11 +606,11 @@
         "step3": "Copia i dettagli dell'errore e segnala il problema"
       },
       "transient": {
-        "title": "Problema temporaneo di sincronizzazione",
-        "message": "Di solito è dovuto a una rete instabile o a una breve modifica dei dati nel cloud. L'app riprova automaticamente: per ora non serve fare nulla.",
-        "step1": "Attendi che l'app riprovi automaticamente",
-        "step2": "Se non si risolve per molto tempo, fai clic su «Sincronizza ora»",
-        "step3": "Se ancora non si risolve, copia i dettagli dell'errore e segnala il problema"
+        "title": "La sincronizzazione non riesce a completarsi",
+        "message": "La sincronizzazione non è riuscita diverse volte di seguito. L'app continuerà a riprovare in automatico e i dati di questo dispositivo non sono interessati.",
+        "step1": "Verifica che la connessione di rete sia stabile",
+        "step2": "Fai clic su «Sincronizza ora» per riprovare",
+        "step3": "Se continua, copia i dettagli e inviaceli"
       },
       "unknownError": "Errore sconosciuto"
     },
@@ -830,8 +831,7 @@
       "autoSyncSub": "Carica le modifiche automaticamente",
       "showPassword": "Mostra password",
       "hidePassword": "Nascondi password",
-      "retryAt": "Prossimo tentativo: {time}",
-      "errorDetailLabel": "Messaggio di errore"
+      "retryAt": "Prossimo tentativo: {time}"
     },
     "failedWith": "{context}: {reason}"
   },

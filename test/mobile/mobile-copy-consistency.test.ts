@@ -54,7 +54,7 @@ describe('移动端文案', () => {
       'mobileAI.failedWith', 'mobileModels.desktopOnly', 'mobileModels.desktopOnlyConfigNote', 'mobileModels.desktopOnlyProviders',
       'mobileModels.noModelSelected', 'mobileModels.enterServiceEndpoint',
       'mobileModels.requestTestFailed', 'mobilePrompt.rawTemplateCopied', 'promptFill.listHint', 'mobileSettings.sync.retryAt',
-      'mobileSettings.sync.errorDetailLabel', 'mobileSettings.failedWith',
+      'mobileSettings.failedWith',
     ]
     for (const code of LOCALES) {
       const messages = locale(code)

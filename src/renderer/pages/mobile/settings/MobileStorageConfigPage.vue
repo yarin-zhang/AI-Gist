@@ -161,12 +161,9 @@ import {
   getCloudSyncResultMessage,
   type CloudSyncJoinPreview
 } from '~/lib/services/cloud-sync.service'
-import {
-  getCloudSyncCategoryMergeMessages,
-  getCloudSyncJoinMessageLines
-} from '~/lib/utils/cloud-sync-merge-notices'
+import { getCloudSyncJoinMessageLines } from '~/lib/utils/cloud-sync-merge-notices'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
-import { confirmAction, getDeviceLabel, presentSyncErrorDetails, showToast, withLoading } from './shared'
+import { confirmAction, getDeviceLabel, joinSentences, presentSyncErrorDetails, showToast, withLoading } from './shared'
 
 const route = useRoute()
 const router = useRouter()
@@ -264,7 +261,9 @@ const saveConfig = async () => {
       : CloudBackupAPI.addStorageConfig(savedPayload))
 
     if (!result.success) {
-      await showToast(result.error || t('dataSync.saveFailed'), 'danger')
+      // 手机上保存只是写本机配置，失败了用户也处理不了：只说没保存成功，原因写日志
+      console.warn('保存存储配置失败:', result.error)
+      await showToast(t('dataSync.saveFailed'), 'danger')
       return
     }
 
@@ -322,7 +321,8 @@ const joinStorage = async (storageId: string) => {
   const enabled = await withLoading(t('common.loading'), () =>
     CloudBackupAPI.updateStorageConfig(storageId, { enabled: true }))
   if (!enabled.success) {
-    await showToast(enabled.error || t('dataSync.saveFailed'), 'danger')
+    console.warn('启用存储配置失败:', enabled.error)
+    await showToast(t('dataSync.saveFailed'), 'danger')
     return
   }
   // 启用后按新配置再连接一次；确认过的那次同步跑在停用状态下，本机「有改动等待同步」的标记靠这一次清掉
@@ -343,14 +343,16 @@ const testConnection = async () => {
       ...buildConfigPayload()
     } as CloudStorageConfig)
 
-    // 移动端实现会在连接可用但目录需要初始化时附带 warning，桌面端类型里没有这个字段。
+    // 移动端实现会附带 warning（服务器不支持条件写入时同步改用兼容模式）：用户换不了服务器，只写日志
     const warning = (result as { warning?: string }).warning
+    if (warning) console.warn('WebDAV 连接可用，但有兼容性提示:', warning)
     if (result.success) {
-      testResult.value = warning
-        ? { tone: 'warning', message: warning }
-        : { tone: 'success', message: t('dataSync.connectionTestSuccess') }
+      testResult.value = { tone: 'success', message: t('dataSync.connectionTestSuccess') }
     } else {
-      testResult.value = { tone: 'error', message: result.error || t('dataSync.connectionTestFailed') }
+      // 和桌面端「测试连接」同一套说明：地址拼错、端口不对、账号密码不对还是服务器没响应
+      console.warn('测试存储连接失败:', result.error)
+      const diagnosis = getCloudStorageConnectionDiagnosis(result.error)
+      testResult.value = { tone: 'error', message: joinSentences(diagnosis.title, diagnosis.message) }
     }
   } catch (error) {
     console.error('测试存储连接失败:', error)
@@ -373,19 +375,15 @@ const runSync = async (storageId: string) => {
       // 冲突在数据同步页处理，这里只提示
       await showToast(getCloudSyncResultMessage(result.action), 'warning')
     } else if (result.success) {
-      await showToast([
-        getCloudSyncResultMessage(result.action, result.conflicts.length),
-        ...(result.warnings || []),
-        // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
-        ...getCloudSyncCategoryMergeMessages(result)
-      ].join('; '))
+      // 恢复了哪些记录、同名分类保留了哪一边等，由主页面的 useCloudSyncResultNotices 在顶部统一提醒
+      await showToast(getCloudSyncResultMessage(result.action, result.conflicts.length))
     } else {
-      await presentSyncErrorDetails(result, { storageId })
+      await presentSyncErrorDetails(result, { storageId, quietWhenRecoverable: true })
     }
   } catch (error) {
     await presentSyncErrorDetails(
       error instanceof Error ? error.message : String(error),
-      { storageId }
+      { storageId, quietWhenRecoverable: true }
     )
   }
 }
@@ -413,7 +411,8 @@ const deleteConfig = async () => {
   try {
     const result = await CloudBackupAPI.deleteStorageConfig(configId.value)
     if (!result.success) {
-      await showToast(result.error || t('dataSync.deleteFailed'), 'danger')
+      console.warn('删除存储配置失败:', result.error)
+      await showToast(t('dataSync.deleteFailed'), 'danger')
       return
     }
     await showToast(t('dataSync.deleteSuccess'))

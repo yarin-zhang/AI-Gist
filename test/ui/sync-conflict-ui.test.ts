@@ -85,10 +85,10 @@ describe('sync conflict UI (V5-Conflict)', () => {
     const mobileShell = read('pages/MobileMainPage.vue')
     const mobileStatus = read('pages/mobile/settings/shared.ts')
 
-    expect(indicator).toContain('useCloudSyncRestoredNotice(text => message.info(text))')
-    expect(indicator).toContain('getCloudSyncRestoredMessage(status.value.lastResult.restoredAfterLocalDelete)')
-    expect(mobileShell).toContain('useCloudSyncRestoredNotice(text => {')
-    expect(mobileStatus).toContain('getCloudSyncRestoredMessage(status.lastResult.restoredAfterLocalDelete)')
+    expect(indicator).toContain('useCloudSyncResultNotices(messages => messages.forEach(text => message.info(text)))')
+    expect(indicator).toContain('getCloudSyncRecordChangeMessages(status.value.lastResult)')
+    expect(mobileShell).toContain('useCloudSyncResultNotices(messages => {')
+    expect(mobileStatus).toContain('getCloudSyncRecordChangeMessages(status.lastResult)')
   })
 
   it('removes the unused legacy conflict dialog', () => {

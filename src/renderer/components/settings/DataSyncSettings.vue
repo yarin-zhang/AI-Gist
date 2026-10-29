@@ -123,9 +123,11 @@
             </UiAlert>
             <UiAlert v-else-if="draftTest.diagnosis" tone="error" class="sync-form-result">
                 <strong>{{ draftTest.diagnosis.title }}</strong> {{ draftTest.diagnosis.message }}
-                <span v-if="draftTest.diagnosis.detail" class="sync-form-result__detail">
+                <!-- 服务器原样返回的内容只在反馈问题时有用：默认折叠，说明和建议已经在上面 -->
+                <details v-if="draftTest.diagnosis.detail" class="sync-form-result__detail">
+                    <summary>{{ t('dataSync.technicalDetails') }}</summary>
                     {{ t('dataSync.connectionDiagnosis.detail', { detail: draftTest.diagnosis.detail }) }}
-                </span>
+                </details>
             </UiAlert>
             <!-- 存储已经停用保存，只是读不到云端数据：留在弹窗里说明原因，改好后再点保存会重新读取 (#490) -->
             <UiAlert v-if="joinError" tone="error" class="sync-form-result">
@@ -235,7 +237,6 @@ import type {
     CloudStorageConnectionDiagnosis, CloudSyncJoinPreview, CloudSyncResult, CloudSyncStatus,
 } from '@/lib/services/cloud-sync.service';
 import {
-    getCloudSyncCategoryMergeMessages,
     getCloudSyncJoinCategoryLine,
     getCloudSyncJoinRows,
 } from '@/lib/utils/cloud-sync-merge-notices';
@@ -351,6 +352,7 @@ const syncStatusDiagnosis = computed(() => getCloudSyncErrorDiagnosis(
 // 「等待同步」(#425)。存储列表以本页刚加载的为准（只算已启用的存储）。
 const dataSyncStatusKind = computed<DataSyncStatusKind>(() => resolveDataSyncStatusKind(createDataSyncStatusInput(syncStatus.value, {
     canAutoRetryError: syncStatusDiagnosis.value.canAutoRetry,
+    quietError: syncStatusDiagnosis.value.quiet,
     autoSyncEnabled: autoSyncEnabled.value,
     hasStorageConfigs: hasEnabledStorage.value,
 })));
@@ -555,7 +557,7 @@ const saveConfig = async () => {
             ? await CloudBackupAPI.updateStorageConfig(editingId, payload)
             : await CloudBackupAPI.addStorageConfig(payload as any);
         if (!result.success) {
-            message.error(result.error || t('dataSync.saveFailed'));
+            reportStorageSaveFailure(result);
             return;
         }
         // 地址、账号或密码改过之后，之前记下的失败不再作数
@@ -591,6 +593,21 @@ const joinRows = computed(() => joinConfirm.value.preview ? getCloudSyncJoinRows
 const joinCategoryLine = computed(() => joinConfirm.value.preview ? getCloudSyncJoinCategoryLine(joinConfirm.value.preview) : '');
 
 /**
+ * 保存或启用存储失败。保存前都会先连一次存储：连不上时用「测试连接」同一套说明告诉用户怎么改，
+ * 弹窗还开着就留在表单下面对照着改；其他原因（写配置文件失败等）用户处理不了，只说没保存成功。
+ */
+const reportStorageSaveFailure = (result: { error?: string; errorCode?: string }) => {
+    console.warn('保存存储配置失败:', result.error);
+    if (result.errorCode !== 'CONNECTION_FAILED') {
+        message.error(t('dataSync.saveFailed'));
+        return;
+    }
+    const diagnosis = getCloudStorageConnectionDiagnosis(result.error);
+    if (showConfigModal.value) draftTest.value = { state: 'error', diagnosis };
+    else message.error(diagnosis.message);
+};
+
+/**
  * 刚存下（停用状态）的存储：读两边的数据。本机和云端各有对方没有的提示词或分类时先问用户，
  * 确认后马上同步一次、结果就地提示，再启用；选「暂不同步」时存储保持停用。
  */
@@ -624,7 +641,7 @@ const joinStorage = async (storageId: string, isNew: boolean) => {
     const enabled = await CloudBackupAPI.updateStorageConfig(storageId, { enabled: true });
     await loadStorageConfigs();
     if (!enabled.success) {
-        message.error(enabled.error || t('dataSync.saveFailed'));
+        reportStorageSaveFailure(enabled);
         return;
     }
     if (!preview.needsConfirmation) message.success(isNew ? t('dataSync.addSuccess') : t('dataSync.updateSuccess'));
@@ -635,7 +652,10 @@ const joinStorage = async (storageId: string, isNew: boolean) => {
 const deleteConfig = async (id: string) => {
     try {
         const result = await CloudBackupAPI.deleteStorageConfig(id);
-        if (!result.success) return message.error(result.error || t('dataSync.deleteFailed'));
+        if (!result.success) {
+            console.warn('删除存储配置失败:', result.error);
+            return message.error(t('dataSync.deleteFailed'));
+        }
         message.success(t('dataSync.deleteSuccess'));
         await loadStorageConfigs();
     } catch (error) {
@@ -690,18 +710,23 @@ const syncCloudData = async (storageId: string) => {
             message.warning(getCloudSyncResultMessage(result.action));
             syncConflict.open(storageId);
         } else if (result.success) {
+            // 恢复了哪些记录、同名分类保留了哪一边等，由状态栏的 useCloudSyncResultNotices 统一提醒
             message.success(getCloudSyncResultMessage(result.action, result.conflicts.length));
-            for (const warning of result.warnings || []) message.warning(warning);
-            // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
-            for (const notice of getCloudSyncCategoryMergeMessages(result)) message.warning(notice);
-        } else message.error(showSyncErrorDetails(result, storageId).message);
+        } else reportManualSyncFailure(result, storageId);
     } catch (error) {
         console.error('云同步失败:', error);
-        message.error(showSyncErrorDetails(error instanceof Error ? error.message : String(error), storageId).message);
+        reportManualSyncFailure(error instanceof Error ? error.message : String(error), storageId);
     } finally {
         loading.value.syncNow = false;
         syncingStorageId.value = '';
     }
+};
+
+// 同步被新的同步接替、临时状况这类应用自己会恢复的失败，只轻轻说一句稍后会再同步，不弹错误详情
+const reportManualSyncFailure = (error: string | CloudSyncResult, storageId: string) => {
+    const diagnosis = getCloudSyncErrorDiagnosis(error, { storageId, reason: 'manual', status: 'error' });
+    if (diagnosis.quiet) message.info(t('dataSync.syncWillRetrySoon'));
+    else message.error(showSyncErrorDetails(error, storageId).message);
 };
 
 const showSyncErrorDetails = (error: string | CloudSyncResult | undefined, storageId: string) => {
@@ -974,6 +999,18 @@ onUnmounted(() => unsubscribeSyncStatus?.());
     margin-top: 4px;
     color: var(--content-secondary);
     font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+}
+
+.sync-form-result__detail summary {
+    width: fit-content;
+    cursor: pointer;
+}
+
+.sync-form-result__detail summary:focus-visible {
+    border-radius: var(--radius-control);
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
 }
 
 .join-confirm {

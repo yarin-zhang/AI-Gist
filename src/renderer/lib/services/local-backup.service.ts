@@ -85,12 +85,16 @@ export function getDefaultLocalBackupDescription(backupType: BackupType = 'manua
   }
 }
 
-/** 恢复备份、清空数据库前自动创建的保护性备份，列表里按 trigger 显示成单独的类型 */
-export type LocalSafetyBackupReason = 'restore' | 'clear' | 'import';
+/**
+ * 恢复备份、清空数据库前自动创建的保护性备份，列表里按 trigger 显示成单独的类型。
+ * cloudOverwrite 是恢复备份后选「覆盖云端」时，先把云端原来的数据存一份在本机。
+ */
+export type LocalSafetyBackupReason = 'restore' | 'clear' | 'import' | 'cloudOverwrite';
 export const LOCAL_SAFETY_BACKUP_TRIGGERS: Record<LocalSafetyBackupReason, string> = {
   restore: 'pre-restore',
   clear: 'pre-clear',
-  import: 'pre-import'
+  import: 'pre-import',
+  cloudOverwrite: 'pre-restore-cloud-overwrite'
 };
 
 export class LocalBackupService {
