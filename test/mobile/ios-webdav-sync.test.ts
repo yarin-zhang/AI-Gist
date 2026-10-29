@@ -173,6 +173,16 @@ describe('iOS 连群晖 WebDAV', () => {
     expect(put).not.toHaveProperty('Cache-Control')
   })
 
+  it('文件不存在时群晖回的是 HTML 错误页：照实交回 404，不拿去按 JSON 解析', async () => {
+    httpRequest.mockResolvedValue({ status: 404, data: '<!DOCTYPE HTML><html><title>404 Not Found</title></html>', headers: {} })
+    const transport = new MobileWebDAVTransport()
+
+    const response = await transport.request({ url: 'https://nas.example.com/AI-Gist-Backup/sync-manifest.json', method: 'GET', responseType: 'json' })
+
+    expect(response.status).toBe(404)
+    expect(typeof response.data).toBe('string')
+  })
+
   it('原生层关掉 URLSession 的缓存并清掉以前存下的；http 地址和 Android 一样能用', () => {
     const appDelegate = readFileSync('ios/App/App/AppDelegate.swift', 'utf8')
     const launch = appDelegate.slice(appDelegate.indexOf('didFinishLaunchingWithOptions'), appDelegate.indexOf('PromptAccessory.register()'))

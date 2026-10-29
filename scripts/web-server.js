@@ -912,7 +912,7 @@ async function saveWebDAVSyncManifest({ config, manifest, options = {} }) {
   const headers = {};
   if (options.expectedRevision !== undefined) {
     if (primaryState?.etag) {
-      headers['If-Match'] = normalizeIfMatchHeaderValue(primaryState.etag);
+      headers['If-Match'] = normalizeIfMatchHeaderValue(await resolveWritableEtag(client, manifestPath, primaryState.etag));
     } else if (!currentManifest.latestSnapshot) {
       headers['If-None-Match'] = '*';
     }
@@ -1255,6 +1255,37 @@ function isRevisionConflictError(error) {
 
 function formatErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+// 群晖（Apache）在文件写入后的一秒内只给弱 ETag（W/"…"），这时带任何 If-Match 都会被 412 拒绝；
+// 过了这一秒，同一个版本的 ETag 就变成强的。webdav 库会去掉引号，弱 ETag 读出来是 W/xxx。
+// 手里是弱 ETag 时等它变强再写；文件已经变了就原样返回，让条件写照常报冲突（桌面端、移动端同样处理）
+const WEAK_ETAG_RECHECK_DELAYS_MS = [1100, 500, 500];
+
+async function resolveWritableEtag(client, remotePath, etag) {
+  if (!etag || !isWeakEtag(etag)) {
+    return etag;
+  }
+  for (const waitMs of WEAK_ETAG_RECHECK_DELAYS_MS) {
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    const stat = await client.stat(remotePath).catch(() => null);
+    const current = typeof stat?.etag === 'string' ? stat.etag : undefined;
+    if (!current || normalizeEtagValue(current) !== normalizeEtagValue(etag)) {
+      return etag;
+    }
+    if (!isWeakEtag(current)) {
+      return current;
+    }
+  }
+  return etag;
+}
+
+function isWeakEtag(etag) {
+  return /^W\//i.test(String(etag).trim());
+}
+
+function normalizeEtagValue(etag) {
+  return String(etag).trim().replace(/^W\//i, '').replace(/"/g, '');
 }
 
 function normalizeIfMatchHeaderValue(etag) {

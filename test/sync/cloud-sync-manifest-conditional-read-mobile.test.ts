@@ -205,6 +205,23 @@ describe.each(['ios', 'android'])('mobile sync manifest conditional read on %s (
     server = null
   })
 
+  it('waits for the strong ETag when the server only gives weak ones right after a write (Synology)', async () => {
+    // 群晖（Apache）写入后一秒内只给弱 ETag，带它条件写一定 412；这里缩短成 300ms
+    const config = await setupStorage({ weakEtagWindowMs: 300 })
+    const device = createDevice()
+    await device.saveCloudSyncManifest(config.id, manifestAt('rev-1', 'First'))
+    await device.getCloudSyncManifest(config.id)
+
+    expect(await device.saveCloudSyncManifest(config.id, manifestAt('rev-2', 'Second'), { expectedRevision: 'rev-1' }))
+      .toMatchObject({ success: true })
+    expect(await device.saveCloudSyncManifest(config.id, manifestAt('rev-3', 'Third'), { expectedRevision: 'rev-2' }))
+      .toMatchObject({ success: true })
+
+    const manifestPuts = manifestRequests().filter(request => request.method === 'PUT')
+    expect(manifestPuts.map(request => request.status)).toEqual([201, 204, 204])
+    expect(getCloudSyncManifestRevision(await device.getCloudSyncManifest(config.id))).toBe('rev-3')
+  })
+
   it('sends one conditional GET and downloads nothing when the cloud has not changed', async () => {
     const config = await setupStorage()
     const device = createDevice()
