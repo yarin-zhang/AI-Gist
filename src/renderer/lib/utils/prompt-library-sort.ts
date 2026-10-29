@@ -22,10 +22,18 @@ export const defaultSortOrder = (sortBy: PromptLibrarySortBy): PromptLibrarySort
 
 const time = (value: Date | string | undefined) => (value ? new Date(value).getTime() : 0)
 
+/**
+ * 最近一次修改或使用的时间。复制使用只记在 lastUsedAt、不改 updatedAt (#488)，
+ * 「最近」和按更新时间排序要把两者都算上，用过的提示词照样排到前面。
+ */
+export const promptActivityTime = (prompt: Pick<PromptWithRelations, 'updatedAt' | 'lastUsedAt'>): number => (
+  Math.max(time(prompt.updatedAt), time(prompt.lastUsedAt))
+)
+
 /** 升序比较 */
 const ascending: Record<PromptLibrarySortBy, (a: PromptWithRelations, b: PromptWithRelations) => number> = {
   created: (a, b) => time(a.createdAt) - time(b.createdAt),
-  updated: (a, b) => time(a.updatedAt) - time(b.updatedAt),
+  updated: (a, b) => promptActivityTime(a) - promptActivityTime(b),
   usage: (a, b) => (a.useCount || 0) - (b.useCount || 0),
   title: (a, b) => a.title.localeCompare(b.title),
 }

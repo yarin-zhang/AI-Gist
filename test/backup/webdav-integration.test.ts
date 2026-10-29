@@ -1703,7 +1703,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
               imageBlobs: [imageDataUrl]
             })
           ])
-        }))
+        }), { preserveSyncMetadata: true })
         expect(webLocalData.prompts).toEqual(expect.arrayContaining([
           expect.objectContaining({
             uuid: 'cross-platform-prompt',
@@ -1955,7 +1955,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       expect(deviceBDatabase.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
         categories: expect.arrayContaining([expect.objectContaining({ uuid: mockExportData.categories[0].uuid })]),
         prompts: expect.arrayContaining([expect.objectContaining({ uuid: mockExportData.prompts[0].uuid })])
-      }))
+      }), { preserveSyncMetadata: true })
     })
 
     it('本机变更事件会自动排队同步并写入同一 WebDAV manifest', async () => {
@@ -2120,7 +2120,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       expect(result.action).toBe('downloaded')
       expect(deviceDatabase.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
         prompts: expect.arrayContaining([expect.objectContaining({ title: 'Recovered from snapshot file' })])
-      }))
+      }), { preserveSyncMetadata: true })
 
       const repairedManifest = await service.getCloudSyncManifest(storageId)
       expect(repairedManifest.latestSnapshot?.revision).toBe('rev-webdav-file')

@@ -69,6 +69,8 @@ export interface CloudSyncManifestSaveResult {
   error?: string;
   conflict?: boolean;
   currentRevision?: string | null;
+  /** 存储层写后已经确认落盘（例如桌面 WebDAV 查过文件信息），调用方不必再整份读回校验 (#486) */
+  verified?: boolean;
 }
 
 export class CloudSyncManifestCorruptError extends Error {

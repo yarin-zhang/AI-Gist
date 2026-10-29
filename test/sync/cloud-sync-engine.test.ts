@@ -536,6 +536,167 @@ describe('cloud sync engine', () => {
     expect(remoteDeleteWins.conflicts[0]).toMatchObject({ reason: 'delete_vs_update', resolution: 'take-remote' })
   })
 
+  describe('delete vs update with sync tombstones (#485)', () => {
+    const T0 = '2026-01-01T00:00:00.000Z'
+    const EDITED_AT = '2026-01-02T00:00:10.000Z'
+    const DELETED_AT = '2026-01-02T00:00:20.000Z'
+    const RESOLVED_AT = '2026-01-03T00:00:00.000Z'
+    const prompt = (title: string, updatedAt: string) => ({ id: 1, uuid: 'prompt-1', title, content: 'body', updatedAt })
+    const variable = { id: 5, uuid: 'variable-1', promptId: 1, promptUuid: 'prompt-1', name: 'tone', updatedAt: T0 }
+    const tombstones = (deletedAt: string) => [
+      {
+        collectionName: 'prompts',
+        recordKey: 'uuid:prompt-1',
+        recordUuid: 'prompt-1',
+        deletedAt,
+        recordSnapshot: { id: 1, uuid: 'prompt-1' }
+      },
+      {
+        collectionName: 'promptVariables',
+        recordKey: 'uuid:variable-1',
+        recordUuid: 'variable-1',
+        deletedAt,
+        recordSnapshot: { id: 5, uuid: 'variable-1', promptId: 1, promptUuid: 'prompt-1' }
+      }
+    ]
+    const base = { prompts: [prompt('Base', T0)], promptVariables: [variable], syncTombstones: [] }
+    const edited = { prompts: [prompt('Edited', EDITED_AT)], promptVariables: [variable], syncTombstones: [] }
+    const deleted = (deletedAt: string) => ({ prompts: [], promptVariables: [], syncTombstones: tombstones(deletedAt) })
+
+    it('keeps the edited version the user picked even when the deletion is newer', () => {
+      const result = mergeCloudSyncData(edited, deleted(DELETED_AT), base, {
+        resolutions: { 'prompts::uuid:prompt-1': 'local' },
+        resolvedAt: RESOLVED_AT
+      })
+
+      expect(result.conflicts).toEqual([
+        expect.objectContaining({ reason: 'delete_vs_update', resolution: 'keep-local' })
+      ])
+      expect(result.data.prompts).toEqual([
+        expect.objectContaining({ uuid: 'prompt-1', title: 'Edited', updatedAt: RESOLVED_AT })
+      ])
+      expect(result.data.promptVariables).toEqual([expect.objectContaining({ uuid: 'variable-1' })])
+    })
+
+    it('restores the kept version on the device that deleted it', () => {
+      const resolved = mergeCloudSyncData(edited, deleted(DELETED_AT), base, {
+        resolutions: { 'prompts::uuid:prompt-1': 'local' },
+        resolvedAt: RESOLVED_AT
+      })
+
+      // 删除的那台设备：本机和基线都是删除后的状态，云端是对方保留后的结果
+      const onDeletingDevice = mergeCloudSyncData(deleted(DELETED_AT), resolved.data, deleted(DELETED_AT))
+
+      expect(onDeletingDevice.hasConflicts).toBe(false)
+      expect(onDeletingDevice.data.prompts).toEqual([expect.objectContaining({ title: 'Edited' })])
+      expect(onDeletingDevice.data.promptVariables).toEqual([expect.objectContaining({ uuid: 'variable-1' })])
+    })
+
+    it('keeps the deletion the user picked even when the edit is newer, on both devices', () => {
+      const deletedEarlier = deleted('2026-01-02T00:00:05.000Z')
+      const resolved = mergeCloudSyncData(deletedEarlier, edited, base, {
+        resolutions: { 'prompts::uuid:prompt-1': 'local' },
+        resolvedAt: RESOLVED_AT
+      })
+
+      expect(resolved.data.prompts).toEqual([])
+      const promptTombstone = resolved.data.syncTombstones?.find(item => item.collectionName === 'prompts')
+      expect(promptTombstone?.deletedAt).toBe(RESOLVED_AT)
+
+      // 修改的那台设备：本机和基线都是修改后的版本，云端是对方保留删除后的结果
+      const onEditingDevice = mergeCloudSyncData(edited, resolved.data, edited)
+
+      expect(onEditingDevice.data.prompts).toEqual([])
+    })
+
+    it('reports the newer deletion as the outcome when no side is chosen', () => {
+      const result = mergeCloudSyncData(edited, deleted(DELETED_AT), base)
+
+      expect(result.data.prompts).toEqual([])
+      expect(result.conflicts).toEqual([
+        expect.objectContaining({ reason: 'delete_vs_update', resolution: 'take-remote' })
+      ])
+      // 提示词和它的变量一起删除
+      expect(result.data.promptVariables).toEqual([])
+      expect(result.summary).toMatchObject({ deleted: 2, kept: 0 })
+    })
+
+    it('accepts a deletion when the other device only used the prompt, even from an old version that bumped updatedAt (#488)', () => {
+      const usedOnly = {
+        prompts: [{ ...prompt('Base', '2026-01-02T00:00:30.000Z'), useCount: 1, lastUsedAt: '2026-01-02T00:00:30.000Z' }],
+        promptVariables: [variable],
+        syncTombstones: []
+      }
+
+      const result = mergeCloudSyncData(deleted(DELETED_AT), usedOnly, { ...base, prompts: [{ ...base.prompts[0], useCount: 0 }] })
+
+      expect(result.hasConflicts).toBe(false)
+      expect(result.data.prompts).toEqual([])
+    })
+
+    it('keeps the newer edit over an older deletion when no side is chosen', () => {
+      const result = mergeCloudSyncData(edited, deleted('2026-01-02T00:00:05.000Z'), base)
+
+      expect(result.data.prompts).toEqual([expect.objectContaining({ title: 'Edited', updatedAt: EDITED_AT })])
+      expect(result.conflicts).toEqual([
+        expect.objectContaining({ reason: 'delete_vs_update', resolution: 'keep-local' })
+      ])
+    })
+  })
+
+  describe('usage counts (#488)', () => {
+    const T0 = '2026-01-01T00:00:00.000Z'
+    const usedPrompt = (overrides: Record<string, any>) => ({
+      id: 1, uuid: 'prompt-1', title: 'Weekly report', content: 'body', useCount: 0, updatedAt: T0, ...overrides
+    })
+
+    it('adds up the uses from both devices instead of asking which side to keep', () => {
+      const base = { prompts: [usedPrompt({})] }
+      const local = { prompts: [usedPrompt({ useCount: 2, lastUsedAt: '2026-01-02T00:00:00.000Z' })] }
+      const remote = { prompts: [usedPrompt({ useCount: 1, lastUsedAt: '2026-01-03T00:00:00.000Z' })] }
+
+      const result = mergeCloudSyncData(local, remote, base)
+
+      expect(result.hasConflicts).toBe(false)
+      expect(result.data.prompts?.[0]).toMatchObject({ useCount: 3, lastUsedAt: '2026-01-03T00:00:00.000Z', updatedAt: T0 })
+    })
+
+    it('counts one use on each device as two even when both records end up identical', () => {
+      const base = { prompts: [usedPrompt({})] }
+      const usedOnce = { prompts: [usedPrompt({ useCount: 1 })] }
+
+      const result = mergeCloudSyncData(usedOnce, usedOnce, base)
+
+      expect(result.hasConflicts).toBe(false)
+      expect(result.data.prompts?.[0].useCount).toBe(2)
+    })
+
+    it('keeps an edit from one device and the uses from the other without a conflict', () => {
+      const base = { prompts: [usedPrompt({ useCount: 5 })] }
+      const local = { prompts: [usedPrompt({ title: 'Edited title', useCount: 5, updatedAt: '2026-01-02T00:00:00.000Z' })] }
+      const remote = { prompts: [usedPrompt({ useCount: 7, lastUsedAt: '2026-01-03T00:00:00.000Z' })] }
+
+      const result = mergeCloudSyncData(local, remote, base)
+
+      expect(result.hasConflicts).toBe(false)
+      expect(result.data.prompts?.[0]).toMatchObject({ title: 'Edited title', useCount: 7, updatedAt: '2026-01-02T00:00:00.000Z' })
+    })
+
+    it('does not treat records that only differ in usage as a conflict when there is no base', () => {
+      const local = { prompts: [usedPrompt({ useCount: 4, lastUsedAt: '2026-01-02T00:00:00.000Z' })] }
+      const remote = { prompts: [usedPrompt({ useCount: 6, updatedAt: '2026-01-03T00:00:00.000Z' })] }
+
+      const result = mergeCloudSyncData(local, remote)
+
+      expect(result.hasConflicts).toBe(false)
+      expect(result.data.prompts?.[0]).toMatchObject({
+        useCount: 6,
+        lastUsedAt: '2026-01-02T00:00:00.000Z',
+        updatedAt: '2026-01-03T00:00:00.000Z'
+      })
+    })
+  })
+
   it('ignores a stored choice once the record no longer conflicts', () => {
     const base = {
       prompts: [{ id: 1, uuid: 'prompt-1', title: 'Base', content: 'A', updatedAt: '2026-01-01T00:00:00.000Z' }]

@@ -85,6 +85,9 @@ export interface CloudStorageProvider {
   
   // 读取文件
   readFile(path: string): Promise<Buffer>;
+
+  // 读取文件并带回这次响应的 ETag（可选，用于之后的条件写，省掉写入前再读一遍）
+  readFileWithInfo?(path: string): Promise<CloudFileReadResult>;
   
   // 写入文件
   writeFile(path: string, data: Buffer, options?: CloudFileWriteOptions): Promise<void | CloudFileWriteResult>;
@@ -112,6 +115,19 @@ export interface CloudFileWriteOptions {
   overwrite?: boolean;
   ifMatch?: string;
   ifNoneMatch?: boolean;
+  /**
+   * 写后校验方式。content（默认）把文件整份下载回来逐字节比对；
+   * metadata 只查一次文件信息，大小一致且 ETag 已经变化就算写入成功，看不出来时再按 content 校验；
+   * none 不校验，只用于主文件之外的备用副本 (#486)
+   */
+  verify?: 'content' | 'metadata' | 'none';
+  /** 调用方已确认父目录存在，写入前不再逐级检查 */
+  skipDirectoryCheck?: boolean;
+}
+
+export interface CloudFileReadResult {
+  data: Buffer;
+  etag?: string;
 }
 
 export interface CloudFileWriteResult {

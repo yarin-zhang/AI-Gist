@@ -75,6 +75,14 @@ interface PreparedRestorePlan {
   details: Record<string, number>;
 }
 
+export interface ReplaceAllDataOptions {
+  /**
+   * 保留 syncMetadata（同步基线等）。云同步把合并结果写回本机时必须保留：
+   * 上传失败或重试时还要靠旧基线做三方合并 (#484)。恢复备份不传，基线随数据一起清空。
+   */
+  preserveSyncMetadata?: boolean;
+}
+
 class StructuredDataOperationError extends Error {
   readonly failure: DataOperationFailure;
 
@@ -1284,11 +1292,11 @@ export class DatabaseServiceManager {
   /**
    * 完全替换所有数据（先清空，再恢复）
    */
-  async replaceAllData(backupData: any): Promise<DataImportResult> {
-    return dataOperationLock.runExclusive(() => this.replaceAllDataUnlocked(backupData));
+  async replaceAllData(backupData: any, options: ReplaceAllDataOptions = {}): Promise<DataImportResult> {
+    return dataOperationLock.runExclusive(() => this.replaceAllDataUnlocked(backupData, options));
   }
 
-  private async replaceAllDataUnlocked(backupData: any): Promise<DataImportResult> {
+  private async replaceAllDataUnlocked(backupData: any, options: ReplaceAllDataOptions = {}): Promise<DataImportResult> {
     const operationId = generateUUID();
     try {
       this.debugLog('渲染进程: 开始完全替换数据...');
@@ -1312,7 +1320,7 @@ export class DatabaseServiceManager {
         });
       }
       const plan = await this.prepareAtomicRestorePlan(contractResult.data, operationId);
-      await this.commitAtomicRestorePlan(plan);
+      await this.commitAtomicRestorePlan(plan, options);
 
       const totalSucceeded = plan.records.length;
       return {
@@ -1545,7 +1553,7 @@ export class DatabaseServiceManager {
     return { operationId, records, details };
   }
 
-  private async commitAtomicRestorePlan(plan: PreparedRestorePlan): Promise<void> {
+  private async commitAtomicRestorePlan(plan: PreparedRestorePlan, options: ReplaceAllDataOptions = {}): Promise<void> {
     const db = await this.getDatabase();
     if (!db) {
       throw this.createStructuredFailure({
@@ -1566,9 +1574,10 @@ export class DatabaseServiceManager {
       });
     }
 
+    const clearsSyncMetadata = !options.preserveSyncMetadata && db.objectStoreNames.contains('syncMetadata');
     const transactionStores = [
       ...SYNCABLE_DATA_STORES,
-      ...(db.objectStoreNames.contains('syncMetadata') ? ['syncMetadata'] : [])
+      ...(clearsSyncMetadata ? ['syncMetadata'] : [])
     ];
     let transaction: IDBTransaction;
     try {

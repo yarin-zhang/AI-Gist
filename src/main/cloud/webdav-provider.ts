@@ -3,6 +3,7 @@ import {
   CloudConnectionCheckResult,
   CloudStorageProvider,
   CloudFileInfo,
+  CloudFileReadResult,
   CloudFileWriteOptions,
   CloudFileWriteResult,
   WebDAVConfig
@@ -213,29 +214,45 @@ export class WebDAVProvider implements CloudStorageProvider {
    * @returns 文件内容缓冲区
    */
   async readFile(filePath: string): Promise<Buffer> {
+    return this.toBuffer((await this.readFileWithInfo(filePath)).data);
+  }
+
+  /**
+   * 读取文件，同时带回这次 GET 响应里的 ETag：之后可以直接拿它做条件写，
+   * 不必在写入前再读一遍确认文件没被别的设备改过 (#486)
+   */
+  async readFileWithInfo(filePath: string): Promise<CloudFileReadResult> {
     await this.ensureClient();
     try {
-      const data = await this.withRequestTimeout(
+      const response: any = await this.withRequestTimeout(
         signal => this.client.getFileContents(this.normalizeRemotePath(filePath), {
           format: 'binary',
+          details: true,
           signal
         }),
         '读取文件'
       );
-      if (Buffer.isBuffer(data)) {
-        return data;
-      }
-      if (data instanceof ArrayBuffer) {
-        return Buffer.from(data);
-      }
-      if (ArrayBuffer.isView(data)) {
-        return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
-      }
-      return Buffer.from(String(data), 'utf-8');
+      const detailed = response && typeof response === 'object' && 'data' in response && 'headers' in response;
+      const data = detailed ? response.data : response;
+      const etag = detailed && typeof response.headers?.etag === 'string' ? response.headers.etag : undefined;
+      return { data: this.toBuffer(data), etag };
     } catch (error) {
       this.logOperationError(CONSTANTS.LOG_MESSAGES.READ_FILE_FAILED, error);
       throw new Error(`${CONSTANTS.ERROR_MESSAGES.READ_FILE_FAILED}: ${this.getErrorMessage(error)}`);
     }
+  }
+
+  private toBuffer(data: unknown): Buffer {
+    if (Buffer.isBuffer(data)) {
+      return data;
+    }
+    if (data instanceof ArrayBuffer) {
+      return Buffer.from(data);
+    }
+    if (ArrayBuffer.isView(data)) {
+      return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    }
+    return Buffer.from(String(data), 'utf-8');
   }
 
   /**
@@ -252,7 +269,7 @@ export class WebDAVProvider implements CloudStorageProvider {
     try {
       const targetPath = this.normalizeRemotePath(filePath);
       const dirPath = this.dirnameRemotePath(targetPath);
-      if (dirPath) {
+      if (dirPath && !options.skipDirectoryCheck) {
         await this.createDirectory(dirPath);
       }
 
@@ -271,7 +288,11 @@ export class WebDAVProvider implements CloudStorageProvider {
         throw new Error('WebDAV PUT 未返回成功状态');
       }
 
-      return await this.verifyRemoteWrite(targetPath, data);
+      if (options.verify === 'none') {
+        return {};
+      }
+
+      return await this.verifyRemoteWrite(targetPath, data, options);
     } catch (error) {
       this.logOperationError(CONSTANTS.LOG_MESSAGES.WRITE_FILE_FAILED, error);
       throw new Error(`${CONSTANTS.ERROR_MESSAGES.WRITE_FILE_FAILED}: ${this.getErrorMessage(error)}`);
@@ -434,7 +455,11 @@ export class WebDAVProvider implements CloudStorageProvider {
     return `/${CONSTANTS.BACKUP_DIR}`;
   }
 
-  private async verifyRemoteWrite(filePath: string, expectedData: Buffer): Promise<CloudFileWriteResult> {
+  private async verifyRemoteWrite(
+    filePath: string,
+    expectedData: Buffer,
+    options: CloudFileWriteOptions = {}
+  ): Promise<CloudFileWriteResult> {
     try {
       const response: any = await this.withRequestTimeout(
         signal => this.client.stat(filePath, { signal, details: true }),
@@ -443,6 +468,20 @@ export class WebDAVProvider implements CloudStorageProvider {
       const stat = response?.data ?? response;
       if (stat?.type === 'directory') {
         throw new Error('远端路径是目录，不是文件');
+      }
+
+      // 大小对得上、ETag 也换成了新的，说明这次写入已经落盘，不必再整份下载回来比对 (#486)
+      const info = stat ? this.mapFileInfo(stat) : undefined;
+      if (
+        options.verify === 'metadata' &&
+        info?.etag &&
+        Number(stat?.size) === expectedData.length &&
+        (!options.ifMatch || this.normalizeEtagForCompare(info.etag) !== this.normalizeEtagForCompare(options.ifMatch))
+      ) {
+        return {
+          etag: info.etag,
+          modifiedAt: typeof stat?.lastmod === 'string' ? stat.lastmod : undefined
+        };
       }
 
       const remoteData = await this.readFile(filePath);
@@ -477,6 +516,11 @@ export class WebDAVProvider implements CloudStorageProvider {
     // parsing PROPFIND responses. Preserve the server representation so the
     // conditional request matches both standard and non-standard servers.
     return value;
+  }
+
+  /** 只用于比较新旧 ETag 是否相同：GET 头和 PROPFIND 返回的写法可能一个带引号一个不带 */
+  private normalizeEtagForCompare(etag: string): string {
+    return etag.trim().replace(/^W\//i, '').replace(/^"(.*)"$/, '$1');
   }
 
   private normalizeRemotePath(remotePath: string, allowRoot = false): string {

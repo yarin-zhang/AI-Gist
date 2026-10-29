@@ -315,4 +315,38 @@ describe('DatabaseServiceManager full restore against IndexedDB constraints', ()
     ]))
     expect(snapshotAll(indexedDb)).toEqual(before)
   })
+
+  describe('同步基线 syncMetadata (#484)', () => {
+    const syncState = { key: 'ai_gist_cloud_sync_state:cfg-1', value: { lastKnownRevision: 'rev-1' }, updatedAt: T0 }
+
+    beforeEach(() => {
+      indexedDb = createTransactionalIndexedDB({
+        ...STORE_DEFINITIONS,
+        syncMetadata: { keyPath: 'key', autoIncrement: false }
+      })
+      ;(manager.category as any).db = indexedDb.db
+      indexedDb.seed('syncMetadata', [syncState])
+    })
+
+    it('云同步写回本机时保留同步基线，上传失败后下一次合并还能用', async () => {
+      const result = await manager.replaceAllData({
+        ...emptyRestoreData(),
+        prompts: [prompt({ categoryId: undefined, categoryUuid: undefined })]
+      }, { preserveSyncMetadata: true })
+
+      expect(result).toMatchObject({ success: true })
+      expect(indexedDb.snapshot('prompts')).toHaveLength(1)
+      expect(indexedDb.snapshot('syncMetadata')).toEqual([syncState])
+    })
+
+    it('恢复备份时仍然清空同步基线', async () => {
+      const result = await manager.replaceAllData({
+        ...emptyRestoreData(),
+        prompts: [prompt({ categoryId: undefined, categoryUuid: undefined })]
+      })
+
+      expect(result).toMatchObject({ success: true })
+      expect(indexedDb.snapshot('syncMetadata')).toEqual([])
+    })
+  })
 })

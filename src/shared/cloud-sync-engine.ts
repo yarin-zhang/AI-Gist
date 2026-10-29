@@ -97,6 +97,11 @@ export interface CloudSyncMergeOptions {
    * 只对真正冲突的记录生效：选中的一方整条保留（删除也算一种版本）。
    */
   resolutions?: Record<string, CloudSyncConflictSide>;
+  /**
+   * 用户处理冲突的时间，默认当前时间。「一边删除、一边修改」时，用户的选择按这个时间记为一次新操作：
+   * 保留修改版时记录时间要晚于删除标记，保留删除时删除标记要晚于修改，否则会被删除标记的时间比较推翻 (#485)。
+   */
+  resolvedAt?: string;
 }
 
 interface CloudSyncRelationContext {
@@ -118,6 +123,10 @@ interface CloudSyncTombstoneMergeContext {
   tombstones: CloudSyncTombstone[];
   preservedPromptDeletes: PreservedPromptDeleteContext;
   preservedCategoryDeletes: PreservedCategoryDeleteContext;
+  /** 用户处理冲突的时间（毫秒） */
+  resolvedTime: number;
+  /** 用户选择保留删除的记录：合并结束后把它们的删除标记挪到修改之后 */
+  confirmedDeletes: { collection: string; record: any }[];
 }
 
 export interface CloudSyncSnapshotValidationResult {
@@ -140,6 +149,14 @@ const REQUIRED_SNAPSHOT_COLLECTIONS = [
   ...DEFAULT_COLLECTIONS,
   'syncTombstones'
 ];
+
+/**
+ * 只记录使用情况的字段：两边不同不算冲突，删除冲突里也不算「改过这条记录」(#488)。
+ * updatedAt 也在内，因为旧版本复制提示词时会顺带改它。
+ */
+const USAGE_ONLY_FIELDS: Record<string, string[]> = {
+  prompts: ['useCount', 'lastUsedAt', 'updatedAt']
+};
 
 const IDENTITY_FIELDS: Record<string, string[]> = {
   categories: ['uuid', 'id'],
@@ -386,6 +403,7 @@ export function mergeCloudSyncData<TData extends CloudSyncDataSet>(
     base: createRelationContext(baseData)
   };
   const tombstoneContext = createTombstoneMergeContext(localData, remoteData, baseData);
+  tombstoneContext.resolvedTime = getTimestampValueTime(options.resolvedAt) || Date.now();
 
   const collections = getAllCollectionNames(localData, remoteData, baseData);
 
@@ -407,6 +425,12 @@ export function mergeCloudSyncData<TData extends CloudSyncDataSet>(
     summary.deleted += merged.summary.deleted;
     summary.kept += merged.summary.kept;
     summary.conflicts += merged.summary.conflicts;
+  }
+
+  if (tombstoneContext.confirmedDeletes.length > 0 && Array.isArray(resultData.syncTombstones)) {
+    resultData.syncTombstones = resultData.syncTombstones.map(tombstone =>
+      moveTombstoneAfterConfirmedDeletes(tombstone, tombstoneContext)
+    );
   }
 
   const dataWithDeletesApplied = applyCloudSyncTombstones(resultData) as TData;
@@ -679,6 +703,18 @@ function mergeWithoutBase(
       return;
     }
 
+    // 内容一样、只差使用统计：没有基线算不出各自用了几次，次数取较大的一方，不算冲突
+    if (recordsEqualIgnoringUsage(collection, localRecord, remoteRecord, relationContexts.local, relationContexts.remote)) {
+      const merged = mergeUsageOnlyRecords(collection, localRecord, remoteRecord);
+      records.push(merged);
+      if (recordsEqual(collection, merged, localRecord, relationContexts.local, relationContexts.local)) {
+        summary.kept++;
+      } else {
+        summary.updated++;
+      }
+      return;
+    }
+
     const decided = getUserResolution(options, collection, key);
     const chosen = decided
       ? { record: decided === 'local' ? localRecord : remoteRecord, resolution: decided === 'local' ? 'keep-local' as const : 'take-remote' as const }
@@ -750,14 +786,16 @@ function mergeWithBase(
       return;
     }
 
-    const remoteChanged = !recordsEqual(collection, remoteRecord, baseRecord, relationContexts.remote, relationContexts.base);
+    // 对方只是用过这条记录、没改内容，不算修改：直接接受删除
+    const remoteChanged = !recordsEqualIgnoringUsage(collection, remoteRecord, baseRecord, relationContexts.remote, relationContexts.base);
     if (!remoteChanged) {
       summary.deleted++;
       return;
     }
 
-    // 本机删了、服务器改了：用户选本机时保留这次删除
-    if (getUserResolution(options, collection, key) === 'local') {
+    // 本机删了、服务器改了：用户选本机时保留这次删除；没有选择时，删除标记比修改新就按删除处理
+    const decided = getUserResolution(options, collection, key);
+    if (decided === 'local' || (!decided && isDeletedByTombstone(tombstoneContext, collection, remoteRecord))) {
       addConflict(conflicts, summary, {
         collection,
         key,
@@ -767,11 +805,14 @@ function mergeWithBase(
         remote: remoteRecord,
         base: baseRecord
       });
+      if (decided === 'local') tombstoneContext.confirmedDeletes.push({ collection, record: remoteRecord });
       summary.deleted++;
       return;
     }
 
-    records.push(cloneValue(remoteRecord));
+    records.push(cloneValue(decided === 'remote'
+      ? reviveRecordOverTombstones(tombstoneContext, collection, remoteRecord, baseRecord)
+      : remoteRecord));
     addConflict(conflicts, summary, {
       collection,
       key,
@@ -798,14 +839,15 @@ function mergeWithBase(
       return;
     }
 
-    const localChanged = !recordsEqual(collection, localRecord, baseRecord, relationContexts.local, relationContexts.base);
+    const localChanged = !recordsEqualIgnoringUsage(collection, localRecord, baseRecord, relationContexts.local, relationContexts.base);
     if (!localChanged) {
       summary.deleted++;
       return;
     }
 
-    // 服务器删了、本机改了：用户选服务器时接受这次删除
-    if (getUserResolution(options, collection, key) === 'remote') {
+    // 服务器删了、本机改了：用户选服务器时接受这次删除；没有选择时，删除标记比修改新就按删除处理
+    const decided = getUserResolution(options, collection, key);
+    if (decided === 'remote' || (!decided && isDeletedByTombstone(tombstoneContext, collection, localRecord))) {
       addConflict(conflicts, summary, {
         collection,
         key,
@@ -815,11 +857,14 @@ function mergeWithBase(
         remote: remoteRecord,
         base: baseRecord
       });
+      if (decided === 'remote') tombstoneContext.confirmedDeletes.push({ collection, record: localRecord });
       summary.deleted++;
       return;
     }
 
-    records.push(cloneValue(localRecord));
+    records.push(cloneValue(decided === 'local'
+      ? reviveRecordOverTombstones(tombstoneContext, collection, localRecord, baseRecord)
+      : localRecord));
     addConflict(conflicts, summary, {
       collection,
       key,
@@ -833,7 +878,10 @@ function mergeWithBase(
     return;
   }
 
-  if (recordsEqual(collection, localRecord, remoteRecord, relationContexts.local, relationContexts.remote)) {
+  if (
+    recordsEqual(collection, localRecord, remoteRecord, relationContexts.local, relationContexts.remote) &&
+    !usageCountersDiverged(collection, localRecord, remoteRecord, baseRecord)
+  ) {
     records.push(cloneValue(localRecord));
     summary.kept++;
     return;
@@ -976,6 +1024,12 @@ function mergeChangedRecordFields(
     const localValue = localRecord?.[field];
     const remoteValue = remoteRecord?.[field];
 
+    // 使用次数是计数器：两边各自用了几次都要算上，放在相等判断之前（两边各用一次也是 +2）
+    if (isUsageCounterField(collection, field)) {
+      merged[field] = mergeUsageCounter(baseValue, localValue, remoteValue);
+      continue;
+    }
+
     if (fieldValuesEqual(collection, field, localValue, remoteValue, relationContexts.local, relationContexts.remote)) {
       merged[field] = cloneValue(localValue);
       continue;
@@ -1069,7 +1123,76 @@ function isLocalIdentityField(field: string): boolean {
 function isMergeTimestampField(field: string): boolean {
   return field === 'updatedAt' ||
     field === 'modifiedAt' ||
-    field === 'lastModified';
+    field === 'lastModified' ||
+    field === 'lastUsedAt';
+}
+
+function isUsageCounterField(collection: string, field: string): boolean {
+  return collection === 'prompts' && field === 'useCount';
+}
+
+function toUsageCount(value: any): number {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+/** 基线 + 本机增量 + 云端增量 */
+function mergeUsageCounter(baseValue: any, localValue: any, remoteValue: any): number {
+  return Math.max(0, toUsageCount(localValue) + toUsageCount(remoteValue) - toUsageCount(baseValue));
+}
+
+/** 两边都在基线上累加过使用次数：即使结果碰巧相同（各用一次），也要按增量合并 */
+function usageCountersDiverged(collection: string, localRecord: any, remoteRecord: any, baseRecord: any): boolean {
+  if (collection !== 'prompts') {
+    return false;
+  }
+
+  const baseCount = toUsageCount(baseRecord?.useCount);
+  return toUsageCount(localRecord?.useCount) !== baseCount && toUsageCount(remoteRecord?.useCount) !== baseCount;
+}
+
+function withoutUsageFields(collection: string, record: any): any {
+  const fields = USAGE_ONLY_FIELDS[collection];
+  if (!fields || !record || typeof record !== 'object') {
+    return record;
+  }
+
+  const copy = { ...record };
+  for (const field of fields) {
+    delete copy[field];
+  }
+  return copy;
+}
+
+function recordsEqualIgnoringUsage(
+  collection: string,
+  left: any,
+  right: any,
+  leftRelationContext?: CloudSyncRelationContext,
+  rightRelationContext?: CloudSyncRelationContext
+): boolean {
+  return recordsEqual(
+    collection,
+    withoutUsageFields(collection, left),
+    withoutUsageFields(collection, right),
+    leftRelationContext,
+    rightRelationContext
+  );
+}
+
+/** 没有基线时合并只差使用统计的两份记录：次数取较大的一方，时间取较新的一方 */
+function mergeUsageOnlyRecords(collection: string, localRecord: any, remoteRecord: any): any {
+  const merged = cloneValue(localRecord);
+  for (const field of USAGE_ONLY_FIELDS[collection] || []) {
+    const localValue = localRecord?.[field];
+    const remoteValue = remoteRecord?.[field];
+    const value = isUsageCounterField(collection, field)
+      ? Math.max(toUsageCount(localValue), toUsageCount(remoteValue))
+      : chooseNewestTimestampValue(localValue, remoteValue);
+    if (value !== undefined) {
+      merged[field] = cloneValue(value);
+    }
+  }
+  return merged;
 }
 
 function chooseNewestTimestampValue(...values: any[]): any {
@@ -1417,8 +1540,69 @@ function createTombstoneMergeContext(...dataSets: CloudSyncDataSet[]): CloudSync
     preservedCategoryDeletes: createPreservedCategoryDeleteContext(
       mergeDataSetsForRelationContext(...getActiveMergeDataSets(dataSets)),
       tombstones
-    )
+    ),
+    resolvedTime: Date.now(),
+    confirmedDeletes: []
   };
+}
+
+/** 合并结束后套用删除标记时，这条记录会不会被删掉 */
+function isDeletedByTombstone(
+  tombstoneContext: CloudSyncTombstoneMergeContext,
+  collection: string,
+  record: any
+): boolean {
+  return tombstoneContext.tombstones.some(tombstone => tombstoneDeletesRecord(tombstone, collection, record));
+}
+
+/**
+ * 用户选择保留被另一边删除的记录：把记录时间挪到删除标记和处理时间之后，
+ * 本机和其他设备套用删除标记时都不会再删掉它；提示词的变量、历史版本跟着保留 (#485)
+ */
+function reviveRecordOverTombstones(
+  tombstoneContext: CloudSyncTombstoneMergeContext,
+  collection: string,
+  record: any,
+  baseRecord: any
+): any {
+  const deletingTombstones = tombstoneContext.tombstones
+    .filter(tombstone => tombstoneDeletesRecord(tombstone, collection, record));
+  if (deletingTombstones.length === 0) {
+    return record;
+  }
+
+  const latestDeleteTime = Math.max(...deletingTombstones.map(getTombstoneTime));
+  const revived = {
+    ...cloneValue(record),
+    updatedAt: new Date(Math.max(tombstoneContext.resolvedTime, latestDeleteTime + 1)).toISOString()
+  };
+
+  if (collection === 'prompts') {
+    const preserved = tombstoneContext.preservedPromptDeletes;
+    for (const candidate of [revived, baseRecord]) {
+      if (typeof candidate?.uuid === 'string' && candidate.uuid) preserved.promptUuids.add(candidate.uuid);
+      const id = normalizeRelationId(candidate?.id);
+      if (id) preserved.promptIds.add(id);
+    }
+  }
+
+  return revived;
+}
+
+/** 用户选择保留删除：删除标记的时间挪到另一边的修改和处理时间之后，其他设备同步时同样按删除处理 */
+function moveTombstoneAfterConfirmedDeletes(
+  tombstone: any,
+  tombstoneContext: CloudSyncTombstoneMergeContext
+): any {
+  const confirmed = tombstoneContext.confirmedDeletes
+    .filter(item => tombstoneMatchesRecord(tombstone, item.collection, item.record));
+  if (confirmed.length === 0) {
+    return tombstone;
+  }
+
+  const latestEditTime = Math.max(...confirmed.map(item => getRecordTime(item.record)));
+  const deletedAt = Math.max(tombstoneContext.resolvedTime, latestEditTime + 1, getTombstoneTime(tombstone));
+  return { ...tombstone, deletedAt: new Date(deletedAt).toISOString() };
 }
 
 function getActiveMergeDataSets(dataSets: CloudSyncDataSet[]): CloudSyncDataSet[] {
