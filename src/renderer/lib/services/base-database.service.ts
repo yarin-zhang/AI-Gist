@@ -1394,7 +1394,8 @@ export class BaseDatabaseService {
 
   private createSyncTombstone(storeName: string, existingRecord: any): Omit<SyncTombstone, 'id'> {
     const collectionName = SYNC_COLLECTION_BY_STORE[storeName] || storeName;
-    const cleanSnapshot = this.cleanDataForStorage(existingRecord);
+    // 删除标记里的副本只用来认出是哪条记录，不带图片：图片是 Blob，写进同步文件会变成 {}，校验和就对不上
+    const { imageBlobs: _images, ...cleanSnapshot } = this.cleanDataForStorage(existingRecord);
 
     return {
       storeName,
