@@ -323,7 +323,8 @@ export class DatabaseServiceManager {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
+      // onerror 收到的是 ProgressEvent，直接抛出去只会显示「[object ProgressEvent]」
+      reader.onerror = () => reject(new Error(`读取图片数据失败（${reader.error?.name || 'unknown'}）`))
       reader.readAsDataURL(blob)
     })
   }

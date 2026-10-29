@@ -238,6 +238,9 @@ export function normalizeCloudSyncDataSet<TData extends CloudSyncDataSet>(data: 
     }
   }
 
+  if (Array.isArray(normalized.syncTombstones)) {
+    normalized.syncTombstones = normalized.syncTombstones.map(stripTombstoneSnapshotImages);
+  }
   validateSnapshotTombstonesOrThrow(normalized.syncTombstones || []);
   const recordValidation = validateSnapshotRecords(normalized);
   if (!recordValidation.valid) {
@@ -384,6 +387,12 @@ function validateSnapshotTombstones(tombstones: CloudSyncTombstone[]): CloudSync
       Number.isNaN(deletedAtTime)
     ) {
       return { valid: false, reason: `snapshot data syncTombstones[${index}] deletedAt is invalid` };
+    }
+
+    // 副本里的图片会在规范化时去掉（见 stripTombstoneSnapshotImages），其余地方不能有 Blob
+    const blobPath = findRawBlobPath(stripTombstoneSnapshotImages(tombstone));
+    if (blobPath) {
+      return { valid: false, reason: `snapshot data syncTombstones[${index}] contains unserialized Blob at ${blobPath}` };
     }
   }
 
@@ -562,11 +571,14 @@ export type CloudSyncConflictPreviewFieldKey =
   | 'model'
   | 'type'
   | 'defaultValue'
-  | 'value';
+  | 'value'
+  | 'images';
 
 export interface CloudSyncConflictPreviewField {
   key: CloudSyncConflictPreviewFieldKey;
   value: string;
+  /** 两边比较用的值；图片只显示张数，张数一样但换了图也要标出不同 */
+  compareValue?: string;
 }
 
 export const CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH = 240;
@@ -626,6 +638,9 @@ export function createCloudSyncConflictPreview(
       add('category', options.categoryNameOf?.(record));
       add('tags', toConflictPreviewTags(record.tags));
       add('description', record.description);
+      if (Array.isArray(record.imageBlobs) && record.imageBlobs.length) {
+        fields.push({ key: 'images', value: String(record.imageBlobs.length), compareValue: createStableChecksum(record.imageBlobs) });
+      }
       return { title: titleOf(record.title), excerpt: excerptOf(record.content), fields };
     case 'categories':
       add('description', record.description);
@@ -1597,7 +1612,7 @@ function normalizeCloudSyncTombstones(tombstones: any[]): CloudSyncTombstone[] {
       continue;
     }
 
-    const normalized = cloneValue(tombstone);
+    const normalized = stripTombstoneSnapshotImages(cloneValue(tombstone));
     const current = indexed.get(key);
     if (!current || getTombstoneTime(normalized) >= getTombstoneTime(current)) {
       indexed.set(key, normalized);
@@ -1606,6 +1621,21 @@ function normalizeCloudSyncTombstones(tombstones: any[]): CloudSyncTombstone[] {
 
   return Array.from(indexed.values())
     .sort((left, right) => getCloudSyncTombstoneKey(left).localeCompare(getCloudSyncTombstoneKey(right)));
+}
+
+/**
+ * 删除标记里的原记录副本只用来认出是哪条记录（uuid、id、所属提示词和分类），不需要图片。
+ * 手机删掉带图片的提示词时，副本里还是 Blob：算校验和时按「类型 + 大小」算，写成 JSON 却变成 {}，
+ * 云端文件和自己的校验和对不上，每台设备读到都当成损坏去修、再当成有改动去写，同步一直「云端文件在变」。
+ * 去掉副本里的图片字段；云端旧文件里已经变成 {} 的同样去掉，两边才一致
+ */
+export function stripTombstoneSnapshotImages<T>(tombstone: T): T {
+  const snapshot = (tombstone as any)?.recordSnapshot;
+  if (!snapshot || typeof snapshot !== 'object' || !('imageBlobs' in snapshot)) {
+    return tombstone;
+  }
+  const { imageBlobs: _images, ...rest } = snapshot;
+  return { ...(tombstone as any), recordSnapshot: rest };
 }
 
 function isCloudSyncTombstone(value: any): value is CloudSyncTombstone {

@@ -432,6 +432,8 @@ export class PromptService extends BaseDatabaseService {
    */
   async incrementPromptUseCount(id: number): Promise<Prompt> {
     const db = await this.ensureDB();
+    // 图片换成内存里的副本再写回（见 detachStoredBlobs），不然连着复制两次第二次会写不进去
+    const detached = await this.detachStoredBlobs(await this.getById<Prompt>('prompts', id));
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(['prompts'], 'readwrite');
       const store = transaction.objectStore('prompts');
@@ -455,7 +457,7 @@ export class PromptService extends BaseDatabaseService {
 
         // 使用不算修改：不动 updatedAt，「最近」靠 lastUsedAt 排序 (#488)
         updatedPrompt = {
-          ...prompt,
+          ...this.withDetachedBlobs(prompt, detached),
           useCount: Number(prompt.useCount || 0) + 1,
           lastUsedAt: new Date(),
         };
@@ -858,6 +860,11 @@ export class PromptService extends BaseDatabaseService {
     data: Partial<Omit<PromptHistory, 'id' | 'uuid' | 'promptId' | 'version' | 'createdAt'>>
   ): Promise<PromptHistory> {
     if (!this.db) throw new Error('Database not initialized');
+    // 图片换成内存里的副本再写回（见 detachStoredBlobs）
+    const [detachedExisting, detachedData] = await Promise.all([
+      this.getById<PromptHistory>('promptHistories', id).then(record => this.detachStoredBlobs(record)),
+      this.detachStoredBlobs(data)
+    ]);
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['promptHistories'], 'readwrite');
@@ -875,8 +882,8 @@ export class PromptService extends BaseDatabaseService {
 
         // 合并数据，保留不可修改的字段
         const updatedHistory = {
-          ...existingHistory,
-          ...data,
+          ...this.withDetachedBlobs(existingHistory, detachedExisting),
+          ...detachedData,
           updatedAt: new Date()
         };
 
