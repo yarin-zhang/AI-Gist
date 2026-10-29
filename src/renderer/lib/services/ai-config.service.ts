@@ -222,16 +222,7 @@ export class AIConfigService extends BaseDatabaseService {
    * @throws Error 如果配置不存在或未启用
    */
   async setPreferredAIConfig(configId: number): Promise<void> {
-    // 首先取消所有配置的首选项状态
-    const allConfigs = await this.getAllAIConfigs();
-    
-    for (const config of allConfigs) {
-      if (config.id && config.isPreferred) {
-        await this.updateAIConfig(config.id, { isPreferred: false });
-      }
-    }
-
-    // 设置新的首选配置
+    // 先确认目标能设为首选，再清掉原来的首选：校验失败时原来的首选保持不变
     const targetConfig = await this.getAIConfigById(configId);
     if (!targetConfig) {
       throw new Error('AI Config not found');
@@ -239,6 +230,13 @@ export class AIConfigService extends BaseDatabaseService {
 
     if (!targetConfig.enabled) {
       throw new Error('Cannot set disabled config as preferred');
+    }
+
+    const allConfigs = await this.getAllAIConfigs();
+    for (const config of allConfigs) {
+      if (config.id && config.isPreferred && config.id !== configId) {
+        await this.updateAIConfig(config.id, { isPreferred: false });
+      }
     }
 
     await this.updateAIConfig(configId, { isPreferred: true });

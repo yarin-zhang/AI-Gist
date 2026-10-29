@@ -34,7 +34,10 @@
                 <NIcon :size="16" class="generate-status__icon"><AlertCircle v-if="statusTone === 'error'" /><AlertTriangle v-else /></NIcon>
                 <span>{{ statusText }}</span>
               </span>
-              <span v-if="generation.errorMessage.value" class="generate-status__reason">{{ generation.errorMessage.value }}</span>
+              <!-- 请求失败：先说原因和怎么办，服务商的原始报错折叠在「技术详情」里 -->
+              <AIErrorNotice v-if="generation.failure.value" plain :error="generation.failure.value.error"
+                :local="generation.failure.value.local" class="generate-status__reason" />
+              <span v-else-if="generation.errorMessage.value" class="generate-status__reason">{{ generation.errorMessage.value }}</span>
               <div class="generate-status__actions">
                 <NButton v-if="revertable" size="tiny" quaternary @click="emit('revert')">
                   {{ t('promptGenerate.revert') }}
@@ -88,6 +91,7 @@ import { NButton, NCheckbox, NIcon, NScrollbar, NSpin } from 'naive-ui'
 import { AlertCircle, AlertTriangle, Send, Stars } from '@vicons/tabler'
 import type { AIGenerationHistory } from '@shared/types/ai'
 import UiEmptyState from '@/components/ui/UiEmptyState.vue'
+import AIErrorNotice from '@/components/ai/AIErrorNotice.vue'
 import { formatFriendlyDate } from '@/lib/utils/date'
 import type { usePromptGeneration } from '@/composables/prompt/usePromptGeneration'
 import { isImeComposing } from '@/lib/utils/ime'

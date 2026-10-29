@@ -48,9 +48,9 @@
         </div>
 
         <!-- 检查失败提示 -->
-        <p v-if="checkError" class="m-note about-error" role="alert">
+        <p v-if="checkFailed" class="m-note about-error" role="alert">
           <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
-          <span>{{ checkError }}</span>
+          <span>{{ t('about.checkFailed') }}</span>
         </p>
 
         <MobileGroup :title="t('about.projectInfo')">
@@ -108,7 +108,7 @@ const appIcon = new URL('../../assets/images/logo.png', import.meta.url).href
 const {
   currentVersion,
   checking,
-  checkError,
+  checkFailed,
   hasUpdate,
   latestVersion,
   releaseNotes,
@@ -126,15 +126,9 @@ const showToast = async (message: string, color: string = 'success') => {
 
 const handleCheckForUpdates = async () => {
   const result = await checkForUpdates()
-  if (result.success) {
-    if (result.data?.hasUpdate) {
-      showToast(t('about.newVersionAvailable'))
-    } else {
-      showToast(t('about.isLatest'))
-    }
-  } else {
-    showToast(result.error || t('about.checkFailed'), 'danger')
-  }
+  // 失败时页面上已经有说明；连点时上一次检查还没结束，不用提示
+  if (!result.success) return
+  showToast(result.data?.hasUpdate ? t('about.newVersionAvailable') : t('about.isLatest'))
 }
 
 const handleOpenDownloadPage = () => {

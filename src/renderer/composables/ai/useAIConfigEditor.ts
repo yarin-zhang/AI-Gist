@@ -172,7 +172,8 @@ export function useAIConfigEditor(onSaved: (config: AIConfig) => void | Promise<
         show.value = true
     }
 
-    const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error ?? '')) || t('common.unknownError')
+    // 没有报错原文时留空：AIErrorNotice 会直接说该检查什么，而不是显示「未知错误」
+    const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error ?? ''))
 
     const ask = (options: { title: string; content: string; positiveText: string; negativeText: string }) => new Promise<boolean>(resolve => {
         let settled = false
@@ -373,7 +374,7 @@ export function useAIConfigEditor(onSaved: (config: AIConfig) => void | Promise<
             if (run !== connectionTestRun) return
             connectionResult.value = result.success
                 ? { success: true }
-                : { success: false, error: result.error || t('common.unknownError') }
+                : { success: false, error: result.error || '' }
             lastTestFingerprint.value = fingerprint
         } catch (error) {
             if (run !== connectionTestRun) return
@@ -459,7 +460,8 @@ export function useAIConfigEditor(onSaved: (config: AIConfig) => void | Promise<
             editingConfig.value = null
             await onSaved(saved)
         } catch (error) {
-            message.error(t('aiConfig.saveFailed') + (error as Error).message)
+            console.error('保存模型配置失败:', error)
+            message.error(t('aiConfig.saveFailed'))
         } finally {
             saving.value = false
         }

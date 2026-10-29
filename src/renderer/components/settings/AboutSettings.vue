@@ -25,17 +25,18 @@
             <UiSettingRow v-if="publishedAt" :title="t('about.publishedAt')">
                 <span class="about__secondary">{{ publishedAt }}</span>
             </UiSettingRow>
-            <div v-if="(hasUpdate && releaseNotes) || checkError" class="about__notices">
-                <div v-if="hasUpdate && releaseNotes" class="ui-alert about__update">
+            <div v-if="hasUpdate || checkFailed" class="about__notices">
+                <div v-if="hasUpdate" class="ui-alert about__update">
                     <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><InfoCircle /></NIcon>
                     <span class="about__update-text">{{ t('about.newVersionDesc', { version: latestVersion }) }}</span>
-                    <NButton quaternary size="tiny" @click="showReleaseNotes = !showReleaseNotes">
+                    <NButton v-if="releaseNotes" quaternary size="tiny" @click="showReleaseNotes = !showReleaseNotes">
                         {{ showReleaseNotes ? t('about.hideReleaseNotes') : t('about.viewReleaseNotes') }}
                     </NButton>
                     <NButton type="primary" size="tiny" @click="handleOpenDownloadPage">{{ t('about.downloadNewVersion') }}</NButton>
                 </div>
                 <div v-if="hasUpdate && releaseNotes && showReleaseNotes" class="ui-muted-box">{{ releaseNotes }}</div>
-                <UiAlert v-if="checkError" tone="error">{{ checkError }}</UiAlert>
+                <!-- 检查失败只在这里说一次，不再另外弹提示 -->
+                <UiAlert v-if="checkFailed" tone="error">{{ t('about.checkFailed') }}</UiAlert>
             </div>
         </UiPanel>
 
@@ -81,7 +82,7 @@ const {
     currentVersion,
     updateInfo,
     checking,
-    checkError,
+    checkFailed,
     hasUpdate,
     isLatest,
     latestVersion,
@@ -100,14 +101,12 @@ const showReleaseNotes = ref(false);
 // 检查更新
 const handleCheckForUpdates = async () => {
     const result = await checkForUpdates();
-    if (result.success) {
-        if (result.data?.hasUpdate) {
-            message.success(t('about.updateFound', { version: result.data.latestVersion }));
-        } else {
-            message.info(t('about.alreadyLatest'));
-        }
+    // 失败时版本信息面板里已经有说明；连点时上一次检查还没结束，不用提示
+    if (!result.success) return;
+    if (result.data?.hasUpdate) {
+        message.success(t('about.updateFound', { version: result.data.latestVersion }));
     } else {
-        message.error(result.error || t('about.checkFailed'));
+        message.info(t('about.alreadyLatest'));
     }
 };
 
@@ -117,7 +116,7 @@ const handleOpenDownloadPage = async () => {
 
     const result = await openDownloadPage(downloadUrl.value);
     if (!result.success) {
-        message.error(result.error || t('about.openDownloadFailed'));
+        message.error(t('about.openDownloadFailed'));
     }
 };
 

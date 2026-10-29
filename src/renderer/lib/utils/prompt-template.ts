@@ -524,6 +524,23 @@ export function renderPrompt(
   }
 }
 
+type Translate = (key: string, named?: Record<string, unknown>) => string
+
+/** Nunjucks 报错里的位置「[Line 3, Column 4]」，行号从 1 开始；缺了结尾、写到文件末尾这类报错没有位置 */
+export function readTemplateErrorLine(error: string | undefined): number | null {
+  const line = Number(error?.match(/\[Line (\d+)(?:, Column \d+)?\]/i)?.[1])
+  return line > 0 ? line : null
+}
+
+/**
+ * 模板渲染失败时给用户看的一句话：第几行出了问题、该检查什么。
+ * Nunjucks 的原始报错（unexpected token、parseIf…）用户看不懂，只在控制台里留着。
+ */
+export function describeTemplateError(error: string | undefined, t: Translate): string {
+  const line = readTemplateErrorLine(error)
+  return line ? t('promptWorkspace.renderFailedAtLine', { line }) : t('promptWorkspace.renderFailed')
+}
+
 export const isNumberPromptVariable = (type: string) => normalizeVariableType(type) === 'number'
 export const isBooleanPromptVariable = (type: string) => normalizeVariableType(type) === 'boolean'
 

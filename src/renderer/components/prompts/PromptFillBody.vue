@@ -16,7 +16,7 @@
         ><template v-else>{{ token.text }}</template></template></div>
       <template v-else>
         <div v-if="rendered.error" class="prompt-body__error" role="alert">
-          {{ t('promptWorkspace.renderFailedWithError', { error: rendered.error }) }}
+          {{ describeTemplateError(rendered.error, t) }}
         </div>
         <p v-else class="prompt-body__text">{{ rendered.content }}</p>
       </template>
@@ -29,7 +29,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PromptWithRelations } from '@shared/types/database'
 import UiVariableChip from '@/components/ui/UiVariableChip.vue'
-import { getActivePromptVariables, isEmptyPromptValue, parsePromptTemplate, renderPrompt } from '@/lib/utils/prompt-template'
+import { describeTemplateError, getActivePromptVariables, isEmptyPromptValue, parsePromptTemplate, renderPrompt } from '@/lib/utils/prompt-template'
 
 const props = withDefaults(defineProps<{
   prompt: PromptWithRelations

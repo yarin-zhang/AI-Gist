@@ -11,7 +11,7 @@
         @select="selectConfig" @create="openAddConfigModal" />
 
       <div v-if="loadError" class="models-page__state">
-        <UiEmptyState :title="t('aiConfig.loadFailed')" :description="loadError">
+        <UiEmptyState :title="t('aiConfig.loadFailed')">
           <template #actions><NButton @click="loadConfigs">{{ t('common.retry') }}</NButton></template>
         </UiEmptyState>
       </div>

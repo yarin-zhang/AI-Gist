@@ -68,7 +68,7 @@
           <p v-if="variable.description" class="fill-field__hint">{{ variable.description }}</p>
         </template>
         <p v-if="renderError && isLast" class="fill-field__error" role="alert">
-          {{ t('promptWorkspace.renderFailedWithError', { error: renderError }) }}
+          {{ describeTemplateError(renderError, t) }}
         </p>
       </div>
     </template>
@@ -100,6 +100,7 @@ import { IonIcon } from '@ionic/vue'
 import { chevronForward, copyOutline, playCircleOutline } from 'ionicons/icons'
 import { useI18n } from '~/composables/useI18n'
 import {
+  describeTemplateError,
   findMultilineVariableNames,
   getMissingPromptVariables,
   hasLineBreak,

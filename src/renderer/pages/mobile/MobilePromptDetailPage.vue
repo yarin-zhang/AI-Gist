@@ -60,7 +60,7 @@
           <MobilePromptBody plain :content="prompt.content" />
         </div>
         <p v-if="rendered.error" class="render-error">
-          {{ t('promptWorkspace.renderFailedWithError', { error: rendered.error }) }}
+          {{ describeTemplateError(rendered.error, t) }}
         </p>
 
         <!-- 图片 -->
@@ -165,6 +165,7 @@ import { getTagsArray } from '~/lib/utils/tag-colors'
 import {
   getActivePromptVariables,
   createPromptDraft,
+  describeTemplateError,
   getMissingPromptVariables,
   isEmptyPromptValue,
   normalizeVariableType,

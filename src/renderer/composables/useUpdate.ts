@@ -26,10 +26,15 @@ export interface GitHubRelease {
   draft: boolean;
 }
 
+/**
+ * 检查更新的结果。失败的原因（断网、GitHub 限流、接口出错）用户都只能「检查网络后再试」，
+ * 所以不往界面传原始报错：界面看 checkFailed 显示一句固定的说明，原因记在控制台。
+ */
 export interface UpdateCheckResult {
   success: boolean;
   data: UpdateInfo | null;
-  error: string | null;
+  /** 上一次检查还没结束，这次什么也没做（连点了按钮），界面不用提示 */
+  skipped?: boolean;
 }
 
 export function useUpdate() {
@@ -37,7 +42,8 @@ export function useUpdate() {
   const currentVersion = ref('');
   const updateInfo = ref<UpdateInfo | null>(null);
   const checking = ref(false);
-  const checkError = ref('');
+  /** 最近一次检查没成功，界面显示 about.checkFailed */
+  const checkFailed = ref(false);
 
   // 私有属性
   const repoOwner = 'yarin-zhang';
@@ -86,7 +92,7 @@ export function useUpdate() {
       });
 
       if (!response.ok) {
-        throw new Error(`GitHub API 请求失败: ${response.status} ${response.statusText}`);
+        throw new Error(`GitHub API ${response.status} ${response.statusText}`.trim());
       }
 
       return await response.json();
@@ -124,62 +130,42 @@ export function useUpdate() {
    * 检查更新
    */
   const checkForUpdates = async (): Promise<UpdateCheckResult> => {
+    // 正在检查时再点一次：等上一次的结果就好，不提示
     if (checking.value) {
-      return {
-        success: false,
-        data: null,
-        error: '正在检查更新中'
-      };
+      return { success: false, data: null, skipped: true };
     }
 
     checking.value = true;
-    checkError.value = '';
+    checkFailed.value = false;
 
     try {
       const currentVersionValue = await getCurrentVersion();
       const release = await fetchLatestReleaseInfo();
 
-      // 跳过预发布版本和草稿版本
-      if (release.prerelease || release.draft) {
-        return {
-          success: false,
-          data: null,
-          error: '最新发布版本是预发布版本或草稿版本'
-        };
-      }
-
-      const latestVersion = release.tag_name;
-      const hasUpdate = compareVersions(currentVersionValue, latestVersion);
+      // 最新的是预发布或草稿版本：正式版里没有更新的，按「已是最新」处理
+      const stable = !release.prerelease && !release.draft;
+      const latestVersion = stable ? release.tag_name : currentVersionValue;
+      const hasUpdate = stable && compareVersions(currentVersionValue, latestVersion);
 
       const updateInfoValue: UpdateInfo = {
         currentVersion: currentVersionValue,
         latestVersion,
         hasUpdate,
-        releaseNotes: release.body || '暂无更新说明',
-        downloadUrl: release.html_url,
-        publishedAt: release.published_at
+        // 没写更新说明就留空，界面不显示「查看更新说明」
+        releaseNotes: stable ? (release.body || '').trim() : '',
+        downloadUrl: stable ? release.html_url : '',
+        publishedAt: stable ? release.published_at : ''
       };
 
       // 更新状态
       currentVersion.value = currentVersionValue;
       updateInfo.value = updateInfoValue;
-      checkError.value = '';
 
-      return {
-        success: true,
-        data: updateInfoValue,
-        error: null
-      };
-    } catch (error: any) {
+      return { success: true, data: updateInfoValue };
+    } catch (error) {
       console.error('检查更新失败:', error);
-      const errorMessage = error.message || '检查更新失败';
-      checkError.value = errorMessage;
-      
-      return {
-        success: false,
-        data: null,
-        error: errorMessage
-      };
+      checkFailed.value = true;
+      return { success: false, data: null };
     } finally {
       checking.value = false;
     }
@@ -188,22 +174,15 @@ export function useUpdate() {
   /**
    * 打开下载页面
    */
-  const openDownloadPage = async (url: string): Promise<{ success: boolean; error: string | null }> => {
+  /** 打开下载页面。失败时界面显示 about.openDownloadFailed，系统给的原因只记在控制台 */
+  const openDownloadPage = async (url: string): Promise<{ success: boolean }> => {
     try {
       const result = await openExternalUrl(url);
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.error || '打开下载页面失败'
-        };
-      }
-      return { success: true, error: null };
-    } catch (error: any) {
+      if (!result.success) console.error('打开下载页面失败:', result.error);
+      return { success: result.success };
+    } catch (error) {
       console.error('打开下载页面失败:', error);
-      return {
-        success: false,
-        error: error.message || '打开下载页面失败'
-      };
+      return { success: false };
     }
   };
 
@@ -254,7 +233,7 @@ export function useUpdate() {
     currentVersion: readonly(currentVersion),
     updateInfo: readonly(updateInfo),
     checking: readonly(checking),
-    checkError: readonly(checkError),
+    checkFailed: readonly(checkFailed),
     
     // 计算属性
     hasUpdate,

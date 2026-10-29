@@ -30,7 +30,6 @@ const CONSTANTS = {
     NO_MODEL: '未指定模型',
     UNSUPPORTED_PROVIDER: '不支持的AI供应商类型',
     GENERATION_TIMEOUT: '生成超时，请检查网络连接或服务状态',
-    GENERATION_FAILED: '生成失败',
     USER_INTERRUPTED: '用户中断生成'
   },
   LOG_MESSAGES: {
@@ -527,7 +526,8 @@ class AIServiceManager {
       if (error.message?.includes('请求超时')) {
         throw new Error(CONSTANTS.ERROR_MESSAGES.GENERATION_TIMEOUT);
       }
-      throw new Error(`${CONSTANTS.ERROR_MESSAGES.GENERATION_FAILED}: ${error.message}`);
+      // 原样抛出服务商的报错，不再套「生成失败:」：界面按原因说明，原文只放进技术详情
+      throw error instanceof Error ? error : new Error(error?.message || String(error));
     }
   }
 
@@ -562,7 +562,8 @@ class AIServiceManager {
       if (error.message?.includes('请求超时')) {
         throw new Error(CONSTANTS.ERROR_MESSAGES.GENERATION_TIMEOUT);
       }
-      throw new Error(`${CONSTANTS.ERROR_MESSAGES.GENERATION_FAILED}: ${error.message}`);
+      // 原样抛出服务商的报错，不再套「生成失败:」：界面按原因说明，原文只放进技术详情
+      throw error instanceof Error ? error : new Error(error?.message || String(error));
     }
   }
 

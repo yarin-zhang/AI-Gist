@@ -4,6 +4,7 @@ import { useMessage } from 'naive-ui'
 import type { AIGenerationHistory } from '@shared/types/ai'
 import { api } from '@/lib/api'
 import { GenerationStoppedError, stopGeneration, streamGeneration } from '@/lib/utils/ai-request'
+import { describeAIError, isLocalAIConfig } from '@/lib/utils/ai-error'
 import { useAIModels } from './useAIModels'
 
 const AUTO_SAVE_KEY = 'prompt_generation_auto_save'
@@ -13,6 +14,16 @@ const AUTO_SAVE_KEY = 'prompt_generation_auto_save'
  * stopped：用户点了停止。后两种情况正文里可能留着没写完的内容（见 partial）。
  */
 export type PromptGenerationStatus = 'idle' | 'generating' | 'success' | 'error' | 'stopped' | 'interrupted'
+
+/** 生成请求失败：原始报错交给 AIErrorNotice 按原因说明，原文只放进「技术详情」 */
+export interface PromptGenerationFailure {
+  error: unknown
+  /** 请求的是本机服务（Ollama、LM Studio）：连不上时提示「服务没有启动」 */
+  local: boolean
+}
+
+/** 请求成功了，但模型一个字都没返回 */
+class EmptyGenerationError extends Error {}
 
 /**
  * 新建提示词时右侧「AI 生成」页签：按描述生成提示词，生成过程直接写进正文。
@@ -27,6 +38,9 @@ export function usePromptGeneration() {
   const status = ref<PromptGenerationStatus>('idle')
   /** 最近一次生成用的描述，重试时用 */
   const request = ref('')
+  /** AI 请求失败的原因（见 PromptGenerationFailure） */
+  const failure = ref<PromptGenerationFailure | null>(null)
+  /** 不是请求出错时的说明，目前只有「模型没有返回内容」 */
   const errorMessage = ref('')
   /** 正文里是否已经写进了这次生成的内容（停止或中断时就是没写完的部分） */
   const partial = ref(false)
@@ -76,6 +90,7 @@ export function usePromptGeneration() {
     status.value = 'generating'
     request.value = description.trim()
     errorMessage.value = ''
+    failure.value = null
     partial.value = false
     try {
       const result = await streamGeneration({
@@ -89,7 +104,7 @@ export function usePromptGeneration() {
         },
         shouldStop: () => stopRequested,
       })
-      if (!result.generatedPrompt?.trim()) throw new Error(t('promptGenerate.emptyResult'))
+      if (!result.generatedPrompt?.trim()) throw new EmptyGenerationError('empty result')
       status.value = 'success'
       partial.value = false
       await record({
@@ -106,10 +121,19 @@ export function usePromptGeneration() {
         status.value = 'stopped'
         return null
       }
-      const reason = error instanceof Error ? error.message : String(error)
+      const empty = error instanceof EmptyGenerationError
+      // 生成记录里留原始报错，查看记录时再按原因说明
+      const reason = empty ? t('promptGenerate.emptyResult') : error instanceof Error ? error.message : String(error)
       status.value = partial.value ? 'interrupted' : 'error'
-      errorMessage.value = reason
-      message.error(`${t('aiGenerator.generateFailed')}: ${reason}`)
+      // 提示里只放一句原因；服务商的原始报错（JSON、HTML）只出现在面板的「技术详情」里
+      if (empty) {
+        errorMessage.value = reason
+        message.error(t('promptGenerate.failedWith', { reason }))
+      } else {
+        const local = isLocalAIConfig(selected.config)
+        failure.value = { error, local }
+        message.error(t('promptGenerate.failedWith', { reason: describeAIError(error, { local }, t).title }))
+      }
       await record({
         historyId: `error_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
         configId: selected.config.configId,
@@ -136,11 +160,12 @@ export function usePromptGeneration() {
     status.value = 'idle'
     request.value = ''
     errorMessage.value = ''
+    failure.value = null
     partial.value = false
   }
 
   return {
-    models, generating, status, request, errorMessage, partial, history, autoSave,
+    models, generating, status, request, failure, errorMessage, partial, history, autoSave,
     setAutoSave, loadHistory, generate, stop, reset,
   }
 }

@@ -281,7 +281,7 @@ export function describeMobileAIError(error: unknown, t: Translate): MobileAIErr
   return {
     kind,
     summary: t(`aiError.${kind}.title`),
-    hint: t(`aiError.${kind}.message`),
+    hint: kind === diagnosis.kind ? diagnosis.message : t(`aiError.${kind}.message`),
     detail: diagnosis.detail,
   }
 }

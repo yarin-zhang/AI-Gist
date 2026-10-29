@@ -326,8 +326,6 @@ const historyMeta = (item: AIGenerationHistory) => {
 /** 不是服务商报错、只有一句说明的失败（没有生成内容等） */
 const plainError = (summary: string): MobileAIErrorView => ({ kind: 'generic', summary, detail: '' })
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
 const scrollToBottom = async () => {
   await nextTick()
   await contentRef.value?.$el?.scrollToBottom?.(300)
@@ -505,7 +503,7 @@ const afterResult = async (turnId: number) => {
     showToast(t('aiGenerator.generateAndSaveSuccess'))
   } catch (error) {
     console.error('保存提示词失败:', error)
-    showToast(`${t('aiGenerator.saveFailed')}: ${errorText(error)}`, 'danger')
+    showToast(t('aiGenerator.saveFailed'), 'danger')
   }
 }
 
@@ -597,7 +595,7 @@ const savePrompt = async (turn: GenerationTurn) => {
     showToast(t('aiGenerator.saveSuccess'))
   } catch (error) {
     console.error('保存提示词失败:', error)
-    showToast(`${t('aiGenerator.saveFailed')}: ${errorText(error)}`, 'danger')
+    showToast(t('aiGenerator.saveFailed'), 'danger')
   } finally {
     saving.value = false
   }

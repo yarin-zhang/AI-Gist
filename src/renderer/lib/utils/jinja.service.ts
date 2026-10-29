@@ -1,6 +1,16 @@
 import * as nunjucks from 'nunjucks';
 
 /**
+ * Nunjucks 报错形如「(unknown path) [Line 1, Column 13]\n  unexpected token: %}」，整理成一行并保留位置。
+ * 调用方靠报错是否为空判断渲染成没成功，所以整理后为空时也要留一句。
+ */
+const cleanTemplateError = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+  .replace(/\(unknown path\)/g, '')
+  .replace(/Template render error:/g, '')
+  .replace(/\s+/g, ' ')
+  .trim() || 'Template render error';
+
+/**
  * Jinja 模板服务
  * 提供模板渲染、语法检查等功能
  */
@@ -26,7 +36,8 @@ export class JinjaService {
       return this.env.renderString(template, context);
     } catch (error) {
       console.error('Jinja 模板渲染错误:', error);
-      throw new Error(`模板渲染失败: ${error instanceof Error ? error.message : String(error)}`);
+      // 不套「模板渲染失败:」，去掉 Nunjucks 的「(unknown path)」；界面用 describeTemplateError 按行号说明
+      throw new Error(cleanTemplateError(error));
     }
   }
 
