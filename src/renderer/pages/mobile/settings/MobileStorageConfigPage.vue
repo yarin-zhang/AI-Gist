@@ -157,8 +157,14 @@ import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import {
   cloudSyncService,
-  getCloudSyncResultMessage
+  getCloudStorageConnectionDiagnosis,
+  getCloudSyncResultMessage,
+  type CloudSyncJoinPreview
 } from '~/lib/services/cloud-sync.service'
+import {
+  getCloudSyncCategoryMergeMessages,
+  getCloudSyncJoinMessageLines
+} from '~/lib/utils/cloud-sync-merge-notices'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
 import { confirmAction, getDeviceLabel, presentSyncErrorDetails, showToast, withLoading } from './shared'
 
@@ -248,12 +254,23 @@ const saveConfig = async () => {
 
   try {
     const payload = buildConfigPayload()
-    const result = await withLoading(t('common.loading'), () => isNew.value
-      ? CloudBackupAPI.addStorageConfig(payload)
-      : CloudBackupAPI.updateStorageConfig(configId.value, payload))
+    const editingId = isNew.value ? '' : configId.value
+    // 本机还没和这个存储同步过：先停用保存，看过两边的数据（需要时问过用户）再启用，
+    // 免得自动同步抢在用户确认之前就把两边合并 (#490)
+    const joining = payload.enabled && !(editingId && await cloudSyncService.hasSyncedWithStorage(editingId))
+    const savedPayload = joining ? { ...payload, enabled: false } : payload
+    const result = await withLoading(t('common.loading'), () => editingId
+      ? CloudBackupAPI.updateStorageConfig(editingId, savedPayload)
+      : CloudBackupAPI.addStorageConfig(savedPayload))
 
     if (!result.success) {
       await showToast(result.error || t('dataSync.saveFailed'), 'danger')
+      return
+    }
+
+    if (joining && result.config) {
+      await joinStorage(result.config.id)
+      router.back()
       return
     }
 
@@ -269,6 +286,48 @@ const saveConfig = async () => {
   } finally {
     busy.save = false
   }
+}
+
+/**
+ * 刚存下（停用状态）的存储：读两边的数据。本机和云端各有对方没有的提示词或分类时先问用户，
+ * 确认后马上同步一次再启用；选「暂不同步」或读不到云端数据时，存储保持停用。
+ */
+const joinStorage = async (storageId: string) => {
+  let preview: CloudSyncJoinPreview
+  try {
+    preview = await withLoading(t('common.loading'), () => cloudSyncService.previewStorageJoin(storageId))
+  } catch (error) {
+    console.error('读取云端同步数据失败:', error)
+    const diagnosis = getCloudStorageConnectionDiagnosis(error instanceof Error ? error.message : String(error))
+    await showToast(t('dataSync.joinConfirm.previewFailed', { error: diagnosis.title }), 'danger')
+    return
+  }
+
+  if (preview.needsConfirmation) {
+    const confirmed = await confirmAction({
+      header: t('dataSync.joinConfirm.title'),
+      message: getCloudSyncJoinMessageLines(preview).join('\n'),
+      confirmText: t('dataSync.joinConfirm.confirm'),
+      cancelText: t('dataSync.joinConfirm.cancel')
+    })
+    if (!confirmed) {
+      await showToast(t('dataSync.joinConfirm.savedDisabled'), 'medium')
+      return
+    }
+    // 趁存储还停用着亲自跑第一次同步：自动同步不碰停用的存储，不会抢先合并，
+    // 合并结果（含同名分类保留了哪一边）一定在这里提示出来
+    await runSync(storageId)
+  }
+
+  const enabled = await withLoading(t('common.loading'), () =>
+    CloudBackupAPI.updateStorageConfig(storageId, { enabled: true }))
+  if (!enabled.success) {
+    await showToast(enabled.error || t('dataSync.saveFailed'), 'danger')
+    return
+  }
+  // 启用后按新配置再连接一次；确认过的那次同步跑在停用状态下，本机「有改动等待同步」的标记靠这一次清掉
+  cloudSyncService.scheduleSync('config-change', { storageId, delayMs: 0 })
+  if (!preview.needsConfirmation) await showToast(t(isNew.value ? 'dataSync.addSuccess' : 'dataSync.updateSuccess'))
 }
 
 const testConnection = async () => {
@@ -301,11 +360,7 @@ const testConnection = async () => {
   }
 }
 
-const syncNow = async () => {
-  if (isNew.value || busy.sync) return
-  busy.sync = true
-  const storageId = configId.value
-
+const runSync = async (storageId: string) => {
   try {
     const result = await withLoading(t('cloudBackup.syncing'), () =>
       cloudSyncService.syncNow(storageId, {
@@ -320,7 +375,9 @@ const syncNow = async () => {
     } else if (result.success) {
       await showToast([
         getCloudSyncResultMessage(result.action, result.conflicts.length),
-        ...(result.warnings || [])
+        ...(result.warnings || []),
+        // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
+        ...getCloudSyncCategoryMergeMessages(result)
       ].join('; '))
     } else {
       await presentSyncErrorDetails(result, { storageId })
@@ -330,6 +387,14 @@ const syncNow = async () => {
       error instanceof Error ? error.message : String(error),
       { storageId }
     )
+  }
+}
+
+const syncNow = async () => {
+  if (isNew.value || busy.sync) return
+  busy.sync = true
+  try {
+    await runSync(configId.value)
   } finally {
     busy.sync = false
   }

@@ -6,31 +6,19 @@
 import { BaseDatabaseService } from './base-database.service';
 import { QuickOptimizationConfig, CreateQuickOptimizationConfig, UpdateQuickOptimizationConfig } from '@shared/types/ai';
 import { generateUUID } from '../utils/uuid';
-import i18n from '../../i18n';
+import {
+  buildDefaultQuickOptimizationConfigs,
+  isUnmodifiedBuiltinQuickOptimization
+} from './quick-optimization-defaults';
 
-/** 默认的快速优化动作：名称、说明和模板都在语言包 quickOptimization.defaults 下，跟随界面语言生成 */
-const DEFAULT_ACTIONS = [
-  { key: 'shorter', enabled: true },
-  { key: 'richer', enabled: true },
-  { key: 'general', enabled: true },
-  { key: 'extractVariables', enabled: true },
-  { key: 'professional', enabled: false }
-] as const;
+export { buildDefaultQuickOptimizationConfigs } from './quick-optimization-defaults';
 
 /** 本机是否已经预置过默认动作；用户删光后不再自动加回来 */
 const DEFAULTS_SEEDED_KEY = 'ai-gist:quick-optimization-defaults-seeded';
 
-const translate = (key: string) => (i18n.global.t as (key: string) => string)(key);
-
-export function buildDefaultQuickOptimizationConfigs(t: (key: string) => string = translate): CreateQuickOptimizationConfig[] {
-  return DEFAULT_ACTIONS.map((action, index) => ({
-    name: t(`quickOptimization.defaults.${action.key}.name`),
-    description: t(`quickOptimization.defaults.${action.key}.description`),
-    prompt: t(`quickOptimization.defaults.${action.key}.prompt`),
-    enabled: action.enabled,
-    sortOrder: index + 1
-  }));
-}
+/** 用户改了这几项，默认动作就成了用户自己的动作 */
+const CONTENT_FIELDS = ['name', 'description', 'prompt'] as const;
+const touchesContent = (data: UpdateQuickOptimizationConfig) => CONTENT_FIELDS.some(field => field in data);
 
 const readSeededFlag = (): boolean => {
   try {
@@ -79,7 +67,8 @@ export class QuickOptimizationService extends BaseDatabaseService {
       description: data.description ? String(data.description).trim() : undefined,
       prompt: String(data.prompt || '').trim(),
       enabled: Boolean(data.enabled ?? true),
-      sortOrder: Number(data.sortOrder ?? 0)
+      sortOrder: Number(data.sortOrder ?? 0),
+      ...(data.builtinKey ? { builtinKey: String(data.builtinKey) } : {})
     };
 
     // 验证必填字段
@@ -156,8 +145,10 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<QuickOptimizationConfig> 更新后的完整快速优化提示词配置记录
    */
   async updateQuickOptimizationConfig(id: number, data: UpdateQuickOptimizationConfig): Promise<QuickOptimizationConfig> {
+    const existing = touchesContent(data) ? await this.getQuickOptimizationConfigById(id) : null;
     return this.update<QuickOptimizationConfig>('quick_optimization_configs', id, {
       ...data,
+      ...this.getBuiltinKeyUpdate(existing, data),
       updatedAt: new Date()
     });
   }
@@ -169,10 +160,29 @@ export class QuickOptimizationService extends BaseDatabaseService {
    * @returns Promise<QuickOptimizationConfig | null> 更新后的完整快速优化提示词配置记录，如果不存在则返回null
    */
   async updateQuickOptimizationConfigByUUID(uuid: string, data: UpdateQuickOptimizationConfig): Promise<QuickOptimizationConfig | null> {
+    const existing = touchesContent(data) ? await this.getQuickOptimizationConfigByUUID(uuid) : null;
     return this.updateByUUID<QuickOptimizationConfig>('quick_optimization_configs', uuid, {
       ...data,
+      ...this.getBuiltinKeyUpdate(existing, data),
       updatedAt: new Date()
     });
+  }
+
+  /**
+   * 默认动作的名称、说明或模板被改过之后，它就是用户自己的动作：去掉内置标识，
+   * 同步时不再和其他设备上的同一个默认动作归并，改动不会被覆盖 (#490)。
+   * 只开关或调整顺序不算改过。
+   */
+  private getBuiltinKeyUpdate(
+    existing: QuickOptimizationConfig | null,
+    data: UpdateQuickOptimizationConfig
+  ): Partial<QuickOptimizationConfig> {
+    if (!existing?.builtinKey) return {};
+    const next = { ...existing, ...data };
+    const contentChanged = CONTENT_FIELDS
+      .some(field => field in data && (next[field] || '').trim() !== (existing[field] || '').trim());
+    if (!contentChanged || isUnmodifiedBuiltinQuickOptimization(next, existing.builtinKey)) return {};
+    return { builtinKey: undefined };
   }
 
   /**
@@ -237,6 +247,8 @@ export class QuickOptimizationService extends BaseDatabaseService {
   /**
    * 首次使用时预置默认动作：每台设备只做一次，列表里已有配置时只记下标记。
    * 并发调用（AI 面板和弹窗同时加载）共用同一次初始化，避免重复添加。
+   * 预置的动作带内置标识，和别的设备各自预置的同一批动作在同步时归并成一份 (#490)；
+   * 归并只会删掉重复的那份，列表不会因此变空，所以这个标记不用跟着同步变。
    */
   async ensureDefaultConfigs(): Promise<void> {
     if (readSeededFlag()) return;

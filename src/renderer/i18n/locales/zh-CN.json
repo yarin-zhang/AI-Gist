@@ -693,7 +693,37 @@
     "syncIntervalTooShort": "最少 {min} 分钟",
     "syncIntervalTooLong": "最多 {hours} 小时（{max} 分钟）",
     "indicatorShortRetrying": "同步失败 · 稍后自动重试",
-    "technicalDetails": "技术详情（反馈问题时复制）"
+    "technicalDetails": "技术详情（反馈问题时复制）",
+    "joinConfirm": {
+      "title": "合并本机和云端的数据？",
+      "description": "本机和这个存储里都已经有数据。开始同步后两边会合并成一份，各自的提示词都会保留。",
+      "local": "本机",
+      "remote": "云端",
+      "merged": "合并后约",
+      "prompts": "提示词",
+      "categories": "分类",
+      "row": "{label}：本机 {local} · 云端 {remote} · 合并后约 {merged}",
+      "sameNameCategories": "同名分类会合并为一个：{names}",
+      "sameNameCategoriesMore": "同名分类会合并为一个：{names} 等 {count} 个",
+      "quotedName": "「{name}」",
+      "cancelHint": "选「暂不同步」会保存这个存储，但先不启用。",
+      "confirm": "合并并同步",
+      "cancel": "暂不同步",
+      "savedDisabled": "存储已保存，暂未开启同步",
+      "previewFailed": "存储已保存，但没能读取云端数据，暂未开启同步：{error}"
+    },
+    "categoryMerged": "同名分类「{name}」已合并为一个，{fields}以{side}的为准",
+    "categoryMergedMore": "另有 {count} 个同名分类已合并，不一样的地方以较新的一份为准",
+    "mergeSide": {
+      "local": "本机",
+      "remote": "云端"
+    },
+    "categoryFields": {
+      "description": "说明",
+      "color": "颜色",
+      "icon": "图标",
+      "parentUuid": "上级分类"
+    }
   },
   "databaseStatus": {
     "connectionError": "数据库连接异常",

@@ -693,7 +693,37 @@
     "syncIntervalTooShort": "{min} 分以上で指定してください",
     "syncIntervalTooLong": "{hours} 時間（{max} 分）以内で指定してください",
     "indicatorShortRetrying": "同期失敗 · 後で自動再試行",
-    "technicalDetails": "技術的な詳細（問題を報告するときにコピー）"
+    "technicalDetails": "技術的な詳細（問題を報告するときにコピー）",
+    "joinConfirm": {
+      "title": "このデバイスとクラウドのデータを統合しますか？",
+      "description": "このデバイスとストレージの両方にすでにデータがあります。同期を始めると 1 つに統合され、両方のプロンプトが残ります。",
+      "local": "このデバイス",
+      "remote": "クラウド",
+      "merged": "統合後（約）",
+      "prompts": "プロンプト",
+      "categories": "カテゴリ",
+      "row": "{label}：このデバイス {local} · クラウド {remote} · 統合後 約 {merged}",
+      "sameNameCategories": "同じ名前のカテゴリは 1 つに統合されます：{names}",
+      "sameNameCategoriesMore": "同じ名前のカテゴリは 1 つに統合されます：{names} など {count} 件",
+      "quotedName": "「{name}」",
+      "cancelHint": "「後で」を選ぶと、ストレージは保存されますが無効のままです。",
+      "confirm": "統合して同期",
+      "cancel": "後で",
+      "savedDisabled": "ストレージを保存しました。同期はまだオンになっていません",
+      "previewFailed": "ストレージを保存しましたが、クラウドのデータを読み込めなかったため同期はまだオンになっていません：{error}"
+    },
+    "categoryMerged": "同じ名前のカテゴリ「{name}」を 1 つに統合し、{fields}は{side}のものを残しました",
+    "categoryMergedMore": "ほかに {count} 件の同じ名前のカテゴリを統合しました。異なる部分は新しいほうを残しました",
+    "mergeSide": {
+      "local": "このデバイス",
+      "remote": "クラウド"
+    },
+    "categoryFields": {
+      "description": "説明",
+      "color": "色",
+      "icon": "アイコン",
+      "parentUuid": "親カテゴリ"
+    }
   },
   "databaseStatus": {
     "connectionError": "データベースの接続エラー",

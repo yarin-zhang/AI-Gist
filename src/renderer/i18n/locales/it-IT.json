@@ -693,7 +693,37 @@
     "syncIntervalTooShort": "Il minimo è {min} minuti",
     "syncIntervalTooLong": "Il massimo è {hours} ore ({max} minuti)",
     "indicatorShortRetrying": "Sincronizzazione non riuscita · Nuovo tentativo più tardi",
-    "technicalDetails": "Dettagli tecnici (copiali quando segnali un problema)"
+    "technicalDetails": "Dettagli tecnici (copiali quando segnali un problema)",
+    "joinConfirm": {
+      "title": "Unire i dati di questo dispositivo con il cloud?",
+      "description": "Sia questo dispositivo sia l’archivio contengono già dati. La sincronizzazione li unisce in un unico insieme e mantiene i prompt di entrambi.",
+      "local": "Questo dispositivo",
+      "remote": "Cloud",
+      "merged": "Dopo l’unione (circa)",
+      "prompts": "Prompt",
+      "categories": "Categorie",
+      "row": "{label}: {local} su questo dispositivo · {remote} nel cloud · circa {merged} dopo l’unione",
+      "sameNameCategories": "Le categorie con lo stesso nome verranno unite in una sola: {names}",
+      "sameNameCategoriesMore": "Le categorie con lo stesso nome verranno unite in una sola: {names} e altre ({count} in totale)",
+      "quotedName": "«{name}»",
+      "cancelHint": "Se scegli Non ora, l’archivio viene salvato ma resta disattivato.",
+      "confirm": "Unisci e sincronizza",
+      "cancel": "Non ora",
+      "savedDisabled": "Archivio salvato. La sincronizzazione non è ancora attiva",
+      "previewFailed": "Archivio salvato, ma non è stato possibile leggere i dati nel cloud, quindi la sincronizzazione non è ancora attiva: {error}"
+    },
+    "categoryMerged": "Le categorie chiamate «{name}» sono state unite in una sola. Per i campi diversi ({fields}) è stata mantenuta la versione {side}.",
+    "categoryMergedMore": "È stata unita anche {count} altra categoria con lo stesso nome; dove erano diverse è stata mantenuta la copia più recente. | Sono state unite anche altre {count} categorie con lo stesso nome; dove erano diverse è stata mantenuta la copia più recente.",
+    "mergeSide": {
+      "local": "di questo dispositivo",
+      "remote": "del cloud"
+    },
+    "categoryFields": {
+      "description": "descrizione",
+      "color": "colore",
+      "icon": "icona",
+      "parentUuid": "categoria padre"
+    }
   },
   "databaseStatus": {
     "connectionError": "Errore di connessione al database",

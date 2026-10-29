@@ -127,6 +127,10 @@
                     {{ t('dataSync.connectionDiagnosis.detail', { detail: draftTest.diagnosis.detail }) }}
                 </span>
             </UiAlert>
+            <!-- 存储已经停用保存，只是读不到云端数据：留在弹窗里说明原因，改好后再点保存会重新读取 (#490) -->
+            <UiAlert v-if="joinError" tone="error" class="sync-form-result">
+                <strong>{{ joinError.title }}</strong> {{ joinError.message }}
+            </UiAlert>
             <template #footer>
                 <NButton @click="showConfigModal = false">{{ t('common.cancel') }}</NButton>
                 <NButton @click="testDraftConnection" :loading="loading.testDraft" :disabled="!canUseICloudConfig">
@@ -135,6 +139,40 @@
                 <NButton type="primary" @click="saveConfig" :loading="loading.saveConfig" :disabled="!canUseICloudConfig || loading.testDraft">
                     {{ t('common.save') }}
                 </NButton>
+            </template>
+        </UiModal>
+
+        <!-- 第一次连上一个已有数据的存储：先说明两边会怎么合并，确认后才启用并开始同步 (#490) -->
+        <UiModal :show="joinConfirm.visible" :close-label="t('common.close')" :title="t('dataSync.joinConfirm.title')"
+            @close="settleJoinConfirm(false)">
+            <div v-if="joinConfirm.preview" class="join-confirm">
+                <p class="join-confirm__text">{{ t('dataSync.joinConfirm.description') }}</p>
+                <div class="ui-panel join-confirm__panel">
+                    <table class="join-confirm__table">
+                        <thead>
+                            <tr>
+                                <td />
+                                <th scope="col">{{ t('dataSync.joinConfirm.local') }}</th>
+                                <th scope="col">{{ t('dataSync.joinConfirm.remote') }}</th>
+                                <th scope="col">{{ t('dataSync.joinConfirm.merged') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in joinRows" :key="row.key">
+                                <th scope="row">{{ row.label }}</th>
+                                <td>{{ row.local }}</td>
+                                <td>{{ row.remote }}</td>
+                                <td>{{ row.merged }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p v-if="joinCategoryLine" class="join-confirm__text">{{ joinCategoryLine }}</p>
+                <p class="ui-help">{{ t('dataSync.joinConfirm.cancelHint') }}</p>
+            </div>
+            <template #footer>
+                <NButton @click="settleJoinConfirm(false)">{{ t('dataSync.joinConfirm.cancel') }}</NButton>
+                <NButton type="primary" @click="settleJoinConfirm(true)">{{ t('dataSync.joinConfirm.confirm') }}</NButton>
             </template>
         </UiModal>
 
@@ -193,7 +231,14 @@ import {
     getCloudSyncErrorDiagnosis,
     getCloudSyncResultMessage,
 } from '@/lib/services/cloud-sync.service';
-import type { CloudStorageConnectionDiagnosis, CloudSyncResult, CloudSyncStatus } from '@/lib/services/cloud-sync.service';
+import type {
+    CloudStorageConnectionDiagnosis, CloudSyncJoinPreview, CloudSyncResult, CloudSyncStatus,
+} from '@/lib/services/cloud-sync.service';
+import {
+    getCloudSyncCategoryMergeMessages,
+    getCloudSyncJoinCategoryLine,
+    getCloudSyncJoinRows,
+} from '@/lib/utils/cloud-sync-merge-notices';
 import { PlatformDetector } from '@shared/platform';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
 import {
@@ -234,6 +279,10 @@ const loading = ref({ saveConfig: false, testDraft: false, syncNow: false, saveS
 // 弹窗里「测试连接」的结果；改了连接相关的字段就作废
 const draftTest = ref<{ state: 'idle' | 'testing' | 'success' | 'error'; diagnosis?: CloudStorageConnectionDiagnosis }>({ state: 'idle' });
 let draftTestRun = 0;
+// 第一次加入同步前的确认框；保存时读不到云端数据的原因
+const joinConfirm = ref<{ visible: boolean; preview: CloudSyncJoinPreview | null }>({ visible: false, preview: null });
+const joinError = ref<{ title: string; message: string } | null>(null);
+let settleJoin: ((confirmed: boolean) => void) | null = null;
 let unsubscribeSyncStatus: (() => void) | null = null;
 
 const configForm = ref({
@@ -398,6 +447,7 @@ const resetConfigForm = () => {
 const resetDraftTest = () => {
     draftTestRun += 1;
     draftTest.value = { state: 'idle' };
+    joinError.value = null;
 };
 
 const showAddConfigModal = () => {
@@ -424,7 +474,7 @@ const editConfig = (config: CloudStorageConfig) => {
 // 测试结果只对测试时的地址和账号成立
 watch(
     () => [configForm.value.type, configForm.value.url, configForm.value.username, configForm.value.password, configForm.value.path],
-    () => { if (draftTest.value.state !== 'idle') resetDraftTest(); },
+    () => { if (draftTest.value.state !== 'idle' || joinError.value) resetDraftTest(); },
 );
 
 const handleTypeChange = () => {
@@ -490,30 +540,96 @@ const testSavedConnection = async (config: CloudStorageConfig) => {
 const saveConfig = async () => {
     if (!(await validateForm())) return;
     loading.value.saveConfig = true;
+    joinError.value = null;
     try {
         const draft = toStorageConfig();
         const data = configForm.value.type === 'webdav'
             ? { name: draft.name, type: draft.type, enabled: draft.enabled, url: (draft as any).url, username: (draft as any).username, password: (draft as any).password }
             : { name: draft.name, type: draft.type, enabled: draft.enabled, path: (draft as any).path };
-        const result = configForm.value.id
-            ? await CloudBackupAPI.updateStorageConfig(configForm.value.id, data)
-            : await CloudBackupAPI.addStorageConfig(data as any);
+        const editingId = configForm.value.id;
+        // 本机还没和这个存储同步过：先停用保存，看过两边的数据（需要时问过用户）再启用，
+        // 免得自动同步抢在用户确认之前就把两边合并 (#490)
+        const joining = data.enabled && !(editingId && await cloudSyncService.hasSyncedWithStorage(editingId));
+        const payload = joining ? { ...data, enabled: false } : data;
+        const result = editingId
+            ? await CloudBackupAPI.updateStorageConfig(editingId, payload)
+            : await CloudBackupAPI.addStorageConfig(payload as any);
         if (!result.success) {
             message.error(result.error || t('dataSync.saveFailed'));
             return;
         }
-        message.success(configForm.value.id ? t('dataSync.updateSuccess') : t('dataSync.addSuccess'));
+        // 地址、账号或密码改过之后，之前记下的失败不再作数
+        if (result.config) cloudSyncService.resetStorageFailureState(result.config.id);
+        if (joining && result.config) {
+            // 已经存下了：之后再点保存是更新这一条，不会重复添加
+            configForm.value.id = result.config.id;
+            await joinStorage(result.config.id, !editingId);
+            return;
+        }
+        message.success(editingId ? t('dataSync.updateSuccess') : t('dataSync.addSuccess'));
         showConfigModal.value = false;
         await loadStorageConfigs();
-        if (result.config) {
-            // 地址、账号或密码改过之后，之前记下的失败不再作数；启用的存储随后按新配置真正连接一次
-            cloudSyncService.resetStorageFailureState(result.config.id);
-            if (result.config.enabled) cloudSyncService.scheduleSync('config-change', { storageId: result.config.id, delayMs: 0 });
-        }
+        // 启用的存储随后按新配置真正连接一次
+        if (result.config?.enabled) cloudSyncService.scheduleSync('config-change', { storageId: result.config.id, delayMs: 0 });
     } catch (error) {
         console.error('保存存储配置失败:', error);
         message.error(t('dataSync.saveFailed'));
     } finally { loading.value.saveConfig = false; }
+};
+
+const askJoinConfirm = (preview: CloudSyncJoinPreview) => new Promise<boolean>(resolve => {
+    settleJoin = resolve;
+    joinConfirm.value = { visible: true, preview };
+});
+const settleJoinConfirm = (confirmed: boolean) => {
+    joinConfirm.value = { ...joinConfirm.value, visible: false };
+    const settle = settleJoin;
+    settleJoin = null;
+    settle?.(confirmed);
+};
+const joinRows = computed(() => joinConfirm.value.preview ? getCloudSyncJoinRows(joinConfirm.value.preview) : []);
+const joinCategoryLine = computed(() => joinConfirm.value.preview ? getCloudSyncJoinCategoryLine(joinConfirm.value.preview) : '');
+
+/**
+ * 刚存下（停用状态）的存储：读两边的数据。本机和云端各有对方没有的提示词或分类时先问用户，
+ * 确认后马上同步一次、结果就地提示，再启用；选「暂不同步」时存储保持停用。
+ */
+const joinStorage = async (storageId: string, isNew: boolean) => {
+    let preview: CloudSyncJoinPreview;
+    try {
+        preview = await cloudSyncService.previewStorageJoin(storageId);
+    } catch (error) {
+        console.error('读取云端同步数据失败:', error);
+        await loadStorageConfigs();
+        const diagnosis = getCloudStorageConnectionDiagnosis(error instanceof Error ? error.message : String(error));
+        joinError.value = {
+            title: t('dataSync.joinConfirm.previewFailed', { error: diagnosis.title }),
+            message: diagnosis.message,
+        };
+        return;
+    }
+
+    showConfigModal.value = false;
+    if (preview.needsConfirmation) {
+        if (!(await askJoinConfirm(preview))) {
+            await loadStorageConfigs();
+            message.info(t('dataSync.joinConfirm.savedDisabled'));
+            return;
+        }
+        // 趁存储还停用着亲自跑第一次同步：自动同步不碰停用的存储，不会抢先合并，
+        // 合并结果（含同名分类保留了哪一边）一定在这里提示出来
+        await syncCloudData(storageId);
+    }
+
+    const enabled = await CloudBackupAPI.updateStorageConfig(storageId, { enabled: true });
+    await loadStorageConfigs();
+    if (!enabled.success) {
+        message.error(enabled.error || t('dataSync.saveFailed'));
+        return;
+    }
+    if (!preview.needsConfirmation) message.success(isNew ? t('dataSync.addSuccess') : t('dataSync.updateSuccess'));
+    // 启用后按新配置再连接一次；确认过的那次同步跑在停用状态下，本机「有改动等待同步」的标记靠这一次清掉
+    cloudSyncService.scheduleSync('config-change', { storageId, delayMs: 0 });
 };
 
 const deleteConfig = async (id: string) => {
@@ -576,6 +692,8 @@ const syncCloudData = async (storageId: string) => {
         } else if (result.success) {
             message.success(getCloudSyncResultMessage(result.action, result.conflicts.length));
             for (const warning of result.warnings || []) message.warning(warning);
+            // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
+            for (const notice of getCloudSyncCategoryMergeMessages(result)) message.warning(notice);
         } else message.error(showSyncErrorDetails(result, storageId).message);
     } catch (error) {
         console.error('云同步失败:', error);
@@ -856,6 +974,65 @@ onUnmounted(() => unsubscribeSyncStatus?.());
     margin-top: 4px;
     color: var(--content-secondary);
     font-size: var(--font-size-xs);
+}
+
+.join-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.join-confirm__text {
+    margin: 0;
+    color: var(--content-primary);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+}
+
+.join-confirm__panel {
+    overflow: hidden;
+}
+
+.join-confirm__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-base);
+}
+
+.join-confirm__table thead :is(th, td) {
+    height: 34px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-secondary);
+    color: var(--content-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.join-confirm__table tbody :is(th, td) {
+    height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.join-confirm__table tbody tr:last-child :is(th, td) {
+    border-bottom: 0;
+}
+
+/* 名称列占满剩下的宽度，数字列按内容收紧、表头不折行 */
+.join-confirm__table th[scope='row'],
+.join-confirm__table thead td {
+    width: 100%;
+    color: var(--content-primary);
+    font-weight: var(--font-weight-medium);
+    text-align: left;
+}
+
+.join-confirm__table th[scope='col'],
+.join-confirm__table tbody td {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .sync-error {

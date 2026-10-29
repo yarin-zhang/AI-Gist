@@ -693,7 +693,37 @@
     "syncIntervalTooShort": "最少 {min} 分鐘",
     "syncIntervalTooLong": "最多 {hours} 小時（{max} 分鐘）",
     "indicatorShortRetrying": "同步失敗 · 稍後自動重試",
-    "technicalDetails": "技術詳情（回報問題時複製）"
+    "technicalDetails": "技術詳情（回報問題時複製）",
+    "joinConfirm": {
+      "title": "合併本機和雲端的資料？",
+      "description": "本機和這個儲存裡都已經有資料。開始同步後兩邊會合併成一份，各自的提示詞都會保留。",
+      "local": "本機",
+      "remote": "雲端",
+      "merged": "合併後約",
+      "prompts": "提示詞",
+      "categories": "分類",
+      "row": "{label}：本機 {local} · 雲端 {remote} · 合併後約 {merged}",
+      "sameNameCategories": "同名分類會合併為一個：{names}",
+      "sameNameCategoriesMore": "同名分類會合併為一個：{names} 等 {count} 個",
+      "quotedName": "「{name}」",
+      "cancelHint": "選「暫不同步」會先儲存設定，但不啟用這個儲存。",
+      "confirm": "合併並同步",
+      "cancel": "暫不同步",
+      "savedDisabled": "設定已儲存，暫未開啟同步",
+      "previewFailed": "設定已儲存，但無法讀取雲端資料，暫未開啟同步：{error}"
+    },
+    "categoryMerged": "同名分類「{name}」已合併為一個，{fields}以{side}的為準",
+    "categoryMergedMore": "另有 {count} 個同名分類已合併，不一樣的地方以較新的一份為準",
+    "mergeSide": {
+      "local": "本機",
+      "remote": "雲端"
+    },
+    "categoryFields": {
+      "description": "說明",
+      "color": "顏色",
+      "icon": "圖示",
+      "parentUuid": "上層分類"
+    }
   },
   "databaseStatus": {
     "connectionError": "資料庫連線異常",

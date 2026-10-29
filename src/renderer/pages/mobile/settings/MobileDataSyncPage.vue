@@ -173,6 +173,7 @@ import {
   type CloudSyncRestoreSuspension,
   type CloudSyncStatus
 } from '~/lib/services/cloud-sync.service'
+import { getCloudSyncCategoryMergeMessages } from '~/lib/utils/cloud-sync-merge-notices'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
 import {
   confirmAction,
@@ -297,7 +298,9 @@ const syncNow = async (storageId: string) => {
     } else if (result.success) {
       await showToast([
         getCloudSyncResultMessage(result.action, result.conflicts.length),
-        ...(result.warnings || [])
+        ...(result.warnings || []),
+        // 同名分类合并时两边字段不一样：说明保留了哪一边 (#490)
+        ...getCloudSyncCategoryMergeMessages(result)
       ].join('; '))
     } else {
       await presentSyncErrorDetails(result, { storageId, onRetry: retry })
