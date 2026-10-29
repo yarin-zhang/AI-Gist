@@ -7,6 +7,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // CapacitorHttp 走 URLSession.shared，默认会按 Last-Modified 自己缓存 GET。WebDAV 同步文件被别的设备改过之后，
+        // 它还会把缓存里的旧内容当成最新的交给网页，甚至拿旧正文配上新的 ETag，导致同步读到旧数据、误删本机记录。
+        // 应用自己用 ETag 做条件读取，不需要系统缓存：清掉以前存下的，之后也不再缓存
+        URLCache.shared.removeAllCachedResponses()
+        URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0, directory: nil)
+
         // 原生 UI 扩展必须在网页启动 Native UI 之前注册，见 PromptAccessory.swift
         do {
             try PromptAccessory.register()

@@ -3563,17 +3563,18 @@ export function getCloudStorageConnectionDiagnosis(error?: string): CloudStorage
   const raw = detail || '';
   let kind = 'generic';
 
-  if (/invalid url|ERR_INVALID_URL|only absolute urls|unsupported protocol/i.test(raw)) {
+  // iOS 的网络错误是按系统语言翻译过的句子（「无法连接服务器。」「此服务器的证书无效……」），也要认得出来
+  if (/invalid url|ERR_INVALID_URL|only absolute urls|unsupported protocol|unsupported URL|不支持的URL|不支援的URL/i.test(raw)) {
     kind = 'invalidUrl';
-  } else if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|UnknownHostException|could not resolve/i.test(raw)) {
+  } else if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|UnknownHostException|could not resolve|hostname could not be found|指定主机名的服务器|主機名稱的伺服器|ホスト名のサーバ|nome host specificato/i.test(raw)) {
     kind = 'hostNotFound';
-  } else if (/ECONNREFUSED|connection refused|failed to connect/i.test(raw)) {
+  } else if (/ECONNREFUSED|connection refused|failed to connect|could not connect to the server|无法连接服务器|无法连接到服务器|未能连接服务器|無法連接伺服器|サーバに接続できません|impossibile connettersi al server/i.test(raw)) {
     kind = 'refused';
-  } else if (/certificate|CERT_|self[- ]signed|EPROTO/i.test(raw) || /\b(?:SSL|TLS)\b/.test(raw)) {
+  } else if (/certificate|CERT_|self[- ]signed|EPROTO|证书|憑證|証明書|certificato|secure connection|安全连接|安全連線/i.test(raw) || /\b(?:SSL|TLS)\b/.test(raw) || /(?:SSL|TLS)错误|(?:SSL|TLS)錯誤/.test(raw)) {
     kind = 'tls';
-  } else if (/ETIMEDOUT|timeout|timed out|socket hang up|ECONNRESET|socket disconnected|aborted|超时/i.test(raw)) {
+  } else if (/ETIMEDOUT|timeout|timed out|socket hang up|ECONNRESET|socket disconnected|aborted|超时|逾時|タイムアウト|scaduta|appears to be offline|connection was lost|已断开与互联网的连接|网络连接已中断|網際網路連線|網路連線已中斷|オフライン|ネットワーク接続が切れました|sembra essere offline|connessione di rete è stata persa/i.test(raw)) {
     kind = 'timeout';
-  } else if (/\b(?:401|403)\b|Unauthorized|Forbidden/i.test(raw)) {
+  } else if (/\b(?:401|403)\b|Unauthorized|Forbidden|认证失败/i.test(raw)) {
     kind = 'auth';
   } else if (/\b(?:404|405|501)\b|Not Found|Method Not Allowed/i.test(raw)) {
     kind = 'path';

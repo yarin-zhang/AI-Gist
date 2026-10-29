@@ -358,6 +358,23 @@ export class MobileCloudBackupService {
     }
   }
 
+  /**
+   * 读回的探针内容：服务器标成文本时是字符串，标成 JSON 时 iOS 已经解析成对象（字段顺序不保证），
+   * 按字段比较
+   */
+  private isSameProbeContent(data: unknown, expected: string): boolean {
+    try {
+      const actual = typeof data === 'string' ? JSON.parse(data) : data
+      const wanted = JSON.parse(expected) as Record<string, unknown>
+      if (!actual || typeof actual !== 'object') return false
+      const actualRecord = actual as Record<string, unknown>
+      return Object.keys(actualRecord).length === Object.keys(wanted).length &&
+        Object.entries(wanted).every(([key, value]) => actualRecord[key] === value)
+    } catch {
+      return false
+    }
+  }
+
   getWebDAVCapabilityReport(config: Pick<CloudStorageConfig, 'id'> & { url?: string }): MobileWebDAVCapabilityReport | null {
     return this.webDAVCapabilityReports.get(config.id) ||
       (config.url ? this.webDAVCapabilityReports.get(config.url) : null) ||
@@ -369,7 +386,13 @@ export class MobileCloudBackupService {
     const probeName = `.ai-gist-mobile-probe-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
     const probePath = getCloudBackupFilePath(probeName)
     const probeUrl = this.buildWebDAVUrlFromCloudPath(config, probePath)
-    const probeData = `ai-gist-webdav-probe:${new Date().toISOString()}:${Math.random().toString(36).slice(2)}`
+    // 探针文件以 .json 结尾，群晖（Apache）、nginx 等会按 application/json 返回，iOS 的 CapacitorHttp 会把它当 JSON 解析：
+    // 内容必须是合法 JSON，读回时按解析后的值比较，否则配置完全正确也会报「读回校验失败」
+    const probeData = JSON.stringify({
+      probe: 'ai-gist-webdav',
+      createdAt: new Date().toISOString(),
+      nonce: Math.random().toString(36).slice(2)
+    })
     let conditionalWrite = true
 
     try {
@@ -394,7 +417,7 @@ export class MobileCloudBackupService {
       }
 
       const read = await this.requestWebDAV(config, probeUrl, 'GET')
-      if (read.status !== 200 || String(read.data || '') !== probeData) {
+      if (read.status !== 200 || !this.isSameProbeContent(read.data, probeData)) {
         throw new Error(`WebDAV 写入后读回校验失败（HTTP ${read.status}）`)
       }
 
@@ -992,8 +1015,10 @@ export class MobileCloudBackupService {
         return { manifest: assertValidCloudSyncManifest(JSON.parse(cached.json)), etag: cached.etag }
       }
       if (result.conditionIgnored) {
-        // 这次已经整份下载了，内容照常用；之后检查改用 PROPFIND 比对，省掉没变时的下载
+        // 回来的 ETag 就是手里这份：云端没变，用自己确认过的缓存，不用这次的正文。
+        // iOS 的 URLSession 会拿它自己更早缓存的正文冒充 200 交回来，正文可能是旧的
         this.webDAVStoragesIgnoringConditionalRead.add(config.id)
+        return { manifest: assertValidCloudSyncManifest(JSON.parse(cached.json)), etag: cached.etag }
       }
       this.rememberWebDAVSyncManifest(config.id, location, result.etag, result.manifest)
       return { manifest: result.manifest, etag: result.etag }
