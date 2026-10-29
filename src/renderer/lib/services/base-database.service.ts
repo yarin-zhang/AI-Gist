@@ -491,17 +491,16 @@ export class BaseDatabaseService {
    */
   protected async add<T>(storeName: string, data: Omit<T, 'id'>): Promise<T> {
     const db = await this.ensureDB();
+    // 深度克隆数据以确保可序列化；图片换成内存里的副本（见 detachStoredBlobs）
+    const cleanData = await this.detachStoredBlobs(this.cleanDataForStorage(data));
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
       let result: T | undefined;
       let settled = false;
-      
+
       const now = new Date();
-      
-      // 深度克隆数据以确保可序列化
-      const cleanData = this.cleanDataForStorage(data);
-      
+
       const dataWithTimestamps = {
         ...cleanData,
         createdAt: now,
@@ -580,6 +579,69 @@ export class BaseDatabaseService {
   }
 
   /**
+   * 把数据里的图片换成内存里的新 Blob 再写入。
+   *
+   * iOS（WebKit）的 IndexedDB：从库里读出来的 Blob 原样写回后，大约半秒内这条记录的图片读不出来（NotFoundError），
+   * 这段时间里再写这条记录也会失败（Error preparing Blob/File data to be stored in object store）。
+   * 编辑带图的提示词、复制时记使用次数都会写回整条记录，紧接着的同步导出或第二次保存就失败。
+   * 先把图片读成内存数据再写，写进去的是一份独立的数据，就没有这段读不到的时间。
+   */
+  protected async detachStoredBlobs<T>(data: T): Promise<T> {
+    if (data === null || data === undefined || !this.containsBlob(data)) {
+      return data;
+    }
+
+    if (data instanceof Blob) {
+      const blob = data;
+      const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(new Error(`读取图片数据失败（${reader.error?.name || 'unknown'}）`));
+        reader.readAsArrayBuffer(blob);
+      });
+      return new Blob([bytes], { type: blob.type }) as T;
+    }
+
+    if (Array.isArray(data)) {
+      return Promise.all(data.map(item => this.detachStoredBlobs(item))) as Promise<T>;
+    }
+
+    const detached: any = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      detached[key] = await this.detachStoredBlobs(value);
+    }
+    return detached;
+  }
+
+  /**
+   * 写回整条记录时，图片字段换成事务前准备好的内存副本（detached 来自写入前读到的同一条记录）。
+   * 期间图片被别处改过（类型、大小对不上）就保留库里当前的值，不拿旧图片覆盖。
+   */
+  protected withDetachedBlobs<T extends Record<string, any>>(current: T, detached: Partial<T> | null | undefined): T {
+    if (!detached) return current;
+    const merged: Record<string, any> = { ...current };
+    for (const [key, value] of Object.entries(current)) {
+      if (this.containsBlob(value) && this.blobSignature(value) === this.blobSignature(detached[key])) {
+        merged[key] = detached[key];
+      }
+    }
+    return merged as T;
+  }
+
+  private containsBlob(value: unknown): boolean {
+    if (value instanceof Blob) return true;
+    if (Array.isArray(value)) return value.some(item => this.containsBlob(item));
+    if (value && typeof value === 'object' && !(value instanceof Date)) {
+      return Object.values(value).some(item => this.containsBlob(item));
+    }
+    return false;
+  }
+
+  private blobSignature(value: unknown): string {
+    return JSON.stringify(value, (_key, item) => item instanceof Blob ? { blobType: item.type, blobSize: item.size } : item);
+  }
+
+  /**
    * 通用的查询所有记录方法
    * 获取指定对象存储中的所有记录
    * @param storeName string 对象存储名称
@@ -636,6 +698,11 @@ export class BaseDatabaseService {
    */
   protected async update<T>(storeName: string, id: number, updates: Partial<T>): Promise<T> {
     const db = await this.ensureDB();
+    // 图片换成内存里的副本再写回（见 detachStoredBlobs）；读写图片不能放进事务里，先在事务外准备好
+    const [detachedExisting, detachedUpdates] = await Promise.all([
+      this.getById<any>(storeName, id).then(record => this.detachStoredBlobs(record)),
+      this.detachStoredBlobs(this.cleanDataForStorage(updates))
+    ]);
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([storeName], 'readwrite');
       const store = transaction.objectStore(storeName);
@@ -656,8 +723,8 @@ export class BaseDatabaseService {
 
         // 合并更新数据
         const updatedData = {
-          ...existingData,
-          ...this.cleanDataForStorage(updates),
+          ...this.withDetachedBlobs(existingData, detachedExisting),
+          ...detachedUpdates,
           updatedAt: new Date(),
         };
 
