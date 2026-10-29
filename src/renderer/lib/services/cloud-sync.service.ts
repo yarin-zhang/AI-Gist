@@ -16,6 +16,7 @@ import type {
 } from '@shared/cloud-sync-engine';
 import {
   applyCloudSyncTombstones,
+  cloudSyncConflictNeedsUserDecision,
   createCloudSyncCategoryNameLookup,
   createCloudSyncConflictPreview,
   findCloudSyncRecordsRestoredOverLocalDeletes,
@@ -323,7 +324,11 @@ export interface CloudSyncStatus {
   hasEnabledStorage?: boolean;
   /** 本机从备份恢复后，还有存储在等用户选择覆盖云端还是与云端合并；选好之前不会同步 */
   restoreDecisionPending?: boolean;
+  /** 正在同步时走到了哪一步，给冲突弹窗之类等着结果的界面显示进度 */
+  syncPhase?: CloudSyncProgressPhase;
 }
+
+export type CloudSyncProgressPhase = 'export' | 'read-remote' | 'merge' | 'apply-local' | 'write-remote';
 
 export interface CloudSyncFlushResult {
   success: boolean;
@@ -516,7 +521,8 @@ export class CloudSyncService {
       reason: options.reason || 'manual',
       lastAttemptAt: attemptAt,
       error: undefined,
-      nextSyncAt: undefined
+      nextSyncAt: undefined,
+      syncPhase: 'export'
     });
 
     const syncPromise = this.performSync(storageId, options, 0, generation, generateUUID())
@@ -629,11 +635,15 @@ export class CloudSyncService {
    * 按用户在冲突弹窗里的选择重新同步。期间云端如果又出现新的冲突，
    * manual 策略下没选过的项会让同步再次暂停，弹窗刷新列表。
    */
-  resolveConflicts(
+  async resolveConflicts(
     storageId: string,
     decision: CloudSyncConflictDecision,
     options: CloudSyncOptions = {}
   ): Promise<CloudSyncResult> {
+    // 自动同步可能正在跑：等它结束再按用户的选择同步。直接拿它的结果会把用户的选择丢掉，弹窗只能原地不动
+    for (let running = this.runningSyncs.get(storageId); running; running = this.runningSyncs.get(storageId)) {
+      await running.catch(() => undefined);
+    }
     return this.syncNow(storageId, {
       ...(this.autoSyncOptions || {}),
       ...options,
@@ -656,18 +666,29 @@ export class CloudSyncService {
       return preview;
     }
 
+    // 「全用本机 / 全用云端」只作用于弹窗里列出的、需要用户选的冲突；其余冲突照常按较新的为准
     const resolutions: Record<string, CloudSyncConflictSide> = decision.strategy === 'manual'
       ? { ...(decision.resolutions || {}) }
-      : Object.fromEntries(preview.conflicts.map(conflict => [getCloudSyncConflictId(conflict), decision.strategy as CloudSyncConflictSide]));
+      : Object.fromEntries(preview.conflicts
+        .filter(conflict => cloudSyncConflictNeedsUserDecision(conflict))
+        .map(conflict => [getCloudSyncConflictId(conflict), decision.strategy as CloudSyncConflictSide]));
     return mergeCloudSyncData(localData, remoteData, baseData, { ...mergeOptions, resolutions });
   }
 
+  /** 只有需要用户选的冲突才让同步停下来，其余冲突已经按较新的为准合并好了 */
   private hasUnresolvedConflicts(conflicts: CloudSyncConflict[], decision?: CloudSyncConflictDecision): boolean {
-    if (conflicts.length === 0) return false;
+    const needDecision = conflicts.filter(conflict => cloudSyncConflictNeedsUserDecision(conflict));
+    if (needDecision.length === 0) return false;
     if (!decision) return this.conflictMode === 'ask';
     if (decision.strategy !== 'manual') return false;
     const resolutions = decision.resolutions || {};
-    return conflicts.some(conflict => !resolutions[getCloudSyncConflictId(conflict)]);
+    return needDecision.some(conflict => !resolutions[getCloudSyncConflictId(conflict)]);
+  }
+
+  /** 同步走到下一步时告诉界面，只在这个存储正在同步时更新 */
+  private reportSyncPhase(storageId: string, phase: CloudSyncProgressPhase): void {
+    if (this.status.status !== 'syncing' || this.status.storageId !== storageId || this.status.syncPhase === phase) return;
+    this.updateStatus({ syncPhase: phase });
   }
 
   private queueAutoSyncAfterRunning(storageId: string, reason: CloudSyncRunReason): void {
@@ -1363,6 +1384,7 @@ export class CloudSyncService {
       const localChangeVersionAtExport = this.pendingChangeVersion;
       this.assertCurrentSyncGeneration(storageId, generation);
       phase = 'read-remote';
+      this.reportSyncPhase(storageId, phase);
       const manifestResult = await this.getManifestOrRecoverCorruption(
         storageId,
         localData,
@@ -1406,6 +1428,7 @@ export class CloudSyncService {
         targetRevision = snapshot.revision;
         try {
           phase = 'write-remote';
+          this.reportSyncPhase(storageId, phase);
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -1445,6 +1468,7 @@ export class CloudSyncService {
       const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
       const baseData = this.getBaseData(localState);
       phase = 'merge';
+      this.reportSyncPhase(storageId, phase);
       const mergeResult = this.mergeWithConflictDecision(localData, remoteData, baseData, options);
       if (this.hasUnresolvedConflicts(mergeResult.conflicts, options.conflictDecision)) {
         // 发布前暂停：本机数据和云端都不改，等用户在冲突弹窗里选择处理方式
@@ -1560,6 +1584,7 @@ export class CloudSyncService {
           return await this.retryAfterLocalChanged(storageId, options, attempt, generation, operationId);
         }
         phase = 'apply-local';
+        this.reportSyncPhase(storageId, phase);
         this.assertCurrentSyncGeneration(storageId, generation);
         await this.replaceLocalDataForSync(mergedData, localData);
         this.assertCurrentSyncGeneration(storageId, generation);
@@ -1576,6 +1601,7 @@ export class CloudSyncService {
       if (latestManifestForUpload) {
         try {
           phase = 'write-remote';
+          this.reportSyncPhase(storageId, phase);
           this.assertCurrentSyncGeneration(storageId, generation);
           await this.saveManifest(
             storageId,
@@ -2932,6 +2958,8 @@ export class CloudSyncService {
   private updateStatus(update: Partial<CloudSyncStatus>): void {
     this.status = {
       ...this.status,
+      // 同步结束（或换成别的状态）时进度跟着清掉
+      ...(update.status && update.status !== 'syncing' ? { syncPhase: undefined } : {}),
       ...update,
       updatedAt: new Date().toISOString()
     };
@@ -3239,7 +3267,8 @@ export function createCloudSyncPendingConflict(
   return {
     storageId,
     detectedAt,
-    items: mergeResult.conflicts.map(conflict => {
+    // 只列需要用户选的冲突；其余冲突已按较新的为准合并，不拿来打扰用户
+    items: mergeResult.conflicts.filter(conflict => cloudSyncConflictNeedsUserDecision(conflict)).map(conflict => {
       const localDeleted = !isPresentRecord(conflict.local);
       const remoteDeleted = !isPresentRecord(conflict.remote);
       return {

@@ -1831,7 +1831,14 @@
     "countCategories": "{count} categoria | {count} categorie",
     "countAiConfigs": "{count} configurazione del modello | {count} configurazioni dei modelli",
     "newer": "Più recente",
-    "deletedAtTime": "Eliminato {time}"
+    "deletedAtTime": "Eliminato {time}",
+    "progress": {
+      "export": "Preparazione dei dati su questo dispositivo…",
+      "readRemote": "Lettura dei dati nel cloud…",
+      "merge": "Unione in corso…",
+      "applyLocal": "Salvataggio su questo dispositivo…",
+      "writeRemote": "Caricamento nel cloud…"
+    }
   },
   "appInit": {
     "loading": "Apertura di AI Gist…",

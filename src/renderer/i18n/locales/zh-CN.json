@@ -1831,7 +1831,14 @@
     "countCategories": "{count} 个分类",
     "countAiConfigs": "{count} 个模型配置",
     "newer": "较新",
-    "deletedAtTime": "删除于 {time}"
+    "deletedAtTime": "删除于 {time}",
+    "progress": {
+      "export": "正在整理本机数据…",
+      "readRemote": "正在读取云端数据…",
+      "merge": "正在合并…",
+      "applyLocal": "正在写入本机…",
+      "writeRemote": "正在上传到云端…"
+    }
   },
   "appInit": {
     "loading": "正在打开 AI Gist…",
