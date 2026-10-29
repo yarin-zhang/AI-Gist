@@ -1167,13 +1167,26 @@ describe('conflict previews (#447)', () => {
     expect(preview?.fields).toEqual([
       { key: 'category', value: '写作' },
       { key: 'tags', value: '工作, 周报' },
-      { key: 'description', value: '每周五用' }
+      { key: 'description', value: '每周五用' },
+      { key: 'images', value: '1', compareValue: expect.any(String) }
     ])
     expect(preview?.excerpt?.endsWith('…')).toBe(true)
     expect(Array.from(preview?.excerpt || '').length).toBe(CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH + 1)
     expect(JSON.stringify(preview)).not.toContain('image/png')
     expect(categoryNameOf({ categoryId: 4 })).toBeUndefined()
     expect(categoryNameOf({ categoryUuid: 'cat-3', categoryId: 99 })).toBe('写作')
+  })
+
+  it('shows how many images each side has and tells changed images apart even when the count is the same', () => {
+    const imagesOf = (imageBlobs: string[]) =>
+      createCloudSyncConflictPreview('prompts', { uuid: 'p', title: '海报', content: '正文', imageBlobs })?.fields.find(field => field.key === 'images')
+    const red = 'data:image/png;base64,UkVE'
+    const blue = 'data:image/png;base64,QkxVRQ=='
+
+    expect(imagesOf([red, blue])?.value).toBe('2')
+    expect(imagesOf([red])?.compareValue).toBe(imagesOf([red])?.compareValue)
+    expect(imagesOf([red])?.compareValue).not.toBe(imagesOf([blue])?.compareValue)
+    expect(imagesOf([])).toBeUndefined()
   })
 
   it('never exposes API keys or endpoints of AI configs, nor secret-looking settings', () => {

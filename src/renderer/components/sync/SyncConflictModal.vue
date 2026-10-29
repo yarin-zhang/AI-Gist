@@ -79,7 +79,7 @@
                           <span class="conflict__side-title" :class="{ 'is-different': side.differs.title }">{{ side.preview.title || '—' }}</span>
                           <dl v-if="side.fields.length" class="conflict__fields">
                             <template v-for="field in side.fields" :key="field.key">
-                              <dt>{{ t(`syncConflict.fields.${field.key}`) }}</dt>
+                              <dt>{{ field.label }}</dt>
                               <dd :class="{ 'is-different': field.differs }">{{ field.value || '—' }}</dd>
                             </template>
                           </dl>
@@ -245,8 +245,14 @@ const comparisonSides = (item: CloudSyncConflictItem) => {
     local: item.localPreview,
     remote: item.remotePreview,
   }
+  const fieldOf = (preview: CloudSyncConflictPreview | undefined, key: CloudSyncConflictPreviewFieldKey) =>
+    preview?.fields.find(field => field.key === key)
   const valueOf = (preview: CloudSyncConflictPreview | undefined, key: CloudSyncConflictPreviewFieldKey) =>
-    preview?.fields.find(field => field.key === key)?.value || ''
+    fieldOf(preview, key)?.value || ''
+  const compareOf = (preview: CloudSyncConflictPreview | undefined, key: CloudSyncConflictPreviewFieldKey) => {
+    const field = fieldOf(preview, key)
+    return field?.compareValue ?? field?.value ?? ''
+  }
   const keys = [...new Set([...(item.localPreview?.fields || []), ...(item.remotePreview?.fields || [])].map(field => field.key))]
   const bothPresent = !!item.localPreview && !!item.remotePreview
   const differs = {
@@ -265,11 +271,18 @@ const comparisonSides = (item: CloudSyncConflictItem) => {
     differs,
     fields: keys.map(key => ({
       key,
-      value: valueOf(previews[side], key),
-      differs: bothPresent && valueOf(item.localPreview, key) !== valueOf(item.remotePreview, key),
+      label: fieldLabel(key),
+      value: fieldText(key, valueOf(previews[side], key)),
+      differs: bothPresent && compareOf(item.localPreview, key) !== compareOf(item.remotePreview, key),
     })),
   }))
 }
+
+// 图片沿用提示词编辑里的「图片」「N 张」
+const fieldLabel = (key: CloudSyncConflictPreviewFieldKey) =>
+  key === 'images' ? t('promptManagement.images') : t(`syncConflict.fields.${key}`)
+const fieldText = (key: CloudSyncConflictPreviewFieldKey, value: string) =>
+  key === 'images' && value ? t('mobilePrompt.imageCount', { count: Number(value) }, Number(value)) : value
 
 const chooseAll = (side: CloudSyncConflictSide) => {
   resolutions.value = Object.fromEntries((pending.value?.items || []).map(item => [item.id, side]))

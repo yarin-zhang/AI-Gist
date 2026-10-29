@@ -571,11 +571,14 @@ export type CloudSyncConflictPreviewFieldKey =
   | 'model'
   | 'type'
   | 'defaultValue'
-  | 'value';
+  | 'value'
+  | 'images';
 
 export interface CloudSyncConflictPreviewField {
   key: CloudSyncConflictPreviewFieldKey;
   value: string;
+  /** 两边比较用的值；图片只显示张数，张数一样但换了图也要标出不同 */
+  compareValue?: string;
 }
 
 export const CLOUD_SYNC_CONFLICT_EXCERPT_LENGTH = 240;
@@ -635,6 +638,9 @@ export function createCloudSyncConflictPreview(
       add('category', options.categoryNameOf?.(record));
       add('tags', toConflictPreviewTags(record.tags));
       add('description', record.description);
+      if (Array.isArray(record.imageBlobs) && record.imageBlobs.length) {
+        fields.push({ key: 'images', value: String(record.imageBlobs.length), compareValue: createStableChecksum(record.imageBlobs) });
+      }
       return { title: titleOf(record.title), excerpt: excerptOf(record.content), fields };
     case 'categories':
       add('description', record.description);
