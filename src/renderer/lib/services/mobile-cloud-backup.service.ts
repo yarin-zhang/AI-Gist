@@ -107,6 +107,11 @@ export class MobileCloudBackupService {
   private readonly webDAVSyncManifestCache = new Map<string, WebDAVSyncManifestCacheEntry>()
   /** GET 不认 If-None-Match（没变也回 200）的存储：改用 PROPFIND 比对 ETag，变了再 GET (#487) */
   private readonly webDAVStoragesIgnoringConditionalRead = new Set<string>()
+  /**
+   * GET 返回的 ETag 拿去 If-Match 会被拒（412）的存储，只用 PROPFIND 查到的 ETag 条件写。
+   * 群晖（Apache）压缩响应时会给 ETag 加上 -gzip 后缀，校验条件写时却只认原来的写法；桌面端同样处理 (#486)
+   */
+  private readonly webDAVStoragesRejectingReadEtags = new Set<string>()
 
   private constructor() {
     // Singleton service.
@@ -1135,6 +1140,7 @@ export class MobileCloudBackupService {
   private forgetWebDAVSyncManifestCache(storageId: string): void {
     this.webDAVSyncManifestCache.delete(storageId)
     this.webDAVStoragesIgnoringConditionalRead.delete(storageId)
+    this.webDAVStoragesRejectingReadEtags.delete(storageId)
   }
 
   /** GET 响应头和 PROPFIND 里的 ETag 写法可能一个带引号一个不带，比较前去掉引号和弱标记 */
@@ -1176,11 +1182,32 @@ export class MobileCloudBackupService {
     currentManifest = currentManifest || assertValidCloudSyncManifest({})
     this.assertExpectedCloudSyncRevision(currentManifest, options.expectedRevision)
 
-    await this.writeWebDAVPrimarySyncManifest(config, manifest, {
-      ifMatch: primaryState?.etag,
-      ifNoneMatch: !primaryState && !currentManifest.latestSnapshot
-    })
+    let ifMatch = primaryState?.etag
+    if (primaryState && this.webDAVStoragesRejectingReadEtags.has(config.id)) {
+      ifMatch = await this.statWebDAVFileEtag(config, primaryPath) || ifMatch
+    }
+    try {
+      await this.writeWebDAVPrimarySyncManifest(config, manifest, {
+        ifMatch,
+        ifNoneMatch: !primaryState && !currentManifest.latestSnapshot
+      })
+    } catch (error) {
+      if (!primaryState || !ifMatch || !this.isManifestPreconditionFailed(error)) throw error
+      // 412：可能是云端真被别的设备改了，也可能是服务器不认这个 ETag 的写法。
+      // 重新读一遍：revision 变了就是真冲突；没变就改用 PROPFIND 查到的 ETag 再写一次
+      const statEtag = await this.statWebDAVFileEtag(config, primaryPath)
+      const latest = await this.readWebDAVSyncManifestFileWithMeta(config, primaryPath)
+      this.assertExpectedCloudSyncRevision(latest.manifest, options.expectedRevision)
+      if (!statEtag || statEtag.trim() === ifMatch.trim()) throw error
+      this.webDAVStoragesRejectingReadEtags.add(config.id)
+      await this.writeWebDAVPrimarySyncManifest(config, manifest, { ifMatch: statEtag })
+    }
     await this.writeWebDAVSyncManifestFile(config, backupPath, manifest)
+  }
+
+  /** writeWebDAVSyncManifestFile 遇到 412 时抛出的错误 */
+  private isManifestPreconditionFailed(error: unknown): boolean {
+    return /已被其他设备更新/.test(error instanceof Error ? error.message : String(error))
   }
 
   private async tryReadWebDAVPrimarySyncManifestForWrite(
