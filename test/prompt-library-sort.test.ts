@@ -57,6 +57,18 @@ describe('sortPromptsForLibrary', () => {
     expect(result.map(p => p.title)).toEqual(['B', 'A'])
   })
 
+  it('counts a recent use as activity in the "updated" sort, since using no longer bumps updatedAt (#488)', () => {
+    const edited = prompt({ id: 1, title: 'Edited', updatedAt: new Date('2026-03-01T00:00:00Z') })
+    const used = prompt({
+      id: 2,
+      title: 'Used',
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      lastUsedAt: new Date('2026-04-01T00:00:00Z')
+    })
+
+    expect(sortPromptsForLibrary([edited, used], 'updated').map(p => p.title)).toEqual(['Used', 'Edited'])
+  })
+
   it('sorts by usage count (highest first) for the "usage" sort', () => {
     const low = prompt({ id: 1, title: 'Low', useCount: 2 })
     const high = prompt({ id: 2, title: 'High', useCount: 9 })

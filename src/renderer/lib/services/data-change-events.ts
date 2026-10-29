@@ -28,6 +28,8 @@ export interface DataChangeEventPayload {
   action: DataChangeAction;
   id?: IDBValidKey;
   ids?: IDBValidKey[];
+  /** 只更新了使用次数这类统计：界面照常刷新，但不单独触发云同步，等下一次同步一起带上 (#488) */
+  usageOnly?: boolean;
   timestamp: number;
   sourceId: string;
 }

@@ -43,6 +43,8 @@ export interface Prompt {
   variables?: PromptVariable[];
   isFavorite: boolean;
   useCount: number;
+  /** 最近一次复制使用的时间。使用不算修改：不改 updatedAt，也不单独触发云同步 (#488) */
+  lastUsedAt?: Date | string;
   version?: number;
   isActive: boolean;
   isJinjaTemplate?: boolean; // 是否为 Jinja 模板

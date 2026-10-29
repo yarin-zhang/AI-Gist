@@ -15,6 +15,7 @@ import {
   PromptFillResult 
 } from '@shared/types/database';
 import { generateUUID } from '../utils/uuid';
+import { promptActivityTime } from '../utils/prompt-library-sort';
 import { emitDataChange } from './data-change-events';
 
 /**
@@ -147,10 +148,10 @@ export class PromptService extends BaseDatabaseService {
     if (filters?.sortBy) {
       switch (filters.sortBy) {
         case 'timeDesc': // 最新优先
-          filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          filteredPrompts.sort((a, b) => promptActivityTime(b) - promptActivityTime(a));
           break;
         case 'timeAsc': // 最早优先
-          filteredPrompts.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+          filteredPrompts.sort((a, b) => promptActivityTime(a) - promptActivityTime(b));
           break;
         case 'useCount': // 使用次数优先
           filteredPrompts.sort((a, b) => b.useCount - a.useCount);
@@ -161,7 +162,7 @@ export class PromptService extends BaseDatabaseService {
               return b.isFavorite ? 1 : -1;
             }
             // 收藏相同时按更新时间排序
-            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            return promptActivityTime(b) - promptActivityTime(a);
           });
           break;
         case 'title':
@@ -171,7 +172,7 @@ export class PromptService extends BaseDatabaseService {
           filteredPrompts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           break;
         case 'updatedAt':
-          filteredPrompts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          filteredPrompts.sort((a, b) => promptActivityTime(b) - promptActivityTime(a));
           break;
         default:
           // 默认排序逻辑
@@ -185,7 +186,7 @@ export class PromptService extends BaseDatabaseService {
               return b.useCount - a.useCount;
             }
             // 最后按更新时间排序
-            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            return promptActivityTime(b) - promptActivityTime(a);
           });
       }
     } else {
@@ -197,7 +198,7 @@ export class PromptService extends BaseDatabaseService {
         if (a.useCount !== b.useCount) {
           return b.useCount - a.useCount;
         }
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        return promptActivityTime(b) - promptActivityTime(a);
       });
     }    // 计算总数
     const total = filteredPrompts.length;
@@ -452,10 +453,11 @@ export class PromptService extends BaseDatabaseService {
           return;
         }
 
+        // 使用不算修改：不动 updatedAt，「最近」靠 lastUsedAt 排序 (#488)
         updatedPrompt = {
           ...prompt,
           useCount: Number(prompt.useCount || 0) + 1,
-          updatedAt: new Date(),
+          lastUsedAt: new Date(),
         };
         const putRequest = store.put(this.cleanDataForStorage(updatedPrompt));
         putRequest.onerror = () => rejectTransaction(new Error(
@@ -470,7 +472,7 @@ export class PromptService extends BaseDatabaseService {
       transaction.oncomplete = () => {
         if (settled || !updatedPrompt) return;
         settled = true;
-        emitDataChange({ storeName: 'prompts', action: 'update', id });
+        emitDataChange({ storeName: 'prompts', action: 'update', id, usageOnly: true });
         resolve(updatedPrompt);
       };
       transaction.onerror = () => rejectTransaction(new Error(

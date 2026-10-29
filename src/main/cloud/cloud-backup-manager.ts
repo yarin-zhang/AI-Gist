@@ -19,6 +19,7 @@ import {
   CloudRestoreResult,
   CloudFileInfo,
   CloudFileWriteOptions,
+  CloudFileWriteResult,
   CloudStorageProvider,
   CloudConnectionCheckResult
 } from '@shared/types/cloud-backup';
@@ -115,6 +116,15 @@ const CONSTANTS = {
 export class CloudBackupManager {
   // ==================== 私有属性 ====================
   private storageConfigs = new Map<string, CloudStorageConfig>();
+  /**
+   * 每个存储最近一次读到或写入的同步 manifest：revision 和对应的 ETag。
+   * 下次保存基于同一个 revision 时直接拿它做 If-Match 条件写，不必先把整份 manifest 再读一遍 (#486)
+   */
+  private syncManifestEtags = new Map<string, { revision: string | null; etag: string; source: 'read' | 'write' }>();
+  /** 本次运行中已经确认同步目录存在的存储 */
+  private verifiedSyncDirectories = new Set<string>();
+  /** GET 响应里的 ETag 拿去条件写会被拒绝的存储（服务器两处 ETag 写法不一致），只用写后查到的 ETag */
+  private storagesRejectingReadEtags = new Set<string>();
   private dataManagementService: DataManagementService;
   private configPath: string;
   private backupDir: string;
@@ -231,6 +241,8 @@ export class CloudBackupManager {
         this.validateICloudPathForUpdate(config, existingConfig);
         const updatedConfig = this.createUpdatedConfig(id, existingConfig, config);
         await this.testAndSaveConfig(updatedConfig);
+        this.forgetSyncWriteState(id);
+        this.storagesRejectingReadEtags.delete(id);
         return { success: true, config: updatedConfig };
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.UPDATE_STORAGE_CONFIG_FAILED, error);
@@ -246,6 +258,8 @@ export class CloudBackupManager {
       try {
         this.validateConfigExists(id);
         this.storageConfigs.delete(id);
+        this.forgetSyncWriteState(id);
+        this.storagesRejectingReadEtags.delete(id);
         await this.saveConfigs();
         return { success: true };
       } catch (error) {
@@ -447,8 +461,8 @@ export class CloudBackupManager {
       options?: CloudSyncManifestSaveOptions
     ) => {
       try {
-        await this.writeCloudSyncManifest(storageId, manifest, options);
-        return { success: true };
+        const { verified } = await this.writeCloudSyncManifest(storageId, manifest, options);
+        return { success: true, verified };
       } catch (error) {
         if (this.isCloudSyncRevisionConflictError(error)) {
           return {
@@ -916,22 +930,49 @@ export class CloudBackupManager {
     const provider = this.createProvider(config);
     const manifestPath = this.getSyncManifestCloudPath(config);
     const backupPath = this.getSyncManifestBackupCloudPath(config);
+    let primaryEtag: string | undefined;
 
-    return readCloudSyncManifestWithFallback({
-      readPrimary: () => this.readCloudSyncManifestFile(provider, manifestPath),
+    const manifest = await readCloudSyncManifestWithFallback({
+      readPrimary: async () => {
+        const result = await this.readCloudSyncManifestFileWithInfo(provider, manifestPath);
+        primaryEtag = result.etag;
+        return result.manifest;
+      },
       readBackup: () => this.readCloudSyncManifestFile(provider, backupPath),
       isNotFoundError: error => this.isNotFoundError(error),
       describeError: error => this.formatErrorMessage(error)
     });
+
+    // 只有主文件读成功时 ETag 才对应这份 manifest；从备份副本读到的不能用来条件写主文件。
+    // 不用这次读到的 ETag 时，本机上次写入记下的 ETag 只要 revision 还对得上就继续留着
+    const revision = getCloudSyncManifestRevision(manifest);
+    if (primaryEtag && config.type === 'webdav' && !this.storagesRejectingReadEtags.has(storageId)) {
+      this.syncManifestEtags.set(storageId, { revision, etag: primaryEtag, source: 'read' });
+    } else if (this.syncManifestEtags.get(storageId)?.revision !== revision) {
+      this.syncManifestEtags.delete(storageId);
+    }
+    return manifest;
   }
 
   private async readCloudSyncManifestFile(
     provider: CloudStorageProvider,
     cloudPath: string
   ): Promise<CloudSyncManifest> {
-    const data = await provider.readFile(cloudPath);
+    return (await this.readCloudSyncManifestFileWithInfo(provider, cloudPath)).manifest;
+  }
+
+  private async readCloudSyncManifestFileWithInfo(
+    provider: CloudStorageProvider,
+    cloudPath: string
+  ): Promise<{ manifest: CloudSyncManifest; etag?: string }> {
+    const { data, etag } = provider.readFileWithInfo
+      ? await provider.readFileWithInfo(cloudPath)
+      : { data: await provider.readFile(cloudPath), etag: undefined };
     try {
-      return assertValidCloudSyncManifest(JSON.parse(Buffer.from(data).toString('utf-8')));
+      return {
+        manifest: assertValidCloudSyncManifest(JSON.parse(Buffer.from(data).toString('utf-8'))),
+        etag
+      };
     } catch (error) {
       throw new Error(`云同步 manifest 内容无效（${cloudPath}）: ${this.formatErrorMessage(error)}`);
     }
@@ -939,12 +980,16 @@ export class CloudBackupManager {
 
   /**
    * 写入云同步 manifest。
+   *
+   * 基于上次读到 / 写入的 revision 保存时，直接用记住的 ETag 做 If-Match 条件写，
+   * 写后只查一次文件信息确认落盘；条件写被拒绝时再退回「读一遍、比 revision、再写」(#486)。
+   * 返回 verified 表示这次写入已经在主进程确认过，渲染进程不必再整份读回校验。
    */
   private async writeCloudSyncManifest(
     storageId: string,
     manifest: CloudSyncManifest,
     options: CloudSyncManifestSaveOptions = {}
-  ): Promise<void> {
+  ): Promise<{ verified: boolean }> {
     await this.loadConfigs();
     const config = this.getStorageConfig(storageId);
     const provider = this.createProvider(config);
@@ -954,18 +999,44 @@ export class CloudBackupManager {
       ...manifest,
       updatedAt: new Date().toISOString()
     });
+    const revision = getCloudSyncManifestRevision(normalizedManifest);
+    const content = Buffer.from(JSON.stringify(normalizedManifest), 'utf-8');
+    // WebDAVProvider 写后都会校验（至少查一次文件信息），渲染进程不必再读回
+    const verified = config.type === 'webdav';
 
-    if (config.type === 'webdav' && provider.initializeDirectories) {
-      await provider.initializeDirectories();
-    }
-
-    const content = Buffer.from(JSON.stringify(normalizedManifest, null, 2), 'utf-8');
     if (options.expectedRevision === undefined) {
-      await provider.writeFile(manifestPath, content);
-      await provider.writeFile(backupPath, content);
-      return;
+      await this.ensureSyncDirectories(storageId, config, provider);
+      const written = await provider.writeFile(manifestPath, content, this.createSyncWriteOptions(storageId));
+      this.rememberWrittenSyncManifest(storageId, revision, written);
+      await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
+      return { verified };
     }
 
+    const cached = this.syncManifestEtags.get(storageId);
+    let cachedEtagRejected = false;
+    if (config.type === 'webdav' && cached && cached.revision === options.expectedRevision) {
+      // 手里有这份 manifest 的 ETag，说明它所在的目录存在，不必再逐级检查；目录被删时 PUT 会返回 409
+      this.verifiedSyncDirectories.add(storageId);
+      try {
+        const written = await provider.writeFile(manifestPath, content, {
+          ...this.createSyncWriteOptions(storageId),
+          ifMatch: cached.etag
+        });
+        this.rememberWrittenSyncManifest(storageId, revision, written);
+        await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
+        return { verified };
+      } catch (error) {
+        this.forgetSyncWriteState(storageId);
+        // 412：云端被别的设备改过，或者服务器不认这个 ETag 的写法；目录被删掉时是 409。
+        // 这两种都退回完整流程判断，其余错误照常交给上层
+        if (!this.isCloudSyncRevisionConflictError(error) && !this.isMissingParentDirectoryError(error)) {
+          throw error;
+        }
+        cachedEtagRejected = true;
+      }
+    }
+
+    await this.ensureSyncDirectories(storageId, config, provider);
     const primaryInfo = await this.getCloudFileInfo(provider, manifestPath);
     const currentManifest = await readCloudSyncManifestWithFallback({
       readPrimary: () => this.readCloudSyncManifestFile(provider, manifestPath),
@@ -974,11 +1045,20 @@ export class CloudBackupManager {
       describeError: error => this.formatErrorMessage(error)
     });
     this.assertExpectedCloudSyncRevision(currentManifest, options.expectedRevision);
+    if (cachedEtagRejected && cached?.source === 'read') {
+      // revision 没变、条件写却被拒：这台服务器 GET 返回的 ETag 不能直接用于 If-Match
+      this.storagesRejectingReadEtags.add(storageId);
+    }
 
-    const writeOptions = this.createManifestWriteOptions(primaryInfo, currentManifest, options.expectedRevision);
+    const writeOptions = {
+      ...this.createSyncWriteOptions(storageId),
+      ...this.createManifestWriteOptions(primaryInfo, currentManifest, options.expectedRevision)
+    };
+    let written: void | CloudFileWriteResult;
     try {
-      await provider.writeFile(manifestPath, content, writeOptions);
+      written = await provider.writeFile(manifestPath, content, writeOptions);
     } catch (error) {
+      this.forgetSyncWriteState(storageId);
       if (this.isCloudSyncRevisionConflictError(error)) {
         throw createCloudSyncManifestRevisionConflictError(
           options.expectedRevision,
@@ -988,7 +1068,64 @@ export class CloudBackupManager {
       throw error;
     }
 
-    await provider.writeFile(backupPath, content);
+    this.rememberWrittenSyncManifest(storageId, revision, written);
+    await this.writeSyncManifestBackup(storageId, provider, backupPath, content);
+    return { verified };
+  }
+
+  /** 同步目录每次运行只确认一次，之后的写入不再逐级 PROPFIND */
+  private async ensureSyncDirectories(
+    storageId: string,
+    config: CloudStorageConfig,
+    provider: CloudStorageProvider
+  ): Promise<void> {
+    if (config.type !== 'webdav' || !provider.initializeDirectories || this.verifiedSyncDirectories.has(storageId)) {
+      return;
+    }
+
+    await provider.initializeDirectories();
+    this.verifiedSyncDirectories.add(storageId);
+  }
+
+  /** 备用副本只在主文件损坏时读取，PUT 成功即可，不再查文件信息 */
+  private async writeSyncManifestBackup(
+    storageId: string,
+    provider: CloudStorageProvider,
+    backupPath: string,
+    content: Buffer
+  ): Promise<void> {
+    await provider.writeFile(backupPath, content, {
+      ...this.createSyncWriteOptions(storageId),
+      verify: 'none'
+    });
+  }
+
+  private createSyncWriteOptions(storageId: string): CloudFileWriteOptions {
+    return {
+      verify: 'metadata',
+      skipDirectoryCheck: this.verifiedSyncDirectories.has(storageId)
+    };
+  }
+
+  private rememberWrittenSyncManifest(
+    storageId: string,
+    revision: string | null,
+    written: void | CloudFileWriteResult
+  ): void {
+    if (written?.etag) {
+      this.syncManifestEtags.set(storageId, { revision, etag: written.etag, source: 'write' });
+    } else {
+      this.syncManifestEtags.delete(storageId);
+    }
+  }
+
+  private forgetSyncWriteState(storageId: string): void {
+    this.syncManifestEtags.delete(storageId);
+    this.verifiedSyncDirectories.delete(storageId);
+  }
+
+  private isMissingParentDirectoryError(error: unknown): boolean {
+    return /\b409\b|\b404\b/.test(this.getErrorMessage(error));
   }
 
   private async listCloudSyncSnapshots(storageId: string): Promise<CloudSyncRemoteSnapshotInfo[]> {

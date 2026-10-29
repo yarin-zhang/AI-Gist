@@ -249,7 +249,7 @@ export interface CloudSyncCloudClient {
 
 export interface CloudSyncDatabaseClient {
   exportAllDataForSync(): Promise<ExportResult>;
-  replaceAllData(data: CloudSyncDataSet): Promise<ImportResult>;
+  replaceAllData(data: CloudSyncDataSet, options?: { preserveSyncMetadata?: boolean }): Promise<ImportResult>;
   getLocalSyncMetadata?<T = any>(key: string): Promise<T | null>;
   setLocalSyncMetadata?<T = any>(key: string, value: T): Promise<void>;
   removeLocalSyncMetadata?(key: string): Promise<void>;
@@ -1433,16 +1433,9 @@ export class CloudSyncService {
       let finalSnapshot = remoteSnapshot;
       let latestManifestForUpload: CloudSyncManifest | null = null;
       if (!mergedEqualsRemote) {
-        const latestManifest = await this.getCloudClient().getCloudSyncManifest(storageId);
-        this.assertCurrentSyncGeneration(storageId, generation);
-        if (
-          hasRemoteRevisionChanged(remoteSnapshot, latestManifest.latestSnapshot) &&
-          hasRemoteDataChanged(remoteData, latestManifest.latestSnapshot)
-        ) {
-          return await this.retryWithLatestRemote(storageId, options, attempt, generation);
-        }
-
-        latestManifestForUpload = latestManifest;
+        // 不在上传前再读一遍云端：保存时带着读到的 revision 做条件写，
+        // 期间别的设备写过就会被拒绝，按冲突重试 (#486)
+        latestManifestForUpload = manifest;
         finalSnapshot = createCloudSyncSnapshot(mergedData, deviceId);
         targetRevision = finalSnapshot.revision;
       } else if (manifestRepairMetadata) {
@@ -1459,6 +1452,12 @@ export class CloudSyncService {
         await this.replaceLocalDataForSync(mergedData, localData);
         this.assertCurrentSyncGeneration(storageId, generation);
         appliedLocal = true;
+        if (latestManifestForUpload) {
+          // 本机已经包含这份云端快照的全部改动，基线随之前移。上传失败或重试时，
+          // 下一次合并不会把云端的改动再算一遍：使用次数不会重复累加，选过的冲突也不会再问 (#488)
+          await this.saveLocalState(storageId, deviceId, remoteSnapshot, now);
+          this.assertCurrentSyncGeneration(storageId, generation);
+        }
       }
 
       let uploadedRemote = false;
@@ -1565,7 +1564,8 @@ export class CloudSyncService {
   private async replaceLocalDataForSync(nextData: CloudSyncDataSet, rollbackData: CloudSyncDataSet): Promise<void> {
     this.applyingRemoteDataDepth++;
     try {
-      const importResult = await this.database.replaceAllData(nextData);
+      // 保留同步基线：写入本机之后上传还可能失败或因并发重试，下一次合并仍要用旧基线 (#484)
+      const importResult = await this.database.replaceAllData(nextData, { preserveSyncMetadata: true });
       if (!importResult.success) {
         throw new CloudSyncLocalApplyError(importResult);
       }
@@ -1587,7 +1587,7 @@ export class CloudSyncService {
 
   private async rollbackLocalDataAfterFailedSync(rollbackData: CloudSyncDataSet): Promise<unknown | null> {
     try {
-      const rollbackResult = await this.database.replaceAllData(rollbackData);
+      const rollbackResult = await this.database.replaceAllData(rollbackData, { preserveSyncMetadata: true });
       if (!rollbackResult.success) {
         return new Error(rollbackResult.error || rollbackResult.message || '同步失败后恢复本机数据失败');
       }
@@ -1986,6 +1986,10 @@ export class CloudSyncService {
       throw new Error(result.error || fallbackErrorMessage);
     }
 
+    if (result.verified) {
+      return;
+    }
+
     try {
       await this.verifySavedManifest(storageId, manifest, generation);
     } catch (error) {
@@ -2233,6 +2237,11 @@ export class CloudSyncService {
     }
 
     if (change.action === 'clear' && change.storeName === 'syncTombstones') {
+      return;
+    }
+
+    // 复制提示词只改使用次数：不单独上传整库，等下一次同步一起带上 (#488)
+    if (change.usageOnly) {
       return;
     }
 
@@ -3498,24 +3507,6 @@ function createCloudSyncErrorReport(
   );
 
   return lines.join('\n');
-}
-
-function hasRemoteRevisionChanged(
-  previousSnapshot: CloudSyncSnapshot,
-  latestSnapshot?: CloudSyncSnapshot
-): boolean {
-  return !!latestSnapshot && latestSnapshot.revision !== previousSnapshot.revision;
-}
-
-function hasRemoteDataChanged(
-  previousRemoteData: CloudSyncDataSet,
-  latestSnapshot?: CloudSyncSnapshot
-): boolean {
-  if (!latestSnapshot) {
-    return false;
-  }
-
-  return !dataSetsEqual(previousRemoteData, applyCloudSyncTombstones(latestSnapshot.data));
 }
 
 function compareRemoteSnapshotInfoDescending(
