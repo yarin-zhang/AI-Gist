@@ -12,7 +12,7 @@
 
 It supports variable substitution, Jinja templates, AI-powered generation and refinement, version history, cloud backups, and more.
 
-![Main screenshot](images/image-main.png?v=202610290030)
+![Main screenshot](images/image-main.png?v=202610290914)
 
 [🏠 Official website](https://getaigist.com) | [🔗 Download from GitHub](https://github.com/yarin-zhang/AI-Gist/releases) | [🇨🇳 中文 README](../README.md)
 
@@ -27,7 +27,7 @@ AI Gist provides the essential features for creating, organizing, and using AI p
 * **Filtering and categorization**: Quickly filter, find, and organize prompts using tags, categories, ratings, favorites, and more.
 * **Version history**: Keep track of changes so you can reuse and continuously improve your prompts, with a record you can revisit later.
 
-![Features 01](images/image-main-dark.png?v=202610290030)
+![Features 01](images/image-main-dark.png?v=202610290914)
 
 AI Gist also integrates AI models to help you generate and refine prompts more efficiently. Polish it before you use it.
 
@@ -36,7 +36,7 @@ AI Gist also integrates AI models to help you generate and refine prompts more e
 * **AI refinement**: Rewrite prompts with AI to make them more specific and detailed, with support for custom refinement instructions.
 * **AI variable extraction**: Let AI identify potential variables automatically instead of adding placeholders manually.
 
-![Features 02](images/image-ai-generator.png?v=202610290030)
+![Features 02](images/image-ai-generator.png?v=202610290914)
 
 AI Gist puts privacy and data security first. All data is stored locally, and cloud backup makes it easy to keep data in sync across devices.
 
@@ -44,7 +44,7 @@ AI Gist puts privacy and data security first. All data is stored locally, and cl
 * **Data control**: You retain full control of your data, with complete export and import support, plus export to the widely compatible CSV format.
 * **Cloud backup**: Back up and restore through WebDAV or iCloud to share data across multiple devices.
 
-![Features 03](images/image-data-cloud-backup.png?v=202610290030)
+![Features 03](images/image-data-cloud-backup.png?v=202610290914)
 
 * **Cross-platform support**: Available on Windows, macOS, and Linux desktop, as well as Android (APK) and iOS (App Store).
 * **Multiple languages**: Supports Simplified Chinese, Traditional Chinese, English, and Japanese.
@@ -173,28 +173,28 @@ You are also welcome to join the QQ group to exchange ideas with the developer a
 
 <table>
   <tr>
-    <td align="center"><img src="images/image-variable-fill.png?v=202610290030" alt="Variable filling" width="390"><br>Variable filling</td>
-    <td align="center"><img src="images/image-edit-prompt.png?v=202610290030" alt="Prompt editing" width="390"><br>Prompt editing</td>
+    <td align="center"><img src="images/image-variable-fill.png?v=202610290914" alt="Variable filling" width="390"><br>Variable filling</td>
+    <td align="center"><img src="images/image-edit-prompt.png?v=202610290914" alt="Prompt editing" width="390"><br>Prompt editing</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/image-jinja-template.png?v=202610290030" alt="Jinja template" width="390"><br>Jinja template</td>
-    <td align="center"><img src="images/image-ai-config.png?v=202610290030" alt="AI model management" width="390"><br>AI model management</td>
+    <td align="center"><img src="images/image-jinja-template.png?v=202610290914" alt="Jinja template" width="390"><br>Jinja template</td>
+    <td align="center"><img src="images/image-ai-config.png?v=202610290914" alt="AI model management" width="390"><br>AI model management</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/image-ai-add-config.png?v=202610290030" alt="Add AI configuration" width="390"><br>Add AI configuration</td>
-    <td align="center"><img src="images/image-ai-quick-adjust.png?v=202610290030" alt="Quick AI adjustment" width="390"><br>Quick AI adjustment</td>
+    <td align="center"><img src="images/image-ai-add-config.png?v=202610290914" alt="Add AI configuration" width="390"><br>Add AI configuration</td>
+    <td align="center"><img src="images/image-ai-quick-adjust.png?v=202610290914" alt="Quick AI adjustment" width="390"><br>Quick AI adjustment</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/image-filter.png?v=202610290030" alt="Advanced filtering" width="390"><br>Advanced filtering</td>
-    <td align="center"><img src="images/image-table-view.png?v=202610290030" alt="Table view" width="390"><br>Table view</td>
+    <td align="center"><img src="images/image-filter.png?v=202610290914" alt="Advanced filtering" width="390"><br>Advanced filtering</td>
+    <td align="center"><img src="images/image-table-view.png?v=202610290914" alt="Table view" width="390"><br>Table view</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/image-folder-view.png?v=202610290030" alt="Folder view" width="390"><br>Folder view</td>
-    <td align="center"><img src="images/image-category.png?v=202610290030" alt="Category management" width="390"><br>Category management</td>
+    <td align="center"><img src="images/image-folder-view.png?v=202610290914" alt="Folder view" width="390"><br>Folder view</td>
+    <td align="center"><img src="images/image-category.png?v=202610290914" alt="Category management" width="390"><br>Category management</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/image-data-local-backup.png?v=202610290030" alt="Data backup" width="390"><br>Data backup</td>
-    <td align="center"><img src="images/image-main-light.png?v=202610290030" alt="Light mode" width="390"><br>Light mode</td>
+    <td align="center"><img src="images/image-data-local-backup.png?v=202610290914" alt="Data backup" width="390"><br>Data backup</td>
+    <td align="center"><img src="images/image-main-light.png?v=202610290914" alt="Light mode" width="390"><br>Light mode</td>
   </tr>
 </table>
 
@@ -202,19 +202,19 @@ You are also welcome to join the QQ group to exchange ideas with the developer a
 
 <table>
   <tr>
-    <td align="center"><img src="images/mobile-01-library.png?v=202610290030" alt="Prompt library" width="240"><br>Prompt library</td>
-    <td align="center"><img src="images/mobile-02-fill.png?v=202610290030" alt="Filling variables" width="240"><br>Filling variables</td>
-    <td align="center"><img src="images/mobile-03-filter.png?v=202610290030" alt="Filter and sort" width="240"><br>Filter and sort</td>
+    <td align="center"><img src="images/mobile-01-library.png?v=202610290914" alt="Prompt library" width="240"><br>Prompt library</td>
+    <td align="center"><img src="images/mobile-02-fill.png?v=202610290914" alt="Filling variables step by step" width="240"><br>Filling variables step by step</td>
+    <td align="center"><img src="images/mobile-03-image-prompt.png?v=202610290914" alt="Image prompts" width="240"><br>Image prompts</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/mobile-04-edit.png?v=202610290030" alt="Editing and quick optimization" width="240"><br>Editing and quick optimization</td>
-    <td align="center"><img src="images/mobile-05-variable.png?v=202610290030" alt="Variable settings" width="240"><br>Variable settings</td>
-    <td align="center"><img src="images/mobile-06-ai-generator.png?v=202610290030" alt="AI generation with follow-ups" width="240"><br>AI generation with follow-ups</td>
+    <td align="center"><img src="images/mobile-04-filter.png?v=202610290914" alt="Filter and sort" width="240"><br>Filter and sort</td>
+    <td align="center"><img src="images/mobile-05-edit.png?v=202610290914" alt="Editing and quick optimization" width="240"><br>Editing and quick optimization</td>
+    <td align="center"><img src="images/mobile-06-variable.png?v=202610290914" alt="Variable settings" width="240"><br>Variable settings</td>
   </tr>
   <tr>
-    <td align="center"><img src="images/mobile-07-settings.png?v=202610290030" alt="Settings" width="240"><br>Settings</td>
-    <td align="center"><img src="images/mobile-08-sync.png?v=202610290030" alt="Data sync" width="240"><br>Data sync</td>
-    <td align="center"><img src="images/mobile-09-appearance.png?v=202610290030" alt="Appearance and language" width="240"><br>Appearance and language</td>
+    <td align="center"><img src="images/mobile-07-ai-generator.png?v=202610290914" alt="AI generation with follow-ups" width="240"><br>AI generation with follow-ups</td>
+    <td align="center"><img src="images/mobile-08-sync.png?v=202610290914" alt="Data sync" width="240"><br>Data sync</td>
+    <td align="center"><img src="images/mobile-09-appearance.png?v=202610290914" alt="Appearance and language" width="240"><br>Appearance and language</td>
   </tr>
 </table>
 
