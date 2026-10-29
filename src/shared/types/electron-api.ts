@@ -17,7 +17,8 @@ import type {
   CloudStorageConfig,
   CloudBackupInfo,
   CloudBackupCreateOptions,
-  CloudBackupDeleteTarget
+  CloudBackupDeleteTarget,
+  ICloudAvailability
 } from './cloud-backup';
 import type {
   CloudSyncManifest,
@@ -32,7 +33,9 @@ import type {
 } from '../cloud-sync-engine';
 import type {
   PasteCapability,
+  PasteUnavailableReason,
   PromptShortcutBinding,
+  SupportedLocale,
   ShortcutCommandId,
   ShortcutExecutionRequest,
   ShortcutInvocation,
@@ -44,6 +47,8 @@ import type {
   CloudSyncV2StoredObject,
   CloudSyncV2StoredObjectInfo
 } from '../cloud-sync-v2-repository';
+import type { ShortcutErrorCode } from '../shortcut-errors';
+import type { ProxyTestOverall, ProxyTestSiteResult } from './network-proxy';
 import type {
   CliBridgeRequest,
   CliBridgeResponse,
@@ -60,6 +65,8 @@ export default interface ElectronApi {
     get: () => Promise<any>
     set: (prefs: any) => Promise<any>
     reset: () => Promise<any>
+    /** 只有桌面端有：上报当前界面语言，给托盘和系统对话框用 */
+    setUiLocale?: (locale: SupportedLocale) => Promise<boolean>
   }
   
   window: {
@@ -128,7 +135,7 @@ export default interface ElectronApi {
 
   // 云端备份功能
   cloud: {
-    checkICloudAvailability: () => Promise<{ available: boolean; reason?: string }>
+    checkICloudAvailability: () => Promise<ICloudAvailability>
     getStorageConfigs: () => Promise<CloudStorageConfig[]>
     addStorageConfig: (config: Omit<CloudStorageConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
     updateStorageConfig: (id: string, config: Partial<CloudStorageConfig>) => Promise<{ success: boolean; config?: CloudStorageConfig; error?: string }>
@@ -222,34 +229,15 @@ export default interface ElectronApi {
         noProxy?: string;
       };
     }) => Promise<{
-      overall: {
-        success: boolean;
-        totalSites: number;
-        successSites: number;
-        failedSites: number;
-      };
-      results: {
-        name: string;
-        url: string;
-        description: string;
-        success: boolean;
-        responseTime?: number;
-        error?: string;
-      }[];
+      overall: ProxyTestOverall;
+      results: ProxyTestSiteResult[];
     }>
     getProxyInfo: (url?: string) => Promise<string>
     setProxyMode: (mode: 'direct' | 'system' | 'manual', config?: any) => Promise<{
       success: boolean;
       error?: string;
     }>
-    onTestProgress: (callback: (result: {
-      name: string;
-      url: string;
-      description: string;
-      success: boolean;
-      responseTime?: number;
-      error?: string;
-    }) => void) => () => void
+    onTestProgress: (callback: (result: ProxyTestSiteResult) => void) => () => void
   }
 
   // 快捷键管理
@@ -268,7 +256,7 @@ export interface CliBridgeAPI {
 
 export interface ShortcutsAPI {
   getState: () => Promise<ShortcutState>;
-  validate: (accelerator: string, excludeId?: string) => Promise<{ valid: boolean; error?: string }>;
+  validate: (accelerator: string, excludeId?: string) => Promise<{ valid: boolean; errorCode?: ShortcutErrorCode }>;
   updateCommand: (commandId: ShortcutCommandId, patch: { accelerator?: string; enabled?: boolean }) => Promise<ShortcutState>;
   upsertPromptBinding: (binding: Omit<PromptShortcutBinding, 'id'> & { id?: string }) => Promise<ShortcutState>;
   removePromptBinding: (id: string) => Promise<ShortcutState>;
@@ -278,7 +266,7 @@ export interface ShortcutsAPI {
   showLauncher: () => Promise<void>;
   openLauncher: () => Promise<void>;
   hideLauncher: () => Promise<void>;
-  executeText: (request: ShortcutExecutionRequest) => Promise<{ success: boolean; pasted: boolean; warning?: string }>;
+  executeText: (request: ShortcutExecutionRequest) => Promise<{ success: boolean; pasted: boolean }>;
   navigateMain: (target: 'home' | 'new-prompt' | 'shortcuts', promptUUID?: string) => Promise<void>;
   requestPastePermission: () => Promise<PasteCapability>;
   onLauncherInvocation: (callback: (invocation: ShortcutInvocation) => void) => () => void;
@@ -305,7 +293,7 @@ export interface ShortcutsAPI {
   getRegistered: () => Promise<string[]>;
   
   // 检查权限并尝试注册快捷键
-  checkPermissions: () => Promise<{ hasPermission: boolean; message?: string }>;
+  checkPermissions: () => Promise<{ hasPermission: boolean; reason?: PasteUnavailableReason }>;
   
   // 监听快捷键事件
   onInsertData: (callback: (promptId?: number) => void) => () => void;

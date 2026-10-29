@@ -730,10 +730,19 @@
     "deviceNameWeb": "网页版 AI Gist"
   },
   "databaseStatus": {
-    "connectionError": "数据库连接异常",
+    "connectionError": "数据没能加载",
     "hide": "隐藏",
     "retry": "重试",
-    "retrying": "重试中..."
+    "retrying": "重试中...",
+    "retryHint": "点「重试」；还不行就重启 AI Gist。",
+    "upgradeBlockedHint": "AI Gist 还在其他窗口或浏览器标签页里开着。关掉它们后点「重试」。",
+    "detailLabel": "技术详情"
+  },
+  "icloudAvailability": {
+    "driveOff": "这台 Mac 没有打开 iCloud Drive。在系统设置中登录 Apple 账户并打开 iCloud Drive，然后重新打开此页面。",
+    "windowsMissing": "没有找到 iCloud Drive。安装 iCloud for Windows 并打开 iCloud Drive，然后重启 AI Gist。",
+    "unsupported": "这个系统上没有 iCloud Drive，请改用 WebDAV。",
+    "checkFailed": "没能检测 iCloud Drive。重新打开此页面再试；如果一直这样，请重启 AI Gist。"
   },
   "language": {
     "selectLanguage": "选择语言",
@@ -858,7 +867,32 @@
     "testing": "测试中...",
     "testingDescription": "正在测试网络连接...",
     "connectionOkWithTime": "连接正常 · 平均响应 {ms} ms",
-    "notTestedYet": "还没有测试。测试会依次访问几个常用站点。"
+    "notTestedYet": "还没有测试。测试会依次访问几个常用站点。",
+    "connectionFailedProxy": "连接失败：连不上代理服务器。检查代理地址和端口，并确认代理软件正在运行。",
+    "sites": {
+      "baidu": {
+        "name": "百度",
+        "description": "国内网站"
+      },
+      "github": {
+        "name": "GitHub",
+        "description": "海外代码托管平台"
+      },
+      "google": {
+        "name": "Google",
+        "description": "海外搜索引擎"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "description": "海外 AI 服务"
+      }
+    },
+    "siteErrors": {
+      "timeout": "连接超时",
+      "proxyRefused": "连不上代理",
+      "unreachable": "无法访问",
+      "httpError": "网站返回 {status}"
+    }
   },
   "promptEditor": {
     "addVariable": "新建变量",
@@ -1184,7 +1218,6 @@
     "actions": "操作",
     "assignFromPromptHint": "在提示词的「更多」菜单里设置",
     "assignPromptBinding": "设置提示词快捷键",
-    "autoPasteUnavailable": "自动粘贴当前不可用",
     "behavior": "调用行为",
     "commandManage": "管理快捷键",
     "commandNewPrompt": "新建提示词",
@@ -1197,7 +1230,7 @@
     "editPromptBinding": "编辑提示词快捷键",
     "globalCommands": "全局命令",
     "inputShortcut": "输入快捷键",
-    "invalidTarget": "提示词已失效",
+    "invalidTarget": "提示词已删除",
     "launcherCommand": "提示词启动器",
     "launcherCommandDesc": "在任意应用中搜索并调用提示词",
     "launcherPlaceholder": "搜索提示词、标签、分类或命令…",
@@ -1209,12 +1242,12 @@
     "navigate": "选择",
     "noLauncherResults": "没有匹配的提示词或命令",
     "noPromptBindings": "还没有为提示词分配快捷键",
-    "notRegistered": "未注册",
+    "notRegistered": "未生效",
     "notSet": "未设置",
-    "pasteFallbackHint": "当平台或权限不支持时，自动降级为复制到剪贴板。",
+    "pasteFallbackHint": "无法自动粘贴时，会改为复制到剪贴板。",
     "pressShortcut": "请按下您想要的快捷键组合",
     "promptBindings": "提示词直达键",
-    "registered": "已注册",
+    "registered": "已生效",
     "requestPermission": "请求权限",
     "resetSuccess": "快捷键设置已恢复默认",
     "resetToDefault": "恢复默认",
@@ -1229,7 +1262,20 @@
     "bindingStatus": "状态",
     "editBindingFor": "编辑「{name}」的快捷键",
     "enableBinding": "启用「{name}」的快捷键",
-    "removeBindingFor": "删除「{name}」的快捷键"
+    "removeBindingFor": "删除「{name}」的快捷键",
+    "errors": {
+      "empty": "先按下要用的快捷键。",
+      "modifierRequired": "快捷键需要包含修饰键（Ctrl、Alt、Shift 或 ⌘），F1–F24 可以单独使用。",
+      "reservedKey": "Esc、Enter、Tab 不能单独作为快捷键，加上修饰键再试。",
+      "duplicate": "AI Gist 里已经有别的快捷键用了这个组合，换一个试试。",
+      "inUse": "这个组合被其他应用或系统占用了，换一个试试。",
+      "saveFailed": "快捷键没能保存，请再试一次。"
+    },
+    "pasteUnavailable": {
+      "accessibility": "自动粘贴需要辅助功能权限。授权前只会复制到剪贴板。",
+      "xdotool": "安装 xdotool 后可以自动粘贴，在此之前只会复制到剪贴板。",
+      "copyOnly": "这台电脑不支持自动粘贴，只会复制到剪贴板。"
+    }
   },
   "startup": {
     "autoStart": "开机自动启动",
@@ -1640,7 +1686,8 @@
     "editShortcut": "修改快捷键",
     "nextVariable": "下一个变量",
     "detail": "详情",
-    "run": "执行"
+    "run": "执行",
+    "runFailed": "没能执行，请再试一次。"
   },
   "models": {
     "title": "模型",
@@ -1793,7 +1840,7 @@
   },
   "appInit": {
     "loading": "正在打开 AI Gist…",
-    "failedTitle": "数据库没有打开",
+    "failedTitle": "数据没能加载",
     "continue": "先继续使用（部分功能不可用）"
   },
   "mobileModels": {

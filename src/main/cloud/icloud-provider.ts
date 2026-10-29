@@ -9,6 +9,7 @@ import {
   CloudFileInfo,
   CloudFileWriteOptions,
   CloudFileWriteResult,
+  ICloudAvailability,
   ICloudConfig
 } from '@shared/types/cloud-backup';
 
@@ -37,10 +38,6 @@ const CONSTANTS = {
   ERROR_MESSAGES: {
     EMPTY_PATH: 'iCloud 路径不能为空',
     UNSUPPORTED_OS: '不支持的操作系统',
-    LINUX_NOT_SUPPORTED: 'Linux 系统不支持 iCloud Drive',
-    MACOS_NOT_FOUND: 'iCloud Drive 未启用或不可访问',
-    MACOS_DETECTION_FAILED: 'iCloud Drive 检测失败',
-    WINDOWS_NOT_FOUND: '未检测到 iCloud Drive 目录，请先安装 iCloud for Windows。如已配置完毕，请重启本应用。',
     CONNECTION_TEST_FAILED: 'iCloud Drive 连接测试失败',
     LIST_FILES_FAILED: 'iCloud Drive 列出文件失败',
     READ_FILE_FAILED: 'iCloud Drive 读取文件失败',
@@ -96,7 +93,7 @@ export class ICloudProvider implements CloudStorageProvider {
    * 检测 iCloud 是否可用
    * @returns 可用性检测结果
    */
-  static async isICloudAvailable(): Promise<{ available: boolean; reason?: string }> {
+  static async isICloudAvailable(): Promise<ICloudAvailability> {
     const platform = os.platform();
     const homedir = os.homedir();
     
@@ -106,7 +103,7 @@ export class ICloudProvider implements CloudStorageProvider {
     
     // Linux 系统不支持
     if (platform === CONSTANTS.PLATFORMS.LINUX) {
-      return { available: false, reason: CONSTANTS.ERROR_MESSAGES.LINUX_NOT_SUPPORTED };
+      return { available: false, reasonCode: 'unsupported-platform' };
     }
     
     // macOS 系统检测
@@ -119,7 +116,7 @@ export class ICloudProvider implements CloudStorageProvider {
       return await this.checkWindowsAvailability(homedir);
     }
     
-    return { available: false, reason: CONSTANTS.ERROR_MESSAGES.UNSUPPORTED_OS };
+    return { available: false, reasonCode: 'unsupported-platform' };
   }
 
   // ==================== 私有方法 ====================
@@ -138,7 +135,7 @@ export class ICloudProvider implements CloudStorageProvider {
    * @param homedir 用户主目录
    * @returns 可用性检测结果
    */
-  private static async checkMacOSAvailability(homedir: string): Promise<{ available: boolean; reason?: string }> {
+  private static async checkMacOSAvailability(homedir: string): Promise<ICloudAvailability> {
     const possiblePaths = CONSTANTS.ICLOUD_PATHS.MACOS.map(p => path.join(homedir, p));
     
     try {
@@ -158,12 +155,12 @@ export class ICloudProvider implements CloudStorageProvider {
       }
       
       this.debugLog(CONSTANTS.LOG_MESSAGES.MACOS_NOT_FOUND);
-      return { available: false, reason: CONSTANTS.ERROR_MESSAGES.MACOS_NOT_FOUND };
+      return { available: false, reasonCode: 'icloud-drive-off' };
     } catch (error) {
       console.error(CONSTANTS.LOG_MESSAGES.DETECTION_FAILED
         .replace('{platform}', 'macOS')
         .replace('{error}', String(error)));
-      return { available: false, reason: CONSTANTS.ERROR_MESSAGES.MACOS_DETECTION_FAILED };
+      return { available: false, reasonCode: 'check-failed' };
     }
   }
 
@@ -172,7 +169,7 @@ export class ICloudProvider implements CloudStorageProvider {
    * @param homedir 用户主目录
    * @returns 可用性检测结果
    */
-  private static async checkWindowsAvailability(homedir: string): Promise<{ available: boolean; reason?: string }> {
+  private static async checkWindowsAvailability(homedir: string): Promise<ICloudAvailability> {
     const possiblePaths = CONSTANTS.ICLOUD_PATHS.WINDOWS.map(p => path.join(homedir, p));
     
     this.debugLog(CONSTANTS.LOG_MESSAGES.WINDOWS_PATHS.replace('{paths}', JSON.stringify(possiblePaths)));
@@ -195,7 +192,7 @@ export class ICloudProvider implements CloudStorageProvider {
     }
     
     this.debugLog(CONSTANTS.LOG_MESSAGES.WINDOWS_NOT_FOUND);
-    return { available: false, reason: CONSTANTS.ERROR_MESSAGES.WINDOWS_NOT_FOUND };
+    return { available: false, reasonCode: 'icloud-for-windows-missing' };
   }
 
   /**

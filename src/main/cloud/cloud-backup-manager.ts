@@ -223,7 +223,7 @@ export class CloudBackupManager {
         return await ICloudProvider.isICloudAvailable();
       } catch (error) {
         this.debugError(CONSTANTS.LOG_MESSAGES.ICLOUD_AVAILABILITY_CHECK_FAILED, error);
-        return { available: false, reason: '检测失败' };
+        return { available: false, reasonCode: 'check-failed' };
       }
     });
 

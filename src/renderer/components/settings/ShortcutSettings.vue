@@ -8,10 +8,8 @@
 
     <div v-if="state && !state.pasteCapability.permissionGranted" class="ui-alert ui-alert--warning shortcut-settings__alert">
       <NIcon :size="14" class="ui-alert__icon" aria-hidden="true"><AlertTriangle /></NIcon>
-      <span class="shortcut-settings__alert-text">
-        {{ t('shortcuts.autoPasteUnavailable') }}<template v-if="state.pasteCapability.reason">：{{ state.pasteCapability.reason }}</template>
-      </span>
-      <NButton v-if="state.pasteCapability.supported" size="tiny" @click="requestPastePermission">{{ t('shortcuts.requestPermission') }}</NButton>
+      <span class="shortcut-settings__alert-text">{{ describePasteUnavailable(state.pasteCapability.reason, t) }}</span>
+      <NButton v-if="state.pasteCapability.reason === 'accessibility-permission'" size="tiny" @click="requestPastePermission">{{ t('shortcuts.requestPermission') }}</NButton>
     </div>
 
     <UiPanel :title="t('shortcuts.globalCommands')" body="rows">
@@ -119,6 +117,7 @@ import UiPanel from '@/components/ui/UiPanel.vue';
 import UiSegmented from '@/components/ui/UiSegmented.vue';
 import UiSettingRow from '@/components/ui/UiSettingRow.vue';
 import { displayAccelerator } from '@/lib/utils/accelerator';
+import { describePasteUnavailable, describeShortcutError } from '@/lib/utils/shortcut-messages';
 
 const { t } = useI18n();
 const message = useMessage();
@@ -260,7 +259,7 @@ async function saveCommandCapture(): Promise<void> {
     await restoreShortcuts();
     state.value = await window.electronAPI.shortcuts.getState();
   } catch (caught) {
-    captureError.value = caught instanceof Error ? caught.message : String(caught);
+    captureError.value = describeShortcutError(caught, t);
   }
 }
 
@@ -268,7 +267,7 @@ async function toggleCommand(id: ShortcutCommandId, enabled: boolean): Promise<v
   try {
     state.value = await window.electronAPI.shortcuts.updateCommand(id, { enabled });
   } catch (caught) {
-    message.error(caught instanceof Error ? caught.message : String(caught));
+    message.error(describeShortcutError(caught, t));
   }
 }
 
@@ -276,7 +275,7 @@ async function toggleBinding(binding: PromptShortcutBinding, enabled: boolean): 
   try {
     state.value = await window.electronAPI.shortcuts.upsertPromptBinding({ ...binding, enabled });
   } catch (caught) {
-    message.error(caught instanceof Error ? caught.message : String(caught));
+    message.error(describeShortcutError(caught, t));
   }
 }
 

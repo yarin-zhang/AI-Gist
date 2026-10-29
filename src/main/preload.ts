@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: () => ipcRenderer.invoke('get-user-preferences'),
     set: (prefs: any) => ipcRenderer.invoke('set-user-preferences', prefs),
     reset: () => ipcRenderer.invoke('reset-user-preferences'),
+    setUiLocale: (locale: string) => ipcRenderer.invoke('preferences:set-ui-locale', locale),
   },
 
   // 窗口管理

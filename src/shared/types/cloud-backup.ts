@@ -33,6 +33,27 @@ export interface WebDAVConfig extends CloudStorageConfig {
   requestTimeoutMs?: number;
 }
 
+/**
+ * iCloud Drive 用不了的原因（桌面端主进程检测），由渲染进程翻译成用户能照着做的话：
+ * - icloud-drive-off：macOS 上没打开 iCloud 云盘
+ * - icloud-for-windows-missing：Windows 上没装 iCloud for Windows（或装了还没重启 AI Gist）
+ * - unsupported-platform：这个系统没有 iCloud Drive（Linux 等）
+ * - check-failed：检测本身出错
+ */
+export type ICloudUnavailableReason =
+  | 'icloud-drive-off'
+  | 'icloud-for-windows-missing'
+  | 'unsupported-platform'
+  | 'check-failed';
+
+export interface ICloudAvailability {
+  available: boolean;
+  /** 已经翻译好的说明，直接显示 */
+  reason?: string;
+  /** 桌面端主进程返回的原因码，渲染进程据此生成 reason */
+  reasonCode?: ICloudUnavailableReason;
+}
+
 export interface ICloudConfig extends CloudStorageConfig {
   type: 'icloud';
   path: string; // iCloud Drive 中的路径

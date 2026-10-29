@@ -7,6 +7,7 @@ import { BrowserWindow, dialog, app, nativeTheme } from 'electron';
 // 本地模块导入
 import { getAppIconPath } from './utils';
 import { preferencesManager } from './preferences-manager';
+import { getMainStrings } from './main-locale';
 import designTokens from '../../renderer/design-tokens.json';
 
 /**
@@ -22,17 +23,6 @@ const CONSTANTS = {
   BACKGROUND_COLORS: {
     DARK: designTokens.palette.dark.surface.body,
     LIGHT: designTokens.palette.light.surface.body
-  },
-  DIALOG_BUTTONS: {
-    QUIT: '退出',
-    MINIMIZE: '最小化到托盘',
-    CANCEL: '取消'
-  },
-  DIALOG_MESSAGES: {
-    TITLE: '确认操作',
-    MESSAGE: '您想要退出应用程序还是最小化到系统托盘？',
-    DETAIL: '最小化到托盘后，应用程序将在后台继续运行。',
-    CHECKBOX_LABEL: '不再显示此对话框'
   },
   LOG_MESSAGES: {
     QUIT_START: '开始退出应用程序...',
@@ -307,15 +297,16 @@ class WindowManager {
    * @returns 对话框结果
    */
   private async showCloseConfirmationDialog() {
+    const strings = getMainStrings().closeDialog;
     return await dialog.showMessageBox(this.mainWindow!, {
       type: 'question',
-      buttons: [CONSTANTS.DIALOG_BUTTONS.QUIT, CONSTANTS.DIALOG_BUTTONS.MINIMIZE, CONSTANTS.DIALOG_BUTTONS.CANCEL],
+      buttons: [strings.quit, strings.minimize, strings.cancel],
       defaultId: 0,
       cancelId: 2,
-      title: CONSTANTS.DIALOG_MESSAGES.TITLE,
-      message: CONSTANTS.DIALOG_MESSAGES.MESSAGE,
-      detail: CONSTANTS.DIALOG_MESSAGES.DETAIL,
-      checkboxLabel: CONSTANTS.DIALOG_MESSAGES.CHECKBOX_LABEL,
+      title: strings.title,
+      message: strings.message,
+      detail: strings.detail,
+      checkboxLabel: strings.remember,
       checkboxChecked: false
     });
   }

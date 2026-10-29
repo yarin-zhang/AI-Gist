@@ -1,5 +1,17 @@
 import { fsService } from './fs-service';
 import { dialog } from 'electron';
+import { getMainStrings } from '../electron/main-locale';
+import { formatMainString } from '../electron/main-strings';
+
+/** 文件选择框里的「CSV 文件」「JSON 文件」「所有文件」过滤项 */
+function fileFilter(format: string): Electron.FileFilter {
+  const strings = getMainStrings().fileDialog;
+  return { name: formatMainString(strings.formatFiles, { format: format.toUpperCase() }), extensions: [format] };
+}
+
+function allFilesFilter(): Electron.FileFilter {
+  return { name: getMainStrings().fileDialog.allFiles, extensions: ['*'] };
+}
 
 /**
  * 数据管理服务
@@ -15,11 +27,8 @@ export class DataManagementService {
    */
   async selectImportFile(format: string): Promise<string | null> {
     const result = await dialog.showOpenDialog({
-      title: '选择导入文件',
-      filters: [
-        { name: `${format.toUpperCase()} 文件`, extensions: [format] },
-        { name: '所有文件', extensions: ['*'] },
-      ],
+      title: getMainStrings().fileDialog.importTitle,
+      filters: [fileFilter(format), allFilesFilter()],
       properties: ['openFile'],
     });
 
@@ -31,28 +40,12 @@ export class DataManagementService {
    */
   async selectExportPath(defaultName: string): Promise<string | null> {
     const fileExtension = defaultName.split('.').pop()?.toLowerCase();
-    let filters;
-    
-    if (fileExtension === 'csv') {
-      filters = [
-        { name: 'CSV 文件', extensions: ['csv'] },
-        { name: '所有文件', extensions: ['*'] },
-      ];
-    } else if (fileExtension === 'json') {
-      filters = [
-        { name: 'JSON 文件', extensions: ['json'] },
-        { name: '所有文件', extensions: ['*'] },
-      ];
-    } else {
-      filters = [
-        { name: 'CSV 文件', extensions: ['csv'] },
-        { name: 'JSON 文件', extensions: ['json'] },
-        { name: '所有文件', extensions: ['*'] },
-      ];
-    }
-    
+    const filters = fileExtension === 'csv' || fileExtension === 'json'
+      ? [fileFilter(fileExtension), allFilesFilter()]
+      : [fileFilter('csv'), fileFilter('json'), allFilesFilter()];
+
     const result = await dialog.showSaveDialog({
-      title: '选择导出路径',
+      title: getMainStrings().fileDialog.exportTitle,
       defaultPath: defaultName,
       filters: filters,
     });

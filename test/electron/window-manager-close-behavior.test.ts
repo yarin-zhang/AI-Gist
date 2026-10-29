@@ -176,3 +176,31 @@ describe('windowManager close behavior vs. CLI bridge lifecycle', () => {
     stopSpy.mockRestore()
   })
 })
+
+describe('windowManager close confirmation dialog language', () => {
+  afterEach(() => {
+    preferencesManager.updatePreferences({ closeBehaviorMode: 'ask', closeAction: 'quit' })
+  })
+
+  it.each([
+    ['en-US', ['Quit app', 'Minimize to tray', 'Cancel'], 'Remember my choice'],
+    ['ja-JP', ['アプリケーションを終了', 'トレイに最小化', 'キャンセル'], 'この選択を記憶'],
+    ['zh-CN', ['退出应用', '最小化到托盘', '取消'], '记住我的选择'],
+  ] as const)('asks in the UI language reported by the renderer (%s)', async (locale, buttons, checkboxLabel) => {
+    const { setUiLocale } = await import('../../src/main/electron/main-locale')
+    setUiLocale(locale)
+    electronMock.showMessageBox.mockResolvedValue({ response: 2, checkboxChecked: false })
+    preferencesManager.updatePreferences({ closeBehaviorMode: 'ask' })
+    const win = createWindow()
+
+    await win.handlers['close']({ preventDefault: () => undefined })
+
+    expect(electronMock.showMessageBox).toHaveBeenCalledTimes(1)
+    const options = electronMock.showMessageBox.mock.calls[0][1]
+    expect(options.buttons).toEqual(buttons)
+    expect(options.checkboxLabel).toBe(checkboxLabel)
+    // 用户点了「取消」（mock 返回 response 2），窗口既不隐藏也不退出
+    expect(win.hideCalls).toBe(0)
+    expect(electronMock.appQuit).not.toHaveBeenCalled()
+  })
+})

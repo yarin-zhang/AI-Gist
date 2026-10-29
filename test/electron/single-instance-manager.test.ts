@@ -12,8 +12,10 @@
 // 的对话框，这个对话框和用户执行的 CLI 命令毫无关系。
 //
 // 修复：single-instance-manager.ts 的 handleSecondInstance() 在 commandLine
-// 里检测到这个标记时直接静默返回，不弹窗，也不强制显示/聚焦主窗口。这里验证
-// 这条分支，并确认没有标记时（真正的用户重复启动）原有的弹窗行为不受影响。
+// 里检测到这个标记时直接静默返回，不强制显示/聚焦主窗口。
+//
+// 之后又去掉了用户手动重复启动时的「AI-Gist 程序已经在运行了！」对话框（只有中文，
+// 用户也没什么可处理的）：再次打开应用时只把现有窗口带到前台。
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'fs'
@@ -140,13 +142,13 @@ function getSecondInstanceHandler() {
 }
 
 describe('singleInstanceManager — CLI auto-launch probe vs. a genuine second launch', () => {
-  it('shows the "already running" dialog and focuses the window for a genuine second launch (no CLI marker)', () => {
+  it('just focuses the existing window for a genuine second launch, without an "already running" dialog', () => {
     windowManager.createMainWindow()
     const win = electronMock.FakeBrowserWindow.instances[electronMock.FakeBrowserWindow.instances.length - 1]
 
     getSecondInstanceHandler()({}, ['/path/to/AI Gist', '--some-unrelated-flag'], '/tmp')
 
-    expect(electronMock.showMessageBox).toHaveBeenCalledTimes(1)
+    expect(electronMock.showMessageBox).not.toHaveBeenCalled()
     expect(electronMock.showErrorBox).not.toHaveBeenCalled()
     // FakeBrowserWindow.isVisible() 恒为 true，所以 windowManager.showMainWindow()
     // 只会调用 focus()（不会调用 show()，那只在窗口真的不可见时才触发）。
@@ -170,6 +172,15 @@ describe('singleInstanceManager — CLI auto-launch probe vs. a genuine second l
   it('also silently ignores a CLI auto-launch probe when there is no main window yet (system-level dialog suppressed too)', () => {
     // 不创建窗口，模拟 mainWindow 还不存在的极端情况。
     getSecondInstanceHandler()({}, ['/path/to/AI Gist', CLI_AUTO_LAUNCH_MARKER], '/tmp')
+
+    expect(electronMock.showMessageBox).not.toHaveBeenCalled()
+    expect(electronMock.showErrorBox).not.toHaveBeenCalled()
+  })
+
+  it('shows no system error box for a genuine second launch while the main window is not created yet', () => {
+    windowManager.destroy()
+
+    getSecondInstanceHandler()({}, ['/path/to/AI Gist'], '/tmp')
 
     expect(electronMock.showMessageBox).not.toHaveBeenCalled()
     expect(electronMock.showErrorBox).not.toHaveBeenCalled()

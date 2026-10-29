@@ -36,6 +36,7 @@ import { NButton } from 'naive-ui';
 import UiModal from '@/components/ui/UiModal.vue';
 import UiSegmented from '@/components/ui/UiSegmented.vue';
 import { displayAccelerator } from '@/lib/utils/accelerator';
+import { describeShortcutError } from '@/lib/utils/shortcut-messages';
 import { useI18n } from 'vue-i18n';
 import type { PromptShortcutBinding, ShortcutAction } from '@shared/types';
 
@@ -133,7 +134,7 @@ async function save(): Promise<void> {
     await restore();
     emit('saved');
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = describeShortcutError(caught, t);
   } finally {
     saving.value = false;
   }

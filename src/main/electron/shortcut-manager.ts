@@ -13,6 +13,7 @@ import {
 } from 'electron';
 import type {
   PasteCapability,
+  PasteUnavailableReason,
   PromptShortcutBinding,
   ShortcutAction,
   ShortcutCommandId,
@@ -22,9 +23,13 @@ import type {
   ShortcutRegistrationStatus,
   ShortcutState,
 } from '@shared/types';
+import { createShortcutError, type ShortcutErrorCode } from '@shared/shortcut-errors';
 import { preferencesManager } from './preferences-manager';
+import { getMainStrings } from './main-locale';
 
 type PasteTarget = { platform: NodeJS.Platform; value: string } | null;
+/** 自动粘贴没成功的原因，只用于选择通知文案和写日志 */
+type PasteFailure = PasteUnavailableReason | 'no-target' | 'failed';
 
 export class ShortcutManager {
   private static instance: ShortcutManager;
@@ -72,16 +77,16 @@ export class ShortcutManager {
       .replace(/→/g, 'Right');
   }
 
-  private validateFormat(accelerator: string): string | null {
+  private validateFormat(accelerator: string): ShortcutErrorCode | null {
     const normalized = this.normalizeAccelerator(accelerator);
-    if (!normalized) return '快捷键不能为空';
+    if (!normalized) return 'empty';
     const parts = normalized.split('+').filter(Boolean);
     const key = parts[parts.length - 1] || '';
     const modifiers = new Set(['Command', 'Control', 'CommandOrControl', 'Alt', 'Option', 'Shift', 'Super']);
     const hasModifier = parts.slice(0, -1).some(part => modifiers.has(part));
     const isFunctionKey = /^F(?:[1-9]|1\d|2[0-4])$/i.test(key);
-    if (!hasModifier && !isFunctionKey) return '请至少使用一个修饰键';
-    if (['Escape', 'Esc', 'Enter', 'Tab'].includes(key) && !hasModifier) return '该单键不能作为全局快捷键';
+    if (['Escape', 'Esc', 'Enter', 'Tab'].includes(key) && !hasModifier) return 'reserved-key';
+    if (!hasModifier && !isFunctionKey) return 'modifier-required';
     return null;
   }
 
@@ -101,14 +106,14 @@ export class ShortcutManager {
     ];
   }
 
-  validateAccelerator(accelerator: string, excludeId?: string): { valid: boolean; error?: string } {
+  validateAccelerator(accelerator: string, excludeId?: string): { valid: boolean; errorCode?: ShortcutErrorCode } {
     const formatError = this.validateFormat(accelerator);
-    if (formatError) return { valid: false, error: formatError };
+    if (formatError) return { valid: false, errorCode: formatError };
     const normalized = this.normalizeAccelerator(accelerator).toLowerCase();
     const duplicate = this.getAllConfiguredBindings().find(binding =>
       binding.enabled && binding.id !== excludeId && this.normalizeAccelerator(binding.accelerator).toLowerCase() === normalized
     );
-    if (duplicate) return { valid: false, error: '该快捷键已在 AI Gist 中使用' };
+    if (duplicate) return { valid: false, errorCode: 'duplicate' };
     return { valid: true };
   }
 
@@ -126,7 +131,7 @@ export class ShortcutManager {
           id,
           accelerator,
           state: 'conflict',
-          message: '快捷键可能已被其他应用占用',
+          message: 'in-use',
         });
         return;
       }
@@ -177,7 +182,7 @@ export class ShortcutManager {
     }
   }
 
-  private async canTemporarilyRegister(accelerator: string, excludeId?: string): Promise<{ valid: boolean; error?: string }> {
+  private async canTemporarilyRegister(accelerator: string, excludeId?: string): Promise<{ valid: boolean; errorCode?: ShortcutErrorCode }> {
     const validation = this.validateAccelerator(accelerator, excludeId);
     if (!validation.valid) return validation;
     const normalized = this.normalizeAccelerator(accelerator);
@@ -193,7 +198,7 @@ export class ShortcutManager {
     } finally {
       await this.registerUserShortcuts();
     }
-    return available ? { valid: true } : { valid: false, error: '快捷键已被其他应用或系统占用' };
+    return available ? { valid: true } : { valid: false, errorCode: 'in-use' };
   }
 
   async updateCommand(commandId: ShortcutCommandId, patch: Partial<{ accelerator: string; enabled: boolean }>): Promise<ShortcutState> {
@@ -202,7 +207,7 @@ export class ShortcutManager {
     const next = { ...current, ...patch };
     if (next.enabled) {
       const result = await this.canTemporarilyRegister(next.accelerator, `command:${commandId}`);
-      if (!result.valid) throw new Error(result.error);
+      if (!result.valid) throw createShortcutError(result.errorCode ?? 'in-use');
     }
     const shortcuts: ShortcutPreferences = {
       ...prefs,
@@ -218,7 +223,7 @@ export class ShortcutManager {
     const id = input.id || randomUUID();
     if (input.enabled) {
       const result = await this.canTemporarilyRegister(input.accelerator, `prompt:${id}`);
-      if (!result.valid) throw new Error(result.error);
+      if (!result.valid) throw createShortcutError(result.errorCode ?? 'in-use');
     }
     const binding: PromptShortcutBinding = { ...input, id };
     const existingIndex = prefs.promptBindings.findIndex(item => item.id === id || item.promptUUID === input.promptUUID);
@@ -256,7 +261,7 @@ export class ShortcutManager {
       id: registryId,
       accelerator: binding?.accelerator || '',
       state: 'invalid-target',
-      message: '关联的提示词不存在',
+      message: 'prompt-missing',
     });
   }
 
@@ -294,7 +299,7 @@ export class ShortcutManager {
         if (launcher.isVisible() && !launcher.webContents.isDevToolsOpened()) launcher.hide();
       });
       const mainUrl = this.mainWindow?.webContents.getURL();
-      if (!mainUrl) throw new Error('主窗口尚未就绪');
+      if (!mainUrl) throw new Error('Main window is not ready yet');
       const url = new URL(mainUrl);
       url.searchParams.set('surface', 'launcher');
       await launcher.loadURL(url.toString());
@@ -373,19 +378,23 @@ export class ShortcutManager {
     this.mainWindow?.webContents.send('shortcut:navigate-main', { target, promptUUID });
   }
 
-  async executeText(request: ShortcutExecutionRequest): Promise<{ success: boolean; pasted: boolean; warning?: string }> {
+  async executeText(request: ShortcutExecutionRequest): Promise<{ success: boolean; pasted: boolean }> {
     clipboard.writeText(request.content);
     this.recordRecent(request.promptUUID);
     this.hideLauncherWindow();
+    const strings = getMainStrings().notifications;
     if (request.action === 'paste') {
-      const result = await this.autoPaste();
-      if (!result.success) {
-        this.notify('已复制提示词', result.warning || '自动粘贴不可用，请手动粘贴');
-        return { success: true, pasted: false, warning: result.warning };
+      const failure = await this.autoPaste();
+      if (failure) {
+        // 内容已经在剪贴板里，用户手动粘贴即可；原始报错只写日志
+        this.notify(strings.copiedTitle, failure === 'accessibility-permission'
+          ? strings.pasteNeedsPermission
+          : strings.pasteFailed);
+        return { success: true, pasted: false };
       }
       return { success: true, pasted: true };
     }
-    this.notify('已复制提示词', request.title);
+    this.notify(strings.copiedTitle, request.title);
     return { success: true, pasted: false };
   }
 
@@ -406,22 +415,22 @@ export class ShortcutManager {
       return {
         supported: true,
         permissionGranted,
-        reason: permissionGranted ? undefined : '需要在系统设置中授予辅助功能权限',
+        reason: permissionGranted ? undefined : 'accessibility-permission',
       };
     }
     if (process.platform === 'win32') return { supported: true, permissionGranted: true };
     if (process.platform === 'linux') {
       if ((process.env.XDG_SESSION_TYPE || '').toLowerCase() === 'wayland') {
-        return { supported: false, permissionGranted: false, reason: 'Wayland 会话不支持可靠的自动粘贴' };
+        return { supported: false, permissionGranted: false, reason: 'wayland' };
       }
       try {
         await this.execFileAsync('which', ['xdotool']);
         return { supported: true, permissionGranted: true };
       } catch {
-        return { supported: false, permissionGranted: false, reason: '未安装 xdotool，将仅复制到剪贴板' };
+        return { supported: false, permissionGranted: false, reason: 'xdotool-missing' };
       }
     }
-    return { supported: false, permissionGranted: false, reason: '当前平台不支持自动粘贴' };
+    return { supported: false, permissionGranted: false, reason: 'unsupported-platform' };
   }
 
   private async capturePasteTarget(): Promise<PasteTarget> {
@@ -445,10 +454,11 @@ export class ShortcutManager {
     return null;
   }
 
-  private async autoPaste(): Promise<{ success: boolean; warning?: string }> {
+  /** 自动粘贴到唤起启动器前的窗口；成功返回 null，失败返回原因 */
+  private async autoPaste(): Promise<PasteFailure | null> {
     const capability = await this.getPasteCapability(false);
-    if (!capability.supported || !capability.permissionGranted) return { success: false, warning: capability.reason };
-    if (!this.pasteTarget?.value) return { success: false, warning: '无法确定要粘贴到的窗口' };
+    if (!capability.supported || !capability.permissionGranted) return capability.reason ?? 'failed';
+    if (!this.pasteTarget?.value) return 'no-target';
     await new Promise(resolve => setTimeout(resolve, 120));
     try {
       if (this.pasteTarget.platform === 'darwin') {
@@ -462,16 +472,17 @@ export class ShortcutManager {
         ]);
       } else if (this.pasteTarget.platform === 'win32') {
         const handle = Number(this.pasteTarget.value);
-        if (!Number.isFinite(handle)) throw new Error('无效的窗口句柄');
+        if (!Number.isFinite(handle)) throw new Error(`Invalid window handle: ${this.pasteTarget.value}`);
         const script = `Add-Type -AssemblyName System.Windows.Forms; Add-Type @"\nusing System; using System.Runtime.InteropServices; public class FG { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); }\n"@; [FG]::SetForegroundWindow([IntPtr]${handle}); Start-Sleep -Milliseconds 120; [System.Windows.Forms.SendKeys]::SendWait('^v')`;
         await this.execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
       } else if (this.pasteTarget.platform === 'linux') {
         await this.execFileAsync('xdotool', ['windowactivate', '--sync', this.pasteTarget.value]);
         await this.execFileAsync('xdotool', ['key', '--clearmodifiers', 'ctrl+v']);
       }
-      return { success: true };
+      return null;
     } catch (error) {
-      return { success: false, warning: error instanceof Error ? error.message : '自动粘贴失败' };
+      console.warn('自动粘贴失败:', error);
+      return 'failed';
     }
   }
 
@@ -501,9 +512,9 @@ export class ShortcutManager {
     void this.registerUserShortcuts();
   }
 
-  async checkPermissionsAndRegister(): Promise<{ hasPermission: boolean; message?: string }> {
+  async checkPermissionsAndRegister(): Promise<{ hasPermission: boolean; reason?: PasteUnavailableReason }> {
     const capability = await this.getPasteCapability(false);
-    return { hasPermission: capability.permissionGranted, message: capability.reason };
+    return { hasPermission: capability.permissionGranted, reason: capability.reason };
   }
 
   registerDefaultShortcuts(): void {

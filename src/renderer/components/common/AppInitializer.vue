@@ -10,7 +10,12 @@
         </template>
         <template v-else>
           <span class="loading-title loading-title--error">{{ t('appInit.failedTitle') }}</span>
-          <span class="loading-detail">{{ databaseError }}</span>
+          <span class="loading-detail">{{ describeDatabaseError(databaseError, t) }}</span>
+          <!-- 原始报错带错误码和 IndexedDB 细节，只在反馈问题时有用：默认折叠 -->
+          <details v-if="databaseError.detail" class="loading-tech">
+            <summary>{{ t('databaseStatus.detailLabel') }}</summary>
+            <span class="loading-tech__raw">{{ databaseError.detail }}</span>
+          </details>
           <div class="loading-actions">
             <NButton type="primary" :loading="isRetrying" @click="retry">{{ t('common.retry') }}</NButton>
             <NButton quaternary @click="continueWithoutDb">{{ t('appInit.continue') }}</NButton>
@@ -33,6 +38,7 @@ import { NButton, NSpin } from 'naive-ui'
 import appIcon from '~/assets/images/logo.png'
 import { useDatabase } from '~/composables/useDatabase'
 import { initDatabaseState } from '~/composables/useDatabase'
+import { describeDatabaseError } from '~/lib/utils/database-error'
 
 const { t } = useI18n()
 const { isDatabaseReady, databaseError, clearError } = useDatabase()
@@ -122,9 +128,39 @@ onMounted(() => {
 }
 
 .loading-detail {
-  color: var(--content-tertiary);
+  color: var(--content-secondary);
   font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
+}
+
+.loading-tech {
+  max-width: 100%;
+  color: var(--content-tertiary);
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.loading-tech summary {
+  width: fit-content;
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+.loading-tech summary:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.loading-tech__raw {
+  display: block;
+  max-height: 160px;
+  margin-top: 6px;
+  overflow: auto;
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .loading-actions {

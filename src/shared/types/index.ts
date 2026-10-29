@@ -10,3 +10,4 @@ export * from './ipc';
 export * from './ai';
 export * from './data-management';
 export * from './cli-bridge';
+export * from './network-proxy';

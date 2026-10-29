@@ -400,6 +400,18 @@ async function executePrompt(prompt: PromptWithRelations, action: ShortcutAction
       content: rendered.content,
       action,
     });
+  } catch (caught) {
+    // 主进程的原始报错（例如窗口还没就绪）用户处理不了，只请他再试一次
+    console.error('启动器执行提示词失败:', caught);
+    executionError.value = t('launcher.runFailed');
+    executing.value = false;
+    await window.electronAPI.shortcuts.showLauncher();
+    return;
+  }
+  pinned.value = null;
+  revealedMissing.value = new Set();
+  try {
+    // 内容已经复制或粘贴出去了；记录使用次数、刷新最近使用失败不影响用户，只写日志
     if (prompt.id) {
       await recordPromptUsage({
         promptId: prompt.id,
@@ -409,11 +421,8 @@ async function executePrompt(prompt: PromptWithRelations, action: ShortcutAction
       });
     }
     state.value = await window.electronAPI.shortcuts.getState();
-    pinned.value = null;
-    revealedMissing.value = new Set();
   } catch (caught) {
-    executionError.value = caught instanceof Error ? caught.message : String(caught);
-    await window.electronAPI.shortcuts.showLauncher();
+    console.error('记录启动器使用情况失败:', caught);
   } finally {
     executing.value = false;
   }
