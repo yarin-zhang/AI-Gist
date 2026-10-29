@@ -690,6 +690,7 @@
     "syncIntervalTooShort": "The minimum is {min} minutes",
     "syncIntervalTooLong": "The maximum is {hours} hours ({max} minutes)",
     "indicatorShortRetrying": "Sync failed · Retrying later",
+    "indicatorShortRestorePaused": "Sync is waiting for your choice",
     "technicalDetails": "Technical details (copy these when reporting a problem)",
     "joinConfirm": {
       "title": "Merge this device's data with the cloud?",

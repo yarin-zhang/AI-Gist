@@ -690,6 +690,7 @@
     "syncIntervalTooShort": "最少 {min} 分鐘",
     "syncIntervalTooLong": "最多 {hours} 小時（{max} 分鐘）",
     "indicatorShortRetrying": "同步失敗 · 稍後自動重試",
+    "indicatorShortRestorePaused": "同步等你選擇",
     "technicalDetails": "技術詳情（回報問題時複製）",
     "joinConfirm": {
       "title": "合併本機和雲端的資料？",

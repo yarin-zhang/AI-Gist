@@ -17,6 +17,7 @@ export type DataSyncStatusKind =
     | 'retryScheduled'
     | 'error'
     | 'conflict'
+    | 'restorePaused'
     | 'paused'
     | 'syncing'
     | 'pending'
@@ -42,11 +43,15 @@ export interface DataSyncStatusInput {
     hasStorageConfigs: boolean;
     /** 两边都改过的数据在等用户选择处理方式（同步已暂停发布）。 */
     hasPendingConflict?: boolean;
+    /** 从备份恢复后，在等用户选择覆盖云端还是与云端合并；选好之前不会同步。 */
+    hasRestoreDecision?: boolean;
 }
 
 export function resolveDataSyncStatusKind(input: DataSyncStatusInput): DataSyncStatusKind {
     // 没有可用的存储时什么都不会同步：本地变更、下次检查、上次同步结果都不该再露出来 (#425)
     if (!input.hasStorageConfigs) return 'notConfigured';
+    // 恢复后同步整个停着：之前的失败、重试和下次检查都不作数，只等用户选择
+    if (input.hasRestoreDecision) return 'restorePaused';
     if (input.hasScheduledRetry) return 'retryScheduled';
     if (input.isError) return 'error';
     if (input.hasPendingConflict) return 'conflict';
@@ -67,6 +72,7 @@ export interface DataSyncStatusSnapshot {
     pendingChanges?: boolean;
     autoSyncEnabled?: boolean;
     hasEnabledStorage?: boolean;
+    restoreDecisionPending?: boolean;
 }
 
 /**
@@ -97,12 +103,14 @@ export function createDataSyncStatusInput(
         // 还没查过存储列表时按「有存储」处理，避免启动瞬间闪一下「未开启同步」
         hasStorageConfigs: context.hasStorageConfigs ?? snapshot.hasEnabledStorage ?? true,
         hasPendingConflict: snapshot.status === 'conflict',
+        hasRestoreDecision: !!snapshot.restoreDecisionPending,
     };
 }
 
 const ALERT_TYPE_BY_KIND: Record<Exclude<DataSyncStatusKind, 'error'>, 'success' | 'info' | 'warning'> = {
     retryScheduled: 'warning',
     conflict: 'warning',
+    restorePaused: 'warning',
     paused: 'warning',
     syncing: 'info',
     pending: 'info',

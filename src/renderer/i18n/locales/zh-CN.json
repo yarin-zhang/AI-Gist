@@ -690,6 +690,7 @@
     "syncIntervalTooShort": "最少 {min} 分钟",
     "syncIntervalTooLong": "最多 {hours} 小时（{max} 分钟）",
     "indicatorShortRetrying": "同步失败 · 稍后自动重试",
+    "indicatorShortRestorePaused": "同步等你选择",
     "technicalDetails": "技术详情（反馈问题时复制）",
     "joinConfirm": {
       "title": "合并本机和云端的数据？",
