@@ -126,10 +126,18 @@ import {
 import { shouldResetFloatingNav } from '~/lib/mobile/floating-nav-reset'
 import { isNativeTabBarEnabled, isVerticalBarsActive } from '~/lib/mobile/native-tab-bar'
 import { requestPromptSearch } from '~/lib/mobile/prompt-search-request'
+import { useCloudSyncRestoredNotice } from '~/composables/useCloudSyncRestoredNotice'
+import { presentMobileToast } from '~/lib/utils/mobile-toast'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+
+// 本机删除过的记录在另一台设备上被修改、同步后恢复了：提醒一次 (#489)。
+// 主页面一直在页面栈里，自动同步和手动同步的结果都能收到；放在顶部，不和底部的同步结果提示叠在一起
+useCloudSyncRestoredNotice(text => {
+  void presentMobileToast(text, 'success', { position: 'top', duration: 4000 })
+})
 
 // ------------------------------------------------------------------
 // 附件栏：左边长按钮 + 右边圆按钮（Gitea issue #7）

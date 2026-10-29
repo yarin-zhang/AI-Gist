@@ -514,7 +514,9 @@
       "merged": "已合并",
       "upToDate": "同步完成",
       "uploaded": "已上传",
-      "conflictPending": "本机和云端有改动冲突，请选择处理方式"
+      "conflictPending": "本机和云端有改动冲突，请选择处理方式",
+      "restoredOne": "「{name}」在另一台设备上被修改，已恢复",
+      "restoredMany": "「{name}」等 {total} 项在另一台设备上被修改，已恢复"
     },
     "testConnection": "测试连接",
     "title": "数据同步",
@@ -693,7 +695,9 @@
     "syncIntervalTooShort": "最少 {min} 分钟",
     "syncIntervalTooLong": "最多 {hours} 小时（{max} 分钟）",
     "indicatorShortRetrying": "同步失败 · 稍后自动重试",
-    "technicalDetails": "技术详情（反馈问题时复制）"
+    "technicalDetails": "技术详情（反馈问题时复制）",
+    "deviceNameOnPlatform": "{platform} 上的 AI Gist",
+    "deviceNameWeb": "网页版 AI Gist"
   },
   "databaseStatus": {
     "connectionError": "数据库连接异常",
@@ -1688,9 +1692,9 @@
     "description": "本机和云端的数据不一致，选好处理方式后再继续同步。",
     "localCounts": "本机：{prompts}、{categories}、{aiConfigs}",
     "remoteCounts": "云端：{prompts}、{categories}、{aiConfigs}",
-    "added": "云端新增 {count} 条",
-    "updated": "云端改过 {count} 条",
-    "deleted": "已删除 {count} 条",
+    "added": "云端新增了 {count} 条",
+    "updated": "云端修改了 {count} 条",
+    "deleted": "云端删除了 {count} 条",
     "strategyLabel": "处理方式",
     "useLocal": "使用本机数据",
     "useLocalDesc": "冲突项保留本机版本，丢弃云端的修改",
@@ -1751,7 +1755,9 @@
     },
     "countPrompts": "{count} 个提示词",
     "countCategories": "{count} 个分类",
-    "countAiConfigs": "{count} 个模型配置"
+    "countAiConfigs": "{count} 个模型配置",
+    "newer": "较新",
+    "deletedAtTime": "删除于 {time}"
   },
   "appInit": {
     "loading": "正在打开 AI Gist…",

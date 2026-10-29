@@ -514,7 +514,9 @@
       "merged": "已合併",
       "upToDate": "同步完成",
       "uploaded": "已上傳",
-      "conflictPending": "本機和雲端有修改衝突，請選擇處理方式"
+      "conflictPending": "本機和雲端有修改衝突，請選擇處理方式",
+      "restoredOne": "「{name}」在另一台裝置上被修改，已恢復",
+      "restoredMany": "「{name}」等 {total} 項在另一台裝置上被修改，已恢復"
     },
     "testConnection": "測試連線",
     "title": "資料同步",
@@ -693,7 +695,9 @@
     "syncIntervalTooShort": "最少 {min} 分鐘",
     "syncIntervalTooLong": "最多 {hours} 小時（{max} 分鐘）",
     "indicatorShortRetrying": "同步失敗 · 稍後自動重試",
-    "technicalDetails": "技術詳情（回報問題時複製）"
+    "technicalDetails": "技術詳情（回報問題時複製）",
+    "deviceNameOnPlatform": "{platform} 上的 AI Gist",
+    "deviceNameWeb": "網頁版 AI Gist"
   },
   "databaseStatus": {
     "connectionError": "資料庫連線異常",
@@ -1688,9 +1692,9 @@
     "description": "本機和雲端的資料不一致，選好處理方式後再繼續同步。",
     "localCounts": "本機：{prompts}、{categories}、{aiConfigs}",
     "remoteCounts": "雲端：{prompts}、{categories}、{aiConfigs}",
-    "added": "雲端新增 {count} 筆",
-    "updated": "雲端改過 {count} 筆",
-    "deleted": "已刪除 {count} 筆",
+    "added": "雲端新增了 {count} 筆",
+    "updated": "雲端修改了 {count} 筆",
+    "deleted": "雲端刪除了 {count} 筆",
     "strategyLabel": "處理方式",
     "useLocal": "使用本機資料",
     "useLocalDesc": "衝突項保留本機版本，捨棄雲端的修改",
@@ -1751,7 +1755,9 @@
     },
     "countPrompts": "{count} 個提示詞",
     "countCategories": "{count} 個分類",
-    "countAiConfigs": "{count} 個模型設定"
+    "countAiConfigs": "{count} 個模型設定",
+    "newer": "較新",
+    "deletedAtTime": "刪除於 {time}"
   },
   "appInit": {
     "loading": "正在開啟 AI Gist…",

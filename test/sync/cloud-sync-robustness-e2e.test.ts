@@ -303,17 +303,16 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
       ]
     })
 
+    // 审计日志和云端 manifest 里的冲突只留记录键、原因、处理结果和时间，不带完整记录 (#489)
     const conflictLog = deviceA.getConflictLog(storageId)
-    expect(conflictLog[0].conflicts[0].local.imageBlobs).toEqual({
-      omitted: true,
-      type: 'imageBlobs',
-      itemCount: 1
+    expect(conflictLog[0].conflicts[0]).toMatchObject({
+      collection: 'prompts',
+      key: 'uuid:prompt-main',
+      reason: 'both_modified',
+      resolution: 'take-newer'
     })
-    expect(conflictLog[0].conflicts[0].remote.imageBlobs).toEqual({
-      omitted: true,
-      type: 'imageBlobs',
-      itemCount: 1
-    })
+    expect(conflictLog[0].conflicts[0]).not.toHaveProperty('local')
+    expect(conflictLog[0].conflicts[0]).not.toHaveProperty('remote')
     expect(JSON.stringify(conflictLog)).not.toContain(largeImage)
 
     const manifest = await client.getCloudSyncManifest(storageId)
@@ -324,16 +323,14 @@ describe('Cloud sync robustness E2E over WebDAV', () => {
         imageBlobs: [largeImage]
       })
     ]))
-    expect(manifest.conflicts?.[0].local.imageBlobs).toEqual({
-      omitted: true,
-      type: 'imageBlobs',
-      itemCount: 1
+    expect(manifest.conflicts?.[0]).toMatchObject({
+      collection: 'prompts',
+      key: 'uuid:prompt-main',
+      reason: 'both_modified',
+      resolution: 'take-newer'
     })
-    expect(manifest.conflicts?.[0].remote.imageBlobs).toEqual({
-      omitted: true,
-      type: 'imageBlobs',
-      itemCount: 1
-    })
+    expect(manifest.conflicts?.[0]).not.toHaveProperty('local')
+    expect(manifest.conflicts?.[0]).not.toHaveProperty('remote')
     expect(JSON.stringify(manifest.conflicts)).not.toContain(largeImage)
     expect(manifest.latestSnapshot?.dataChecksum)
       .toBe(createCloudSyncDataChecksum(manifest.latestSnapshot!.data))

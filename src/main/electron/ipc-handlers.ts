@@ -1,3 +1,4 @@
+import os from 'os';
 import { ipcMain } from 'electron';
 import { shell } from 'electron';
 import { preferencesManager } from './preferences-manager';
@@ -200,6 +201,15 @@ class IpcHandlers {
     // 获取当前版本
     ipcMain.handle('app:get-version', () => {
       return updateManager.getCurrentVersion();
+    });
+
+    // 云同步记在 manifest 里的设备名：用主机名，用户在多台设备之间认得出是哪一台 (#489)
+    ipcMain.handle('app:get-device-name', () => {
+      try {
+        return os.hostname();
+      } catch {
+        return '';
+      }
     });
 
     // 获取应用路径
@@ -489,6 +499,7 @@ class IpcHandlers {
     
     // 清理更新处理器
     ipcMain.removeHandler('app:get-version');
+    ipcMain.removeHandler('app:get-device-name');
     ipcMain.removeHandler('app:get-path');
     ipcMain.removeHandler('app:open-download-page');
     
