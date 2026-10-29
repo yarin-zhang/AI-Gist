@@ -131,8 +131,6 @@ const isRestorableBackupData = (data: unknown): boolean => {
   });
 };
 
-const errorMessageOf = (error: unknown) => (error instanceof Error ? error.message : String(error ?? ''));
-
 const countOf = (value: unknown) => (Array.isArray(value) ? value.length : 0);
 
 const summarizeBackupData = (data: any): FullBackupImportSummary => ({
@@ -456,12 +454,30 @@ export class DataManagementAPI {
         filePath: success ? filePath : null
       };
     } catch (error) {
+      // 读本机数据或写文件时的原文只写日志，界面只说导出没有完成
+      console.error('导出完整备份失败:', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : tr('settingsMessages.fullBackupExportFailed'),
+        message: tr('settingsMessages.fullBackupExportFailed'),
         error: error
       };
     }
+  }
+
+  /**
+   * 把备份文件的文本读成可以导入的数据：不是 JSON、不是 AI Gist 的完整备份、版本太新、校验不通过分开报。
+   * 桌面端导入和移动端「从文件导入」共用，失败时界面按错误码显示 dataBackup.importErrors.* 里的说明。
+   */
+  static parseFullBackupContent(content: string):
+    | { ok: true; data: any }
+    | { ok: false; errorCode: FullBackupImportErrorCode; params?: Record<string, unknown>; error?: unknown } {
+    let imported: unknown;
+    try {
+      imported = JSON.parse(content);
+    } catch (error) {
+      return { ok: false, errorCode: 'invalidJson', error };
+    }
+    return this.readFullBackupData(imported);
   }
 
   /**
@@ -491,13 +507,17 @@ export class DataManagementAPI {
    * `approve` 拿到文件里的条目数，返回 false 就取消；`beforeReplace` 在替换前执行（用来做导入前备份），抛错则不导入。
    */
   static async importFullBackup(options: FullBackupImportOptions = {}): Promise<any> {
-    // 每种失败都说清楚原因，并告诉用户本机数据有没有被动过 (#442)
-    const fail = (errorCode: FullBackupImportErrorCode, params: Record<string, unknown> = {}, error?: unknown) => ({
-      success: false,
-      errorCode,
-      message: tr(`dataBackup.importErrors.${errorCode}`, params),
-      error
-    });
+    // 每种失败都说清楚原因，并告诉用户本机数据有没有被动过 (#442)。
+    // 底层的错误原文（哪张表写不进去、哪个字段不对）用户处理不了，只写日志，不拼进提示
+    const fail = (errorCode: FullBackupImportErrorCode, params: Record<string, unknown> = {}, error?: unknown) => {
+      if (error !== undefined) console.warn(`导入完整备份没有完成（${errorCode}）:`, error);
+      return {
+        success: false,
+        errorCode,
+        message: tr(`dataBackup.importErrors.${errorCode}`, params),
+        error
+      };
+    };
 
     try {
       // 1. 选择导入文件
@@ -515,14 +535,7 @@ export class DataManagementAPI {
       }
       if (!content) return fail('readFailed');
 
-      let imported: unknown;
-      try {
-        imported = JSON.parse(content);
-      } catch (error) {
-        return fail('invalidJson', {}, error);
-      }
-
-      const parsed = this.readFullBackupData(imported);
+      const parsed = this.parseFullBackupContent(content);
       if (!parsed.ok) return fail(parsed.errorCode, parsed.params, parsed.error);
       const data = parsed.data;
 
@@ -533,14 +546,14 @@ export class DataManagementAPI {
       try {
         await options.beforeReplace?.();
       } catch (error) {
-        return fail('backupFailed', { error: errorMessageOf(error) }, error);
+        return fail('backupFailed', {}, error);
       }
 
       // 4. 导入到数据库（整体替换是原子的，失败时本机数据保持原样）
       const result = await this.importDataToDatabase(data);
       if (!result.success) {
         return {
-          ...fail('importFailed', { error: result.error || tr('dataSync.diagnosis.unknownError') }),
+          ...fail('importFailed', {}, result.error || result.errorCode || 'unknown'),
           imported: result.imported
         };
       }
@@ -551,7 +564,7 @@ export class DataManagementAPI {
         imported: result.imported
       };
     } catch (error) {
-      return fail('importFailed', { error: errorMessageOf(error) }, error);
+      return fail('importFailed', {}, error);
     }
   }
 

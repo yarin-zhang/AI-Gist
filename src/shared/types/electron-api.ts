@@ -142,8 +142,8 @@ export default interface ElectronApi {
     deleteStorageConfig: (id: string) => Promise<{ success: boolean; error?: string }>
     testStorageConnection: (config: CloudStorageConfig) => Promise<{ success: boolean; error?: string }>
     getBackupList: (storageId: string) => Promise<CloudBackupInfo[]>
-    createBackup: (storageId: string, options?: string | CloudBackupCreateOptions) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
-    restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string }>
+    createBackup: (storageId: string, options?: string | CloudBackupCreateOptions) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string; localFailure?: boolean }>
+    restoreBackup: (storageId: string, backupId: string) => Promise<{ success: boolean; message: string; backupInfo?: CloudBackupInfo; error?: string; localFailure?: boolean }>
     deleteBackup: (storageId: string, backup: CloudBackupDeleteTarget) => Promise<{ success: boolean; message?: string; error?: string }>
     getSyncManifest: (storageId: string) => Promise<
       CloudSyncManifest |

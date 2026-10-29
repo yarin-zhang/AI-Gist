@@ -85,6 +85,7 @@ import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
 import { cloudSyncService } from '~/lib/services/cloud-sync.service'
 import { formatFriendlyDate } from '~/lib/utils/date'
+import { describeCloudBackupFailure } from '~/lib/utils/cloud-backup-feedback'
 import type { CloudBackupInfo, CloudStorageConfig } from '@shared/types/cloud-backup'
 import { confirmAction, formatSize, showToast, withLoading } from './shared'
 
@@ -122,28 +123,22 @@ const loadConfig = async () => {
   }
 }
 
-// 失败提示带上做的是哪件事：「创建云端备份失败：…」，没有具体原因时只说哪件事失败了
-const failedWith = (context: string, reason?: unknown) => {
-  const text = reason instanceof Error ? reason.message : String(reason ?? '').trim()
-  return text ? t('mobileSettings.failedWith', { context, reason: text }) : context
-}
-
 const loadBackups = async () => {
   if (!storageId.value) return
   busy.refresh = true
   try {
     backups.value = await CloudBackupAPI.getCloudBackupList(storageId.value)
   } catch (error) {
-    console.error('加载云端备份列表失败:', error)
     const message = error instanceof Error ? error.message : String(error)
-    // 首次使用时远端目录还不存在，这不是错误，提示用户先创建一个备份即可。
+    backups.value = []
+    // 首次使用时远端还没有备份目录：这不是错误，列表的空状态已经说明了，不再弹提示
     if (message.includes('does not exist') || message.includes('404')) {
-      backups.value = []
-      await showToast(t('cloudBackup.backupDirectoryCreated'), 'warning')
-    } else {
-      backups.value = []
-      await showToast(failedWith(t('dataBackup.loadCloudBackupsFailed'), message), 'danger')
+      console.info('云端还没有备份目录:', message)
+      return
     }
+    console.error('加载云端备份列表失败:', error)
+    // 只有连不上存储（密码、地址……）时才说原因，其余原因用户处理不了，只写日志
+    await showToast(describeCloudBackupFailure(t('dataBackup.loadCloudBackupsFailed'), message), 'danger')
   } finally {
     busy.refresh = false
   }
@@ -175,14 +170,16 @@ const createBackup = async () => {
       }))
 
     if (!result.success) {
-      await showToast(failedWith(t('dataBackup.createCloudBackupFailed'), result.error), 'danger')
+      console.warn('创建云端备份失败:', result.error || result.message)
+      await showToast(describeCloudBackupFailure(t('dataBackup.createCloudBackupFailed'), result.error,
+        { localFailure: result.localFailure }), 'danger')
       return
     }
     await showToast(t('dataBackup.createCloudBackupSuccess'))
     await loadBackups()
   } catch (error) {
     console.error('创建云端备份失败:', error)
-    await showToast(failedWith(t('dataBackup.createCloudBackupFailed'), error), 'danger')
+    await showToast(describeCloudBackupFailure(t('dataBackup.createCloudBackupFailed'), error), 'danger')
   } finally {
     busy.create = false
   }
@@ -202,7 +199,12 @@ const restoreBackup = async (backup: CloudBackupInfo) => {
       CloudBackupAPI.restoreCloudBackup(storageId.value, backup.id))
 
     if (!result.success) {
-      await showToast(failedWith(t('dataBackup.restoreFailed'), result.error), 'danger')
+      console.warn('恢复云端备份失败:', result.error || result.message)
+      // 恢复在替换本机数据之前失败，或者替换本身失败后整体回滚：本机数据都没有变
+      await showToast(describeCloudBackupFailure(t('dataBackup.restoreFailed'), result.error, {
+        localFailure: result.localFailure,
+        otherwise: t('dataBackup.restoreFailedUnchanged')
+      }), 'danger')
       return
     }
 
@@ -218,7 +220,7 @@ const restoreBackup = async (backup: CloudBackupInfo) => {
     }
   } catch (error) {
     console.error('恢复云端备份失败:', error)
-    await showToast(failedWith(t('dataBackup.restoreFailed'), error), 'danger')
+    await showToast(describeCloudBackupFailure(t('dataBackup.restoreFailed'), error), 'danger')
   }
 }
 
@@ -234,7 +236,8 @@ const deleteBackup = async (backup: CloudBackupInfo) => {
   try {
     const result = await CloudBackupAPI.deleteCloudBackup(storageId.value, backup.id)
     if (!result.success) {
-      await showToast(failedWith(t('dataBackup.deleteFailed'), result.error), 'danger')
+      console.warn('删除云端备份失败:', result.error || result.message)
+      await showToast(describeCloudBackupFailure(t('dataBackup.deleteFailed'), result.error), 'danger')
       return
     }
     await showToast(t('dataBackup.deleteSuccess'))

@@ -27,6 +27,11 @@ export const MAX_AUTO_BACKUP_INTERVAL_MINUTES = 10080;
 export const AUTOMATIC_BACKUP_INTERVAL_PRESETS = [5, 10, 15, 30, 60, 120, 360, 720, 1440, 10080] as const;
 
 const AUTO_BACKUP_STARTUP_DELAY_MS = 30_000;
+/**
+ * 连续失败几次才在设置页提一句。偶尔一次没做成（数据正忙、刚好退出）下一轮会自动重试，
+ * 用户什么也做不了，不该打扰他；一直做不成时才需要让他知道，自己另外留一份备份。
+ */
+export const AUTOMATIC_BACKUP_FAILURE_NOTICE_THRESHOLD = 2;
 const BACKUP_STORE_NAMES: DataStoreName[] = [
   'categories',
   'prompts',
@@ -48,17 +53,22 @@ export interface AutomaticBackupStatus {
   updatedAt: string;
   lastBackupAt?: string;
   nextBackupAt?: string;
+  /** 最近一次失败的原因，只给日志和排查用，不显示在界面上 */
   error?: string;
+  /** 连续失败的次数，成功一次就清零 */
+  consecutiveFailures?: number;
   lastRunAction?: 'created' | 'unchanged' | 'maintenance';
   deletedCount?: number;
-  deferredCount?: number;
 }
 
 export interface AutomaticBackupRetentionUpdateResult {
   retention: number;
   deletedCount: number;
-  deferredCount: number;
-  warnings: string[];
+}
+
+/** 设置页要不要提示「最近几次自动备份没有完成」 */
+export function shouldNotifyAutomaticBackupFailure(status: Pick<AutomaticBackupStatus, 'consecutiveFailures'>): boolean {
+  return (status.consecutiveFailures ?? 0) >= AUTOMATIC_BACKUP_FAILURE_NOTICE_THRESHOLD;
 }
 
 export interface AutomaticBackupFlushResult {
@@ -217,6 +227,10 @@ export class AutomaticBackupService {
     return this.applyRetentionNow();
   }
 
+  /**
+   * 按保留份数删掉多出来的旧自动备份。删不掉的不用告诉用户：设置已经保存，
+   * 下一次自动备份会按同样的份数再清理一次（LocalBackupService.create 带着 retention）。
+   */
   async applyRetentionNow(): Promise<AutomaticBackupRetentionUpdateResult> {
     try {
       const deletedCount = await this.backupService.pruneAutomatic(this.retention);
@@ -224,14 +238,12 @@ export class AutomaticBackupService {
         status: 'success',
         error: undefined,
         lastRunAction: 'maintenance',
-        deletedCount,
-        deferredCount: 0
+        deletedCount
       });
-      return { retention: this.retention, deletedCount, deferredCount: 0, warnings: [] };
+      return { retention: this.retention, deletedCount };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.updateStatus({ status: 'error', error: message, lastRunAction: 'maintenance' });
-      return { retention: this.retention, deletedCount: 0, deferredCount: 0, warnings: [message] };
+      console.warn('清理旧的自动备份失败，下次自动备份时会再试:', error);
+      return { retention: this.retention, deletedCount: 0 };
     }
   }
 
@@ -328,17 +340,20 @@ export class AutomaticBackupService {
         status: 'success',
         lastBackupAt: result.backup.createdAt,
         error: undefined,
+        consecutiveFailures: 0,
         lastRunAction: result.action,
-        deletedCount: result.deletedCount,
-        deferredCount: 0
+        deletedCount: result.deletedCount
       });
       if (this.pendingChangeVersion === pendingVersion) this.pendingChangeVersion = 0;
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // 下一轮定时会自动重试；原因只写日志
+      console.warn(`自动备份没有完成（${trigger}），会自动重试:`, error);
       this.updateStatus({
         status: 'error',
-        error: message
+        error: message,
+        consecutiveFailures: (this.status.consecutiveFailures ?? 0) + 1
       });
       return { success: false, error: message };
     }

@@ -152,6 +152,7 @@ import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
 import MobileRow from '~/components/mobile/ui/MobileRow.vue'
 import { useI18n } from '~/composables/useI18n'
 import {
+  isLocalDataUnchangedAfterFailedRestore,
   localBackupService,
   type LocalBackupInfo
 } from '~/lib/services/local-backup.service'
@@ -285,16 +286,12 @@ const pickRetention = async () => {
   if (value === undefined || value === autoBackupRetention.value) return
 
   try {
+    // 份数保存了就算成功；旧备份这次没删掉的，下次自动备份时会再清理，不用告诉用户
     const result = await automaticBackupService.setRetention(value)
     autoBackupRetention.value = result.retention
-    if (result.warnings.length > 0) {
-      await showToast(
-        t('dataBackup.automaticBackupRetentionWarning', { error: result.warnings.join('; ') }),
-        'warning'
-      )
-    } else {
-      await showToast(t('dataBackup.automaticBackupRetentionApplied', { count: result.deletedCount }))
-    }
+    await showToast(result.deletedCount > 0
+      ? t('dataBackup.automaticBackupRetentionApplied', { count: result.deletedCount })
+      : t('dataBackup.automaticBackupRetentionSaved', { count: result.retention }))
     await loadBackups()
   } catch (error) {
     console.error('保存本地备份保留份数失败:', error)
@@ -347,11 +344,11 @@ const restoreBackup = async (backup: LocalBackupInfo) => {
       if (goToSync) void router.push('/mobile/settings/data-sync')
     }
   } catch (error) {
+    // 原因（哪张表、哪条记录）只写日志，用户看到的只说结果
     console.error('恢复本地备份失败:', error)
-    await showToast(
-      error instanceof Error ? error.message : t('mobileSettings.backup.restoreFailed'),
-      'danger'
-    )
+    await showToast(isLocalDataUnchangedAfterFailedRestore(error)
+      ? t('dataBackup.restoreFailedUnchanged')
+      : t('mobileSettings.backup.restoreFailed'), 'danger')
   }
 }
 

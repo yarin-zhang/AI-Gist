@@ -9,13 +9,15 @@ import { DataManagementAPI, type FullBackupImportOptions } from '@renderer/lib/a
 import { useDatabase } from './useDatabase';
 import { databaseService } from '@renderer/lib/db';
 import {
+  isLocalDataUnchangedAfterFailedRestore,
   localBackupService,
   type LocalBackupInfo
 } from '@renderer/lib/services/local-backup.service';
 
 export type BackupInfo = LocalBackupInfo;
 
-// 提示会直接显示在设置页上，必须跟随界面语言
+// 提示会直接显示在设置页上，必须跟随界面语言。
+// 只显示这里的提示语：底层的错误原文（表名、记录 ID、事务错误……）用户处理不了，只写日志。
 const tr = (key: string, named?: Record<string, unknown>) =>
   (i18n.global.t as (key: string, named?: Record<string, unknown>) => string)(key, named ?? {});
 
@@ -59,7 +61,7 @@ export function useDataManagement() {
       return backups;
     } catch (err) {
       console.error('获取备份列表失败:', err);
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.getBackupListFailed');
+      error.value = tr('settingsMessages.getBackupListFailed');
       return [];
     } finally {
       if (showLoading) setLoading('refreshBackupList', false);
@@ -81,7 +83,7 @@ export function useDataManagement() {
       return result.backup;
     } catch (err) {
       console.error('创建备份失败:', err);
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.backupCreatedFailed');
+      error.value = tr('settingsMessages.backupCreatedFailed');
       return null;
     } finally {
       setLoading('backup', false);
@@ -97,7 +99,10 @@ export function useDataManagement() {
       success.value = tr('dataManagement.messages.backupRestored');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.backupRestoreFailed');
+      console.error('恢复备份失败:', err);
+      error.value = isLocalDataUnchangedAfterFailedRestore(err)
+        ? tr('dataBackup.restoreFailedUnchanged')
+        : tr('dataManagement.messages.backupRestoreFailed');
       return false;
     } finally {
       setLoading('restore', false);
@@ -114,7 +119,8 @@ export function useDataManagement() {
       success.value = tr('settingsMessages.backupDeleteSuccess');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.backupDeleteFailed');
+      console.error('删除备份失败:', err);
+      error.value = tr('settingsMessages.backupDeleteFailed');
       return false;
     } finally {
       setLoading('backup', false);
@@ -126,7 +132,8 @@ export function useDataManagement() {
     try {
       await localBackupService.openDirectory();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.openDirectoryFailed');
+      console.error('打开备份目录失败:', err);
+      error.value = tr('dataManagement.messages.openDirectoryFailed');
     }
   };
 
@@ -144,10 +151,12 @@ export function useDataManagement() {
       // 在保存对话框里点了取消，不算失败
       if (result.cancelled) return false;
 
-      error.value = result.message || tr('settingsMessages.fullBackupExportFailed');
+      console.error('导出完整备份失败:', result.error || result.message);
+      error.value = tr('settingsMessages.fullBackupExportFailed');
       return false;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.fullBackupExportFailed');
+      console.error('导出完整备份失败:', err);
+      error.value = tr('settingsMessages.fullBackupExportFailed');
       return false;
     } finally {
       setLoading('export', false);
@@ -171,10 +180,12 @@ export function useDataManagement() {
       }
       if (result.cancelled) return false;
 
+      // message 是按失败原因写好的界面提示（文件坏了、不是备份、版本太新……）
       error.value = result.message || tr('settingsMessages.fullBackupImportFailed');
       return false;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.fullBackupImportFailed');
+      console.error('导入完整备份失败:', err);
+      error.value = tr('settingsMessages.fullBackupImportFailed');
       return false;
     } finally {
       setLoading('import', false);
@@ -190,7 +201,9 @@ export function useDataManagement() {
       // 1. 从数据库获取选定数据
       const result = await safeDbOperation(() => databaseService.exportAllData());
       if (!result || !result.success) {
-        throw new Error(tr('dataManagement.messages.exportDataFailed'));
+        console.error('读取要导出的数据失败:', result?.error || result?.message);
+        error.value = tr('dataManagement.messages.exportDataFailed');
+        return false;
       }
       
       // 2. 根据选项过滤数据
@@ -213,10 +226,8 @@ export function useDataManagement() {
       const defaultName = `ai-gist-selected-${timestamp}.${format}`;
       const filePath = await DataManagementAPI.selectExportPath(defaultName);
       
-      if (!filePath) {
-        error.value = tr('dataManagement.messages.noExportPath');
-        return false;
-      }
+      // 在保存对话框里点了取消，不算失败，和完整备份导出一样不提示
+      if (!filePath) return false;
       
       // 4. 导出数据
       const exportSuccess = await DataManagementAPI.exportDataToFile(filteredData, filePath, format, {
@@ -231,7 +242,8 @@ export function useDataManagement() {
         return false;
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.selectiveExportFailed');
+      console.error('选择性导出失败:', err);
+      error.value = tr('dataManagement.messages.selectiveExportFailed');
       return false;
     } finally {
       setLoading('export', false);
@@ -257,18 +269,24 @@ export function useDataManagement() {
       
       const result = await safeDbOperation(() => databaseService.getHealthStatus());
       
-      if (result && result.healthy) {
+      if (!result) {
+        // 检查本身没跑成（数据还没就绪、读取出错），不能说成数据有问题
+        error.value = tr('settingsMessages.databaseHealthCheckFailed');
+        return { healthy: false, missingStores: [] };
+      }
+      if (result.healthy) {
         success.value = tr('dataManagement.messages.healthCheckPassed');
       } else {
-        error.value = tr('dataManagement.messages.healthCheckIssues', {
-          stores: result?.missingStores?.join(', ') || tr('dataManagement.messages.unknownIssue')
-        });
+        // 缺的是哪几张内部数据表只对排查有用，界面只说需要修复、去点哪个按钮
+        console.warn('数据检查发现缺失的数据表:', result.missingStores);
+        error.value = tr('dataManagement.messages.healthCheckIssues');
       }
       
       return result;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.databaseHealthCheckFailed');
-      return { healthy: false, missingStores: [tr('dataManagement.messages.checkFailed')] };
+      console.error('数据检查失败:', err);
+      error.value = tr('settingsMessages.databaseHealthCheckFailed');
+      return { healthy: false, missingStores: [] };
     } finally {
       setLoading('healthCheck', false);
     }
@@ -286,11 +304,13 @@ export function useDataManagement() {
         success.value = tr('dataManagement.messages.repairSuccess');
         return true;
       } else {
-        error.value = result?.message || tr('dataManagement.messages.repairFailed');
+        console.error('修复数据失败:', result?.message);
+        error.value = tr('dataManagement.messages.repairFailed');
         return false;
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('dataManagement.messages.repairFailed');
+      console.error('修复数据失败:', err);
+      error.value = tr('dataManagement.messages.repairFailed');
       return false;
     } finally {
       setLoading('repair', false);
@@ -304,18 +324,32 @@ export function useDataManagement() {
       clearMessages();
       
       // 清空前先备份当前数据（界面承诺「先自动备份，再删除」），备份失败就不清空
-      await localBackupService.createSafetyBackup('clear');
+      try {
+        await localBackupService.createSafetyBackup('clear');
+      } catch (err) {
+        console.error('清空前备份当前数据失败，已取消清空:', err);
+        error.value = tr('settingsMessages.clearBackupFailed');
+        return false;
+      }
 
-      // 清空所有表
-      await safeDbOperation(() => databaseService.forceCleanAllTables());
-      
+      // 清空所有表。safeDbOperation 出错时只返回兜底值，不会抛出，要靠返回值判断有没有清空
+      const cleared = await safeDbOperation(async () => {
+        await databaseService.forceCleanAllTables();
+        return true;
+      }, false);
+
       // 本地备份存在独立的库里，清空数据不会删掉它们（包括刚做的保护性备份），刷新一下列表
       await getBackupList();
-      
+
+      if (!cleared) {
+        error.value = tr('settingsMessages.databaseClearFailed');
+        return false;
+      }
       success.value = tr('settingsMessages.databaseCleared');
       return true;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : tr('settingsMessages.databaseClearFailed');
+      console.error('清空本机数据失败:', err);
+      error.value = tr('settingsMessages.databaseClearFailed');
       return false;
     } finally {
       setLoading('clearDatabase', false);

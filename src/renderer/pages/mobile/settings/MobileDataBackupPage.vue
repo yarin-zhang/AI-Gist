@@ -103,9 +103,11 @@ import MobileGroup from '~/components/mobile/ui/MobileGroup.vue'
 import MobileRow from '~/components/mobile/ui/MobileRow.vue'
 import { useI18n } from '~/composables/useI18n'
 import { CloudBackupAPI } from '~/lib/api/cloud-backup.api'
+import { DataManagementAPI } from '~/lib/api/data-management.api'
 import { databaseService } from '~/lib/db'
 import { dataRestoreService } from '~/lib/services/data-restore.service'
 import { formatFriendlyDate } from '~/lib/utils/date'
+import { isShareDismissed } from '~/lib/utils/share-dismissed'
 import { createBackupPayload } from '@shared/backup-integrity'
 import type { CloudStorageConfig } from '@shared/types/cloud-backup'
 import { confirmAction, loadLocalBackupSummary, showToast, withLoading } from './shared'
@@ -211,6 +213,11 @@ const handleExport = async () => {
 
     await showToast(t('settingsMessages.dataExportSuccess'))
   } catch (error) {
+    // 用户自己关掉了分享面板：文件已经写进应用的文稿目录，不算失败，什么都不提示
+    if (isShareDismissed(error)) {
+      console.info('用户关闭了分享面板，导出的文件已保存在应用文稿目录')
+      return
+    }
     console.error('导出完整备份失败:', error)
     await showToast(t('settingsMessages.dataExportFailed'), 'danger')
   }
@@ -225,17 +232,22 @@ const handleImport = () => {
     const file = (event.target as HTMLInputElement)?.files?.[0]
     if (!file) return
 
-    let prepared
+    // 和桌面端共用同一套判断：不是 JSON、不是完整备份、版本太新、校验不通过分开说明，原文只写日志
+    let content: string
     try {
-      prepared = dataRestoreService.parseFileContent(await file.text())
+      content = await file.text()
     } catch (error) {
-      console.error('导入文件校验失败:', error)
-      await showToast(
-        error instanceof Error ? error.message : t('settingsMessages.dataImportFailed'),
-        'danger'
-      )
+      console.error('读取导入文件失败:', error)
+      await showToast(t('dataBackup.importErrors.readFailed'), 'danger')
       return
     }
+    const parsed = DataManagementAPI.parseFullBackupContent(content)
+    if (!parsed.ok) {
+      console.warn(`导入文件校验没有通过（${parsed.errorCode}）:`, parsed.error)
+      await showToast(t(`dataBackup.importErrors.${parsed.errorCode}`, parsed.params ?? {}), 'danger')
+      return
+    }
+    const prepared = dataRestoreService.prepare(parsed.data)
 
     const confirmed = await confirmAction({
       header: t('common.warning'),
@@ -250,7 +262,7 @@ const handleImport = () => {
       ].join('\n'),
       destructive: true
     })
-    if (confirmed) await performImport(prepared.payload)
+    if (confirmed) await performImport(prepared.data)
   }
 
   input.click()
@@ -262,7 +274,10 @@ const performImport = async (payload: unknown) => {
       dataRestoreService.restore(payload, { source: 'local-file' }))
 
     if (!result?.success) {
-      throw new Error(result?.error || result?.message || '导入失败')
+      // 恢复服务的失败都发生在替换之前，或者是原子替换失败后回滚：本机数据没有变化
+      console.error('导入完整备份没有完成:', result?.error || result?.message)
+      await showToast(t('dataBackup.importErrors.importFailed'), 'danger')
+      return
     }
 
     await showToast(t('settingsMessages.dataImportSuccess'))

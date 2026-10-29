@@ -242,7 +242,10 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
         const result = await DataManagementAPI.exportFullBackup()
 
         expect(result.success).toBe(false)
-        expect(result.message).toContain('database unavailable')
+        // 底层原因只写日志，提示里只说导出没有完成
+        expect(result.message).not.toContain('database unavailable')
+        expect(result.message).toBe('完整备份导出失败')
+        expect(errorSpy).toHaveBeenCalledWith('导出完整备份失败:', expect.any(Error))
         expect((window as any).electronAPI.invoke).not.toHaveBeenCalledWith(
           'data:write-file',
           expect.anything()
@@ -362,15 +365,18 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
     })
 
     it('导入前备份失败时不替换数据库', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       const result = await DataManagementAPI.importFullBackup({
         approve: async () => true,
-        beforeReplace: async () => { throw new Error('备份失败') },
+        beforeReplace: async () => { throw new Error('ENOSPC: no space left on device') },
       })
 
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe('backupFailed')
-      expect(result.message).toContain('备份失败')
-      expect(result.message).toContain('本机数据没有改动')
+      expect(result.message).toBe('导入前没能先备份当前数据，所以没有导入。本机数据没有改动。')
+      // 原始原因只进日志
+      expect(result.message).not.toContain('ENOSPC')
+      expect(warnSpy).toHaveBeenCalledWith('导入完整备份没有完成（backupFailed）:', expect.any(Error))
       expect((window as any).databaseAPI.replaceAllData).not.toHaveBeenCalled()
     })
 
@@ -442,11 +448,14 @@ describe('DataManagementAPI - 本地备份/恢复', () => {
       expect(result.message).toContain('本机数据没有改动')
     })
 
-    it('数据库替换失败时返回 importFailed 和原因', async () => {
-      ;(window as any).databaseAPI.replaceAllData.mockResolvedValueOnce({ success: false, error: 'quota exceeded' })
+    it('数据库替换失败时返回 importFailed，原因只写日志', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      ;(window as any).databaseAPI.replaceAllData.mockResolvedValueOnce({ success: false, error: '写入 prompts 记录失败: quota exceeded' })
       const result = await DataManagementAPI.importFullBackup()
       expect(result).toMatchObject({ success: false, errorCode: 'importFailed' })
-      expect(result.message).toContain('quota exceeded')
+      expect(result.message).toBe('导入没有完成，本机数据保持原样。')
+      expect(result.message).not.toMatch(/quota|prompts/)
+      expect(warnSpy).toHaveBeenCalledWith('导入完整备份没有完成（importFailed）:', '写入 prompts 记录失败: quota exceeded')
     })
 
     it('提示跟随界面语言，英文界面不再出现中文', async () => {

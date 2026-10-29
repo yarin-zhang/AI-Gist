@@ -30,8 +30,9 @@
                     <template #suffix>{{ t('dataBackup.copies') }}</template>
                 </NInputNumber>
             </UiSettingRow>
-            <p v-if="autoBackupStatus.error" class="backup-settings__error" role="alert">
-                {{ t('dataBackup.automaticBackupFailed', { error: autoBackupStatus.error }) }}
+            <!-- 偶尔一次没做成会自动重试，不打扰；连续几次都没做成才提一句，原因只写日志 -->
+            <p v-if="shouldNotifyAutomaticBackupFailure(autoBackupStatus)" class="backup-settings__notice" role="status">
+                {{ t('dataBackup.automaticBackupFailed') }}
             </p>
         </UiPanel>
 
@@ -188,6 +189,7 @@ import {
     DEFAULT_AUTO_BACKUP_RETENTION,
     MAX_AUTO_BACKUP_INTERVAL_MINUTES,
     MIN_AUTO_BACKUP_INTERVAL_MINUTES,
+    shouldNotifyAutomaticBackupFailure,
 } from '@/lib/services/automatic-backup.service';
 import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
 import { LOCAL_SAFETY_BACKUP_TRIGGERS } from '@/lib/services/local-backup.service';
@@ -589,19 +591,11 @@ const saveAutoBackupRetention = async () => {
             autoBackupRetention.value = savedAutoBackupRetention;
             return;
         }
+        // 份数保存了就算成功；旧备份这次没删掉的，下次自动备份时会再清理，不用告诉用户
         const retentionResult = await automaticBackupService.setRetention(retention);
         savedAutoBackupRetention = retentionResult.retention;
         autoBackupRetention.value = retentionResult.retention;
-        if (retentionResult.warnings.length > 0) {
-            message.warning(t('dataBackup.automaticBackupRetentionWarning', {
-                error: retentionResult.warnings.join('；')
-            }));
-        } else if (retentionResult.deferredCount > 0) {
-            message.info(t('dataBackup.automaticBackupRetentionDeferred', {
-                count: retentionResult.deletedCount,
-                deferred: retentionResult.deferredCount
-            }));
-        } else if (retentionResult.deletedCount > 0) {
+        if (retentionResult.deletedCount > 0) {
             message.success(t('dataBackup.automaticBackupRetentionApplied', {
                 count: retentionResult.deletedCount
             }));
@@ -694,10 +688,10 @@ onUnmounted(() => {
     padding: 0;
 }
 
-.backup-settings__error {
+.backup-settings__notice {
     margin: 0;
     padding: 8px 0 12px;
-    color: var(--accent-error);
+    color: var(--accent-warning);
     font-size: var(--font-size-sm);
 }
 
