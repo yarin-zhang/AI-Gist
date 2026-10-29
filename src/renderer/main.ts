@@ -4,6 +4,7 @@ import i18n from './i18n'
 import { initDatabase, databaseService, cloudSyncService, automaticBackupService, initializeCliBridgeExecutor } from './lib/services'
 import { applyDocumentLocale, resolveInitialLocale } from './i18n/locale-detection'
 import { PlatformDetector } from '@shared/platform'
+import { resolveCloudSyncDeviceName } from './lib/utils/device-name'
 // 界面字体随包分发，离线也能用；中日韩字形走 global.css 里的系统字体回退
 import '@fontsource-variable/inter'
 import '@fontsource/jetbrains-mono/400.css'
@@ -177,7 +178,8 @@ async function startApp() {
     if (!isLauncherSurface) {
       await cloudSyncService.startAutoSyncFromSettings({
         platform: PlatformDetector.getPlatform(),
-        deviceName: navigator.userAgent,
+        // 写进云端的设备名：桌面端用主机名，其他平台用「iPhone 上的 AI Gist」这类名字，不再是整串 User-Agent (#489)
+        deviceName: await resolveCloudSyncDeviceName(),
         startupDelayMs: PlatformDetector.isMobile() ? 0 : undefined
       });
       await automaticBackupService.startFromSettings();

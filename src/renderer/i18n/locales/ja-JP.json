@@ -302,7 +302,7 @@
     "backupEveryHours": "{count} 時間ごと",
     "backupEveryMinutes": "{count} 分ごと",
     "cloudBackup": "クラウドバックアップ",
-    "cloudLocationDescription": "「クラウドバックアップを作成」をクリックしたときにのみ完全バックアップをアップロードします。自動バックアップは常にこの端末に保存され、クラウドへの自動アップロードやローテーションは行いません。",
+    "cloudLocationDescription": "「クラウドバックアップを作成」をクリックしたときにのみ完全バックアップをアップロードします（モデル設定の API キーは含みません）。自動バックアップは常にこの端末に保存され、クラウドへの自動アップロードやローテーションは行いません。",
     "configureCloudStorage": "データ同期を設定",
     "confirmDeleteCloudBackup": "このクラウドバックアップを削除しますか？",
     "confirmRestore": "復元",
@@ -514,7 +514,9 @@
       "merged": "マージしました",
       "upToDate": "同期が完了しました",
       "uploaded": "アップロードしました",
-      "conflictPending": "このデバイスとクラウドの変更が競合しています。対処方法を選んでください"
+      "conflictPending": "このデバイスとクラウドの変更が競合しています。対処方法を選んでください",
+      "restoredOne": "「{name}」は別のデバイスで変更されたため、復元しました",
+      "restoredMany": "「{name}」など {total} 件は別のデバイスで変更されたため、復元しました"
     },
     "testConnection": "接続テスト",
     "title": "データ同期",
@@ -723,7 +725,9 @@
       "color": "色",
       "icon": "アイコン",
       "parentUuid": "親カテゴリ"
-    }
+    },
+    "deviceNameOnPlatform": "{platform} の AI Gist",
+    "deviceNameWeb": "Web 版 AI Gist"
   },
   "databaseStatus": {
     "connectionError": "データベースの接続エラー",
@@ -1705,7 +1709,9 @@
     "systemPromptDefaultLanguageNote": "内蔵の既定プロンプトは中国語で書かれており、そのままモデルに送信されます。別の言語で指示したい場合は、独自の内容に書き換えてください。",
     "switchProviderTitle": "「{name}」に切り替えますか？",
     "switchProviderMessage": "入力済みの API キー、アドレス、モデル一覧はクリアされ、新しいプロバイダーに合わせて入力し直す必要があります。",
-    "switchProvider": "切り替え"
+    "switchProvider": "切り替え",
+    "credentialMissingTag": "API キー未設定",
+    "credentialNotSynced": "API キーは同期されません。この設定を使うには、このデバイスで API キーを入力してください。"
   },
   "mobileNav": {
     "label": "メインナビゲーション",
@@ -1718,9 +1724,9 @@
     "description": "このデバイスとクラウドのデータが一致しません。対処方法を選ぶと同期を再開します。",
     "localCounts": "このデバイス：{prompts}、{categories}、{aiConfigs}",
     "remoteCounts": "クラウド：{prompts}、{categories}、{aiConfigs}",
-    "added": "クラウドで追加：{count} 件",
-    "updated": "クラウドで変更：{count} 件",
-    "deleted": "削除：{count} 件",
+    "added": "クラウドで {count} 件追加されました",
+    "updated": "クラウドで {count} 件変更されました",
+    "deleted": "クラウドで {count} 件削除されました",
     "strategyLabel": "対処方法",
     "useLocal": "このデバイスのデータを使う",
     "useLocalDesc": "競合した項目はこのデバイスの版を残し、クラウドの変更は破棄します",
@@ -1781,7 +1787,9 @@
     },
     "countPrompts": "プロンプト {count} 件",
     "countCategories": "カテゴリ {count} 件",
-    "countAiConfigs": "モデル設定 {count} 件"
+    "countAiConfigs": "モデル設定 {count} 件",
+    "newer": "新しい方",
+    "deletedAtTime": "{time} に削除"
   },
   "appInit": {
     "loading": "AI Gist を開いています…",

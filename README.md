@@ -13,7 +13,7 @@
 
 支持变量替换、Jinja 模板、AI 生成与调优、历史版本记录、云端备份等核心功能。
 
-![主要截图](docs/images/image-main.png?v=202608170119)
+![主要截图](docs/images/image-main.png?v=202610290914)
 
 [🏠 访问官网](https://getaigist.com) | [🔗 GitHub 下载](https://github.com/yarin-zhang/AI-Gist/releases) | [🇬🇧 English README](docs/README.en.md)
 
@@ -28,7 +28,7 @@ AI Gist 提供基础的 AI 提示词管理功能，旨在帮助用户高效地�
 * **筛选分类**：快速筛选、查找、组织提示词，支持标签、分类、评分、收藏等功能。
 * **多种历史记录**：便于重复调用与持续优化，事后可回溯。
 
-![特点01](docs/images/image-main-dark.png?v=202608162327)
+![特点01](docs/images/image-main-dark.png?v=202610290914)
 
 AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升管理效率。用之前，改一改。
 
@@ -37,7 +37,7 @@ AI Gist 还集成了 AI 模型，支持自动生成和调整提示词，提升�
 * **AI 调优**：使用 AI 改写提示词，快速让提示词更具体、更丰富，同样支持自定义。
 * **AI 提取变量**：无需手动挖空，使用 AI 自动提取可能的变量。
 
-![特点02](docs/images/image-ai-generator.png?v=202608162327)
+![特点02](docs/images/image-ai-generator.png?v=202610290914)
 
 AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持云备份功能，方便在不同设备间同步。
 
@@ -45,7 +45,7 @@ AI Gist 关注隐私和数据安全，所有数据都存储在本地，并支持
 * **掌控数据**：拥有完整的数据控制，支持完整导出和导入，通用格式 CSV 导出。
 * **云端备份**：支持 WebDAV、iCloud 备份与恢复，方便在多设备间共享数据。
 
-![特点03](docs/images/image-data-cloud-backup.png?v=202608162327)
+![特点03](docs/images/image-data-cloud-backup.png?v=202610290914)
 
 * **多平台支持**：支持 Windows / macOS / Linux 桌面端，Android（APK）和 iOS（App Store）移动端。
 * **多语言支持**：支持简体中文、繁体中文、英文、日语。
@@ -170,57 +170,54 @@ yarn build:linux    # 构建 Linux 安装包
 
 ## 应用截图
 
-<div align="center">
+### 桌面端
 
-![变量填充](docs/images/image-variable-fill.png?v=202608162327)
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/image-variable-fill.png?v=202610290914" alt="变量填充" width="390"><br>变量填充</td>
+    <td align="center"><img src="docs/images/image-edit-prompt.png?v=202610290914" alt="编辑提示词" width="390"><br>编辑提示词</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-jinja-template.png?v=202610290914" alt="Jinja 模板" width="390"><br>Jinja 模板</td>
+    <td align="center"><img src="docs/images/image-ai-config.png?v=202610290914" alt="AI 模型管理" width="390"><br>AI 模型管理</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-ai-add-config.png?v=202610290914" alt="添加 AI 配置" width="390"><br>添加 AI 配置</td>
+    <td align="center"><img src="docs/images/image-ai-quick-adjust.png?v=202610290914" alt="AI 快速调整" width="390"><br>AI 快速调整</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-filter.png?v=202610290914" alt="高级筛选" width="390"><br>高级筛选</td>
+    <td align="center"><img src="docs/images/image-table-view.png?v=202610290914" alt="表格视图" width="390"><br>表格视图</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-folder-view.png?v=202610290914" alt="文件夹视图" width="390"><br>文件夹视图</td>
+    <td align="center"><img src="docs/images/image-category.png?v=202610290914" alt="分类管理" width="390"><br>分类管理</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-data-local-backup.png?v=202610290914" alt="数据备份" width="390"><br>数据备份</td>
+    <td align="center"><img src="docs/images/image-main-light.png?v=202610290914" alt="明亮模式" width="390"><br>明亮模式</td>
+  </tr>
+</table>
 
-变量填充
+### 移动端
 
-![编辑提示词](docs/images/image-edit-prompt.png?v=202608162327)
-
-编辑提示词
-
-![Jinja 模板](docs/images/image-jinja-template.png?v=202608162327)
-
-Jinja 模板
-
-![AI 模型管理](docs/images/image-ai-config.png?v=202608162327)
-
-AI 模型管理
-
-![AI 添加配置](docs/images/image-ai-add-config.png?v=202608162327)
-
-添加 AI 配置
-
-![AI 快速调整](docs/images/image-ai-quick-adjust.png?v=202608162327)
-
-AI 快速调整
-
-![高级筛选](docs/images/image-filter.png?v=202608162327)
-
-高级筛选
-
-![表格视图](docs/images/image-table-view.png?v=202608162327)
-
-表格视图
-
-![文件夹视图](docs/images/image-folder-view.png?v=202608162327)
-
-文件夹视图
-
-![分类管理](docs/images/image-category.png?v=202608162327)
-
-分类管理
-
-![数据备份](docs/images/image-data-local-backup.png?v=202608162327)
-
-数据备份
-
-![明亮模式](docs/images/image-main-light.png?v=202608162327)
-
-明亮模式
-
-</div>
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-01-library.png?v=202610290914" alt="提示词库" width="240"><br>提示词库</td>
+    <td align="center"><img src="docs/images/mobile-02-fill.png?v=202610290914" alt="逐个填写变量" width="240"><br>逐个填写变量</td>
+    <td align="center"><img src="docs/images/mobile-03-image-prompt.png?v=202610290914" alt="图片提示词" width="240"><br>图片提示词</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-04-filter.png?v=202610290914" alt="筛选与排序" width="240"><br>筛选与排序</td>
+    <td align="center"><img src="docs/images/mobile-05-edit.png?v=202610290914" alt="编辑与快速优化" width="240"><br>编辑与快速优化</td>
+    <td align="center"><img src="docs/images/mobile-06-variable.png?v=202610290914" alt="变量设置" width="240"><br>变量设置</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-07-ai-generator.png?v=202610290914" alt="AI 生成与多轮调整" width="240"><br>AI 生成与多轮调整</td>
+    <td align="center"><img src="docs/images/mobile-08-sync.png?v=202610290914" alt="数据同步" width="240"><br>数据同步</td>
+    <td align="center"><img src="docs/images/mobile-09-appearance.png?v=202610290914" alt="外观与语言" width="240"><br>外观与语言</td>
+  </tr>
+</table>
 
 ## 许可证
 

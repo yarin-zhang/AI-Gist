@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useMessage } from 'naive-ui';
 import { Copy, Refresh, Settings, X } from '@vicons/tabler';
 import {
   cloudSyncService,
   getCloudSyncErrorDiagnosis,
+  getCloudSyncRestoredMessage,
   getCloudSyncResultMessage
 } from '~/lib/services/cloud-sync.service';
 import type { CloudSyncStatus } from '~/lib/services/cloud-sync.service';
@@ -16,9 +18,13 @@ import {
   resolveDataSyncStatusKind
 } from '~/lib/utils/data-sync-status';
 import { useSyncConflict } from '~/composables/useSyncConflict';
+import { useCloudSyncRestoredNotice } from '~/composables/useCloudSyncRestoredNotice';
 
 const { t, locale } = useI18n();
+const message = useMessage();
 const syncConflict = useSyncConflict();
+// 本机删除过的记录在另一台设备上被修改、同步后恢复了：弹一条提示，状态说明里也留着 (#489)
+useCloudSyncRestoredNotice(text => message.info(text));
 const status = ref<CloudSyncStatus>(cloudSyncService.getStatus());
 const tooltipVisible = ref(false);
 const detailPanelVisible = ref(false);
@@ -123,7 +129,10 @@ const detailText = computed(() => {
     case 'retryScheduled':
     case 'error': return errorDiagnosis.value.message;
     case 'current': return status.value.lastResult?.success
-      ? getCloudSyncResultMessage(status.value.lastResult.action)
+      ? [
+        getCloudSyncResultMessage(status.value.lastResult.action),
+        getCloudSyncRestoredMessage(status.value.lastResult.restoredAfterLocalDelete)
+      ].filter(Boolean).reduce((text, sentence) => joinSentences(text, sentence, String(locale.value)))
       : t('dataSync.indicatorSyncedDetail');
     case 'pending': return t('dataSync.indicatorScheduledDetail');
     case 'syncing': return t('dataSync.statusSyncingDescription');

@@ -616,9 +616,9 @@ describe('cloud sync engine', () => {
       expect(result.conflicts).toEqual([
         expect.objectContaining({ reason: 'delete_vs_update', resolution: 'take-remote' })
       ])
-      // 提示词和它的变量一起删除
+      // 提示词和它的变量一起删除：提示词是冲突项，只计入 conflicts；变量没有冲突，按云端删除计数 (#489)
       expect(result.data.promptVariables).toEqual([])
-      expect(result.summary).toMatchObject({ deleted: 2, kept: 0 })
+      expect(result.summary).toMatchObject({ added: 0, updated: 0, deleted: 1, kept: 0, conflicts: 1 })
     })
 
     it('accepts a deletion when the other device only used the prompt, even from an old version that bumped updatedAt (#488)', () => {

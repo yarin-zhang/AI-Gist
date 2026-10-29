@@ -11,27 +11,32 @@ import type {
   CloudSyncMergeOptions,
   CloudSyncMergeResult,
   CloudSyncMergeSummary,
+  CloudSyncRestoredRecord,
   CloudSyncSnapshot
 } from '@shared/cloud-sync-engine';
 import {
   applyCloudSyncTombstones,
   createCloudSyncCategoryNameLookup,
   createCloudSyncConflictPreview,
+  findCloudSyncRecordsRestoredOverLocalDeletes,
   getCloudSyncConflictId,
   createCloudSyncSemanticChecksum,
   createCloudSyncSemanticSignature,
   createCloudSyncSnapshot,
   getCloudSyncRecordKey,
+  getCloudSyncRecordLabel,
   mergeCloudSyncData,
   normalizeCloudSyncDataSet,
   validateCloudSyncDataSetShape,
   validateCloudSyncSnapshot
 } from '@shared/cloud-sync-engine';
 import type {
+  CloudSyncConflictMetadata,
   CloudSyncManifest,
   CloudSyncManifestSaveOptions,
   CloudSyncManifestSaveResult
 } from '@shared/cloud-sync-manifest';
+import { getPlatformDeviceName } from '../utils/device-name';
 import {
   createEmptyCloudSyncManifest,
   getCloudSyncManifestRepairMetadata,
@@ -57,6 +62,7 @@ import {
   createSyncedCloudSyncJoinPreview,
   type CloudSyncJoinPreview
 } from '@shared/cloud-sync-join-preview';
+import { dataSetContainsCredentials, stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import { generateUUID } from '../utils/uuid';
 import i18n from '../../i18n';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
@@ -93,6 +99,11 @@ const DEFAULT_AUTO_SYNC_DEBOUNCE_MS = 5000;
 const DEFAULT_REMOTE_POLL_INTERVAL_MS = DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES * 60 * 1000;
 const DEFAULT_AUTO_SYNC_RETRY_MS = DEFAULT_REMOTE_POLL_INTERVAL_MS;
 const DEFAULT_STARTUP_SYNC_DELAY_MS = 10000;
+/**
+ * 窗口重新获得焦点、从后台回来、恢复联网时的检查，在云端没变也不必整份下载 manifest 时的最短间隔 (#487)。
+ * 做不到的存储仍按完整检查间隔节流，避免频繁整份下载
+ */
+const CHEAP_REMOTE_CHECK_MIN_INTERVAL_MS = 60 * 1000;
 const MAX_AUTO_SYNC_RETRY_MS = 60 * 60 * 1000;
 const MAX_REMOTE_RECHECK_ATTEMPTS = 5;
 const REMOTE_RECHECK_RETRY_STEP_MS = 200;
@@ -151,6 +162,9 @@ export interface CloudSyncConflictItem {
   remoteUpdatedAt?: string;
   localDeleted: boolean;
   remoteDeleted: boolean;
+  /** 这一边删除这条记录的时间（来自删除标记）；没删除或没有删除标记时没有 */
+  localDeletedAt?: string;
+  remoteDeletedAt?: string;
   /** 本机这一边的关键内容（标题、正文开头、分类等）；已删除时没有 */
   localPreview?: CloudSyncConflictPreview;
   /** 云端这一边的关键内容；已删除时没有 */
@@ -192,6 +206,8 @@ export interface CloudSyncResult {
   relationRepairs?: CloudSyncRelationRepair[];
   v2MirrorStatus?: 'skipped' | 'published' | 'already-current' | 'rebase-required' | 'failed';
   pendingConflict?: CloudSyncPendingConflict;
+  /** 本机删除过、因另一台设备保留或修改得更晚而在这次同步后恢复的记录，由同步状态提示告诉用户 (#489) */
+  restoredAfterLocalDelete?: CloudSyncRestoredRecord[];
 }
 
 export type CloudSyncErrorCode =
@@ -247,6 +263,11 @@ export interface CloudSyncRestoreSuspension {
 
 export interface CloudSyncCloudClient {
   getCloudSyncManifest(storageId: string): Promise<CloudSyncManifest>;
+  /**
+   * 刚读过 manifest 之后调用：下一次检查这个存储时，云端没变的话能否不下载整份 manifest
+   * （条件读取或 PROPFIND 比对 ETag）。没有实现按「不能」处理 (#487)
+   */
+  canCheckManifestCheaply?(storageId: string): boolean;
   saveCloudSyncManifest(
     storageId: string,
     manifest: CloudSyncManifest,
@@ -261,6 +282,10 @@ export interface CloudSyncCloudClient {
 
 export interface CloudSyncDatabaseClient {
   exportAllDataForSync(): Promise<ExportResult>;
+  /**
+   * 用同步结果整库替换本机数据。同步数据不带模型配置的 API Key (#491)，实现必须保留本机已有的凭据：
+   * 写入的配置没有凭据时按 uuid / configId 用本机原有的补上（DatabaseServiceManager 默认如此）。
+   */
   replaceAllData(data: CloudSyncDataSet, options?: { preserveSyncMetadata?: boolean }): Promise<ImportResult>;
   getLocalSyncMetadata?<T = any>(key: string): Promise<T | null>;
   setLocalSyncMetadata?<T = any>(key: string, value: T): Promise<void>;
@@ -343,7 +368,8 @@ export interface CloudSyncConflictLogEntry {
   localRevision?: string;
   remoteRevision?: string;
   resolvedRevision?: string;
-  conflicts: CloudSyncConflict[];
+  /** 只记哪条记录、为什么冲突、怎么处理的和两边的修改时间，不带完整记录 (#489) */
+  conflicts: CloudSyncConflictMetadata[];
 }
 
 export interface CloudSyncServiceDeps {
@@ -390,6 +416,11 @@ export class CloudSyncService {
     remoteRevision?: string;
     result: CloudSyncResult;
   }>();
+  /**
+   * 每个存储最近一次检查后，下次检查在云端没变时能否不下载整份 manifest (#487)。
+   * 查过的存储全都能做到时，焦点 / 唤醒触发的检查才放宽到最短 1 分钟一次
+   */
+  private readonly cheapRemoteCheckStorages = new Map<string, boolean>();
   private syncAllAfterRetry = false;
   private readonly statusListeners = new Set<CloudSyncStatusListener>();
   private autoSyncOptions: CloudSyncAutoOptions | null = null;
@@ -848,7 +879,7 @@ export class CloudSyncService {
       const remoteSnapshot = manifest.latestSnapshot;
       if (remoteSnapshot) this.assertValidRemoteSnapshot(remoteSnapshot);
       const remoteData = remoteSnapshot
-        ? applyCloudSyncTombstones(remoteSnapshot.data)
+        ? this.getRemoteMergeData(remoteSnapshot)
         : normalizeCloudSyncDataSet({});
       let safetyBackupCreated = false;
 
@@ -1118,6 +1149,8 @@ export class CloudSyncService {
   resetStorageFailureState(storageId: string): void {
     this.deterministicFailureGuards.delete(storageId);
     this.blockedStorageFailures.delete(storageId);
+    // 配置改了，存储层的 manifest 缓存也已作废，等下一次检查重新确认
+    this.cheapRemoteCheckStorages.delete(storageId);
     if (this.status.status !== 'error' || this.status.storageId !== storageId || this.runningSyncs.has(storageId)) {
       return;
     }
@@ -1386,7 +1419,7 @@ export class CloudSyncService {
         };
       }
 
-      const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
+      const remoteData = this.getRemoteMergeData(remoteSnapshot);
       const baseData = this.getBaseData(localState);
       phase = 'merge';
       const mergeResult = this.mergeWithConflictDecision(localData, remoteData, baseData, options);
@@ -1419,7 +1452,13 @@ export class CloudSyncService {
       }
       const mergedData = contractResult.data;
       const mergedEqualsLocal = dataSetsEqual(localData, mergedData);
-      const mergedEqualsRemote = dataSetsEqual(remoteData, mergedData);
+      // 旧版本上传的云端快照带着明文 API Key：内容相同也要重新上传一份不含凭据的，把云端的明文覆盖掉 (#491)
+      const mergedEqualsRemote = !dataSetContainsCredentials(remoteSnapshot.data) &&
+        dataSetsEqual(remoteData, mergedData);
+      // 本机删除过、这次合并又带回来的记录：写回本机后要告诉用户，不能悄悄恢复 (#489)
+      const restoredAfterLocalDelete = mergedEqualsLocal
+        ? []
+        : findCloudSyncRecordsRestoredOverLocalDeletes(localData, mergedData);
       // 同名分类另有 categoryMerges 逐个说明；默认快速优化动作归并成一份是预期行为，不用提示 (#490)
       const otherBusinessKeyMerges = contractResult.merges
         .filter(merge => merge.collection !== 'categories' && merge.collection !== 'quickOptimizationConfigs');
@@ -1525,13 +1564,15 @@ export class CloudSyncService {
           );
         } catch (error) {
           if (isCloudSyncRemoteChangedError(error)) {
+            // 本机已经写入了恢复的记录，重试时它们不再是「本机没有」的记录，提醒要带过去
             return await this.retryAfterManifestConflict(
               storageId,
               options,
               attempt,
               finalSnapshot,
               appliedLocal,
-              generation
+              generation,
+              appliedLocal ? restoredAfterLocalDelete : []
             );
           }
           throw error;
@@ -1560,7 +1601,8 @@ export class CloudSyncService {
         warnings: mergeWarnings(contractWarnings, stateWarning),
         businessKeyMerges: contractResult.merges,
         categoryMerges,
-        relationRepairs: contractResult.repairs
+        relationRepairs: contractResult.repairs,
+        ...(appliedLocal && restoredAfterLocalDelete.length > 0 ? { restoredAfterLocalDelete } : {})
       };
     } catch (error) {
       const diagnostic = createCloudSyncStructuredDiagnostic(error, {
@@ -1611,13 +1653,24 @@ export class CloudSyncService {
       throw new Error(`本机同步数据导出不完整，已取消本次云同步: ${validation.reason || '未知原因'}`);
     }
 
-    return normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data));
+    // 模型配置的 API Key 只留在本机：数据库导出时已经去掉，这里再兜一次底，任何导出实现都不会把凭据带进快照 (#491)
+    return stripCredentialsFromDataSet(normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data)));
+  }
+
+  /**
+   * 参与合并的云端数据。旧版本上传的快照可能带着明文 API Key，合并前去掉：
+   * 凭据不参与比较，两边只差 API Key 不算修改也不算冲突，也不会被写进本机或再上传 (#491)
+   */
+  private getRemoteMergeData(snapshot: CloudSyncSnapshot): CloudSyncDataSet {
+    return stripCredentialsFromDataSet(applyCloudSyncTombstones(snapshot.data));
   }
 
   private async replaceLocalDataForSync(nextData: CloudSyncDataSet, rollbackData: CloudSyncDataSet): Promise<void> {
     this.applyingRemoteDataDepth++;
     try {
       // 保留同步基线：写入本机之后上传还可能失败或因并发重试，下一次合并仍要用旧基线 (#484)
+      // 合并结果里的模型配置不带 API Key：replaceAllData 默认在同一个事务里按 uuid / configId
+      // 用本机原有的凭据补上（preserveLocalCredentials），不会把本机的 API Key 清空 (#491)
       const importResult = await this.database.replaceAllData(nextData, { preserveSyncMetadata: true });
       if (!importResult.success) {
         throw new CloudSyncLocalApplyError(importResult);
@@ -1640,6 +1693,7 @@ export class CloudSyncService {
 
   private async rollbackLocalDataAfterFailedSync(rollbackData: CloudSyncDataSet): Promise<unknown | null> {
     try {
+      // 回滚用的本机导出同样不带凭据，replaceAllData 按同样的规则补回本机原有的 API Key (#491)
       const rollbackResult = await this.database.replaceAllData(rollbackData, { preserveSyncMetadata: true });
       if (!rollbackResult.success) {
         return new Error(rollbackResult.error || rollbackResult.message || '同步失败后恢复本机数据失败');
@@ -1683,9 +1737,13 @@ export class CloudSyncService {
     attempt: number,
     submittedSnapshot: CloudSyncSnapshot,
     appliedLocal: boolean,
-    generation: number
+    generation: number,
+    restoredBeforeRetry: CloudSyncRestoredRecord[] = []
   ): Promise<CloudSyncResult> {
-    const retryResult = await this.retryWithLatestRemote(storageId, options, attempt, generation);
+    const retryResult = withRestoredRecords(
+      await this.retryWithLatestRemote(storageId, options, attempt, generation),
+      restoredBeforeRetry
+    );
     if (
       retryResult.success &&
       retryResult.remoteRevision === submittedSnapshot.revision
@@ -1713,7 +1771,9 @@ export class CloudSyncService {
     generation: number
   ): Promise<{ manifest: CloudSyncManifest; result?: CloudSyncResult }> {
     try {
-      const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+      const cloudClient = this.getCloudClient();
+      const manifest = await cloudClient.getCloudSyncManifest(storageId);
+      this.cheapRemoteCheckStorages.set(storageId, cloudClient.canCheckManifestCheaply?.(storageId) === true);
       this.assertCurrentSyncGeneration(storageId, generation);
       if (manifest.latestSnapshot) {
         return { manifest };
@@ -2195,7 +2255,8 @@ export class CloudSyncService {
 
   private getBaseData(localState: CloudSyncLocalState | null): CloudSyncDataSet {
     if (localState?.baseSnapshot) {
-      return applyCloudSyncTombstones(localState.baseSnapshot.data);
+      // 旧版本留下的基线可能带着 API Key，和本机、云端一样去掉后再比较 (#491)
+      return stripCredentialsFromDataSet(applyCloudSyncTombstones(localState.baseSnapshot.data));
     }
 
     return {};
@@ -2236,6 +2297,7 @@ export class CloudSyncService {
     if (PlatformDetector.isElectron()) {
       return {
         getCloudSyncManifest: storageId => CloudBackupAPI.getCloudSyncManifest(storageId),
+        canCheckManifestCheaply: storageId => CloudBackupAPI.canCheckSyncManifestCheaply(storageId),
         saveCloudSyncManifest: (storageId, manifest, options) =>
           CloudBackupAPI.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => CloudBackupAPI.listCloudSyncSnapshots(storageId),
@@ -2246,6 +2308,7 @@ export class CloudSyncService {
     if (PlatformDetector.isWeb()) {
       return {
         getCloudSyncManifest: storageId => webCloudBackupService.getCloudSyncManifest(storageId),
+        canCheckManifestCheaply: storageId => webCloudBackupService.canCheckSyncManifestCheaply(storageId),
         saveCloudSyncManifest: (storageId, manifest, options) =>
           webCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
         listCloudSyncSnapshots: storageId => webCloudBackupService.listCloudSyncSnapshots(storageId),
@@ -2255,6 +2318,7 @@ export class CloudSyncService {
 
     return {
       getCloudSyncManifest: storageId => mobileCloudBackupService.getCloudSyncManifest(storageId),
+      canCheckManifestCheaply: storageId => mobileCloudBackupService.canCheckSyncManifestCheaply(storageId),
       saveCloudSyncManifest: (storageId, manifest, options) =>
         mobileCloudBackupService.saveCloudSyncManifest(storageId, manifest, options),
       listCloudSyncSnapshots: storageId => mobileCloudBackupService.listCloudSyncSnapshots(storageId),
@@ -2806,7 +2870,20 @@ export class CloudSyncService {
       return 0;
     }
 
-    return Math.max(0, lastAttemptTime + intervalMs - Date.now());
+    // 云端没变时检查只要一次条件请求（几百字节），焦点 / 唤醒 / 恢复联网时不必等满整个检查间隔，
+    // 另一台设备的改动切回来就能看到；做不到的存储仍按完整间隔，避免频繁整份下载 (#487)
+    const throttleIntervalMs = this.canRelaxForegroundCheckThrottle(reason)
+      ? Math.min(intervalMs, CHEAP_REMOTE_CHECK_MIN_INTERVAL_MS)
+      : intervalMs;
+    return Math.max(0, lastAttemptTime + throttleIntervalMs - Date.now());
+  }
+
+  private canRelaxForegroundCheckThrottle(reason: CloudSyncRunReason): boolean {
+    if (reason !== 'focus' && reason !== 'resume' && reason !== 'online') {
+      return false;
+    }
+    const checks = [...this.cheapRemoteCheckStorages.values()];
+    return checks.length > 0 && checks.every(Boolean);
   }
 
   private getNextRetryDelayMs(): number {
@@ -3099,9 +3176,33 @@ function isPresentRecord(record: any): boolean {
   return !!record && record._deleted !== true && record.isDeleted !== true;
 }
 
-function getConflictRecordLabel(record: any, fallback: string): string {
-  const label = record?.title || record?.name || record?.key || record?.uuid;
-  return typeof label === 'string' && label.trim() ? label.trim() : fallback;
+/** 这一边删除这条记录的时间：取匹配的删除标记里最晚的一个 */
+function getConflictDeletedAt(data: CloudSyncDataSet, conflict: CloudSyncConflict): string | undefined {
+  const uuid = [conflict.local, conflict.remote, conflict.base]
+    .map(record => record?.uuid)
+    .find((value): value is string => typeof value === 'string' && !!value);
+  const times = (data.syncTombstones || [])
+    .filter(tombstone =>
+      tombstone?.collectionName === conflict.collection &&
+      (tombstone.recordKey === conflict.key || (!!uuid && tombstone.recordUuid === uuid)))
+    .map(tombstone => toIsoTime(tombstone.deletedAt))
+    .filter((value): value is string => !!value)
+    .sort();
+  return times[times.length - 1];
+}
+
+/** 把重试前已写入本机的「已恢复」记录并进重试结果，同一条只保留一次 */
+function withRestoredRecords(result: CloudSyncResult, restored: CloudSyncRestoredRecord[]): CloudSyncResult {
+  if (!result.success || restored.length === 0) {
+    return result;
+  }
+
+  const existing = result.restoredAfterLocalDelete || [];
+  const seen = new Set(existing.map(record => getCloudSyncConflictId(record)));
+  return {
+    ...result,
+    restoredAfterLocalDelete: [...existing, ...restored.filter(record => !seen.has(getCloudSyncConflictId(record)))]
+  };
 }
 
 function countSyncCollections(data: CloudSyncDataSet): CloudSyncCollectionCounts {
@@ -3129,19 +3230,27 @@ export function createCloudSyncPendingConflict(
   return {
     storageId,
     detectedAt,
-    items: mergeResult.conflicts.map(conflict => ({
-      id: getCloudSyncConflictId(conflict),
-      collection: conflict.collection,
-      key: conflict.key,
-      reason: conflict.reason,
-      label: getConflictRecordLabel(conflict.local || conflict.remote || conflict.base, conflict.key),
-      localUpdatedAt: toIsoTime(conflict.local?.updatedAt || conflict.local?.createdAt),
-      remoteUpdatedAt: toIsoTime(conflict.remote?.updatedAt || conflict.remote?.createdAt),
-      localDeleted: !isPresentRecord(conflict.local),
-      remoteDeleted: !isPresentRecord(conflict.remote),
-      localPreview: createCloudSyncConflictPreview(conflict.collection, conflict.local, { categoryNameOf: localCategoryName }),
-      remotePreview: createCloudSyncConflictPreview(conflict.collection, conflict.remote, { categoryNameOf: remoteCategoryName })
-    })),
+    items: mergeResult.conflicts.map(conflict => {
+      const localDeleted = !isPresentRecord(conflict.local);
+      const remoteDeleted = !isPresentRecord(conflict.remote);
+      return {
+        id: getCloudSyncConflictId(conflict),
+        collection: conflict.collection,
+        key: conflict.key,
+        reason: conflict.reason,
+        label: getCloudSyncRecordLabel(conflict.local || conflict.remote || conflict.base, conflict.key),
+        localUpdatedAt: toIsoTime(conflict.local?.updatedAt || conflict.local?.createdAt),
+        remoteUpdatedAt: toIsoTime(conflict.remote?.updatedAt || conflict.remote?.createdAt),
+        localDeleted,
+        remoteDeleted,
+        // 「一边删除、一边修改」时，智能合并比较的是删除时间和修改时间，弹窗里也要能看到删除时间
+        localDeletedAt: localDeleted ? getConflictDeletedAt(localData, conflict) : undefined,
+        remoteDeletedAt: remoteDeleted ? getConflictDeletedAt(remoteData, conflict) : undefined,
+        localPreview: createCloudSyncConflictPreview(conflict.collection, conflict.local, { categoryNameOf: localCategoryName }),
+        remotePreview: createCloudSyncConflictPreview(conflict.collection, conflict.remote, { categoryNameOf: remoteCategoryName })
+      };
+    }),
+    // 冲突项只算在 items 里，summary 里的新增 / 修改 / 删除都是不冲突、会直接合并的改动 (#489)
     summary: { ...mergeResult.summary },
     localCounts: countSyncCollections(localData),
     remoteCounts: countSyncCollections(remoteData)
@@ -3152,11 +3261,12 @@ function getBrowserStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'
   return typeof window !== 'undefined' ? window.localStorage : undefined;
 }
 
+/**
+ * 调用方没给设备名时的兜底：按平台生成「Mac 上的 AI Gist」这类名字，不再写整串 User-Agent (#489)。
+ * 桌面端启动自动同步时会先经主进程取主机名传进来。
+ */
 function getDefaultDeviceName(): string {
-  if (typeof navigator === 'undefined') {
-    return 'Unknown Device';
-  }
-  return navigator.userAgent || 'Unknown Device';
+  return getPlatformDeviceName();
 }
 
 function getSyncAction(appliedLocal: boolean, uploadedRemote: boolean): CloudSyncAction {
@@ -3231,6 +3341,38 @@ export function getCloudSyncResultMessage(action?: string, _conflictCount = 0): 
     ? action
     : 'upToDate';
   return translateSyncMessage(`dataSync.syncResult.${key}`);
+}
+
+/**
+ * 本机删除过的记录被另一台设备保留或修改得更晚、这次同步后恢复了：给用户一句说明 (#489)。
+ * 一条时写出名字；多条时写第一条的名字和其余条数。没有恢复的记录时返回空字符串。
+ */
+export function getCloudSyncRestoredMessage(records: CloudSyncRestoredRecord[] | undefined): string {
+  if (!records || records.length === 0) return '';
+  const name = records[0].label;
+  if (records.length === 1) {
+    return translateSyncCountMessage('dataSync.syncResult.restoredOne', { name }, 1,
+      `「${name}」在另一台设备上被修改，已恢复`);
+  }
+  // count 是名字之外的其余条数（英语、意大利语按它变单复数），total 是总条数（中文、日语写「等 N 项」）
+  const count = records.length - 1;
+  const total = records.length;
+  return translateSyncCountMessage('dataSync.syncResult.restoredMany', { name, count, total }, count,
+    `「${name}」等 ${total} 项在另一台设备上被修改，已恢复`);
+}
+
+function translateSyncCountMessage(
+  key: string,
+  named: Record<string, unknown>,
+  plural: number,
+  fallback: string
+): string {
+  try {
+    const translated = (i18n.global.t as (key: string, named: Record<string, unknown>, plural: number) => string)(key, named, plural);
+    return translated === key ? fallback : translated;
+  } catch {
+    return fallback;
+  }
 }
 
 /** 诊断标题、说明、建议操作和可复制的报告都会直接给用户看，必须跟随界面语言 */

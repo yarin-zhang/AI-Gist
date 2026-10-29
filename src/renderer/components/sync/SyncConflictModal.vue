@@ -12,12 +12,13 @@
         </div>
       </div>
 
-      <!-- 统计写成完整的短句（云端新增几条、两边都改过几项），不用「+」「~」这类符号 -->
+      <!-- 统计写成完整的短句（云端新增了几条、两边都改过几项），不用「+」「~」这类符号。
+           新增 / 修改 / 删除只数不冲突、会直接合并的改动；删除标记本身不算新增 (#489) -->
       <div class="conflict__stats">
         <span v-if="pending.items.length" class="ui-tag ui-tag--warning">{{ t('syncConflict.bothChanged', { count: pending.items.length }) }}</span>
-        <span v-if="pending.summary.added" class="ui-tag ui-tag--success">{{ t('syncConflict.added', { count: pending.summary.added }) }}</span>
-        <span v-if="pending.summary.updated" class="ui-tag">{{ t('syncConflict.updated', { count: pending.summary.updated }) }}</span>
-        <span v-if="pending.summary.deleted" class="ui-tag">{{ t('syncConflict.deleted', { count: pending.summary.deleted }) }}</span>
+        <span v-if="pending.summary.added" class="ui-tag ui-tag--success">{{ t('syncConflict.added', { count: pending.summary.added }, pending.summary.added) }}</span>
+        <span v-if="pending.summary.updated" class="ui-tag">{{ t('syncConflict.updated', { count: pending.summary.updated }, pending.summary.updated) }}</span>
+        <span v-if="pending.summary.deleted" class="ui-tag">{{ t('syncConflict.deleted', { count: pending.summary.deleted }, pending.summary.deleted) }}</span>
       </div>
 
       <UiChoiceCards v-model="strategy" :options="strategyOptions" :label="t('syncConflict.strategyLabel')" />
@@ -58,18 +59,13 @@
                       </span>
                     </span>
                   </td>
-                  <td>
+                  <!-- 两边在同一分钟内时显示到秒，并标出较新的一边 (#489) -->
+                  <td v-for="side in SIDES" :key="side">
                     <label class="conflict__choice">
-                      <input type="radio" :name="item.id" :checked="resolutions[item.id] === 'local'"
-                        @change="resolutions = { ...resolutions, [item.id]: 'local' }" />
-                      {{ versionLabel(item.localDeleted, item.localUpdatedAt) }}
-                    </label>
-                  </td>
-                  <td>
-                    <label class="conflict__choice">
-                      <input type="radio" :name="item.id" :checked="resolutions[item.id] === 'remote'"
-                        @change="resolutions = { ...resolutions, [item.id]: 'remote' }" />
-                      {{ versionLabel(item.remoteDeleted, item.remoteUpdatedAt) }}
+                      <input type="radio" :name="item.id" :checked="resolutions[item.id] === side"
+                        @change="resolutions = { ...resolutions, [item.id]: side }" />
+                      <span>{{ versionLabel(item, side) }}</span>
+                      <span v-if="isNewer(item, side)" class="ui-tag">{{ t('syncConflict.newer') }}</span>
                     </label>
                   </td>
                 </tr>
@@ -142,7 +138,9 @@ import {
   type CloudSyncConflictStrategy,
   type CloudSyncPendingConflict
 } from '@/lib/services/cloud-sync.service'
-import { formatFriendlyDate } from '@/lib/utils/date'
+import { describeConflictVersionTimes } from '@/lib/utils/sync-conflict-versions'
+
+const SIDES = ['local', 'remote'] as const
 
 const { t, locale } = useI18n()
 const message = useMessage()
@@ -200,10 +198,20 @@ const collectionLabel = (collection: string) => (
   COLLECTION_KEYS[collection] ? t(`syncConflict.collections.${COLLECTION_KEYS[collection]}`) : collection
 )
 
-const versionLabel = (deleted: boolean, updatedAt?: string) => {
-  if (deleted) return t('syncConflict.deletedVersion')
-  return updatedAt ? formatFriendlyDate(updatedAt, locale.value, { withTime: true }) : t('syncConflict.unknownTime')
+// 每项两边的时间：同一分钟内显示到秒，并记下较新的一边
+const versionTimes = computed(() => Object.fromEntries(
+  (pending.value?.items || []).map(item => [item.id, describeConflictVersionTimes(item, String(locale.value))])
+))
+
+const versionLabel = (item: CloudSyncConflictItem, side: CloudSyncConflictSide) => {
+  const time = versionTimes.value[item.id]?.[side]
+  if (side === 'local' ? item.localDeleted : item.remoteDeleted) {
+    return time ? t('syncConflict.deletedAtTime', { time }) : t('syncConflict.deletedVersion')
+  }
+  return time || t('syncConflict.unknownTime')
 }
+
+const isNewer = (item: CloudSyncConflictItem, side: CloudSyncConflictSide) => versionTimes.value[item.id]?.newer === side
 
 const reasonLabel = (reason: CloudSyncConflictReason) => t(`syncConflict.reasons.${reason}`)
 
@@ -228,11 +236,13 @@ const comparisonSides = (item: CloudSyncConflictItem) => {
     title: bothPresent && (item.localPreview?.title || '') !== (item.remotePreview?.title || ''),
     excerpt: bothPresent && (item.localPreview?.excerpt || '') !== (item.remotePreview?.excerpt || ''),
   }
-  return (['local', 'remote'] as const).map(side => ({
+  return SIDES.map(side => ({
     key: side,
-    label: side === 'local'
-      ? `${t('syncConflict.localVersion')} · ${versionLabel(item.localDeleted, item.localUpdatedAt)}`
-      : `${t('syncConflict.remoteVersion')} · ${versionLabel(item.remoteDeleted, item.remoteUpdatedAt)}`,
+    label: [
+      side === 'local' ? t('syncConflict.localVersion') : t('syncConflict.remoteVersion'),
+      versionLabel(item, side),
+      ...(isNewer(item, side) ? [t('syncConflict.newer')] : []),
+    ].join(' · '),
     preview: previews[side],
     deleted: side === 'local' ? item.localDeleted : item.remoteDeleted,
     differs,

@@ -73,12 +73,29 @@ export interface CloudSyncConflict {
   base?: any;
 }
 
+/**
+ * 一次合并对本机数据意味着什么，按记录计数。冲突项只计入 conflicts，不再重复计入其他几项；
+ * 删除标记（syncTombstones）本身不计数，它删掉的记录按 deleted 计 (#489)。
+ */
 export interface CloudSyncMergeSummary {
+  /** 云端新增、本机还没有的记录 */
   added: number;
+  /** 云端改过、本机没改，合并后本机会跟着更新的记录 */
   updated: number;
+  /** 云端删除、本机还在，合并后本机会跟着删除的记录（本机自己删除的不算） */
   deleted: number;
+  /** 本机保持不变的记录（包括只在本机改过或删除、等待上传的） */
   kept: number;
+  /** 两边都改过、需要选择保留哪一份的记录 */
   conflicts: number;
+}
+
+/** 本机删除过、因为另一台设备保留或修改得更晚而在这次同步后重新出现的记录 (#489) */
+export interface CloudSyncRestoredRecord {
+  collection: string;
+  key: string;
+  /** 标题或名称，没有时为记录键 */
+  label: string;
 }
 
 export interface CloudSyncMergeResult<TData extends CloudSyncDataSet = CloudSyncDataSet> {
@@ -420,11 +437,15 @@ export function mergeCloudSyncData<TData extends CloudSyncDataSet>(
 
     resultData[collection] = merged.records;
     conflicts.push(...merged.conflicts);
+    summary.conflicts += merged.summary.conflicts;
+    // 删除标记不是用户数据：新收到一条删除标记不能算「云端新增」，它删掉的记录已在所属集合里按 deleted 计数 (#489)
+    if (collection === 'syncTombstones') {
+      continue;
+    }
     summary.added += merged.summary.added;
     summary.updated += merged.summary.updated;
     summary.deleted += merged.summary.deleted;
     summary.kept += merged.summary.kept;
-    summary.conflicts += merged.summary.conflicts;
   }
 
   if (tombstoneContext.confirmedDeletes.length > 0 && Array.isArray(resultData.syncTombstones)) {
@@ -445,6 +466,50 @@ export function mergeCloudSyncData<TData extends CloudSyncDataSet>(
 
 export function getCloudSyncConflictId(conflict: Pick<CloudSyncConflict, 'collection' | 'key'>): string {
   return `${conflict.collection}::${conflict.key}`;
+}
+
+/**
+ * 需要提醒「已恢复」的集合：用户直接管理、认得出名字的数据。
+ * 变量、历史版本跟着提示词一起恢复，只提示词本身提醒一次；设置和 AI 生成记录不提醒。
+ */
+const RESTORE_NOTICE_COLLECTIONS = ['prompts', 'categories', 'aiConfigs', 'quickOptimizationConfigs'];
+
+/**
+ * 找出本机删除过（本机有删除标记）、合并后又回来的记录：另一台设备在冲突里保留了它，
+ * 或者对它的修改晚于本机的删除，删除标记就不再生效 (#489)。
+ * mergedData 是已经套用过删除标记、将要写回本机的数据。
+ */
+export function findCloudSyncRecordsRestoredOverLocalDeletes(
+  localData: CloudSyncDataSet,
+  mergedData: CloudSyncDataSet
+): CloudSyncRestoredRecord[] {
+  const localTombstones = normalizeCloudSyncTombstones(localData.syncTombstones || []);
+  if (localTombstones.length === 0) {
+    return [];
+  }
+
+  const restored: CloudSyncRestoredRecord[] = [];
+  for (const collection of RESTORE_NOTICE_COLLECTIONS) {
+    const localKeys = new Set(
+      (localData[collection] || [])
+        .filter(isPresent)
+        .map(record => getCloudSyncRecordKey(collection, record))
+    );
+    for (const record of mergedData[collection] || []) {
+      if (!isPresent(record)) continue;
+      const key = getCloudSyncRecordKey(collection, record);
+      if (localKeys.has(key)) continue;
+      if (!localTombstones.some(tombstone => tombstoneMatchesRecord(tombstone, collection, record))) continue;
+      restored.push({ collection, key, label: getCloudSyncRecordLabel(record, key) });
+    }
+  }
+  return restored;
+}
+
+/** 记录的标题或名称，没有时用 fallback */
+export function getCloudSyncRecordLabel(record: any, fallback: string): string {
+  const label = record?.title || record?.name || record?.key || record?.uuid;
+  return typeof label === 'string' && label.trim() ? label.trim() : fallback;
 }
 
 /**
@@ -720,6 +785,7 @@ function mergeWithoutBase(
       ? { record: decided === 'local' ? localRecord : remoteRecord, resolution: decided === 'local' ? 'keep-local' as const : 'take-remote' as const }
       : chooseRecord(localRecord, remoteRecord, options);
     records.push(cloneValue(chosen.record));
+    // 冲突项只计入 conflicts
     addConflict(conflicts, summary, {
       collection,
       key,
@@ -728,11 +794,6 @@ function mergeWithoutBase(
       local: localRecord,
       remote: remoteRecord
     });
-    if (chosen.record === remoteRecord) {
-      summary.updated++;
-    } else {
-      summary.kept++;
-    }
     return;
   }
 
@@ -768,8 +829,9 @@ function mergeWithBase(
   const localExists = isPresent(localRecord);
   const remoteExists = isPresent(remoteRecord);
 
+  // 两边都已删除：本机没有变化
   if (!localExists && !remoteExists) {
-    summary.deleted++;
+    summary.kept++;
     return;
   }
 
@@ -786,10 +848,10 @@ function mergeWithBase(
       return;
     }
 
-    // 对方只是用过这条记录、没改内容，不算修改：直接接受删除
+    // 对方只是用过这条记录、没改内容，不算修改：直接接受删除。这是本机自己的删除，等待上传，不算云端删除
     const remoteChanged = !recordsEqualIgnoringUsage(collection, remoteRecord, baseRecord, relationContexts.remote, relationContexts.base);
     if (!remoteChanged) {
-      summary.deleted++;
+      summary.kept++;
       return;
     }
 
@@ -806,7 +868,6 @@ function mergeWithBase(
         base: baseRecord
       });
       if (decided === 'local') tombstoneContext.confirmedDeletes.push({ collection, record: remoteRecord });
-      summary.deleted++;
       return;
     }
 
@@ -822,7 +883,6 @@ function mergeWithBase(
       remote: remoteRecord,
       base: baseRecord
     });
-    summary.updated++;
     return;
   }
 
@@ -858,7 +918,6 @@ function mergeWithBase(
         base: baseRecord
       });
       if (decided === 'remote') tombstoneContext.confirmedDeletes.push({ collection, record: localRecord });
-      summary.deleted++;
       return;
     }
 
@@ -874,7 +933,6 @@ function mergeWithBase(
       remote: remoteRecord,
       base: baseRecord
     });
-    summary.kept++;
     return;
   }
 
@@ -924,8 +982,6 @@ function mergeWithBase(
       remote: remoteRecord,
       base: baseRecord
     });
-    if (decided === 'remote') summary.updated++;
-    else summary.kept++;
     return;
   }
 
@@ -941,6 +997,7 @@ function mergeWithBase(
       remote: remoteRecord,
       base: baseRecord
     });
+    return;
   }
 
   if (!recordsEqual(collection, mergedRecord.record, localRecord, relationContexts.local, relationContexts.local)) {

@@ -302,7 +302,7 @@
     "backupEveryHours": "Every hour | Every {count} hours",
     "backupEveryMinutes": "Every minute | Every {count} minutes",
     "cloudBackup": "Cloud backups",
-    "cloudLocationDescription": "A full backup is uploaded only when you click “Create cloud backup”. Automatic backups always stay on this device; cloud backups are never uploaded or rotated automatically.",
+    "cloudLocationDescription": "A full backup is uploaded only when you click “Create cloud backup”, without the API keys of model configurations. Automatic backups always stay on this device; cloud backups are never uploaded or rotated automatically.",
     "configureCloudStorage": "Set up data sync",
     "confirmDeleteCloudBackup": "Delete this cloud backup?",
     "confirmRestore": "Restore",
@@ -514,7 +514,9 @@
       "merged": "Sync complete — local and cloud data were merged",
       "upToDate": "Sync complete — everything is already up to date",
       "uploaded": "Sync complete — local data was uploaded",
-      "conflictPending": "Changes on this device and in the cloud conflict. Choose how to resolve them."
+      "conflictPending": "Changes on this device and in the cloud conflict. Choose how to resolve them.",
+      "restoredOne": "“{name}” was changed on another device and has been restored",
+      "restoredMany": "“{name}” and {count} other item were changed on another device and have been restored | “{name}” and {count} other items were changed on another device and have been restored"
     },
     "testConnection": "Test connection",
     "title": "Data sync",
@@ -723,7 +725,9 @@
       "color": "color",
       "icon": "icon",
       "parentUuid": "parent category"
-    }
+    },
+    "deviceNameOnPlatform": "AI Gist on {platform}",
+    "deviceNameWeb": "AI Gist on the web"
   },
   "databaseStatus": {
     "connectionError": "Database connection error",
@@ -1705,7 +1709,9 @@
     "systemPromptDefaultLanguageNote": "The built-in default prompt is written in Chinese and is sent to the model as is. To give instructions in another language, replace it with your own version.",
     "switchProviderTitle": "Switch to “{name}”?",
     "switchProviderMessage": "The API key, address and model list you entered will be cleared, and you'll need to fill them in again for the new provider.",
-    "switchProvider": "Switch"
+    "switchProvider": "Switch",
+    "credentialMissingTag": "No API key",
+    "credentialNotSynced": "API keys aren't synced. Enter the key on this device to use this configuration."
   },
   "mobileNav": {
     "label": "Main navigation",
@@ -1718,9 +1724,9 @@
     "description": "Data on this device and in the cloud don’t match. Choose how to handle it before syncing continues.",
     "localCounts": "This device: {prompts}, {categories}, {aiConfigs}",
     "remoteCounts": "Cloud: {prompts}, {categories}, {aiConfigs}",
-    "added": "New in the cloud: {count}",
-    "updated": "Changed in the cloud: {count}",
-    "deleted": "Deleted: {count}",
+    "added": "{count} item was added in the cloud | {count} items were added in the cloud",
+    "updated": "{count} item was changed in the cloud | {count} items were changed in the cloud",
+    "deleted": "{count} item was deleted in the cloud | {count} items were deleted in the cloud",
     "strategyLabel": "How to resolve",
     "useLocal": "Use this device's data",
     "useLocalDesc": "Keep this device’s version of conflicting items and drop the cloud edits",
@@ -1781,7 +1787,9 @@
     },
     "countPrompts": "{count} prompt | {count} prompts",
     "countCategories": "{count} category | {count} categories",
-    "countAiConfigs": "{count} model configuration | {count} model configurations"
+    "countAiConfigs": "{count} model configuration | {count} model configurations",
+    "newer": "Newer",
+    "deletedAtTime": "Deleted {time}"
   },
   "appInit": {
     "loading": "Opening AI Gist…",

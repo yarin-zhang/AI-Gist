@@ -36,4 +36,11 @@ describe('formatFriendlyDate (#450)', () => {
     expect(formatFriendlyDate(today, 'it-IT', { withTime: false, now, capitalize: false })).toBe('oggi')
     expect(formatFriendlyDate(today, 'ja-JP', { withTime: false, now, capitalize: false })).toBe('今日')
   })
+
+  it('shows seconds only when asked (#489)', () => {
+    const withSeconds = new Date(2026, 9, 27, 9, 30, 7)
+    expect(formatFriendlyDate(withSeconds, 'en-US', { withTime: true, now })).toBe('Today 09:30')
+    expect(formatFriendlyDate(withSeconds, 'en-US', { withTime: true, withSeconds: true, now })).toBe('Today 09:30:07')
+    expect(formatFriendlyDate(withSeconds, 'zh-CN', { withTime: true, withSeconds: true, now })).toBe('今天 09:30:07')
+  })
 })

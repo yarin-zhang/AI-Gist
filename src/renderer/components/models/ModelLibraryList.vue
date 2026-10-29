@@ -36,8 +36,12 @@
           <span class="model-item__title">
             <span class="model-item__name" :class="{ 'is-disabled': !config.enabled }">{{ config.name }}</span>
             <span v-if="config.isPreferred && config.enabled" class="ui-tag model-item__tag">{{ t('models.preferred') }}</span>
-            <span v-else-if="config.enabled" class="ui-dot ui-dot--success" :aria-label="t('aiConfig.enabled')" />
-            <span v-else class="model-item__state">{{ t('models.disabled') }}</span>
+            <!-- 同步过来的配置不带 API Key，需要在这台设备上补填 (#491) -->
+            <span v-if="config.enabled && isAIConfigCredentialMissing(config)" class="ui-tag ui-tag--warning model-item__tag">
+              {{ t('models.credentialMissingTag') }}
+            </span>
+            <span v-else-if="config.enabled && !config.isPreferred" class="ui-dot ui-dot--success" :aria-label="t('aiConfig.enabled')" />
+            <span v-else-if="!config.enabled" class="model-item__state">{{ t('models.disabled') }}</span>
           </span>
           <span class="model-item__meta">{{ metaText(config) }}</span>
         </button>
@@ -53,6 +57,7 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NInput, NScrollbar, NSelect, NTooltip } from 'naive-ui'
 import { Plus, Search } from '@vicons/tabler'
 import type { AIConfig } from '@shared/types/ai'
+import { isAIConfigCredentialMissing } from '@shared/ai-config-credentials'
 import UiSegmented from '@/components/ui/UiSegmented.vue'
 import type { ConfigFilter } from '@/composables/ai/useAIConfigWorkspace'
 

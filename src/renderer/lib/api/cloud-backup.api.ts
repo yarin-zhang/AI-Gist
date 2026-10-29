@@ -42,6 +42,9 @@ const getCloudBackupClient = () => {
 };
 
 export class CloudBackupAPI {
+  /** 桌面端每个存储最近一次读取 manifest 时，主进程报告的「下次检查能否不整份下载」(#487) */
+  private static readonly syncManifestCheapChecks = new Map<string, boolean>();
+
   private static isElectronAvailable(): boolean {
     return typeof window !== 'undefined' && !!window.electronAPI && !!window.electronAPI.cloud;
   }
@@ -315,11 +318,26 @@ export class CloudBackupAPI {
     const response = await window.electronAPI.cloud.getSyncManifest(storageId);
     if (response && typeof response === 'object' && 'success' in response) {
       if (response.success && response.manifest) {
+        this.syncManifestCheapChecks.set(storageId, response.cheapCheckAvailable === true);
         return response.manifest;
       }
+      this.syncManifestCheapChecks.delete(storageId);
       throw new Error(('error' in response && response.error) || '读取云同步 manifest 失败');
     }
+    this.syncManifestCheapChecks.delete(storageId);
     return response;
+  }
+
+  /**
+   * 下一次检查这个存储时，云端没变的话能否不下载整份 manifest（条件读取或 PROPFIND 比对 ETag）。
+   * 自动同步据此决定焦点 / 唤醒时能不能更频繁地检查 (#487)
+   */
+  static canCheckSyncManifestCheaply(storageId: string): boolean {
+    const client = getCloudBackupClient();
+    if (client) {
+      return client.canCheckSyncManifestCheaply(storageId);
+    }
+    return this.syncManifestCheapChecks.get(storageId) === true;
   }
 
   /**

@@ -302,7 +302,7 @@
     "backupEveryHours": "每 {count} 小時",
     "backupEveryMinutes": "每 {count} 分鐘",
     "cloudBackup": "雲端備份",
-    "cloudLocationDescription": "只有在你按下「建立」時才會上傳完整備份；自動備份一律儲存在本機，不會自動上傳或輪替雲端備份。",
+    "cloudLocationDescription": "只有在你按下「建立」時才會上傳完整備份（不含模型設定的 API Key）；自動備份一律儲存在本機，不會自動上傳或輪替雲端備份。",
     "configureCloudStorage": "前往資料同步設定",
     "confirmDeleteCloudBackup": "確定要刪除此雲端備份嗎？",
     "confirmRestore": "確定還原",
@@ -514,7 +514,9 @@
       "merged": "已合併",
       "upToDate": "同步完成",
       "uploaded": "已上傳",
-      "conflictPending": "本機和雲端有修改衝突，請選擇處理方式"
+      "conflictPending": "本機和雲端有修改衝突，請選擇處理方式",
+      "restoredOne": "「{name}」在另一台裝置上被修改，已恢復",
+      "restoredMany": "「{name}」等 {total} 項在另一台裝置上被修改，已恢復"
     },
     "testConnection": "測試連線",
     "title": "資料同步",
@@ -723,7 +725,9 @@
       "color": "顏色",
       "icon": "圖示",
       "parentUuid": "上層分類"
-    }
+    },
+    "deviceNameOnPlatform": "{platform} 上的 AI Gist",
+    "deviceNameWeb": "網頁版 AI Gist"
   },
   "databaseStatus": {
     "connectionError": "資料庫連線異常",
@@ -1705,7 +1709,9 @@
     "systemPromptDefaultLanguageNote": "內建的預設提示詞是以簡體中文撰寫，會原樣傳給模型。想用其他語言下指示，可以改寫成自己的版本。",
     "switchProviderTitle": "切換到「{name}」？",
     "switchProviderMessage": "已填寫的 API Key、位址和模型清單會被清空，需要依新的服務供應商重新填寫。",
-    "switchProvider": "切換"
+    "switchProvider": "切換",
+    "credentialMissingTag": "缺少 API Key",
+    "credentialNotSynced": "API Key 不會隨同步傳輸，需要在這台裝置上填寫後才能使用這個設定。"
   },
   "mobileNav": {
     "label": "主導覽",
@@ -1718,9 +1724,9 @@
     "description": "本機和雲端的資料不一致，選好處理方式後再繼續同步。",
     "localCounts": "本機：{prompts}、{categories}、{aiConfigs}",
     "remoteCounts": "雲端：{prompts}、{categories}、{aiConfigs}",
-    "added": "雲端新增 {count} 筆",
-    "updated": "雲端改過 {count} 筆",
-    "deleted": "已刪除 {count} 筆",
+    "added": "雲端新增了 {count} 筆",
+    "updated": "雲端修改了 {count} 筆",
+    "deleted": "雲端刪除了 {count} 筆",
     "strategyLabel": "處理方式",
     "useLocal": "使用本機資料",
     "useLocalDesc": "衝突項保留本機版本，捨棄雲端的修改",
@@ -1781,7 +1787,9 @@
     },
     "countPrompts": "{count} 個提示詞",
     "countCategories": "{count} 個分類",
-    "countAiConfigs": "{count} 個模型設定"
+    "countAiConfigs": "{count} 個模型設定",
+    "newer": "較新",
+    "deletedAtTime": "刪除於 {time}"
   },
   "appInit": {
     "loading": "正在開啟 AI Gist…",

@@ -10,7 +10,7 @@
  */
 import { actionSheetController, alertController, loadingController } from '@ionic/vue'
 import { joinSentences as joinSentencesIn } from '~/lib/utils/join-sentences'
-import { Capacitor } from '@capacitor/core'
+import { getPlatformDeviceName } from '~/lib/utils/device-name'
 import {
   alertCircleOutline,
   cloudDoneOutline,
@@ -32,6 +32,7 @@ import {
 } from '~/lib/utils/data-sync-status'
 import {
   getCloudSyncErrorDiagnosis,
+  getCloudSyncRestoredMessage,
   type CloudSyncResult,
   type CloudSyncStatus
 } from '~/lib/services/cloud-sync.service'
@@ -88,10 +89,8 @@ export const formatSize = (size?: number) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export const getDeviceLabel = () => {
-  const language = typeof navigator !== 'undefined' ? navigator.language : 'unknown-locale'
-  return `${Capacitor.getPlatform()}-${language || 'unknown-locale'}`
-}
+/** 写进云端的设备名：「iPhone 上的 AI Gist」这类用户认得出的名字，不再是「ios-zh-CN」(#489) */
+export const getDeviceLabel = () => getPlatformDeviceName()
 
 /**
  * 同步失败时展示结构化诊断：先弹一条简短提示，再提供完整详情、复制和重试入口。
@@ -321,7 +320,10 @@ export const describeSyncStatus = (input: {
     case 'pending':
       return view(kind, tone, cloudUploadOutline, translate('dataSync.statusPending'), translate('dataSync.pendingChanges'))
     case 'current':
-      return view(kind, tone, cloudDoneOutline, translate('dataSync.statusCurrent'), translate('mobileSettings.sync.noPendingChanges'))
+      // 刚恢复了本机删除过的记录时，状态卡上说明一下，直到下一次同步 (#489)
+      return view(kind, tone, cloudDoneOutline, translate('dataSync.statusCurrent'),
+        (status.lastResult?.success && getCloudSyncRestoredMessage(status.lastResult.restoredAfterLocalDelete))
+          || translate('mobileSettings.sync.noPendingChanges'))
     case 'ready':
       return view(kind, tone, cloudOutline, translate('dataSync.statusReady'), translate('dataSync.statusAutomaticDescription'))
     default:
