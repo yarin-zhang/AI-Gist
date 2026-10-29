@@ -302,7 +302,7 @@
     "backupEveryHours": "Every hour | Every {count} hours",
     "backupEveryMinutes": "Every minute | Every {count} minutes",
     "cloudBackup": "Cloud backups",
-    "cloudLocationDescription": "A full backup is uploaded only when you click “Create cloud backup”. Automatic backups always stay on this device; cloud backups are never uploaded or rotated automatically.",
+    "cloudLocationDescription": "A full backup is uploaded only when you click “Create cloud backup”, without the API keys of model configurations. Automatic backups always stay on this device; cloud backups are never uploaded or rotated automatically.",
     "configureCloudStorage": "Set up data sync",
     "confirmDeleteCloudBackup": "Delete this cloud backup?",
     "confirmRestore": "Restore",
@@ -1675,7 +1675,9 @@
     "systemPromptDefaultLanguageNote": "The built-in default prompt is written in Chinese and is sent to the model as is. To give instructions in another language, replace it with your own version.",
     "switchProviderTitle": "Switch to “{name}”?",
     "switchProviderMessage": "The API key, address and model list you entered will be cleared, and you'll need to fill them in again for the new provider.",
-    "switchProvider": "Switch"
+    "switchProvider": "Switch",
+    "credentialMissingTag": "No API key",
+    "credentialNotSynced": "API keys aren't synced. Enter the key on this device to use this configuration."
   },
   "mobileNav": {
     "label": "Main navigation",

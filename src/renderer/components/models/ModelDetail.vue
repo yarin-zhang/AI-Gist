@@ -47,10 +47,12 @@
           </div>
           <div class="model-field">
             <span class="model-field__label">{{ t('aiConfig.workspace.credential') }}</span>
-            <span :class="{ 'ui-mono model-field__secret': config.apiKey }">
-              {{ config.apiKey ? maskSecret(config.apiKey) : t('aiConfig.workspace.notRequired') }}
-            </span>
+            <span v-if="config.apiKey" class="ui-mono model-field__secret">{{ maskSecret(config.apiKey) }}</span>
+            <span v-else-if="credentialMissing" class="model-field__value--warning">{{ t('aiConfig.workspace.notConfigured') }}</span>
+            <span v-else>{{ t('aiConfig.workspace.notRequired') }}</span>
           </div>
+          <!-- API Key 不随同步传输：另一台设备同步过来的配置要在这台设备上补填 (#491) -->
+          <UiAlert v-if="credentialMissing" tone="warning">{{ t('models.credentialNotSynced') }}</UiAlert>
           <p v-if="testingConnection" class="ui-help model-detail__testing" aria-live="polite">
             <NSpin :size="12" />{{ t('models.testing', { seconds: testTimeoutSeconds }) }}
           </p>
@@ -156,6 +158,7 @@ import { AI_TEST_TIMEOUT_MS, isLocalAIConfig } from '@/lib/utils/ai-error'
 import { formatFriendlyDate } from '@/lib/utils/date'
 import { handleEnterKey } from '@/lib/utils/ime'
 import { maskSecret } from '@/lib/utils/secret'
+import { isAIConfigCredentialMissing } from '@shared/ai-config-credentials'
 
 const props = defineProps<{
   config: AIConfig
@@ -191,6 +194,7 @@ const { getConfigDisplayLabel } = useAIProviderChoices()
 
 const providerLabel = computed(() => getConfigDisplayLabel(props.config))
 const isLocal = computed(() => isLocalAIConfig(props.config))
+const credentialMissing = computed(() => isAIConfigCredentialMissing(props.config))
 const testTimeoutSeconds = AI_TEST_TIMEOUT_MS / 1000
 
 // 回车发送请求测试；输入法确认候选词的那次回车不算
@@ -356,6 +360,10 @@ const formatLongDate = (value: Date | string) => {
 
 .model-field__secret {
   font-size: var(--font-size-sm);
+}
+
+.model-field__value--warning {
+  color: var(--accent-warning);
 }
 
 .model-tags {

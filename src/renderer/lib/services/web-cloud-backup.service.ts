@@ -15,6 +15,7 @@ import {
   createBackupPayload,
   parseBackupPayload
 } from '@shared/backup-integrity';
+import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import type {
   CloudSyncManifest,
   CloudSyncManifestSaveOptions,
@@ -221,7 +222,8 @@ export class WebCloudBackupService {
         name,
         description: normalizedOptions?.description || 'Web 端云端备份',
         createdAt,
-        data: backupDataToWrite,
+        // 云端备份不带模型配置的 API Key，和云同步一致 (#491)
+        data: stripCredentialsFromDataSet(backupDataToWrite),
         backupType: normalizedOptions?.backupType,
         trigger: normalizedOptions?.trigger,
         deviceId: normalizedOptions?.deviceId,

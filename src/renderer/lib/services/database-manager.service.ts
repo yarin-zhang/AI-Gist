@@ -21,6 +21,7 @@ import { generateUUID } from '../utils/uuid';
 import { emitDataChange } from './data-change-events';
 import { unwrapBackupData } from '@shared/backup-integrity';
 import { reconcileCloudSyncDataContract } from '@shared/cloud-sync-contract';
+import { restoreLocalAIConfigCredentials, stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import { dataOperationLock } from './data-operation-lock';
 
 const SYNCABLE_DATA_STORES = [
@@ -81,6 +82,12 @@ export interface ReplaceAllDataOptions {
    * 上传失败或重试时还要靠旧基线做三方合并 (#484)。恢复备份不传，基线随数据一起清空。
    */
   preserveSyncMetadata?: boolean;
+  /**
+   * 保留本机模型配置的凭据（API Key 等），默认开启。云同步快照和云端备份不带凭据 (#491)，
+   * 写入的配置没有凭据时，按 uuid / configId 用本机原有的补上，而不是把本机的 API Key 清空。
+   * 在同一个事务里先读后写，写入失败回滚时本机凭据也不受影响。
+   */
+  preserveLocalCredentials?: boolean;
 }
 
 class StructuredDataOperationError extends Error {
@@ -635,7 +642,8 @@ export class DatabaseServiceManager {
 
   /**
    * 导出云同步快照数据。
-   * 与普通备份相比，同步快照额外包含删除标记，避免多端硬删除丢失。
+   * 与普通备份相比，同步快照额外包含删除标记，避免多端硬删除丢失；
+   * 模型配置的 API Key 等凭据只留在本机，不进同步快照 (#491)。
    */
   async exportAllDataForSync(): Promise<DataExportResult> {
     return dataOperationLock.runExclusive(() => this.exportAllDataForSyncUnlocked());
@@ -669,10 +677,10 @@ export class DatabaseServiceManager {
 
     return {
       ...result,
-      data: {
+      data: stripCredentialsFromDataSet({
         ...result.data,
         syncTombstones
-      }
+      })
     };
   }
 
@@ -1601,6 +1609,11 @@ export class DatabaseServiceManager {
       };
     });
 
+    // 先在同一个事务里读出本机模型配置，再清空：读在清空之前排队，拿到的一定是写入前的凭据 (#491)
+    const localAIConfigsRequest = options.preserveLocalCredentials === false
+      ? null
+      : this.readAllInRestoreTransaction(transaction, 'ai_configs', failure => { firstFailure ||= failure; });
+
     const clearRequests = transactionStores.map(storeName => {
       const request = transaction.objectStore(storeName).clear();
       return this.waitForRestoreRequest(request, {
@@ -1613,8 +1626,9 @@ export class DatabaseServiceManager {
     });
 
     try {
-      await Promise.all(clearRequests);
-      await Promise.all(plan.records.map(record => {
+      const [localAIConfigs] = await Promise.all([localAIConfigsRequest, ...clearRequests]);
+      const records = this.restoreLocalCredentialsInPlan(plan.records, localAIConfigs || []);
+      await Promise.all(records.map(record => {
         const request = transaction.objectStore(record.storeName).put(record.value);
         return this.waitForRestoreRequest(request, {
           phase: 'write',
@@ -1637,6 +1651,50 @@ export class DatabaseServiceManager {
     for (const storeName of SYNCABLE_DATA_STORES) {
       emitDataChange({ storeName, action: 'clear' });
     }
+  }
+
+  private readAllInRestoreTransaction(
+    transaction: IDBTransaction,
+    storeName: string,
+    onFailure: (failure: DataOperationFailure) => void
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const request = transaction.objectStore(storeName).getAll();
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      request.onerror = () => {
+        const failure = this.createDatabaseFailure('prepare', request.error, {
+          phase: 'prepare',
+          code: 'UNKNOWN_DATABASE_ERROR',
+          storeName,
+          message: `读取本机数据表 ${storeName} 失败`,
+          retryable: true
+        });
+        onFailure(failure);
+        reject(new StructuredDataOperationError(failure));
+      };
+    });
+  }
+
+  /** 写入的模型配置没有凭据时，用本机同一配置原有的 API Key 补上 (#491) */
+  private restoreLocalCredentialsInPlan(
+    records: PreparedRestoreRecord[],
+    localAIConfigs: any[]
+  ): PreparedRestoreRecord[] {
+    const aiConfigRecords = records.filter(record => record.collection === 'aiConfigs');
+    if (aiConfigRecords.length === 0 || localAIConfigs.length === 0) return records;
+
+    const { records: values, restored } = restoreLocalAIConfigCredentials(
+      aiConfigRecords.map(record => record.value),
+      localAIConfigs
+    );
+    if (restored === 0) return records;
+
+    this.debugLog(`写入本机时保留了 ${restored} 个模型配置的本机凭据`);
+    const valueByRecord = new Map(aiConfigRecords.map((record, index) => [record, values[index]]));
+    return records.map(record => {
+      const value = valueByRecord.get(record);
+      return value === undefined || value === record.value ? record : { ...record, value };
+    });
   }
 
   private waitForRestoreRequest(

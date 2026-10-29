@@ -94,6 +94,7 @@ import {
   createCloudSyncSnapshotFile
 } from '@shared/cloud-sync-snapshots'
 import { parseBackupPayload } from '@shared/backup-integrity'
+import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials'
 
 const mockHttp = CapacitorHttp as unknown as { request: ReturnType<typeof vi.fn> }
 
@@ -2059,14 +2060,15 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         }]),
       })
 
-      const remoteData = {
+      // 新版本写的快照不带 API Key；带着明文 Key 的旧快照会在同步时被重新上传覆盖 (#491)
+      const remoteData = stripCredentialsFromDataSet({
         ...mockExportData,
         prompts: [
           { ...mockExportData.prompts[0], title: 'Recovered from snapshot file' }
         ],
         promptHistories: [],
         syncTombstones: []
-      }
+      })
       const remoteSnapshot = {
         ...createCloudSyncSnapshot(remoteData, 'remote-device', 'rev-webdav-file'),
         createdAt: '2026-03-15T00:00:00.000Z'
@@ -2374,8 +2376,11 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         )
         const rawPayload = JSON.parse(await fsp.readFile(backupPath, 'utf-8'))
         const parsedPayload = parseBackupPayload(rawPayload)
+        // 云端备份不带模型配置的 API Key (#491)
+        const uploadedData = stripCredentialsFromDataSet(mockExportData)
         expect(parsedPayload.legacy).toBe(false)
-        expect(parsedPayload.data).toEqual(mockExportData)
+        expect(parsedPayload.data).toEqual(uploadedData)
+        expect(JSON.stringify(rawPayload)).not.toContain('"apiKey"')
         expect(rawPayload.schemaVersion).toBe(1)
 
         const backups = await runtime.client.getCloudBackupList(config.id)
@@ -2388,7 +2393,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
 
         const restoreResult = await runtime.client.restoreCloudBackup(config.id, createResult.backupInfo!.id)
         expect(restoreResult.success).toBe(true)
-        expect(replaceSpy).toHaveBeenCalledWith(mockExportData)
+        expect(replaceSpy).toHaveBeenCalledWith(uploadedData)
 
         replaceSpy.mockClear()
         rawPayload.data.prompts.push({

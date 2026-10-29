@@ -64,11 +64,19 @@ import {
 } from '@shared/cloud-sync-snapshots';
 import { WebDAVProvider } from './webdav-provider';
 import { ICloudProvider } from './icloud-provider';
+import {
+  decodeStoredStorageConfigs,
+  encodeStorageConfigsForDisk,
+  getPasswordEncryptionUnavailableReason,
+  reportPlaintextPasswordFallback,
+  resolveSafeStorage
+} from './storage-config-secrets';
 import { DataManagementService } from '../data/data-management-service';
 import {
   createBackupPayload,
   parseBackupPayload
 } from '@shared/backup-integrity';
+import { stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 
 /**
  * 常量定义
@@ -151,6 +159,14 @@ export class CloudBackupManager {
   /** GET 不认 If-None-Match（没变也回 200）的存储：改用 PROPFIND 比对 ETag，变了再 GET (#487) */
   private storagesIgnoringConditionalRead = new Set<string>();
   private dataManagementService: DataManagementService;
+  /** 解不开的 WebDAV 加密密码（钥匙串暂时不可用等），保存配置时原样写回，见 storage-config-secrets.ts */
+  private undecryptablePasswords = new Map<string, string>();
+  /** 配置文件依次写入，避免并发保存互相覆盖 */
+  private configWriteQueue: Promise<void> = Promise.resolve();
+  /** 旧版明文密码迁移成加密存储，同一时间只做一次 */
+  private passwordMigration: Promise<void> | null = null;
+  /** 迁移写入失败过（例如目录只读）：本次运行不再每次读取都重试，下一次正常保存配置时会顺带加密 */
+  private passwordMigrationFailed = false;
   private configPath: string;
   private backupDir: string;
 
@@ -383,7 +399,8 @@ export class CloudBackupManager {
           name: backupName,
           description: normalizedOptions?.description || '云端备份',
           createdAt: timestamp,
-          data: backupDataToWrite,
+          // 云端备份和同步快照放在同一个云端目录里，同样不带模型配置的 API Key (#491)
+          data: stripCredentialsFromDataSet(backupDataToWrite),
           backupType: normalizedOptions?.backupType,
           trigger: normalizedOptions?.trigger,
           deviceId: normalizedOptions?.deviceId,
@@ -1708,15 +1725,22 @@ export class CloudBackupManager {
       await fs.mkdir(configDir, { recursive: true });
       
       const data = await fs.readFile(this.configPath, 'utf-8');
-      const configs = JSON.parse(data);
-      
+      // WebDAV 密码在文件里是加密的，这里解密成内存里的 password，对外的配置形状不变 (#491)
+      const decoded = decodeStoredStorageConfigs(JSON.parse(data));
+
       this.storageConfigs.clear();
-      for (const config of configs) {
+      for (const config of decoded.configs) {
         this.storageConfigs.set(config.id, config);
+      }
+      this.undecryptablePasswords = decoded.undecryptablePasswords;
+
+      if (decoded.hasPlaintextPasswords) {
+        await this.migratePlaintextPasswords();
       }
     } catch (error) {
       if (this.isFileNotFoundError(error)) {
         this.storageConfigs.clear();
+        this.undecryptablePasswords.clear();
         return;
       }
 
@@ -1725,19 +1749,67 @@ export class CloudBackupManager {
   }
 
   /**
-   * 保存配置文件
+   * 旧版本写的明文密码：系统加密可用时重写一遍配置文件，改成加密保存。
+   * 重写失败只记日志，不影响这次读取和同步；系统加密不可用时保持明文 (#491)。
+   */
+  private async migratePlaintextPasswords(): Promise<void> {
+    if (this.passwordMigrationFailed) return;
+    const unavailableReason = getPasswordEncryptionUnavailableReason(resolveSafeStorage());
+    if (unavailableReason) {
+      reportPlaintextPasswordFallback(unavailableReason);
+      return;
+    }
+    if (!this.passwordMigration) {
+      this.passwordMigration = this.saveConfigs()
+        .catch(error => {
+          this.passwordMigrationFailed = true;
+          console.warn('[cloud-config] WebDAV 密码迁移到加密存储失败，暂时保持明文：', this.getErrorMessage(error));
+        })
+        .finally(() => {
+          this.passwordMigration = null;
+        });
+    }
+    await this.passwordMigration;
+  }
+
+  /**
+   * 保存配置文件。WebDAV 密码能加密时只写密文；先写临时文件再改名，
+   * 读取的一方不会读到写了一半的文件；文件只允许当前用户读写。
    */
   private async saveConfigs(): Promise<void> {
+    const configs = encodeStorageConfigsForDisk(
+      Array.from(this.storageConfigs.values()),
+      resolveSafeStorage(),
+      this.undecryptablePasswords
+    );
+    const content = JSON.stringify(configs, null, 2);
+    const write = this.configWriteQueue.then(() => this.writeConfigFile(content));
+    this.configWriteQueue = write.catch(() => undefined);
     try {
-      const configDir = path.dirname(this.configPath);
-      await fs.mkdir(configDir, { recursive: true });
-      
-      const configs = Array.from(this.storageConfigs.values());
-      await fs.writeFile(this.configPath, JSON.stringify(configs, null, 2));
+      await write;
+      this.passwordMigrationFailed = false;
     } catch (error) {
       this.debugError(CONSTANTS.LOG_MESSAGES.SAVE_CONFIG_FAILED, error);
       throw error;
     }
+  }
+
+  private async writeConfigFile(content: string): Promise<void> {
+    const configDir = path.dirname(this.configPath);
+    await fs.mkdir(configDir, { recursive: true });
+
+    const tempPath = `${this.configPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await fs.writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600 });
+      await fs.rename(tempPath, this.configPath);
+    } catch (error) {
+      await fs.rm(tempPath, { force: true }).catch(() => undefined);
+      // 个别文件系统不支持覆盖式改名（例如目标文件被占用），退回直接写入
+      this.debugWarn('原子写入云存储配置失败，改为直接写入:', error);
+      await fs.writeFile(this.configPath, content, { encoding: 'utf-8', mode: 0o600 });
+    }
+    // 旧版本创建的配置文件权限可能是 0644，收紧到只有当前用户能读写（Windows 上忽略）
+    await fs.chmod(this.configPath, 0o600).catch(() => undefined);
   }
 
   // ==================== 工具方法 ====================
