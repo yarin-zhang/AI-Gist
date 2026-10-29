@@ -2,7 +2,6 @@ import { reactive } from 'vue'
 import { api } from '~/lib/api'
 import type { AIConfig } from '@shared/types'
 import { getConfigModels, isMobileSupportedProvider } from '~/components/mobile/prompt/mobile-ai'
-import { isAIConfigCredentialMissing } from '@shared/ai-config-credentials'
 
 export interface ConnectionStatus {
   state: 'testing' | 'ok' | 'error'
@@ -96,16 +95,14 @@ export const testSavedConfigConnection = async (config: AIConfig): Promise<Conne
 
 /**
  * 配置在列表、详情和首选卡片上显示的状态，三处用同一套判断：
- * 禁用 > 仅桌面版 > 测试中 > 缺少 API Key > 连接失败 > 未选择模型 > 连接成功 > 未验证。
- * API Key 不随同步传输，另一台设备同步过来的配置要在这台设备上补填 (#491)。
+ * 禁用 > 仅桌面版 > 测试中 > 连接失败 > 未选择模型 > 连接成功 > 未验证。
  */
-export type ConnectionBadge = 'disabled' | 'desktopOnly' | 'testing' | 'noCredential' | 'error' | 'noModel' | 'ok' | 'untested'
+export type ConnectionBadge = 'disabled' | 'desktopOnly' | 'testing' | 'error' | 'noModel' | 'ok' | 'untested'
 
 export const connectionBadgeOf = (config: AIConfig, status = statusForConfig(config)): ConnectionBadge => {
   if (!config.enabled) return 'disabled'
   if (!isMobileSupportedProvider(config.type)) return 'desktopOnly'
   if (status?.state === 'testing') return 'testing'
-  if (isAIConfigCredentialMissing(config)) return 'noCredential'
   if (status?.state === 'error') return 'error'
   if (!getConfigModels(config).length) return 'noModel'
   if (status?.state === 'ok') return 'ok'
@@ -138,8 +135,6 @@ export const connectionBadgeView = (
       return { badge, label: t('mobileModels.desktopOnly'), tone: '', dot: '' }
     case 'testing':
       return { badge, label: t('mobileModels.testing'), tone: 'm-pill-blue', dot: '' }
-    case 'noCredential':
-      return { badge, label: t('models.credentialMissingTag'), tone: 'm-pill-warn', dot: 'warn' }
     case 'error':
       return { badge, label: t('mobileModels.connectionFailedShort'), tone: 'm-pill-err', dot: 'err' }
     case 'noModel':
