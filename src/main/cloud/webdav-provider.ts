@@ -3,6 +3,7 @@ import {
   CloudConnectionCheckResult,
   CloudStorageProvider,
   CloudFileInfo,
+  CloudFileReadOptions,
   CloudFileReadResult,
   CloudFileWriteOptions,
   CloudFileWriteResult,
@@ -219,23 +220,41 @@ export class WebDAVProvider implements CloudStorageProvider {
 
   /**
    * 读取文件，同时带回这次 GET 响应里的 ETag：之后可以直接拿它做条件写，
-   * 不必在写入前再读一遍确认文件没被别的设备改过 (#486)
+   * 不必在写入前再读一遍确认文件没被别的设备改过 (#486)。
+   *
+   * 传了 ifNoneMatch 时带 If-None-Match 做条件读取：文件没变时服务器回 304，不下载正文 (#487)
    */
-  async readFileWithInfo(filePath: string): Promise<CloudFileReadResult> {
+  async readFileWithInfo(filePath: string, options: CloudFileReadOptions = {}): Promise<CloudFileReadResult> {
     await this.ensureClient();
+    const ifNoneMatch = options.ifNoneMatch?.trim() || undefined;
     try {
       const response: any = await this.withRequestTimeout(
         signal => this.client.getFileContents(this.normalizeRemotePath(filePath), {
           format: 'binary',
           details: true,
-          signal
+          signal,
+          ...(ifNoneMatch ? { headers: { 'If-None-Match': ifNoneMatch } } : {})
         }),
         '读取文件'
       );
       const detailed = response && typeof response === 'object' && 'data' in response && 'headers' in response;
       const data = detailed ? response.data : response;
       const etag = detailed && typeof response.headers?.etag === 'string' ? response.headers.etag : undefined;
-      return { data: this.toBuffer(data), etag };
+      // webdav 库只把 4xx/5xx 当错误，304 会当成功返回一个空正文；必须看状态码，
+      // 否则空正文会被当成文件内容，manifest 解析失败后还会误去读备份副本
+      if (ifNoneMatch && detailed && Number(response.status) === 304) {
+        return { data: Buffer.alloc(0), etag: etag || ifNoneMatch, notModified: true };
+      }
+
+      return {
+        data: this.toBuffer(data),
+        etag,
+        // 200 带回来的 ETag 和发过去的一样，说明文件没变、服务器只是不认 If-None-Match
+        conditionIgnored: ifNoneMatch && etag &&
+          this.normalizeEtagForCompare(etag) === this.normalizeEtagForCompare(ifNoneMatch)
+          ? true
+          : undefined
+      };
     } catch (error) {
       this.logOperationError(CONSTANTS.LOG_MESSAGES.READ_FILE_FAILED, error);
       throw new Error(`${CONSTANTS.ERROR_MESSAGES.READ_FILE_FAILED}: ${this.getErrorMessage(error)}`);

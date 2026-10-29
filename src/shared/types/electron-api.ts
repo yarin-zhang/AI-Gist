@@ -140,7 +140,12 @@ export default interface ElectronApi {
     deleteBackup: (storageId: string, backup: CloudBackupDeleteTarget) => Promise<{ success: boolean; message?: string; error?: string }>
     getSyncManifest: (storageId: string) => Promise<
       CloudSyncManifest |
-      { success: true; manifest: CloudSyncManifest } |
+      {
+        success: true
+        manifest: CloudSyncManifest
+        /** 下一次检查这个存储时，云端没变的话能否不下载整份 manifest (#487) */
+        cheapCheckAvailable?: boolean
+      } |
       { success: false; error?: string }
     >
     saveSyncManifest: (

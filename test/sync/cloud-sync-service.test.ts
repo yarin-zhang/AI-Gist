@@ -3064,6 +3064,99 @@ describe('CloudSyncService', () => {
     service.stopAutoSync()
   })
 
+  describe('focus / resume throttle when checks are cheap (#487)', () => {
+    const POLL_INTERVAL_MS = 15 * 60_000
+
+    async function startAfterOneCheck(cheap: boolean | undefined) {
+      vi.useFakeTimers()
+      // 云端已经是本机这份数据：检查只读不写
+      const remoteManifest = {
+        ...createEmptyCloudSyncManifest('2026-01-01T00:00:00.000Z'),
+        latestSnapshot: createCloudSyncSnapshot(baseData, 'device-b', 'rev-remote')
+      }
+      const created = createService(baseData, remoteManifest, {
+        configClient: {
+          getStorageConfigs: vi.fn().mockResolvedValue([enabledWebDAVConfig])
+        }
+      })
+      if (cheap !== undefined) {
+        ;(created.cloudClient as any).canCheckManifestCheaply = vi.fn().mockReturnValue(cheap)
+      }
+      created.service.startAutoSync({ syncOnStart: false, pollIntervalMs: POLL_INTERVAL_MS, retryMs: 0 })
+      created.service.scheduleSync('focus', { delayMs: 0 })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(created.service.getStatus()).toMatchObject({ status: 'success' })
+      expect(created.cloudClient.saveCloudSyncManifest).not.toHaveBeenCalled()
+      return created
+    }
+
+    it.each(['focus', 'resume', 'online'] as const)(
+      'checks again on %s one minute after the last check when the storage can confirm "unchanged" cheaply',
+      async reason => {
+        const { service, cloudClient } = await startAfterOneCheck(true)
+        const callsAfterFirstCheck = cloudClient.getCloudSyncManifest.mock.calls.length
+
+        await vi.advanceTimersByTimeAsync(30_000)
+        service.scheduleSync(reason, { delayMs: 0 })
+        await vi.advanceTimersByTimeAsync(0)
+        // 不到 1 分钟：推迟到满 1 分钟，而不是等满 15 分钟
+        expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(callsAfterFirstCheck)
+        expect(Date.parse(service.getStatus().nextSyncAt!) - Date.now()).toBe(30_000)
+
+        await vi.advanceTimersByTimeAsync(30_000)
+        expect(cloudClient.getCloudSyncManifest.mock.calls.length).toBeGreaterThan(callsAfterFirstCheck)
+        expect(service.getStatus()).toMatchObject({ status: 'success', reason })
+
+        service.stopAutoSync()
+      }
+    )
+
+    it.each([
+      ['the storage reports full downloads', false],
+      ['the cloud client cannot tell', undefined]
+    ] as const)('keeps the full check interval on focus when %s', async (_label, cheap) => {
+      const { service, cloudClient } = await startAfterOneCheck(cheap)
+      const callsAfterFirstCheck = cloudClient.getCloudSyncManifest.mock.calls.length
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      service.scheduleSync('focus', { delayMs: 0 })
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(callsAfterFirstCheck)
+      expect(Date.parse(service.getStatus().nextSyncAt!)).toBeGreaterThanOrEqual(
+        Date.now() + POLL_INTERVAL_MS - 30_000 - 60_000
+      )
+
+      service.stopAutoSync()
+    })
+
+    it('does not relax the interval poll itself', async () => {
+      const { service, cloudClient } = await startAfterOneCheck(true)
+      const callsAfterFirstCheck = cloudClient.getCloudSyncManifest.mock.calls.length
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      service.scheduleSync('interval', { delayMs: 0 })
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(callsAfterFirstCheck)
+      service.stopAutoSync()
+    })
+
+    it('forgets that checks were cheap after the storage config changes', async () => {
+      const { service, cloudClient } = await startAfterOneCheck(true)
+      const callsAfterFirstCheck = cloudClient.getCloudSyncManifest.mock.calls.length
+
+      // 配置改了：存储层的缓存已作废，下一次检查前不能再按「便宜」放宽
+      service.resetStorageFailureState(enabledWebDAVConfig.id)
+      await vi.advanceTimersByTimeAsync(30_000)
+      service.scheduleSync('focus', { delayMs: 0 })
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(cloudClient.getCloudSyncManifest).toHaveBeenCalledTimes(callsAfterFirstCheck)
+      service.stopAutoSync()
+    })
+  })
+
   it('retries immediately when browser comes online during retry backoff', async () => {
     vi.useFakeTimers()
     let dataChangeListener: ((change: any) => void) | undefined

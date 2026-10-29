@@ -1,6 +1,7 @@
 /**
  * 纯 Node.js 内置模块实现的 WebDAV 测试服务器
  * 支持 Basic Auth、PROPFIND / GET / PUT / DELETE / MKCOL / OPTIONS
+ * GET 支持 If-None-Match 条件读取（可关掉，模拟不认条件请求的服务器）
  * 无需任何额外 npm 依赖
  */
 
@@ -15,7 +16,19 @@ export interface WebDAVServerOptions {
   username?: string
   password?: string
   rootDir?: string
-  etagFormat?: 'quoted' | 'unquoted'
+  /** none：GET / PUT 不回 ETag，PROPFIND 也不带 getetag，模拟完全没有 ETag 的服务器 */
+  etagFormat?: 'quoted' | 'unquoted' | 'none'
+  /** false：GET 忽略 If-None-Match，文件没变也回 200 和整份正文 */
+  conditionalGet?: boolean
+}
+
+/** 服务器收到的每个请求：方法、路径、状态码、响应正文字节数，以及条件读取带的 If-None-Match */
+export interface TestWebDAVRequestLog {
+  method: string
+  path: string
+  status: number
+  bodyBytes: number
+  ifNoneMatch?: string
 }
 
 // ---- XML 工具 ----
@@ -29,7 +42,7 @@ function propfindXml(entries: { href: string; isDir: boolean; size: number; mtim
     const resourcetype = e.isDir ? '<D:resourcetype><D:collection/></D:resourcetype>' : '<D:resourcetype/>'
     const extra = e.isDir
       ? ''
-      : `<D:getcontentlength>${e.size}</D:getcontentlength><D:getetag>${escapeXml(e.etag || '')}</D:getetag>`
+      : `<D:getcontentlength>${e.size}</D:getcontentlength>${e.etag ? `<D:getetag>${escapeXml(e.etag)}</D:getetag>` : ''}`
     return `
   <D:response>
     <D:href>${escapeXml(e.href)}</D:href>
@@ -55,14 +68,18 @@ export class TestWebDAVServer {
   readonly rootDir: string
   private username: string
   private password: string
-  private etagFormat: 'quoted' | 'unquoted'
+  private etagFormat: 'quoted' | 'unquoted' | 'none'
+  private conditionalGet: boolean
   readonly port: number
+  /** 按顺序记录收到的请求，测试据此断言请求数和有没有下载正文 */
+  readonly requests: TestWebDAVRequestLog[] = []
 
   constructor(opts: WebDAVServerOptions = {}) {
     this.port     = opts.port     ?? 18765
     this.username = opts.username ?? 'testuser'
     this.password = opts.password ?? 'testpass'
     this.etagFormat = opts.etagFormat ?? 'quoted'
+    this.conditionalGet = opts.conditionalGet ?? true
     this.rootDir  = opts.rootDir  ?? fs.mkdtempSync(path.join(os.tmpdir(), 'ai-gist-webdav-'))
     this.server   = this.createServer()
   }
@@ -114,6 +131,7 @@ export class TestWebDAVServer {
 
       const urlPath = decodeURIComponent(new URL(req.url ?? '/', `http://127.0.0.1`).pathname)
       const fsPath  = path.join(this.rootDir, urlPath)
+      this.recordRequest(req, res, urlPath)
 
       try {
         switch (req.method?.toUpperCase()) {
@@ -131,6 +149,27 @@ export class TestWebDAVServer {
         res.writeHead(500); res.end(err.message)
       }
     })
+  }
+
+  private recordRequest(req: http.IncomingMessage, res: http.ServerResponse, urlPath: string) {
+    const ifNoneMatch = req.headers['if-none-match']
+    const log: TestWebDAVRequestLog = {
+      method: req.method?.toUpperCase() ?? '',
+      path: urlPath,
+      status: 0,
+      bodyBytes: 0,
+      ...(typeof ifNoneMatch === 'string' ? { ifNoneMatch } : {})
+    }
+    this.requests.push(log)
+    const end = res.end.bind(res) as (...args: any[]) => http.ServerResponse
+    res.end = ((...args: any[]) => {
+      const [chunk] = args
+      if (typeof chunk === 'string' || Buffer.isBuffer(chunk)) {
+        log.bodyBytes += Buffer.byteLength(chunk)
+      }
+      log.status = res.statusCode
+      return end(...args)
+    }) as typeof res.end
   }
 
   // ---- Auth ----
@@ -201,7 +240,7 @@ export class TestWebDAVServer {
     res.end(xml)
   }
 
-  private async handleGet(_req: http.IncomingMessage, res: http.ServerResponse, fsPath: string) {
+  private async handleGet(req: http.IncomingMessage, res: http.ServerResponse, fsPath: string) {
     let stat: fs.Stats
     try {
       stat = await fsp.stat(fsPath)
@@ -210,10 +249,17 @@ export class TestWebDAVServer {
     }
     if (stat.isDirectory()) { res.writeHead(403); res.end(); return }
 
+    const etag = createEtag(stat, this.etagFormat)
+    const etagHeaders: Record<string, string> = etag ? { 'ETag': etag } : {}
+    const ifNoneMatch = req.headers['if-none-match']
+    if (this.conditionalGet && etag && typeof ifNoneMatch === 'string' && etagListMatches(ifNoneMatch, etag)) {
+      res.writeHead(304, etagHeaders); res.end(); return
+    }
+
     const data = await fsp.readFile(fsPath)
     res.writeHead(200, {
       'Content-Length': String(data.length),
-      'ETag': createEtag(stat, this.etagFormat),
+      ...etagHeaders,
     })
     res.end(data)
   }
@@ -236,9 +282,8 @@ export class TestWebDAVServer {
     const body = await readBody(req)
     await fsp.writeFile(fsPath, body)
     const nextStat = await fsp.stat(fsPath)
-    res.writeHead(existingStat ? 204 : 201, {
-      'ETag': createEtag(nextStat, this.etagFormat),
-    }); res.end()
+    const nextEtag = createEtag(nextStat, this.etagFormat)
+    res.writeHead(existingStat ? 204 : 201, nextEtag ? { 'ETag': nextEtag } : {}); res.end()
   }
 
   private async handleDelete(_req: http.IncomingMessage, res: http.ServerResponse, fsPath: string) {
@@ -269,9 +314,16 @@ export class TestWebDAVServer {
 
 // ---- 工具函数 ----
 
-function createEtag(stat: fs.Stats, format: 'quoted' | 'unquoted'): string {
+function createEtag(stat: fs.Stats, format: 'quoted' | 'unquoted' | 'none'): string {
+  if (format === 'none') return ''
   const token = `${stat.size}-${Math.floor(stat.mtimeMs)}`
   return format === 'quoted' ? `"${token}"` : token
+}
+
+/** If-None-Match 按弱比较：去掉 W/ 后逐字比对，写法（带不带引号）不一样就不算匹配，和严格的服务器一致 */
+function etagListMatches(header: string, etag: string): boolean {
+  const strip = (value: string) => value.trim().replace(/^W\//i, '')
+  return header.split(',').some(candidate => candidate.trim() === '*' || strip(candidate) === strip(etag))
 }
 
 function readBody(req: http.IncomingMessage): Promise<Buffer> {

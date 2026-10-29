@@ -45,6 +45,12 @@
           <span>{{ t('mobileModels.desktopOnlyConfigNote') }}</span>
         </p>
 
+        <!-- API Key 不随同步传输：另一台设备同步过来的配置要在这台设备上补填 (#491) -->
+        <p v-else-if="credentialMissing" class="m-note detail-note">
+          <ion-icon :icon="keyOutline" aria-hidden="true" />
+          <span>{{ t('models.credentialNotSynced') }}</span>
+        </p>
+
         <!-- 启用 / 全局首选 -->
         <MobileGroup>
           <MobileRow static :title="t('aiConfig.enabled')" :icon="powerOutline" tone="green">
@@ -169,6 +175,7 @@ import {
   type MobileAIErrorView
 } from '~/components/mobile/prompt/mobile-ai'
 import { useConfigActions } from '~/components/mobile/models/useConfigActions'
+import { isAIConfigCredentialMissing } from '@shared/ai-config-credentials'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -191,6 +198,7 @@ const providerLabel = computed(() => config.value ? getConfigDisplayLabel(config
 const connectionStatus = computed(() => config.value ? statusForConfig(config.value) : undefined)
 const testingConnection = computed(() => connectionStatus.value?.state === 'testing')
 const desktopOnly = computed(() => Boolean(config.value && !isMobileSupportedProvider(config.value.type)))
+const credentialMissing = computed(() => isAIConfigCredentialMissing(config.value))
 
 // 头部状态：和模型列表、首选卡片同一套判断，测试成功时带上耗时
 const statusPill = computed(() => connectionBadgeView(config.value!, t, { withElapsed: true }))

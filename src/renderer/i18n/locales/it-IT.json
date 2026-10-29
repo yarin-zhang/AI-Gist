@@ -302,7 +302,7 @@
     "backupEveryHours": "Ogni ora | Ogni {count} ore",
     "backupEveryMinutes": "Ogni minuto | Ogni {count} minuti",
     "cloudBackup": "Backup su cloud",
-    "cloudLocationDescription": "Un backup completo viene caricato solo quando fai clic su «Crea backup nel cloud». I backup automatici restano sempre su questo dispositivo; i backup nel cloud non vengono caricati né ruotati automaticamente.",
+    "cloudLocationDescription": "Un backup completo viene caricato solo quando fai clic su «Crea backup nel cloud», senza le chiavi API delle configurazioni dei modelli. I backup automatici restano sempre su questo dispositivo; i backup nel cloud non vengono caricati né ruotati automaticamente.",
     "configureCloudStorage": "Vai a Sincronizzazione dati",
     "confirmDeleteCloudBackup": "Vuoi eliminare questo backup nel cloud?",
     "confirmRestore": "Ripristina",
@@ -1679,7 +1679,9 @@
     "systemPromptDefaultLanguageNote": "Il prompt predefinito integrato è scritto in cinese e viene inviato al modello così com'è. Per dare istruzioni in un'altra lingua, sostituiscilo con una tua versione.",
     "switchProviderTitle": "Passare a «{name}»?",
     "switchProviderMessage": "La chiave API, l'indirizzo e l'elenco dei modelli inseriti verranno cancellati e dovrai compilarli di nuovo per il nuovo provider.",
-    "switchProvider": "Cambia"
+    "switchProvider": "Cambia",
+    "credentialMissingTag": "Senza chiave API",
+    "credentialNotSynced": "Le chiavi API non vengono sincronizzate. Inserisci la chiave su questo dispositivo per usare questa configurazione."
   },
   "mobileNav": {
     "label": "Navigazione principale",
