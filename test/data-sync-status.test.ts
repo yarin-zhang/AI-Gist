@@ -188,6 +188,31 @@ describe('one status source for the settings card and the status bar (#425)', ()
     expect(resolveDataSyncStatusKind(paused)).toBe('paused')
   })
 
+  it('shows a restore that waits for the user choice on desktop too, ahead of stale failures and the auto-sync switch', () => {
+    // 恢复后同步整个停着：状态 paused、之前留下的失败或冲突都不作数，桌面端不能落到「已同步」
+    const afterRestore = createDataSyncStatusInput(
+      { status: 'paused', lastSyncAt: 'x', lastResult: { success: true }, restoreDecisionPending: true },
+      { canAutoRetryError: false },
+    )
+    expect(resolveDataSyncStatusKind(afterRestore)).toBe('restorePaused')
+    expect(resolveDataSyncAlertType('restorePaused', false)).toBe('warning')
+
+    for (const override of [
+      { hasScheduledRetry: true, isError: true },
+      { isError: true },
+      { hasPendingConflict: true },
+      { autoSyncEnabled: false },
+      { pendingChanges: true },
+    ]) {
+      expect(resolveDataSyncStatusKind({ ...baseInput, ...override, hasRestoreDecision: true })).toBe('restorePaused')
+    }
+    // 存储全停用或删掉了：不会同步，也就没什么可选
+    expect(resolveDataSyncStatusKind({ ...baseInput, hasStorageConfigs: false, hasRestoreDecision: true })).toBe('notConfigured')
+    // 选好之后回到平常的判断
+    const resolved = createDataSyncStatusInput({ status: 'success', lastSyncAt: 'x', restoreDecisionPending: false }, { canAutoRetryError: false })
+    expect(resolveDataSyncStatusKind(resolved)).toBe('current')
+  })
+
   it('diagnoses the latest failed result, not a stale success left over from before an auto retry', () => {
     const failed = { success: false, error: '401 Unauthorized' }
     expect(getDataSyncErrorSource({ error: 'x', lastResult: failed })).toBe(failed)

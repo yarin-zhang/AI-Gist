@@ -76,6 +76,8 @@ const visualState = computed(() => {
     case 'retryScheduled': return 'retrying';
     case 'error': return errorDiagnosis.value.canAutoRetry ? 'attention' : 'error';
     case 'conflict': return 'conflict';
+    // 从备份恢复后在等用户选择覆盖云端还是合并：点状态栏去设置页的数据同步里选
+    case 'restorePaused': return 'restorePaused';
     case 'paused': return 'paused';
     case 'syncing': return 'syncing';
     case 'pending': return 'scheduled';
@@ -94,6 +96,7 @@ const dotClass = computed(() => {
 
 const shortText = computed(() => {
   if (visualState.value === 'off') return t('dataSync.indicatorSyncOff');
+  if (visualState.value === 'restorePaused') return t('dataSync.indicatorShortRestorePaused');
   if (visualState.value === 'paused') return t('dataSync.statusPaused');
   if (visualState.value === 'syncing') return t('dataSync.indicatorShortSyncing');
   if (visualState.value === 'conflict') return t('syncConflict.shortStatus', { count: conflictCount.value });
@@ -112,6 +115,7 @@ const shortText = computed(() => {
 const primaryText = computed(() => {
   switch (statusKind.value) {
     case 'notConfigured': return t('dataSync.indicatorSyncOff');
+    case 'restorePaused': return t('dataSync.diagnosis.restoreDecision.title');
     case 'paused': return t('dataSync.statusPaused');
     case 'syncing': return t('dataSync.statusSyncing');
     case 'conflict': return t('syncConflict.statusTitle', { count: conflictCount.value });
@@ -126,6 +130,7 @@ const primaryText = computed(() => {
 const detailText = computed(() => {
   switch (statusKind.value) {
     case 'notConfigured': return t('dataSync.indicatorSyncOffDetail');
+    case 'restorePaused': return t('cloudBackup.restoreDecisionDescription');
     case 'paused': return t('dataSync.statusPausedDescription');
     case 'conflict': return t('syncConflict.statusDescription');
     case 'retryScheduled':

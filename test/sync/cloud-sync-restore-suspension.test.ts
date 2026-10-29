@@ -123,4 +123,95 @@ describe('CloudSyncService restore suspensions', () => {
       error: undefined
     })
   })
+
+  it('tells status listeners a restore is waiting for a choice, even after a restart, until it is resolved', async () => {
+    const storage = new MemoryStorage()
+    const remoteData = {
+      categories: [], prompts: [], promptVariables: [], promptHistories: [], aiConfigs: [],
+      quickOptimizationConfigs: [], aiHistory: [], settings: [], syncTombstones: []
+    }
+    let manifest = { ...createEmptyCloudSyncManifest(), latestSnapshot: createCloudSyncSnapshot(remoteData, 'remote-device') }
+    const deps = {
+      storage,
+      createDeviceId: () => 'desktop-device',
+      configClient: { getStorageConfigs: vi.fn().mockResolvedValue([config]) },
+      cloudClient: {
+        getCloudSyncManifest: vi.fn().mockImplementation(async () => manifest),
+        saveCloudSyncManifest: vi.fn().mockImplementation(async (_storageId, nextManifest) => {
+          manifest = nextManifest
+          return { success: true }
+        })
+      },
+      database: {
+        exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, data: remoteData }),
+        replaceAllData: vi.fn().mockResolvedValue({ success: true, atomic: true, message: 'ok' })
+      },
+      localBackupService: { create: vi.fn().mockResolvedValue({ action: 'created', deletedCount: 0 }) }
+    }
+    const service = new CloudSyncService(deps)
+    const seen: (boolean | undefined)[] = []
+    service.onStatusChange(status => seen.push(status.restoreDecisionPending))
+
+    await service.suspendEnabledStoragesAfterRestore({ source: 'local-file' })
+    expect(service.getStatus().restoreDecisionPending).toBe(true)
+    // 桌面端恢复云端备份后会重新载入页面：状态 paused 没了，等选择这件事还在
+    expect(new CloudSyncService(deps).getStatus()).toMatchObject({ status: 'idle', restoreDecisionPending: true })
+
+    await service.publishRestoredDataToCloud(config.id)
+    expect(service.getStatus().restoreDecisionPending).toBe(false)
+    expect(seen.at(-1)).toBe(false)
+  })
+
+  it('keeps waiting when merging after a restore fails, and the status says so', async () => {
+    const storage = new MemoryStorage()
+    const service = new CloudSyncService({
+      storage,
+      configClient: { getStorageConfigs: vi.fn().mockResolvedValue([config]) },
+      cloudClient: {
+        getCloudSyncManifest: vi.fn().mockRejectedValue(new Error('getaddrinfo ENOTFOUND dav.example.com')),
+        saveCloudSyncManifest: vi.fn()
+      },
+      database: {
+        exportAllDataForSync: vi.fn().mockResolvedValue({ success: true, data: {} }),
+        replaceAllData: vi.fn()
+      }
+    })
+    await service.suspendEnabledStoragesAfterRestore({ source: 'local-file' })
+
+    const result = await service.resumeRestoreWithMerge(config.id)
+
+    expect(result.success).toBe(false)
+    expect(service.getPendingRestoreDecisions()).toEqual([expect.objectContaining({ storageId: config.id })])
+    expect(service.getStatus().restoreDecisionPending).toBe(true)
+  })
+
+  it('only waits on storages that still exist and are enabled', async () => {
+    const storage = new MemoryStorage()
+    const other = { ...config, id: 'storage-b', name: 'NAS' }
+    const service = new CloudSyncService({
+      storage,
+      configClient: { getStorageConfigs: vi.fn().mockResolvedValue([config, other]) },
+      cloudClient: { getCloudSyncManifest: vi.fn(), saveCloudSyncManifest: vi.fn() },
+      database: { exportAllDataForSync: vi.fn(), replaceAllData: vi.fn() }
+    })
+    await service.suspendEnabledStoragesAfterRestore({ source: 'cloud-backup' })
+    expect(service.getPendingRestoreDecisions().map(item => item.storageId)).toEqual([config.id, other.id])
+
+    // 停用的存储不同步，先不用选；重新启用后还要选
+    await service.refreshStorageAvailability([{ ...config, enabled: false }, other])
+    expect(service.getPendingRestoreDecisions().map(item => item.storageId)).toEqual([other.id])
+    await service.refreshStorageAvailability([config, other])
+    expect(service.getPendingRestoreDecisions().map(item => item.storageId)).toEqual([config.id, other.id])
+
+    // 删掉的存储不再等选择，重启后也不会回来
+    await service.refreshStorageAvailability([other])
+    expect(service.getRestoreSuspensions().map(item => item.storageId)).toEqual([other.id])
+    const restarted = new CloudSyncService({
+      storage,
+      configClient: { getStorageConfigs: vi.fn().mockResolvedValue([other]) },
+      cloudClient: { getCloudSyncManifest: vi.fn(), saveCloudSyncManifest: vi.fn() },
+      database: { exportAllDataForSync: vi.fn(), replaceAllData: vi.fn() }
+    })
+    expect(restarted.getRestoreSuspensions().map(item => item.storageId)).toEqual([other.id])
+  })
 })

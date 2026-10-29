@@ -326,6 +326,8 @@ export interface CloudSyncStatus {
   autoSyncEnabled?: boolean;
   /** 是否有已启用的云端存储；还没查过存储列表时为 undefined */
   hasEnabledStorage?: boolean;
+  /** 本机从备份恢复后，还有存储在等用户选择覆盖云端还是与云端合并；选好之前不会同步 */
+  restoreDecisionPending?: boolean;
 }
 
 export interface CloudSyncFlushResult {
@@ -457,6 +459,8 @@ export class CloudSyncService {
   private pendingChangeVersion = 0;
   private lastLocalChangeAt: string | undefined;
   private restoreSuspensions = new Map<string, CloudSyncRestoreSuspension>();
+  /** 最近一次确认过的已启用存储；还没查过存储列表时为 undefined */
+  private enabledStorageIds?: Set<string>;
 
   constructor(deps: CloudSyncServiceDeps = {}) {
     this.cloudClient = deps.cloudClient;
@@ -843,6 +847,7 @@ export class CloudSyncService {
   clearRestoreSuspension(storageId: string): void {
     if (!this.restoreSuspensions.delete(storageId)) return;
     this.persistRestoreSuspensions();
+    this.updateStatus({});
   }
 
   async resumeRestoreWithMerge(storageId: string, options: CloudSyncOptions = {}): Promise<CloudSyncResult> {
@@ -857,6 +862,7 @@ export class CloudSyncService {
     if (!result.success && previous) {
       this.restoreSuspensions.set(storageId, previous);
       this.persistRestoreSuspensions();
+      this.updateStatus({});
     }
     return result;
   }
@@ -1118,6 +1124,7 @@ export class CloudSyncService {
     }
 
     const enabledIds = new Set(list.filter(config => config.enabled).map(config => config.id));
+    this.enabledStorageIds = enabledIds;
     const hasEnabledStorage = enabledIds.size > 0;
     const update: Partial<CloudSyncStatus> = { hasEnabledStorage };
     for (const storageId of [...this.pendingConflicts.keys()]) {
@@ -1126,6 +1133,11 @@ export class CloudSyncService {
     for (const storageId of [...this.blockedStorageFailures.keys()]) {
       if (!enabledIds.has(storageId)) this.blockedStorageFailures.delete(storageId);
     }
+    // 存储删掉了，恢复后等它做的选择也不再作数；只是停用的留着，重新启用时还要用户选
+    const existingIds = new Set(list.map(config => config.id));
+    const staleSuspensions = [...this.restoreSuspensions.keys()].filter(storageId => !existingIds.has(storageId));
+    staleSuspensions.forEach(storageId => this.restoreSuspensions.delete(storageId));
+    if (staleSuspensions.length > 0) this.persistRestoreSuspensions();
 
     const statusStorageGone = !!this.status.storageId && !enabledIds.has(this.status.storageId);
     if (!hasEnabledStorage || statusStorageGone) {
@@ -1251,7 +1263,13 @@ export class CloudSyncService {
   }
 
   getStatus(): CloudSyncStatus {
-    return { ...this.status };
+    return { ...this.status, restoreDecisionPending: this.getPendingRestoreDecisions().length > 0 };
+  }
+
+  /** 恢复后还在等用户选择的存储；停用的存储不同步，等它重新启用时再选 */
+  getPendingRestoreDecisions(): CloudSyncRestoreSuspension[] {
+    return this.getRestoreSuspensions()
+      .filter(suspension => !this.enabledStorageIds || this.enabledStorageIds.has(suspension.storageId));
   }
 
   getCloudSyncV2RolloutState(storageId: string): Promise<CloudSyncV2RolloutState> {

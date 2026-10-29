@@ -6,10 +6,21 @@
             <div class="sync-status__text">
                 <span class="sync-status__title">{{ statusTitle }}</span>
                 <span v-if="statusLine" class="sync-status__description">{{ statusLine }}</span>
-                <span v-if="syncStatus.pendingChanges && dataSyncStatusKind !== 'notConfigured'" class="sync-status__description">{{ t('dataSync.pendingChanges') }}</span>
+                <span v-if="syncStatus.pendingChanges && dataSyncStatusKind !== 'notConfigured' && dataSyncStatusKind !== 'restorePaused'" class="sync-status__description">{{ t('dataSync.pendingChanges') }}</span>
             </div>
             <!-- 窄窗口或长文案（意大利语等）时按钮整体换到第二行，不把左边的说明挤成一列 -->
-            <div v-if="showErrorDetailsButton || dataSyncStatusKind === 'conflict' || primaryStorage" class="sync-status__actions">
+            <!-- 从备份恢复后同步停着：就在这里选覆盖云端还是合并，选好之前「立即同步」没有用，不显示 -->
+            <div v-if="dataSyncStatusKind === 'restorePaused'" class="sync-status__actions">
+                <NButton type="error" ghost :disabled="!!restoreDecisionRunning" :loading="restoreDecisionRunning === 'overwrite'"
+                    @click="confirmRestoreOverwrite">
+                    {{ t('cloudBackup.overwriteCloud') }}
+                </NButton>
+                <NButton type="primary" :disabled="!!restoreDecisionRunning" :loading="restoreDecisionRunning === 'merge'"
+                    @click="resolveRestoreDecision('merge')">
+                    {{ t('cloudBackup.mergeWithCloud') }}
+                </NButton>
+            </div>
+            <div v-else-if="showErrorDetailsButton || dataSyncStatusKind === 'conflict' || primaryStorage" class="sync-status__actions">
                 <NButton v-if="showErrorDetailsButton" quaternary @click="showCurrentSyncError">{{ t('dataSync.viewErrorDetails') }}</NButton>
                 <NButton v-if="dataSyncStatusKind === 'conflict'" type="primary" @click="syncConflict.open(syncStatus.storageId)">{{ t('syncConflict.resolve') }}</NButton>
                 <NButton v-if="primaryStorage" :loading="loading.syncNow" @click="syncCloudData(primaryStorage.id)">
@@ -202,7 +213,9 @@
                 <NButton @click="copySyncErrorDetails">
                     <template #icon><NIcon><Copy /></NIcon></template>{{ t('dataSync.indicatorCopyDetails') }}
                 </NButton>
-                <NButton type="primary" @click="retrySyncFromDialog" :loading="loading.syncNow" :disabled="!syncErrorStorageId">
+                <!-- 恢复后还没选好的存储同步不了：回到状态卡片上重新选，不在这里重试 -->
+                <NButton v-if="!isAwaitingRestoreDecision(syncErrorStorageId)" type="primary" @click="retrySyncFromDialog"
+                    :loading="loading.syncNow" :disabled="!syncErrorStorageId">
                     {{ t('dataSync.retrySync') }}
                 </NButton>
             </template>
@@ -234,7 +247,7 @@ import {
     getCloudSyncResultMessage,
 } from '@/lib/services/cloud-sync.service';
 import type {
-    CloudStorageConnectionDiagnosis, CloudSyncJoinPreview, CloudSyncResult, CloudSyncStatus,
+    CloudStorageConnectionDiagnosis, CloudSyncJoinPreview, CloudSyncRestoreSuspension, CloudSyncResult, CloudSyncStatus,
 } from '@/lib/services/cloud-sync.service';
 import {
     getCloudSyncJoinCategoryLine,
@@ -266,6 +279,9 @@ const formatSyncTime = (value: string) => formatFriendlyDate(value, locale.value
 
 const storageConfigs = ref<CloudStorageConfig[]>([]);
 const syncStatus = ref<CloudSyncStatus>(cloudSyncService.getStatus());
+// 从备份恢复后在等用户选择的存储（只算已启用的）；状态变化时跟着刷新
+const restoreDecisions = ref<CloudSyncRestoreSuspension[]>(cloudSyncService.getPendingRestoreDecisions());
+const restoreDecisionRunning = ref<'merge' | 'overwrite' | null>(null);
 const syncIntervalMinutes = ref<number | null>(DEFAULT_CLOUD_SYNC_INTERVAL_MINUTES);
 const autoSyncEnabled = ref(true);
 const showConfigModal = ref(false);
@@ -367,6 +383,7 @@ const statusTitle = computed(() => {
         case 'retryScheduled': return t('dataSync.statusRetryScheduled');
         case 'error': return syncStatusDiagnosis.value.title;
         case 'conflict': return t('syncConflict.statusTitle', { count: syncStatus.value.pendingConflict?.items.length || 0 });
+        case 'restorePaused': return t('dataSync.diagnosis.restoreDecision.title');
         case 'paused': return t('dataSync.statusPaused');
         case 'syncing': return t('dataSync.statusSyncing');
         case 'pending': return t('dataSync.statusPending');
@@ -387,6 +404,7 @@ const statusDescription = computed(() => {
         });
         case 'error': return syncStatusDiagnosis.value.message;
         case 'conflict': return t('syncConflict.statusDescription');
+        case 'restorePaused': return t('cloudBackup.restoreDecisionDescription');
         case 'paused': return t('dataSync.statusPausedDescription');
         case 'syncing': return t('dataSync.statusSyncingDescription');
         // 正常状态标题已经说清楚了，只补上次同步时间
@@ -670,7 +688,7 @@ const storageActionOptions = (config: CloudStorageConfig) => [
     {
         label: t('dataSync.syncNow'),
         key: 'sync',
-        disabled: !config.enabled,
+        disabled: !config.enabled || isAwaitingRestoreDecision(config.id),
         icon: () => h(NIcon, { size: 16 }, { default: () => h(CloudUpload) }),
     },
     { type: 'divider', key: 'divider' },
@@ -757,6 +775,55 @@ const copySyncErrorDetails = async () => {
     } catch { message.error(t('dataSync.errorDetailsCopyFailed')); }
 };
 
+const isAwaitingRestoreDecision = (storageId: string) =>
+    restoreDecisions.value.some(decision => decision.storageId === storageId);
+
+/**
+ * 从备份恢复后，用户选好怎么处理云端：每个在等选择的存储都按同一个选择处理。
+ * 失败时这个存储继续停着等选择，不会自动重试，所以总是打开错误详情，不按「稍后会自动同步」轻描淡写。
+ */
+const resolveRestoreDecision = async (decision: 'merge' | 'overwrite') => {
+    if (restoreDecisionRunning.value) return;
+    restoreDecisionRunning.value = decision;
+    let storageId = '';
+    try {
+        for (const pending of [...restoreDecisions.value]) {
+            storageId = pending.storageId;
+            const options = { platform: PlatformDetector.getPlatform() };
+            const result = decision === 'merge'
+                ? await cloudSyncService.resumeRestoreWithMerge(storageId, options)
+                : await cloudSyncService.publishRestoredDataToCloud(storageId, options);
+            if (result.action === 'conflict-pending') {
+                message.warning(getCloudSyncResultMessage(result.action));
+                syncConflict.open(storageId);
+                return;
+            }
+            if (!result.success) {
+                showSyncErrorDetails(result, storageId);
+                return;
+            }
+        }
+        message.success(t(decision === 'merge' ? 'cloudBackup.mergeWithCloudSuccess' : 'cloudBackup.overwriteCloudSuccess'));
+    } catch (error) {
+        console.error('处理恢复后的云端数据失败:', error);
+        showSyncErrorDetails(error instanceof Error ? error.message : String(error), storageId);
+    } finally {
+        restoreDecisionRunning.value = null;
+        restoreDecisions.value = cloudSyncService.getPendingRestoreDecisions();
+    }
+};
+
+const confirmRestoreOverwrite = () => {
+    dialog.warning({
+        title: t('cloudBackup.overwriteCloud'),
+        content: t('cloudBackup.overwriteCloudWarning'),
+        positiveText: t('cloudBackup.overwriteCloud'),
+        negativeText: t('common.cancel'),
+        positiveButtonProps: { type: 'error' },
+        onPositiveClick: () => { void resolveRestoreDecision('overwrite'); },
+    });
+};
+
 const saveAutoSyncEnabled = async (enabled: boolean) => {
     autoSyncEnabled.value = await cloudSyncService.setAutoSyncEnabled(enabled);
     message.success(enabled ? t('dataSync.autoSyncEnabled') : t('dataSync.autoSyncDisabled'));
@@ -821,7 +888,10 @@ const getConfigDescription = (config: CloudStorageConfig) => config.type === 'we
     ? (config as any).url : `iCloud Drive - ${(config as any).path || 'AI-Gist-Backup'}`;
 
 onMounted(async () => {
-    unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => { syncStatus.value = status; });
+    unsubscribeSyncStatus = cloudSyncService.onStatusChange(status => {
+        syncStatus.value = status;
+        restoreDecisions.value = cloudSyncService.getPendingRestoreDecisions();
+    });
     [autoSyncEnabled.value, syncIntervalMinutes.value] = await Promise.all([
         cloudSyncService.getAutoSyncEnabled(), cloudSyncService.getAutoSyncIntervalMinutes(),
     ]);

@@ -193,6 +193,7 @@ import {
 } from '@/lib/services/automatic-backup.service';
 import type { AutomaticBackupStatus } from '@/lib/services/automatic-backup.service';
 import { LOCAL_SAFETY_BACKUP_TRIGGERS } from '@/lib/services/local-backup.service';
+import { cloudSyncService } from '@/lib/services/cloud-sync.service';
 import { onDataChange } from '@/lib/services/data-change-events';
 import type { CloudStorageConfig } from '@shared/types/cloud-backup';
 import { formatFriendlyDate } from '@/lib/utils/date';
@@ -388,7 +389,18 @@ const handleRefreshBackupList = async () => {
 const handleRestoreBackup = async (backupId: string) => {
     const restored = await restoreBackup(backupId);
     notifyResult();
-    if (restored) await Promise.all([getBackupList(), refreshDataStats()]);
+    if (!restored) return;
+    await Promise.all([getBackupList(), refreshDataStats()]);
+    // 恢复后同步会停下来，等用户选择覆盖云端还是与云端合并：当场说明，并带去数据同步里选
+    if (cloudSyncService.getPendingRestoreDecisions().length > 0) {
+        dialog.warning({
+            title: t('cloudBackup.restoreDecisionTitle'),
+            content: t('cloudBackup.restoreDecisionDescription'),
+            positiveText: t('dataSync.title'),
+            negativeText: t('common.close'),
+            onPositiveClick: () => emit('navigate-section', 'cloud-backup'),
+        });
+    }
 };
 
 const handleDeleteBackup = async (backupId: string) => {

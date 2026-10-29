@@ -237,7 +237,7 @@ export const formatRelative = (value?: string | null, now = new Date()) =>
 export const joinSentences = (first: string, second: string, locale = currentLocale()) =>
   joinSentencesIn(first, second, locale)
 
-export type MobileSyncStatusKind = DataSyncStatusKind | 'restorePaused'
+export type MobileSyncStatusKind = DataSyncStatusKind
 export type MobileSyncTone = 'success' | 'info' | 'warning' | 'error'
 
 export interface MobileSyncStatusView {
@@ -261,10 +261,9 @@ const TILE_TONE: Record<MobileSyncTone, MobileTileTone> = {
  * 设置首页的同步状态卡和数据同步页的状态卡共用同一套判断。
  *
  * 标题和颜色直接来自桌面端的 resolveDataSyncStatusKind / resolveDataSyncAlertType，
- * 保证两端对同一个状态说同样的话、用同样的颜色。移动端只在前面多两条规则：
- * - 没有任何存储配置时一律显示「尚未配置」，避免让用户以为同步已经在工作；
- * - 本地恢复后同步被挂起（等用户选择合并或覆盖云端）时显示「恢复后已暂停」，
- *   这时服务状态是 paused，桌面端的判断会落到「已是最新」，不能沿用。
+ * 保证两端对同一个状态说同样的话、用同样的颜色。移动端只在前面多一条规则：
+ * 没有任何存储配置时一律显示「尚未配置」，避免让用户以为同步已经在工作。
+ * 恢复后等用户选择（restorePaused）以本页列出的待选存储为准。
  */
 export const describeSyncStatus = (input: {
   status: CloudSyncStatus
