@@ -696,6 +696,36 @@
     "syncIntervalTooLong": "The maximum is {hours} hours ({max} minutes)",
     "indicatorShortRetrying": "Sync failed · Retrying later",
     "technicalDetails": "Technical details (copy these when reporting a problem)",
+    "joinConfirm": {
+      "title": "Merge this device's data with the cloud?",
+      "description": "This device and the storage both already have data. Syncing merges them into one set and keeps the prompts from both.",
+      "local": "This device",
+      "remote": "Cloud",
+      "merged": "After merging (approx.)",
+      "prompts": "Prompts",
+      "categories": "Categories",
+      "row": "{label}: {local} on this device · {remote} in the cloud · about {merged} after merging",
+      "sameNameCategories": "Categories with the same name will be merged into one: {names}",
+      "sameNameCategoriesMore": "Categories with the same name will be merged into one: {names} and others ({count} in total)",
+      "quotedName": "“{name}”",
+      "cancelHint": "If you choose Not now, the storage is saved but stays disabled.",
+      "confirm": "Merge and sync",
+      "cancel": "Not now",
+      "savedDisabled": "Storage saved. Sync isn't on yet",
+      "previewFailed": "Storage saved, but the cloud data couldn't be read, so sync isn't on yet: {error}"
+    },
+    "categoryMerged": "The categories named “{name}” were merged into one. Kept the {fields} from {side}.",
+    "categoryMergedMore": "{count} more category with the same name was merged. Where they differed, the newer copy was kept. | {count} more categories with the same name were merged. Where they differed, the newer copy was kept.",
+    "mergeSide": {
+      "local": "this device",
+      "remote": "the cloud"
+    },
+    "categoryFields": {
+      "description": "description",
+      "color": "color",
+      "icon": "icon",
+      "parentUuid": "parent category"
+    },
     "deviceNameOnPlatform": "AI Gist on {platform}",
     "deviceNameWeb": "AI Gist on the web"
   },

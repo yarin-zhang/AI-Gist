@@ -170,6 +170,8 @@ export interface QuickOptimizationConfig {
   prompt: string; // 优化提示词模板
   enabled: boolean; // 是否启用
   sortOrder: number; // 排序顺序
+  /** 内置默认动作的标识（shorter、richer……）；用户自己建的或改过的动作没有 */
+  builtinKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -183,6 +185,8 @@ export interface CreateQuickOptimizationConfig {
   prompt: string;
   enabled?: boolean;
   sortOrder?: number;
+  /** 只在预置默认动作时传 */
+  builtinKey?: string;
 }
 
 /**

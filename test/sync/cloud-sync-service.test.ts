@@ -1866,7 +1866,9 @@ describe('CloudSyncService', () => {
 
     expect(result.success).toBe(true)
     expect(result.businessKeyMerges).toHaveLength(1)
-    expect(result.warnings?.[0]).toContain('自动归并 1 组')
+    // 同名分类另有 categoryMerges 逐个说明；只有一边填了说明，合并后什么都没丢，不用提示 (#490)
+    expect(result.warnings || []).not.toEqual(expect.arrayContaining([expect.stringContaining('业务唯一键')]))
+    expect(result.categoryMerges).toEqual([])
     expect(database.replaceAllData).toHaveBeenCalledTimes(1)
     expect(database.replaceAllData).toHaveBeenCalledWith(expect.objectContaining({
       categories: [expect.objectContaining({ uuid: 'cat-1', name: 'Base' })]

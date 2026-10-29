@@ -162,6 +162,7 @@ export const confirmAction = async (options: {
   header: string
   message: string
   confirmText?: string
+  cancelText?: string
   destructive?: boolean
 }): Promise<boolean> => {
   const alert = await alertController.create({
@@ -169,7 +170,7 @@ export const confirmAction = async (options: {
     message: options.message,
     cssClass: 'mobile-alert-preserve-lines',
     buttons: [
-      { text: translate('common.cancel'), role: 'cancel' },
+      { text: options.cancelText || translate('common.cancel'), role: 'cancel' },
       {
         text: options.confirmText || translate('common.confirm'),
         role: options.destructive ? 'destructive' : 'confirm'

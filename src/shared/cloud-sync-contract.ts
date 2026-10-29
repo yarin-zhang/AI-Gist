@@ -36,7 +36,9 @@ export const CLOUD_SYNC_COLLECTION_CONTRACT = {
   quickOptimizationConfigs: {
     storeName: 'quick_optimization_configs',
     stableIdentityFields: ['uuid'],
-    businessUniqueFields: []
+    // 内置的默认动作（更简短、更丰富……）每台设备各自预置，uuid 都不一样；
+    // 按内置标识归并，同一个默认动作只留一份，不管当时是哪种界面语言 (#490)
+    businessUniqueFields: ['builtinKey']
   },
   aiHistory: {
     storeName: 'ai_generation_history',
@@ -83,11 +85,33 @@ export interface CloudSyncContractIssue {
 }
 
 export interface CloudSyncBusinessKeyMerge {
-  collection: 'categories' | 'aiConfigs' | 'aiHistory';
-  businessKeyField: 'name' | 'configId' | 'historyId';
+  collection: 'categories' | 'aiConfigs' | 'aiHistory' | 'quickOptimizationConfigs';
+  businessKeyField: 'name' | 'configId' | 'historyId' | 'builtinKey';
   businessKeyFingerprint: string;
   canonicalUuid?: string;
   mergedRecordIdentities: string[];
+  /**
+   * 合并前几条记录各自填了不同值的字段（只有字段名，不含内容）。
+   * 只算两边都填了值的字段：一边空着时合并后不会丢东西。
+   */
+  differingFields: string[];
+  /** 取值冲突时以哪一条为准：更新时间最新的那条 */
+  keptRecordIdentity?: string;
+}
+
+/** 同名分类合并后要告诉用户的一条：哪个分类、哪些字段两边不一样、保留了哪一边 (#490) */
+export interface CloudSyncCategoryMergeNotice {
+  name: string;
+  keptSide: 'local' | 'remote';
+  differingFields: string[];
+}
+
+export interface CloudSyncContractOptions {
+  /**
+   * 认出还没被改过的默认快速优化动作，返回它的内置标识（shorter、richer……）。
+   * 旧数据和旧版本预置的动作没有 builtinKey，靠它在合并时补上，之后就能按内置标识归并。
+   */
+  resolveQuickOptimizationBuiltinKey?: (record: any) => string | undefined;
 }
 
 export type CloudSyncRelationRepairCode =
@@ -147,8 +171,12 @@ interface RelationDefinition {
 const BUSINESS_UNIQUE_COLLECTIONS = [
   { collection: 'categories', field: 'name' },
   { collection: 'aiConfigs', field: 'configId' },
-  { collection: 'aiHistory', field: 'historyId' }
+  { collection: 'aiHistory', field: 'historyId' },
+  { collection: 'quickOptimizationConfigs', field: 'builtinKey' }
 ] as const;
+
+/** 比较字段是否两边不一样时跳过：身份、时间戳和各设备各自生成的数字关联 ID */
+const MERGE_DIFF_IGNORED_FIELDS = new Set(['id', 'uuid', 'createdAt', 'updatedAt']);
 
 const RELATIONS: readonly RelationDefinition[] = [
   {
@@ -219,10 +247,15 @@ export function getCloudSyncStableIdentity(
  */
 export function reconcileCloudSyncDataContract<TData extends CloudSyncContractData>(
   input: TData,
-  base?: CloudSyncContractData
+  base?: CloudSyncContractData,
+  options: CloudSyncContractOptions = {}
 ): CloudSyncContractResult<TData> {
   const data = cloneValue(input) as TData;
   const baseData = base ? cloneValue(base) : undefined;
+  if (options.resolveQuickOptimizationBuiltinKey) {
+    assignQuickOptimizationBuiltinKeys(data, options.resolveQuickOptimizationBuiltinKey);
+    if (baseData) assignQuickOptimizationBuiltinKeys(baseData, options.resolveQuickOptimizationBuiltinKey);
+  }
   const merges: CloudSyncBusinessKeyMerge[] = [];
   const resolutions = new Map<CloudSyncContractCollection, DuplicateResolution>();
 
@@ -496,8 +529,8 @@ function mergeOverlappingQuarantineGroups(
 }
 
 function resolveBusinessKeyDuplicates(
-  collection: 'categories' | 'aiConfigs' | 'aiHistory',
-  field: 'name' | 'configId' | 'historyId',
+  collection: CloudSyncBusinessKeyMerge['collection'],
+  field: CloudSyncBusinessKeyMerge['businessKeyField'],
   records: any[],
   baseRecords: any[]
 ): DuplicateResolution {
@@ -550,6 +583,8 @@ function resolveBusinessKeyDuplicates(
       const mergedRecordIdentities = group
         .map(record => safeRecordIdentity(collection, record))
         .sort();
+      const byUpdateOrder = sortByUpdateOrder(group, field);
+      const newest = byUpdateOrder[byUpdateOrder.length - 1];
       merges.push({
         collection,
         businessKeyField: field,
@@ -557,7 +592,9 @@ function resolveBusinessKeyDuplicates(
         // category/config key would still permit dictionary-based disclosure.
         businessKeyFingerprint: createStableChecksum({ collection, field, mergedRecordIdentities }),
         canonicalUuid,
-        mergedRecordIdentities
+        mergedRecordIdentities,
+        differingFields: getDifferingFields(group, field),
+        keptRecordIdentity: newest ? safeRecordIdentity(collection, newest) : undefined
       });
     }
   }
@@ -588,12 +625,7 @@ function mergeDuplicateGroup(group: any[], baseRecord: any, businessKeyField: st
 
   const canonicalSource = candidates[0];
   const canonical = cloneValue(canonicalSource);
-  const byUpdateOrder = [...group].sort((left, right) => {
-    const leftTime = normalizeTimestamp(left?.updatedAt ?? left?.createdAt);
-    const rightTime = normalizeTimestamp(right?.updatedAt ?? right?.createdAt);
-    if (leftTime !== rightTime) return leftTime - rightTime;
-    return compareCanonicalCandidates(left, right, businessKeyField);
-  });
+  const byUpdateOrder = sortByUpdateOrder(group, businessKeyField);
   for (const candidate of byUpdateOrder) {
     mergeDefinedFields(canonical, candidate, new Set(['id', 'uuid', businessKeyField, 'createdAt']));
   }
@@ -606,6 +638,96 @@ function mergeDuplicateGroup(group: any[], baseRecord: any, businessKeyField: st
     canonical.uuid = canonicalSource?.uuid;
   }
   return canonical;
+}
+
+/** 按更新时间从旧到新排：合并时后面的取值覆盖前面的 */
+function sortByUpdateOrder(group: any[], businessKeyField: string): any[] {
+  return [...group].sort((left, right) => {
+    const leftTime = normalizeTimestamp(left?.updatedAt ?? left?.createdAt);
+    const rightTime = normalizeTimestamp(right?.updatedAt ?? right?.createdAt);
+    if (leftTime !== rightTime) return leftTime - rightTime;
+    return compareCanonicalCandidates(left, right, businessKeyField);
+  });
+}
+
+/**
+ * 合并时会被覆盖掉的字段：至少两条记录都填了值、而且值不一样。
+ * 数字形式的关联 ID（parentId 等）各设备各自生成，不算；关联看 uuid 字段。
+ */
+function getDifferingFields(group: any[], businessKeyField: string): string[] {
+  const fields = new Set<string>();
+  for (const record of group) {
+    if (!record || typeof record !== 'object') continue;
+    for (const key of Object.keys(record)) {
+      if (key === businessKeyField || MERGE_DIFF_IGNORED_FIELDS.has(key) || /Id$/.test(key)) continue;
+      fields.add(key);
+    }
+  }
+  return Array.from(fields)
+    .filter(key => {
+      const values = new Set(group
+        .filter(record => record?.[key] !== undefined)
+        .map(record => stableSerialize(record[key])));
+      return values.size > 1;
+    })
+    .sort();
+}
+
+/** 给还没有 builtinKey、但内容和某个默认动作完全一致的快速优化动作补上内置标识 */
+function assignQuickOptimizationBuiltinKeys(
+  data: CloudSyncContractData,
+  resolve: (record: any) => string | undefined
+): void {
+  for (const record of getCollectionRecords(data, 'quickOptimizationConfigs')) {
+    if (!record || typeof record !== 'object' || normalizeBusinessKey(record.builtinKey) !== undefined) continue;
+    const builtinKey = resolve(record);
+    if (normalizeBusinessKey(builtinKey) !== undefined) {
+      record.builtinKey = builtinKey;
+    }
+  }
+}
+
+/**
+ * 把合并结果里「同名分类、字段不一样」的几组整理成给用户看的说明 (#490)：
+ * 分类名取合并后的那条，保留的一边看取值为准的那条记录原来在本机还是云端。
+ * 两边字段完全一样的同名分类合并后什么都没丢，不用提示。
+ */
+export function describeCloudSyncCategoryMerges(
+  merges: CloudSyncBusinessKeyMerge[],
+  mergedData: CloudSyncContractData,
+  localData: CloudSyncContractData,
+  remoteData: CloudSyncContractData
+): CloudSyncCategoryMergeNotice[] {
+  const identitiesOf = (data: CloudSyncContractData) => new Set(
+    getCollectionRecords(data, 'categories').map(record => safeRecordIdentity('categories', record))
+  );
+  const localIdentities = identitiesOf(localData);
+  const remoteIdentities = identitiesOf(remoteData);
+  const mergedCategories = getCollectionRecords(mergedData, 'categories');
+  const notices: CloudSyncCategoryMergeNotice[] = [];
+
+  for (const merge of merges) {
+    if (merge.collection !== 'categories' || !merge.differingFields?.length || !merge.keptRecordIdentity) continue;
+    const canonical = mergedCategories.find(record => normalizeIdentityValue(record?.uuid) === merge.canonicalUuid);
+    const name = typeof canonical?.name === 'string' ? canonical.name : '';
+    if (!name) continue;
+    const kept = merge.keptRecordIdentity;
+    const keptInLocal = localIdentities.has(kept);
+    const keptInRemote = remoteIdentities.has(kept);
+    let keptSide: CloudSyncCategoryMergeNotice['keptSide'];
+    if (keptInLocal !== keptInRemote) {
+      keptSide = keptInLocal ? 'local' : 'remote';
+    } else {
+      // 保留的那条两边都有：被合并掉的是哪边新加的，保留的就是另一边原来的
+      const othersFromLocal = merge.mergedRecordIdentities
+        .filter(identity => identity !== kept)
+        .some(identity => localIdentities.has(identity) && !remoteIdentities.has(identity));
+      keptSide = othersFromLocal ? 'remote' : 'local';
+    }
+    notices.push({ name, keptSide, differingFields: [...merge.differingFields] });
+  }
+
+  return notices.sort((left, right) => compareText(left.name, right.name));
 }
 
 function compareCanonicalCandidates(left: any, right: any, businessKeyField: string): number {

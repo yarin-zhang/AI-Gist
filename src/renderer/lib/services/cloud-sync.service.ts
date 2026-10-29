@@ -49,12 +49,19 @@ import type {
   CloudSyncRemoteSnapshotInfo
 } from '@shared/cloud-sync-snapshots';
 import {
+  describeCloudSyncCategoryMerges,
   reconcileCloudSyncDataContract,
   pruneCloudSyncTombstonedPromptChildren,
   type CloudSyncBusinessKeyMerge,
+  type CloudSyncCategoryMergeNotice,
   type CloudSyncContractIssue,
   type CloudSyncRelationRepair
 } from '@shared/cloud-sync-contract';
+import {
+  createCloudSyncJoinPreview,
+  createSyncedCloudSyncJoinPreview,
+  type CloudSyncJoinPreview
+} from '@shared/cloud-sync-join-preview';
 import { dataSetContainsCredentials, stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import { generateUUID } from '../utils/uuid';
 import i18n from '../../i18n';
@@ -72,6 +79,9 @@ import {
   type CloudSyncV2RolloutState
 } from './cloud-sync-v2-coordinator';
 import type { CloudSyncV2ObjectStorageAdapter } from '@shared/cloud-sync-v2-repository';
+import { resolveQuickOptimizationBuiltinKey } from './quick-optimization-defaults';
+
+export type { CloudSyncJoinPreview } from '@shared/cloud-sync-join-preview';
 
 const DEVICE_ID_STORAGE_KEY = 'ai_gist_cloud_sync_device_id';
 const LOCAL_STATE_STORAGE_PREFIX = 'ai_gist_cloud_sync_state';
@@ -191,6 +201,8 @@ export interface CloudSyncResult {
   diagnostic?: CloudSyncStructuredDiagnostic;
   warnings?: string[];
   businessKeyMerges?: CloudSyncBusinessKeyMerge[];
+  /** 同名分类合并时字段不一样的那几组，同步结果提示里告诉用户保留了哪一边 (#490) */
+  categoryMerges?: CloudSyncCategoryMergeNotice[];
   relationRepairs?: CloudSyncRelationRepair[];
   v2MirrorStatus?: 'skipped' | 'published' | 'already-current' | 'rebase-required' | 'failed';
   pendingConflict?: CloudSyncPendingConflict;
@@ -1154,6 +1166,39 @@ export class CloudSyncService {
     });
   }
 
+  /** 本机是否已经和这个存储同步过（有同步基线） */
+  async hasSyncedWithStorage(storageId: string): Promise<boolean> {
+    return !!(await this.getLocalState(storageId));
+  }
+
+  /**
+   * 第一次连上一个存储之前，看两边各有多少数据、合并后会怎样 (#490)。只读：不改本机，也不写云端。
+   * 本机已经和它同步过时不用再问。云端 manifest 还没有快照时，和同步一样再看一眼旧格式的快照文件；
+   * manifest 损坏时同步会从快照文件恢复，这里也按最新的快照文件算。
+   */
+  async previewStorageJoin(storageId: string): Promise<CloudSyncJoinPreview> {
+    if (await this.hasSyncedWithStorage(storageId)) {
+      return createSyncedCloudSyncJoinPreview();
+    }
+
+    const localData = await this.exportLocalData();
+    let remoteSnapshot: CloudSyncSnapshot | null | undefined;
+    try {
+      const manifest = await this.getCloudClient().getCloudSyncManifest(storageId);
+      remoteSnapshot = manifest.latestSnapshot;
+      if (remoteSnapshot) this.assertValidRemoteSnapshot(remoteSnapshot);
+    } catch (error) {
+      if (!isRecoverableCloudSyncManifestCorruption(error)) throw error;
+      remoteSnapshot = undefined;
+    }
+    if (!remoteSnapshot) {
+      remoteSnapshot = await this.getNewestRemoteSnapshot(storageId, { required: false });
+    }
+
+    const remoteData = remoteSnapshot ? applyCloudSyncTombstones(remoteSnapshot.data) : {};
+    return createCloudSyncJoinPreview(localData, remoteData);
+  }
+
   scheduleSync(
     reason: CloudSyncRunReason = 'manual',
     options: { storageId?: string; delayMs?: number } = {}
@@ -1399,7 +1444,9 @@ export class CloudSyncService {
         applyCloudSyncTombstones(mergeResult.data),
         baseData
       );
-      const contractResult = reconcileCloudSyncDataContract(mergedWithDeletesApplied, baseData);
+      const contractResult = reconcileCloudSyncDataContract(mergedWithDeletesApplied, baseData, {
+        resolveQuickOptimizationBuiltinKey
+      });
       if (!contractResult.valid) {
         throw new CloudSyncContractError(contractResult.issues);
       }
@@ -1412,9 +1459,13 @@ export class CloudSyncService {
       const restoredAfterLocalDelete = mergedEqualsLocal
         ? []
         : findCloudSyncRecordsRestoredOverLocalDeletes(localData, mergedData);
+      // 同名分类另有 categoryMerges 逐个说明；默认快速优化动作归并成一份是预期行为，不用提示 (#490)
+      const otherBusinessKeyMerges = contractResult.merges
+        .filter(merge => merge.collection !== 'categories' && merge.collection !== 'quickOptimizationConfigs');
+      const categoryMerges = describeCloudSyncCategoryMerges(contractResult.merges, mergedData, localData, remoteData);
       const contractWarnings = [
-        ...(contractResult.merges.length > 0
-          ? [`已自动归并 ${contractResult.merges.length} 组业务唯一键冲突`]
+        ...(otherBusinessKeyMerges.length > 0
+          ? [`已自动归并 ${otherBusinessKeyMerges.length} 组业务唯一键冲突`]
           : []),
         ...(contractResult.repairs.length > 0
           ? [`已自动修复 ${contractResult.repairs.length} 条失效的可选关联；相关提示词已保留为未分类`]
@@ -1465,6 +1516,7 @@ export class CloudSyncService {
           summary: mergeResult.summary,
           warnings: mergeWarnings(contractWarnings, stateWarning),
           businessKeyMerges: contractResult.merges,
+          categoryMerges,
           relationRepairs: contractResult.repairs
         };
       }
@@ -1548,6 +1600,7 @@ export class CloudSyncService {
         summary: mergeResult.summary,
         warnings: mergeWarnings(contractWarnings, stateWarning),
         businessKeyMerges: contractResult.merges,
+        categoryMerges,
         relationRepairs: contractResult.repairs,
         ...(appliedLocal && restoredAfterLocalDelete.length > 0 ? { restoredAfterLocalDelete } : {})
       };
