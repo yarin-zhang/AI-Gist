@@ -170,57 +170,54 @@ yarn build:linux    # 构建 Linux 安装包
 
 ## 应用截图
 
-<div align="center">
+### 桌面端
 
-![变量填充](docs/images/image-variable-fill.png?v=202610290030)
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/image-variable-fill.png?v=202610290030" alt="变量填充" width="390"><br>变量填充</td>
+    <td align="center"><img src="docs/images/image-edit-prompt.png?v=202610290030" alt="编辑提示词" width="390"><br>编辑提示词</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-jinja-template.png?v=202610290030" alt="Jinja 模板" width="390"><br>Jinja 模板</td>
+    <td align="center"><img src="docs/images/image-ai-config.png?v=202610290030" alt="AI 模型管理" width="390"><br>AI 模型管理</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-ai-add-config.png?v=202610290030" alt="添加 AI 配置" width="390"><br>添加 AI 配置</td>
+    <td align="center"><img src="docs/images/image-ai-quick-adjust.png?v=202610290030" alt="AI 快速调整" width="390"><br>AI 快速调整</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-filter.png?v=202610290030" alt="高级筛选" width="390"><br>高级筛选</td>
+    <td align="center"><img src="docs/images/image-table-view.png?v=202610290030" alt="表格视图" width="390"><br>表格视图</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-folder-view.png?v=202610290030" alt="文件夹视图" width="390"><br>文件夹视图</td>
+    <td align="center"><img src="docs/images/image-category.png?v=202610290030" alt="分类管理" width="390"><br>分类管理</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/image-data-local-backup.png?v=202610290030" alt="数据备份" width="390"><br>数据备份</td>
+    <td align="center"><img src="docs/images/image-main-light.png?v=202610290030" alt="明亮模式" width="390"><br>明亮模式</td>
+  </tr>
+</table>
 
-变量填充
+### 移动端
 
-![编辑提示词](docs/images/image-edit-prompt.png?v=202610290030)
-
-编辑提示词
-
-![Jinja 模板](docs/images/image-jinja-template.png?v=202610290030)
-
-Jinja 模板
-
-![AI 模型管理](docs/images/image-ai-config.png?v=202610290030)
-
-AI 模型管理
-
-![AI 添加配置](docs/images/image-ai-add-config.png?v=202610290030)
-
-添加 AI 配置
-
-![AI 快速调整](docs/images/image-ai-quick-adjust.png?v=202610290030)
-
-AI 快速调整
-
-![高级筛选](docs/images/image-filter.png?v=202610290030)
-
-高级筛选
-
-![表格视图](docs/images/image-table-view.png?v=202610290030)
-
-表格视图
-
-![文件夹视图](docs/images/image-folder-view.png?v=202610290030)
-
-文件夹视图
-
-![分类管理](docs/images/image-category.png?v=202610290030)
-
-分类管理
-
-![数据备份](docs/images/image-data-local-backup.png?v=202610290030)
-
-数据备份
-
-![明亮模式](docs/images/image-main-light.png?v=202610290030)
-
-明亮模式
-
-</div>
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-01-library.png?v=202610290030" alt="提示词库" width="240"><br>提示词库</td>
+    <td align="center"><img src="docs/images/mobile-02-fill.png?v=202610290030" alt="填写变量" width="240"><br>填写变量</td>
+    <td align="center"><img src="docs/images/mobile-03-filter.png?v=202610290030" alt="筛选与排序" width="240"><br>筛选与排序</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-04-edit.png?v=202610290030" alt="编辑与快速优化" width="240"><br>编辑与快速优化</td>
+    <td align="center"><img src="docs/images/mobile-05-variable.png?v=202610290030" alt="变量设置" width="240"><br>变量设置</td>
+    <td align="center"><img src="docs/images/mobile-06-ai-generator.png?v=202610290030" alt="AI 生成与多轮调整" width="240"><br>AI 生成与多轮调整</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mobile-07-settings.png?v=202610290030" alt="设置" width="240"><br>设置</td>
+    <td align="center"><img src="docs/images/mobile-08-sync.png?v=202610290030" alt="数据同步" width="240"><br>数据同步</td>
+    <td align="center"><img src="docs/images/mobile-09-appearance.png?v=202610290030" alt="外观与语言" width="240"><br>外观与语言</td>
+  </tr>
+</table>
 
 ## 许可证
 

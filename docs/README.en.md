@@ -169,57 +169,54 @@ You are also welcome to join the QQ group to exchange ideas with the developer a
 
 ## Screenshots
 
-<div align="center">
+### Desktop
 
-![Variable filling](images/image-variable-fill.png?v=202610290030)
+<table>
+  <tr>
+    <td align="center"><img src="images/image-variable-fill.png?v=202610290030" alt="Variable filling" width="390"><br>Variable filling</td>
+    <td align="center"><img src="images/image-edit-prompt.png?v=202610290030" alt="Prompt editing" width="390"><br>Prompt editing</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/image-jinja-template.png?v=202610290030" alt="Jinja template" width="390"><br>Jinja template</td>
+    <td align="center"><img src="images/image-ai-config.png?v=202610290030" alt="AI model management" width="390"><br>AI model management</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/image-ai-add-config.png?v=202610290030" alt="Add AI configuration" width="390"><br>Add AI configuration</td>
+    <td align="center"><img src="images/image-ai-quick-adjust.png?v=202610290030" alt="Quick AI adjustment" width="390"><br>Quick AI adjustment</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/image-filter.png?v=202610290030" alt="Advanced filtering" width="390"><br>Advanced filtering</td>
+    <td align="center"><img src="images/image-table-view.png?v=202610290030" alt="Table view" width="390"><br>Table view</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/image-folder-view.png?v=202610290030" alt="Folder view" width="390"><br>Folder view</td>
+    <td align="center"><img src="images/image-category.png?v=202610290030" alt="Category management" width="390"><br>Category management</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/image-data-local-backup.png?v=202610290030" alt="Data backup" width="390"><br>Data backup</td>
+    <td align="center"><img src="images/image-main-light.png?v=202610290030" alt="Light mode" width="390"><br>Light mode</td>
+  </tr>
+</table>
 
-Variable filling
+### Mobile
 
-![Prompt editing](images/image-edit-prompt.png?v=202610290030)
-
-Prompt editing
-
-![Jinja template](images/image-jinja-template.png?v=202610290030)
-
-Jinja template
-
-![AI model management](images/image-ai-config.png?v=202610290030)
-
-AI model management
-
-![Add AI configuration](images/image-ai-add-config.png?v=202610290030)
-
-Add AI configuration
-
-![Quick AI adjustment](images/image-ai-quick-adjust.png?v=202610290030)
-
-Quick AI adjustment
-
-![Advanced filtering](images/image-filter.png?v=202610290030)
-
-Advanced filtering
-
-![Table view](images/image-table-view.png?v=202610290030)
-
-Table view
-
-![Folder view](images/image-folder-view.png?v=202610290030)
-
-Folder view
-
-![Category management](images/image-category.png?v=202610290030)
-
-Category management
-
-![Data backup](images/image-data-local-backup.png?v=202610290030)
-
-Data backup
-
-![Light mode](images/image-main-light.png?v=202610290030)
-
-Light mode
-
-</div>
+<table>
+  <tr>
+    <td align="center"><img src="images/mobile-01-library.png?v=202610290030" alt="Prompt library" width="240"><br>Prompt library</td>
+    <td align="center"><img src="images/mobile-02-fill.png?v=202610290030" alt="Filling variables" width="240"><br>Filling variables</td>
+    <td align="center"><img src="images/mobile-03-filter.png?v=202610290030" alt="Filter and sort" width="240"><br>Filter and sort</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/mobile-04-edit.png?v=202610290030" alt="Editing and quick optimization" width="240"><br>Editing and quick optimization</td>
+    <td align="center"><img src="images/mobile-05-variable.png?v=202610290030" alt="Variable settings" width="240"><br>Variable settings</td>
+    <td align="center"><img src="images/mobile-06-ai-generator.png?v=202610290030" alt="AI generation with follow-ups" width="240"><br>AI generation with follow-ups</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/mobile-07-settings.png?v=202610290030" alt="Settings" width="240"><br>Settings</td>
+    <td align="center"><img src="images/mobile-08-sync.png?v=202610290030" alt="Data sync" width="240"><br>Data sync</td>
+    <td align="center"><img src="images/mobile-09-appearance.png?v=202610290030" alt="Appearance and language" width="240"><br>Appearance and language</td>
+  </tr>
+</table>
 
 ## License
 
