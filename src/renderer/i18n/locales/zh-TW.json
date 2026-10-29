@@ -298,7 +298,7 @@
     "backupEveryHours": "每 {count} 小時",
     "backupEveryMinutes": "每 {count} 分鐘",
     "cloudBackup": "雲端備份",
-    "cloudLocationDescription": "只有在你按下「建立」時才會上傳完整備份（不含模型設定的 API Key）；自動備份一律儲存在本機，不會自動上傳或輪替雲端備份。",
+    "cloudLocationDescription": "只有在你按下「建立」時才會上傳完整備份；自動備份一律儲存在本機，不會自動上傳或輪替雲端備份。",
     "configureCloudStorage": "前往資料同步設定",
     "confirmDeleteCloudBackup": "確定要刪除此雲端備份嗎？",
     "confirmRestore": "確定還原",
@@ -1753,9 +1753,7 @@
     "systemPromptDefaultLanguageNote": "內建的預設提示詞是以簡體中文撰寫，會原樣傳給模型。想用其他語言下指示，可以改寫成自己的版本。",
     "switchProviderTitle": "切換到「{name}」？",
     "switchProviderMessage": "已填寫的 API Key、位址和模型清單會被清空，需要依新的服務供應商重新填寫。",
-    "switchProvider": "切換",
-    "credentialMissingTag": "缺少 API Key",
-    "credentialNotSynced": "API Key 不會隨同步傳輸，需要在這台裝置上填寫後才能使用這個設定。"
+    "switchProvider": "切換"
   },
   "mobileNav": {
     "label": "主導覽",

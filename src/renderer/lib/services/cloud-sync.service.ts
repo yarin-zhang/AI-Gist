@@ -64,7 +64,6 @@ import {
   createSyncedCloudSyncJoinPreview,
   type CloudSyncJoinPreview
 } from '@shared/cloud-sync-join-preview';
-import { dataSetContainsCredentials, stripCredentialsFromDataSet } from '@shared/ai-config-credentials';
 import { generateUUID } from '../utils/uuid';
 import i18n from '../../i18n';
 import { CloudBackupAPI } from '../api/cloud-backup.api';
@@ -292,10 +291,6 @@ export interface CloudSyncCloudClient {
 
 export interface CloudSyncDatabaseClient {
   exportAllDataForSync(): Promise<ExportResult>;
-  /**
-   * 用同步结果整库替换本机数据。同步数据不带模型配置的 API Key (#491)，实现必须保留本机已有的凭据：
-   * 写入的配置没有凭据时按 uuid / configId 用本机原有的补上（DatabaseServiceManager 默认如此）。
-   */
   replaceAllData(data: CloudSyncDataSet, options?: { preserveSyncMetadata?: boolean }): Promise<ImportResult>;
   getLocalSyncMetadata?<T = any>(key: string): Promise<T | null>;
   setLocalSyncMetadata?<T = any>(key: string, value: T): Promise<void>;
@@ -897,7 +892,7 @@ export class CloudSyncService {
       const remoteSnapshot = manifest.latestSnapshot;
       if (remoteSnapshot) this.assertValidRemoteSnapshot(remoteSnapshot);
       const remoteData = remoteSnapshot
-        ? this.getRemoteMergeData(remoteSnapshot)
+        ? applyCloudSyncTombstones(remoteSnapshot.data)
         : normalizeCloudSyncDataSet({});
       let safetyBackupCreated = false;
 
@@ -1447,7 +1442,7 @@ export class CloudSyncService {
         };
       }
 
-      const remoteData = this.getRemoteMergeData(remoteSnapshot);
+      const remoteData = applyCloudSyncTombstones(remoteSnapshot.data);
       const baseData = this.getBaseData(localState);
       phase = 'merge';
       const mergeResult = this.mergeWithConflictDecision(localData, remoteData, baseData, options);
@@ -1480,9 +1475,7 @@ export class CloudSyncService {
       }
       const mergedData = contractResult.data;
       const mergedEqualsLocal = dataSetsEqual(localData, mergedData);
-      // 旧版本上传的云端快照带着明文 API Key：内容相同也要重新上传一份不含凭据的，把云端的明文覆盖掉 (#491)
-      const mergedEqualsRemote = !dataSetContainsCredentials(remoteSnapshot.data) &&
-        dataSetsEqual(remoteData, mergedData);
+      const mergedEqualsRemote = dataSetsEqual(remoteData, mergedData);
       // 本机删除过、这次合并又带回来的记录：写回本机后要告诉用户，不能悄悄恢复 (#489)
       const restoredAfterLocalDelete = mergedEqualsLocal
         ? []
@@ -1682,24 +1675,13 @@ export class CloudSyncService {
       throw new Error(`本机同步数据导出不完整，已取消本次云同步: ${validation.reason || '未知原因'}`);
     }
 
-    // 模型配置的 API Key 只留在本机：数据库导出时已经去掉，这里再兜一次底，任何导出实现都不会把凭据带进快照 (#491)
-    return stripCredentialsFromDataSet(normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data)));
-  }
-
-  /**
-   * 参与合并的云端数据。旧版本上传的快照可能带着明文 API Key，合并前去掉：
-   * 凭据不参与比较，两边只差 API Key 不算修改也不算冲突，也不会被写进本机或再上传 (#491)
-   */
-  private getRemoteMergeData(snapshot: CloudSyncSnapshot): CloudSyncDataSet {
-    return stripCredentialsFromDataSet(applyCloudSyncTombstones(snapshot.data));
+    return normalizeCloudSyncDataSet(applyCloudSyncTombstones(exportResult.data));
   }
 
   private async replaceLocalDataForSync(nextData: CloudSyncDataSet, rollbackData: CloudSyncDataSet): Promise<void> {
     this.applyingRemoteDataDepth++;
     try {
       // 保留同步基线：写入本机之后上传还可能失败或因并发重试，下一次合并仍要用旧基线 (#484)
-      // 合并结果里的模型配置不带 API Key：replaceAllData 默认在同一个事务里按 uuid / configId
-      // 用本机原有的凭据补上（preserveLocalCredentials），不会把本机的 API Key 清空 (#491)
       const importResult = await this.database.replaceAllData(nextData, { preserveSyncMetadata: true });
       if (!importResult.success) {
         throw new CloudSyncLocalApplyError(importResult);
@@ -1722,7 +1704,6 @@ export class CloudSyncService {
 
   private async rollbackLocalDataAfterFailedSync(rollbackData: CloudSyncDataSet): Promise<unknown | null> {
     try {
-      // 回滚用的本机导出同样不带凭据，replaceAllData 按同样的规则补回本机原有的 API Key (#491)
       const rollbackResult = await this.database.replaceAllData(rollbackData, { preserveSyncMetadata: true });
       if (!rollbackResult.success) {
         return new Error(rollbackResult.error || rollbackResult.message || '同步失败后恢复本机数据失败');
@@ -2284,8 +2265,7 @@ export class CloudSyncService {
 
   private getBaseData(localState: CloudSyncLocalState | null): CloudSyncDataSet {
     if (localState?.baseSnapshot) {
-      // 旧版本留下的基线可能带着 API Key，和本机、云端一样去掉后再比较 (#491)
-      return stripCredentialsFromDataSet(applyCloudSyncTombstones(localState.baseSnapshot.data));
+      return applyCloudSyncTombstones(localState.baseSnapshot.data);
     }
 
     return {};
